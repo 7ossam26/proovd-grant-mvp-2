@@ -1,0 +1,32 @@
+# Line endings. core.autocrlf is machine-local and does not travel with the
+# repo; this file does. Normalize to LF in history, native in the working tree,
+# so a Windows and a Linux checkout never produce a whole-file diff.
+* text=auto
+
+# Files that must stay LF even on a Windows checkout — they are consumed by
+# Linux tooling (Docker build, container shell, dotenv parsers).
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+.dockerignore   text eol=lf
+.env.example    text eol=lf
+*.sql           text eol=lf
+
+# Binary: never line-ending-converted, never diffed as text.
+*.woff2 binary
+*.woff  binary
+*.ttf   binary
+*.otf   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+
+# Vendored GSAP is the source of truth (CLAUDE.md), but it is not our code:
+# keep it out of language stats and out of review diffs.
+frontend/public/vendor/** linguist-vendored -diff
+
+# Generated lockfile: still committed, but not worth reading in a diff.
+package-lock.json linguist-generated -diff

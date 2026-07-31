@@ -1,13 +1,31 @@
 node_modules/
 dist/
 build/
+*.tsbuildinfo
+
+# Secrets. .env.example is the committed contract (variable names only) and is
+# re-included below — everything else matching .env* stays out.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
 *.log
-.DS_Store
 .vite/
 coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
 # Licensed font binaries — self-hosted locally, never committed (redistribution).
 # Referenced woff2 live in frontend/public/fonts/; docs/fonts/ holds spare statics.
 frontend/public/fonts/*.woff2
