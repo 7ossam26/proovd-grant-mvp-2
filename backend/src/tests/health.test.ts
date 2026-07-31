@@ -1,16 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, createDbPool } from '../db/client.js';
 import { createApp } from '../app.js';
+import { migrateSerialized } from './helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Tests run from src/tests/; migrations are at src/db/migrations/
-const MIGRATIONS_FOLDER = path.resolve(__dirname, '..', 'db', 'migrations');
 
 let container: StartedPostgreSqlContainer | null = null;
 let pool: Pool;
@@ -32,7 +30,7 @@ beforeAll(async () => {
   pool = createDbPool(connectionString);
   const db = createDb(pool);
 
-  await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+  await migrateSerialized(db, pool);
 
   app = createApp(db, {
     appBaseUrl: 'http://localhost:3000',
