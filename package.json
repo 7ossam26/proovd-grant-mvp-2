@@ -10,5 +10,16 @@
   ],
   "engines": {
     "node": ">=20"
+  },
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=@proovd/backend",
+    "dev:frontend": "npm run dev --workspace=@proovd/frontend",
+    "build": "npm run build --workspace=@proovd/shared && npm run build --workspace=@proovd/backend && npm run build --workspace=@proovd/frontend",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p shared/tsconfig.json && tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p frontend/tsconfig.json"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }
