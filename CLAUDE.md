@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 Proovd MVP. A founder-led crowdfunding platform: vetted Founders run campaigns, hand-recruited Creators promote them, Backers save a card and are charged later under a disclosed rule, and Admin operates almost everything manually behind a polished surface.
 
 You are building this one phase at a time. **Read the phase file you were given, then read the Spec sections it names.** Do not work from memory or from paraphrase.
@@ -14,6 +16,38 @@ You are building this one phase at a time. **Read the phase file you were given,
 4. `docs/master-plan.md` — sequencing.
 
 `§N` below always means a section of the Engineering Spec.
+
+---
+
+## Repository state — read this before looking for a file
+
+This repo is **pre-Phase-1**. It holds only the governing documents plus staged design-system and prebuilt-integration files. **There is no application code yet.** `frontend/`, `backend/`, and `shared/` do not exist. The code tree in `docs/tech-stack-v2.md` §11 is the *target* layout, and the paths this file names — `shared/money`, `backend/src/auth/token-service.ts`, `frontend/src/motion/MotionProvider.tsx`, `frontend/public/proovd.css` — are where things *will* live, not where they are now. Never assume a path this file references already exists; check first.
+
+What is actually on disk today, and where the docs point instead:
+
+| Thing | Referenced in the docs as | Actually at |
+|---|---|---|
+| Engineering Spec | `docs/spec/…-Spec-v1_0.md` | `docs/spec/Proovd-MVP-Engineering-Implementation-Spec-v1_0.md` ✓ |
+| DNA | `docs/spec/Proovd_DNA.md` | `docs/spec/Proovd_DNA.md` ✓ |
+| Stylesheet / motion runtime | `frontend/public/proovd.css`, `…/proovd-motion.js` | `docs/spec/proovd.css`, `docs/spec/proovd-motion.js` (staged) |
+| Vendored GSAP + smoke test | `frontend/public/vendor/gsap/…`, `…/gsap-check.html` | `docs/gsap/vendor/gsap/…`, `docs/gsap/gsap-check.html` (staged) |
+| Phase files | `docs/phases/phase-NN.md` | only `phase-00.md` exists so far |
+
+The two spec files now match the paths the docs reference. The remaining rows are still staged under `docs/` — open by the "Actually at" column until Phase 0 moves them. Phase 0 (`docs/phases/phase-00.md`) is a **human** step, not a Claude Code session: it moves the staged files to their target paths under `frontend/`, `backend/`, and `shared/`, and runs the `gsap-check.html` smoke test. Phase 1 is the first Claude Code session and scaffolds the workspaces, Docker, Postgres, and test harness (`docs/master-plan.md` §6).
+
+## How a session works
+
+One phase per session (`docs/master-plan.md` §1.3): read `docs/phases/phase-NN.md`, then read only the Spec sections it names — not from memory — build, run **that phase's named §33 acceptance tests**, and commit only when every one passes. Serial: never start a phase whose predecessors aren't green. If the phase is too large for one session, stop and say so; a truncated session produces code that looks finished and isn't. Phase sequencing and the 00–24 table live in `docs/master-plan.md` §6.
+
+## Toolchain (established Phase 1, per `docs/tech-stack-v2.md` §2, §11, §13)
+
+Nothing below runs yet — these are the commands the scaffolding will expose, so a future session knows what to reach for once it exists.
+
+- **Repo:** npm workspaces — `frontend/` (React 19 + Vite), `backend/` (Express 5), `shared/` (Zod schemas, money waterfall, state machines, calendar). One root `package.json`, one multi-stage `Dockerfile`.
+- **DB:** Postgres 16 + Drizzle; `drizzle-kit` generates and applies migrations. Money is integer cents in `bigint`.
+- **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres test container for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11. To run one test, use Vitest's filter (`vitest run -t "<name>"` / path).
+- **Local Stripe:** the Stripe CLI forwards webhooks; its signing secret lives in local env only. Mount raw-body parsing on webhook routes **before** `express.json()`.
+- **Env:** copy `.env.example` (variable names only; `docs/tech-stack-v2.md` §17). `backend/src/env.ts` is Zod-validated and fails closed on any live/test key or mode mismatch.
 
 ---
 
