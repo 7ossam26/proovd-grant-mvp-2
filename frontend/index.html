@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Proovd</title>
+
+    <!--
+      ══════════════════════════════════════════════════════════════════════════
+      LOAD ORDER IS LOAD-BEARING. DNA §6.7.
+
+      Everything below is served from frontend/public/, which Vite copies to the
+      build output verbatim. None of it is imported, bundled, or transformed.
+
+      Do NOT:
+        - install the `gsap` npm package (creates a second GSAP instance and
+          breaks registerPlugin)
+        - import proovd-motion.js (it is an IIFE assigning window.Proovd)
+        - load any of this from a CDN (forbidden — vendored files are the
+          source of truth)
+        - hand-write or hand-inline GSAP source (forbidden; a model cannot emit
+          150KB of minified library code without corrupting it)
+      ══════════════════════════════════════════════════════════════════════════
+    -->
+
+    <!-- Satoshi, self-hosted. Preload the variable file: it is on the critical
+         path, and proovd.css declares @font-face against this exact path.
+         DNA §3 — the Fontshare link is for throwaway prototypes only. -->
+    <link
+      rel="preload"
+      href="/fonts/Satoshi-Variable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+
+    <link rel="stylesheet" href="/proovd.css" />
+
+    <!-- GSAP core first, always. Plugins after. -->
+    <script src="/vendor/gsap/gsap.min.js"></script>
+    <script src="/vendor/gsap/ScrollTrigger.min.js"></script>
+    <script src="/vendor/gsap/Flip.min.js"></script>
+    <script src="/vendor/gsap/SplitText.min.js"></script>
+    <script src="/vendor/gsap/TextPlugin.min.js"></script>
+    <script src="/vendor/gsap/ScrambleTextPlugin.min.js"></script>
+
+    <!-- The motion layer. Last, after the plugins and after proovd.css.
+         Registers plugins, sets gsap.defaults from the §6.1 tokens, ships the
+         Satoshi verification, and installs the fail-loud notice. -->
+    <script src="/proovd-motion.js"></script>
+  </head>
+
+  <body>
+    <!--
+      The page background is always #FAFAFA. There is no dark mode background
+      (DNA §1, hard rule). Section modes paint themselves; :root carries the
+      no-fill mode so unwrapped content is already correct.
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

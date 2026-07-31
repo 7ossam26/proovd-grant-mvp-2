@@ -1,0 +1,14 @@
+{
+  "name": "proovd-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Proovd MVP — founder-led crowdfunding platform (app.proovd.co)",
+  "workspaces": [
+    "shared",
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
