@@ -292,10 +292,115 @@ export interface FounderDetail {
   lastSentAt: string | null;
   retentionDueAt: string | null;
   hasLiveToken: boolean;
+
+  /* ── §9 / §10, added Phase 07. All read — Admin does not re-enter Founder
+     data (§9). The one exception is the Problem/Solution prefill, which §9
+     asks for by name and which has its own route. ─────────────────────────*/
+  vetting: AdminVettingState | null;
+  vettingEdits: VettingFieldEdit[];
+  claimProfile: AdminClaimProfile | null;
+  creatorSignal: PossibleCreatorSignal | null;
+  signupComplete: { campaignId: string; founderUserId: string; occurredAt: string } | null;
+}
+
+export interface AdminFieldProvenance {
+  supplier: 'proovd' | 'founder' | null;
+  /** Absent on Competition — §9 gives it no prefill and §33.1.5 tests it. */
+  prefilledText?: string | null;
+  prefilledAt?: string | null;
+  firstEditedAt: string | null;
+  lastEditedAt: string | null;
+}
+
+export interface AdminVettingState {
+  draftId: string;
+  campaignId: string;
+  selectedType: 'pre_build' | 'pre_launch' | null;
+  problem: string | null;
+  solution: string | null;
+  competition: string | null;
+  provenance: {
+    problem: AdminFieldProvenance;
+    solution: AdminFieldProvenance;
+    competition: AdminFieldProvenance;
+  };
+  lastSavedAt: string | null;
+  resumeStep: string | null;
+  submittedAt: string | null;
+  completeness: Record<'campaign_path' | 'problem' | 'solution' | 'competition', boolean>;
+  campaignStatus: string;
+  lockedType: 'pre_build' | 'pre_launch' | null;
+  typeLockedAt: string | null;
+}
+
+export interface VettingFieldEdit {
+  record: string;
+  field: string;
+  priorValue: string | null;
+  newValue: string | null;
+  supplier: 'proovd' | 'founder';
+  editedBy: string;
+  occurredAt: string;
+}
+
+export interface AdminClaimProfile {
+  draftId: string;
+  campaignId: string;
+  fields: Record<
+    string,
+    { value: string | null; supplier: 'proovd' | 'founder' | null; prefilled: string | null; editedAt: string | null }
+  >;
+  soleProprietor: boolean | null;
+  emailOwnership: string | null;
+  phoneVerified: false;
+  representations: { usPerson: boolean; age18Plus: boolean; sanctions: boolean };
+  lastSavedAt: string | null;
+  claimedAt: string | null;
+}
+
+export interface PossibleCreatorSignal {
+  count: number;
+  basis: string;
+  recordedBy: string;
+  recordedAt: string;
 }
 
 export const fetchFounderDetail = (draftId: string): Promise<FounderDetail> =>
   call(`/api/admin/founders/${encodeURIComponent(draftId)}`);
+
+/**
+ * §9: Problem and Solution are prefilled by Proovd from discovery.
+ *
+ * There is no `competition` key in this body and no route that accepts one.
+ * §9 states the rule twice and §33.1.5 tests it.
+ */
+export const prefillVetting = (
+  draftId: string,
+  body: { problem?: string; solution?: string },
+): Promise<AdminVettingState> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/vetting-prefill`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export const recordCreatorSignal = (
+  campaignId: string,
+  count: number,
+  basis: string,
+): Promise<PossibleCreatorSignal> =>
+  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/creator-signal`, {
+    method: 'POST',
+    body: JSON.stringify({ count, basis }),
+  });
+
+export const archiveAndRestart = (
+  campaignId: string,
+  reason: string,
+): Promise<{ archivedCampaignId: string; campaignId: string; draftId: string }> =>
+  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/archive-and-restart`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
 
 export interface ComposeBody {
   whatWeUnderstood: string;

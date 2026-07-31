@@ -114,6 +114,9 @@ export async function startHarness(
     // assertions into limiter tests. The limiter's own behaviour is covered by
     // `auth-tokens.test.ts`, which mounts it with a deliberately tiny limit.
     draftVerifyLimit: 100_000,
+    // Same reasoning for the blanket limiter: one loopback address drives every
+    // request in the suite, and a whole Founder journey is dozens of autosaves.
+    globalRateLimit: 1_000_000,
     // Captured, never sent. The real Resend transport is not exercised by the
     // suite — what has to be proved is that a duplicate cannot produce a second
     // message (§27.2), and that is a property of `createNotifier`, not of the

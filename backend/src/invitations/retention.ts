@@ -48,6 +48,11 @@ import {
   campaignDrafts,
   campaignInvitationSends,
 } from '../db/schema/invitations.js';
+import {
+  campaignVetting,
+  founderClaimProfiles,
+  draftFieldEdits,
+} from '../db/schema/vetting.js';
 import { auditEvents } from '../db/schema/integrity.js';
 
 /** §7 and §25.8 both state 30 calendar days. Not a business-day count. */
@@ -145,6 +150,59 @@ export async function anonymiseDraft(
       .update(campaignInvitationSends)
       .set({ recipientEmail: null, recipientName: null })
       .where(eq(campaignInvitationSends.draftId, due.draftId));
+
+    /* ── Phase 07's records go with the draft they belong to ──────────────
+       The vetting answers are the Founder's own words about their product;
+       the claim profile holds a date of birth, a phone number, and an
+       address. Both are draft content that nobody claimed, so §25.8 covers
+       them exactly as it covers the invitation itself. Leaving them behind
+       because they arrived in a later phase would be a retention policy with
+       a hole in it. */
+    await tx
+      .update(campaignVetting)
+      .set({
+        problemPrefilledText: null,
+        problemText: null,
+        solutionPrefilledText: null,
+        solutionText: null,
+        competitionText: null,
+        resumeStep: null,
+        anonymisedAt: now,
+        updatedBy: 'system:unclaimed-draft-retention',
+      })
+      .where(eq(campaignVetting.draftId, due.draftId));
+
+    await tx
+      .update(founderClaimProfiles)
+      .set({
+        legalName: null,
+        legalNamePrefilled: null,
+        preferredName: null,
+        preferredNamePrefilled: null,
+        email: null,
+        emailPrefilled: null,
+        phone: null,
+        phonePrefilled: null,
+        dateOfBirth: null,
+        country: null,
+        stateRegion: null,
+        businessName: null,
+        businessEntityType: null,
+        anonymisedAt: now,
+        updatedBy: 'system:unclaimed-draft-retention',
+      })
+      .where(eq(founderClaimProfiles.draftId, due.draftId));
+
+    // The edit history holds a verbatim copy of every version of every answer,
+    // which would make the two statements above pointless on their own. The
+    // column grant permits exactly these two columns: `field`, `supplier`,
+    // `edited_by`, and `occurred_at` survive, so the evidence that edits
+    // happened and who made them outlives the text of them (§25.8's "retain
+    // minimum audit event").
+    await tx
+      .update(draftFieldEdits)
+      .set({ priorValue: null, newValue: null })
+      .where(eq(draftFieldEdits.draftId, due.draftId));
 
     // The person, only if this was their last draft.
     const remaining = await tx

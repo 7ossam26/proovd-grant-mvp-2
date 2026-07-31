@@ -326,9 +326,19 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
    * The conditional UPDATE is the whole mechanism — the second caller's WHERE
    * clause matches zero rows and it gets the standard rejection. Do not
    * reimplement this as select-then-update.
+   *
+   * Takes an executor for the same reason `revokeDraftTokens` does: Phase 07's
+   * account claim has to burn the token and create the account together, and a
+   * crash between the two would strand a Founder behind a dead link with no
+   * account to sign into. The audit row is written outside the caller's
+   * transaction on purpose — `audit_events` is insert-only and the attempt is
+   * worth recording whether or not the surrounding work commits.
    */
-  async function claimDraft(tokenId: string): Promise<{ ok: boolean }> {
-    const claimed = await db
+  async function claimDraft(
+    tokenId: string,
+    executor: Pick<NodePgDatabase<Record<string, unknown>>, 'update'> = db,
+  ): Promise<{ ok: boolean }> {
+    const claimed = await executor
       .update(secureTokens)
       .set({ claimedAt: now(), revokedAt: now(), revokedReason: 'claimed' })
       .where(

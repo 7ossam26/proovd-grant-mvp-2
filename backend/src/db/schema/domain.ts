@@ -142,6 +142,25 @@ export const campaigns = pgTable(
     type: campaignType('type'),
     typeLockedAt: timestamp('type_locked_at', { withTimezone: true }),
 
+    /* ── The wrong-type path (§9, §33.1.7), added Phase 07 ─────────────────
+       §9: "A wrong locked type is archived and a new vetting record begins…
+       No campaign-type migration exists." The type locks on this row, so the
+       replacement has to be a different row — there is no unlock.
+
+       Archive is deliberately NOT a `campaigns.status` value. §23.1 gives
+       `vetting_submitted` the exit rule "Account claimed or archived/replaced"
+       and names no destination state, and inventing one is what §1 rule 6
+       forbids. So archival is its own dimension beside the lifecycle, the way
+       §23.3's payment flags are: the lifecycle did not transition, the record
+       was retired. */
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    archivedReason: text('archived_reason'),
+    archivedBy: text('archived_by'),
+    /** Set on the archived row; points forward to the fresh vetting record. */
+    replacedByCampaignId: uuid('replaced_by_campaign_id'),
+    /** Set on the replacement; points back. Nothing else is carried across. */
+    replacesCampaignId: uuid('replaces_campaign_id'),
+
     /** Lifecycle ONLY (§23.1). Payment flags live in campaign_payment_flags. */
     status: campaignStatus('status').notNull().default('invited_draft'),
 

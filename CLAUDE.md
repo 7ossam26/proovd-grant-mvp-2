@@ -21,29 +21,30 @@ You are building this one phase at a time. **Read the phase file you were given,
 
 ## Repository state — read this before looking for a file
 
-**Phases 00–06 are complete and committed.** Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation — and §33.1.1, §33.1.2, and §33.1.3 all pass. **Phase 07 (Founder vetting and the account claim) is next.** Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present.
+**Phases 00–07 are complete and committed.** Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation. §33.1.1 through §33.1.9 all pass. **Phase 08 (Affiliate recruitment and the private signup) is next.** Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present.
 
 What exists on disk:
 
 | Area | State |
 |---|---|
-| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, §6 settings register, Zod schemas |
-| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate, `app_settings` + history + `production_prerequisites`, **prospects/drafts/invitation sends, Resend + React Email, pg-boss retention sweep**, `/api/admin`, `/api/draft` |
-| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, the Admin shell at `/admin` (Founders, configuration, prerequisites), **the Founder draft landing at `/draft/:token`**, dev-only gallery at `/_gallery`, `/link-unavailable` |
+| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, §6 settings register, **the §9 vetting sequence and its copy**, Zod schemas |
+| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate, `app_settings` + history + `production_prerequisites`, prospects/drafts/invitation sends, Resend + React Email, pg-boss retention sweep, **`campaign_vetting` + provenance history, `founder_claim_profiles`, `possible_creator_results`, `policy_consents`**, `/api/admin`, `/api/draft` |
+| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, the Admin shell at `/admin` (Founders, configuration, prerequisites, **the vetting record**), the Founder draft landing at `/draft/:token`, **the vetting flow, the possible-creator result, and the account claim under `/draft/:token/…`**, dev-only gallery at `/_gallery`, `/link-unavailable` |
 | `frontend/public/` | `proovd.css`, `proovd-motion.js`, `vendor/gsap/*.min.js`, `gsap-check.html` |
 
-Four gaps to know about, none of them a bug:
+Five gaps to know about, none of them a bug:
 
 - **`frontend/public/fonts/` is empty.** `proovd.css` already declares `@font-face` against `Satoshi-Variable.woff2` and `Satoshi-VariableItalic.woff2`. Until those two files are dropped in, the fail-loud font notice is *correct* behaviour, not something to suppress.
 - **All eight policy documents are `draft`.** Track A2 is in legal review; §1 rule 6 forbids inventing the text and §31.4 forbids substituting a summary. See "Policies" below.
+- **Because they are drafts, the account claim refuses, in the open.** §10 requires Terms + Founder AUP + privacy acceptance and a consent may cite only a published version, so `completeClaim` returns `policies_unpublished` and the surface renders the reason instead of the button. That is the correct state, not a bug to route around — see "Vetting and the account claim" below.
 - **Six §6 settings ship with no value, and the prerequisites panel blocks.** That is the designed state, not unfinished work — see "Global configuration" below.
 - **No email provider is configured, so the transport refuses loudly.** `unconfiguredTransport` throws rather than swallowing a message, the failure is recorded, and the prerequisites panel already blocks on it (§1.4). Do not replace it with a no-op.
 
-### What Phase 07 owns
+### What Phase 08 owns
 
-`docs/phases/phase-07.md` is the brief. Phase 06b deliberately stopped at the draft *landing*: it names the Founder and product, explains what happens next, and **asks for nothing**. The vetting flow, the account claim, and everything downstream of `campaigns.status = invited_draft → vetting_submitted` are Phase 07's.
+`docs/phases/phase-08.md` is the brief: §8's campaign-specific Affiliate prospect and private invitation, §11's compact signup and payout onboarding, the waiting and `preparing` states, and the Campaign kit.
 
-`tokens.claimDraft()` exists and is tested for the concurrent case (§33.1.2), but nothing calls it yet — Phase 07 is what turns a claim into an account, and it must also set `founder_prospects.claimed_user_id`/`claimed_at`, which is what removes the prospect from the retention sweep.
+**Phase 07 emitted `founder_signup_complete` and stopped there.** §10 attaches an Affiliate handoff to that event — the named campaign appears in `preparing` exactly once, with one `Review campaign` action — and Phase 07 deliberately built none of it, because no Affiliate existed to reveal anything to and a handler with nothing to handle claims a feature exists (§1.4). Phase 08 consumes the event: `readSignupComplete(db, campaignId)` in `backend/src/vetting/claim.ts` reads the `idempotency_keys` row that *is* the event. The "reveals … exactly once" half of §33.1.9 is Phase 08's to prove.
 
 ## How a session works
 
@@ -188,7 +189,7 @@ The eight §31.4 documents are a **register, not text**. `shared/src/policies/do
 
 - **`/admin` stands outside the public shell.** No `PublicLayout`, no site footer, no live-chat gate. §26 licenses dashboard density **here and nowhere else**, and shared chrome is how that density leaks into a Founder surface. DNA §5.14 still applies: every settings row is Glance (value + provenance) → Act (inputs) → Explore (change history behind one control).
 - **Guards are mounted for real now.** Everything under `/api/admin` goes through `requireAdmin`; every write additionally through `requireFreshSession`. `backend/src/tests/admin-settings.test.ts` proves no session, wrong role, unenrolled factor, and stale session all fail closed on a real product surface rather than on a probe route.
-- **`Saving…` / `Saved [time]` / `Could not save — retrying`** is the §9 autosave vocabulary, established in `frontend/src/features/admin/autosave.ts` so Phase 07 inherits it. `retrying` appears **only** while a retry is genuinely scheduled; a 4xx is a decision, not a transient failure, and claiming to retry one would be §1.4's failure in miniature.
+- **`Saving…` / `Saved [time]` / `Could not save — retrying`** is the §9 autosave vocabulary. It lives in `frontend/src/lib/autosave.ts` — moved there by Phase 07, because the vetting flow, the account claim, and the settings surface all speak it and a Founder surface importing its status vocabulary out of `features/admin` was one refactor away from two of them. `retrying` appears **only** while a retry is genuinely scheduled; a 4xx is a decision, not a transient failure, and claiming to retry one would be §1.4's failure in miniature.
 - **Backend test files each get their own database.** `startHarness(overrides, label)` provisions one when `TEST_DATABASE_URL` points at a shared server. §33.1.1 asserts that opening a draft link creates *no* user row, which is only checkable if nothing else is creating user rows concurrently — making that assertion defensive instead would have quietly weakened the one that matters.
 
 ### The Founder invitation and the retention sweep (§7, §25.8, built Phase 06b)
@@ -206,6 +207,20 @@ The first phase where a real person receives something. Three tables:
 - **`NO_GUARANTEE_TEXT` and `PROCESS_SUMMARY` are constants, not columns.** §7 forbids Admin promising acceptance, results, reward pricing, or a named Creator's participation, and an editable disclaimer is one that gets softened under pressure. The compose surface renders them read-only; there is no route that writes them, and a test asserts the sent body contains the text verbatim.
 - **A prospect is anonymised only when it was their last draft**, and never once claimed — §25.8 keeps Founder account data for account life + 7 years.
 - **Backend event keys are restated in `notifications/events.ts`**, drift-tested against the shared §27 register. A key appears there when something starts sending it, never before: a key with no sender claims a message exists when it does not (§1.4).
+
+### Vetting, the type lock, and the account claim (§9, §10, built Phase 07)
+
+The first real Founder journey, and the first irreversible decision in the product. `shared/src/vetting/steps.ts` owns §9's five-item sequence and its copy; `backend/src/vetting/` owns the record; `frontend/src/surfaces/draft/` owns the three surfaces.
+
+- **Competition has nowhere to be prefilled, in three places.** §9 states the rule twice and §33.1.5 tests it. `campaign_vetting` carries `problem_prefilled_*` and `solution_prefilled_*` and **no `competition_prefilled_*` of any kind** — absent, not unused; `prefillVetting` takes two parameters and there is no third; a CHECK constraint pins `competition_supplier` to `founder` so even a hand-written `UPDATE` cannot record it as Proovd's. A test scans the tree for a fourth way in. It is the one field that proves the Founder did their own thinking.
+- **The type lock is a database trigger, not a service rule.** Submission sets `campaigns.type` and `type_locked_at` in one conditional `UPDATE`; `enforce_campaign_type_lock` then refuses to change either, forever, for every future phase and every support script. §9: "No campaign-type migration exists." If a change proposes a "convert campaign type" affordance, that is §1 rule 6.
+- **A wrong type archives and restarts; it never converts.** `archiveAndRestartVetting` marks the old campaign `archived_at`/`replaced_by_campaign_id` and creates a **new campaign, draft, and empty vetting record** for the same prospect. Archive is deliberately *not* a `campaigns.status` value — §23.1 names no destination and inventing one is forbidden — so it is its own dimension beside the lifecycle, like §23.3's payment flags. The service reads no association, reward, payment, or consent table at all: the safest implementation of "nothing is copied" is code with no idea they exist. After `listing_paid_at` it refuses and says the cancellation and refund rules control (Phase 11's).
+- **The possible-creator result is a recorded Admin assessment, not a query.** §10 is explicit that it "is not the recruited/accepted roster", and Affiliate recruitment is Phase 08 — so there is nothing to count and a formula over an empty table would produce a meaningless number. A named Admin records the count *and its basis* into the append-only `possible_creator_results`; §1.3 is what makes that valid. **Zero and unrecorded produce the identical Founder-facing state** — a waiting state owned by Proovd — because telling them apart would tell the Founder a number §10 forbids showing. The basis never leaves Admin.
+- **The claim is one transaction anchored by two mechanisms.** `idempotency_keys` on `founder_signup_complete:<campaignId>` makes the event singular under retry; Phase 04's conditional `claimDraft` — which now takes an executor, so it runs *inside* the transaction — settles the race between two requests holding the same link. Better Auth's account creation happens **before** the transaction on purpose: a leftover account with no claim is recoverable by clicking the link again, while a claimed draft with no account strands someone behind a dead link.
+- **A draft policy blocks the claim, in the open.** A `policy_consents` row may cite only a `published` version — a trigger, not a service rule, because the failure is silent. All eight documents are drafts, so the claim refuses with `policies_unpublished` and the surface renders the reason and says nothing was lost. Do not soften this, do not stub a consent, do not accept a draft.
+- **The vetting record and the claim profile are draft content, so §25.8 sweeps them.** `anonymiseDraft` nulls the answers, the profile, *and* `draft_field_edits.prior_value`/`new_value` — that table holds a verbatim copy of every version of every answer, and emptying the source while leaving the history would be a retention policy with a hole in it. `field`, `supplier`, `edited_by`, and `occurred_at` are outside the grant, so the fact of each edit outlives its text.
+- **Provenance history is a trigger.** `record_vetting_edits` and `record_claim_profile_edits` write `draft_field_edits`; the anonymisation write is exempt, because recording "problem_text changed from *the Founder's words* to NULL" would file a copy of the deleted text somewhere insert-only.
+- **A save writes only the keys it was given.** `undefined` means "not in this request". §9's "a failed save never clears valid fields" starts here, and on the surface the typed value never comes back from the server — `useAutosave` takes a patch and reports an outcome, and cannot overwrite what is in the box. The obvious implementation, clear-on-error-and-refetch, is the single most common autosave bug.
 
 ### Forbidden patterns (§30, DNA §5.10)
 

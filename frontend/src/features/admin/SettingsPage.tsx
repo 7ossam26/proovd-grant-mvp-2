@@ -62,7 +62,7 @@ import {
   retryDelayMs,
   MAX_SAVE_ATTEMPTS,
   type SaveState,
-} from './autosave.js';
+} from '../../lib/autosave.js';
 
 export function SettingsPage() {
   const [states, setStates] = useState<Record<string, SettingState> | null>(null);

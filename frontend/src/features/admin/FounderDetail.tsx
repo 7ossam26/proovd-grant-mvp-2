@@ -34,6 +34,9 @@ import {
   composeInvitation,
   sendInvitation,
   revokeInvitation,
+  prefillVetting,
+  recordCreatorSignal,
+  archiveAndRestart,
   AdminRequestError,
   type FounderDetail as FounderDetailData,
   type InvitationPreview,
@@ -126,6 +129,8 @@ export function FounderDetail() {
       ) : null}
 
       <InvitationPanel detail={detail} preview={preview} onChanged={load} />
+
+      <VettingPanel detail={detail} onChanged={load} />
 
       <section className="admin-group" aria-labelledby="prospect-record">
         <h2 className="admin-group__heading" id="prospect-record">
@@ -221,6 +226,415 @@ function Row({ label, value, note }: { label: string; value: string | null; note
       <dd>
         {value ?? <span className="setting__unset">Not recorded</span>}
         {note ? <span className="admin-table__sub">{note}</span> : null}
+      </dd>
+    </div>
+  );
+}
+
+/* ── §9 / §10 the vetting record, and the two decisions Admin owns ────────── */
+
+/**
+ * §9: "Admin can see the live saved draft, provenance, completeness, last-save
+ * time, and errors but does not re-enter Founder data."
+ *
+ * So the Founder's four answers render read-only, with who supplied each one
+ * and when it was last touched. The only writable things here are the two §9
+ * and §10 name explicitly: the Problem/Solution *prefill*, and the recorded
+ * possible-creator count.
+ *
+ * ── There is no Competition input, and there is no place to add one ─────────
+ * The field renders read-only like the others, and the prefill form beside it
+ * has two boxes rather than three. §9 states the rule twice; §33.1.5 tests that
+ * no path prefills it. A textarea here would be the first of those paths.
+ */
+function VettingPanel({
+  detail,
+  onChanged,
+}: {
+  detail: FounderDetailData;
+  onChanged: () => void;
+}) {
+  const vetting = detail.vetting;
+  const campaign = detail.campaign;
+
+  const [problem, setProblem] = useState(vetting?.provenance.problem.prefilledText ?? '');
+  const [solution, setSolution] = useState(vetting?.provenance.solution.prefilledText ?? '');
+  const [prefillError, setPrefillError] = useState<string | null>(null);
+  const [prefillSaved, setPrefillSaved] = useState<Date | null>(null);
+
+  const [count, setCount] = useState('');
+  const [basis, setBasis] = useState('');
+  const [signalError, setSignalError] = useState<string | null>(null);
+
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiveResult, setArchiveResult] = useState<string | null>(null);
+
+  if (!vetting) return null;
+
+  const submitted = vetting.submittedAt !== null;
+  const answered = Object.values(vetting.completeness).filter(Boolean).length;
+
+  async function savePrefill() {
+    setPrefillError(null);
+    try {
+      await prefillVetting(detail.draft.id, { problem, solution });
+      setPrefillSaved(new Date());
+      onChanged();
+    } catch (error) {
+      setPrefillError(
+        error instanceof AdminRequestError
+          ? (error.detail.whatHappened ?? error.detail.title)
+          : 'That could not be saved.',
+      );
+    }
+  }
+
+  async function saveSignal() {
+    setSignalError(null);
+    const parsed = Number(count);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      setSignalError('The count must be a whole number of zero or more.');
+      return;
+    }
+    try {
+      await recordCreatorSignal(vetting!.campaignId, parsed, basis);
+      setCount('');
+      setBasis('');
+      onChanged();
+    } catch (error) {
+      setSignalError(
+        error instanceof AdminRequestError
+          ? (error.detail.whatHappened ?? error.detail.title)
+          : 'That was not recorded.',
+      );
+    }
+  }
+
+  async function archive() {
+    setArchiveError(null);
+    try {
+      const result = await archiveAndRestart(vetting!.campaignId, archiveReason);
+      setArchiveResult(result.draftId);
+      onChanged();
+    } catch (error) {
+      setArchiveError(
+        error instanceof AdminRequestError
+          ? (error.detail.whatHappened ?? error.detail.title)
+          : 'That record was not archived.',
+      );
+    }
+  }
+
+  return (
+    <section className="admin-group" aria-labelledby="vetting-record">
+      <h2 className="admin-group__heading" id="vetting-record">
+        Vetting
+      </h2>
+
+      <Card>
+        <dl className="kv">
+          <Row
+            label="Progress"
+            value={`${answered} of 4 answered`}
+            note={
+              submitted
+                ? 'Submitted. The answers and the campaign path are read-only from here.'
+                : 'Still being filled in. The Founder can change anything until they submit.'
+            }
+          />
+          <Row
+            label="Last saved"
+            value={vetting.lastSavedAt ? new Date(vetting.lastSavedAt).toLocaleString() : null}
+          />
+          <Row
+            label="Where they are"
+            value={vetting.resumeStep}
+            note="The step their link reopens on."
+          />
+          <Row
+            label="Submitted"
+            value={vetting.submittedAt ? new Date(vetting.submittedAt).toLocaleString() : null}
+          />
+        </dl>
+      </Card>
+
+      <Card>
+        <h3 className="admin-group__subheading">The live saved draft</h3>
+        <dl className="kv">
+          <div className="kv__row">
+            <dt>Campaign path</dt>
+            <dd>
+              {vetting.selectedType ? (
+                <>
+                  {/* §3: the customer-facing name, never `pre_build`. */}
+                  {vetting.selectedType === 'pre_build' ? 'Idea Campaign' : 'Product Campaign'}
+                  {vetting.typeLockedAt ? (
+                    <span className="admin-table__sub">
+                      Locked {new Date(vetting.typeLockedAt).toLocaleString()}. There is no
+                      migration path — a wrong lock is archived and restarted.
+                    </span>
+                  ) : (
+                    <span className="admin-table__sub">Not locked yet.</span>
+                  )}
+                </>
+              ) : (
+                <span className="setting__unset">Not chosen</span>
+              )}
+            </dd>
+          </div>
+          <Answer label="Problem" text={vetting.problem} provenance={vetting.provenance.problem} />
+          <Answer label="Solution" text={vetting.solution} provenance={vetting.provenance.solution} />
+          <Answer
+            label="Competition"
+            text={vetting.competition}
+            provenance={vetting.provenance.competition}
+            note="Never prefilled by Proovd. This is the Founder's own thinking, which is the whole point of asking (§9)."
+          />
+        </dl>
+      </Card>
+
+      {!submitted ? (
+        <Card>
+          <h3 className="admin-group__subheading">Prefill from discovery</h3>
+          <p className="field-hint">
+            §9 has Proovd draft the Problem and the Solution from what we learned; the
+            Founder reviews and edits them. Once they have edited a field, this only
+            updates our original — their words are never overwritten.
+          </p>
+          <Field label="Problem" id="prefill-problem">
+            <Textarea rows={5} value={problem} onChange={(e) => setProblem(e.target.value)} />
+          </Field>
+          <Field label="Solution" id="prefill-solution">
+            <Textarea rows={5} value={solution} onChange={(e) => setSolution(e.target.value)} />
+          </Field>
+          {/* No Competition box. §9, §33.1.5. */}
+          <p className="field-hint">
+            There is no box for Competition here, and there is no route that would accept
+            one.
+          </p>
+          <div className="setting__actions">
+            <Button small onClick={() => void savePrefill()}>
+              Save prefill
+            </Button>
+            {prefillSaved ? (
+              <span className="setting__status" role="status">
+                Saved {prefillSaved.toLocaleTimeString()}
+              </span>
+            ) : null}
+          </div>
+          {prefillError ? (
+            <p className="field-error" role="alert">
+              {prefillError}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {submitted ? (
+        <Card>
+          <h3 className="admin-group__subheading">Possible-creator result (§10)</h3>
+          <p className="field-hint">
+            The Founder sees this number, and only this number, before they are asked to
+            create an account. They never see the basis — that is ours. A zero is a real
+            answer and is recorded as one, but it does not render: it holds them at a
+            waiting state until someone here looks at the campaign.
+          </p>
+
+          {detail.creatorSignal ? (
+            <dl className="kv">
+              <Row label="Recorded count" value={String(detail.creatorSignal.count)} />
+              <Row label="Basis" value={detail.creatorSignal.basis} />
+              <Row label="Recorded by" value={detail.creatorSignal.recordedBy} />
+              <Row
+                label="Recorded at"
+                value={new Date(detail.creatorSignal.recordedAt).toLocaleString()}
+              />
+              <Row
+                label="What the Founder sees"
+                value={
+                  detail.creatorSignal.count > 0
+                    ? `The number ${detail.creatorSignal.count}, with §10's disclosures`
+                    : 'A waiting state owned by Proovd. The zero is not shown.'
+                }
+              />
+            </dl>
+          ) : (
+            <p>
+              Nothing recorded. The Founder is held at a waiting state and cannot create an
+              account until a count is here.
+            </p>
+          )}
+
+          <Field
+            label="Count"
+            hint="Creators who may be relevant. A whole number."
+            id="signal-count"
+          >
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={count}
+              onChange={(e) => setCount(e.target.value)}
+            />
+          </Field>
+          <Field
+            label="What is this based on?"
+            hint="Stored with the count and read by whoever audits it. A number with no basis is a guess, and this one reaches a Founder."
+            id="signal-basis"
+          >
+            <Textarea rows={3} value={basis} onChange={(e) => setBasis(e.target.value)} />
+          </Field>
+          <div className="setting__actions">
+            <Button small disabled={count === '' || basis.trim() === ''} onClick={() => void saveSignal()}>
+              Record
+            </Button>
+          </div>
+          {signalError ? (
+            <p className="field-error" role="alert">
+              {signalError}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {detail.signupComplete ? (
+        <Card>
+          <h3 className="admin-group__subheading">Account claim</h3>
+          <dl className="kv">
+            <Row
+              label="Claimed at"
+              value={new Date(detail.signupComplete.occurredAt).toLocaleString()}
+            />
+            <Row label="Founder account" value={detail.signupComplete.founderUserId} />
+            <Row
+              label="Email ownership"
+              value={detail.claimProfile?.emailOwnership ?? null}
+              note="How we know the address is theirs. Never a verification claim."
+            />
+            <Row
+              label="Preparing-campaign visibility"
+              value="No Creator has been recruited for this campaign yet"
+              note="The Affiliate half of §10's handoff arrives with Creator recruitment. Nothing has been revealed to anyone."
+            />
+          </dl>
+        </Card>
+      ) : null}
+
+      {/* §9 / §33.1.7 — the wrong-type path. Only reachable once a type is
+          actually locked, because before that the Founder can simply change
+          their answer and there is nothing to correct. */}
+      {campaign?.typeLockedAt && !campaign.listingPaidAt ? (
+        <Card>
+          <h3 className="admin-group__subheading">Wrong campaign path</h3>
+          <p className="field-hint">
+            There is no way to convert one kind of campaign into the other, and none may
+            be built. Archiving this record starts a fresh vetting record for the same
+            person. Nothing carries over — no Creator acceptance, no reward, no payment,
+            no consent — and the replacement needs its own invitation sending.
+          </p>
+          <Field
+            label="Why is this being archived?"
+            hint="Stored on the record and read by whoever audits it."
+            id="archive-reason"
+          >
+            <Input
+              type="text"
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+            />
+          </Field>
+          <div className="setting__actions">
+            <Button
+              small
+              tier="secondary"
+              disabled={archiveReason.trim() === ''}
+              onClick={() => void archive()}
+            >
+              Archive and start a new vetting record
+            </Button>
+          </div>
+          {archiveResult ? (
+            <p className="field-hint">
+              Archived. The replacement draft is{' '}
+              <RouterLink to={`/admin/founders/${archiveResult}`}>{archiveResult}</RouterLink> —
+              it has no invitation yet.
+            </p>
+          ) : null}
+          {archiveError ? (
+            <p className="field-error" role="alert">
+              {archiveError}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {detail.vettingEdits.length > 0 ? (
+        <details className="admin-explore">
+          <summary>Provenance history ({detail.vettingEdits.length})</summary>
+          <div className="admin-table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Field</th>
+                  <th scope="col">Supplied by</th>
+                  <th scope="col">By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.vettingEdits.map((edit, index) => (
+                  <tr key={`${edit.occurredAt}-${edit.field}-${index}`}>
+                    <th scope="row">
+                      <When value={edit.occurredAt} />
+                    </th>
+                    <td>
+                      {edit.record}.{edit.field}
+                    </td>
+                    <td>
+                      <Tag variant={edit.supplier === 'proovd' ? 'mint' : 'moss'}>
+                        {edit.supplier === 'proovd' ? 'Proovd' : 'Founder'}
+                      </Tag>
+                    </td>
+                    <td>{edit.editedBy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
+function Answer({
+  label,
+  text,
+  provenance,
+  note,
+}: {
+  label: string;
+  text: string | null;
+  provenance: { supplier: 'proovd' | 'founder' | null; lastEditedAt: string | null };
+  note?: string;
+}) {
+  return (
+    <div className="kv__row">
+      <dt>{label}</dt>
+      <dd>
+        {text ?? <span className="setting__unset">Nothing written yet</span>}
+        <span className="admin-table__sub">
+          {provenance.supplier === null
+            ? 'No value.'
+            : provenance.supplier === 'proovd'
+              ? 'Currently our draft — the Founder has not changed it.'
+              : 'The Founder wrote this.'}
+          {provenance.lastEditedAt
+            ? ` Last edited ${new Date(provenance.lastEditedAt).toLocaleString()}.`
+            : ''}
+          {note ? ` ${note}` : ''}
+        </span>
       </dd>
     </div>
   );

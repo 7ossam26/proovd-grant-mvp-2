@@ -23,8 +23,8 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–06 are
-complete**; Phase 07 (Founder vetting and the account claim) is next.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–07 are
+complete**; Phase 08 (Affiliate recruitment and the private signup) is next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -36,10 +36,11 @@ complete**; Phase 07 (Founder vetting and the account claim) is next.
 | 05 | The fourteen public routes, policy versioning, two sample campaigns |
 | 06a | Global configuration, the production-prerequisites gate, the Admin shell |
 | 06b | Transactional email, the Founder invitation and draft, the retention sweep |
+| 07 | Pre-account vetting, the permanent campaign-type lock, the account claim |
 
 Phase 06 as written in `docs/phases/phase-06.md` bundles four independent
-deliverables, so it was built in two halves against one brief. Its named
-acceptance tests — §33.1.1, §33.1.2, §33.1.3 — all pass.
+deliverables, so it was built in two halves against one brief. Every named
+acceptance test from §33.1.1 to §33.1.9 passes.
 
 ## Layout
 
@@ -49,18 +50,21 @@ npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
 shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/policies/   the eight canonical policy records and their versions
   src/settings/   the §6 operating-constant register
+  src/vetting/    the §9 vetting sequence, its copy, and the two campaign paths
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
   src/settings/       reading, validating, and versioning the §6 constants
   src/admin/          the production-prerequisites panel
   src/invitations/    Founder prospects, the invitation, the retention sweep
+  src/vetting/        the §9 answers and their provenance, the §10 account claim
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
   src/features/admin/    the Admin shell, Founders, configuration, prerequisites
-  src/surfaces/          the Founder draft landing, the unusable-link page
+  src/surfaces/          the unusable-link page
+  src/surfaces/draft/    the Founder journey: vetting, result, account claim
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
@@ -109,6 +113,15 @@ its versioned record and says plainly that the document is in review.
 
 `draft` blocks the fourth condition of Spec §34's live-mode gate. Phase 24
 releases it by publishing the documents — not by bypassing the check.
+
+**It also blocks the Founder account claim, and that is deliberate.** Spec §10
+requires a Founder to accept the Terms, the Founder AUP, and the privacy policy
+before an account exists, and a consent record may cite only a published
+version — a database trigger, not a convention, because the failure would
+otherwise be silent. So while the documents are with the lawyers, the last step
+of the Founder journey refuses in the open: it says why, says that nothing was
+created and nothing entered was lost, and offers no button. Asking someone to
+accept text Proovd's own lawyers have not agreed records agreement to nothing.
 
 ## Global configuration
 
@@ -189,10 +202,61 @@ explains what happens next, and **asks for nothing** — no account, no card, no
 form, not even a disabled one. Every unusable link, for every reason, renders one
 identical page.
 
+## Vetting, the type lock, and the account claim
+
+The Founder journey is four questions, a result, and an account — Spec §9 and
+§10 — and the whole of it happens behind the invitation link, with no session
+and no account until the very last step.
+
+**The campaign type locks permanently at submission, and there is no migration
+path.** Idea Campaign or Product Campaign decides whether there is an order
+threshold, how many pre-orders one Backer may place, which refund policy
+applies, and when the Founder is paid — so both options are shown in full, with
+what each commits them to, before either is chosen, and the permanence is said
+plainly twice. Once locked, a database trigger refuses to change it, for every
+future phase and every support script. A wrong lock is corrected by archiving
+the record and starting a fresh one: a new campaign, a new draft, an empty
+vetting record, and nothing carried across — no Creator acceptance, no reward,
+no payment, no consent. The code that does it reads none of those tables, which
+is a stronger guarantee than checking that it copied none of them.
+
+**Competition is never prefilled.** Proovd drafts the Problem and the Solution
+from discovery and the Founder edits them; the Competition box starts empty and
+stays that way. It is the one field that proves the Founder did their own
+thinking, so there is no column to prefill it into, no parameter that would
+carry one, and a `CHECK` constraint that refuses to record it as anything but
+theirs. Every field stores who supplied the value that is in it now, what
+Proovd originally supplied, and when the Founder took it over.
+
+**Everything saves as it is typed, and a failed save never costs a sentence.**
+The status line says `Saving…`, `Saved 14:32`, or `Could not save — retrying`,
+and it says `retrying` only while a retry is genuinely scheduled — a refusal is
+a decision, not a transient failure. The typed value is never replaced by a
+server response, so nothing the server says can empty a box.
+
+**The possible-creator result promises nothing.** It is a relevance signal a
+named Admin records with its basis, shown once before the account exists, with
+every one of Spec §10's limits beside it in full. Recruitment is Spec §8's and
+has not happened yet, so there is no roster to count — inventing a formula over
+an empty table would produce a number that means nothing. A zero result and an
+unrecorded one look identical to the Founder: a waiting state owned by Proovd.
+Distinguishing them would tell them a number Spec §10 forbids showing.
+
+**The claim is one transaction.** It creates the account, invalidates the draft
+link, keeps the draft and its provenance, emits `founder_signup_complete`
+exactly once, and moves the campaign to `account_claimed`. A retry, a
+double-submit, and two genuinely concurrent claims all produce one account and
+one event — the idempotency key settles the first two, the conditional update on
+the token settles the third.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
 **most recent send** (Spec §25.8, §33.1.3) by a pg-boss job on the same Postgres.
+That covers the vetting answers, the half-filled account details, and the
+before/after values in the provenance history — that history holds a verbatim
+copy of every version of every answer, and emptying the source while leaving it
+behind would be a retention policy with a hole in it.
 Resending restarts the clock, which is why `campaign_invitation_sends` is
 append-only and `UPDATE` on `sent_at` is revoked from the application role: a
 retention clock a later statement could move is not a retention policy.
@@ -305,8 +369,15 @@ The frontend and shared suites need neither Docker nor a database.
   documents.** Spec §8 states it for Creators; it applies everywhere. An email
   that asks for those trains people to answer the one that isn't from us.
 - **There is no public signup, for any role.** Accounts are created server-side
-  by `seedAccount` in [backend/src/auth/seed.ts](backend/src/auth/seed.ts),
-  which always takes an explicit role and exposes no HTTP route.
+  by `seedAccount` in [backend/src/auth/seed.ts](backend/src/auth/seed.ts) and
+  by the Founder account claim, which is reachable only with a valid invitation
+  token. Neither exposes a route anyone can find without being invited.
+- **The campaign type locks permanently and there is no migration path.** Spec
+  §9 is explicit, and a database trigger enforces it rather than a service rule.
+  A wrong lock is corrected by archiving and restarting, never by converting.
+- **Phone numbers are collected and never verified.** No SMS OTP path exists
+  anywhere in the tree, a test scans for one, and `user.phone_verified` is
+  pinned false by a `CHECK` constraint.
 - **Backers have no account.** They use campaign-scoped magic links through
   [backend/src/auth/token-service.ts](backend/src/auth/token-service.ts) —
   never Better Auth's magic-link plugin, which would create accounts and

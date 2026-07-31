@@ -15,4 +15,7 @@ export * from './settings.js';
 // Phase 6b: the Founder prospect, the invited draft whose content the 30-day
 // retention sweep anonymises, and the append-only record of every send.
 export * from './invitations.js';
+// Phase 7: the §9 vetting answers and their provenance, the §10 possible-creator
+// recording, the account-claim profile, and the policy consents a claim writes.
+export * from './vetting.js';
 

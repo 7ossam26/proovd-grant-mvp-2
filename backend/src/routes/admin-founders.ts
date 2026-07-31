@@ -46,6 +46,15 @@ import {
 } from '../invitations/service.js';
 import { retentionDueAt, UNCLAIMED_DRAFT_RETENTION_DAYS } from '../invitations/retention.js';
 import { NO_GUARANTEE_TEXT, PROCESS_SUMMARY } from '../notifications/templates/founder-invitation.js';
+import {
+  readVetting,
+  prefillVetting,
+  readFieldEdits,
+  readPossibleCreatorSignal,
+  recordPossibleCreatorSignal,
+  archiveAndRestartVetting,
+} from '../vetting/service.js';
+import { readClaimProfile, readSignupComplete } from '../vetting/claim.js';
 
 export const ADMIN_FOUNDERS_PATH = '/api/admin/founders';
 export const ADMIN_CAMPAIGNS_PATH = '/api/admin/campaigns';
@@ -239,8 +248,161 @@ export function createAdminFoundersRouter({
       retentionDueAt: retentionDueAt(record.lastSentAt)?.toISOString() ?? null,
       // Whether a usable link is outstanding — never the link (§28.1).
       hasLiveToken: record.hasLiveToken,
+
+      /* ── §9's Admin lens, added Phase 07 ───────────────────────────────
+         "Admin can see the live saved draft, provenance, completeness,
+         last-save time, and errors but does not re-enter Founder data."
+
+         Everything below is read. There is no route on this router that
+         writes a Founder's answer — the one write Admin has is the Problem
+         and Solution *prefill*, which §9 asks for by name, and it stops
+         moving the moment the Founder edits the field. */
+      vetting: await readVetting(db, record.draft.id),
+      vettingEdits: await readFieldEdits(db, record.draft.id),
+      claimProfile: await readClaimProfile(db, record.draft.id),
+      creatorSignal: campaign ? await readPossibleCreatorSignal(db, campaign.id) : null,
+      // §10: "Admin sees account-claim time [and] provenance." The Affiliate
+      // half of that sentence is Phase 08's, because no Affiliate exists yet.
+      signupComplete: campaign ? await readSignupComplete(db, campaign.id) : null,
     });
   });
+
+  /* ── §9 — prefilling Problem and Solution from discovery ───────────────── */
+
+  /**
+   * There is no `competition` field in this body, in this route, or in the
+   * table behind it. §9 states the rule twice and §33.1.5 tests it: Competition
+   * is always blank and is written by the Founder. The way to be certain of
+   * that is to leave nowhere for a prefill to go.
+   *
+   * No freshness gate: nothing leaves the building and nobody's access changes.
+   * Making an Admin reauthenticate to paste two paragraphs teaches them to
+   * reauthenticate reflexively, which is how the gate stops meaning anything.
+   */
+  router.put(`${ADMIN_FOUNDERS_PATH}/:draftId/vetting-prefill`, admin, json, async (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    const str = (key: string): string | null | undefined =>
+      key in body
+        ? typeof body[key] === 'string'
+          ? (body[key] as string)
+          : null
+        : undefined;
+
+    const result = await prefillVetting(db, req.params['draftId'] as string, {
+      ...(str('problem') !== undefined ? { problem: str('problem') } : {}),
+      ...(str('solution') !== undefined ? { solution: str('solution') } : {}),
+      actor: actorOf(req),
+    });
+
+    if (!result.ok) {
+      res.status(422).json({
+        error: 'prefill_rejected',
+        title: 'That could not be saved',
+        whatHappened: result.message,
+        next: 'Nothing has changed.',
+      });
+      return;
+    }
+
+    res.json(result.state);
+  });
+
+  /* ── §10 — recording the possible-creator result ───────────────────────── */
+
+  /**
+   * Takes the freshness gate. The number recorded here is what a Founder sees
+   * at the last step before they create an account, and a zero holds them at a
+   * waiting state until someone looks at it — that reaches a real person as
+   * surely as an email does.
+   */
+  router.post(
+    `${ADMIN_CAMPAIGNS_PATH}/:campaignId/creator-signal`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = req.body as { count?: unknown; basis?: unknown };
+      if (typeof body?.count !== 'number' || typeof body?.basis !== 'string') {
+        badRequest(
+          res,
+          'A count and the basis for it are both required.',
+          'Fill both in and record it again.',
+        );
+        return;
+      }
+
+      const result = await recordPossibleCreatorSignal(db, {
+        campaignId: req.params['campaignId'] as string,
+        count: body.count,
+        basis: body.basis,
+        actor: actorOf(req),
+      });
+
+      if (!result.ok) {
+        res.status(422).json({
+          error: 'signal_rejected',
+          title: 'That was not recorded',
+          whatHappened: result.message,
+          next: 'Nothing has changed.',
+        });
+        return;
+      }
+
+      res.status(201).json(result.signal);
+    },
+  );
+
+  /* ── §9, §33.1.7 — the wrong-type path ─────────────────────────────────── */
+
+  /**
+   * Archive a campaign whose type locked wrongly and begin a fresh vetting
+   * record for the same person.
+   *
+   * §9 is explicit that this is not a conversion: "No campaign-type migration
+   * exists. No Creator acceptance, reward, payment, or consent record is copied
+   * automatically." The service reads none of those tables — which is a
+   * stronger guarantee than checking that it copied none of them.
+   *
+   * The response carries the new draft id but no link. The replacement needs an
+   * invitation sending, which is the existing send route: §28.1 puts the raw
+   * token in the delivered URL and nowhere else, and this route is not an
+   * exception to that.
+   */
+  router.post(
+    `${ADMIN_CAMPAIGNS_PATH}/:campaignId/archive-and-restart`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = req.body as { reason?: unknown };
+      if (typeof body?.reason !== 'string') {
+        badRequest(
+          res,
+          'A reason is required before a campaign record can be archived.',
+          'Say why, then archive.',
+        );
+        return;
+      }
+
+      const result = await archiveAndRestartVetting(db, {
+        campaignId: req.params['campaignId'] as string,
+        reason: body.reason,
+        actor: actorOf(req),
+      });
+
+      if (!result.ok) {
+        res.status(422).json({
+          error: 'archive_rejected',
+          title: 'That record was not archived',
+          whatHappened: result.message,
+          next: 'Nothing has changed.',
+        });
+        return;
+      }
+
+      res.status(201).json(result.result);
+    },
+  );
 
   /* ── Compose (§7) ──────────────────────────────────────────────────────── */
 

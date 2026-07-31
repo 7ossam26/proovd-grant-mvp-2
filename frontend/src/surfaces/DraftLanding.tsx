@@ -4,12 +4,12 @@
  * §7: it "names the Founder/product and explains what will happen before an
  * account or payment is required."
  *
- * ── It does not ask for anything ────────────────────────────────────────────
- * No form, no account, no payment field, no "get started" that quietly begins
- * something. Phase 07 owns the vetting flow; this surface exists to tell a
- * person what they have been invited to and what happens next, so that when
- * they are asked for something they already know why. A Founder who lands here
- * and closes the tab has lost nothing.
+ * ── It still asks for nothing ───────────────────────────────────────────────
+ * No form, no account, no payment field. Phase 07 added exactly one control —
+ * a link on to the vetting form — and it is a door, not a commitment: nothing
+ * is created by walking through it, the first question is answerable in a
+ * sentence, and it can be closed at any point with everything saved. A Founder
+ * who lands here and closes the tab has still lost nothing.
  *
  * ── One failure surface ─────────────────────────────────────────────────────
  * An unusable link renders `/link-unavailable` — the same page for invalid,
@@ -131,7 +131,7 @@ export function DraftLanding() {
       <Section>
         <Measure>
           <StatePanel
-            state="Nothing is needed from you yet"
+            state="Whenever you're ready"
             whatHappened={
               <>
                 You&rsquo;ve opened your draft. <strong>No account has been created, no
@@ -139,10 +139,14 @@ export function DraftLanding() {
                 {draft.expectedSetupTime ? ` ${draft.expectedSetupTime}` : ''}
               </>
             }
-            next="When you're ready to go ahead, we'll ask you about the product, the problem it solves, and who else is solving it. You can stop at any point."
+            next="Four questions about the product, the problem it solves, and who else is solving it. Everything saves as you type, so you can stop at any point and come back to this link."
             owner="You"
             nextUpdate="Whenever you come back to this link"
-            action="No action needed"
+            action={
+              <Button href={`/draft/${encodeURIComponent(token)}/vetting`}>
+                Start the questions
+              </Button>
+            }
             reference={draft.reference}
             getHelp={{
               href: supportMailto(`Question about my Proovd invitation (${draft.reference})`),

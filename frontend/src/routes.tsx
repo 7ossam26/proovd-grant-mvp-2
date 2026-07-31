@@ -17,6 +17,9 @@ import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
 import { FoundersPage } from './features/admin/FoundersPage.js';
 import { FounderDetail } from './features/admin/FounderDetail.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
+import { VettingFlow } from './surfaces/draft/VettingFlow.js';
+import { CreatorResult } from './surfaces/draft/CreatorResult.js';
+import { AccountClaim } from './surfaces/draft/AccountClaim.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -101,6 +104,23 @@ const rootChildren: RouteObject[] = [
     // else, and this is a Founder surface.
     path: 'draft/:token',
     element: <DraftLanding />,
+  },
+  {
+    // Phase 07 (§9, §10). The vetting sequence, its result, and the account
+    // claim. Four separate addresses rather than one stateful page, because
+    // DNA §5.12 requires position to survive interruption and a URL is the
+    // cheapest durable position there is — a Founder who bookmarks the middle
+    // of their form gets the middle of their form back.
+    path: 'draft/:token/vetting',
+    element: <VettingFlow />,
+  },
+  {
+    path: 'draft/:token/result',
+    element: <CreatorResult />,
+  },
+  {
+    path: 'draft/:token/claim',
+    element: <AccountClaim />,
   },
   {
     // Phase 04 (§5.5). One route for every token failure — invalid, expired,

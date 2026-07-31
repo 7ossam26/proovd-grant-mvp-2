@@ -1,8 +1,13 @@
 /**
- * The save vocabulary every Admin form uses — Spec §9.
+ * The save vocabulary every Proovd form uses — Spec §9.
  *
- * §9 fixes three phrases and Phase 06 establishes them here so Phase 07's
- * vetting flow inherits them rather than inventing a fourth:
+ * Established by Phase 06 for the Admin settings surface and moved here by
+ * Phase 07, which is where §9 actually puts it: the vetting flow, the account
+ * claim, and the Admin settings all speak the same three phrases, and a Founder
+ * surface importing its status vocabulary out of `features/admin` was one
+ * refactor away from two of them.
+ *
+ * §9 fixes three phrases:
  *
  *   `Saving…`                  a write is in flight
  *   `Saved <time>`             it landed, and when

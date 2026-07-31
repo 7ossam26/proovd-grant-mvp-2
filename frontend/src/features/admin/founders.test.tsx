@@ -436,12 +436,30 @@ describe("§33.1.1 the Founder's draft landing state", () => {
     renderAt('/draft/a-token-value');
     await screen.findByRole('heading', { level: 1 });
 
-    expect(screen.getByText(/nothing is needed from you yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/whenever you're ready/i)).toBeInTheDocument();
     // §34 gates live card collection; this surface mounts no payment field and
     // no credential field at all — disabled is not the same as absent.
     expect(document.querySelectorAll('form')).toHaveLength(0);
     expect(document.querySelectorAll('input, iframe, select, textarea')).toHaveLength(0);
     expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('offers exactly one way forward, and it commits to nothing (Phase 07)', async () => {
+    // Phase 06b's landing asked for nothing at all. Phase 07 adds one control —
+    // a link on to the four questions — and it is a door, not a commitment:
+    // nothing is created by walking through it. Everything above still holds.
+    stubDraft({ status: 200, body: LANDING });
+    const { container } = renderAt('/draft/a-token-value');
+    await screen.findByRole('heading', { level: 1 });
+
+    const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(hrefs).toContain('/draft/a-token-value/vetting');
+    expect(screen.getByText(/four questions about the product/i)).toBeInTheDocument();
+    // Still nothing that reads as an account, a card, or a commitment. The
+    // "Read how payments work" link stays — explaining is not asking.
+    expect(
+      screen.queryByRole('link', { name: /sign up|create an account|add a card|pay now/i }),
+    ).toBeNull();
   });
 
   it('states that nothing has been created or charged', async () => {

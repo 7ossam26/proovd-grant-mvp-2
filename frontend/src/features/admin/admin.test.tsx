@@ -20,7 +20,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import { SETTING_DEFINITIONS, SETTING_GROUPS } from '@proovd/shared';
 import { appRoutes } from '../../routes.js';
-import { describeSaveState, isRetryable, MAX_SAVE_ATTEMPTS } from './autosave.js';
+import { describeSaveState, isRetryable, MAX_SAVE_ATTEMPTS } from '../../lib/autosave.js';
 
 /* ── A stub network ───────────────────────────────────────────────────────── */
 

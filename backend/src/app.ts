@@ -9,6 +9,7 @@ import { createAuthRouter } from './routes/auth.js';
 import { createAdminRouter } from './routes/admin.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createDraftRouter } from './routes/draft.js';
+import { createVettingRouter } from './routes/vetting.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
@@ -50,6 +51,15 @@ export interface AppConfig {
    * from one loopback address than any person would.
    */
   draftVerifyLimit?: number;
+  /**
+   * The blanket per-address request limit. Defaults to the production value.
+   *
+   * Configurable only because the integration suite drives an entire Founder
+   * journey — dozens of autosaves per person — from one loopback address, and a
+   * suite that tripped this would turn unrelated assertions into limiter tests.
+   * Nothing in production overrides it.
+   */
+  globalRateLimit?: number;
   /** §5.5 email-link password reset. Injected; the transport arrives later. */
   sendResetPassword: SendResetPassword;
   /** Founder-only Google sign-in (§5.2). Omitted when unconfigured. */
@@ -92,7 +102,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      limit: 200,
+      limit: config.globalRateLimit ?? 200,
       standardHeaders: 'draft-7',
       legacyHeaders: false,
     }),
@@ -138,6 +148,16 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     createDraftRouter(db, tokens, {
       ...(config.draftVerifyLimit !== undefined
         ? { verifyLimit: config.draftVerifyLimit }
+        : {}),
+    }),
+  );
+  // Phase 07 (§9, §10). The vetting sequence, the possible-creator result, and
+  // the account claim — all behind the same draft token, all learning the draft
+  // id from the verified subject rather than from the request.
+  app.use(
+    createVettingRouter(db, auth, tokens, {
+      ...(config.draftVerifyLimit !== undefined
+        ? { verifyLimit: config.draftVerifyLimit, saveLimit: config.draftVerifyLimit }
         : {}),
     }),
   );
