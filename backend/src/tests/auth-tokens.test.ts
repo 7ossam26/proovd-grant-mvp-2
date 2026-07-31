@@ -44,7 +44,7 @@ let probe: Express;
 let limited: Express;
 
 beforeAll(async () => {
-  h = await startHarness();
+  h = await startHarness({}, 'authtokens');
 
   probe = express();
   // §33.1.1: the route learns the draft id ONLY from the verified subject. It

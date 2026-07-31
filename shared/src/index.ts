@@ -5,3 +5,4 @@ export * from './states/index.js';
 export * from './calendar/index.js';
 export * from './notifications/index.js';
 export * from './policies/index.js';
+export * from './settings/index.js';

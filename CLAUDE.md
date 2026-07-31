@@ -21,22 +21,33 @@ You are building this one phase at a time. **Read the phase file you were given,
 
 ## Repository state — read this before looking for a file
 
-**Phases 00–05 are complete and committed.** Phase 06 (Admin shell and global configuration) is next. Every path this file names now exists at the path it names — the staging table that used to live here is gone because Phase 0 moved those files to their targets. `docs/phases/phase-00.md` … `phase-24.md` are all present.
+**Phases 00–05 are complete and committed. Phase 06 is split, and 06a is done.** `docs/phases/phase-06.md` bundles four deliverables; 06a shipped the §6 settings register and store, the fail-closed prerequisites panel, and the Admin shell. **Phase 06b is next** — see "What Phase 06b owns" below. Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present.
 
 What exists on disk:
 
 | Area | State |
 |---|---|
-| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, Zod schemas |
-| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate |
-| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, dev-only gallery at `/_gallery`, `/link-unavailable` |
+| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, **§6 settings register**, Zod schemas |
+| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate, **`app_settings` + history + `production_prerequisites`, `/api/admin`** |
+| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, **the Admin shell at `/admin`**, dev-only gallery at `/_gallery`, `/link-unavailable` |
 | `frontend/public/` | `proovd.css`, `proovd-motion.js`, `vendor/gsap/*.min.js`, `gsap-check.html` |
 
 Three gaps to know about, none of them a bug:
 
 - **`frontend/public/fonts/` is empty.** `proovd.css` already declares `@font-face` against `Satoshi-Variable.woff2` and `Satoshi-VariableItalic.woff2`. Until those two files are dropped in, the fail-loud font notice is *correct* behaviour, not something to suppress.
 - **All eight policy documents are `draft`.** Track A2 is in legal review; §1 rule 6 forbids inventing the text and §31.4 forbids substituting a summary. See "Policies" below.
-- **Authenticated surfaces do not exist yet.** Phase 04 built the auth *mechanism* — guards, token middleware, the failure surface — and mounts the guards on no product route, because Phase 05 is entirely public. `backend/src/tests/auth-tokens.test.ts` mounts them on probe routes to prove they work. The first real mount is Phase 06's Admin.
+- **Six §6 settings ship with no value, and the prerequisites panel blocks.** That is the designed state, not unfinished work — see "Global configuration" below.
+
+### What Phase 06b owns
+
+Read `docs/phases/phase-06.md` again; these are its remaining scope items:
+
+- Resend + React Email, routed through the Phase 03 notification registry and `notification_deliveries` (§27.2).
+- Founder prospect and the §7 invitation surface — create, **preview**, send, resend, revoke. Preview is a hard gate: an unresolved `[VARIABLE]` makes Send unavailable.
+- The invitation email and the draft landing state (§7).
+- The pg-boss 30-day retention job. `expireStaleDrafts()` in the token service revokes the tokens; the job must anonymise the draft content **in the same transaction**.
+- Users → Founders (§26.1) and Campaign detail (§26.2).
+- **Acceptance: §33.1.1, §33.1.2, §33.1.3.** None of these is satisfied yet.
 
 ## How a session works
 
@@ -49,7 +60,8 @@ One phase per session (`docs/master-plan.md` §1.3): read `docs/phases/phase-NN.
 - **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one test with Vitest's filter: `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`.
 - **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11.
 - **Integration tests need a real Postgres.** `backend/src/tests/app-harness.ts` uses `TEST_DATABASE_URL` when set and otherwise starts a Testcontainers `postgres:16-alpine`, which needs Docker. The migrator runs `CREATE ROLE proovd_app`, so the connecting role needs `CREATEROLE` or superuser. With neither Docker nor a spare server, a throwaway cluster works: `initdb -D <tmp> -U postgres --auth=trust`, `pg_ctl -o "-p 55432"` start, `createdb`, point `TEST_DATABASE_URL` at it, and stop it afterwards.
-- **A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`**, one failing statement per transaction — the first error aborts the block, so a second assertion in the same one only observes the abort. `policy-versions.test.ts` is the pattern.
+- **A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`**, one failing statement per transaction — the first error aborts the block, so a second assertion in the same one only observes the abort. `policy-versions.test.ts` is the pattern. A test that must commit restores what it changed in a `finally`.
+- **Each harness-based test file gets its own database.** Pass a label: `startHarness({}, 'settings')`. On `TEST_DATABASE_URL` this provisions `proovd_t_<label>_<hex>` and drops it on `stop()`; on Testcontainers the container already isolates it.
 - **Local Stripe:** the Stripe CLI forwards webhooks; its signing secret lives in local env only. Mount raw-body parsing on webhook routes **before** `express.json()`.
 - **Env:** copy `.env.example` (variable names only; `docs/tech-stack-v2.md` §17). `backend/src/env.ts` is Zod-validated and fails closed on any live/test key or mode mismatch.
 - **`backend/tsconfig.json` sets `declaration: false` on purpose.** Declaration emit forces TypeScript to name every inferred type, and Better Auth's instance type reaches into its own bundled Zod, which this package cannot name (TS2742). The backend is an application; nothing imports its `.d.ts`.
@@ -131,7 +143,7 @@ This is not four login types. Admin, Founder, and Affiliate have accounts in Bet
 - **No public signup exists, for any role.** `disableSignUp: true` closes the HTTP route. Accounts are created server-side through `backend/src/auth/seed.ts` (`seedAccount`), which always takes an explicit `role` and has no HTTP surface. Do not add one — §33.2.1 is exactly this.
 - **`role` has no database default.** Every creation path states it. Google sign-in maps to `founder` because §5.1 seeds Admins and §5.3 admits Affiliates by invitation only, so neither has an OAuth route.
 - **Guards fail closed** (`backend/src/auth/guards.ts`): `requireSession`, `requireRole`, `requireAdmin`, `requireFreshSession`. No session, unreadable session, database error, missing role, Admin without a registered factor, stale session — every one blocks. None logs a warning and proceeds (§33.12.5).
-- **`ADMIN_REAUTH_WINDOW_SECONDS` has no default anywhere.** §6 names the setting and fixes no number, so the app refuses to boot without it. Phase 06 moves it into the Admin settings surface. Do not invent a value in code.
+- **The Admin reauthentication window lives in `app_settings`, not in env.** `ADMIN_REAUTH_WINDOW_SECONDS` is now only the first-boot seed: `seedAdminReauthWindow` writes it while the setting is still NULL and is a no-op afterwards, because an Admin cannot reach the settings surface before the app is running and guarded. `requireFreshSession` takes a resolver and reads the setting per request, so a change applies to the next sensitive action. It **fails closed on `null`** with a 503 that names the settings route — §6 fixes no number and a guard that invents one has invented a security policy.
 - **Phone is never verified.** A CHECK constraint pins `user.phone_verified` false. There is no SMS OTP path and the acceptance suite scans the source tree to keep it that way (§33.1.8).
 
 ### Tokens (§28.1)
@@ -163,6 +175,23 @@ The eight §31.4 documents are a **register, not text**. `shared/src/policies/do
 - **The §27.8 contact block is exact text**, rendered line for line in `SiteFooter.tsx` and compared against the constant by test.
 - **Sample campaigns mount no payment field at all** — no form, no input, no iframe, no provider script. "Disabled" is not absent, and §34 gates live mode on this. They carry the Appendix A.6 banner permanently and reproduce A.2/A.3/A.4 in full with sample figures.
 - **Live chat renders only inside staffed hours, and not at all outside them.** §31.4 names the hours as a setting and fixes no number, so `VITE_SUPPORT_CHAT_*` has no default anywhere and an unconfigured deployment renders no chat. Days come from the committed calendar, not from configuration.
+
+### Global configuration and the §6 prerequisites (§6, §25.6, §29.6, built Phase 06a)
+
+**Every operating constant is a setting, and later phases read the setting.** `shared/src/settings/registry.ts` is the register — one record per §6 constant, mirrored row for row by `app_settings`, drift-tested in `backend/src/tests/admin-settings.test.ts` exactly like the policy register and the state enums. `shared/src/money/constants.ts` is now **seed defaults only**: it is what the register and the migration read to agree on the §6 numbers. Importing a name from it to decide a live fee, deadline, or percentage is the bug Phase 06's trap names — *"a hardcoded duration is a bug even when the number is right."* Read the setting.
+
+- **Three provenances, and the distinction is load-bearing.** `specified` — §6 states the value; it seeds and Admin may change it. `operator` — §6 names the setting and fixes **no** value, so it has no default anywhere and ships unset; six settings are in this state and an unset one **blocks** (§1 rule 6). `derived` — the value follows a committed artifact; the holiday-calendar version and its timezone are the whole set, and a trigger refuses to edit them because §29.6 forbids an edit silently moving a deadline already computed and promised.
+- **The backend never imports `@proovd/shared` at runtime.** It exports TypeScript source, the backend compiles under `rootDir: src`, and the production image ships only `backend/dist`. So `kind`, `provenance`, `minimum`, `maximum`, and `spec_ref` are columns on `app_settings`, and `backend/src/settings/values.ts` validates from the row it is validating. This is the same constraint `db/schema/domain.ts` documents for the state enums; the answer is the same — restate the data, drift-test it, never import across the boundary. Labels and help text are **not** mirrored: the Admin surface imports the register through Vite.
+- **History is a trigger, not a service call.** `app_settings.updated_by` and `update_reason` are NOT NULL, so an update that does not say who and why never commits; an AFTER trigger writes `app_setting_versions`. A service that wrote the history row is a service one careless `db.update()` can bypass. The §25.6 audit row is still written by `updateSetting`, in the same transaction, because the database cannot see MFA context.
+- **`production_prerequisites` is insert-only.** Ten items: five the app re-checks on every load, five a named person verifies and records with note and evidence (§34's own words: "recorded as complete"). A missing record is **unsatisfied**, never unknown. Presenting a recorded item as system-verified would be the §1.4 failure, so the surface labels which is which.
+- **Fail closed means the control is gone.** `frontend/src/features/admin/PrerequisitesPage.tsx` renders no override, no "proceed anyway", no enable-live-mode button, and there is nowhere to add one. §34 is released by satisfying it.
+
+### Admin surfaces (§26, DNA §5.2, built Phase 06a)
+
+- **`/admin` stands outside the public shell.** No `PublicLayout`, no site footer, no live-chat gate. §26 licenses dashboard density **here and nowhere else**, and shared chrome is how that density leaks into a Founder surface. DNA §5.14 still applies: every settings row is Glance (value + provenance) → Act (inputs) → Explore (change history behind one control).
+- **Guards are mounted for real now.** Everything under `/api/admin` goes through `requireAdmin`; every write additionally through `requireFreshSession`. `backend/src/tests/admin-settings.test.ts` proves no session, wrong role, unenrolled factor, and stale session all fail closed on a real product surface rather than on a probe route.
+- **`Saving…` / `Saved [time]` / `Could not save — retrying`** is the §9 autosave vocabulary, established in `frontend/src/features/admin/autosave.ts` so Phase 07 inherits it. `retrying` appears **only** while a retry is genuinely scheduled; a 4xx is a decision, not a transient failure, and claiming to retry one would be §1.4's failure in miniature.
+- **Backend test files each get their own database.** `startHarness(overrides, label)` provisions one when `TEST_DATABASE_URL` points at a shared server. §33.1.1 asserts that opening a draft link creates *no* user row, which is only checkable if nothing else is creating user rows concurrently — making that assertion defensive instead would have quietly weakened the one that matters.
 
 ### Forbidden patterns (§30, DNA §5.10)
 

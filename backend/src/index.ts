@@ -66,8 +66,21 @@ async function main() {
   await migrate(db, { migrationsFolder });
   logger.info('Migrations complete');
 
+  // ── First-boot settings seed (§6) ──────────────────────────────────────────
+  // `requireFreshSession` reads the Admin reauthentication window from
+  // `app_settings`, but an Admin cannot reach the settings surface until the
+  // app is running and guarded. ADMIN_REAUTH_WINDOW_SECONDS — which env.ts
+  // already refuses to boot without — provides the first value, recorded with
+  // an honest actor and reason. It runs only while the setting is still unset;
+  // once an Admin states a value the setting is authoritative and this is a
+  // no-op.
+  const { seedAdminReauthWindow } = await import('./settings/service.js');
+  const seedResult = await seedAdminReauthWindow(db, env.ADMIN_REAUTH_WINDOW_SECONDS);
+  logger.info({ adminReauthWindow: seedResult }, 'Settings bootstrap');
+
   // ── Express app ────────────────────────────────────────────────────────────
   const { createApp } = await import('./app.js');
+  const { prerequisiteFacts } = await import('./env.js');
   const publicDir = path.join(__dirname, '..', 'public');
   const { app } = createApp(db, {
     appBaseUrl: env.APP_BASE_URL,
@@ -75,6 +88,7 @@ async function main() {
     publicDir,
     authSecret: env.BETTER_AUTH_SECRET,
     adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
+    prerequisiteEnvironment: prerequisiteFacts(env),
     // §5.5 password reset for Founder, Affiliate, and Admin. Resend arrives in
     // a later phase; until it does this refuses loudly rather than pretending
     // to have sent mail (§1.4: never imply automation that does not exist).

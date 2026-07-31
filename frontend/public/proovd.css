@@ -1130,6 +1130,124 @@ main:focus { outline: none; }          /* programmatic focus target, not a contr
 .btn:disabled { opacity: 0.55; cursor: default; }
 
 
+/* ════════════════════════════════════ PHASE 06 — the Admin panel. Spec §26
+   licenses dashboard density HERE AND NOWHERE ELSE, so this is the only
+   section in the file that packs rows tightly. DNA §5.14 is not repealed by
+   it: every row still reads Glance → Act → Explore, which is why a setting
+   shows its value before its controls and hides its history behind a control.
+   Same discipline as above — read a mode slot or a token, never a raw value;
+   px only for borders, radii, and the 44px touch minimum. */
+
+.admin { min-height: 100vh; }
+
+/* ---- Top bar. Painted by .mode-dark on the wrapper, like the site footer. */
+.admin-bar { padding: var(--sp-12) var(--gutter); background: var(--mode-bg); }
+.admin-bar__inner {
+  width: var(--wrap); margin-inline: auto;
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: var(--sp-12) var(--sp-24);
+}
+.admin-bar__brand {
+  margin: 0; font-size: 1.125rem; font-weight: 900; letter-spacing: -0.01em;
+  color: var(--mode-title);
+  display: inline-flex; align-items: center; gap: var(--sp-8);
+  min-height: var(--touch);
+}
+.admin-bar__who { display: flex; align-items: center; gap: var(--sp-16); }
+.admin-bar__name { color: var(--mode-body); font-weight: 700; }
+
+/* ---- Section nav. Current location by weight + ink, never colour alone. */
+.admin-nav { padding: 0 var(--gutter); border-bottom: var(--bw) solid var(--grey-light); }
+.admin-nav__list {
+  width: var(--wrap); margin-inline: auto; padding: 0;
+  list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-24);
+}
+.admin-nav__link {
+  min-height: var(--touch); display: inline-flex; align-items: center;
+  color: var(--mode-body); font-weight: 700; text-decoration: none;
+  border-bottom: var(--bw) solid transparent; margin-bottom: calc(var(--bw) * -1);
+}
+.admin-nav__link.is-current {
+  color: var(--mode-title); font-weight: 900; border-bottom-color: var(--brand);
+}
+
+.admin-main { padding: var(--sp-32) var(--gutter) var(--sp-96); }
+.admin-main:focus { outline: none; }   /* programmatic target, not a control */
+
+.admin-page { width: var(--wrap); margin-inline: auto; display: grid; gap: var(--sp-48); }
+.admin-page__head { display: grid; gap: var(--sp-16); }
+.admin-page__lede { max-width: var(--measure); margin: 0; }
+
+/* ---- Sign-in. One question per moment (DNA §5.1) — never both steps at once. */
+.admin-signin {
+  width: min(28rem, 100%); margin: var(--sp-64) auto;
+  display: grid; gap: var(--sp-24);
+}
+.admin-form { display: grid; gap: var(--sp-16); justify-items: start; }
+.admin-form > .field { width: 100%; }
+.admin-form__note { margin: 0; color: var(--grey); max-width: var(--measure); }
+
+/* ---- The unset-settings alert. Names what blocks; offers no way past it. */
+.admin-alert { display: grid; gap: var(--sp-12); max-width: var(--measure); }
+.admin-alert__head { margin: 0; font-weight: 900; color: var(--mode-title); }
+.admin-alert__list { margin: 0; padding-left: var(--sp-24); display: grid; gap: var(--sp-4); }
+
+/* ---- Setting groups */
+.admin-group { display: grid; gap: var(--sp-24); }
+.admin-group__heading { margin: 0; }
+.admin-group__rows {
+  display: grid; gap: var(--sp-24);
+  grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
+}
+
+/* ---- One setting: Glance (label, value, provenance), Act (inputs), Explore */
+.setting { display: grid; gap: var(--sp-12); align-content: start; }
+.setting__glance { display: grid; gap: var(--sp-8); }
+.setting__label { margin: 0; font-size: 1.125rem; }
+.setting__value { margin: 0; font-size: var(--fs-step); font-weight: 900; color: var(--mode-title); }
+.setting__value code { font-weight: 900; white-space: pre-line; }
+.setting__unset {
+  font-size: var(--fs-body); font-weight: 700; color: var(--grey);
+  border: var(--bw) dashed var(--grey); border-radius: var(--radius);
+  padding: var(--sp-4) var(--sp-12); display: inline-block;
+}
+.setting__tags { margin: 0; display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.setting__help { margin: 0; color: var(--mode-body); }
+.setting__spec, .prereq__spec { margin: 0; color: var(--grey); font-size: 0.9375rem; }
+.setting__locked { margin: 0; color: var(--moss); }
+
+.setting__act { display: grid; gap: var(--sp-12); }
+.setting__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-16); }
+/* §9 save vocabulary: Saving… / Saved <time> / Could not save — retrying */
+.setting__status { font-weight: 700; color: var(--grey); }
+.setting__status[data-state="saved"] { color: var(--stat-mint-text); }
+.setting__status[data-state="retrying"],
+.setting__status[data-state="failed"] { color: var(--mode-title); }
+
+.setting__explore { display: grid; gap: var(--sp-12); justify-items: start; }
+.setting__history { margin: 0; padding-left: var(--sp-24); display: grid; gap: var(--sp-16); }
+.setting__history-change, .setting__history-meta, .setting__history-reason { margin: 0; }
+.setting__history-meta { color: var(--grey); font-size: 0.9375rem; }
+.setting__history-empty { margin: 0; color: var(--grey); }
+
+/* ---- Prerequisites. A blocking item is ringed and labelled, never coloured
+   alone — the palette has no error hue and inventing one is out (DNA §1). */
+.prereq-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-24); }
+.prereq { display: grid; gap: var(--sp-12); }
+.prereq--blocking { box-shadow: inset 0 0 0 var(--bw) var(--brand); }
+.prereq__glance { display: grid; gap: var(--sp-8); }
+.prereq__label { margin: 0; font-size: 1.25rem; }
+.prereq__tags { margin: 0; display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.prereq__detail { margin: 0; font-weight: 700; color: var(--mode-title); max-width: var(--measure); }
+.prereq__requirement { margin: 0; color: var(--mode-body); max-width: var(--measure); }
+.prereq__subjects { margin: 0; padding-left: var(--sp-24); display: grid; gap: var(--sp-4); }
+.prereq__attestation { margin: 0; }
+.prereq__automatic { margin: 0; color: var(--grey); }
+.prereq__act { display: grid; gap: var(--sp-12); justify-items: start; }
+.prereq__form { display: grid; gap: var(--sp-12); width: 100%; max-width: var(--measure); }
+.prereq__buttons { display: flex; flex-wrap: wrap; gap: var(--sp-12); }
+
+
 /* ─── FOCUS — declared after every stroke outline so the keyboard ring
    always wins on :focus-visible */
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }

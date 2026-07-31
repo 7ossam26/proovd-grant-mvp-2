@@ -47,6 +47,14 @@ const schema = z.object({
     .int()
     .positive('ADMIN_REAUTH_WINDOW_SECONDS must be a positive number of seconds'),
 
+  // ── Transactional email (§27.2) ──────────────────────────────────────────
+  // Optional to boot, because the app has to start before an Admin can look at
+  // the §6 prerequisites panel and see that it is missing. Absent, the panel's
+  // transactional-email prerequisite is unsatisfied and blocks — which is the
+  // honest state until a provider is configured.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().email().optional(),
+
   // ── Jobs ─────────────────────────────────────────────────────────────────
   // Must be present and ≥32 chars. Protects close-batch and cron endpoints.
   CRON_SECRET: z.string().min(32, 'CRON_SECRET must be at least 32 characters'),
@@ -114,6 +122,36 @@ function checkGoogleOAuth(data: Env): void {
         'GOOGLE_CLIENT_SECRET, or neither.',
     );
   }
+}
+
+/**
+ * The environment facts the §6 prerequisites panel reads.
+ *
+ * Derived from the same predicates `checkStripeMode` enforces, so the panel
+ * cannot report separation that the boot guard would have rejected. In practice
+ * `stripeKeysMatchMode` is always true in a running process — the app exits
+ * non-zero otherwise — and the panel records that it held rather than assuming
+ * it (§34: the gate is about recorded facts, not assumed ones).
+ */
+export function prerequisiteFacts(env: Env): {
+  stripeMode: 'test' | 'live';
+  stripeKeysMatchMode: boolean;
+  platformWebhookSecretPresent: boolean;
+  connectWebhookSecretPresent: boolean;
+  transactionalEmailConfigured: boolean;
+} {
+  const expectedSecret = env.STRIPE_MODE === 'test' ? 'sk_test_' : 'sk_live_';
+  const expectedPublishable = env.STRIPE_MODE === 'test' ? 'pk_test_' : 'pk_live_';
+
+  return {
+    stripeMode: env.STRIPE_MODE,
+    stripeKeysMatchMode:
+      env.STRIPE_PLATFORM_SECRET_KEY.startsWith(expectedSecret) &&
+      env.STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith(expectedPublishable),
+    platformWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_PLATFORM),
+    connectWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_CONNECT),
+    transactionalEmailConfigured: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM),
+  };
 }
 
 /**

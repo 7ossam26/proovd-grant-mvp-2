@@ -6,9 +6,11 @@ import path from 'node:path';
 import type { Database } from './db/client.js';
 import { createHealthRouter } from './routes/health.js';
 import { createAuthRouter } from './routes/auth.js';
+import { createAdminRouter } from './routes/admin.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
+import type { PrerequisiteEnvironment } from './admin/prerequisites.js';
 
 export interface AppConfig {
   appBaseUrl: string;
@@ -17,8 +19,18 @@ export interface AppConfig {
   publicDir: string;
   /** Signs Better Auth sessions and reset links. */
   authSecret: string;
-  /** §6 Admin setting — reauthentication window. No default anywhere. */
+  /**
+   * §6 Admin setting — reauthentication window. No default anywhere.
+   *
+   * Better Auth fixes its own `freshAge` at construction, so this is the value
+   * it uses for the lifetime of the process. Proovd's own `requireFreshSession`
+   * reads `app_settings` per request instead, so an Admin who changes the
+   * window sees it apply immediately to Proovd's sensitive actions and on the
+   * next restart to Better Auth's. The settings surface says so.
+   */
   adminReauthWindowSeconds: number;
+  /** Observable facts for the §6 prerequisites panel. */
+  prerequisiteEnvironment: PrerequisiteEnvironment;
   /** §5.5 email-link password reset. Injected; the transport arrives later. */
   sendResetPassword: SendResetPassword;
   /** Founder-only Google sign-in (§5.2). Omitted when unconfigured. */
@@ -80,6 +92,11 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
 
   app.use(createAuthRouter(auth));
   app.use(createHealthRouter(db));
+  // Phase 06 (§6, §26). The first product routes any guard is mounted on:
+  // everything under /api/admin requires a session, the admin role, and a
+  // registered TOTP factor, and every write additionally requires a recent
+  // sign-in.
+  app.use(createAdminRouter({ db, auth, environment: config.prerequisiteEnvironment }));
 
   // ── SPA fallback ──────────────────────────────────────────────────────────
   // /api/* routes go above. Everything else returns index.html so the SPA

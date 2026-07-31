@@ -24,7 +24,7 @@ Working rules for contributors and for Claude Code sessions live in
 ## Status
 
 Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–05 are
-complete**; Phase 06 (Admin shell and global configuration) is next.
+complete, and Phase 06 is split in two — 06a is done, 06b is next.**
 
 | Phase | Delivered |
 | --- | --- |
@@ -34,6 +34,14 @@ complete**; Phase 06 (Admin shell and global configuration) is next.
 | 03 | Domain kernel — money, state machines, calendar, audit, idempotency |
 | 04 | Auth — three account roles, Admin MFA and freshness gate, token service |
 | 05 | The fourteen public routes, policy versioning, two sample campaigns |
+| 06a | Global configuration, the production-prerequisites gate, the Admin shell |
+| 06b | *Next:* transactional email, the Founder invitation and draft, retention |
+
+Phase 06 as written in `docs/phases/phase-06.md` bundles four independent
+deliverables. 06a shipped the configuration half; 06b owns transactional email,
+the Founder prospect and invitation, the draft landing state, the 30-day
+retention job, the Admin Users and Campaign surfaces, and acceptance tests
+§33.1.1–§33.1.3.
 
 ## Layout
 
@@ -42,16 +50,29 @@ npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
 ```
 shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/policies/   the eight canonical policy records and their versions
+  src/settings/   the §6 operating-constant register
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/       Better Auth config, guards, token service, seeding
   src/policies/   the §34 policy gate
+  src/settings/   reading, validating, and versioning the §6 constants
+  src/admin/      the production-prerequisites panel
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
+  src/features/admin/    the Admin shell, configuration, prerequisites
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
 `shared/money` holds the **only** implementation of the payment waterfall. Both
 the checkout preview and the close batch call it.
+
+**The backend never imports `@proovd/shared` at runtime.** That package exports
+TypeScript source, the backend compiles under `rootDir: src`, and the production
+image ships only `backend/dist`. Where the server needs a shared fact it
+restates it and a drift test fails the suite if the two diverge — the state
+enums in `backend/src/db/schema/domain.ts`, the required policy slugs in
+`policy-gate.ts`, and the setting bounds carried as columns on `app_settings`
+are all the same pattern. Frontend and test files import it freely; Vite and
+Vitest resolve the workspace source directly.
 
 ## Domains
 
@@ -87,6 +108,56 @@ its versioned record and says plainly that the document is in review.
 `draft` blocks the fourth condition of Spec §34's live-mode gate. Phase 24
 releases it by publishing the documents — not by bypassing the check.
 
+## Global configuration
+
+Every operating constant Spec §6 names lives in `app_settings`, seeded from the
+register at [shared/src/settings/registry.ts](shared/src/settings/registry.ts)
+and administered at `/admin/settings`. From Phase 06 on, **later code reads the
+setting, never a constant** — a hardcoded duration is a bug even when the number
+is right. `shared/src/money/constants.ts` survives as the seed values the
+register and the migration agree on, not as something to import at a call site.
+
+Each setting declares where its value comes from, and the distinction decides
+what the surface will let you do:
+
+| Provenance | Meaning |
+| --- | --- |
+| `specified` | §6 states the value. It seeds, and Admin may change it. |
+| `operator` | §6 names the setting and fixes **no** value. No default exists anywhere; it ships unset and blocks. |
+| `derived` | The value follows a committed artifact. Not editable. |
+
+**Six settings ship with no value and that is correct.** Approved campaign
+minimum and maximum duration, the interview providers, availability,
+interviewer roster, reminder lead time, and the Admin reauthentication window —
+Spec §6 names all of them and fixes a number for none. Spec §1 rule 6 forbids
+inventing one, so they are empty, and the prerequisites panel blocks until an
+operator states them. The same reasoning as `VITE_SUPPORT_CHAT_*`.
+
+The two `derived` settings are the business-day calendar version and its
+timezone. They come from the committed calendar in `shared/calendar`, and a
+database trigger refuses to edit them: Spec §29.6 requires the calendar version
+to be stored with every computed deadline and forbids an edit silently resetting
+one, so a new calendar is a new committed version and a deployment.
+
+Changes are versioned and audited by the database, not by convention.
+`app_settings.updated_by` and `update_reason` are `NOT NULL`, so an update that
+does not say who and why never commits, and a trigger writes the
+`app_setting_versions` row that no application code can skip.
+
+## Production prerequisites
+
+`/admin/prerequisites` renders Spec §6's readiness list — the ten items that
+must hold before Proovd may collect a live card. Five the app re-checks on every
+load; five a named person verifies and records with a note and evidence, which
+is Spec §34's own "recorded as complete" and Spec §1.3's rule that manual work
+counts only when the app records it. Each item says which kind it is, because
+showing a human check as a system check would imply automation that does not
+exist (Spec §1.4).
+
+**Incomplete prerequisites block, they do not warn.** There is no override on
+that page, no "proceed anyway", and no place to add one. Spec §34 is released by
+satisfying its conditions.
+
 ## Setup
 
 Requires Node >= 20, a Postgres 16+ for integration tests, and the Stripe CLI
@@ -109,6 +180,14 @@ than failing later at the redirect.
 Admin reauthentication window as a setting and fixes no value, so the operator
 states it — the code does not invent one.
 
+From Phase 06 that variable is the **first-boot seed**, not the running value.
+An Admin cannot reach the settings surface before the app is running and
+guarded, so the app writes it into the `admin_reauth_window_seconds` setting
+while that setting is still empty, and ignores it from then on. Changing the
+variable later does not change the window, and a restart cannot silently reset
+a window an Admin has chosen. `requireFreshSession` reads the setting per
+request and refuses — with a 503 naming the settings page — while it is unset.
+
 ## Commands
 
 | Command | Does |
@@ -124,7 +203,9 @@ workspace with `npx vitest run --project shared`.
 The backend integration suites need a real Postgres. Set `TEST_DATABASE_URL` to
 use an existing one, or leave it unset and Testcontainers starts
 `postgres:16-alpine` (needs Docker). Migrations run `CREATE ROLE proovd_app`, so
-the connecting role needs `CREATEROLE` or superuser.
+the connecting role needs `CREATEROLE` or superuser, and `CREATE DATABASE` —
+each test file that starts the app harness provisions its own database and drops
+it afterwards, so one file's rows are never another file's surprise.
 
 With neither Docker nor a spare server, a throwaway cluster does the job:
 
@@ -160,7 +241,12 @@ The frontend and shared suites need neither Docker nor a database.
   literals. GSAP is the only motion runtime, vendored under
   `frontend/public/vendor/gsap/`, never installed from npm.
 - **Audit tables are insert-only.** `UPDATE` and `DELETE` are revoked from the
-  application role at the database level.
+  application role at the database level. So are the settings-change history
+  and the recorded production prerequisites.
+- **Operating constants come from configuration, never from code.** Spec §6
+  names roughly thirty of them; all of them are settings, and a later phase that
+  needs 72 hours reads the setting. A hardcoded duration is a bug even when the
+  number is right.
 - **There is no public signup, for any role.** Accounts are created server-side
   by `seedAccount` in [backend/src/auth/seed.ts](backend/src/auth/seed.ts),
   which always takes an explicit role and exposes no HTTP route.

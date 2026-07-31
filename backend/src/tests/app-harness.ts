@@ -14,7 +14,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, createDbPool, type Database } from '../db/client.js';
 import { createApp, type AppConfig, type ProovdApp } from '../app.js';
-import { migrateSerialized } from './helpers.js';
+import type { PrerequisiteEnvironment } from '../admin/prerequisites.js';
+import {
+  migrateSerialized,
+  provisionIsolatedDatabase,
+  type IsolatedDatabase,
+} from './helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +32,22 @@ export const TEST_AUTH_SECRET = 'test-only-better-auth-secret-not-a-real-one';
  */
 export const TEST_REAUTH_WINDOW_SECONDS = 300;
 
+/**
+ * The §6 prerequisite facts a test environment can honestly report.
+ *
+ * Every one is false or absent except the Stripe mode agreement, because a test
+ * process has no webhook secrets and no email provider. That is the correct
+ * starting state: the panel must block, and a suite that started from a
+ * satisfied panel would never notice if `blocking` stopped meaning anything.
+ */
+export const TEST_PREREQUISITE_ENVIRONMENT: PrerequisiteEnvironment = {
+  stripeMode: 'test',
+  stripeKeysMatchMode: true,
+  platformWebhookSecretPresent: false,
+  connectWebhookSecretPresent: false,
+  transactionalEmailConfigured: false,
+};
+
 export interface Harness extends ProovdApp {
   db: Database;
   pool: Pool;
@@ -35,13 +56,22 @@ export interface Harness extends ProovdApp {
   stop: () => Promise<void>;
 }
 
-export async function startHarness(overrides: Partial<AppConfig> = {}): Promise<Harness> {
+export async function startHarness(
+  overrides: Partial<AppConfig> = {},
+  /** Names the private database, so a failure points at the file that made it. */
+  label = 'harness',
+): Promise<Harness> {
   let container: StartedPostgreSqlContainer | null = null;
+  let owned: IsolatedDatabase | null = null;
   let connectionString: string;
 
   const testDbUrl = process.env['TEST_DATABASE_URL'];
   if (testDbUrl) {
-    connectionString = testDbUrl;
+    // A shared server needs a private database per file — see
+    // `provisionIsolatedDatabase`. Testcontainers already gives each file its
+    // own server, so it needs nothing further.
+    owned = await provisionIsolatedDatabase(testDbUrl, label);
+    connectionString = owned.connectionString;
   } else {
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
     connectionString = container.getConnectionUri();
@@ -49,7 +79,7 @@ export async function startHarness(overrides: Partial<AppConfig> = {}): Promise<
 
   const pool = createDbPool(connectionString);
   const db = createDb(pool);
-  await migrateSerialized(db, pool);
+  if (!owned) await migrateSerialized(db, pool);
 
   const resetLinks: Array<{ email: string; url: string }> = [];
 
@@ -59,6 +89,7 @@ export async function startHarness(overrides: Partial<AppConfig> = {}): Promise<
     publicDir: path.resolve(__dirname, '../../public'),
     authSecret: TEST_AUTH_SECRET,
     adminReauthWindowSeconds: TEST_REAUTH_WINDOW_SECONDS,
+    prerequisiteEnvironment: TEST_PREREQUISITE_ENVIRONMENT,
     sendResetPassword: async ({ user, url }) => {
       resetLinks.push({ email: user.email, url });
     },
@@ -72,6 +103,7 @@ export async function startHarness(overrides: Partial<AppConfig> = {}): Promise<
     resetLinks,
     stop: async () => {
       await pool.end();
+      await owned?.drop();
       await container?.stop();
     },
   };

@@ -1,4 +1,4 @@
-import { Outlet, type RouteObject } from 'react-router';
+import { Navigate, Outlet, type RouteObject } from 'react-router';
 import { lazy, Suspense } from 'react';
 import { POLICY_DOCUMENTS } from '@proovd/shared';
 import { MotionProvider } from './motion/MotionProvider.js';
@@ -11,6 +11,9 @@ import { Safety } from './features/public/Safety.js';
 import { PolicyPage } from './features/public/PolicyPage.js';
 import { NotFoundSurface, PageLoading } from './features/public/states.js';
 import { CampaignPage } from './features/public/campaign/CampaignPage.js';
+import { AdminLayout } from './features/admin/AdminLayout.js';
+import { SettingsPage } from './features/admin/SettingsPage.js';
+import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -69,6 +72,20 @@ const rootChildren: RouteObject[] = [
         element: <CampaignPage campaign={SAMPLE_PRODUCT_CAMPAIGN} />,
       },
       { path: '*', element: <NotFoundSurface /> },
+    ],
+  },
+  {
+    // Phase 06 (§6, §26). The Admin panel stands outside the public shell: it
+    // is the only dashboard-density surface in the MVP (§26), and sharing the
+    // site header, footer sitemap, and live-chat gate is how that density
+    // leaks into a Founder surface. Access is decided by the server on every
+    // request — the layout's session check only decides what to render.
+    path: 'admin',
+    element: <AdminLayout />,
+    children: [
+      { index: true, element: <Navigate to="/admin/settings" replace /> },
+      { path: 'settings', element: <SettingsPage /> },
+      { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
   },
   {

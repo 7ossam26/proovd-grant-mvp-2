@@ -29,6 +29,13 @@
       "when": 1785489523006,
       "tag": "0003_policy_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785494211547,
+      "tag": "0004_admin_configuration",
+      "breakpoints": true
     }
   ]
 }

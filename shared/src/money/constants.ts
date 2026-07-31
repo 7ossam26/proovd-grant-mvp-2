@@ -1,7 +1,26 @@
 /**
- * Configured constants — every value here is named in Spec §6 (Phase 0 —
- * Global configuration and production prerequisites). If §6 doesn't name a
- * fee, window, percentage, or duration, it doesn't exist; do not add one.
+ * Seeded defaults for the §6 settings register — every value here is named in
+ * Spec §6 (Phase 0, global configuration). If §6 doesn't name a fee, window,
+ * percentage, or duration, it doesn't exist; do not add one.
+ *
+ * ── What changed in Phase 06, and what these are now ────────────────────────
+ * These were the operating constants. They are now the *seed* values for the
+ * settings of the same name: `shared/src/settings/registry.ts` reads each one
+ * as a `defaultValue`, the Phase 06 migration writes them into `app_settings`,
+ * and from there every runtime consumer reads the SETTING.
+ *
+ * Phase 06's own rule: "constants live in configuration, not in code — a
+ * hardcoded duration is a bug even when the number is right." So importing a
+ * name from this file to decide a live fee, deadline, or percentage is exactly
+ * that bug. Read the setting. This file exists so the §6 numbers have one
+ * literal home that the register, the migration, and the drift test all agree
+ * on — not so a later phase can shortcut past configuration.
+ *
+ * §6 also names settings for which it fixes no value at all — approved
+ * campaign min/max duration, the interview roster, the Admin reauthentication
+ * window. Those have no entry here and never will: §1 rule 6 forbids inventing
+ * a commercial value, so they ship unset and block until an operator states
+ * one.
  */
 
 /** §6: Listing-fee base: US$35. */

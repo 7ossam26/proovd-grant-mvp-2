@@ -174,11 +174,28 @@ export function requireAdmin(auth: Auth): RequestHandler {
  * a session that has merely been *used* recently is not fresh — only one that
  * was recently established by proving a credential again.
  *
- * `windowSeconds` is the §6 Admin setting. It has no default here: the Spec
- * states the setting exists but not its value, and a number invented in code is
- * a commercial rule invented in code (§1 rule 6).
+ * `window` is the §6 Admin setting. It has no default here: the Spec states the
+ * setting exists but not its value, and a number invented in code is a
+ * commercial rule invented in code (§1 rule 6).
+ *
+ * Phase 06 moved that setting into `app_settings`, so this accepts a resolver
+ * as well as a number — passing a function makes a change to the window take
+ * effect on the next request rather than the next deployment. A resolver that
+ * returns `null`, or throws, blocks: an unreadable security policy is not a
+ * permissive one.
  */
-export function requireFreshSession(auth: Auth, windowSeconds: number): RequestHandler {
+export type FreshnessWindow = number | (() => Promise<number | null> | number | null);
+
+async function resolveWindowSeconds(window: FreshnessWindow): Promise<number | null> {
+  if (typeof window === 'number') return window;
+  try {
+    return await window();
+  } catch {
+    return null;
+  }
+}
+
+export function requireFreshSession(auth: Auth, window: FreshnessWindow): RequestHandler {
   return async function freshnessGuard(req: Request, res: Response, next: NextFunction) {
     const loaded = req.authUser && req.authSession
       ? { user: req.authUser, session: req.authSession }
@@ -190,6 +207,21 @@ export function requireFreshSession(auth: Auth, windowSeconds: number): RequestH
     }
     req.authUser = loaded.user;
     req.authSession = loaded.session;
+
+    const windowSeconds = await resolveWindowSeconds(window);
+    if (windowSeconds === null || !Number.isFinite(windowSeconds) || windowSeconds <= 0) {
+      res.status(503).json({
+        error: 'reauthentication_window_unconfigured',
+        title: 'This action is unavailable right now',
+        whatHappened:
+          'The Admin reauthentication window has no value, so Proovd cannot tell whether your ' +
+          'sign-in is recent enough for an action of this kind.',
+        next: 'Set the reauthentication window in Admin settings, then try again.',
+        action: '/admin/settings',
+        support: '/support',
+      });
+      return;
+    }
 
     const ageSeconds = (Date.now() - loaded.session.createdAt.getTime()) / 1000;
 
