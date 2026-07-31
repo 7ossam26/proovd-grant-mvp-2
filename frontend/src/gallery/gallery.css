@@ -1,0 +1,30 @@
+/* Gallery-only styles. This route is development-only and excluded from the
+   production build, but it still obeys the design-system rules: tokens and
+   mode slots only, no hex, no arbitrary px. */
+
+.gx-bar {
+  position: sticky;
+  top: 0;
+  z-index: 700;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12) var(--sp-16);
+  background: var(--surface);
+  border-bottom: var(--bw) solid var(--brand);
+}
+.gx-bar__group { display: flex; align-items: center; gap: var(--sp-8); flex-wrap: wrap; }
+.gx-bar__label { color: var(--grey); font-weight: 700; font-size: 0.9375rem; }
+
+.gx-canvas { min-height: 100vh; }
+
+.gx-demo { display: grid; gap: var(--sp-24); padding-block: var(--sp-48); }
+.gx-demo + .gx-demo { border-top: 1px solid var(--brand); }
+.gx-demo__note { color: var(--grey); max-width: var(--measure); margin: 0; }
+
+.gx-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-24); }
+.gx-stack { display: grid; gap: var(--sp-16); max-width: var(--measure); }
+
+/* Cover-the-copy test: hide every word, keep every silhouette (DNA §7.1). */
+.cover-copy *:not(svg):not(path):not(rect):not(circle) { color: transparent !important; }

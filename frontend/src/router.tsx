@@ -1,10 +1,12 @@
 import { createBrowserRouter } from 'react-router';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { MotionProvider } from './motion/MotionProvider.js';
 
-// Phase 1: single blank route. Each later phase adds routes here.
+// Phase 02: the design system plus a development-only gallery route. Product
+// surfaces begin in Phase 05. Each later phase adds routes here.
 // React Router v7 data mode — loaders/actions added per phase.
 
-function AppShell({ children }: { children: React.ReactNode }) {
+function AppShell({ children }: { children: ReactNode }) {
   return <MotionProvider>{children}</MotionProvider>;
 }
 
@@ -18,12 +20,22 @@ function BlankPage() {
         minHeight: '100vh',
       }}
     >
-      {/* Phase 02 adds the design system. Phase 05 builds the public site. */}
+      {import.meta.env.DEV ? (
+        <a href="/_gallery" className="btn btn--secondary">
+          <span className="btn__label">Open the design-system gallery</span>
+        </a>
+      ) : null}
     </div>
   );
 }
 
-export const router = createBrowserRouter([
+// The gallery is a dev-only surface (Phase 02 §8). The dynamic import lives in a
+// branch that Vite eliminates in the production build, so its code never ships.
+const Gallery = import.meta.env.DEV
+  ? lazy(() => import('./gallery/Gallery.js'))
+  : null;
+
+const routes = [
   {
     path: '/',
     element: (
@@ -32,4 +44,19 @@ export const router = createBrowserRouter([
       </AppShell>
     ),
   },
-]);
+];
+
+if (Gallery) {
+  routes.push({
+    path: '/_gallery',
+    element: (
+      <AppShell>
+        <Suspense fallback={null}>
+          <Gallery />
+        </Suspense>
+      </AppShell>
+    ),
+  });
+}
+
+export const router = createBrowserRouter(routes);

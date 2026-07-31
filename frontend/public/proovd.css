@@ -52,6 +52,8 @@
   /* brand core */
   --brand:        #41ED98;
   --white:        #FAFAFA;
+  --surface:      #FFFFFF;   /* pure-white component fill (inputs, toggle track,
+                                modal) — distinct from the #FAFAFA page bg */
   --dark:         #013F17;   /* Dark Green — section fill */
   --darker:       #012D10;   /* Darker Green — headers on white, tab drawers */
   --brand-5:      rgba(65, 237, 152, 0.05);  /* selection / loading / live */
@@ -865,6 +867,112 @@ a::after, .u::after {
 .mode-light .sk-7  { --sk-o: var(--dark); --sk-i: var(--sky); }
 .mode-light .sk-8  { --sk-o: var(--sky);  --sk-i: var(--dark); }
 .mode-light .sk-9  { --sk-o: var(--sky);  --sk-i: var(--brand); }
+
+
+/* ════════════════════════════════════ PHASE 02 — component styles the kit
+   references but the base sheet didn't define: icon sizing, the standalone
+   tabs, the six-question state panel, the one-thing-per-screen flow, and the
+   Glance/Act/Explore scaffold. Same discipline: read a mode slot or a token,
+   never a raw value. */
+
+/* icons — default glyph size; more specific rules (.option__box svg) win */
+.pv-ico { display: inline-block; width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-width: 2; vertical-align: -0.15em; flex: none; }
+.icon svg:not(.pv-ico) { width: 1.5rem; height: 1.5rem; }
+
+/* screen-reader-only text (visible to assistive tech, off-screen visually) */
+.pv-sr {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ---- Field wrapper — label, optional hint, control, programmatic error */
+.field { display: grid; gap: var(--sp-8); }
+.field .field-label { margin-bottom: 0; }
+.field-hint { color: var(--grey); font-size: 0.9375rem; margin: 0; }
+.field-error { color: var(--darker); font-weight: 700; margin: 0; }
+
+/* ---- Toggle row label stack (sits bare on the page, §7.1) */
+.toggle-row__label { display: grid; gap: var(--sp-4); }
+.toggle-row__label .field-label { margin-bottom: 0; }
+
+/* ---- Tabs (standalone; the drawer tab list keeps its own rules above).
+   Radix owns roving focus + selection; the underline is moved by GSAP, and the
+   active tab is also weight-shifted so the state never rides on colour alone. */
+.tablist { position: relative; display: flex; flex-wrap: wrap; gap: var(--sp-24); }
+.tab {
+  background: none; border: none;
+  padding: var(--sp-12) var(--sp-4);
+  min-height: var(--touch);
+  color: var(--mode-body);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  position: relative;
+}
+.tab.is-active { color: var(--mode-title); font-weight: 900; }
+.tab-underline {
+  position: absolute; left: 0; bottom: 0;
+  width: 0; height: 2px;
+  background: var(--brand);
+  border-radius: var(--radius);
+}
+.tabpanel { padding-block: var(--sp-24); }
+
+/* ---- Accordion header wrapper (Radix renders the heading element) */
+.accordion__header { margin: 0; font-size: inherit; line-height: inherit; }
+.menu button:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- StatePanel — Spec §27.1 six questions. Sits on the page by default; the
+   brand ring is opt-in for a "needs you" emphasis state. */
+.state-panel { display: grid; gap: var(--sp-16); max-width: var(--measure); }
+.state-panel--ring {
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  background: var(--brand-5);
+  padding: var(--sp-24);
+}
+.state-panel__head {
+  font-size: var(--fs-step); font-weight: 900; line-height: 1.2;
+  color: var(--mode-title); margin: 0; max-width: none;
+}
+.state-panel__rows { display: grid; gap: var(--sp-8); margin: 0; }
+.state-panel__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, max-content) 1fr;
+  gap: var(--sp-16); align-items: baseline;
+}
+.state-panel__key { color: var(--grey); font-weight: 700; margin: 0; }
+.state-panel__val { color: var(--mode-body); min-width: 0; margin: 0; }
+.state-panel__val .utc { color: var(--grey); }
+.state-panel__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-12); }
+.state-panel__noaction { color: var(--grey); font-weight: 700; }
+@media (max-width: 600px) {
+  .state-panel__row { grid-template-columns: 1fr; gap: var(--sp-4); }
+}
+
+/* ---- Flow — one-thing-per-screen sequence (DNA §5.9). The stage clips the
+   sliding step so a transition never spawns a scrollbar. */
+.flow { display: grid; gap: var(--sp-32); }
+.flow__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16); flex-wrap: wrap; }
+.flow__progress { flex: 1 1 12rem; min-width: 0; }
+.flow__meta-right { display: flex; align-items: center; gap: var(--sp-12); }
+.flow__count { color: var(--grey); font-weight: 700; }
+.flow__stage { position: relative; overflow: hidden; }
+.flow__step { display: grid; gap: var(--sp-24); }
+.flow__nav { display: flex; align-items: center; gap: var(--sp-12); margin-top: var(--sp-8); }
+.flow__summary { display: grid; gap: var(--sp-16); margin: 0; }
+.flow__summary-row {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) 1fr auto;
+  gap: var(--sp-16); align-items: baseline;
+}
+
+/* ---- Glance / Act / Explore scaffold (DNA §5.2) */
+.scaffold { display: grid; gap: var(--sp-48); }
+.scaffold__glance { display: grid; gap: var(--sp-16); }
+.scaffold__act { display: grid; gap: var(--sp-16); max-width: var(--measure); }
+.scaffold__explore-open { justify-self: start; }
 
 
 /* ─── FOCUS — declared after every stroke outline so the keyboard ring
