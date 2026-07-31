@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { MotionProvider } from './motion/MotionProvider.js';
+import { LinkUnavailable } from './surfaces/LinkUnavailable.js';
 
 // Phase 02: the design system plus a development-only gallery route. Product
 // surfaces begin in Phase 05. Each later phase adds routes here.
@@ -41,6 +42,19 @@ const routes = [
     element: (
       <AppShell>
         <BlankPage />
+      </AppShell>
+    ),
+  },
+  {
+    // Phase 04 (§5.5). One route for every token failure — invalid, expired,
+    // revoked, claimed, malformed, rate-limited, never-existed. Deliberately
+    // takes no parameter and reads no state: anything this page could vary on
+    // is something a caller could measure to learn whether a link, an account,
+    // or a draft exists.
+    path: '/link-unavailable',
+    element: (
+      <AppShell>
+        <LinkUnavailable />
       </AppShell>
     ),
   },

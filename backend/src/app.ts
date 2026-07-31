@@ -3,19 +3,50 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { Database } from './db/client.js';
 import { createHealthRouter } from './routes/health.js';
+import { createAuthRouter } from './routes/auth.js';
+import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
+import { createAuditWriter } from './auth/audit.js';
+import { createTokenService, type TokenService } from './auth/token-service.js';
 
 export interface AppConfig {
   appBaseUrl: string;
   nodeEnv: string;
   /** Absolute path to the directory that holds the SPA build. */
   publicDir: string;
+  /** Signs Better Auth sessions and reset links. */
+  authSecret: string;
+  /** §6 Admin setting — reauthentication window. No default anywhere. */
+  adminReauthWindowSeconds: number;
+  /** §5.5 email-link password reset. Injected; the transport arrives later. */
+  sendResetPassword: SendResetPassword;
+  /** Founder-only Google sign-in (§5.2). Omitted when unconfigured. */
+  google?: { clientId: string; clientSecret: string };
 }
 
-export function createApp(db: Database, config: AppConfig): express.Express {
+export interface ProovdApp {
+  app: express.Express;
+  auth: Auth;
+  tokens: TokenService;
+}
+
+export function createApp(db: Database, config: AppConfig): ProovdApp {
   const app = express();
+
+  // ── Auth (§5) ──────────────────────────────────────────────────────────────
+  // Three account roles through Better Auth; the two account-less surfaces
+  // through the token service. Both write to the same immutable audit table.
+  const audit = createAuditWriter(db);
+  const auth = createAuth({
+    db,
+    baseUrl: config.appBaseUrl,
+    secret: config.authSecret,
+    adminReauthWindowSeconds: config.adminReauthWindowSeconds,
+    sendResetPassword: config.sendResetPassword,
+    ...(config.google ? { google: config.google } : {}),
+  });
+  const tokens = createTokenService({ db, audit });
 
   // ── Security headers ───────────────────────────────────────────────────────
   app.use(helmet());
@@ -41,11 +72,13 @@ export function createApp(db: Database, config: AppConfig): express.Express {
   // ── Routes (per-router body parsing — no global express.json()) ────────────
   //
   // DO NOT add app.use(express.json()) here. Phase 10 mounts Stripe webhook
-  // routes that need the raw body for signature verification. A global JSON
-  // parser consumes the raw body first and causes signature failures that
-  // look like a Stripe configuration problem. Each router adds its own body
-  // parsing at the correct scope.
+  // routes that need the raw body for signature verification, and Better
+  // Auth's handler reads the request stream itself. A global JSON parser
+  // consumes the raw body first and breaks both — as a signature failure that
+  // looks like a Stripe configuration problem, and as sign-in requests that
+  // hang. Each router adds its own body parsing at the correct scope.
 
+  app.use(createAuthRouter(auth));
   app.use(createHealthRouter(db));
 
   // ── SPA fallback ──────────────────────────────────────────────────────────
@@ -63,5 +96,5 @@ export function createApp(db: Database, config: AppConfig): express.Express {
     });
   });
 
-  return app;
+  return { app, auth, tokens };
 }

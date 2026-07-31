@@ -15,10 +15,10 @@
  * A helpful error message here is a user-enumeration vulnerability.
  */
 
-import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { randomBytes, createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { and, eq, isNull, lte, sql } from 'drizzle-orm';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { secureTokens, type SecureToken } from '../db/schema/tokens';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { secureTokens, type SecureToken } from '../db/schema/tokens.js';
 
 /* ── Configuration ────────────────────────────────────────────────────────── */
 
@@ -106,7 +106,7 @@ export function safeCompareHex(a: string, b: string): boolean {
 /* ── Service ──────────────────────────────────────────────────────────────── */
 
 export interface TokenServiceDeps {
-  db: PostgresJsDatabase<Record<string, unknown>>;
+  db: NodePgDatabase<Record<string, unknown>>;
   /**
    * Writes to the immutable audit table (Spec §25.6). Every issue, rotate,
    * revoke, claim, and failed verification is recorded here — this is where
@@ -138,7 +138,7 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
   ): Promise<IssuedToken> {
     const raw = generateRawToken();
     const tokenHash = hashToken(raw);
-    const lineageId = crypto.randomUUID();
+    const lineageId = randomUUID();
 
     const expiresAt =
       opts.expiresAt !== undefined

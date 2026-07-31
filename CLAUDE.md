@@ -21,19 +21,21 @@ You are building this one phase at a time. **Read the phase file you were given,
 
 ## Repository state — read this before looking for a file
 
-This repo is **pre-Phase-1**. It holds only the governing documents plus staged design-system and prebuilt-integration files. **There is no application code yet.** `frontend/`, `backend/`, and `shared/` do not exist. The code tree in `docs/tech-stack-v2.md` §11 is the *target* layout, and the paths this file names — `shared/money`, `backend/src/auth/token-service.ts`, `frontend/src/motion/MotionProvider.tsx`, `frontend/public/proovd.css` — are where things *will* live, not where they are now. Never assume a path this file references already exists; check first.
+**Phases 00–04 are complete and committed.** Phase 05 (public site and policy routes) is next. Every path this file names now exists at the path it names — the staging table that used to live here is gone because Phase 0 moved those files to their targets. `docs/phases/phase-00.md` … `phase-24.md` are all present.
 
-What is actually on disk today, and where the docs point instead:
+What exists on disk:
 
-| Thing | Referenced in the docs as | Actually at |
-|---|---|---|
-| Engineering Spec | `docs/spec/…-Spec-v1_0.md` | `docs/spec/Proovd-MVP-Engineering-Implementation-Spec-v1_0.md` ✓ |
-| DNA | `docs/spec/Proovd_DNA.md` | `docs/spec/Proovd_DNA.md` ✓ |
-| Stylesheet / motion runtime | `frontend/public/proovd.css`, `…/proovd-motion.js` | `docs/spec/proovd.css`, `docs/spec/proovd-motion.js` (staged) |
-| Vendored GSAP + smoke test | `frontend/public/vendor/gsap/…`, `…/gsap-check.html` | `docs/gsap/vendor/gsap/…`, `docs/gsap/gsap-check.html` (staged) |
-| Phase files | `docs/phases/phase-NN.md` | only `phase-00.md` exists so far |
+| Area | State |
+|---|---|
+| `shared/` | money waterfall, three state machines, business-day calendar, notification registry, Zod schemas |
+| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards |
+| `frontend/` | design-system components, `MotionProvider`, dev-only gallery at `/_gallery`, `/link-unavailable` |
+| `frontend/public/` | `proovd.css`, `proovd-motion.js`, `vendor/gsap/*.min.js`, `gsap-check.html` |
 
-The two spec files now match the paths the docs reference. The remaining rows are still staged under `docs/` — open by the "Actually at" column until Phase 0 moves them. Phase 0 (`docs/phases/phase-00.md`) is a **human** step, not a Claude Code session: it moves the staged files to their target paths under `frontend/`, `backend/`, and `shared/`, and runs the `gsap-check.html` smoke test. Phase 1 is the first Claude Code session and scaffolds the workspaces, Docker, Postgres, and test harness (`docs/master-plan.md` §6).
+Two gaps to know about, neither of them a bug:
+
+- **`frontend/public/fonts/` is empty.** `proovd.css` already declares `@font-face` against `Satoshi-Variable.woff2` and `Satoshi-VariableItalic.woff2`. Until those two files are dropped in, the fail-loud font notice is *correct* behaviour, not something to suppress.
+- **Product surfaces do not exist yet.** Phase 04 built the auth *mechanism* — guards, token middleware, the failure surface — but mounts the guards on no product route, because the routes they will protect arrive in Phase 05 and later. `backend/src/tests/auth-tokens.test.ts` mounts them on probe routes to prove they work.
 
 ## How a session works
 
@@ -41,13 +43,14 @@ One phase per session (`docs/master-plan.md` §1.3): read `docs/phases/phase-NN.
 
 ## Toolchain (established Phase 1, per `docs/tech-stack-v2.md` §2, §11, §13)
 
-Nothing below runs yet — these are the commands the scaffolding will expose, so a future session knows what to reach for once it exists.
-
 - **Repo:** npm workspaces — `frontend/` (React 19 + Vite), `backend/` (Express 5), `shared/` (Zod schemas, money waterfall, state machines, calendar). One root `package.json`, one multi-stage `Dockerfile`.
 - **DB:** Postgres 16 + Drizzle; `drizzle-kit` generates and applies migrations. Money is integer cents in `bigint`.
-- **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres test container for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11. To run one test, use Vitest's filter (`vitest run -t "<name>"` / path).
+- **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one test with Vitest's filter: `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`.
+- **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11.
+- **Integration tests need a real Postgres.** `backend/src/tests/app-harness.ts` uses `TEST_DATABASE_URL` when set and otherwise starts a Testcontainers `postgres:16-alpine`, which needs Docker. The migrator runs `CREATE ROLE proovd_app`, so the connecting role needs `CREATEROLE` or superuser.
 - **Local Stripe:** the Stripe CLI forwards webhooks; its signing secret lives in local env only. Mount raw-body parsing on webhook routes **before** `express.json()`.
 - **Env:** copy `.env.example` (variable names only; `docs/tech-stack-v2.md` §17). `backend/src/env.ts` is Zod-validated and fails closed on any live/test key or mode mismatch.
+- **`backend/tsconfig.json` sets `declaration: false` on purpose.** Declaration emit forces TypeScript to name every inferred type, and Better Auth's instance type reaches into its own bundled Zod, which this package cannot name (TS2742). The backend is an application; nothing imports its `.d.ts`.
 
 ---
 
@@ -112,9 +115,34 @@ Insert-only. `UPDATE` and `DELETE` are revoked from the app role at the database
 
 The MVP is manual behind a polished surface. Present manual steps truthfully as guided review, safety control, or human support. Manual work is valid **only when the app records it** (§1.3).
 
+### Auth — four actors, two mechanisms (§5, built Phase 04)
+
+This is not four login types. Admin, Founder, and Affiliate have accounts in Better Auth (`backend/src/auth/auth.ts`); Backers have none at all.
+
+| Actor | Mechanism |
+|---|---|
+| Admin | Email + password, **mandatory TOTP**, freshness gate on sensitive actions |
+| Founder | Email + password **or** Google OAuth |
+| Affiliate | Email + password, private campaign-specific invitation only |
+| Backer | **No account.** Campaign-scoped magic link, via the token service |
+
+- **No public signup exists, for any role.** `disableSignUp: true` closes the HTTP route. Accounts are created server-side through `backend/src/auth/seed.ts` (`seedAccount`), which always takes an explicit `role` and has no HTTP surface. Do not add one — §33.2.1 is exactly this.
+- **`role` has no database default.** Every creation path states it. Google sign-in maps to `founder` because §5.1 seeds Admins and §5.3 admits Affiliates by invitation only, so neither has an OAuth route.
+- **Guards fail closed** (`backend/src/auth/guards.ts`): `requireSession`, `requireRole`, `requireAdmin`, `requireFreshSession`. No session, unreadable session, database error, missing role, Admin without a registered factor, stale session — every one blocks. None logs a warning and proceeds (§33.12.5).
+- **`ADMIN_REAUTH_WINDOW_SECONDS` has no default anywhere.** §6 names the setting and fixes no number, so the app refuses to boot without it. Phase 06 moves it into the Admin settings surface. Do not invent a value in code.
+- **Phone is never verified.** A CHECK constraint pins `user.phone_verified` false. There is no SMS OTP path and the acceptance suite scans the source tree to keep it that way (§33.1.8).
+
 ### Tokens (§28.1)
 
 Backers have **no account**. Use `backend/src/auth/token-service.ts` — never Better Auth's magic-link plugin, which creates accounts and sessions. Raw tokens exist only in the delivered URL: never at rest, never in a log, never in an error. Every rejection returns the identical value; invalid, expired, revoked, claimed, and never-existed are indistinguishable to the caller (§5.5).
+
+Wired in Phase 04, and the parts that are easy to undo by accident:
+
+- **One rejection, one status, one body.** `backend/src/auth/token-rejection.ts` holds a frozen constant. Nothing per-request goes in it — no incident id, no timestamp, no retry hint. Rate limiters on token routes return *this*, never a 429: a limiter that announces itself is the same enumeration oracle wearing a different hat.
+- **Never add a reason field.** `TokenInvalid` carries none by design. The reason goes to the audit log, where support can read it and the caller cannot.
+- **Token URLs are redacted in one place.** `backend/src/auth/token-routes.ts` owns both the route shapes and `redactTokenUrl`; Sentry's `beforeSend`/`beforeBreadcrumb` in `index.ts` read from it. Two copies of that list would drift, and the drift is invisible until a token shows up in a log.
+- **Concurrent claim is a conditional `UPDATE`**, never select-then-update, backed by the partial unique index `secure_tokens_one_live_per_lineage`.
+- The database also enforces scope binding, token-identity immutability, and append-only `claimed_at` (migration `0002_auth_and_tokens.sql`, hand-written section).
 
 ### Forbidden patterns (§30, DNA §5.10)
 

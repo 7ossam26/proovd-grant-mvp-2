@@ -15,6 +15,13 @@
       "when": 1785477087609,
       "tag": "0001_domain_kernel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785486303478,
+      "tag": "0002_auth_and_tokens",
+      "breakpoints": true
     }
   ]
 }

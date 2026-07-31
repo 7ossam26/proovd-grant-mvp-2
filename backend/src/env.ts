@@ -28,6 +28,25 @@ const schema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
 
+  // ── Auth (§5, §28.1, §28.2) ──────────────────────────────────────────────
+  // Signs Better Auth sessions and reset links. Same length floor as
+  // CRON_SECRET: a short one is a forgeable session.
+  BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be at least 32 characters'),
+
+  // Founder-only Google sign-in (§5.2). Optional, but all-or-nothing —
+  // half-configured OAuth fails at the redirect, in production, on a Founder.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // §6 Admin setting: "Admin MFA and reauthentication window." The Spec names
+  // the setting and fixes no number, so there is deliberately NO default — the
+  // operator states it and the app refuses to boot without it. Phase 06 moves
+  // this into the Admin settings surface that §6 describes.
+  ADMIN_REAUTH_WINDOW_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive('ADMIN_REAUTH_WINDOW_SECONDS must be a positive number of seconds'),
+
   // ── Jobs ─────────────────────────────────────────────────────────────────
   // Must be present and ≥32 chars. Protects close-batch and cron endpoints.
   CRON_SECRET: z.string().min(32, 'CRON_SECRET must be at least 32 characters'),
@@ -82,6 +101,22 @@ function checkStripeMode(data: Env): void {
 }
 
 /**
+ * Google OAuth is configured or it is not. A client ID without its secret
+ * survives validation and then fails at the redirect — in production, on a
+ * Founder mid-signin (§5.2). Fail at boot instead.
+ */
+function checkGoogleOAuth(data: Env): void {
+  const hasId = Boolean(data.GOOGLE_CLIENT_ID);
+  const hasSecret = Boolean(data.GOOGLE_CLIENT_SECRET);
+  if (hasId !== hasSecret) {
+    throw new Error(
+      'Google OAuth is half-configured: set both GOOGLE_CLIENT_ID and ' +
+        'GOOGLE_CLIENT_SECRET, or neither.',
+    );
+  }
+}
+
+/**
  * Validates raw environment variables and returns the typed result.
  * Throws on schema failure or Stripe mode mismatch.
  * Tests import this directly; `loadEnv` is what triggers process.exit.
@@ -93,6 +128,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
     throw new Error(`Environment validation failed:\n${messages.join('\n')}`);
   }
   checkStripeMode(result.data);
+  checkGoogleOAuth(result.data);
   return result.data;
 }
 

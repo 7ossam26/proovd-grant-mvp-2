@@ -5,6 +5,14 @@
     "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
+    // The backend is an application, not a published library — nothing imports
+    // its .d.ts. Declaration emit also forces TypeScript to *name* every
+    // inferred type, and Better Auth's instance type reaches into its own
+    // bundled Zod, which cannot be named from here (TS2742). Turning emit off
+    // is what lets `createAuth` keep its precise inferred type instead of being
+    // widened to a base interface that loses the configured user fields.
+    "declaration": false,
+    "declarationMap": false,
     "paths": {
       "@proovd/shared": ["../shared/src/index.ts"]
     }
@@ -12,7 +20,6 @@
   "include": ["src/**/*"],
   "exclude": [
     "src/**/*.test.ts",
-    "src/auth/**/*",
     "node_modules",
     "dist"
   ]

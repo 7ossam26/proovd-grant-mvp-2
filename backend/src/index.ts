@@ -13,12 +13,37 @@ async function main() {
   const env = loadEnv();
 
   // ── Sentry ─────────────────────────────────────────────────────────────────
+  // §28.1: a raw token exists only in the delivered URL and never in a log or
+  // an error. Sentry's default behaviour is to attach the request URL to every
+  // event and every navigation breadcrumb, which would put draft and magic-link
+  // tokens in a third-party system the moment anything threw on one of those
+  // routes. The redaction rule lives beside the route definitions in
+  // `auth/token-routes.ts` so the two cannot drift apart.
   if (env.SENTRY_DSN) {
     const Sentry = await import('@sentry/node');
+    const { redactTokenUrl } = await import('./auth/token-routes.js');
+
+    const scrub = (value: unknown): string | undefined =>
+      typeof value === 'string' ? redactTokenUrl(value) : undefined;
+
     Sentry.init({
       dsn: env.SENTRY_DSN,
       environment: env.NODE_ENV,
       tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
+      // sendDefaultPii stays off: these routes have no account behind them and
+      // the Spec's privacy contract (§28.4) is narrower than Sentry's default.
+      sendDefaultPii: false,
+      beforeSend(event) {
+        const url = scrub(event.request?.url);
+        if (url && event.request) event.request.url = url;
+        if (event.request?.query_string) delete event.request.query_string;
+        return event;
+      },
+      beforeBreadcrumb(breadcrumb) {
+        const url = scrub(breadcrumb.data?.['url']);
+        if (url && breadcrumb.data) breadcrumb.data['url'] = url;
+        return breadcrumb;
+      },
     });
     sentryInitialised = true;
   }
@@ -44,10 +69,28 @@ async function main() {
   // ── Express app ────────────────────────────────────────────────────────────
   const { createApp } = await import('./app.js');
   const publicDir = path.join(__dirname, '..', 'public');
-  const app = createApp(db, {
+  const { app } = createApp(db, {
     appBaseUrl: env.APP_BASE_URL,
     nodeEnv: env.NODE_ENV,
     publicDir,
+    authSecret: env.BETTER_AUTH_SECRET,
+    adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
+    // §5.5 password reset for Founder, Affiliate, and Admin. Resend arrives in
+    // a later phase; until it does this refuses loudly rather than pretending
+    // to have sent mail (§1.4: never imply automation that does not exist).
+    sendResetPassword: async () => {
+      throw new Error(
+        'Password-reset delivery is not wired yet: no transactional email provider is configured.',
+      );
+    },
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+          },
+        }
+      : {}),
   });
 
   // ── Start ──────────────────────────────────────────────────────────────────

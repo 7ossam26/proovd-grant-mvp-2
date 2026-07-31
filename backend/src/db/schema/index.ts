@@ -1,5 +1,7 @@
 // Phase 3: domain kernel — skeleton domain tables + integrity tables.
-// tokens.ts is staged Phase 4 code and is deliberately NOT exported yet;
-// exporting it would pull secure_tokens into the migration set early.
+// Phase 4: Better Auth account tables and the secure_tokens table that serves
+// the two account-less surfaces (Founder drafts, Backer magic links).
 export * from './domain.js';
 export * from './integrity.js';
+export * from './auth.js';
+export * from './tokens.js';

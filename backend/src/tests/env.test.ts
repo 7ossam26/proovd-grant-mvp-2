@@ -18,6 +18,8 @@ const validBase = {
   STRIPE_PLATFORM_SECRET_KEY: FAKE_TEST_SK,
   STRIPE_PLATFORM_PUBLISHABLE_KEY: FAKE_TEST_PK,
   CRON_SECRET: 'a-32-character-or-longer-cron-secret-for-tests',
+  BETTER_AUTH_SECRET: 'a-32-character-or-longer-better-auth-secret-for-tests',
+  ADMIN_REAUTH_WINDOW_SECONDS: '300',
 };
 
 describe('env.validateEnv — Stripe mode guard (Spec §6)', () => {
@@ -80,5 +82,39 @@ describe('env.validateEnv — Stripe mode guard (Spec §6)', () => {
   it('rejects missing DATABASE_URL', () => {
     const { DATABASE_URL: _, ...rest } = validBase;
     expect(() => validateEnv(rest)).toThrow(/DATABASE_URL/);
+  });
+});
+
+describe('env.validateEnv — auth configuration (Spec §5, §6, §28.2)', () => {
+  it('rejects a short BETTER_AUTH_SECRET', () => {
+    expect(() => validateEnv({ ...validBase, BETTER_AUTH_SECRET: 'short' })).toThrow(/32/);
+  });
+
+  // §6 names "Admin MFA and reauthentication window" as a setting but fixes no
+  // number. The app therefore has no default: it refuses to boot until the
+  // operator states one, rather than inventing a commercial rule (§1 rule 6).
+  it('refuses to boot without an explicit ADMIN_REAUTH_WINDOW_SECONDS', () => {
+    const { ADMIN_REAUTH_WINDOW_SECONDS: _, ...rest } = validBase;
+    expect(() => validateEnv(rest)).toThrow(/ADMIN_REAUTH_WINDOW_SECONDS/);
+  });
+
+  it('rejects a non-positive reauthentication window', () => {
+    expect(() => validateEnv({ ...validBase, ADMIN_REAUTH_WINDOW_SECONDS: '0' })).toThrow(
+      /ADMIN_REAUTH_WINDOW_SECONDS/,
+    );
+  });
+
+  it('accepts Google OAuth configured fully or not at all (§5.2)', () => {
+    expect(() => validateEnv(validBase)).not.toThrow();
+    expect(() =>
+      validateEnv({ ...validBase, GOOGLE_CLIENT_ID: 'id', GOOGLE_CLIENT_SECRET: 'secret' }),
+    ).not.toThrow();
+  });
+
+  it('rejects a half-configured Google OAuth, which would fail mid-signin instead', () => {
+    expect(() => validateEnv({ ...validBase, GOOGLE_CLIENT_ID: 'id' })).toThrow(/GOOGLE_CLIENT/);
+    expect(() => validateEnv({ ...validBase, GOOGLE_CLIENT_SECRET: 'secret' })).toThrow(
+      /GOOGLE_CLIENT/,
+    );
   });
 });

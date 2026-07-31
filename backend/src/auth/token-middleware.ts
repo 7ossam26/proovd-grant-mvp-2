@@ -1,0 +1,144 @@
+/**
+ * Express middleware for the two token-bearing surfaces (§7, §19).
+ *
+ * This layer does three things and no more: read the raw value out of the URL,
+ * hand it to `token-service.verify()`, and attach the scoped subject to the
+ * request. It does not reimplement verification, does not inspect the hash, and
+ * does not learn why a token was rejected — `verify()` returns one opaque
+ * failure by design and this file is not entitled to more.
+ *
+ * The subject it attaches is the authorization boundary for everything
+ * downstream. §33.1.1: a draft link "grants no other access" — no account, no
+ * Admin, no payment, no other Founder's draft. A route that reads
+ * `req.draftSubject.campaignDraftId` and scopes its query to it cannot be
+ * talked into serving another draft, because no other id ever reaches it.
+ */
+
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
+import rateLimit, { type Options as RateLimitOptions } from 'express-rate-limit';
+import type { DraftSubject, MagicLinkSubject, TokenService } from './token-service.js';
+import type { SecureToken } from '../db/schema/tokens.js';
+import { sendTokenRejection } from './token-rejection.js';
+import { TOKEN_PARAM } from './token-routes.js';
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    /** Present only after `requireDraftToken` has admitted the request. */
+    draftSubject?: DraftSubject;
+    /** Present only after `requireMagicLinkToken` has admitted the request. */
+    magicLinkSubject?: MagicLinkSubject;
+    /** The verified row, for routes that need its version or issue time. */
+    secureToken?: SecureToken;
+  }
+}
+
+function readRawToken(req: Request): string {
+  const fromPath = req.params[TOKEN_PARAM];
+  if (typeof fromPath === 'string' && fromPath.length > 0) return fromPath;
+
+  // Accepted so a client can move the value out of the URL once it has it,
+  // which keeps it out of browser history and Referer headers on later calls.
+  const header = req.get('authorization');
+  if (header?.startsWith('Bearer ')) return header.slice('Bearer '.length);
+
+  return '';
+}
+
+/**
+ * Verification rate limit (§28.1: "rate-limit attempts and resend").
+ *
+ * The handler is the ordinary rejection, not a 429. A limiter that announces
+ * itself tells an attacker their guesses are being counted and, worse, hands
+ * them a response that differs from a plain miss — which is the enumeration
+ * oracle the whole surface exists to avoid.
+ */
+export function createTokenVerifyLimiter(overrides: Partial<RateLimitOptions> = {}): RequestHandler {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: false,
+    legacyHeaders: false,
+    handler: (_req, res) => {
+      void sendTokenRejection(res, Date.now());
+    },
+    ...overrides,
+  });
+}
+
+/**
+ * Resend rate limit (§28.1, §5.5). Tighter than verification: a resend sends
+ * mail, so an unthrottled one is a way to use Proovd to flood someone's inbox.
+ *
+ * §5.5 permits a self-resend only if it stays non-enumerating, so this shares
+ * the rejection path — a throttled resend must be indistinguishable from an
+ * accepted one, exactly as an unknown address must be.
+ */
+export function createTokenResendLimiter(overrides: Partial<RateLimitOptions> = {}): RequestHandler {
+  return rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 5,
+    standardHeaders: false,
+    legacyHeaders: false,
+    handler: (_req, res) => {
+      void sendTokenRejection(res, Date.now());
+    },
+    ...overrides,
+  });
+}
+
+function createTokenGuard(
+  tokens: TokenService,
+  scope: 'founder_draft' | 'backer_magic_link',
+): RequestHandler {
+  return async function tokenGuard(req: Request, res: Response, next: NextFunction) {
+    // Started before any work, so the rejection floor covers the database
+    // round-trip that a well-formed-but-wrong token pays and a malformed one
+    // does not.
+    const startedAt = Date.now();
+    const raw = readRawToken(req);
+
+    let result;
+    try {
+      result = await tokens.verify(raw, scope);
+    } catch {
+      // A database failure must not become a different-looking response. The
+      // caller learns nothing either way.
+      await sendTokenRejection(res, startedAt);
+      return;
+    }
+
+    if (!result.ok) {
+      await sendTokenRejection(res, startedAt);
+      return;
+    }
+
+    req.secureToken = result.token;
+    if (result.subject.scope === 'founder_draft') {
+      req.draftSubject = result.subject;
+    } else {
+      req.magicLinkSubject = result.subject;
+    }
+    next();
+  };
+}
+
+/**
+ * Admits a Founder draft link and nothing else (§7).
+ *
+ * A magic link presented here fails: `verify()` is given the expected scope and
+ * treats a mismatch as a rejection, so the two surfaces cannot be crossed.
+ */
+export function requireDraftToken(tokens: TokenService): RequestHandler {
+  return createTokenGuard(tokens, 'founder_draft');
+}
+
+/**
+ * Admits a Backer magic link and nothing else (§19).
+ *
+ * The subject carries both the campaign and the Backer identity, because §19
+ * grants access to "that Backer's view of that campaign" — one id would be a
+ * broader grant than the Spec allows.
+ */
+export function requireMagicLinkToken(tokens: TokenService): RequestHandler {
+  return createTokenGuard(tokens, 'backer_magic_link');
+}
