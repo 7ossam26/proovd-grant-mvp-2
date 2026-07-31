@@ -2,13 +2,19 @@
    PROOVD-MOTION.JS — the GSAP motion layer
    Source of truth: "Proovd Design System" doc §6 (+ §3 font verification).
 
-   Load order (§6.7 — vendored files, never CDN, never hand-inlined):
-     <script src="vendor/gsap.min.js"></script>
-     <script src="vendor/ScrollTrigger.min.js"></script>
-     <script src="vendor/Flip.min.js"></script>
-     <script src="vendor/SplitText.min.js"></script>
+   Load order (§6.7 — vendored files, never CDN, never hand-inlined,
+   never imported from npm — never install the gsap package):
+     <script src="vendor/gsap/gsap.min.js"></script>
+     <script src="vendor/gsap/ScrollTrigger.min.js"></script>
+     <script src="vendor/gsap/Flip.min.js"></script>
+     <script src="vendor/gsap/SplitText.min.js"></script>
      <link rel="stylesheet" href="proovd.css">
      <script src="proovd-motion.js"></script>   ← this file, last
+
+   In React: never call init() directly. Mount frontend/src/motion/
+   MotionProvider.tsx and drive motion through useProovdMotion() /
+   useGsapScope() — a raw init() binds listeners to DOM nodes React
+   later replaces, and animations then die silently as the app grows.
 
    What it does:
    1. Fails loud + safe (§6.6): missing GSAP → html.no-motion + visible
