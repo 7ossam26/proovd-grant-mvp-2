@@ -21,13 +21,28 @@
  * genuinely new email rather than being swallowed as a duplicate of the first.
  * Keying dedup on the draft would satisfy §27.2 and break §7.
  *
- * ── The order of operations, and the window it leaves ───────────────────────
- * Token first, then send. If the provider refuses, the rotated token has
- * already invalidated the previous one, so the Founder's old link is dead and
- * no new one has arrived. That is recorded, visible in Admin, and recoverable
- * by resending. The alternative — send first, then rotate — risks delivering a
- * link that the next statement invalidates, which is worse: the Founder holds
+ * ── The order of operations, and the windows it leaves ──────────────────────
+ * Token, then send row, then the provider, then confirmation. Two orderings
+ * were chosen deliberately and both are about which way a crash fails.
+ *
+ * **Token before send.** If the provider refuses, the rotated token has already
+ * invalidated the previous one, so the Founder's old link is dead and no new
+ * one has arrived. That is recorded, visible in Admin, and recoverable by
+ * resending. The alternative — send first, then rotate — risks delivering a
+ * link the next statement invalidates, which is worse: the Founder holds
  * something that looks live and is not.
+ *
+ * **Send row before the provider.** The row carries `notification_id` NULL
+ * until the provider acknowledges. Writing it afterwards instead would leave a
+ * crash-shaped hole where an email was delivered with no send row — therefore
+ * no retention clock, therefore a draft §25.8 would never sweep. §25.8 sets a
+ * maximum, not a minimum: a clock that starts slightly early deletes sooner,
+ * which is the safe side; one that never starts keeps personal data forever.
+ *
+ * The cost is the opposite window — a row recorded for a message that may not
+ * have gone out. That is why `notification_id` NULL is a *state*, not missing
+ * data: the draft stays out of `sent` until delivery is confirmed, and Admin
+ * renders the send as "not confirmed" rather than implying it arrived (§1.4).
  */
 
 import { randomUUID } from 'node:crypto';
@@ -463,6 +478,25 @@ export async function sendInvitation(
     ),
   );
 
+  // The send row lands BEFORE the provider call, with `notification_id` NULL.
+  // This is what guarantees a retention clock exists for anything that might
+  // have been delivered — see the ordering note at the top of this file.
+  await db.insert(campaignInvitationSends).values({
+    id: sendId,
+    draftId: input.draftId,
+    recipientEmail: record.prospect.email,
+    recipientName: record.prospect.preferredName || record.prospect.legalName,
+    senderName: record.draft.senderName!,
+    senderEmail: record.draft.senderEmail!,
+    invitationSource: record.prospect.invitationSource,
+    notificationId: null,
+    tokenId,
+    tokenVersion,
+    tokenExpiresAt,
+    status: 'sent',
+    sentBy: input.actor,
+  });
+
   const outcome = await notifier.send({
     eventKey: FOUNDER_INVITATION,
     entityType: 'campaign_invitation_send',
@@ -476,6 +510,9 @@ export async function sendInvitation(
   });
 
   if (outcome.status === 'failed') {
+    // The send row stays, with `notification_id` NULL. It is not a claim that
+    // a message arrived — it is the record that an attempt was made, and the
+    // retention clock that attempt has to start in case it did.
     await db.insert(auditEvents).values({
       actor: input.actor,
       targetType: 'campaign_draft',
@@ -483,7 +520,7 @@ export async function sendInvitation(
       action: 'invitation.send_failed',
       internalReason: `provider refused: ${outcome.reason}`,
       customerExplanation: null,
-      newValue: { sendId, tokenVersion, resent },
+      newValue: { sendId, tokenVersion, resent, deliveryConfirmed: false },
     });
     return {
       ok: false,
@@ -500,21 +537,13 @@ export async function sendInvitation(
   }
 
   await db.transaction(async (tx) => {
-    await tx.insert(campaignInvitationSends).values({
-      id: sendId,
-      draftId: input.draftId,
-      recipientEmail: record.prospect.email,
-      recipientName: record.prospect.preferredName || record.prospect.legalName,
-      senderName: record.draft.senderName!,
-      senderEmail: record.draft.senderEmail!,
-      invitationSource: record.prospect.invitationSource,
-      notificationId: outcome.notificationId,
-      tokenId,
-      tokenVersion,
-      tokenExpiresAt,
-      status: 'sent',
-      sentBy: input.actor,
-    });
+    // Confirmation. `notification_id` is the only column of this row the
+    // application may write after insert (migration 0006), so `sent_at` and
+    // `token_version` — the facts the retention clock rests on — stay fixed.
+    await tx
+      .update(campaignInvitationSends)
+      .set({ notificationId: outcome.notificationId })
+      .where(eq(campaignInvitationSends.id, sendId));
 
     await tx
       .update(campaignDrafts)

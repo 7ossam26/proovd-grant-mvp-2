@@ -642,7 +642,7 @@ describe('§33.1.2 alteration, cross-Founder access, replay, expiry, revoke, res
     expect(detail.body.hasLiveToken).toBe(true);
   });
 
-  it('leaves no live link when the provider refuses a first send', async () => {
+  it('records an unconfirmed send when the provider refuses, and does not call it sent', async () => {
     const created = await createProspect('refused');
     await compose(created.draftId);
 
@@ -654,20 +654,72 @@ describe('§33.1.2 alteration, cross-Founder access, replay, expiry, revoke, res
       .expect(422);
 
     expect(res.body.whatHappened).toContain('did not accept');
-    // No send row: the record only exists when a message was actually accepted.
+
+    // The send row exists so a retention clock exists for a message that may
+    // have gone out — §25.8 sets a maximum, and erring early is the safe side.
     const sends = await h.db
       .select()
       .from(campaignInvitationSends)
       .where(eq(campaignInvitationSends.draftId, created.draftId));
-    expect(sends).toHaveLength(0);
+    expect(sends).toHaveLength(1);
 
-    // The claim survives, unconfirmed — that is the honest "we tried" state.
+    // …but it is not a claim that anything arrived (§1.4).
+    expect(sends[0]!.notificationId).toBeNull();
+    const [draft] = await h.db
+      .select()
+      .from(campaignDrafts)
+      .where(eq(campaignDrafts.id, created.draftId));
+    expect(draft!.status).toBe('draft');
+
+    // The delivery claim survives, unconfirmed — the honest "we tried" state.
     const undelivered = await h.db
       .select()
       .from(notificationDeliveries)
       .where(eq(notificationDeliveries.target, created.email));
     expect(undelivered).toHaveLength(1);
     expect(undelivered[0]!.deliveredAt).toBeNull();
+  });
+
+  it('confirms the send only once the provider accepts it', async () => {
+    const founder = await invitedFounder('confirmed');
+
+    const [send] = await h.db
+      .select()
+      .from(campaignInvitationSends)
+      .where(eq(campaignInvitationSends.draftId, founder.draftId));
+    expect(send!.notificationId).toBeTruthy();
+
+    const [draft] = await h.db
+      .select()
+      .from(campaignDrafts)
+      .where(eq(campaignDrafts.id, founder.draftId));
+    expect(draft!.status).toBe('sent');
+  });
+
+  it('lets the application confirm a send but never edit its retention clock', async () => {
+    const founder = await invitedFounder('immutable-clock');
+    const client = await h.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SET ROLE proovd_app');
+
+      // The one writable column (migration 0006).
+      await client.query(
+        `UPDATE campaign_invitation_sends SET notification_id = 'reconciled' WHERE draft_id = $1`,
+        [founder.draftId],
+      );
+
+      // Everything the clock rests on stays outside the grant.
+      await expect(
+        client.query(
+          `UPDATE campaign_invitation_sends SET sent_at = now() WHERE draft_id = $1`,
+          [founder.draftId],
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
   });
 });
 
@@ -810,6 +862,59 @@ describe('§33.1.3 the 30-day deletion/anonymisation runs from the most recent s
     const created = await createProspect('never-sent');
     const due = await findDueDrafts(h.db, daysFromNow(365));
     expect(due.map((d) => d.draftId)).not.toContain(created.draftId);
+  });
+
+  it('never sweeps a claimed prospect — that is an account now (§25.8)', async () => {
+    const founder = await invitedFounder('claimed-prospect');
+
+    await h.pool.query(
+      `UPDATE founder_prospects SET claimed_user_id = $2, claimed_at = now() WHERE id = $1`,
+      [founder.prospectId, 'user:some-founder'],
+    );
+
+    const due = await findDueDrafts(h.db, daysFromNow(UNCLAIMED_DRAFT_RETENTION_DAYS + 1));
+    expect(due.map((d) => d.draftId)).not.toContain(founder.draftId);
+
+    const result = await sweepUnclaimedDrafts(
+      h.db,
+      h.tokens,
+      daysFromNow(UNCLAIMED_DRAFT_RETENTION_DAYS + 1),
+    );
+    expect(result.draftIds).not.toContain(founder.draftId);
+
+    const [prospect] = await h.db
+      .select()
+      .from(founderProspects)
+      .where(eq(founderProspects.id, founder.prospectId));
+    expect(prospect!.email).not.toBeNull();
+    expect(prospect!.anonymisedAt).toBeNull();
+  });
+
+  it('still exempts a claimed draft if the claim flow forgets to set claimed_user_id', async () => {
+    // Defence in depth. `claimed_user_id` is the claim flow's job (Phase 07),
+    // and if it were ever missed this query would otherwise anonymise a live
+    // Founder's record 30 days after their invitation. Two things have to be
+    // wrong before real data is destroyed, not one.
+    const founder = await invitedFounder('claimed-status-only');
+
+    await h.pool.query(`UPDATE campaign_drafts SET status = 'claimed' WHERE id = $1`, [
+      founder.draftId,
+    ]);
+
+    const due = await findDueDrafts(h.db, daysFromNow(UNCLAIMED_DRAFT_RETENTION_DAYS + 1));
+    expect(due.map((d) => d.draftId)).not.toContain(founder.draftId);
+  });
+
+  it('still sweeps a revoked draft — revocation kills the link, not the data', async () => {
+    const founder = await invitedFounder('revoked-still-swept');
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.draftId}/revoke`)
+      .set('cookie', admin.cookie)
+      .send({ reason: 'not proceeding' })
+      .expect(200);
+
+    const due = await findDueDrafts(h.db, daysFromNow(UNCLAIMED_DRAFT_RETENTION_DAYS + 1));
+    expect(due.map((d) => d.draftId)).toContain(founder.draftId);
   });
 
   it('refuses to un-anonymise, at the database level', async () => {

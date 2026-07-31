@@ -204,7 +204,19 @@ export const campaignInvitationSends = pgTable(
 
     sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
 
-    /** The provider message id, via `notification_deliveries` (§27.2). */
+    /**
+     * The provider message id, via `notification_deliveries` (§27.2).
+     *
+     * NULL is a state, not missing data: the row is written before the provider
+     * call so that a retention clock exists for anything that might have been
+     * delivered, and this is filled in once delivery is confirmed. NULL
+     * therefore means "recorded, not confirmed delivered", and Admin renders it
+     * as exactly that rather than implying a message arrived (§1.4).
+     *
+     * The only column of this row the application may write after insert
+     * (migration 0006) — `sent_at` and `token_version` stay fixed, so the
+     * retention clock cannot be edited.
+     */
     notificationId: text('notification_id'),
 
     /** The token this send delivered. Its raw value is nowhere (§28.1). */

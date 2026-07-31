@@ -169,7 +169,7 @@ export function FounderDetail() {
                   <th scope="col">By</th>
                   <th scope="col">Link version</th>
                   <th scope="col">Link expires</th>
-                  <th scope="col">Message ID</th>
+                  <th scope="col">Delivery</th>
                 </tr>
               </thead>
               <tbody>
@@ -184,7 +184,25 @@ export function FounderDetail() {
                     <td>
                       <When value={send.tokenExpiresAt} />
                     </td>
-                    <td>{send.notificationId ?? '—'}</td>
+                    <td>
+                      {/* The send row is written before the provider is called,
+                          so a missing message ID means the attempt was recorded
+                          and never confirmed. Saying "—" would let an Admin read
+                          it as delivered (§1.4). */}
+                      {send.notificationId ? (
+                        <>
+                          Confirmed
+                          <span className="admin-table__sub">{send.notificationId}</span>
+                        </>
+                      ) : (
+                        <>
+                          Not confirmed
+                          <span className="admin-table__sub">
+                            Recorded, but the provider never acknowledged it. Resend.
+                          </span>
+                        </>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

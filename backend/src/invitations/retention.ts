@@ -40,7 +40,7 @@
  * details go only when every draft they have is gone.
  */
 
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import type { TokenService } from '../auth/token-service.js';
 import {
@@ -92,8 +92,17 @@ export async function findDueDrafts(db: Database, now: Date): Promise<DueDraft[]
     .where(
       and(
         isNull(campaignDrafts.anonymisedAt),
-        // Claimed drafts leave the sweep: they are accounts now (§25.8).
+        // ── Two independent exemptions for a claimed draft, on purpose ─────
+        // §25.8 keeps Founder account data for account life + 7 years, so a
+        // claimed draft leaves this sweep entirely. Both of these say so.
+        //
+        // They are redundant today and that is the point. `claimed_user_id` is
+        // set by the claim flow, and if that flow ever creates an account
+        // without setting it, this query would anonymise a live Founder's
+        // record 30 days after their invitation. Two things have to be wrong
+        // before real data is destroyed, rather than one.
         isNull(founderProspects.claimedUserId),
+        ne(campaignDrafts.status, 'claimed'),
       ),
     )
     .groupBy(campaignDrafts.id, campaignDrafts.prospectId)

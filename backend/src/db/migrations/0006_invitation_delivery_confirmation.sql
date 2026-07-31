@@ -1,0 +1,26 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Hand-written migration (phase 06b, follow-up). No schema change — one grant.
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- ── Why `notification_id` becomes writable ─────────────────────────────────
+-- Migration 0005 made `campaign_invitation_sends` insert-only except for the
+-- two recipient columns the §25.8 sweep must null. That forced the row to be
+-- written only after the email provider acknowledged, because the provider's
+-- message id is not known before then — and a crash in that window left an
+-- email delivered with no send row, therefore no retention clock, therefore a
+-- draft that would never be swept.
+--
+-- The failure direction was wrong. §25.8 sets a maximum, not a minimum: a
+-- retention clock that starts slightly early deletes sooner, which is the safe
+-- side; one that never starts keeps personal data forever, which is not.
+--
+-- So the row is now written BEFORE the provider call, with `notification_id`
+-- NULL, and confirmed afterwards. NULL is a meaningful state — "recorded, not
+-- confirmed delivered" — and the Admin surface renders it as exactly that
+-- rather than implying a message went out (§1.4).
+--
+-- Everything that makes the retention clock trustworthy stays immutable:
+-- `sent_at`, `draft_id`, `token_id`, `token_version`, and `status` are still
+-- outside the grant, so a send that could be edited into a different time is
+-- still impossible.
+GRANT UPDATE ("notification_id") ON "campaign_invitation_sends" TO proovd_app;
