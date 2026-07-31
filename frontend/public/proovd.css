@@ -975,6 +975,161 @@ a::after, .u::after {
 .scaffold__explore-open { justify-self: start; }
 
 
+/* ════════════════════════════════════ PHASE 05 — public site chrome and the
+   campaign page. Same discipline as above: read a mode slot or a token, never
+   a raw value; px only for borders, radii, and the 44px touch minimum. */
+
+/* ---- Skip link (§33.11.1: a fourteen-link footer must not be a keyboard trap
+   on the way to the content). Visible the moment it takes focus. */
+.skip-link {
+  position: absolute; left: var(--sp-8); top: calc(var(--sp-8) * -8);
+  z-index: 900;
+  background: var(--dark); color: var(--white);
+  padding: var(--sp-12) var(--sp-16);
+  min-height: var(--touch);
+  display: inline-flex; align-items: center;
+  font-weight: 700; text-decoration: none;
+  border-radius: var(--radius);
+}
+.skip-link:focus-visible { top: var(--sp-8); }
+main:focus { outline: none; }          /* programmatic focus target, not a control */
+
+/* ---- Site header — wayfinding at every scroll depth (DNA §5.12) */
+.site-header { padding: var(--sp-16) var(--gutter); }
+.site-header__inner {
+  width: var(--wrap); margin-inline: auto;
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--sp-16) var(--sp-24);
+}
+.site-header__brand {
+  font-size: 1.25rem; font-weight: 900; letter-spacing: -0.01em;
+  color: var(--mode-title); text-decoration: none;
+  min-height: var(--touch); display: inline-flex; align-items: center;
+}
+.site-header__brand::after { display: none; }   /* the wordmark is not a body link */
+.site-nav { display: flex; flex-wrap: wrap; gap: var(--sp-8) var(--sp-24); }
+.site-nav__link {
+  min-height: var(--touch); display: inline-flex; align-items: center;
+  color: var(--mode-body); font-weight: 700; text-decoration: none;
+}
+/* current location: weight + ink, never colour alone */
+.site-nav__link.is-current { color: var(--mode-title); font-weight: 900; }
+
+/* ---- Site footer (§31.4). Painted by .mode-dark on the element itself. */
+.site-footer { padding: var(--sp-64) var(--gutter) var(--sp-48); }
+.site-footer__inner { display: grid; gap: var(--sp-48); }
+@media (min-width: 900px) {
+  .site-footer__inner { grid-template-columns: 3fr 2fr 2fr; gap: var(--gutter); }
+}
+.site-footer__heading {
+  font-size: 1.0625rem; font-weight: 900;
+  color: var(--mode-title); margin: 0 0 var(--sp-16);
+}
+.site-footer__line { margin: 0 0 var(--sp-8); max-width: var(--measure); }
+.site-footer__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-4); }
+.site-footer__list a {
+  min-height: var(--touch); display: inline-flex; align-items: center;
+}
+.site-footer__legal { margin-top: var(--sp-48); padding-top: var(--sp-24); border-top: var(--bw) solid var(--mode-body); }
+
+/* ---- Editorial pieces shared by the public pages */
+.cta-row { display: flex; flex-wrap: wrap; gap: var(--sp-12); margin-top: var(--sp-24); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-32); counter-reset: step; }
+.steps > li { counter-increment: step; }
+.steps > li > h3::before {
+  content: counter(step) ". ";
+  color: var(--brand);
+}
+.checks { list-style: none; margin: 0 0 var(--sp-24); padding: 0; display: grid; gap: var(--sp-16); max-width: var(--measure); }
+.doc-list { margin: 0 0 var(--sp-24); padding-left: var(--sp-24); display: grid; gap: var(--sp-8); max-width: var(--measure); }
+.utc { color: var(--grey); }
+
+/* ---- Trust strip (Appendix A.1) */
+.trust-strip { display: grid; gap: var(--sp-16); max-width: var(--measure); }
+.trust-strip__links { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-8); }
+
+/* ---- Policy routes */
+.policy-meta { display: grid; gap: var(--sp-8); margin: 0 0 var(--sp-24); }
+.policy-meta__row {
+  display: grid; grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: var(--sp-16); align-items: baseline;
+}
+.policy-meta__row dt { color: var(--grey); font-weight: 700; }
+.policy-meta__row dd { margin: 0; color: var(--mode-body); }
+@media (max-width: 600px) {
+  .policy-meta__row { grid-template-columns: 1fr; gap: var(--sp-4); }
+}
+
+/* ---- Sample banner (Appendix A.6) — permanent, never dismissible */
+.sample-banner {
+  background: var(--accent-yellow);
+  color: var(--darker);
+  padding: var(--sp-12) var(--gutter);
+  font-weight: 700;
+  text-align: center;
+}
+.sample-banner__text { display: inline-block; max-width: var(--measure); }
+
+/* ---- Key/value rows (Founder identity, dates, reward meta) */
+.kv { display: grid; gap: var(--sp-8); margin: 0 0 var(--sp-24); }
+.kv--tight { gap: var(--sp-4); margin-bottom: 0; }
+.kv__row {
+  display: grid; grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: var(--sp-16); align-items: baseline;
+}
+.kv__row dt { color: var(--grey); font-weight: 700; }
+.kv__row dd { margin: 0; color: var(--mode-body); min-width: 0; }
+@media (max-width: 600px) {
+  .kv__row { grid-template-columns: 1fr; gap: var(--sp-4); }
+}
+
+/* ---- Reward packages */
+.reward-list {
+  display: grid; gap: var(--sp-24);
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+}
+.reward { display: grid; gap: var(--sp-12); align-content: start; }
+.reward__title { margin: 0; }
+.reward__price { font-size: var(--fs-step); font-weight: 900; color: var(--mode-title); margin: 0; }
+.reward__pretax { font-size: var(--fs-body); font-weight: 700; color: var(--grey); }
+.reward__contents { margin: 0; padding-left: var(--sp-24); display: grid; gap: var(--sp-4); }
+
+/* ---- The compact summary beside the primary action (§18) */
+.compact-summary {
+  list-style: none; margin: 0 0 var(--sp-16); padding: 0;
+  display: flex; flex-wrap: wrap; gap: var(--sp-8) var(--sp-16);
+  max-width: var(--measure);
+}
+.compact-summary > li { font-weight: 700; color: var(--mode-title); }
+.compact-summary > li + li::before { content: "→ "; color: var(--brand); }
+
+/* ---- Consent preview (Appendix A.3 / A.4), reproduced verbatim */
+.consent { display: grid; gap: var(--sp-16); }
+.consent__amounts { display: grid; gap: var(--sp-4); margin: 0; }
+.consent__amount {
+  display: grid; grid-template-columns: minmax(10rem, max-content) 1fr;
+  gap: var(--sp-16);
+}
+.consent__amount dt { color: var(--grey); font-weight: 700; }
+.consent__amount dd { margin: 0; font-weight: 700; color: var(--mode-title); }
+.consent__bullets { margin: 0; padding-left: var(--sp-24); display: grid; gap: var(--sp-12); }
+.consent__checks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-12); }
+.consent__checks > li { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-12); }
+.consent__box {
+  width: 1.25rem; height: 1.25rem; margin-top: 0.2rem;
+  border: var(--bw) solid var(--grey); border-radius: var(--radius);
+}
+.consent__action-label {
+  display: inline-block; font-weight: 900; color: var(--grey);
+  border: var(--bw) dashed var(--grey); border-radius: var(--radius);
+  padding: var(--sp-8) var(--sp-16);
+}
+.consent__appendix { color: var(--grey); font-size: 0.9375rem; }
+
+/* ---- Disabled action — present, named, and plainly inert */
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+
 /* ─── FOCUS — declared after every stroke outline so the keyboard ring
    always wins on :focus-visible */
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }

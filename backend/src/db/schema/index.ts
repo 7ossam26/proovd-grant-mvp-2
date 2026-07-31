@@ -5,3 +5,7 @@ export * from './domain.js';
 export * from './integrity.js';
 export * from './auth.js';
 export * from './tokens.js';
+// Phase 5: the versioned policy records the §18 public routes render and the
+// §34 live-mode gate reads.
+export * from './policies.js';
+

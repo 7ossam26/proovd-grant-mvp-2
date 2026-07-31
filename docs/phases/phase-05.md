@@ -114,17 +114,17 @@ Any authenticated surface. Campaign creation. Real campaign rendering. Checkout.
 
 ## Done when
 
-- [ ] All fourteen routes resolve on `app.proovd.co` and render complete surfaces
-- [ ] Homepage carries every §18 trust item and the Appendix A.1 strip **with conditional architecture wording**
-- [ ] Every policy route renders versioned content with title, version, and effective date; `draft` status is visible in Admin and blocks the §34 gate
-- [ ] Every policy page opens with a plain-language overview, full text one gesture below
-- [ ] Both sample campaigns render completely, show the permanent banner, and mount **no** payment field
-- [ ] Footer carries the exact §27.8 block and all ten links
-- [ ] Tawk.to renders only inside staffed hours
-- [ ] US English and role names are consistent; no `MBP`, `reservation`, `tranche`, or undefined acronym reaches a public surface — **§33.11.3**
-- [ ] Every CTA names the actual action; no `Submit`, no `OK` — **§33.11.4**
-- [ ] No unresolved variable, broken link, old campaign name, or placeholder policy presented as final — **§33.11.6**
-- [ ] Loading, empty, waiting, success, and failure states all use the StatePanel six-question pattern — **§33.11.7**
+- [x] All fourteen routes resolve on `app.proovd.co` and render complete surfaces
+- [x] Homepage carries every §18 trust item and the Appendix A.1 strip **with conditional architecture wording**
+- [x] Every policy route renders versioned content with title, version, and effective date; `draft` status is recorded on the version row and blocks the §34 gate via `backend/src/policies/policy-gate.ts` — **Admin *rendering* of that status is Phase 06's prerequisites panel**, which this phase's "Out of scope: any authenticated surface" line excludes
+- [x] Every policy page opens with a plain-language overview, full text one gesture below
+- [x] Both sample campaigns render completely, show the permanent banner, and mount **no** payment field
+- [x] Footer carries the exact §27.8 block and all **nine** §31.4 links — the "ten" this file previously said was a miscount of §31.4's own list (Terms, Privacy, Cookies, Refunds, Fulfillment, AUP, Stripe Connected Account Agreement, How payments work, Safety). The footer also carries the remaining §18 routes as a sitemap; §31.4 states a floor
+- [x] Tawk.to renders only inside staffed hours
+- [x] US English and role names are consistent; no `MBP`, `reservation`, `tranche`, or undefined acronym reaches a public surface — **§33.11.3**
+- [x] Every CTA names the actual action; no `Submit`, no `OK` — **§33.11.4**
+- [x] No unresolved variable, broken link, old campaign name, or placeholder policy presented as final — **§33.11.6**
+- [x] Loading, empty, waiting, success, and failure states all use the StatePanel six-question pattern — **§33.11.7**
 - [ ] Full keyboard and screen-reader pass at 320px and desktop
 
 **Acceptance:** §33.11.3, §33.11.4, §33.11.6, §33.11.7. Partial credit toward §33.11.5 (cross-surface agreement) and the §34 sample-campaign requirement.

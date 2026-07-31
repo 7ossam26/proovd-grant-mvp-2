@@ -1,5 +1,6 @@
 export * from './errors.js';
 export * from './cents.js';
+export * from './format.js';
 export * from './constants.js';
 export * from './waterfall.js';
 export * from './listing-fee.js';

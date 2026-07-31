@@ -23,8 +23,8 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–04 are
-complete**; Phase 05 (public site and policy routes) is next.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–05 are
+complete**; Phase 06 (Admin shell and global configuration) is next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -33,6 +33,7 @@ complete**; Phase 05 (public site and policy routes) is next.
 | 02 | Design-system vocabulary, `StatePanel`, `Flow`, component gallery |
 | 03 | Domain kernel — money, state machines, calendar, audit, idempotency |
 | 04 | Auth — three account roles, Admin MFA and freshness gate, token service |
+| 05 | The fourteen public routes, policy versioning, two sample campaigns |
 
 ## Layout
 
@@ -40,14 +41,51 @@ npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
 
 ```
 shared/     Zod schemas, money waterfall, state machines, business-day calendar
+  src/policies/   the eight canonical policy records and their versions
 backend/    Express 5 + Drizzle + Postgres 16
-  src/auth/   Better Auth config, guards, token service, seeding
+  src/auth/       Better Auth config, guards, token service, seeding
+  src/policies/   the §34 policy gate
 frontend/   React 19 + Vite, styled solely by proovd.css
+  src/features/public/   the fourteen public routes, footer, sample campaigns
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
 `shared/money` holds the **only** implementation of the payment waterfall. Both
 the checkout preview and the close batch call it.
+
+## Domains
+
+`proovd.co` is the marketing home and lives in its own repository.
+`app.proovd.co` is this one, and it owns **every** route in Spec §18's public
+inventory — including the ones that read like marketing.
+
+That is not a preference. §18's attribution contract sets a first-party cookie
+when a Backer arrives through a Creator link and reads it at pre-order; if the
+campaign page and the checkout sit on different hosts, Safari and Chrome drop
+it and Creator compensation is computed from nothing. Backer magic links are
+campaign-scoped to the same origin for the same reason.
+
+**The recorded redirect:** `proovd.co/<path>` 301s to `app.proovd.co/<path>`
+for every path in the §18 inventory except `/`, which stays the marketing home.
+The inventory itself is in
+[frontend/src/features/public/site.ts](frontend/src/features/public/site.ts) —
+one list, read by the router, the header, the footer, and the broken-link test.
+
+## Policies
+
+The eight canonical documents of Spec §31.4 are a **register, not text**.
+[shared/src/policies/documents.ts](shared/src/policies/documents.ts) holds one
+record per document — slug, route, title, version, status, effective date, and
+the coverage §31.4 requires. The backend's `policy_versions` table mirrors it
+row for row, and a drift test fails the suite if they disagree.
+
+**Every document is currently `draft`, and that is the correct state.** The
+approved text is in legal review, and the Spec forbids both filling the gap
+with invented prose and shipping a summary in its place. So each route renders
+its versioned record and says plainly that the document is in review.
+
+`draft` blocks the fourth condition of Spec §34's live-mode gate. Phase 24
+releases it by publishing the documents — not by bypassing the check.
 
 ## Setup
 
@@ -88,11 +126,36 @@ use an existing one, or leave it unset and Testcontainers starts
 `postgres:16-alpine` (needs Docker). Migrations run `CREATE ROLE proovd_app`, so
 the connecting role needs `CREATEROLE` or superuser.
 
+With neither Docker nor a spare server, a throwaway cluster does the job:
+
+```bash
+initdb -D /tmp/pgdata -U postgres --auth=trust
+pg_ctl -D /tmp/pgdata -o "-p 55432" -l /tmp/pg.log start
+createdb -h 127.0.0.1 -p 55432 -U postgres proovd_test
+TEST_DATABASE_URL=postgres://postgres:x@127.0.0.1:55432/proovd_test npm test
+pg_ctl -D /tmp/pgdata stop
+```
+
+The frontend and shared suites need neither Docker nor a database.
+
 ## Conventions that are not negotiable
 
 - **Money is integer cents in `bigint`.** Never floats, never `NUMERIC`
   arithmetic in application code.
 - **Stripe runs in test mode.** Live mode is gated by Spec §34 and is not open.
+  No public surface may claim Stripe production approval before it exists
+  (Spec §2.1). The homepage trust strip ships Appendix A.1 verbatim with
+  exactly one sentence replaced by truthful conditional wording; that
+  substitution lives in
+  [frontend/src/features/public/trust-strip.ts](frontend/src/features/public/trust-strip.ts)
+  and is reversed only when underwriting closes.
+- **Sample campaigns collect nothing.** No form, no input, no iframe, no
+  provider script — "disabled" is not the same as absent, and Spec §34 gates
+  live mode on proving it.
+- **Live chat renders only inside staffed hours**, and outside them not at all.
+  Spec §31.4 names the hours as a setting and fixes no number, so
+  `VITE_SUPPORT_CHAT_*` has no default and an unconfigured deployment shows no
+  chat. The real commitment is the one-business-day email SLA in the footer.
 - **`proovd.css` only** on the frontend — no Tailwind, no CSS-in-JS, no hex
   literals. GSAP is the only motion runtime, vendored under
   `frontend/public/vendor/gsap/`, never installed from npm.

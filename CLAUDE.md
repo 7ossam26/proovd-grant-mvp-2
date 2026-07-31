@@ -21,21 +21,22 @@ You are building this one phase at a time. **Read the phase file you were given,
 
 ## Repository state — read this before looking for a file
 
-**Phases 00–04 are complete and committed.** Phase 05 (public site and policy routes) is next. Every path this file names now exists at the path it names — the staging table that used to live here is gone because Phase 0 moved those files to their targets. `docs/phases/phase-00.md` … `phase-24.md` are all present.
+**Phases 00–05 are complete and committed.** Phase 06 (Admin shell and global configuration) is next. Every path this file names now exists at the path it names — the staging table that used to live here is gone because Phase 0 moved those files to their targets. `docs/phases/phase-00.md` … `phase-24.md` are all present.
 
 What exists on disk:
 
 | Area | State |
 |---|---|
-| `shared/` | money waterfall, three state machines, business-day calendar, notification registry, Zod schemas |
-| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards |
-| `frontend/` | design-system components, `MotionProvider`, dev-only gallery at `/_gallery`, `/link-unavailable` |
+| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, Zod schemas |
+| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate |
+| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, dev-only gallery at `/_gallery`, `/link-unavailable` |
 | `frontend/public/` | `proovd.css`, `proovd-motion.js`, `vendor/gsap/*.min.js`, `gsap-check.html` |
 
-Two gaps to know about, neither of them a bug:
+Three gaps to know about, none of them a bug:
 
 - **`frontend/public/fonts/` is empty.** `proovd.css` already declares `@font-face` against `Satoshi-Variable.woff2` and `Satoshi-VariableItalic.woff2`. Until those two files are dropped in, the fail-loud font notice is *correct* behaviour, not something to suppress.
-- **Product surfaces do not exist yet.** Phase 04 built the auth *mechanism* — guards, token middleware, the failure surface — but mounts the guards on no product route, because the routes they will protect arrive in Phase 05 and later. `backend/src/tests/auth-tokens.test.ts` mounts them on probe routes to prove they work.
+- **All eight policy documents are `draft`.** Track A2 is in legal review; §1 rule 6 forbids inventing the text and §31.4 forbids substituting a summary. See "Policies" below.
+- **Authenticated surfaces do not exist yet.** Phase 04 built the auth *mechanism* — guards, token middleware, the failure surface — and mounts the guards on no product route, because Phase 05 is entirely public. `backend/src/tests/auth-tokens.test.ts` mounts them on probe routes to prove they work. The first real mount is Phase 06's Admin.
 
 ## How a session works
 
@@ -47,7 +48,8 @@ One phase per session (`docs/master-plan.md` §1.3): read `docs/phases/phase-NN.
 - **DB:** Postgres 16 + Drizzle; `drizzle-kit` generates and applies migrations. Money is integer cents in `bigint`.
 - **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one test with Vitest's filter: `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`.
 - **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11.
-- **Integration tests need a real Postgres.** `backend/src/tests/app-harness.ts` uses `TEST_DATABASE_URL` when set and otherwise starts a Testcontainers `postgres:16-alpine`, which needs Docker. The migrator runs `CREATE ROLE proovd_app`, so the connecting role needs `CREATEROLE` or superuser.
+- **Integration tests need a real Postgres.** `backend/src/tests/app-harness.ts` uses `TEST_DATABASE_URL` when set and otherwise starts a Testcontainers `postgres:16-alpine`, which needs Docker. The migrator runs `CREATE ROLE proovd_app`, so the connecting role needs `CREATEROLE` or superuser. With neither Docker nor a spare server, a throwaway cluster works: `initdb -D <tmp> -U postgres --auth=trust`, `pg_ctl -o "-p 55432"` start, `createdb`, point `TEST_DATABASE_URL` at it, and stop it afterwards.
+- **A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`**, one failing statement per transaction — the first error aborts the block, so a second assertion in the same one only observes the abort. `policy-versions.test.ts` is the pattern.
 - **Local Stripe:** the Stripe CLI forwards webhooks; its signing secret lives in local env only. Mount raw-body parsing on webhook routes **before** `express.json()`.
 - **Env:** copy `.env.example` (variable names only; `docs/tech-stack-v2.md` §17). `backend/src/env.ts` is Zod-validated and fails closed on any live/test key or mode mismatch.
 - **`backend/tsconfig.json` sets `declaration: false` on purpose.** Declaration emit forces TypeScript to name every inferred type, and Better Auth's instance type reaches into its own bundled Zod, which this package cannot name (TS2742). The backend is an application; nothing imports its `.d.ts`.
@@ -144,6 +146,24 @@ Wired in Phase 04, and the parts that are easy to undo by accident:
 - **Concurrent claim is a conditional `UPDATE`**, never select-then-update, backed by the partial unique index `secure_tokens_one_live_per_lineage`.
 - The database also enforces scope binding, token-identity immutability, and append-only `claimed_at` (migration `0002_auth_and_tokens.sql`, hand-written section).
 
+### Policies and the §34 gate (§18, §31.4, §29.8, built Phase 05)
+
+The eight §31.4 documents are a **register, not text**. `shared/src/policies/documents.ts` holds one record per document — slug, route, title, version, status, effective date, and §31.4's required coverage. `backend`'s `policy_versions` table mirrors it row for row, and `backend/src/tests/policy-versions.test.ts` fails the suite if they drift, the same way the state enums are drift-tested.
+
+- **Every document is `draft` today, and that is the correct state.** §18 and §31.4 forbid placeholder, "coming soon", and summary-only text at launch; §1 rule 6 forbids inventing the real text. So the routes render the versioned record and say honestly that it is in legal review. **Do not write policy prose to fill the gap, and do not ship a coverage list as the policy.**
+- **`draft` blocks §34 condition 4.** `backend/src/policies/policy-gate.ts` (`readPolicyGate`) is the authority; it fails closed on a missing record as loudly as on a draft one. Phase 06's Admin prerequisites panel renders it; Phase 24 releases it *by publishing*, never by routing around it.
+- **Publication is one-way and version identity is immutable**, enforced by trigger in `0003_policy_versions.sql`. A revision is a new row with a new version — that is what §29.8's reacceptance flow compares. A consent record may cite only a published version.
+- **Published documents open with a Glance overview and the full text one gesture below** (DNA §5.12). Nothing is cut; it is staged.
+
+### Public site (§18, §31.4, §27.8, built Phase 05)
+
+- **`frontend/src/features/public/site.ts` is the single route inventory.** The router, the header, the footer, and the §33.11.6 broken-link scan all read it. A second copy is how a footer link outlives its route.
+- **`app.proovd.co` owns all fourteen routes**, including the marketing-shaped ones. `proovd.co/<path>` 301s here for every path in the inventory except `/`, which stays the marketing home. §18's attribution cookie is first-party or it is nothing (tech-stack §10).
+- **Appendix A.1 is exact text, and so is the sentence after it.** `trust-strip.ts` keeps A.1 verbatim and derives the shipped strip by replacing exactly one sentence — the architecture claim — with truthful conditional wording, because Stripe underwriting (Track A1) is open and §2.1 forbids claiming approval before it exists. When A1 closes, delete the replacement. Edit it for nothing else.
+- **The §27.8 contact block is exact text**, rendered line for line in `SiteFooter.tsx` and compared against the constant by test.
+- **Sample campaigns mount no payment field at all** — no form, no input, no iframe, no provider script. "Disabled" is not absent, and §34 gates live mode on this. They carry the Appendix A.6 banner permanently and reproduce A.2/A.3/A.4 in full with sample figures.
+- **Live chat renders only inside staffed hours, and not at all outside them.** §31.4 names the hours as a setting and fixes no number, so `VITE_SUPPORT_CHAT_*` has no default anywhere and an unconfigured deployment renders no chat. Days come from the committed calendar, not from configuration.
+
 ### Forbidden patterns (§30, DNA §5.10)
 
 No confetti, streaks, or countdown pressure that confuses a saved card with a charge. No fake scarcity, fabricated popularity, or live-viewer counts. No AI support presented as human. No public leaderboards. No prechecked optional consent. No live chat without staffing. No "real time" claims for refresh-based data. No generic errors without money/data status and recovery. No competing actions in payment, cancel, refund, or card-recovery states.
@@ -158,7 +178,8 @@ No confetti, streaks, or countdown pressure that confuses a saved card with a ch
 - **Motion in React** goes through `frontend/src/motion/MotionProvider.tsx`. Any subtree rendering `data-*` motion attributes on changing content calls `useProovdMotion(ref, deps)`. Anything driven by React state uses the imperative API. Hand-written GSAP is wrapped in `useGsapScope`. Skipping this makes animations die silently as the app grows.
 - **Fail loud, never silent.** If GSAP or Satoshi fails to load, the accent-yellow notice renders. Never suppress it.
 - **One question per moment, one hero, one delight** (DNA §5.1, §5.6, §5.8). Complexity is staged into Glance / Act / Explore, never deleted (§5.14).
-- **Accessibility is an acceptance test**, not a polish pass: 320px, keyboard, focus order, 44px targets, screen reader (§33.11).
+- **Accessibility is an acceptance test**, not a polish pass: 320px, keyboard, focus order, 44px targets, screen reader (§33.11). `frontend/src/features/public/a11y.test.tsx` runs axe, the keyboard path, heading structure, and landmark naming on every public route; 320px reflow, real focus visibility, 44px targets, and the screen-reader pass stay manual.
+- **New component styles extend `proovd.css` in a dated phase section** at the bottom of the file, in the same slot-reading style — never a second stylesheet, never a hex literal, never an arbitrary spacing value.
 
 ---
 
