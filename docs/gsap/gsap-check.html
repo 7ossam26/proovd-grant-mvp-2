@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GSAP vendor check</title>
+<style>
+  :root {
+    --bg: #101215;
+    --panel: #171a1f;
+    --line: #262b33;
+    --text: #d6dae1;
+    --dim: #7b8494;
+    --ok: #5ec27a;
+    --bad: #e2585b;
+    --warn: #d9a441;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 15px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 4px; }
+  p.lede { color: var(--dim); margin: 0 0 28px; }
+  section { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 18px 20px; margin-bottom: 18px; }
+  h2 { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); font-weight: 600; margin: 0 0 12px; }
+  .row { display: flex; gap: 12px; align-items: baseline; padding: 3px 0; border-bottom: 1px dotted var(--line); }
+  .row:last-child { border-bottom: 0; }
+  .row b { flex: 1; font-weight: 400; }
+  .tag { font-size: 12px; letter-spacing: .05em; }
+  .ok { color: var(--ok); }
+  .bad { color: var(--bad); }
+  .warn { color: var(--warn); }
+  .stage { height: 60px; display: flex; align-items: center; }
+  .box { width: 40px; height: 40px; background: var(--ok); border-radius: 4px; }
+  .split { font-size: 22px; letter-spacing: .02em; }
+  .scrollzone { height: 120vh; display: flex; align-items: flex-end; color: var(--dim); }
+  #st-status { padding-bottom: 30px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>GSAP vendor check</h1>
+  <p class="lede">Put this file next to your <code>vendor/</code> folder and open it. Every line below should read OK.</p>
+
+  <section>
+    <h2>Files loaded</h2>
+    <div id="files"></div>
+  </section>
+
+  <section>
+    <h2>Plugins registered</h2>
+    <div id="plugins"></div>
+  </section>
+
+  <section>
+    <h2>Live tests</h2>
+    <div class="stage"><div class="box" id="box"></div></div>
+    <div class="split" id="split">SplitText is animating these characters</div>
+    <div id="tests" style="margin-top:14px"></div>
+  </section>
+
+  <section>
+    <h2>Scroll test</h2>
+    <div class="scrollzone"><span id="st-status">Scroll down — this should turn green.</span></div>
+  </section>
+</main>
+
+<!-- Core first. Then plugins. Then your code. Never change this order. -->
+<script src="vendor/gsap/gsap.min.js"></script>
+<script src="vendor/gsap/ScrollTrigger.min.js"></script>
+<script src="vendor/gsap/Flip.min.js"></script>
+<script src="vendor/gsap/SplitText.min.js"></script>
+<script src="vendor/gsap/TextPlugin.min.js"></script>
+<script src="vendor/gsap/ScrambleTextPlugin.min.js"></script>
+
+<script>
+(function () {
+  var filesEl   = document.getElementById('files');
+  var pluginsEl = document.getElementById('plugins');
+  var testsEl   = document.getElementById('tests');
+
+  function line(parent, label, state, note) {
+    var d = document.createElement('div');
+    d.className = 'row';
+    d.innerHTML = '<b>' + label + '</b><span class="tag ' + state + '">' +
+                  (state === 'ok' ? 'OK' : state === 'warn' ? 'WARN' : 'FAIL') + '</span>' +
+                  '<span class="tag" style="color:var(--dim)">' + (note || '') + '</span>';
+    parent.appendChild(d);
+  }
+
+  // 1. Did each global actually appear?
+  var expected = ['gsap', 'ScrollTrigger', 'Flip', 'SplitText', 'TextPlugin', 'ScrambleTextPlugin'];
+  var missing = [];
+  expected.forEach(function (name) {
+    var g = window[name];
+    if (g) {
+      line(filesEl, name, 'ok', 'v' + (g.version || (g.core && g.core.version) || '?'));
+    } else {
+      missing.push(name);
+      line(filesEl, name, 'bad', 'script did not load — check the path / 404 in Network tab');
+    }
+  });
+
+  if (!window.gsap) {
+    line(pluginsEl, 'gsap core is missing, nothing else can run', 'bad', '');
+    return;
+  }
+
+  // 2. Register everything that did load.
+  gsap.registerPlugin.apply(gsap, expected.slice(1).map(function (n) { return window[n]; }).filter(Boolean));
+
+  // GSAP registers plugins two different ways:
+  //  - class plugins (ScrollTrigger, Flip, SplitText) are stored as themselves,
+  //    keyed by .name — which minification can mangle (SplitText -> "ae")
+  //  - config plugins (TextPlugin, ScrambleTextPlugin) are wrapped in a NEW class
+  //    and stored under a capitalized key, so the original object is not in globals
+  // A plugin counts as registered if either path matches.
+  var globals = gsap.core.globals();
+  var keys = Object.keys(globals);
+
+  expected.slice(1).forEach(function (name) {
+    var plugin = window[name];
+    if (!plugin) return;
+    var key = keys.filter(function (k) { return globals[k] === plugin; })[0];
+    if (!key && globals[name]) key = name;
+    line(pluginsEl, name, key ? 'ok' : 'warn',
+         key ? 'registered as "' + key + '"' : 'loaded but not registered');
+  });
+
+  // 3. Core tween on a real DOM element (proves CSSPlugin works).
+  gsap.to('#box', {
+    x: 260, rotation: 180, backgroundColor: '#d9a441',
+    duration: 1.2, yoyo: true, repeat: -1, ease: 'power2.inOut'
+  });
+  line(testsEl, 'Core tween + CSSPlugin', 'ok', 'box should be moving');
+
+  // 4. SplitText.
+  try {
+    var s = SplitText.create('#split', { type: 'chars' });
+    gsap.from(s.chars, { opacity: 0, y: 20, stagger: 0.02, duration: 0.6 });
+    line(testsEl, 'SplitText', s.chars.length ? 'ok' : 'bad', s.chars.length + ' chars');
+  } catch (e) {
+    line(testsEl, 'SplitText', 'bad', e.message);
+  }
+
+  // 5. Flip.
+  try {
+    Flip.getState('#box');
+    line(testsEl, 'Flip', 'ok', 'getState works');
+  } catch (e) {
+    line(testsEl, 'Flip', 'bad', e.message);
+  }
+
+  // 6b. Functional proof for the text plugins: do they actually change the DOM?
+  var probe = document.createElement('div');
+  probe.textContent = 'before';
+  probe.style.cssText = 'position:absolute;left:-9999px';
+  document.body.appendChild(probe);
+
+  var t1 = gsap.to(probe, { duration: 1, text: 'after' });
+  t1.progress(1).kill();
+  line(testsEl, 'TextPlugin', probe.textContent.indexOf('after') > -1 ? 'ok' : 'bad',
+       'wrote "' + probe.textContent + '"');
+
+  probe.textContent = 'scramble me';
+  var t2 = gsap.to(probe, { duration: 1, scrambleText: 'RESULT' });
+  t2.progress(0.5);
+  var mid = probe.textContent;
+  t2.progress(1).kill();
+  line(testsEl, 'ScrambleTextPlugin', mid !== 'scramble me' ? 'ok' : 'bad',
+       'mid-tween showed "' + mid.slice(0, 20) + '"');
+  probe.remove();
+
+  // 7. ScrollTrigger.
+  try {
+    gsap.to('#st-status', {
+      color: '#5ec27a',
+      scrollTrigger: { trigger: '#st-status', start: 'top 90%', toggleActions: 'play none none reverse' }
+    });
+    line(testsEl, 'ScrollTrigger', 'ok', ScrollTrigger.getAll().length + ' trigger(s) created');
+  } catch (e) {
+    line(testsEl, 'ScrollTrigger', 'bad', e.message);
+  }
+
+  if (missing.length) {
+    line(testsEl, 'Missing files: ' + missing.join(', '), 'bad', 'fix paths first');
+  }
+})();
+</script>
+</body>
+</html>

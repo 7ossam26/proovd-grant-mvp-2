@@ -1,0 +1,897 @@
+/* ============================================================================
+   PROOVD.CSS — design tokens + section modes + element identity
+   Source of truth for VALUES: this file (+ proovd-motion.js for motion).
+   The "Proovd Design System" doc is the decision layer — it says where to
+   use what and never restates a value. Section numbers below (§1, §4,
+   §7, §9…) map to that document.
+
+   Architecture — how the "section combinations" work:
+   Every section mode (.mode-none / .mode-dark / .mode-light / .mode-drawer)
+   sets a group of semantic SLOTS (--mode-title, --mode-body, --btn1-*, …).
+   Components (.btn--primary, a, .icon, h1…) only ever read the slots.
+   So the same markup —  <button class="btn btn--primary">  — is automatically
+   correct in any section. Generators never pick colors; they pick a mode.
+
+   Lines marked  DERIVED:  or  UNSPECIFIED:  are decisions the source doc did
+   not make — see the design doc's appendix ("Decisions the kit made") before
+   changing them.
+   ========================================================================= */
+
+
+/* ─────────────────────────────────────────────────────────────── §3 FONT
+   Satoshi is load-bearing. Self-hosted @font-face is the required setup.
+   Put the font files next to this stylesheet in ./fonts/ (download the
+   Satoshi family from Fontshare and self-host — the Fontshare <link> is
+   allowed only for throwaway prototypes).
+   proovd-motion.js ships the runtime verification (§3): if Satoshi isn't
+   actually rendering, the page shows the accent-yellow notice. */
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('fonts/Satoshi-Variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('fonts/Satoshi-VariableItalic.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
+  font-display: swap;
+}
+/* If you self-host static weights instead of the variable file, replace the
+   two blocks above with one @font-face per weight (400/500/700/900). */
+
+
+/* ────────────────────────────────────────────────────────── §1 RAW PALETTE
+   Raw values live here and ONLY here. Components must read slots or these
+   vars — never hex literals. */
+
+:root {
+  /* brand core */
+  --brand:        #41ED98;
+  --white:        #FAFAFA;
+  --dark:         #013F17;   /* Dark Green — section fill */
+  --darker:       #012D10;   /* Darker Green — headers on white, tab drawers */
+  --brand-5:      rgba(65, 237, 152, 0.05);  /* selection / loading / live */
+  --brand-15:     rgba(65, 237, 152, 0.15);  /* graph highlight */
+  --brand-0:      rgba(65, 237, 152, 0);     /* tween-safe transparent brand */
+
+  /* supporting greens */
+  --mint:         #E9FFE1;   /* light-green section fill; text on brand/dark */
+  --leaf:         #D2FBC2;   /* links on dark; placeholder color */
+  --sage:         #95C79D;   /* icons on light green; placeholder color */
+  --moss:         #669370;   /* body on light green */
+
+  /* small-section (stats) palette */
+  --stat-mint-bg:   #EAF7EE;
+  --stat-mint-text: #5BAA78;
+
+  /* accents (toasts) */
+  --accent-blue:   #DEFAFC;
+  --accent-yellow: #F7FF9E;
+  --ink-50:        rgba(1, 45, 16, 0.5);   /* #012D10 at 50% — toast body */
+
+  /* greys */
+  --grey:          #A2AFA8;  /* darkest grey — inputs at rest */
+  --grey-light:    #F1F3F2;
+  --grey-lightest: #F7F7F7;  /* visual section background */
+
+  /* graph tokens (§1) — charts read these, pages never restyle them */
+  --graph-1:        var(--brand);   /* all single-color graphs */
+  --graph-2:        #006D27;        /* second color in two-color graphs */
+  --graph-blue:     #10E9FC;
+  --graph-yellow:   #FFFC56;
+  --graph-highlight:var(--brand-15);/* under-line-graph fills */
+  --graph-text:     var(--grey);
+
+  /* placeholder extra */
+  --sky:           #CAFCFF;
+}
+
+
+/* ───────────────────────────────────────────── §2 BORDER + RADIUS TOKENS
+   Desktop defaults; phone values via the ≤600px query (§8 breakpoints). */
+
+:root {
+  --bw:      2px;   /* outside border (cards, inputs, tags, calendar…) */
+  --bw-btn:  2px;   /* outline buttons — USER REVISION: was 4px */
+  --radius:  1px;   /* sharp. everywhere. */
+}
+@media (max-width: 600px) {
+  :root { --bw: 1px; --bw-btn: 1px; --radius: 0.5px; }
+}
+
+
+/* ─────────────────────────────────────── §4.5 + §9 SPACING & SIZING TOKENS
+   The shared scale, authored in rem (§9: px values are reference at 16px
+   root). Fixed px is legal only for borders/hairlines and hard minimums
+   (44px touch targets). */
+
+:root {
+  --sp-4:   0.25rem;  --sp-8:   0.5rem;   --sp-12:  0.75rem;
+  --sp-16:  1rem;     --sp-24:  1.5rem;   --sp-32:  2rem;
+  --sp-48:  3rem;     --sp-64:  4rem;     --sp-80:  5rem;
+  --sp-96:  6rem;     --sp-120: 7.5rem;   --sp-160: 10rem;
+
+  /* fluid type recipes (§9) — both bounds always ship */
+  --fs-hero: clamp(3.5rem, 10vw, 7.5rem);      /* hero display */
+  --fs-h2:   clamp(1.75rem, 4.5vw, 3.25rem);   /* section headings */
+  --fs-num:  clamp(2.5rem, 6vw, 4.5rem);       /* hero numbers, done-moments */
+  --fs-step: clamp(1.625rem, 4vw, 2.5rem);     /* flow step titles */
+  --fs-body: 1.125rem;                          /* body: 1–1.25rem, never vw */
+  --fs-btn:  1rem;                              /* button labels: 1–1.125rem */
+
+  /* layout */
+  --wrap:        min(90vw, 1600px);
+  --gutter:      clamp(1.5rem, 6vw, 6rem);     /* section inline gutters */
+  --pad-section: clamp(2.5rem, 6vw, 5rem);     /* filled-section padding */
+  --measure:     65ch;
+  --touch:       44px;                          /* hard device minimum */
+}
+
+
+/* ════════════════════════════════════════════ §1 SECTION MODES (the slots)
+   :root carries the NO-FILL mode — text breathing on the #FAFAFA page —
+   so unwrapped content is already correct. .mode-none is an explicit alias.
+
+   Button slot naming:
+     --btn1-*  primary tier (filled)         --btnX-h*  its hover state
+     --btn2-*  secondary tier (border-only)
+     --btn3-*  tertiary tier (plain text)
+   In the no-fill mode the two listed variants swap on hover (§1: "the other
+   variant becomes its hover state"). */
+
+:root, .mode-none {
+  --mode-bg:    transparent;
+  --mode-title: var(--darker);         /* header #012D10 */
+  --mode-body:  var(--dark);           /* text   #013F17 */
+  --mode-link:  var(--brand);          /* UNSPECIFIED: no-fill link color isn't
+                                          in the doc; defaulted to brand. */
+  --mode-icon:  var(--dark);           /* UNSPECIFIED: defaulted to body. */
+
+  /* variant 1 — brand fill */
+  --btn1-bg:      var(--brand);
+  --btn1-text:    var(--mint);         /* hard rule: brand fill → #E9FFE1 */
+  --btn1-border:  var(--brand);
+  --btn1-hbg:     var(--brand-0);      /* hover = variant 2 */
+  --btn1-htext:   var(--brand);
+  --btn1-hborder: var(--brand);
+
+  /* variant 2 — brand border, no fill */
+  --btn2-text:    var(--brand);
+  --btn2-border:  var(--brand);
+  --btn2-hbg:     var(--brand);        /* hover = variant 1 */
+  --btn2-htext:   var(--mint);
+  --btn2-hborder: var(--brand);
+
+  --btn3-text:    var(--darker);       /* §7.1 tertiary: plain #012D10 bold */
+}
+
+/* Dark Green section — §1 "Dark Green: #013F17" */
+.mode-dark {
+  --mode-bg:    var(--dark);
+  --mode-title: var(--white);
+  --mode-body:  var(--mint);
+  --mode-link:  var(--leaf);
+  --mode-icon:  var(--mint);
+
+  --btn1-bg:      var(--white);
+  --btn1-text:    var(--dark);
+  --btn1-border:  var(--white);
+  --btn1-hbg:     var(--brand);        /* hover: #41ED98 fill; text follows
+                                          the §1 hard rule — a brand-filled
+                                          button always uses #E9FFE1 text
+                                          (doc corrected; was #FAFAFA). */
+  --btn1-htext:   var(--mint);
+  --btn1-hborder: var(--brand);
+
+  /* DERIVED: dark sections list only one button, and the hard rules forbid
+     brand-on-dark-green, so the universal §7.1 brand-border secondary can't
+     appear here. This white ghost mirrors the variant-swap logic. Prefer
+     descending to tertiary when possible; delete these four lines to forbid
+     secondaries on dark entirely. */
+  --btn2-text:    var(--white);
+  --btn2-border:  var(--white);
+  --btn2-hbg:     var(--white);
+  --btn2-htext:   var(--dark);
+  --btn2-hborder: var(--white);
+
+  --btn3-text:    var(--white);        /* DERIVED: §7.1's #012D10 is the
+                                          light-background value. */
+}
+
+/* Light green section — §1 "Light green: #E9FFE1" */
+.mode-light {
+  --mode-bg:    var(--mint);
+  --mode-title: var(--dark);
+  --mode-body:  var(--moss);
+  --mode-link:  var(--brand);
+  --mode-icon:  var(--sage);           /* small icons: use .icon--sm → brand */
+
+  --btn1-bg:      var(--dark);
+  --btn1-text:    var(--mint);
+  --btn1-border:  var(--dark);
+  --btn1-hbg:     var(--brand);        /* hover: #41ED98 fill; text follows
+                                          the §1 hard rule (brand fill →
+                                          #E9FFE1 — doc corrected). */
+  --btn1-htext:   var(--mint);
+  --btn1-hborder: var(--brand);
+
+  --btn2-text:    var(--brand);        /* §7.1 universal secondary */
+  --btn2-border:  var(--brand);
+  --btn2-hbg:     var(--brand);
+  --btn2-htext:   var(--mint);         /* hard rule: brand fill → #E9FFE1 */
+  --btn2-hborder: var(--brand);
+
+  --btn3-text:    var(--darker);
+}
+
+/* Darker Green — §1: tab drawers, not sections */
+.mode-drawer {
+  --mode-bg:       var(--darker);
+  --mode-title:    var(--mint);
+  --mode-body:     var(--grey);
+  --tab-active:    var(--mint);
+  --tab-inactive:  var(--grey);
+}
+
+/* mode classes paint themselves and cascade the slots */
+.mode-none, .mode-dark, .mode-light, .mode-drawer {
+  background: var(--mode-bg);
+  color: var(--mode-body);
+}
+
+
+/* ─────────────────────────────────────────────────────────────── BASE */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { background: var(--white); }
+
+body {
+  margin: 0;
+  background: var(--white);              /* §1 hard rule: page bg is always
+                                            #FAFAFA. No dark mode. */
+  color: var(--mode-body);
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+               Roboto, Helvetica, Arial, sans-serif;  /* fallback stack keeps
+               text readable WHILE Satoshi arrives — never a final state (§3) */
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* §9: nothing overflows, nothing breaks */
+img, svg, video { max-width: 100%; height: auto; }
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--mode-title);
+  margin: 0 0 var(--sp-16);
+  line-height: 1.18;
+  font-weight: 900;
+}
+p { margin: 0 0 var(--sp-16); max-width: var(--measure); } /* §9 measure cap */
+p.p-full { max-width: none; }
+
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }              /* §8.2 pointer on everything tappable */
+
+::selection { background: var(--brand-15); }
+
+.icon { color: var(--mode-icon); }
+.icon svg { display: block; fill: none; stroke: currentColor; }
+.mode-light .icon--sm { color: var(--brand); }   /* §1: small icons on light */
+
+
+/* ─────────────────────────────────────────────────── TYPE ROLES (§5.6, §9)
+   line-heights ≥1.14 so masked SplitText reveals never clip (§6.4). */
+
+.hero {
+  font-size: var(--fs-hero);
+  font-weight: 900;
+  line-height: 1.14;
+  letter-spacing: -0.02em;
+  color: var(--mode-title);
+  margin: 0 0 var(--sp-24);
+}
+.h2, .section-title {
+  font-size: var(--fs-h2);
+  font-weight: 900;
+  line-height: 1.18;
+  color: var(--mode-title);
+}
+.num {              /* hero numbers / done-moments */
+  font-size: var(--fs-num);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--mode-title);
+}
+.step-title { font-size: var(--fs-step); font-weight: 900; line-height: 1.2; color: var(--mode-title); }
+.lede { font-size: clamp(1.125rem, 1.5vw, 1.25rem); max-width: var(--measure); }
+.kicker {           /* grey uppercase moment label (§7.2) */
+  color: var(--grey);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+
+/* ─────────────────────────────────────────────────── LAYOUT (§4, §8, §9) */
+
+.wrap { width: var(--wrap); margin-inline: auto; }
+
+.section { padding-block: var(--pad-section); padding-inline: var(--gutter); }
+.section--breathe { padding-block: clamp(4rem, 12vw, 10rem); }  /* §4.1 major gaps */
+
+/* two-column desktop moments (§8.2 anti-timid); stack on phone (§8.1) */
+.cols { display: grid; gap: var(--sp-32); align-items: center; }
+@media (min-width: 900px) {
+  .cols            { grid-template-columns: 1fr 1fr; gap: var(--gutter); }
+  .cols--lead-left { grid-template-columns: 3fr 2fr; }
+  .cols--lead-right{ grid-template-columns: 2fr 3fr; }
+}
+.cols > * { min-width: 0; }               /* §9: text wraps, tracks don't blow */
+
+.grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--track, 16rem), 100%), 1fr));
+  gap: var(--sp-24);
+}
+.grid-auto > * { min-width: 0; }
+
+.measure { max-width: var(--measure); }
+
+/* phone docked primary action (§8.1) — desktop: renders static */
+.dock { display: flex; gap: var(--sp-12); }
+@media (max-width: 600px) {
+  .dock {
+    position: fixed; inset-inline: 0; bottom: 0; z-index: 800;
+    background: var(--white);                       /* solid — no gradients */
+    padding: var(--sp-12) var(--sp-16)
+             calc(var(--sp-12) + env(safe-area-inset-bottom));
+  }
+  .dock .btn { flex: 1; }
+  body.has-dock { padding-bottom: 6rem; }
+}
+
+
+/* ══════════════════════════════════════════ §7.1 ELEMENT IDENTITY
+   One signature treatment per role. Grey borders belong to inputs-at-rest
+   ONLY (USER REVISION: the muted chip is removed from the system). */
+
+/* ---- Buttons — three tiers. Rest/hover colors resolve from the mode slots
+   into --r-* / --h-* so proovd-motion.js can read computed values and tween
+   them (motion is GSAP-only, §6). */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: var(--sp-12) var(--sp-24);
+  min-height: var(--touch);
+  font-weight: 700;
+  font-size: var(--fs-btn);
+  line-height: 1.1;
+  border-radius: var(--radius);
+  border: none;
+  /* USER REVISION: the stroke is an OUTLINE — it sits OUTSIDE the box */
+  outline: var(--bw-btn) solid transparent;
+  outline-offset: 0;
+  position: relative;
+  overflow: hidden;                    /* hosts fill-sweep / progress fill */
+  text-decoration: none;
+}
+
+.btn--primary {
+  --r-bg: var(--btn1-bg);     --r-text: var(--btn1-text);   --r-border: var(--btn1-border);
+  --h-bg: var(--btn1-hbg);    --h-text: var(--btn1-htext);  --h-border: var(--btn1-hborder);
+  background: var(--r-bg);
+  color: var(--r-text);
+  outline-color: var(--r-border);
+}
+
+.btn--secondary {
+  --r-bg: var(--brand-0);     --r-text: var(--btn2-text);   --r-border: var(--btn2-border);
+  --h-bg: var(--btn2-hbg);    --h-text: var(--btn2-htext);  --h-border: var(--btn2-hborder);
+  background: var(--r-bg);
+  color: var(--r-text);
+  outline-color: var(--r-border);
+  isolation: isolate;
+}
+/* fill-sweep host (tweened via --sweep/--so by proovd-motion.js) */
+.btn--secondary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--h-bg);
+  transform: scaleX(var(--sweep, 0));
+  transform-origin: var(--so, left center);
+  z-index: -1;
+}
+
+.btn--tertiary {
+  background: none;
+  border: none;
+  outline: none;
+  overflow: visible;
+  padding: var(--sp-8) var(--sp-4);
+  min-height: var(--touch);
+  color: var(--btn3-text);
+  font-weight: 700;
+}
+
+.btn--sm { padding: var(--sp-8) var(--sp-16); min-height: 0; font-size: 0.9375rem; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+/* button → progress → done morph host (§6.5) */
+.btn .btn__label { position: relative; z-index: 1; }
+.btn .btn__fill {
+  position: absolute; inset: 0;
+  background: var(--brand);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.btn.is-progress {                      /* selection treatment while working */
+  background: var(--brand-5);
+  outline-color: var(--brand);
+  color: var(--darker);
+}
+.btn.is-done .btn__label { color: var(--mint); }   /* check on full brand fill */
+
+/* ---- Text input / textarea — the ONLY grey-bordered tappable (§7.1).
+   Never a silent box: always placeholder or a label directly above. */
+.input {
+  width: 100%;
+  background: #FFFFFF;
+  border: none;
+  outline: var(--bw) solid var(--grey);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  color: var(--darker);
+  padding: var(--sp-12) var(--sp-16);
+  min-height: var(--touch);
+}
+.input::placeholder { color: var(--grey); }
+.input--hero { font-size: 1.5rem; }                /* flow hero input (§9) */
+.field-label { display: block; font-weight: 700; color: var(--darker); margin-bottom: var(--sp-8); }
+
+/* ---- Toggle / switch — selection treatment, square knob, sits bare on the
+   page with its label (never wrapped in an extra bordered card). */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16); }
+.toggle {
+  --tw: 3.5rem; --th: 2rem;
+  position: relative;
+  flex: none;
+  width: var(--tw);
+  height: var(--th);
+  background: #FFFFFF;
+  border: none;
+  outline: var(--bw) solid var(--grey);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  padding: 0;
+}
+.toggle__knob {
+  position: absolute;
+  top: 3px; left: 3px;
+  width:  calc(var(--th) - 6px);
+  height: calc(var(--th) - 6px);
+  background: var(--grey);
+  border-radius: var(--radius);
+}
+/* USER REVISION: on-state is dark-green filled (was brand selection colors) */
+.toggle.is-on { outline-color: var(--dark); background: var(--dark); }
+.toggle.is-on .toggle__knob { background: var(--mint); }
+
+/* ---- Checkbox / selectable option (§1 Selection) */
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-12) var(--sp-16);
+  min-height: var(--touch);
+  background: transparent;
+  border: none;
+  outline: var(--bw) solid var(--grey);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  color: var(--darker);
+  font-weight: 700;
+}
+.option__box {
+  flex: none;
+  width: 1.25rem; height: 1.25rem;
+  border: none;
+  outline: var(--bw) solid var(--grey);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+}
+.option__box svg { width: 0.875rem; height: 0.875rem; fill: none; stroke: var(--brand); stroke-width: 3; opacity: 0; }
+.option .icon { color: var(--grey); }
+.option.is-selected { outline-color: var(--brand); background: var(--brand-5); }
+.option.is-selected .option__box { outline-color: var(--brand); }
+.option.is-selected .option__box svg { opacity: 1; }
+.option.is-selected .icon { color: var(--brand); }
+
+/* ---- Stepper — the number IS the container */
+.stepper { display: inline-flex; align-items: center; gap: var(--sp-16); }
+.stepper__value {
+  font-size: var(--fs-num);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--darker);
+  min-width: 2ch;
+  text-align: center;
+  display: inline-block;
+  overflow: hidden;              /* masks the directional number bump */
+  padding-block: 0.06em;         /* keeps ascenders inside the mask */
+  margin-block: -0.06em;
+}
+.stepper__num { display: inline-block; }
+.stepper__btn {
+  width: var(--touch); height: var(--touch);
+  display: grid; place-items: center;
+  /* USER REVISION: dark-green filled (was brand border, brand text) */
+  background: var(--dark);
+  border: none;
+  border-radius: var(--radius);
+  color: var(--mint);
+  font-weight: 900;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+/* ---- Tag / live status — USER REVISION: quiet-green tags are FILLED
+   (no ring): dark / sage / moss / mint (= --stat-mint-text) backgrounds
+   with mint ink (moss/sage/mint) or mint ink on the dark default.
+   EXCEPTION: .tag--live stays the brand treatment. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.25rem 0.75rem;
+  border: none;
+  background: var(--dark);
+  color: var(--mint);
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+.tag--sage { background: var(--sage);           color: var(--mint); }
+.tag--moss { background: var(--moss);           color: var(--mint); }
+.tag--mint { background: var(--stat-mint-text); color: var(--mint); }
+.tag--live {
+  background: var(--brand-5);
+  color: var(--brand);
+  outline: var(--bw) solid currentColor;
+  outline-offset: 0;
+}
+.tag--live::before { content: ""; width: 0.5em; height: 0.5em; background: currentColor; }
+
+
+/* ---- Card (§4.2/§7.1) — brand ring, never grey.
+   USER REVISION: cards are STAT/METRIC containers only — never a wrapper
+   for plain copy. Modals, menus and drawers keep their own treatments. */
+.card {
+  border: none;
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  padding: var(--sp-24);
+  background: transparent;
+}
+.card--white { background: #FFFFFF; }
+
+/* ---- Links — mode link color + underline draw (tweened via --u/--uo) */
+a {
+  color: var(--mode-link);
+  text-decoration: none;
+  font-weight: 700;
+  position: relative;
+}
+a.u, .btn--tertiary.u, span.u { --u: 0; }
+a::after, .u::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -0.15em;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(var(--u, 0));
+  transform-origin: var(--uo, left center);
+}
+.btn::after { content: none; }           /* buttons never grow link underlines */
+.btn--tertiary.u::after { content: ""; }
+
+/* ---- Progress — always the bordered treatment (§1 hard rule) */
+.progress {
+  position: relative;
+  height: 1rem;
+  border: none;
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  background: var(--brand-5);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.progress__fill {
+  position: absolute; inset: 0;
+  background: var(--brand);
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+/* ---- Divider — a pixel of brand, used sparingly (§1) */
+.divider { border: none; height: 1px; background: var(--brand); margin-block: var(--sp-24); }
+
+/* ---- Copy-link element (§1) */
+.copylink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  border: none;
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-16);
+}
+.copylink__url {
+  color: var(--darker);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Selection / live treatment as a composable state (§1, §5.5) */
+.is-live, .is-selected-surface {
+  background: var(--brand-5);
+  border: none;
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  border-radius: var(--radius);
+}
+
+
+/* ─────────────────────────────── §1 SMALL SECTIONS (stats / statements) */
+
+.stat {
+  padding: var(--sp-24) var(--sp-32);
+  border-radius: var(--radius);
+}
+.stat__value { font-size: var(--fs-num); font-weight: 900; line-height: 1; }
+.stat__sub   { color: var(--grey); font-size: 0.9375rem; margin-top: var(--sp-8); }
+
+.stat--mint  { background: var(--stat-mint-bg); color: var(--stat-mint-text); }
+.stat--dark  { background: var(--dark);          color: var(--white); }
+.stat--white { background: #FFFFFF; border: none;
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0; color: var(--darker); }
+.stat--white.stat--brandval { color: var(--brand); }   /* value may be brand OR darker */
+
+.surface--visual { background: var(--grey-lightest); }  /* visual section bg */
+
+
+/* ─────────────────────────────────────────────── §1 TOASTS / ACCENTS */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--sp-24) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);          /* JS re-centers via xPercent */
+  z-index: 1000;
+  padding: var(--sp-12) var(--sp-24);
+  border-radius: var(--radius);
+  color: var(--darker);
+  font-weight: 700;
+  max-width: min(92vw, 26rem);
+}
+.toast__sub { display: block; color: var(--ink-50); font-weight: 500; font-size: 0.875rem; }
+.toast--yellow { background: var(--accent-yellow); }
+.toast--blue   { background: var(--accent-blue); }
+
+/* fail-loud notices (§3, §6.6) — created by proovd-motion.js */
+.pv-notices { position: fixed; inset-inline: 0; top: 0; z-index: 2147483000; }
+.pv-notice {
+  background: var(--accent-yellow);
+  color: var(--darker);
+  font-weight: 700;
+  text-align: center;
+  padding: var(--sp-12) var(--sp-16);
+}
+
+
+/* ───────────────────────────────── §1 DRAWER (Explore surface, §5.2, §8) */
+
+.drawer {
+  position: fixed;
+  z-index: 900;
+  inset-block: 0;
+  right: 0;
+  width: min(26rem, 100vw);
+  background: var(--darker);
+  padding: var(--pad-section) var(--sp-32);
+  overflow-y: auto;
+}
+.drawer .tab {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: var(--sp-12) 0;
+  color: var(--tab-inactive, var(--grey));
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+.drawer .tab.is-active { color: var(--tab-active, var(--mint)); }
+@media (max-width: 600px) {              /* §8.1: sheets, not side drawers */
+  .drawer {
+    inset: auto 0 0 0;
+    width: auto;
+    max-height: 85vh;
+    padding: var(--sp-32) var(--sp-24)
+             calc(var(--sp-32) + env(safe-area-inset-bottom));
+  }
+}
+
+/* modal + scrim (modal always grows from its trigger — §6.5) */
+.scrim { position: fixed; inset: 0; background: var(--ink-50); z-index: 940; }
+.modal {
+  position: fixed;
+  z-index: 950;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);      /* JS re-centers via x/yPercent */
+  width: min(92vw, 32rem);
+  background: #FFFFFF;
+  border: none;
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  padding: var(--sp-32);
+}
+[hidden] { display: none !important; }
+
+/* accordion (divider-friendly; open state also works without JS) */
+.accordion__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: var(--sp-16) 0;
+  color: var(--darker);
+  font-weight: 700;
+  font-size: 1.0625rem;
+}
+.accordion__chev { color: var(--brand); font-weight: 900; }
+.accordion__body { overflow: hidden; }
+.accordion__body > * { padding-bottom: var(--sp-16); }
+
+/* dropdown menu */
+.menu {
+  position: absolute;
+  z-index: 500;
+  min-width: 12rem;
+  background: #FFFFFF;
+  border: none;
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  border-radius: var(--radius);
+  padding: var(--sp-8);
+  transform-origin: top center;
+}
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: var(--sp-8) var(--sp-12);
+  color: var(--darker);
+  font-weight: 500;
+}
+
+
+/* ─────────────────────────────── §1 PLACEHOLDERS / STICKERS
+   Rectangle-in-rectangle. Numbered pairs are CONTEXTUAL: .sk-N resolves to a
+   valid pair for whatever background it sits on — generators just pick a
+   number. In modes with shorter lists the numbers wrap around, so any .sk-1
+   … .sk-14 is always legal anywhere.
+   These pairings are for placeholders and stickers ONLY (§1 hard rule). */
+
+.sticker {
+  position: relative;
+  width: var(--sk-size, 6rem);
+  aspect-ratio: 1;
+  background: var(--sk-o);
+  border-radius: var(--radius);
+  flex: none;
+}
+.sticker::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  background: var(--sk-i);
+  border-radius: var(--radius);
+}
+.sticker--wide { aspect-ratio: 16 / 10; width: var(--sk-size, 10rem); }
+.sticker--fill { width: 100%; }
+
+/* on the #FAFAFA page (default) */
+.sk-1  { --sk-o: var(--leaf);  --sk-i: var(--sage); }
+.sk-2  { --sk-o: var(--leaf);  --sk-i: var(--dark); }
+.sk-3  { --sk-o: var(--leaf);  --sk-i: var(--brand); }
+.sk-4  { --sk-o: var(--brand); --sk-i: var(--leaf); }
+.sk-5  { --sk-o: var(--brand); --sk-i: var(--dark); }
+.sk-6  { --sk-o: var(--brand); --sk-i: var(--accent-yellow); }
+.sk-7  { --sk-o: var(--brand); --sk-i: var(--sky); }
+.sk-8  { --sk-o: var(--dark);  --sk-i: var(--leaf); }
+.sk-9  { --sk-o: var(--dark);  --sk-i: var(--brand); }
+.sk-10 { --sk-o: var(--dark);  --sk-i: var(--sage); }
+.sk-11 { --sk-o: var(--dark);  --sk-i: var(--accent-yellow); }
+.sk-12 { --sk-o: var(--dark);  --sk-i: var(--sky); }
+.sk-13 { --sk-o: var(--sky);   --sk-i: var(--dark); }
+.sk-14 { --sk-o: var(--sky);   --sk-i: var(--brand); }
+
+/* on #013F17 (7 pairs; 8–14 wrap) */
+.mode-dark .sk-1,  .mode-dark .sk-8  { --sk-o: var(--accent-yellow); --sk-i: var(--brand); }
+.mode-dark .sk-2,  .mode-dark .sk-9  { --sk-o: var(--leaf);  --sk-i: var(--sage); }
+.mode-dark .sk-3,  .mode-dark .sk-10 { --sk-o: var(--leaf);  --sk-i: var(--brand); }
+.mode-dark .sk-4,  .mode-dark .sk-11 { --sk-o: var(--brand); --sk-i: var(--leaf); }
+.mode-dark .sk-5,  .mode-dark .sk-12 { --sk-o: var(--brand); --sk-i: var(--accent-yellow); }
+.mode-dark .sk-6,  .mode-dark .sk-13 { --sk-o: var(--brand); --sk-i: var(--sky); }
+.mode-dark .sk-7,  .mode-dark .sk-14 { --sk-o: var(--sky);   --sk-i: var(--brand); }
+
+/* on #E9FFE1 (9 pairs; 10–14 wrap) */
+.mode-light .sk-1,  .mode-light .sk-10 { --sk-o: var(--brand); --sk-i: var(--dark); }
+.mode-light .sk-2,  .mode-light .sk-11 { --sk-o: var(--brand); --sk-i: var(--accent-yellow); }
+.mode-light .sk-3,  .mode-light .sk-12 { --sk-o: var(--brand); --sk-i: var(--sky); }
+.mode-light .sk-4,  .mode-light .sk-13 { --sk-o: var(--dark);  --sk-i: var(--brand); }
+.mode-light .sk-5,  .mode-light .sk-14 { --sk-o: var(--dark);  --sk-i: var(--sage); }
+.mode-light .sk-6  { --sk-o: var(--dark); --sk-i: var(--accent-yellow); }
+.mode-light .sk-7  { --sk-o: var(--dark); --sk-i: var(--sky); }
+.mode-light .sk-8  { --sk-o: var(--sky);  --sk-i: var(--dark); }
+.mode-light .sk-9  { --sk-o: var(--sky);  --sk-i: var(--brand); }
+
+
+/* ─── FOCUS — declared after every stroke outline so the keyboard ring
+   always wins on :focus-visible */
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+
+/* ──────────────────────────── NO-MOTION FALLBACKS (§6.6 fail loud + safe)
+   Motion is GSAP-only. If GSAP is missing, proovd-motion.js adds
+   html.no-motion and shows the notice; these rules keep every state
+   reachable — jump-cuts, but nothing is trapped or invisible. */
+
+html.no-motion .btn--primary:hover,
+html.no-motion .btn--primary:focus-visible {
+  background: var(--h-bg); color: var(--h-text); outline-color: var(--h-border);
+}
+html.no-motion .btn--secondary:hover,
+html.no-motion .btn--secondary:focus-visible {
+  background: var(--h-bg); color: var(--h-text); outline-color: var(--h-border);
+}
+html.no-motion a:hover::after,
+html.no-motion .u:hover::after { transform: scaleX(1); }
+html.no-motion .input:focus { outline-color: var(--brand); }
+html.no-motion .toggle .toggle__knob { transition: none; }
+html.no-motion .toggle.is-on .toggle__knob {
+  transform: translateX(calc(var(--tw) - var(--th)));
+}
+html.no-motion .progress__fill { transform: scaleX(var(--p, 0)); }
+html.no-motion .accordion__body { height: auto !important; }
+html.no-motion [data-splash] { display: none !important; }
