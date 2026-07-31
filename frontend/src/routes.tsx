@@ -14,6 +14,9 @@ import { CampaignPage } from './features/public/campaign/CampaignPage.js';
 import { AdminLayout } from './features/admin/AdminLayout.js';
 import { SettingsPage } from './features/admin/SettingsPage.js';
 import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
+import { FoundersPage } from './features/admin/FoundersPage.js';
+import { FounderDetail } from './features/admin/FounderDetail.js';
+import { DraftLanding } from './surfaces/DraftLanding.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -83,10 +86,21 @@ const rootChildren: RouteObject[] = [
     path: 'admin',
     element: <AdminLayout />,
     children: [
-      { index: true, element: <Navigate to="/admin/settings" replace /> },
+      { index: true, element: <Navigate to="/admin/founders" replace /> },
+      { path: 'founders', element: <FoundersPage /> },
+      { path: 'founders/:draftId', element: <FounderDetail /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
+  },
+  {
+    // Phase 06b (§7, §33.1.1). The Founder's invited draft. Outside the public
+    // shell — its header offers a nav bar of things to probe, and this page is
+    // reached by a personal link, not by browsing. Outside the Admin shell for
+    // the opposite reason: §26 licenses dashboard density in Admin and nowhere
+    // else, and this is a Founder surface.
+    path: 'draft/:token',
+    element: <DraftLanding />,
   },
   {
     // Phase 04 (§5.5). One route for every token failure — invalid, expired,

@@ -7,10 +7,15 @@ import type { Database } from './db/client.js';
 import { createHealthRouter } from './routes/health.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createAdminRouter } from './routes/admin.js';
+import { createAdminFoundersRouter } from './routes/admin-founders.js';
+import { createDraftRouter } from './routes/draft.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
+import { createNotifier, type EmailTransport, type Notifier } from './notifications/send.js';
+import { unconfiguredTransport } from './notifications/resend-transport.js';
 import type { PrerequisiteEnvironment } from './admin/prerequisites.js';
+import type { InvitationContext } from './invitations/service.js';
 
 export interface AppConfig {
   appBaseUrl: string;
@@ -31,6 +36,20 @@ export interface AppConfig {
   adminReauthWindowSeconds: number;
   /** Observable facts for the §6 prerequisites panel. */
   prerequisiteEnvironment: PrerequisiteEnvironment;
+  /**
+   * §27.2 transactional email. Defaults to the transport that refuses loudly:
+   * an unconfigured deployment must fail visibly rather than report an
+   * invitation as sent when nothing left the building (§1.4).
+   */
+  emailTransport?: EmailTransport;
+  /** §7 / §27.8 addresses and origins the invitation is built from. */
+  invitationContext: InvitationContext;
+  /**
+   * §28.1 draft-token verification limit. Defaults to the production value;
+   * the integration suite raises it because it issues far more verifications
+   * from one loopback address than any person would.
+   */
+  draftVerifyLimit?: number;
   /** §5.5 email-link password reset. Injected; the transport arrives later. */
   sendResetPassword: SendResetPassword;
   /** Founder-only Google sign-in (§5.2). Omitted when unconfigured. */
@@ -41,6 +60,7 @@ export interface ProovdApp {
   app: express.Express;
   auth: Auth;
   tokens: TokenService;
+  notifier: Notifier;
 }
 
 export function createApp(db: Database, config: AppConfig): ProovdApp {
@@ -59,6 +79,11 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     ...(config.google ? { google: config.google } : {}),
   });
   const tokens = createTokenService({ db, audit });
+  const notifier = createNotifier({
+    db,
+    transport: config.emailTransport ?? unconfiguredTransport,
+    audit: (event) => audit({ ...event, targetId: event.targetId }),
+  });
 
   // ── Security headers ───────────────────────────────────────────────────────
   app.use(helmet());
@@ -97,6 +122,25 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // registered TOTP factor, and every write additionally requires a recent
   // sign-in.
   app.use(createAdminRouter({ db, auth, environment: config.prerequisiteEnvironment }));
+  app.use(
+    createAdminFoundersRouter({
+      db,
+      auth,
+      tokens,
+      notifier,
+      context: config.invitationContext,
+    }),
+  );
+  // Phase 06b (§7, §33.1.1). The one route a Founder reaches with no account.
+  // It takes a token, never a draft id, so there is nothing in the request to
+  // substitute — see `routes/draft.ts`.
+  app.use(
+    createDraftRouter(db, tokens, {
+      ...(config.draftVerifyLimit !== undefined
+        ? { verifyLimit: config.draftVerifyLimit }
+        : {}),
+    }),
+  );
 
   // ── SPA fallback ──────────────────────────────────────────────────────────
   // /api/* routes go above. Everything else returns index.html so the SPA
@@ -113,5 +157,5 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     });
   });
 
-  return { app, auth, tokens };
+  return { app, auth, tokens, notifier };
 }

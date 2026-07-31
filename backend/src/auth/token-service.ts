@@ -351,6 +351,45 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     return { ok };
   }
 
+  /**
+   * Revokes every live token bound to one invited draft.
+   *
+   * Takes an executor so the caller can run it inside its own transaction. The
+   * §25.8 retention sweep needs exactly that: revoking a token and leaving the
+   * draft content readable, even for the width of two statements, is not
+   * compliance — and a crash between them would leave it that way permanently.
+   *
+   * Deliberately separate from `expireStaleDrafts`. That one sweeps tokens
+   * whose own `expires_at` has passed; this one is driven by the retention
+   * clock, which §33.1.3 measures from the most recent invitation *send*.
+   */
+  async function revokeDraftTokens(
+    campaignDraftId: string,
+    reason: SecureToken['revokedReason'],
+    executor: Pick<NodePgDatabase<Record<string, unknown>>, 'update'> = db,
+  ): Promise<number> {
+    const revoked = await executor
+      .update(secureTokens)
+      .set({ revokedAt: now(), revokedReason: reason })
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_draft'),
+          eq(secureTokens.campaignDraftId, campaignDraftId),
+          isNull(secureTokens.revokedAt),
+        ),
+      )
+      .returning({ id: secureTokens.id });
+
+    await audit({
+      action: 'token.draft_tokens_revoked',
+      targetType: 'secure_token',
+      targetId: campaignDraftId,
+      internalReason: `${revoked.length} live draft token(s) revoked: ${reason}`,
+    });
+
+    return revoked.length;
+  }
+
   /** Immediate revocation. Access ends on the next request (Spec §7). */
   async function revoke(
     tokenId: string,
@@ -397,7 +436,7 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     return expired.map((r) => r.campaignDraftId).filter((id): id is string => !!id);
   }
 
-  return { issue, rotate, verify, claimDraft, revoke, expireStaleDrafts };
+  return { issue, rotate, verify, claimDraft, revoke, revokeDraftTokens, expireStaleDrafts };
 }
 
 export type TokenService = ReturnType<typeof createTokenService>;

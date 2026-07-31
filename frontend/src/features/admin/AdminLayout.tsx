@@ -34,6 +34,7 @@ import {
 import { AdminSignIn } from './AdminSignIn.js';
 
 const NAV = [
+  { to: '/admin/founders', label: 'Founders' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];

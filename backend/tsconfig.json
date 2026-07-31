@@ -13,6 +13,11 @@
     // widened to a base interface that loses the configured user fields.
     "declaration": false,
     "declarationMap": false,
+    // React Email templates are TSX. The backend renders them to HTML with
+    // @react-email/render and serves no React of its own — this is a template
+    // language, not a UI layer.
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM"],
     "paths": {
       "@proovd/shared": ["../shared/src/index.ts"]
     }

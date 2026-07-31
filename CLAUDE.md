@@ -21,33 +21,29 @@ You are building this one phase at a time. **Read the phase file you were given,
 
 ## Repository state — read this before looking for a file
 
-**Phases 00–05 are complete and committed. Phase 06 is split, and 06a is done.** `docs/phases/phase-06.md` bundles four deliverables; 06a shipped the §6 settings register and store, the fail-closed prerequisites panel, and the Admin shell. **Phase 06b is next** — see "What Phase 06b owns" below. Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present.
+**Phases 00–06 are complete and committed.** Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation — and §33.1.1, §33.1.2, and §33.1.3 all pass. **Phase 07 (Founder vetting and the account claim) is next.** Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present.
 
 What exists on disk:
 
 | Area | State |
 |---|---|
-| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, **§6 settings register**, Zod schemas |
-| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate, **`app_settings` + history + `production_prerequisites`, `/api/admin`** |
-| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, **the Admin shell at `/admin`**, dev-only gallery at `/_gallery`, `/link-unavailable` |
+| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, §6 settings register, Zod schemas |
+| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate, `app_settings` + history + `production_prerequisites`, **prospects/drafts/invitation sends, Resend + React Email, pg-boss retention sweep**, `/api/admin`, `/api/draft` |
+| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, the Admin shell at `/admin` (Founders, configuration, prerequisites), **the Founder draft landing at `/draft/:token`**, dev-only gallery at `/_gallery`, `/link-unavailable` |
 | `frontend/public/` | `proovd.css`, `proovd-motion.js`, `vendor/gsap/*.min.js`, `gsap-check.html` |
 
-Three gaps to know about, none of them a bug:
+Four gaps to know about, none of them a bug:
 
 - **`frontend/public/fonts/` is empty.** `proovd.css` already declares `@font-face` against `Satoshi-Variable.woff2` and `Satoshi-VariableItalic.woff2`. Until those two files are dropped in, the fail-loud font notice is *correct* behaviour, not something to suppress.
 - **All eight policy documents are `draft`.** Track A2 is in legal review; §1 rule 6 forbids inventing the text and §31.4 forbids substituting a summary. See "Policies" below.
 - **Six §6 settings ship with no value, and the prerequisites panel blocks.** That is the designed state, not unfinished work — see "Global configuration" below.
+- **No email provider is configured, so the transport refuses loudly.** `unconfiguredTransport` throws rather than swallowing a message, the failure is recorded, and the prerequisites panel already blocks on it (§1.4). Do not replace it with a no-op.
 
-### What Phase 06b owns
+### What Phase 07 owns
 
-Read `docs/phases/phase-06.md` again; these are its remaining scope items:
+`docs/phases/phase-07.md` is the brief. Phase 06b deliberately stopped at the draft *landing*: it names the Founder and product, explains what happens next, and **asks for nothing**. The vetting flow, the account claim, and everything downstream of `campaigns.status = invited_draft → vetting_submitted` are Phase 07's.
 
-- Resend + React Email, routed through the Phase 03 notification registry and `notification_deliveries` (§27.2).
-- Founder prospect and the §7 invitation surface — create, **preview**, send, resend, revoke. Preview is a hard gate: an unresolved `[VARIABLE]` makes Send unavailable.
-- The invitation email and the draft landing state (§7).
-- The pg-boss 30-day retention job. `expireStaleDrafts()` in the token service revokes the tokens; the job must anonymise the draft content **in the same transaction**.
-- Users → Founders (§26.1) and Campaign detail (§26.2).
-- **Acceptance: §33.1.1, §33.1.2, §33.1.3.** None of these is satisfied yet.
+`tokens.claimDraft()` exists and is tested for the concurrent case (§33.1.2), but nothing calls it yet — Phase 07 is what turns a claim into an account, and it must also set `founder_prospects.claimed_user_id`/`claimed_at`, which is what removes the prospect from the retention sweep.
 
 ## How a session works
 
@@ -63,6 +59,8 @@ One phase per session (`docs/master-plan.md` §1.3): read `docs/phases/phase-NN.
 - **A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`**, one failing statement per transaction — the first error aborts the block, so a second assertion in the same one only observes the abort. `policy-versions.test.ts` is the pattern. A test that must commit restores what it changed in a `finally`.
 - **Each harness-based test file gets its own database.** Pass a label: `startHarness({}, 'settings')`. On `TEST_DATABASE_URL` this provisions `proovd_t_<label>_<hex>` and drops it on `stop()`; on Testcontainers the container already isolates it.
 - **Local Stripe:** the Stripe CLI forwards webhooks; its signing secret lives in local env only. Mount raw-body parsing on webhook routes **before** `express.json()`.
+- **Email templates are TSX.** `backend/tsconfig.json` sets `jsx: react-jsx` and adds `DOM` to `lib` for that reason alone. React Email is a template language here; the backend serves no React of its own. `@react-email/render` is async — await it.
+- **Jobs run on pg-boss**, in the same Postgres, wired in `backend/src/jobs/scheduler.ts`. `startScheduler` throws if it will not start: a deployment whose retention sweep never runs keeps personal data past §25.8's window and should fail at boot rather than serve traffic while quietly doing so.
 - **Env:** copy `.env.example` (variable names only; `docs/tech-stack-v2.md` §17). `backend/src/env.ts` is Zod-validated and fails closed on any live/test key or mode mismatch.
 - **`backend/tsconfig.json` sets `declaration: false` on purpose.** Declaration emit forces TypeScript to name every inferred type, and Better Auth's instance type reaches into its own bundled Zod, which this package cannot name (TS2742). The backend is an application; nothing imports its `.d.ts`.
 
@@ -192,6 +190,20 @@ The eight §31.4 documents are a **register, not text**. `shared/src/policies/do
 - **Guards are mounted for real now.** Everything under `/api/admin` goes through `requireAdmin`; every write additionally through `requireFreshSession`. `backend/src/tests/admin-settings.test.ts` proves no session, wrong role, unenrolled factor, and stale session all fail closed on a real product surface rather than on a probe route.
 - **`Saving…` / `Saved [time]` / `Could not save — retrying`** is the §9 autosave vocabulary, established in `frontend/src/features/admin/autosave.ts` so Phase 07 inherits it. `retrying` appears **only** while a retry is genuinely scheduled; a 4xx is a decision, not a transient failure, and claiming to retry one would be §1.4's failure in miniature.
 - **Backend test files each get their own database.** `startHarness(overrides, label)` provisions one when `TEST_DATABASE_URL` points at a shared server. §33.1.1 asserts that opening a draft link creates *no* user row, which is only checkable if nothing else is creating user rows concurrently — making that assertion defensive instead would have quietly weakened the one that matters.
+
+### The Founder invitation and the retention sweep (§7, §25.8, built Phase 06b)
+
+The first phase where a real person receives something. Three tables:
+`founder_prospects` (the person), `campaign_drafts` (the personalised content the sweep removes), `campaign_invitation_sends` (append-only, the nine facts §7 requires a send to store).
+
+- **Preview is a gate, enforced server-side.** `renderFounderInvitation` scans the *rendered* subject, HTML, and text for bracketed markers; `sendInvitation` refuses while any remain. Checking the input record instead would test the caller's list of required fields rather than what the Founder would receive. The Admin surface disables Send on the server's answer, and the send route re-decides independently — a disabled button is not authorization (§1.1).
+- **The notification dedup key is the SEND, not the draft.** §27.2 forbids a duplicate delivery producing a second email; §7 requires resend to work. Keying on the draft satisfies the first and breaks the second. `createNotifier` claims the `notification_deliveries` row *before* sending, so a crash leaves an unconfirmed claim — visible, honest, and recoverable by resending — rather than two emails.
+- **The retention clock is `max(sent_at)`.** Not creation, not `updated_at`, not the token's `expires_at`. §33.1.3 names it precisely, which is why `campaign_invitation_sends` is append-only and `UPDATE` is revoked except on the two recipient columns the sweep must null (a column-level grant, migration 0005).
+- **Revocation and anonymisation are one transaction.** `tokens.revokeDraftTokens(draftId, reason, tx)` takes the executor so both land together. A revoked token beside live draft content is not compliance, and a crash between them would leave that state permanently.
+- **Anonymisation is irreversible at the database level.** Triggers refuse to clear `anonymised_at` or write content back. A draft that could be un-anonymised was never anonymised, only hidden.
+- **`NO_GUARANTEE_TEXT` and `PROCESS_SUMMARY` are constants, not columns.** §7 forbids Admin promising acceptance, results, reward pricing, or a named Creator's participation, and an editable disclaimer is one that gets softened under pressure. The compose surface renders them read-only; there is no route that writes them, and a test asserts the sent body contains the text verbatim.
+- **A prospect is anonymised only when it was their last draft**, and never once claimed — §25.8 keeps Founder account data for account life + 7 years.
+- **Backend event keys are restated in `notifications/events.ts`**, drift-tested against the shared §27 register. A key appears there when something starts sending it, never before: a key with no sender claims a message exists when it does not (§1.4).
 
 ### Forbidden patterns (§30, DNA §5.10)
 

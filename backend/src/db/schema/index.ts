@@ -12,4 +12,7 @@ export * from './policies.js';
 // constants from, its append-only change history, and the recorded production
 // prerequisites that fail closed.
 export * from './settings.js';
+// Phase 6b: the Founder prospect, the invited draft whose content the 30-day
+// retention sweep anonymises, and the append-only record of every send.
+export * from './invitations.js';
 

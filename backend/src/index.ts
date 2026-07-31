@@ -81,14 +81,35 @@ async function main() {
   // ── Express app ────────────────────────────────────────────────────────────
   const { createApp } = await import('./app.js');
   const { prerequisiteFacts } = await import('./env.js');
+  const { createResendTransport, unconfiguredTransport } = await import(
+    './notifications/resend-transport.js'
+  );
+
+  // §27.2 / §1.4. With no provider configured the transport refuses loudly
+  // rather than silently swallowing a message — an Admin must never see an
+  // invitation reported as sent when nothing left the building. The §6
+  // prerequisites panel is already blocking on the same fact.
+  const emailTransport = env.RESEND_API_KEY
+    ? createResendTransport(env.RESEND_API_KEY)
+    : unconfiguredTransport;
+
   const publicDir = path.join(__dirname, '..', 'public');
-  const { app } = createApp(db, {
+  const { app, tokens } = createApp(db, {
     appBaseUrl: env.APP_BASE_URL,
     nodeEnv: env.NODE_ENV,
     publicDir,
     authSecret: env.BETTER_AUTH_SECRET,
     adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
     prerequisiteEnvironment: prerequisiteFacts(env),
+    emailTransport,
+    invitationContext: {
+      appBaseUrl: env.APP_BASE_URL,
+      // §27.8's published address, and the one the footer already renders.
+      supportEmail: 'support@proovd.co',
+      // Falls back to the support address so a half-configured deployment
+      // still sends from somewhere real if a key is present without a From.
+      fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
+    },
     // §5.5 password reset for Founder, Affiliate, and Admin. Resend arrives in
     // a later phase; until it does this refuses loudly rather than pretending
     // to have sent mail (§1.4: never imply automation that does not exist).
@@ -107,6 +128,19 @@ async function main() {
       : {}),
   });
 
+  // ── Scheduled work (§25.8) ─────────────────────────────────────────────────
+  // Throws if it will not start. A deployment whose retention sweep never runs
+  // keeps personal data past the window §25.8 sets, and should fail at boot
+  // rather than serve traffic while quietly doing so.
+  const { startScheduler } = await import('./jobs/scheduler.js');
+  const scheduler = await startScheduler({
+    db,
+    tokens,
+    connectionString: env.DATABASE_URL,
+    log: (message, detail) => logger.info(detail ?? {}, message),
+  });
+  logger.info('Job scheduler started');
+
   // ── Start ──────────────────────────────────────────────────────────────────
   const server = app.listen(env.PORT, () => {
     logger.info(
@@ -119,6 +153,7 @@ async function main() {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutting down');
     server.close(async () => {
+      await scheduler.stop();
       await pool.end();
       logger.info('Shutdown complete');
       process.exit(0);

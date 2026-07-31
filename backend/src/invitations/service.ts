@@ -1,0 +1,690 @@
+/**
+ * Founder prospects and invitations — Spec §7.
+ *
+ * Create a prospect and the initial campaign container, compose the invitation,
+ * preview it, send it, resend it, revoke it. This is the phase where a real
+ * person first receives something from Proovd, and the constraints are mostly
+ * about what must not happen.
+ *
+ * ── Preview is a gate, not a courtesy ───────────────────────────────────────
+ * §7: "Preview must show final variables and no unresolved placeholder."
+ * `previewInvitation` renders the real template and reports every bracketed
+ * marker still in it; `sendInvitation` refuses while any remain. The check runs
+ * server-side on the rendered output, so a caller that skipped the Admin
+ * surface entirely still cannot send `[WHAT PROOVD UNDERSTOOD]` to a Founder.
+ *
+ * ── A resend is a new send, at every level ──────────────────────────────────
+ * §7: "Resend rotates the token, invalidates all older versions immediately,
+ * and restarts the 30-day unclaimed-draft retention period." So a resend
+ * rotates the token lineage, writes a new append-only send row, and — because
+ * the notification dedup key is the *send* id and not the draft id — produces a
+ * genuinely new email rather than being swallowed as a duplicate of the first.
+ * Keying dedup on the draft would satisfy §27.2 and break §7.
+ *
+ * ── The order of operations, and the window it leaves ───────────────────────
+ * Token first, then send. If the provider refuses, the rotated token has
+ * already invalidated the previous one, so the Founder's old link is dead and
+ * no new one has arrived. That is recorded, visible in Admin, and recoverable
+ * by resending. The alternative — send first, then rotate — risks delivering a
+ * link that the next statement invalidates, which is worse: the Founder holds
+ * something that looks live and is not.
+ */
+
+import { randomUUID } from 'node:crypto';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import type { Database } from '../db/client.js';
+import type { TokenService } from '../auth/token-service.js';
+import type { Notifier } from '../notifications/send.js';
+import { FOUNDER_INVITATION } from '../notifications/events.js';
+import {
+  renderFounderInvitation,
+  type InvitationVariables,
+  type RenderedInvitation,
+} from '../notifications/templates/founder-invitation.js';
+import { campaigns, campaignStatusHistory } from '../db/schema/domain.js';
+import {
+  founderProspects,
+  campaignDrafts,
+  campaignInvitationSends,
+  type CampaignDraft,
+  type FounderProspect,
+} from '../db/schema/invitations.js';
+import { secureTokens } from '../db/schema/tokens.js';
+import { auditEvents } from '../db/schema/integrity.js';
+
+/** The path the delivered link points at. Owned here and by `routes/draft.ts`. */
+export const DRAFT_PATH = '/draft';
+
+export interface InvitationContext {
+  appBaseUrl: string;
+  /** §27.2 / §27.8: the published support address. */
+  supportEmail: string;
+  /** The verified From address. §27.2 money rules do not apply to this one. */
+  fromAddress: string;
+}
+
+/* ── Creating a prospect and its campaign container (§7) ───────────────────── */
+
+export interface CreateProspectInput {
+  legalName: string;
+  preferredName?: string | null;
+  email: string;
+  phone?: string | null;
+  productName: string;
+  productUrl?: string | null;
+  launchFrame?: string | null;
+  usAgeFit?: string | null;
+  deliveryFeasibility?: string | null;
+  compensationExpectations?: string | null;
+  affiliateSourcingHypothesis?: string | null;
+  adminNotes?: string | null;
+  discoveryEvidence?: readonly string[] | null;
+  invitationSource: string;
+  internalOwner: string;
+  /** `user:<id>` of the Admin. */
+  actor: string;
+}
+
+export interface CreatedProspect {
+  prospectId: string;
+  campaignId: string;
+  draftId: string;
+}
+
+/**
+ * Creates the prospect, the campaign container, and the empty invited draft, in
+ * one transaction.
+ *
+ * The campaign lands in `invited_draft` — §23.1's entry state — with its
+ * creation row in the append-only history. `campaigns.type` stays NULL: §33.1.7
+ * locks the type at vetting, and guessing it here from a discovery
+ * conversation would be exactly the invented commitment §1 rule 6 forbids.
+ */
+export async function createProspect(
+  db: Database,
+  input: CreateProspectInput,
+): Promise<CreatedProspect> {
+  return db.transaction(async (tx) => {
+    const [prospect] = await tx
+      .insert(founderProspects)
+      .values({
+        legalName: input.legalName.trim(),
+        preferredName: input.preferredName?.trim() || null,
+        email: input.email.trim().toLowerCase(),
+        phone: input.phone?.trim() || null,
+        productName: input.productName.trim(),
+        productUrl: input.productUrl?.trim() || null,
+        launchFrame: input.launchFrame?.trim() || null,
+        usAgeFit: input.usAgeFit?.trim() || null,
+        deliveryFeasibility: input.deliveryFeasibility?.trim() || null,
+        compensationExpectations: input.compensationExpectations?.trim() || null,
+        affiliateSourcingHypothesis: input.affiliateSourcingHypothesis?.trim() || null,
+        adminNotes: input.adminNotes?.trim() || null,
+        discoveryEvidence: input.discoveryEvidence ? [...input.discoveryEvidence] : null,
+        invitationSource: input.invitationSource.trim(),
+        internalOwner: input.internalOwner.trim(),
+        createdBy: input.actor,
+      })
+      .returning({ id: founderProspects.id });
+
+    const [campaign] = await tx
+      .insert(campaigns)
+      .values({ status: 'invited_draft' })
+      .returning({ id: campaigns.id });
+
+    await tx.insert(campaignStatusHistory).values({
+      campaignId: campaign!.id,
+      fromStatus: null,
+      toStatus: 'invited_draft',
+      actor: input.actor,
+    });
+
+    const [draft] = await tx
+      .insert(campaignDrafts)
+      .values({
+        campaignId: campaign!.id,
+        prospectId: prospect!.id,
+        senderName: null,
+        senderEmail: null,
+        createdBy: input.actor,
+      })
+      .returning({ id: campaignDrafts.id });
+
+    await tx.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_draft',
+      targetId: draft!.id,
+      action: 'invitation.prospect_created',
+      internalReason: `prospect created from ${input.invitationSource}; owner ${input.internalOwner}`,
+      customerExplanation: null,
+      newValue: {
+        prospectId: prospect!.id,
+        campaignId: campaign!.id,
+        productName: input.productName,
+      },
+    });
+
+    return { prospectId: prospect!.id, campaignId: campaign!.id, draftId: draft!.id };
+  });
+}
+
+/* ── Composing (§7) ───────────────────────────────────────────────────────── */
+
+export interface ComposeInput {
+  whatWeUnderstood?: string | null;
+  whyInvited?: string | null;
+  senderName?: string | null;
+  senderEmail?: string | null;
+  expectedSetupTime?: string | null;
+  actor: string;
+}
+
+export async function composeInvitation(
+  db: Database,
+  draftId: string,
+  input: ComposeInput,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const record = await readDraft(db, draftId);
+  if (!record) return { ok: false, message: 'That draft does not exist.' };
+  if (record.draft.anonymisedAt) {
+    return {
+      ok: false,
+      message:
+        'This draft was anonymised after 30 calendar days without a claim. Its content is gone and cannot be restored — create a new prospect if you want to invite them again.',
+    };
+  }
+  if (record.draft.status === 'claimed') {
+    return { ok: false, message: 'This invitation has been claimed and is now an account.' };
+  }
+
+  const prior = {
+    whatWeUnderstood: record.draft.whatWeUnderstood,
+    whyInvited: record.draft.whyInvited,
+    senderName: record.draft.senderName,
+    senderEmail: record.draft.senderEmail,
+    expectedSetupTime: record.draft.expectedSetupTime,
+  };
+
+  const next = {
+    whatWeUnderstood: input.whatWeUnderstood?.trim() || null,
+    whyInvited: input.whyInvited?.trim() || null,
+    senderName: input.senderName?.trim() || null,
+    senderEmail: input.senderEmail?.trim().toLowerCase() || null,
+    expectedSetupTime: input.expectedSetupTime?.trim() || null,
+  };
+
+  await db.transaction(async (tx) => {
+    await tx.update(campaignDrafts).set(next).where(eq(campaignDrafts.id, draftId));
+    await tx.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_draft',
+      targetId: draftId,
+      action: 'invitation.composed',
+      internalReason: 'invitation content edited',
+      customerExplanation: null,
+      priorValue: prior,
+      newValue: next,
+    });
+  });
+
+  return { ok: true };
+}
+
+/* ── Reading ──────────────────────────────────────────────────────────────── */
+
+export interface DraftRecord {
+  draft: CampaignDraft;
+  prospect: FounderProspect;
+  sends: Array<{
+    id: string;
+    sentAt: Date;
+    recipientEmail: string | null;
+    senderName: string;
+    notificationId: string | null;
+    tokenVersion: number;
+    tokenExpiresAt: Date | null;
+    sentBy: string;
+  }>;
+  /** `max(sent_at)`. The retention clock §33.1.3 measures from. */
+  lastSentAt: Date | null;
+  /** Whether a usable link is outstanding. Never the link itself (§28.1). */
+  hasLiveToken: boolean;
+}
+
+export async function readDraft(db: Database, draftId: string): Promise<DraftRecord | null> {
+  const [row] = await db
+    .select({ draft: campaignDrafts, prospect: founderProspects })
+    .from(campaignDrafts)
+    .innerJoin(founderProspects, eq(campaignDrafts.prospectId, founderProspects.id))
+    .where(eq(campaignDrafts.id, draftId))
+    .limit(1);
+
+  if (!row) return null;
+
+  const sends = await db
+    .select({
+      id: campaignInvitationSends.id,
+      sentAt: campaignInvitationSends.sentAt,
+      recipientEmail: campaignInvitationSends.recipientEmail,
+      senderName: campaignInvitationSends.senderName,
+      notificationId: campaignInvitationSends.notificationId,
+      tokenVersion: campaignInvitationSends.tokenVersion,
+      tokenExpiresAt: campaignInvitationSends.tokenExpiresAt,
+      sentBy: campaignInvitationSends.sentBy,
+    })
+    .from(campaignInvitationSends)
+    .where(eq(campaignInvitationSends.draftId, draftId))
+    .orderBy(desc(campaignInvitationSends.sentAt));
+
+  const live = await db
+    .select({ id: secureTokens.id })
+    .from(secureTokens)
+    .where(
+      and(
+        eq(secureTokens.scope, 'founder_draft'),
+        eq(secureTokens.campaignDraftId, draftId),
+        isNull(secureTokens.revokedAt),
+        isNull(secureTokens.claimedAt),
+      ),
+    )
+    .limit(1);
+
+  return {
+    draft: row.draft,
+    prospect: row.prospect,
+    sends,
+    lastSentAt: sends[0]?.sentAt ?? null,
+    hasLiveToken: live.length > 0,
+  };
+}
+
+/* ── Preview (§7's gate) ──────────────────────────────────────────────────── */
+
+/**
+ * The URL shown in a preview.
+ *
+ * Not a real link. §28.1 keeps the raw token out of everything but the
+ * delivered URL, so previewing cannot mint one and cannot recover the last one
+ * — the value is unrecoverable by construction. The Admin surface says so
+ * beside the preview rather than showing a link that would 404 if clicked.
+ */
+export function previewDraftUrl(appBaseUrl: string): string {
+  return `${appBaseUrl}${DRAFT_PATH}/…`;
+}
+
+export interface InvitationPreview extends RenderedInvitation {
+  recipientEmail: string | null;
+  /** True while §7's gate holds Send closed. */
+  blocked: boolean;
+}
+
+export async function previewInvitation(
+  db: Database,
+  draftId: string,
+  context: InvitationContext,
+): Promise<InvitationPreview | null> {
+  const record = await readDraft(db, draftId);
+  if (!record) return null;
+
+  const rendered = await renderFounderInvitation(
+    variablesFor(record, previewDraftUrl(context.appBaseUrl), context.supportEmail),
+  );
+
+  return {
+    ...rendered,
+    recipientEmail: record.prospect.email,
+    blocked: rendered.unresolved.length > 0 || !record.prospect.email,
+  };
+}
+
+function variablesFor(
+  record: DraftRecord,
+  draftUrl: string,
+  supportEmail: string,
+): InvitationVariables {
+  return {
+    recipientName: record.prospect.preferredName || record.prospect.legalName,
+    productName: record.prospect.productName,
+    productUrl: record.prospect.productUrl,
+    whatWeUnderstood: record.draft.whatWeUnderstood,
+    whyInvited: record.draft.whyInvited,
+    senderName: record.draft.senderName,
+    senderEmail: record.draft.senderEmail,
+    expectedSetupTime: record.draft.expectedSetupTime,
+    draftUrl,
+    reference: record.draft.campaignId,
+    supportEmail,
+  };
+}
+
+/* ── Sending and resending (§7) ───────────────────────────────────────────── */
+
+export interface SendInvitationInput {
+  draftId: string;
+  actor: string;
+  context: InvitationContext;
+}
+
+export type SendInvitationResult =
+  | { ok: true; sendId: string; tokenVersion: number; resent: boolean }
+  | { ok: false; message: string; unresolved?: string[] };
+
+export interface InvitationDeps {
+  db: Database;
+  tokens: TokenService;
+  notifier: Notifier;
+}
+
+export async function sendInvitation(
+  { db, tokens, notifier }: InvitationDeps,
+  input: SendInvitationInput,
+): Promise<SendInvitationResult> {
+  const record = await readDraft(db, input.draftId);
+  if (!record) return { ok: false, message: 'That draft does not exist.' };
+
+  if (record.draft.anonymisedAt) {
+    return {
+      ok: false,
+      message:
+        'This draft was anonymised after 30 calendar days without a claim. There is nothing left to send.',
+    };
+  }
+  if (record.draft.status === 'claimed') {
+    return { ok: false, message: 'This invitation has already been claimed.' };
+  }
+  if (!record.prospect.email) {
+    return { ok: false, message: 'This prospect has no email address to send to.' };
+  }
+
+  // §7's gate, enforced on the rendered output rather than on a list of fields
+  // the caller might not share. Runs before anything is issued or written.
+  const rendered = await renderFounderInvitation(
+    variablesFor(record, `${input.context.appBaseUrl}${DRAFT_PATH}/preflight`, input.context.supportEmail),
+  );
+  if (rendered.unresolved.length > 0) {
+    return {
+      ok: false,
+      message:
+        'This invitation still has unfilled fields. A Founder must never receive a placeholder, so Send stays unavailable until every one is written.',
+      unresolved: rendered.unresolved,
+    };
+  }
+
+  const resent = record.hasLiveToken;
+
+  // Token first. See the note at the top of this file for why this ordering,
+  // and what it costs when the provider refuses.
+  let raw: string;
+  let tokenId: string;
+  let tokenVersion: number;
+  let tokenExpiresAt: Date | null;
+
+  if (resent) {
+    const [live] = await db
+      .select({ lineageId: secureTokens.lineageId })
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_draft'),
+          eq(secureTokens.campaignDraftId, input.draftId),
+          isNull(secureTokens.revokedAt),
+          isNull(secureTokens.claimedAt),
+        ),
+      )
+      .limit(1);
+
+    const rotated = await tokens.rotate(live!.lineageId, { actorId: input.actor });
+    if ('ok' in rotated) {
+      return { ok: false, message: 'The existing link could not be rotated. Nothing was sent.' };
+    }
+    raw = rotated.raw;
+    tokenId = rotated.record.id;
+    tokenVersion = rotated.record.version;
+    tokenExpiresAt = rotated.record.expiresAt;
+  } else {
+    const issued = await tokens.issue(
+      { scope: 'founder_draft', campaignDraftId: input.draftId },
+      { actorId: input.actor },
+    );
+    raw = issued.raw;
+    tokenId = issued.record.id;
+    tokenVersion = issued.record.version;
+    tokenExpiresAt = issued.record.expiresAt;
+  }
+
+  // The dedup identity. The SEND, not the draft — see the note at the top.
+  const sendId = randomUUID();
+
+  const message = await renderFounderInvitation(
+    variablesFor(
+      record,
+      `${input.context.appBaseUrl}${DRAFT_PATH}/${raw}`,
+      input.context.supportEmail,
+    ),
+  );
+
+  const outcome = await notifier.send({
+    eventKey: FOUNDER_INVITATION,
+    entityType: 'campaign_invitation_send',
+    entityId: sendId,
+    to: record.prospect.email,
+    from: input.context.fromAddress,
+    replyTo: record.draft.senderEmail ?? undefined,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+  });
+
+  if (outcome.status === 'failed') {
+    await db.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_draft',
+      targetId: input.draftId,
+      action: 'invitation.send_failed',
+      internalReason: `provider refused: ${outcome.reason}`,
+      customerExplanation: null,
+      newValue: { sendId, tokenVersion, resent },
+    });
+    return {
+      ok: false,
+      message:
+        'The email provider did not accept the message, so nothing was delivered. ' +
+        (resent
+          ? 'The previous link has already been replaced, so the Founder currently has no working link — send again.'
+          : 'No link has reached the Founder — send again.'),
+    };
+  }
+
+  if (outcome.status === 'duplicate') {
+    return { ok: false, message: 'That exact send has already been delivered.' };
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.insert(campaignInvitationSends).values({
+      id: sendId,
+      draftId: input.draftId,
+      recipientEmail: record.prospect.email,
+      recipientName: record.prospect.preferredName || record.prospect.legalName,
+      senderName: record.draft.senderName!,
+      senderEmail: record.draft.senderEmail!,
+      invitationSource: record.prospect.invitationSource,
+      notificationId: outcome.notificationId,
+      tokenId,
+      tokenVersion,
+      tokenExpiresAt,
+      status: 'sent',
+      sentBy: input.actor,
+    });
+
+    await tx
+      .update(campaignDrafts)
+      .set({ status: 'sent' })
+      .where(eq(campaignDrafts.id, input.draftId));
+
+    await tx.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_draft',
+      targetId: input.draftId,
+      action: resent ? 'invitation.resent' : 'invitation.sent',
+      internalReason: resent
+        ? `resent; token rotated to v${tokenVersion} and the 30-day retention clock restarted`
+        : `invitation sent with token v${tokenVersion}`,
+      customerExplanation: 'We sent you a personal link to your Proovd draft.',
+      newValue: {
+        sendId,
+        tokenVersion,
+        notificationId: outcome.notificationId,
+        expiresAt: tokenExpiresAt,
+      },
+      relatedNotificationIds: [outcome.notificationId],
+    });
+  });
+
+  return { ok: true, sendId, tokenVersion, resent };
+}
+
+/* ── Revoking (§7) ────────────────────────────────────────────────────────── */
+
+export async function revokeInvitation(
+  { db, tokens }: Pick<InvitationDeps, 'db' | 'tokens'>,
+  input: { draftId: string; actor: string; reason: string },
+): Promise<{ ok: true; revoked: number } | { ok: false; message: string }> {
+  const record = await readDraft(db, input.draftId);
+  if (!record) return { ok: false, message: 'That draft does not exist.' };
+  if (record.draft.status === 'claimed') {
+    return {
+      ok: false,
+      message:
+        'This invitation has been claimed. Revoking the link would not remove the account it created — suspend the account instead.',
+    };
+  }
+  if (!input.reason.trim()) {
+    return { ok: false, message: 'Say why this is being revoked. The reason is stored.' };
+  }
+
+  const revoked = await db.transaction(async (tx) => {
+    const count = await tokens.revokeDraftTokens(input.draftId, 'admin_revoked', tx);
+
+    await tx
+      .update(campaignDrafts)
+      .set({ status: 'revoked' })
+      .where(eq(campaignDrafts.id, input.draftId));
+
+    await tx.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_draft',
+      targetId: input.draftId,
+      action: 'invitation.revoked',
+      internalReason: input.reason.trim(),
+      customerExplanation: null,
+      priorValue: { status: record.draft.status },
+      newValue: { status: 'revoked', tokensRevoked: count },
+    });
+
+    return count;
+  });
+
+  return { ok: true, revoked };
+}
+
+/* ── The draft landing state (§7) ─────────────────────────────────────────── */
+
+/**
+ * What a verified draft token is allowed to reveal.
+ *
+ * §7: the landing state "names the Founder/product and explains what will
+ * happen before an account or payment is required." §33.1.1: it "grants no
+ * other access."
+ *
+ * So this returns the Founder's own name, their own product, and the fixed
+ * process copy — and nothing that belongs to Proovd's operations: no Admin
+ * notes, no discovery evidence, no internal owner, no invitation source, no
+ * other campaign, no other Founder. The route learns the draft id only from the
+ * verified token, so there is no id for a caller to substitute.
+ */
+export interface DraftLanding {
+  recipientName: string;
+  productName: string;
+  whatWeUnderstood: string | null;
+  senderName: string | null;
+  expectedSetupTime: string | null;
+  reference: string;
+}
+
+export async function readDraftLanding(
+  db: Database,
+  draftId: string,
+): Promise<DraftLanding | null> {
+  const [row] = await db
+    .select({
+      legalName: founderProspects.legalName,
+      preferredName: founderProspects.preferredName,
+      productName: founderProspects.productName,
+      whatWeUnderstood: campaignDrafts.whatWeUnderstood,
+      senderName: campaignDrafts.senderName,
+      expectedSetupTime: campaignDrafts.expectedSetupTime,
+      campaignId: campaignDrafts.campaignId,
+      status: campaignDrafts.status,
+      anonymisedAt: campaignDrafts.anonymisedAt,
+    })
+    .from(campaignDrafts)
+    .innerJoin(founderProspects, eq(campaignDrafts.prospectId, founderProspects.id))
+    .where(eq(campaignDrafts.id, draftId))
+    .limit(1);
+
+  if (!row || row.anonymisedAt) return null;
+
+  return {
+    recipientName: row.preferredName || row.legalName || '',
+    productName: row.productName || '',
+    whatWeUnderstood: row.whatWeUnderstood,
+    senderName: row.senderName,
+    expectedSetupTime: row.expectedSetupTime,
+    reference: row.campaignId,
+  };
+}
+
+/* ── Listing, for Admin (§26.1) ───────────────────────────────────────────── */
+
+export interface FounderRow {
+  prospectId: string;
+  draftId: string;
+  campaignId: string;
+  legalName: string | null;
+  email: string | null;
+  productName: string | null;
+  status: string;
+  invitationSource: string | null;
+  internalOwner: string | null;
+  lastSentAt: Date | null;
+  claimedAt: Date | null;
+  anonymisedAt: Date | null;
+  createdAt: Date;
+}
+
+export async function listFounders(db: Database): Promise<FounderRow[]> {
+  const rows = await db
+    .select({
+      prospectId: founderProspects.id,
+      draftId: campaignDrafts.id,
+      campaignId: campaignDrafts.campaignId,
+      legalName: founderProspects.legalName,
+      email: founderProspects.email,
+      productName: founderProspects.productName,
+      status: campaignDrafts.status,
+      invitationSource: founderProspects.invitationSource,
+      internalOwner: founderProspects.internalOwner,
+      claimedAt: founderProspects.claimedAt,
+      anonymisedAt: campaignDrafts.anonymisedAt,
+      createdAt: campaignDrafts.createdAt,
+      lastSentAt: sql<Date | null>`(
+        SELECT max(s.sent_at) FROM campaign_invitation_sends s
+         WHERE s.draft_id = ${campaignDrafts.id}
+      )`.as('last_sent_at'),
+    })
+    .from(campaignDrafts)
+    .innerJoin(founderProspects, eq(campaignDrafts.prospectId, founderProspects.id))
+    .orderBy(desc(campaignDrafts.createdAt));
+
+  return rows;
+}

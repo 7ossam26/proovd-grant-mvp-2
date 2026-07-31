@@ -197,6 +197,178 @@ export interface PrerequisitePanel {
 export const fetchPrerequisites = (): Promise<PrerequisitePanel> =>
   call('/api/admin/prerequisites');
 
+/* ── Founders and invitations (§7, §26.1, §26.2) ──────────────────────────── */
+
+export interface FounderRow {
+  prospectId: string;
+  draftId: string;
+  campaignId: string;
+  legalName: string | null;
+  email: string | null;
+  productName: string | null;
+  status: 'draft' | 'sent' | 'revoked' | 'claimed' | 'expired';
+  invitationSource: string | null;
+  internalOwner: string | null;
+  lastSentAt: string | null;
+  retentionDueAt: string | null;
+  claimedAt: string | null;
+  anonymisedAt: string | null;
+  createdAt: string;
+}
+
+export const fetchFounders = (): Promise<{ founders: FounderRow[] }> =>
+  call('/api/admin/founders');
+
+export interface CreateProspectBody {
+  legalName: string;
+  preferredName?: string;
+  email: string;
+  phone?: string;
+  productName: string;
+  productUrl?: string;
+  launchFrame?: string;
+  usAgeFit?: string;
+  deliveryFeasibility?: string;
+  compensationExpectations?: string;
+  affiliateSourcingHypothesis?: string;
+  adminNotes?: string;
+  discoveryEvidence?: string[];
+  invitationSource: string;
+  internalOwner: string;
+}
+
+export const createProspect = (
+  body: CreateProspectBody,
+): Promise<{ draftId: string; campaignId: string; prospectId: string }> =>
+  call('/api/admin/founders', { method: 'POST', body: JSON.stringify(body) });
+
+export interface FounderDetail {
+  draft: {
+    id: string;
+    campaignId: string;
+    prospectId: string;
+    status: FounderRow['status'];
+    whatWeUnderstood: string | null;
+    whyInvited: string | null;
+    senderName: string | null;
+    senderEmail: string | null;
+    expectedSetupTime: string | null;
+    anonymisedAt: string | null;
+    createdAt: string;
+  };
+  prospect: Record<string, unknown> & {
+    legalName: string | null;
+    preferredName: string | null;
+    email: string | null;
+    productName: string | null;
+    productUrl: string | null;
+    invitationSource: string | null;
+    internalOwner: string | null;
+    claimedAt: string | null;
+    anonymisedAt: string | null;
+  };
+  campaign: {
+    id: string;
+    type: string | null;
+    typeLockedAt: string | null;
+    status: string;
+    affiliateRosterStatus: string;
+    campaignBuildStatus: string;
+    listingPaidAt: string | null;
+    campaignLiveAt: string | null;
+    campaignCloseAt: string | null;
+    createdAt: string;
+  } | null;
+  sends: Array<{
+    id: string;
+    sentAt: string;
+    recipientEmail: string | null;
+    senderName: string;
+    notificationId: string | null;
+    tokenVersion: number;
+    tokenExpiresAt: string | null;
+    sentBy: string;
+  }>;
+  lastSentAt: string | null;
+  retentionDueAt: string | null;
+  hasLiveToken: boolean;
+}
+
+export const fetchFounderDetail = (draftId: string): Promise<FounderDetail> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}`);
+
+export interface ComposeBody {
+  whatWeUnderstood: string;
+  whyInvited: string;
+  senderName: string;
+  senderEmail: string;
+  expectedSetupTime: string;
+}
+
+export const composeInvitation = (
+  draftId: string,
+  body: ComposeBody,
+): Promise<{ ok: true }> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/invitation`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export interface InvitationPreview {
+  subject: string;
+  html: string;
+  text: string;
+  recipientEmail: string | null;
+  /** Bracketed markers still in the rendered message. §7's gate. */
+  unresolved: string[];
+  blocked: boolean;
+}
+
+export const fetchInvitationPreview = (draftId: string): Promise<InvitationPreview> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/preview`);
+
+export const sendInvitation = (
+  draftId: string,
+): Promise<{ sendId: string; tokenVersion: number; resent: boolean }> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/send`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const revokeInvitation = (
+  draftId: string,
+  reason: string,
+): Promise<{ ok: true; tokensRevoked: number }> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/revoke`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+export interface InvitationCopy {
+  processSummary: string[];
+  noGuarantee: string;
+  retentionDays: number;
+}
+
+export const fetchInvitationCopy = (): Promise<InvitationCopy> =>
+  call('/api/admin/founders/invitation-copy');
+
+/* ── The draft landing state (§7) — no account, no session ────────────────── */
+
+export interface DraftLanding {
+  recipientName: string;
+  productName: string;
+  whatWeUnderstood: string | null;
+  senderName: string | null;
+  expectedSetupTime: string | null;
+  reference: string;
+  processSummary: string[];
+  noGuarantee: string;
+}
+
+export const fetchDraftLanding = (token: string): Promise<DraftLanding> =>
+  call(`/api/draft/${encodeURIComponent(token)}`);
+
 export const recordPrerequisite = (
   key: string,
   status: 'satisfied' | 'not_satisfied',

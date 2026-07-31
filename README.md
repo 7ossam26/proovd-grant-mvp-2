@@ -23,8 +23,8 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–05 are
-complete, and Phase 06 is split in two — 06a is done, 06b is next.**
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–06 are
+complete**; Phase 07 (Founder vetting and the account claim) is next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -35,13 +35,11 @@ complete, and Phase 06 is split in two — 06a is done, 06b is next.**
 | 04 | Auth — three account roles, Admin MFA and freshness gate, token service |
 | 05 | The fourteen public routes, policy versioning, two sample campaigns |
 | 06a | Global configuration, the production-prerequisites gate, the Admin shell |
-| 06b | *Next:* transactional email, the Founder invitation and draft, retention |
+| 06b | Transactional email, the Founder invitation and draft, the retention sweep |
 
 Phase 06 as written in `docs/phases/phase-06.md` bundles four independent
-deliverables. 06a shipped the configuration half; 06b owns transactional email,
-the Founder prospect and invitation, the draft landing state, the 30-day
-retention job, the Admin Users and Campaign surfaces, and acceptance tests
-§33.1.1–§33.1.3.
+deliverables, so it was built in two halves against one brief. Its named
+acceptance tests — §33.1.1, §33.1.2, §33.1.3 — all pass.
 
 ## Layout
 
@@ -52,13 +50,17 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/policies/   the eight canonical policy records and their versions
   src/settings/   the §6 operating-constant register
 backend/    Express 5 + Drizzle + Postgres 16
-  src/auth/       Better Auth config, guards, token service, seeding
-  src/policies/   the §34 policy gate
-  src/settings/   reading, validating, and versioning the §6 constants
-  src/admin/      the production-prerequisites panel
+  src/auth/           Better Auth config, guards, token service, seeding
+  src/policies/       the §34 policy gate
+  src/settings/       reading, validating, and versioning the §6 constants
+  src/admin/          the production-prerequisites panel
+  src/invitations/    Founder prospects, the invitation, the retention sweep
+  src/notifications/  the deduplicating sender, Resend, the email templates
+  src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
-  src/features/admin/    the Admin shell, configuration, prerequisites
+  src/features/admin/    the Admin shell, Founders, configuration, prerequisites
+  src/surfaces/          the Founder draft landing, the unusable-link page
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
@@ -158,6 +160,54 @@ exist (Spec §1.4).
 that page, no "proceed anyway", and no place to add one. Spec §34 is released by
 satisfying its conditions.
 
+## The Founder invitation
+
+There is no public signup, for any role. A Founder exists because an Admin found
+them off-platform, recorded a prospect, wrote an invitation, previewed it, and
+sent it. Spec §7 governs the whole path, and three rules shape the code:
+
+**Preview is a gate.** The template renders every unfilled field as a bracketed
+marker — `[WHAT PROOVD UNDERSTOOD]` — and the server scans the *rendered*
+subject, HTML, and text for them. While any remain, Send is unavailable, and the
+send route re-decides independently of the disabled button. A Founder never
+receives a placeholder.
+
+**Resend is a real second email; a duplicate job is not.** The notification
+dedup key in `notification_deliveries` is the *send*, not the draft. Keying on
+the draft would satisfy Spec §27.2's rule against duplicate deliveries and break
+Spec §7's requirement that resend work — the second invitation would be
+swallowed as a duplicate of the first. Resending rotates the token, invalidates
+the previous one immediately, and restarts the retention window.
+
+**The link is never shown in Admin.** Spec §28.1 puts the raw token in the
+delivered URL and nowhere else, so the Admin surface reports that a live link
+exists, which version it is, and when it expires. An Admin who needs a working
+link for a Founder resends one.
+
+The Founder's landing page at `/draft/:token` names them and their product,
+explains what happens next, and **asks for nothing** — no account, no card, no
+form, not even a disabled one. Every unusable link, for every reason, renders one
+identical page.
+
+## Retention
+
+Unclaimed draft content is irreversibly anonymised 30 calendar days after the
+**most recent send** (Spec §25.8, §33.1.3) by a pg-boss job on the same Postgres.
+Resending restarts the clock, which is why `campaign_invitation_sends` is
+append-only and `UPDATE` on `sent_at` is revoked from the application role: a
+retention clock a later statement could move is not a retention policy.
+
+The rows survive; their content does not. What remains is the minimum audit
+evidence Spec §25.8 asks for — that an invitation existed, when it was sent and
+by whom, that nobody claimed it, and when it was anonymised. Deleting the rows
+outright would leave the insert-only audit trail pointing at nothing, which is
+not a stronger privacy position, just an unauditable one.
+
+Revocation and anonymisation happen in one transaction. A revoked token beside
+live draft content is not compliance, and a crash between the two would leave
+that state permanently. Database triggers refuse to clear `anonymised_at` or
+write content back afterwards.
+
 ## Setup
 
 Requires Node >= 20, a Postgres 16+ for integration tests, and the Stripe CLI
@@ -247,6 +297,13 @@ The frontend and shared suites need neither Docker nor a database.
   names roughly thirty of them; all of them are settings, and a later phase that
   needs 72 hours reads the setting. A hardcoded duration is a bug even when the
   number is right.
+- **An unconfigured email provider refuses loudly.** The fallback transport
+  throws; it does not silently succeed. Spec §1.4 forbids implying automation
+  that does not exist, and an Admin must never see an invitation reported as
+  sent when nothing left the building.
+- **No message ever asks for bank details, tax details, a password, or identity
+  documents.** Spec §8 states it for Creators; it applies everywhere. An email
+  that asks for those trains people to answer the one that isn't from us.
 - **There is no public signup, for any role.** Accounts are created server-side
   by `seedAccount` in [backend/src/auth/seed.ts](backend/src/auth/seed.ts),
   which always takes an explicit role and exposes no HTTP route.

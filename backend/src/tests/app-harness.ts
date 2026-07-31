@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, createDbPool, type Database } from '../db/client.js';
 import { createApp, type AppConfig, type ProovdApp } from '../app.js';
+import type { OutgoingEmail } from '../notifications/send.js';
 import type { PrerequisiteEnvironment } from '../admin/prerequisites.js';
 import {
   migrateSerialized,
@@ -48,11 +49,23 @@ export const TEST_PREREQUISITE_ENVIRONMENT: PrerequisiteEnvironment = {
   transactionalEmailConfigured: false,
 };
 
+export interface CapturedEmail extends OutgoingEmail {
+  providerId: string;
+}
+
+/** Captured transactional email, plus a switch to make the next send fail. */
+export interface SentEmails {
+  messages: CapturedEmail[];
+  failNext: boolean;
+}
+
 export interface Harness extends ProovdApp {
   db: Database;
   pool: Pool;
   /** Reset-password deliveries, captured instead of sent. */
   resetLinks: Array<{ email: string; url: string }>;
+  /** Transactional email, captured instead of sent. */
+  sentEmails: SentEmails;
   stop: () => Promise<void>;
 }
 
@@ -82,6 +95,7 @@ export async function startHarness(
   if (!owned) await migrateSerialized(db, pool);
 
   const resetLinks: Array<{ email: string; url: string }> = [];
+  const sentEmails: SentEmails = { messages: [], failNext: false };
 
   const built = createApp(db, {
     appBaseUrl: 'http://localhost:3000',
@@ -90,6 +104,31 @@ export async function startHarness(
     authSecret: TEST_AUTH_SECRET,
     adminReauthWindowSeconds: TEST_REAUTH_WINDOW_SECONDS,
     prerequisiteEnvironment: TEST_PREREQUISITE_ENVIRONMENT,
+    invitationContext: {
+      appBaseUrl: 'http://localhost:3000',
+      supportEmail: 'support@proovd.co',
+      fromAddress: 'hello@proovd.co',
+    },
+    // Every request in the suite arrives from one loopback address, so the
+    // production §28.1 limit would trip partway through and turn unrelated
+    // assertions into limiter tests. The limiter's own behaviour is covered by
+    // `auth-tokens.test.ts`, which mounts it with a deliberately tiny limit.
+    draftVerifyLimit: 100_000,
+    // Captured, never sent. The real Resend transport is not exercised by the
+    // suite — what has to be proved is that a duplicate cannot produce a second
+    // message (§27.2), and that is a property of `createNotifier`, not of the
+    // provider.
+    emailTransport: {
+      async send(message) {
+        if (sentEmails.failNext) {
+          sentEmails.failNext = false;
+          throw new Error('test transport refused the message');
+        }
+        const providerId = `test-msg-${sentEmails.messages.length + 1}`;
+        sentEmails.messages.push({ ...message, providerId });
+        return { providerId };
+      },
+    },
     sendResetPassword: async ({ user, url }) => {
       resetLinks.push({ email: user.email, url });
     },
@@ -101,6 +140,7 @@ export async function startHarness(
     db,
     pool,
     resetLinks,
+    sentEmails,
     stop: async () => {
       await pool.end();
       await owned?.drop();
