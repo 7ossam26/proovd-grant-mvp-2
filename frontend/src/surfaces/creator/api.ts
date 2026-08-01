@@ -177,3 +177,88 @@ export interface PayoutState {
 
 export const fetchPayoutState = (token: string): Promise<PayoutState> =>
   call(`${base(token)}/payout`);
+
+/* ── The signed-in Creator (§10, §31.5) — session, not token ──────────────── */
+
+/**
+ * These calls carry a session cookie and no token: the invitation link was
+ * burned when the account was created, so from here on a Creator arrives
+ * signed in. `credentials: 'same-origin'` is set only for this group — the
+ * token calls above deliberately send no cookie.
+ */
+async function sessionCall<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      credentials: 'same-origin',
+      headers: init?.body ? { 'content-type': 'application/json' } : {},
+      ...init,
+    });
+  } catch {
+    throw new AdminRequestError(opaque(0));
+  }
+
+  if (!response.ok) {
+    let body: Partial<AdminError> | null = null;
+    try {
+      body = (await response.json()) as Partial<AdminError>;
+    } catch {
+      body = null;
+    }
+    throw new AdminRequestError(
+      body?.title ? { ...(body as AdminError), status: response.status } : opaque(response.status),
+    );
+  }
+  return (await response.json()) as T;
+}
+
+export interface CreatorCampaign {
+  associationId: string;
+  campaignId: string;
+  productName: string | null;
+  status: string;
+  revealedAt: string | null;
+  revoked: boolean;
+  /** True only when there is something to read. Drives the one action. */
+  reviewAvailable: boolean;
+}
+
+export const fetchCreatorCampaigns = (): Promise<{ campaigns: CreatorCampaign[] }> =>
+  sessionCall('/api/creator/campaigns');
+
+export interface PreparingKit {
+  associationId: string;
+  campaignId: string;
+  campaignStatus: string;
+  associationStatus: string;
+  founder: { name: string | null; entity: string | null; soleProprietor: boolean | null };
+  productName: string | null;
+  problem: string | null;
+  solution: string | null;
+  competition: string | null;
+  campaignType: string | null;
+  /** §14.1 items that do not exist yet, each with the reason. */
+  notYetAvailable: Array<{ item: string; because: string }>;
+  /** §31.5: the pre-view grants no work permission. Always false here. */
+  workPermitted: false;
+  /** §10: accept/decline/propose are unreachable until listing payment. */
+  decisionsAvailable: false;
+}
+
+export const fetchPreparingKit = (
+  associationId: string,
+  section: 'campaign_information' | 'campaign_kit' = 'campaign_information',
+): Promise<{ kit: PreparingKit }> =>
+  sessionCall(
+    `/api/creator/campaigns/${encodeURIComponent(associationId)}?section=${section}`,
+  );
+
+/** §5.3: email + password. No second factor — §5.1 makes that Admin's rule. */
+export const creatorSignIn = (email: string, password: string): Promise<unknown> =>
+  sessionCall('/api/auth/sign-in/email', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+
+export const creatorSignOut = (): Promise<unknown> =>
+  sessionCall('/api/auth/sign-out', { method: 'POST', body: JSON.stringify({}) });

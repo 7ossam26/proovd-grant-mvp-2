@@ -207,9 +207,40 @@ describe('the signup confirmation uses the §27.4 key', () => {
     });
   });
 
-  it('does not yet claim the Phase 08c handoff key', () => {
-    // §1.4: a key with no sender claims a message the product does not send.
-    expect(BACKEND_NOTIFICATION_EVENTS).not.toContain('affiliate_founder_signup_completed');
+  it('claims no key that nothing actually sends (§1.4)', () => {
+    // The rule is "a key appears here when something starts sending it, never
+    // before" — a key with no sender claims a message the product does not
+    // send. This asserts the rule rather than a snapshot of which keys exist:
+    // the earlier version named the Phase 08c key as absent, which stopped
+    // being true the moment 08c built its sender, and a test that has to be
+    // edited every phase stops being read.
+    const root = path.resolve(fileURLToPath(new URL('../', import.meta.url)));
+    const sources: string[] = [];
+
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== 'tests' && entry.name !== 'migrations') walk(full);
+          continue;
+        }
+        if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
+          if (!full.endsWith(path.join('notifications', 'events.ts'))) {
+            sources.push(fs.readFileSync(full, 'utf8'));
+          }
+        }
+      }
+    };
+    walk(root);
+
+    const tree = sources.join('\n');
+    for (const key of BACKEND_NOTIFICATION_EVENTS) {
+      const constantName = key.toUpperCase();
+      expect(
+        tree.includes(constantName),
+        `${key} is registered but nothing sends it`,
+      ).toBe(true);
+    }
   });
 });
 

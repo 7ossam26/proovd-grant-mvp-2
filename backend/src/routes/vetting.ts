@@ -49,6 +49,7 @@ import {
 } from '../vetting/claim.js';
 import { policyVersions } from '../db/schema/policies.js';
 import { inArray } from 'drizzle-orm';
+import { revealPreparingCampaign, type HandoffDeps } from '../affiliates/handoff.js';
 
 /**
  * The autosave allowance. Generous for a person typing into a debounced form
@@ -61,8 +62,18 @@ export function createVettingRouter(
   db: Database,
   auth: Auth,
   tokens: TokenService,
-  options: { verifyLimit?: number; saveLimit?: number } = {},
+  options: {
+    verifyLimit?: number;
+    saveLimit?: number;
+    /**
+     * §10's Affiliate handoff, run after a successful claim. Optional so the
+     * router can be built without a notifier in contexts that never claim —
+     * absent means the reveal is Admin's to trigger, which it is anyway.
+     */
+    handoff?: HandoffDeps;
+  } = {},
 ): Router {
+  const handoff = options.handoff;
   const router = Router();
   const json: RequestHandler = express.json({ limit: '128kb' });
 
@@ -328,6 +339,26 @@ export function createVettingRouter(
         ...(result.missing ? { missing: result.missing } : {}),
       });
       return;
+    }
+
+    // §10's Affiliate handoff. Runs after the claim transaction commits, for
+    // the same reason the signup confirmation does: revealing a campaign whose
+    // Founder account did not actually get created would grant access on the
+    // strength of an event that did not happen.
+    //
+    // It is idempotent by construction, so a crash between the commit and this
+    // line costs nothing — Admin can run it again and every Creator already
+    // revealed is skipped by their idempotency key. That is why this is not
+    // inside the transaction: holding a row lock across an email provider call
+    // would be a much more expensive way to be no safer.
+    if (handoff) {
+      try {
+        await revealPreparingCampaign(handoff, result.campaignId);
+      } catch {
+        // The Founder's account exists and their claim succeeded. A handoff
+        // failure is Admin's to retry, and must not turn a successful claim
+        // into an error the Founder sees.
+      }
     }
 
     // The raw token is now dead (§10: "invalidates the draft token"). The

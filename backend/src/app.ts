@@ -12,6 +12,7 @@ import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
 import { createDraftRouter } from './routes/draft.js';
 import { createVettingRouter } from './routes/vetting.js';
+import { createCreatorRouter } from './routes/creator.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
@@ -62,6 +63,12 @@ export interface AppConfig {
    * Nothing in production overrides it.
    */
   globalRateLimit?: number;
+  /**
+   * §28.1's per-address limit on the credential endpoints (`/api/auth`).
+   * Configurable for exactly the same reason as `globalRateLimit`, and set by
+   * nothing but the integration suite.
+   */
+  authRouteLimit?: number;
   /** §5.5 email-link password reset. Injected; the transport arrives later. */
   sendResetPassword: SendResetPassword;
   /** Founder-only Google sign-in (§5.2). Omitted when unconfigured. */
@@ -127,7 +134,11 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // looks like a Stripe configuration problem, and as sign-in requests that
   // hang. Each router adds its own body parsing at the correct scope.
 
-  app.use(createAuthRouter(auth));
+  app.use(
+    createAuthRouter(auth, {
+      ...(config.authRouteLimit !== undefined ? { limit: config.authRouteLimit } : {}),
+    }),
+  );
   app.use(createHealthRouter(db));
   // Phase 06 (§6, §26). The first product routes any guard is mounted on:
   // everything under /api/admin requires a session, the admin role, and a
@@ -189,8 +200,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       ...(config.draftVerifyLimit !== undefined
         ? { verifyLimit: config.draftVerifyLimit, saveLimit: config.draftVerifyLimit }
         : {}),
+      // Phase 08c (§10, §33.1.9). The account claim is the event; this is its
+      // consumer. Idempotent, so a failed run costs nothing but a retry.
+      handoff: { db, notifier, context: config.invitationContext },
     }),
   );
+  // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator: their campaigns and
+  // the preparing Campaign kit, every read of it logged and revocable.
+  app.use(createCreatorRouter(db, auth));
 
   // ── SPA fallback ──────────────────────────────────────────────────────────
   // /api/* routes go above. Everything else returns index.html so the SPA

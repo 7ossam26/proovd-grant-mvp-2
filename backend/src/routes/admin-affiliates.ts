@@ -65,6 +65,12 @@ import {
   DECLINE_NOTICE,
   NEVER_ASKS_NOTICE,
 } from '../notifications/templates/affiliate-invitation.js';
+import {
+  revealPreparingCampaign,
+  revokeKitAccess,
+  readPreparingVisibility,
+} from '../affiliates/handoff.js';
+import { readAccessLog } from '../affiliates/kit.js';
 
 export const ADMIN_AFFILIATES_PATH = '/api/admin/affiliates';
 
@@ -255,6 +261,30 @@ export function createAdminAffiliatesRouter({
     }
 
     res.status(201).json(created.value);
+  });
+
+  /* ── §10's preparing visibility, and its revocation (§31.5) ────────────── */
+
+  /**
+   * §10: Admin sees "the set of Affiliates who received preparing visibility,
+   * delivery status of notifications, and any revoked association."
+   */
+  router.get(`${ADMIN_AFFILIATES_PATH}/visibility`, admin, async (req, res) => {
+    const campaignId = str(req.query['campaignId']);
+    if (!campaignId) {
+      badRequest(res, 'A campaign id is required.', 'Open a campaign and try again.');
+      return;
+    }
+
+    const rows = await readPreparingVisibility(db, campaignId);
+    res.json({
+      visibility: rows.map((row) => ({
+        ...row,
+        revealedAt: row.revealedAt?.toISOString() ?? null,
+        revokedAt: row.revokedAt?.toISOString() ?? null,
+        lastAccessAt: row.lastAccessAt?.toISOString() ?? null,
+      })),
+    });
   });
 
   /* ── One recruitment record, everything Admin needs (§33.12.4) ──────────── */
@@ -489,6 +519,67 @@ export function createAdminAffiliatesRouter({
       });
       return;
     }
+    res.json(result);
+  });
+
+  /** §31.5's log, in full, for one association. Every read of the kit. */
+  router.get(`${ADMIN_AFFILIATES_PATH}/:associationId/access-log`, admin, async (req, res) => {
+    const rows = await readAccessLog(db, req.params['associationId'] as string);
+    res.json({
+      access: rows.map((row) => ({
+        id: row.id,
+        section: row.section,
+        affiliateUserId: row.affiliateUserId,
+        occurredAt: row.occurredAt.toISOString(),
+      })),
+    });
+  });
+
+  /**
+   * §10: "Revocation removes it immediately."
+   *
+   * Behind the freshness gate: it withdraws someone's access to confidential
+   * material, and §25.6 wants the actor on a high-impact action to be someone
+   * who authenticated recently.
+   */
+  router.post(
+    `${ADMIN_AFFILIATES_PATH}/:associationId/revoke-kit-access`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await revokeKitAccess(db, {
+        associationId: req.params['associationId'] as string,
+        actor: actorOf(req),
+        reason: str(body['reason']) ?? '',
+      });
+
+      if (!result.ok) {
+        badRequest(res, result.message, 'Nothing was changed.');
+        return;
+      }
+      res.json({ ok: true });
+    },
+  );
+
+  /**
+   * Re-runs §10's handoff for a campaign.
+   *
+   * Idempotent by construction — every Creator already revealed is skipped by
+   * their idempotency key — so this is safe to press after an interrupted run,
+   * which is exactly what §10's "No duplicate visibility event or email may
+   * occur after retries" requires it to be.
+   */
+  router.post(`${ADMIN_AFFILIATES_PATH}/reveal`, admin, fresh, json, async (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    const campaignId = str(body['campaignId']);
+    if (!campaignId) {
+      badRequest(res, 'A campaign id is required.', 'Nothing was changed.');
+      return;
+    }
+
+    const result = await revealPreparingCampaign({ db, notifier, context }, campaignId);
     res.json(result);
   });
 

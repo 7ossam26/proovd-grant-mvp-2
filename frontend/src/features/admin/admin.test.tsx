@@ -340,7 +340,14 @@ describe('global configuration renders the §6 register', () => {
     await user.type(within(row).getByLabelText(/^value/i), '1');
     await user.type(within(row).getByLabelText(/why is this changing/i), 'shorten it');
 
-    expect(within(row).getByRole('alert')).toHaveTextContent(/floor of 3/i);
+    // Awaited rather than asserted synchronously: the violation message and the
+    // disabled Save are rendered from state React commits after the typing
+    // settles, and a bare `getByRole` here passes only while the machine is
+    // fast enough. It flaked once the suite grew — the assertion was always the
+    // race, not the surface.
+    await waitFor(() =>
+      expect(within(row).getByRole('alert')).toHaveTextContent(/floor of 3/i),
+    );
     expect(within(row).getByRole('button', { name: /^save$/i })).toBeDisabled();
     expect(requests.some((r) => r.method === 'PUT')).toBe(false);
   });

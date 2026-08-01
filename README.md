@@ -23,9 +23,8 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–07 are
-complete and Phase 08a–08b are built**; Phase 08c (the preparing reveal and the
-Campaign kit) is next.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–08 are
+complete**; Phase 09 is next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -40,16 +39,14 @@ Campaign kit) is next.
 | 07 | Pre-account vetting, the permanent campaign-type lock, the account claim |
 | 08a | Creator recruitment, subtype verification evidence, the private invitation |
 | 08b | The Creator's compact signup, the payout handoff, the named waiting state |
+| 08c | The preparing reveal, the Campaign kit, access logging and revocation |
 
 Two briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
 the preparing reveal with its Campaign kit. Splitting them was a scheduling
 decision, not a scope one: each half is built against the same brief and lands
 its own named acceptance tests. Every named test from §33.1.1 to §33.1.9 passes,
-and so does §33.2.1.
-
-Still to come in Phase 08: **08c**, the preparing reveal and the Campaign kit
-(§33.2.4, and the second half of §33.1.9).
+and so does every one from §33.2.1 to §33.2.4.
 
 ## Layout
 
@@ -79,7 +76,8 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          prerequisites
   src/surfaces/          the unusable-link page
   src/surfaces/draft/    the Founder journey: vetting, result, account claim
-  src/surfaces/creator/  the Creator's compact signup and waiting state
+  src/surfaces/creator/  the Creator's compact signup, waiting state, and the
+                         preparing Campaign kit
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
@@ -375,6 +373,59 @@ confirmation email both read. Accept, decline, propose, and link activation are
 unreachable: none of them exists yet, and the formal opportunity only opens
 after the listing fee is paid.
 
+## The preparing pre-view
+
+The most confidentiality-sensitive thing in the product. When a Founder finishes
+claiming their account, every Creator already recruited and signed up for that
+campaign can suddenly read the Founder's unreleased product information — having
+signed nothing.
+
+Spec §31.5 permits that only as a narrow, pilot-only exception, and only while it
+stays **private, authenticated, logged, campaign-scoped, and revocable**. Each of
+those is a mechanism here, not an intention.
+
+**It happens exactly once, guarded three ways.** Spec §10 says so twice — the
+campaign "appears automatically in `preparing` exactly once", and Admin must see
+that "no duplicate visibility event or email may occur after retries". So there
+is an idempotency key per association, a conditional status update that matches
+nothing the second time, and the delivery-dedup constraint on the notification.
+Any one would stop the ordinary case; all three are there because a duplicate
+event must never duplicate state or a message, and this event is no different
+from a webhook in that respect.
+
+Each Creator is revealed in their own transaction. One person's failure — a
+revoked kit, a provider refusal — must not roll back another's: they are
+independent grants to independent people, and an all-or-nothing batch would let
+one bad row hold a whole roster in the dark.
+
+**Every read is logged, and the log holds no content.** `campaign_kit_access` is
+insert-only and records who opened what, when — never any of the material. A
+copy of a Founder's confidential text in an insert-only table would be a copy no
+revocation could ever reach. The access row is written by the same function that
+returns the content, so there is no arrangement of routes that serves the kit
+without recording it.
+
+**Revocation is immediate and one-way.** Admin withdraws access with a stored
+reason; the next read refuses before a single field of the Founder's material is
+selected. A database trigger refuses to clear the stamp, because an access grant
+nobody consciously made is precisely what this exception cannot survive.
+Re-granting is deliberately not built.
+
+**The kit is early, and says so.** Spec §14.1 lists the *complete formal* kit —
+rewards, prices, base percentage, tracking links — and almost none of it exists
+before the campaign is built and the listing fee is paid. Spec §10's phrase is
+"currently available", so the Creator sees the Founder, the Problem, the
+Solution, the Competition, and the campaign type, followed by a list of what is
+missing and why. Rendering those sections empty would read as a campaign
+offering nothing rather than one that has not been built yet.
+
+**Nothing here is an offer.** Compensation is Spec §12's and arrives with the
+formal opportunity, so no percentage is selected into this view at all — there
+is no field to accidentally turn into a control. Accept, decline, propose, and
+link activation do not exist as routes or as buttons. The surface says, in the
+same view as the material, that reading is not accepting and that the material
+is confidential.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -521,6 +572,10 @@ The frontend and shared suites need neither Docker nor a database.
   invited draft, a Backer's campaign magic link, and a Creator's campaign
   invitation — and a check constraint refuses any row carrying more than one.
   Scope binding is a property of the database, not a habit of the routes.
+- **The preparing pre-view is logged and revocable, or it is not permitted.**
+  Spec §31.5 grants it on those conditions, so the access log is insert-only,
+  the read that serves the kit is the read that logs it, and revocation is
+  one-way at the database level.
 - **Every token failure returns one identical response.** Invalid, expired,
   revoked, claimed, malformed, rate-limited, and never-existed are
   indistinguishable to the caller; the real reason goes only to the audit log.

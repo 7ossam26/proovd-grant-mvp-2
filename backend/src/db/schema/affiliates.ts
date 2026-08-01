@@ -228,8 +228,47 @@ export const affiliateInvitationSends = pgTable(
   }),
 );
 
+/* ── campaign_kit_access (§10, §31.5) ───────────────────────────────────────*/
+
+/**
+ * Every read of the preparing Campaign kit.
+ *
+ * §10: "Every access is logged." §31.5 makes that one of four conditions the
+ * pilot pre-view exception depends on — private, authenticated, logged,
+ * revocable — so this table is not telemetry, it is the evidence that the
+ * exception was operated as described. Insert-only, like `audit_events`: a log
+ * a later statement could edit is not evidence of anything.
+ *
+ * It records who opened what and when, and deliberately nothing about the
+ * content. The kit is the Founder's confidential material; copying any of it
+ * into an insert-only row would put a second copy somewhere no revocation
+ * could ever reach.
+ */
+export const campaignKitAccess = pgTable(
+  'campaign_kit_access',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    associationId: uuid('association_id')
+      .notNull()
+      .references(() => campaignAffiliateAssociations.id),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id),
+    /** The signed-in Creator. §10's handoff is to an *authenticated* Affiliate. */
+    affiliateUserId: text('affiliate_user_id').notNull(),
+    /** Which part was opened — the campaign information, or the kit itself. */
+    section: text('section').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    associationIdx: index('campaign_kit_access_association_idx').on(t.associationId, t.occurredAt),
+    campaignIdx: index('campaign_kit_access_campaign_idx').on(t.campaignId, t.occurredAt),
+  }),
+);
+
 export type AffiliateProspect = typeof affiliateProspects.$inferSelect;
 export type AffiliateInvitationSend = typeof affiliateInvitationSends.$inferSelect;
+export type CampaignKitAccess = typeof campaignKitAccess.$inferSelect;
 
 /**
  * ── A note on the columns this migration adds to an existing table ──────────

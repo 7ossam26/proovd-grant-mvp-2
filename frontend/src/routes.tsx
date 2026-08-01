@@ -18,6 +18,10 @@ import { FoundersPage } from './features/admin/FoundersPage.js';
 import { FounderDetail } from './features/admin/FounderDetail.js';
 import { CampaignCreators } from './features/admin/CampaignCreators.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
+import {
+  CreatorCampaigns,
+  CreatorCampaignKit,
+} from './surfaces/creator/CreatorCampaigns.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
 import { CreatorResult } from './surfaces/draft/CreatorResult.js';
@@ -139,6 +143,20 @@ const rootChildren: RouteObject[] = [
     // Founder draft route documents.
     path: 'creator-invitation/:token',
     element: <CreatorSignup />,
+  },
+  {
+    // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator. Outside both
+    // shells: §26 licenses dashboard density in Admin only, and this is not a
+    // public page — it is reached by signing in, and everything on it is
+    // scoped to the session.
+    path: 'creator/campaigns',
+    element: <CreatorCampaigns />,
+  },
+  {
+    // The one action §10 allows: `Review campaign`. Its own address, so a
+    // Creator who bookmarks a campaign gets that campaign back.
+    path: 'creator/campaigns/:associationId',
+    element: <CreatorCampaignKit />,
   },
   {
     // Phase 04 (§5.5). One route for every token failure — invalid, expired,

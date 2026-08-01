@@ -22,14 +22,25 @@ import type { Auth } from '../auth/auth.js';
 /** The prefix Better Auth is configured to own. */
 export const AUTH_BASE_PATH = '/api/auth';
 
-export function createAuthRouter(auth: Auth): Router {
+/**
+ * §28.1's credential-endpoint limit. Thirty attempts per quarter-hour per
+ * address is generous for a person signing in and tight for anything guessing.
+ *
+ * Configurable only because the integration suite signs in as an Admin, a
+ * Founder, and several Creators inside one journey and runs that journey many
+ * times from one loopback address — a suite that tripped this would turn
+ * unrelated assertions into limiter tests. Nothing in production overrides it.
+ */
+export const AUTH_ROUTE_LIMIT = 30;
+
+export function createAuthRouter(auth: Auth, options: { limit?: number } = {}): Router {
   const router = Router();
 
   router.use(
     AUTH_BASE_PATH,
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      limit: 30,
+      limit: options.limit ?? AUTH_ROUTE_LIMIT,
       standardHeaders: 'draft-7',
       legacyHeaders: false,
     }),

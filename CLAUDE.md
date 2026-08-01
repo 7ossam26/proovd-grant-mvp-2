@@ -21,7 +21,7 @@ You are building this one phase at a time. **Read the phase file you were given,
 
 ## Repository state — read this before looking for a file
 
-**Phases 00–07 are complete and committed, and Phase 08a + 08b are built.** Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation. §33.1.1 through §33.1.9 all pass, and so do §33.2.1, §33.2.2, and §33.2.3. **Phase 08c (the §10 preparing reveal and the Campaign kit) is next** — see "What Phase 08 owns" below. Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present.
+**Phases 00–08 are complete.** Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation — and Phase 08 in three: 08a recruitment, 08b the compact signup, 08c the preparing reveal. §33.1.1 through §33.1.9 all pass, and so do §33.2.1 through §33.2.4. **Phase 09 is next** — see `docs/master-plan.md` §6. Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present.
 
 What exists on disk:
 
@@ -48,11 +48,9 @@ Five gaps to know about, none of them a bug:
 |---|---|---|---|
 | **08a** | §8 recruitment, §5.3 verification evidence, §25.4 per-campaign association facts, the private invitation, §2.2 slot accounting, the Founder-visible roster | **§33.2.1** | **built** |
 | **08b** | §11 compact signup, the account claim, the `Finish payout setup` surface and its status states, the named waiting state | §33.2.2, §33.2.3 | **built** |
-| **08c** | §10's preparing reveal on `founder_signup_complete`, the Campaign kit, access logging and revocation | §33.2.4, the second half of §33.1.9 | next |
+| **08c** | §10's preparing reveal on `founder_signup_complete`, the Campaign kit, access logging and revocation | §33.2.4, the second half of §33.1.9 | **built** |
 
-**Phase 07 emitted `founder_signup_complete` and stopped there.** §10 attaches an Affiliate handoff to that event — the named campaign appears in `preparing` exactly once, with one `Review campaign` action. **08c** consumes it: `readSignupComplete(db, campaignId)` in `backend/src/vetting/claim.ts` reads the `idempotency_keys` row that *is* the event. The "reveals … exactly once" half of §33.1.9 is 08c's to prove. 08a deliberately built none of it — recruiting a Creator does not reveal anything to them, and a handler with nothing to handle claims a feature exists (§1.4).
-
-**What 08c inherits, already built and tested:** the `affiliate_invitation` token scope and its scope-binding CHECK, `requireAffiliateInvitationToken`, `tokens.claimAffiliateInvitation`, `readInvitationLanding`, the Creator account itself (role `affiliate`, created by `completeAffiliateSignup`), and `readConditionalState` — which already computes §11's `preparing` branch by reading `readSignupComplete`. 08c's job is to make that branch *mean* something: the reveal-once event, the Campaign kit, the access log, and revocation. The resolver returns `reviewAvailable: false` today and every surface reads it, so flipping it is the seam 08c opens.
+**Phase 07 emitted `founder_signup_complete`; 08c consumes it.** `routes/vetting.ts` calls `revealPreparingCampaign` after the claim transaction commits, outside it — the reveal is idempotent, so a crash between the two costs a retry rather than correctness, and holding a row lock across an email provider call would be a much more expensive way to be no safer. Admin can re-run it from `POST /api/admin/affiliates/reveal`.
 
 ## How a session works
 
@@ -261,6 +259,20 @@ The third actor gets an account. `backend/src/affiliates/signup.ts` owns the rec
 - **`preparing` is reported but not reviewable.** `readConditionalState` computes §11's real condition, and the surface renders the Founder-claimed case as "being prepared" with no `Review campaign` action. §10's handoff is 08c's, and offering the action before the Campaign kit exists would claim a capability the product does not have.
 - **`NO_ACTION` is exported from `StatePanel`** and read by the surfaces and the confirmation email. §11 puts "No action needed" in backticks and §33.2.3 tests for it; a paraphrase is a softer promise. One constant, three readers.
 - **The confirmation email is sent after the transaction commits**, keyed on the association. §8's invitation keys dedup on the *send* because §8 requires resend to work; a signup happens once, so only §27.2 applies here and the association is the right key. A provider refusal records the failure and returns — it does not roll back an account, because the account is the more valuable of the two.
+
+### The preparing reveal and the Campaign kit (§10, §31.5, built Phase 08c)
+
+The pilot pre-view: a Creator reads a Founder's unreleased product information having signed nothing. §31.5 permits it only while it stays **private, authenticated, logged, campaign-scoped, and revocable**, and every one of those is a mechanism rather than an intention.
+
+- **"Exactly once" is three mechanisms.** §10 says it twice — "appears automatically in `preparing` exactly once", and Admin sees "No duplicate visibility event or email may occur after retries". So: `idempotency_keys` on `affiliate_preparing_revealed:<associationId>`, the conditional status UPDATE `signed_up_waiting_for_founder → preparing`, and `notification_deliveries`. Any one would stop the common case; all three are there because §33.7.7's rule about duplicate events applies here as much as to a webhook.
+- **Each association is its own transaction.** One Creator's failure must not roll back another's reveal — they are independent grants to independent people, and an all-or-nothing batch would let one bad row hold a whole roster in the dark.
+- **Eligibility is `signed_up_waiting_for_founder`.** §10 reveals to an *authenticated* Affiliate; anything earlier has no account, so writing a `preparing` state for them would grant access to someone who cannot sign in to use it.
+- **Revocation is one-way at the database level**, and so is the reveal stamp (`enforce_kit_revocation_irreversible`). An access grant nobody consciously made is what the exception cannot survive; a reveal stamp that could be cleared is a second reveal waiting to happen. Re-granting is deliberately not built (§1 rule 6).
+- **`campaign_kit_access` is insert-only and records no content.** It is the evidence the exception was operated as described, so a log a later statement could edit is not evidence of anything — and copying any of the Founder's material into it would put a second copy somewhere no revocation could reach. `readPreparingKit` writes the row in the same call that returns the content, not in a middleware a later route could be added without.
+- **The preparing kit is much smaller than §14.1, and says so.** §14.1 is the *complete formal* opportunity — rewards, prices, base percentage, tracking links — almost none of which exists before Phase 09/11/12. §10's phrase is "currently available", so the projection returns Founder, Problem, Solution, Competition, and campaign type, plus a list of what is missing **and why**. Rendering empty sections would read as a campaign offering nothing rather than one that is early.
+- **No compensation reaches the projection at all.** §12 owns it from Phase 12. There is no percentage column selected, no control, and nothing to accidentally turn actionable — the trap's "showing the base percentage as information is fine" is moot because at preparing there is no percentage yet.
+- **Accept, decline, propose, activate are absent, not disabled.** §10 makes them unreachable until listing-fee payment, and there is no route and no control for any of them.
+- **`/api/creator/*` is the first non-Admin session surface**, behind `requireRole(auth, 'affiliate')`. No TOTP: §5.1 makes a second factor Admin's rule and §5.3 gives the Affiliate email + password. Every read filters on the session's user id *inside the query*, and someone else's association answers `not_found` — the same answer as one that does not exist.
 
 ### Forbidden patterns (§30, DNA §5.10)
 

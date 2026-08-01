@@ -41,10 +41,21 @@ export const AFFILIATE_CAMPAIGN_INVITATION = 'affiliate_campaign_invitation' as 
  */
 export const AFFILIATE_SIGNUP_CONFIRMED = 'affiliate_signup_confirmed' as const;
 
+/**
+ * §27.4 — "Founder signup completed / preparing campaign available". Sent by
+ * `affiliates/handoff.ts` when §10's reveal moves an association to
+ * `preparing`.
+ *
+ * §10 fixes its shape: "A transactional notification has one action: `Review
+ * campaign`." One action, and the template has exactly one link.
+ */
+export const AFFILIATE_FOUNDER_SIGNUP_COMPLETED = 'affiliate_founder_signup_completed' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
   AFFILIATE_SIGNUP_CONFIRMED,
+  AFFILIATE_FOUNDER_SIGNUP_COMPLETED,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

@@ -300,6 +300,22 @@ export const campaignAffiliateAssociations = pgTable(
     senderName: text('sender_name'),
     senderEmail: text('sender_email'),
 
+    /* ── §10's handoff and §31.5's pilot exception, added Phase 08c ─────────
+       §10: the named campaign "appears automatically in `preparing` state
+       exactly once". This stamp is one of the three mechanisms that make that
+       true — beside the `idempotency_keys` row and the conditional status
+       UPDATE — and a trigger refuses to change it once set.
+
+       §31.5 licenses the pre-view only while it stays "logged/revocable".
+       `campaign_kit_access` is the log; these three columns are the
+       revocation, and clearing them is refused at the database level: an
+       access grant nobody consciously made is what the exception cannot
+       survive. Re-granting is deliberately not built (§1 rule 6). */
+    preparingRevealedAt: timestamp('preparing_revealed_at', { withTimezone: true }),
+    kitAccessRevokedAt: timestamp('kit_access_revoked_at', { withTimezone: true }),
+    kitAccessRevokedReason: text('kit_access_revoked_reason'),
+    kitAccessRevokedBy: text('kit_access_revoked_by'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
