@@ -22,6 +22,18 @@
 /** §27.3 — "Personalized invitation". Sent by `invitations/service.ts`. */
 export const FOUNDER_INVITATION = 'founder_invitation' as const;
 
-export const BACKEND_NOTIFICATION_EVENTS = [FOUNDER_INVITATION] as const;
+/**
+ * §27.4 — "Campaign-specific invitation". Sent by `affiliates/invitation.ts`.
+ *
+ * The only Affiliate key Phase 08a sends. `affiliate_signup_confirmed` and
+ * `affiliate_founder_signup_completed` are Phase 08b's and 08c's; adding them
+ * here before a sender exists would claim a message the product does not send.
+ */
+export const AFFILIATE_CAMPAIGN_INVITATION = 'affiliate_campaign_invitation' as const;
+
+export const BACKEND_NOTIFICATION_EVENTS = [
+  FOUNDER_INVITATION,
+  AFFILIATE_CAMPAIGN_INVITATION,
+] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

@@ -16,10 +16,17 @@ export const DRAFT_TOKEN_PATH = '/api/draft';
 /** Backer campaign-scoped magic link (§19). */
 export const MAGIC_LINK_TOKEN_PATH = '/api/link';
 
-/** The Express route parameter both middlewares read. */
+/** Private campaign-specific Affiliate invitation (§8, §11). */
+export const AFFILIATE_INVITATION_TOKEN_PATH = '/api/affiliate-invitation';
+
+/** The Express route parameter every token middleware reads. */
 export const TOKEN_PARAM = 'token';
 
-const TOKEN_BEARING_PREFIXES = [DRAFT_TOKEN_PATH, MAGIC_LINK_TOKEN_PATH] as const;
+const TOKEN_BEARING_PREFIXES = [
+  DRAFT_TOKEN_PATH,
+  MAGIC_LINK_TOKEN_PATH,
+  AFFILIATE_INVITATION_TOKEN_PATH,
+] as const;
 
 export const REDACTED = '[redacted]';
 

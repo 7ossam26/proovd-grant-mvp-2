@@ -16,6 +16,7 @@ import { SettingsPage } from './features/admin/SettingsPage.js';
 import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
 import { FoundersPage } from './features/admin/FoundersPage.js';
 import { FounderDetail } from './features/admin/FounderDetail.js';
+import { CampaignCreators } from './features/admin/CampaignCreators.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
 import { CreatorResult } from './surfaces/draft/CreatorResult.js';
@@ -92,6 +93,10 @@ const rootChildren: RouteObject[] = [
       { index: true, element: <Navigate to="/admin/founders" replace /> },
       { path: 'founders', element: <FoundersPage /> },
       { path: 'founders/:draftId', element: <FounderDetail /> },
+      // Phase 08a (§8, §5.3, §25.4). Scoped to one campaign by query string,
+      // because §8's recruitment is always for one campaign and §11 keeps the
+      // Creator tied to it.
+      { path: 'creators', element: <CampaignCreators /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],

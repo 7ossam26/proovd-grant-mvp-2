@@ -58,14 +58,14 @@ import { campaigns } from './domain.js';
  * sweep; `anonymised_at` on the draft is what distinguishes them. There is no
  * `resent` state — a resend leaves the invitation `sent` and adds a send row,
  * because "resent" is a fact about a send, not about the invitation.
+ *
+ * Declared in `domain.ts` and re-exported here. Phase 08's Affiliate invitation
+ * needs the same lifecycle on `campaign_affiliate_associations`, that table
+ * lives in `domain.ts`, and `invitations.ts` already imports from it — so the
+ * enum moved to the module both sides can reach. It is still §7's enum.
  */
-export const invitationStatus = pgEnum('invitation_status', [
-  'draft',
-  'sent',
-  'revoked',
-  'claimed',
-  'expired',
-]);
+import { invitationStatus } from './domain.js';
+export { invitationStatus };
 
 /* ── founder_prospects (§7, §25.5, §26.1) ───────────────────────────────────*/
 

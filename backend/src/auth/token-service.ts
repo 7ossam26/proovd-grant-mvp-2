@@ -76,6 +76,22 @@ export interface MagicLinkSubject {
   backerIdentityId: string;
 }
 
+/**
+ * Spec §8, §11, §33.2.1 — the private campaign-specific Affiliate invitation.
+ *
+ * Bound to ONE association, which is one (campaign, prospect) pair. §33.2.1:
+ * "an invitation claims only that Affiliate's account/association." A Creator
+ * recruited to two campaigns holds two associations and receives two
+ * invitations; there is no field here that could carry a second campaign, and
+ * the scope-binding CHECK (migration 0009) refuses a row that tried.
+ */
+export interface AffiliateInvitationSubject {
+  scope: 'affiliate_invitation';
+  associationId: string;
+}
+
+export type TokenSubject = DraftSubject | MagicLinkSubject | AffiliateInvitationSubject;
+
 /* ── Primitives ───────────────────────────────────────────────────────────── */
 
 function generateRawToken(): string {
@@ -133,7 +149,7 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
    * reconstruct the old value.
    */
   async function issue(
-    subject: DraftSubject | MagicLinkSubject,
+    subject: TokenSubject,
     opts: { expiresAt?: Date | null; actorId?: string | null } = {},
   ): Promise<IssuedToken> {
     const raw = generateRawToken();
@@ -143,9 +159,13 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     const expiresAt =
       opts.expiresAt !== undefined
         ? opts.expiresAt
-        : subject.scope === 'founder_draft'
+        : // §8 gives the Affiliate invitation the same finite life as the
+          // Founder draft: it is a private link to a signup that either happens
+          // or is resent. Only magic links have no stamp at issue time, because
+          // §19 derives their expiry from campaign resolution + 180 days.
+          subject.scope === 'founder_draft' || subject.scope === 'affiliate_invitation'
           ? new Date(now().getTime() + DRAFT_TTL_DAYS * 86_400_000)
-          : null; // magic links: set by the retention job once resolution is known
+          : null;
 
     const [record] = await db
       .insert(secureTokens)
@@ -160,6 +180,8 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
         campaignId: subject.scope === 'backer_magic_link' ? subject.campaignId : null,
         backerIdentityId:
           subject.scope === 'backer_magic_link' ? subject.backerIdentityId : null,
+        associationId:
+          subject.scope === 'affiliate_invitation' ? subject.associationId : null,
       })
       .returning();
 
@@ -211,7 +233,7 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
       const nextVersion = previous.version + 1;
 
       const expiresAt =
-        previous.scope === 'founder_draft'
+        previous.scope === 'founder_draft' || previous.scope === 'affiliate_invitation'
           ? new Date(now().getTime() + DRAFT_TTL_DAYS * 86_400_000)
           : previous.expiresAt;
 
@@ -227,6 +249,10 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
           campaignDraftId: previous.campaignDraftId,
           campaignId: previous.campaignId,
           backerIdentityId: previous.backerIdentityId,
+          // Carried, not recomputed. A rotation that could re-point a token at
+          // a different association would be a resend that silently moved which
+          // Creator the link belongs to.
+          associationId: previous.associationId,
         })
         .returning();
 
@@ -254,8 +280,8 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
    */
   async function verify(
     raw: string,
-    expectedScope: 'founder_draft' | 'backer_magic_link',
-  ): Promise<VerifyResult<DraftSubject | MagicLinkSubject>> {
+    expectedScope: TokenSubject['scope'],
+  ): Promise<VerifyResult<TokenSubject>> {
     // Reject obviously malformed input before touching the database, so a
     // flood of junk can't turn verification into a query amplifier.
     if (typeof raw !== 'string' || raw.length < 32 || raw.length > 256) {
@@ -307,14 +333,16 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
       .set({ lastUsedAt: now(), failedAttempts: 0 })
       .where(eq(secureTokens.id, row.id));
 
-    const subject: DraftSubject | MagicLinkSubject =
+    const subject: TokenSubject =
       row.scope === 'founder_draft'
         ? { scope: 'founder_draft', campaignDraftId: row.campaignDraftId! }
-        : {
-            scope: 'backer_magic_link',
-            campaignId: row.campaignId!,
-            backerIdentityId: row.backerIdentityId!,
-          };
+        : row.scope === 'affiliate_invitation'
+          ? { scope: 'affiliate_invitation', associationId: row.associationId! }
+          : {
+              scope: 'backer_magic_link',
+              campaignId: row.campaignId!,
+              backerIdentityId: row.backerIdentityId!,
+            };
 
     return { ok: true, token: row, subject };
   }
@@ -400,6 +428,81 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     return revoked.length;
   }
 
+  /**
+   * Revokes every live token bound to one campaign-Affiliate association.
+   *
+   * §8: "Admin can send, resend, or revoke one private campaign-specific signup
+   * invitation." Revocation kills the link and nothing else — the prospect
+   * record, the association, and its history all survive, because §25.4 keeps
+   * the invitation events per campaign and a revoked invitation is one of them.
+   *
+   * Takes an executor for the same reason `revokeDraftTokens` does: revocation
+   * and the association's status change belong in one transaction, and a crash
+   * between them would leave a dead link beside an association that still says
+   * `invited`.
+   */
+  async function revokeAssociationTokens(
+    associationId: string,
+    reason: SecureToken['revokedReason'],
+    executor: Pick<NodePgDatabase<Record<string, unknown>>, 'update'> = db,
+  ): Promise<number> {
+    const revoked = await executor
+      .update(secureTokens)
+      .set({ revokedAt: now(), revokedReason: reason })
+      .where(
+        and(
+          eq(secureTokens.scope, 'affiliate_invitation'),
+          eq(secureTokens.associationId, associationId),
+          isNull(secureTokens.revokedAt),
+        ),
+      )
+      .returning({ id: secureTokens.id });
+
+    await audit({
+      action: 'token.association_tokens_revoked',
+      targetType: 'secure_token',
+      targetId: associationId,
+      internalReason: `${revoked.length} live affiliate invitation token(s) revoked: ${reason}`,
+    });
+
+    return revoked.length;
+  }
+
+  /**
+   * Atomically claims an Affiliate invitation token (§33.2.1).
+   *
+   * Identical in mechanism to `claimDraft` and separate from it on purpose: the
+   * scope predicate is what stops a Founder draft token being burned by the
+   * Affiliate signup route, and sharing one function would mean one predicate
+   * covering both — exactly the cross-scope claim §33.2.1 tests for.
+   */
+  async function claimAffiliateInvitation(
+    tokenId: string,
+    executor: Pick<NodePgDatabase<Record<string, unknown>>, 'update'> = db,
+  ): Promise<{ ok: boolean }> {
+    const claimed = await executor
+      .update(secureTokens)
+      .set({ claimedAt: now(), revokedAt: now(), revokedReason: 'claimed' })
+      .where(
+        and(
+          eq(secureTokens.id, tokenId),
+          eq(secureTokens.scope, 'affiliate_invitation'),
+          isNull(secureTokens.claimedAt),
+          isNull(secureTokens.revokedAt),
+        ),
+      )
+      .returning({ id: secureTokens.id });
+
+    const ok = claimed.length === 1;
+    await audit({
+      action: ok ? 'token.affiliate_invitation_claimed' : 'token.claim_rejected',
+      targetType: 'secure_token',
+      targetId: tokenId,
+      internalReason: ok ? 'affiliate invitation claimed' : 'concurrent or repeat claim',
+    });
+    return { ok };
+  }
+
   /** Immediate revocation. Access ends on the next request (Spec §7). */
   async function revoke(
     tokenId: string,
@@ -446,7 +549,17 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     return expired.map((r) => r.campaignDraftId).filter((id): id is string => !!id);
   }
 
-  return { issue, rotate, verify, claimDraft, revoke, revokeDraftTokens, expireStaleDrafts };
+  return {
+    issue,
+    rotate,
+    verify,
+    claimDraft,
+    claimAffiliateInvitation,
+    revoke,
+    revokeDraftTokens,
+    revokeAssociationTokens,
+    expireStaleDrafts,
+  };
 }
 
 export type TokenService = ReturnType<typeof createTokenService>;

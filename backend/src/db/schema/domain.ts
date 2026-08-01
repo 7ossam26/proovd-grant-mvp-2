@@ -26,6 +26,7 @@ import {
   timestamp,
   jsonb,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
 /* ── Enums (values owned by shared/states; drift-tested) ────────────────── */
@@ -131,6 +132,24 @@ export const paymentFlag = pgEnum('payment_flag', [
 /** §23.4. Mirrors shared ROSTER_MEMBERSHIPS. */
 export const rosterMembership = pgEnum('roster_membership', ['initial_roster', 'mid_campaign']);
 
+/**
+ * §7's invitation lifecycle, shared by the Founder invitation (`campaign_drafts`)
+ * and the Phase 08 Affiliate invitation (`campaign_affiliate_associations`).
+ *
+ * It lives here rather than in `invitations.ts` — where §7 put it and where it
+ * is still re-exported from — only because `invitations.ts` imports this module
+ * and a Postgres enum can be declared once. Two declarations would be two
+ * Postgres types with the same values, which is the drift these files exist to
+ * prevent. The direction of the dependency decided the location; nothing else.
+ */
+export const invitationStatus = pgEnum('invitation_status', [
+  'draft',
+  'sent',
+  'revoked',
+  'claimed',
+  'expired',
+]);
+
 /* ── campaigns ──────────────────────────────────────────────────────────── */
 
 export const campaigns = pgTable(
@@ -235,12 +254,69 @@ export const campaignAffiliateAssociations = pgTable(
     /** §23.4: initial-roster vs mid-campaign, stored separately from status. */
     rosterMembership: rosterMembership('roster_membership').notNull(),
 
+    /* ── §25.4's per-campaign facts, added Phase 08 (migration 0008) ────────
+       §25.4 splits the Affiliate record in two: an account section and a "Per
+       campaign" section whose first entry is "Recruitment source/Admin/timing
+       and invitation events." Those belong to the association, because the same
+       person recruited to a second campaign was recruited to it differently —
+       possibly by a different Admin, from a different source, on a different
+       day. Storing them on the prospect would make the second recruitment
+       overwrite the first one's provenance.
+
+       `prospect_id` is nullable for the same reason `affiliate_id` is an
+       unreferenced UUID above: Phase 03 created this table before any Affiliate
+       record existed, and backfilling a NOT NULL onto rows that predate the
+       concept would require inventing a prospect for them. Every row Phase 08
+       creates sets it. */
+    prospectId: uuid('prospect_id'),
+
+    /** §8, §25.4. Recorded per campaign, not per person. */
+    recruitmentSource: text('recruitment_source'),
+    recruitingAdmin: text('recruiting_admin'),
+    recruitedAt: timestamp('recruited_at', { withTimezone: true }),
+
+    /**
+     * §8: "Admin can send, resend, or revoke ONE private campaign-specific
+     * signup invitation." One invitation per association — so its status is a
+     * column here rather than a second table, and `affiliate_invitation_sends`
+     * holds the append-only history of the sends that produced it.
+     */
+    invitationStatus: invitationStatus('invitation_status').notNull().default('draft'),
+
+    /* ── The composed invitation content (§8) ──────────────────────────────
+       §8 requires the email to name why THIS Creator and THIS channel were
+       recruited, and which public presence Proovd reviewed. Both are per
+       campaign, not per person: the same Creator recruited to a second
+       campaign is being told something different, and storing it on the
+       prospect would make the second invitation overwrite the first one's
+       reasoning.
+
+       The two §8 sentences that are NOT here are the ones about the campaign
+       possibly still preparing and declining not harming standing. Those are
+       promises about how Proovd behaves, so they are template constants — an
+       editable version is one that acquires a condition under pressure. */
+    whyRecruited: text('why_recruited'),
+    reviewedPresence: text('reviewed_presence'),
+    senderName: text('sender_name'),
+    senderEmail: text('sender_email'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     campaignIdx: index('associations_campaign_idx').on(t.campaignId, t.status),
     affiliateIdx: index('associations_affiliate_idx').on(t.affiliateId),
+    prospectIdx: index('associations_prospect_idx').on(t.prospectId),
+    /**
+     * §11: "The Affiliate remains tied to the one campaign that caused the
+     * invitation." One association per (campaign, prospect) — recruiting the
+     * same Creator to the same campaign twice is a mistake, not a second
+     * relationship, and without this it would produce two invitations and two
+     * independent statuses for one person.
+     */
+    campaignProspectIdx: uniqueIndex('associations_campaign_prospect_idx')
+      .on(t.campaignId, t.prospectId)
+      .where(sql`${t.prospectId} IS NOT NULL`),
   }),
 );
 

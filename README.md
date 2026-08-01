@@ -24,7 +24,8 @@ Working rules for contributors and for Claude Code sessions live in
 ## Status
 
 Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–07 are
-complete**; Phase 08 (Affiliate recruitment and the private signup) is next.
+complete and Phase 08a is built**; Phase 08b (the Creator's compact signup) is
+next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -37,10 +38,18 @@ complete**; Phase 08 (Affiliate recruitment and the private signup) is next.
 | 06a | Global configuration, the production-prerequisites gate, the Admin shell |
 | 06b | Transactional email, the Founder invitation and draft, the retention sweep |
 | 07 | Pre-account vetting, the permanent campaign-type lock, the account claim |
+| 08a | Creator recruitment, subtype verification evidence, the private invitation |
 
-Phase 06 as written in `docs/phases/phase-06.md` bundles four independent
-deliverables, so it was built in two halves against one brief. Every named
-acceptance test from §33.1.1 to §33.1.9 passes.
+Two briefs have been built in halves. Phase 06 bundles four independent
+deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
+the preparing reveal with its Campaign kit. Splitting them was a scheduling
+decision, not a scope one: each half is built against the same brief and lands
+its own named acceptance tests. Every named test from §33.1.1 to §33.1.9 passes,
+and so does §33.2.1.
+
+Still to come in Phase 08: **08b** the compact signup and the payout-setup
+surface (§33.2.2, §33.2.3), **08c** the preparing reveal and the Campaign kit
+(§33.2.4, and the second half of §33.1.9).
 
 ## Layout
 
@@ -51,6 +60,8 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/policies/   the eight canonical policy records and their versions
   src/settings/   the §6 operating-constant register
   src/vetting/    the §9 vetting sequence, its copy, and the two campaign paths
+  src/affiliates/ the §5.3 subtypes and their evidence, §8's recruitment
+                  record, and §2.2's active-partnership slot rule
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -58,11 +69,13 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/admin/          the production-prerequisites panel
   src/invitations/    Founder prospects, the invitation, the retention sweep
   src/vetting/        the §9 answers and their provenance, the §10 account claim
+  src/affiliates/     Creator recruitment, verification, the private invitation
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
-  src/features/admin/    the Admin shell, Founders, configuration, prerequisites
+  src/features/admin/    the Admin shell, Founders, Creators, configuration,
+                         prerequisites
   src/surfaces/          the unusable-link page
   src/surfaces/draft/    the Founder journey: vetting, result, account claim
 docs/       Spec, DNA, tech stack, master plan, phase briefs
@@ -249,6 +262,62 @@ double-submit, and two genuinely concurrent claims all produce one account and
 one event — the idempotency key settles the first two, the conditional update on
 the token settles the third.
 
+## Creator recruitment
+
+Creators do not apply. There is no open signup for them either — a Creator
+exists because an Admin researched a public channel, recorded why it fits one
+specific campaign, and sent one private invitation. Spec §8 governs it, and the
+shape of the code follows three of its sentences.
+
+**The internal quality tier is a note, not a score.** Spec §8 allows Admin to
+record one and forbids it acting as a commission floor. A ranked tier — bronze
+to gold, 1 to 5 — is a value that can be sorted and multiplied, so the first
+phase that needs a default percentage would find one already sitting there. It
+is therefore free text with no scale: a database constraint refuses a bare
+number or a percentage, and there is no list of tier levels anywhere to import.
+Naming the levels would also invent an eligibility scheme the Spec does not
+state. A rule enforced by the type survives refactors that a rule enforced by
+convention does not.
+
+**The invitation is bound to one association, and the database binds it.** An
+invitation link carries a single campaign-Creator association id and nothing
+else — no draft, no campaign, no Backer identity — enforced by a check
+constraint rather than by every route that reads a token. A Creator recruited to
+two campaigns holds two associations and receives two invitations, because Spec
+§11 ties them to the campaign that caused the invitation. One link is never
+usable against another campaign.
+
+**Two sentences in every invitation cannot be edited.** Spec §8 requires the
+email to say that the opportunity may still be preparing, and that declining
+later does not harm standing. Both are promises about how Proovd behaves rather
+than facts about this recruitment, so they are fixed template text — an editable
+promise is one that gets softened for a Founder who wants a roster filled. The
+compose surface shows them read-only, no route writes them, and a test compares
+the sent body against them.
+
+Everything else mirrors the Founder invitation deliberately: preview is a
+server-side gate on the rendered message, resend rotates the token and produces
+a genuinely new email, and the send row is written before the provider call so
+nothing can be delivered without a record of it. The two senders are kept as
+separate code rather than merged, because they differ in token scope, dedup
+identity, state machine, and required contents — and the difference that matters
+most is the one the acceptance suite is about.
+
+**A slot is counted, never stored.** Spec §2.2 lets one Creator hold three
+active partnerships, running from tracking-link activation until the campaign
+closes or they are removed. That is derived from the association's state on
+every read, so a flag nobody cleared can never strand someone at three. A paused
+Creator still holds their slot — a pause is not a closed campaign, and releasing
+it would let one Creator hold four campaigns by having one go wrong. Recruiting,
+inviting, and preparing consume nothing.
+
+**The Founder sees a card, not a file.** After the account claim a Founder sees
+each recruited Creator's public handle, channel, niche, and status. They cannot
+browse a pool, cannot message anyone, and cannot see the email, phone, legal
+name, quality tier, verification evidence, or internal notes. The query that
+serves that view does not select those columns at all — there is no filtering
+step in it that a later change could forget.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -371,7 +440,13 @@ The frontend and shared suites need neither Docker nor a database.
 - **There is no public signup, for any role.** Accounts are created server-side
   by `seedAccount` in [backend/src/auth/seed.ts](backend/src/auth/seed.ts) and
   by the Founder account claim, which is reachable only with a valid invitation
-  token. Neither exposes a route anyone can find without being invited.
+  token. Neither exposes a route anyone can find without being invited. Creators
+  are the same: every route that can record one sits behind the Admin guards,
+  and a test scans the tree for a second way in.
+- **An internal quality tier is never a rate.** Spec §8 makes it assessment data
+  and forbids it acting as a commission floor. It is stored as free text with no
+  ordering, and a database constraint refuses a bare number or percentage — so
+  there is nothing in the column for a later phase to sort or multiply.
 - **The campaign type locks permanently and there is no migration path.** Spec
   §9 is explicit, and a database trigger enforces it rather than a service rule.
   A wrong lock is corrected by archiving and restarting, never by converting.
@@ -382,6 +457,10 @@ The frontend and shared suites need neither Docker nor a database.
   [backend/src/auth/token-service.ts](backend/src/auth/token-service.ts) —
   never Better Auth's magic-link plugin, which would create accounts and
   sessions the Spec forbids.
+- **Every token is bound to exactly one subject.** Three scopes — a Founder's
+  invited draft, a Backer's campaign magic link, and a Creator's campaign
+  invitation — and a check constraint refuses any row carrying more than one.
+  Scope binding is a property of the database, not a habit of the routes.
 - **Every token failure returns one identical response.** Invalid, expired,
   revoked, claimed, malformed, rate-limited, and never-existed are
   indistinguishable to the caller; the real reason goes only to the audit log.

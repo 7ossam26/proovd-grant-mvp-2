@@ -50,10 +50,16 @@ import {
  *                        campaign. Valid through fulfilment or final
  *                        resolution + 180 days unless revoked or reissued.
  *                        Founder or Affiliate payment never expires it.
+ *  - `affiliate_invitation` Spec §8, §11. Scoped to ONE campaign-Affiliate
+ *                        association. Grants exactly what §33.2.1 allows: the
+ *                        ability to claim that Affiliate's account and that
+ *                        association, and nothing else — not another campaign,
+ *                        not another Creator, not the Founder's draft.
  */
 export const tokenScope = pgEnum('token_scope', [
   'founder_draft',
   'backer_magic_link',
+  'affiliate_invitation',
 ]);
 
 /**
@@ -118,6 +124,18 @@ export const secureTokens = pgTable(
      */
     backerIdentityId: uuid('backer_identity_id'),
 
+    /**
+     * `affiliate_invitation` — the one campaign-Affiliate association this
+     * token claims (§8, §11, §33.2.1).
+     *
+     * The association, not the prospect: a Creator recruited to two campaigns
+     * holds two associations and must receive two invitations. Binding to the
+     * person instead would make one link claimable against whichever campaign
+     * the request named, which is precisely the cross-scope access §33.2.1
+     * tests for.
+     */
+    associationId: uuid('association_id'),
+
     /* ── Lifecycle ─────────────────────────────────────────────────────────*/
 
     issuedAt: timestamp('issued_at', { withTimezone: true })
@@ -166,6 +184,9 @@ export const secureTokens = pgTable(
 
     /** The 30-day unclaimed-draft anonymisation sweep. */
     draftIdx: index('secure_tokens_draft_idx').on(t.campaignDraftId),
+
+    /** Admin: the live invitation for one Affiliate association (§8). */
+    associationIdx: index('secure_tokens_association_idx').on(t.associationId),
   }),
 );
 

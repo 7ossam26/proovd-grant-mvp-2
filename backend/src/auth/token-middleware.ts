@@ -1,5 +1,5 @@
 /**
- * Express middleware for the two token-bearing surfaces (§7, §19).
+ * Express middleware for the three token-bearing surfaces (§7, §8, §19).
  *
  * This layer does three things and no more: read the raw value out of the URL,
  * hand it to `token-service.verify()`, and attach the scoped subject to the
@@ -16,7 +16,13 @@
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import rateLimit, { type Options as RateLimitOptions } from 'express-rate-limit';
-import type { DraftSubject, MagicLinkSubject, TokenService } from './token-service.js';
+import type {
+  AffiliateInvitationSubject,
+  DraftSubject,
+  MagicLinkSubject,
+  TokenService,
+  TokenSubject,
+} from './token-service.js';
 import type { SecureToken } from '../db/schema/tokens.js';
 import { sendTokenRejection } from './token-rejection.js';
 import { TOKEN_PARAM } from './token-routes.js';
@@ -27,6 +33,8 @@ declare module 'express-serve-static-core' {
     draftSubject?: DraftSubject;
     /** Present only after `requireMagicLinkToken` has admitted the request. */
     magicLinkSubject?: MagicLinkSubject;
+    /** Present only after `requireAffiliateInvitationToken` has admitted it. */
+    affiliateInvitationSubject?: AffiliateInvitationSubject;
     /** The verified row, for routes that need its version or issue time. */
     secureToken?: SecureToken;
   }
@@ -86,10 +94,7 @@ export function createTokenResendLimiter(overrides: Partial<RateLimitOptions> = 
   });
 }
 
-function createTokenGuard(
-  tokens: TokenService,
-  scope: 'founder_draft' | 'backer_magic_link',
-): RequestHandler {
+function createTokenGuard(tokens: TokenService, scope: TokenSubject['scope']): RequestHandler {
   return async function tokenGuard(req: Request, res: Response, next: NextFunction) {
     // Started before any work, so the rejection floor covers the database
     // round-trip that a well-formed-but-wrong token pays and a malformed one
@@ -113,8 +118,12 @@ function createTokenGuard(
     }
 
     req.secureToken = result.token;
+    // One branch per scope, and each writes only its own property. A shared
+    // `req.subject` would let a route read a subject it was not guarded for.
     if (result.subject.scope === 'founder_draft') {
       req.draftSubject = result.subject;
+    } else if (result.subject.scope === 'affiliate_invitation') {
+      req.affiliateInvitationSubject = result.subject;
     } else {
       req.magicLinkSubject = result.subject;
     }
@@ -141,4 +150,19 @@ export function requireDraftToken(tokens: TokenService): RequestHandler {
  */
 export function requireMagicLinkToken(tokens: TokenService): RequestHandler {
   return createTokenGuard(tokens, 'backer_magic_link');
+}
+
+/**
+ * Admits a private campaign-specific Affiliate invitation and nothing else
+ * (§8, §11, §33.2.1).
+ *
+ * The subject carries one association id, which names exactly one campaign and
+ * one prospect. §33.2.1: "an invitation claims only that Affiliate's
+ * account/association" — a route downstream of this guard has no other id to
+ * scope by, so there is nothing for a caller to substitute. A Founder draft
+ * token presented here fails on the scope predicate inside `verify()`, with the
+ * same opaque rejection as a token that never existed.
+ */
+export function requireAffiliateInvitationToken(tokens: TokenService): RequestHandler {
+  return createTokenGuard(tokens, 'affiliate_invitation');
 }

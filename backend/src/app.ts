@@ -8,6 +8,7 @@ import { createHealthRouter } from './routes/health.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createAdminRouter } from './routes/admin.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
+import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createDraftRouter } from './routes/draft.js';
 import { createVettingRouter } from './routes/vetting.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
@@ -134,6 +135,19 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   app.use(createAdminRouter({ db, auth, environment: config.prerequisiteEnvironment }));
   app.use(
     createAdminFoundersRouter({
+      db,
+      auth,
+      tokens,
+      notifier,
+      context: config.invitationContext,
+    }),
+  );
+  // Phase 08a (§8, §5.3, §25.4, §33.2.1). Campaign-specific Creator
+  // recruitment and the private invitation. Behind the same guards: §33.2.1's
+  // "no public signup" is partly the fact that every route that can create an
+  // Affiliate is under /api/admin.
+  app.use(
+    createAdminAffiliatesRouter({
       db,
       auth,
       tokens,

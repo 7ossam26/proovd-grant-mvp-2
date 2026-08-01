@@ -18,4 +18,8 @@ export * from './invitations.js';
 // Phase 7: the §9 vetting answers and their provenance, the §10 possible-creator
 // recording, the account-claim profile, and the policy consents a claim writes.
 export * from './vetting.js';
+// Phase 8: the §8 campaign-specific Affiliate prospect, the §25.4 per-campaign
+// recruitment facts on the association, and the append-only record of every
+// private invitation send.
+export * from './affiliates.js';
 

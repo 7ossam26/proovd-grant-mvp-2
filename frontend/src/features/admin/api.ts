@@ -474,6 +474,221 @@ export interface DraftLanding {
 export const fetchDraftLanding = (token: string): Promise<DraftLanding> =>
   call(`/api/draft/${encodeURIComponent(token)}`);
 
+/* ── Campaign Creators (§8, §5.3, §25.4) — added Phase 08a ────────────────── */
+
+/**
+ * The §5.3 register the server validates against, and §8's fixed copy.
+ *
+ * Labels, help text, and every `basis` string are NOT here: the Admin bundle
+ * imports `@proovd/shared`'s register directly through Vite, and copy that
+ * travels over the wire is a second version of the same sentence waiting to
+ * disagree with the first. What comes back is only what the server enforces.
+ */
+export interface AffiliateRegistry {
+  subtypes: string[];
+  requiredEvidence: Record<string, string[]>;
+  verificationStatuses: string[];
+  /** §8's two promises and the never-asks line. Read-only; no route edits them. */
+  fixedCopy: {
+    preparingNotice: string;
+    declineNotice: string;
+    neverAsksNotice: string;
+  };
+}
+
+export const fetchAffiliateRegistry = (): Promise<AffiliateRegistry> =>
+  call('/api/admin/affiliates/registry');
+
+export interface AffiliateRosterRow {
+  associationId: string;
+  prospectId: string;
+  campaignId: string;
+  legalName: string | null;
+  publicHandle: string | null;
+  email: string | null;
+  subtype: string | null;
+  status: string;
+  invitationStatus: 'draft' | 'sent' | 'revoked' | 'claimed' | 'expired';
+  rosterMembership: 'initial_roster' | 'mid_campaign';
+  verificationStatus: 'unverified' | 'in_review' | 'verified' | 'rejected';
+  recruitingAdmin: string | null;
+  lastSentAt: string | null;
+  claimedAt: string | null;
+  createdAt: string;
+}
+
+export const fetchCampaignAffiliates = (
+  campaignId: string,
+): Promise<{ affiliates: AffiliateRosterRow[] }> =>
+  call(`/api/admin/affiliates?campaignId=${encodeURIComponent(campaignId)}`);
+
+export interface RecruitBody {
+  legalName: string;
+  publicHandle: string;
+  email: string;
+  phone?: string;
+  subtype: string;
+  channelReference: string;
+  audienceNiche: string;
+  campaignFit: string;
+  audienceSize?: string;
+  engagementEvidence?: Record<string, string>;
+  audienceDemographics?: string;
+  permissionBasis: string;
+  priorSponsoredContent?: string;
+  adminBio: string;
+  /** §8: assessment data only. A bare number or percentage is refused. */
+  qualityTier?: string;
+  conflictNotes?: string;
+  sanctionsNotes?: string;
+  internalComments?: string;
+  recruitmentSource: string;
+  recruitingAdmin: string;
+  campaignId: string;
+  rosterIntent: 'initial_roster' | 'mid_campaign';
+}
+
+export const recruitAffiliate = (
+  body: RecruitBody,
+): Promise<{ prospectId: string; associationId: string }> =>
+  call('/api/admin/affiliates', { method: 'POST', body: JSON.stringify(body) });
+
+export interface AffiliateDetail {
+  association: {
+    id: string;
+    campaignId: string;
+    status: string;
+    rosterMembership: 'initial_roster' | 'mid_campaign';
+    invitationStatus: AffiliateRosterRow['invitationStatus'];
+    recruitmentSource: string | null;
+    recruitingAdmin: string | null;
+    recruitedAt: string | null;
+  };
+  prospect: Record<string, unknown> & {
+    id: string;
+    legalName: string | null;
+    publicHandle: string | null;
+    email: string | null;
+    phone: string | null;
+    subtype: string | null;
+    channelReference: string | null;
+    audienceNiche: string | null;
+    campaignFit: string | null;
+    audienceSize: string | null;
+    engagementEvidence: Record<string, string> | null;
+    audienceDemographics: string | null;
+    permissionBasis: string | null;
+    priorSponsoredContent: string | null;
+    adminBio: string | null;
+    qualityTier: string | null;
+    verificationStatus: AffiliateRosterRow['verificationStatus'];
+    verificationEvidence: Record<string, string> | null;
+    verifiedBy: string | null;
+    verifiedAt: string | null;
+    conflictNotes: string | null;
+    sanctionsNotes: string | null;
+    internalComments: string | null;
+    claimedAt: string | null;
+  };
+  /** §5.3 evidence still missing for this subtype. Reported, not enforced. */
+  missingEvidence: string[];
+  /** §2.2, across every campaign. Phase 08 can never make this non-zero. */
+  slots: { used: number; limit: number; remaining: number; atLimit: boolean };
+  invitation: {
+    whyRecruited: string | null;
+    reviewedPresence: string | null;
+    senderName: string | null;
+    senderEmail: string | null;
+    founderName: string | null;
+    productName: string | null;
+    hasLiveToken: boolean;
+    lastSentAt: string | null;
+    sends: Array<{
+      id: string;
+      sentAt: string;
+      recipientEmail: string | null;
+      senderName: string;
+      notificationId: string | null;
+      tokenVersion: number;
+      tokenExpiresAt: string | null;
+      sentBy: string;
+      /** §1.4: false means "recorded, not confirmed delivered". */
+      deliveryConfirmed: boolean;
+    }>;
+  } | null;
+}
+
+export const fetchAffiliateDetail = (associationId: string): Promise<AffiliateDetail> =>
+  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}`);
+
+export const updateAffiliateProspect = (
+  associationId: string,
+  body: Partial<Omit<RecruitBody, 'campaignId' | 'rosterIntent' | 'subtype'>>,
+): Promise<{ ok: true }> =>
+  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/prospect`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
+export const recordAffiliateVerification = (
+  associationId: string,
+  body: { status: string; verifiedBy: string; evidence?: Record<string, string> },
+): Promise<{ ok: true }> =>
+  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/verification`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export interface AffiliateComposeBody {
+  whyRecruited: string;
+  reviewedPresence: string;
+  senderName: string;
+  senderEmail: string;
+}
+
+export const composeAffiliateInvitation = (
+  associationId: string,
+  body: AffiliateComposeBody,
+): Promise<{ ok: true }> =>
+  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/invitation`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
+export interface AffiliateInvitationPreview {
+  subject: string;
+  html: string;
+  text: string;
+  recipientEmail: string | null;
+  /** Bracketed markers still in the rendered message. §8's gate. */
+  unresolved: string[];
+  blocked: boolean;
+  /** The route shape only — §28.1 makes the real link unrecoverable. */
+  claimUrlShape: string;
+}
+
+export const fetchAffiliateInvitationPreview = (
+  associationId: string,
+): Promise<AffiliateInvitationPreview> =>
+  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/preview`);
+
+export const sendAffiliateInvitation = (
+  associationId: string,
+): Promise<{ sendId: string; tokenVersion: number; resent: boolean }> =>
+  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/send`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const revokeAffiliateInvitation = (
+  associationId: string,
+  reason: string,
+): Promise<{ ok: true; revoked: number }> =>
+  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/revoke`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
 export const recordPrerequisite = (
   key: string,
   status: 'satisfied' | 'not_satisfied',
