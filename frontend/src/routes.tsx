@@ -17,6 +17,7 @@ import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
 import { FoundersPage } from './features/admin/FoundersPage.js';
 import { FounderDetail } from './features/admin/FounderDetail.js';
 import { CampaignCreators } from './features/admin/CampaignCreators.js';
+import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
 import { CreatorResult } from './surfaces/draft/CreatorResult.js';
@@ -126,6 +127,18 @@ const rootChildren: RouteObject[] = [
   {
     path: 'draft/:token/claim',
     element: <AccountClaim />,
+  },
+  {
+    // Phase 08b (§11, §33.2.2, §33.2.3). The Creator's compact signup — ONE
+    // address, because §11 gives it one flow with one primary action and
+    // forbids a multi-page sequence. The same address serves the waiting state
+    // after the account exists: §11 says "the same surface confirms signup",
+    // and a redirect to a second page would be the sequence it rules out.
+    //
+    // Outside the public shell and outside the Admin shell, for the reasons the
+    // Founder draft route documents.
+    path: 'creator-invitation/:token',
+    element: <CreatorSignup />,
   },
   {
     // Phase 04 (§5.5). One route for every token failure — invalid, expired,

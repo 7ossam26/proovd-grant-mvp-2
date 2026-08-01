@@ -71,6 +71,13 @@
       "when": 1785506401000,
       "tag": "0009_affiliate_token_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785510000000,
+      "tag": "0010_affiliate_signup",
+      "breakpoints": true
     }
   ]
 }

@@ -31,9 +31,20 @@ export const FOUNDER_INVITATION = 'founder_invitation' as const;
  */
 export const AFFILIATE_CAMPAIGN_INVITATION = 'affiliate_campaign_invitation' as const;
 
+/**
+ * §27.4 — "Signup confirmed / waiting state". Sent by
+ * `affiliates/signup-notification.ts` once the claim transaction commits.
+ *
+ * `affiliate_founder_signup_completed` is still absent: that is the §10 handoff
+ * Phase 08c builds, and a key with no sender claims a message the product does
+ * not send (§1.4).
+ */
+export const AFFILIATE_SIGNUP_CONFIRMED = 'affiliate_signup_confirmed' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
+  AFFILIATE_SIGNUP_CONFIRMED,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

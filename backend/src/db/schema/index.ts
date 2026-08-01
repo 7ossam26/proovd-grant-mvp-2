@@ -22,4 +22,7 @@ export * from './vetting.js';
 // recruitment facts on the association, and the append-only record of every
 // private invitation send.
 export * from './affiliates.js';
+// Phase 8b: the §11 compact signup profile — what Proovd prefilled, what the
+// Creator corrected, the five confirmations, and the payout-onboarding status.
+export * from './affiliate-signup.js';
 

@@ -24,8 +24,8 @@ Working rules for contributors and for Claude Code sessions live in
 ## Status
 
 Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–07 are
-complete and Phase 08a is built**; Phase 08b (the Creator's compact signup) is
-next.
+complete and Phase 08a–08b are built**; Phase 08c (the preparing reveal and the
+Campaign kit) is next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -39,6 +39,7 @@ next.
 | 06b | Transactional email, the Founder invitation and draft, the retention sweep |
 | 07 | Pre-account vetting, the permanent campaign-type lock, the account claim |
 | 08a | Creator recruitment, subtype verification evidence, the private invitation |
+| 08b | The Creator's compact signup, the payout handoff, the named waiting state |
 
 Two briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -47,8 +48,7 @@ decision, not a scope one: each half is built against the same brief and lands
 its own named acceptance tests. Every named test from §33.1.1 to §33.1.9 passes,
 and so does §33.2.1.
 
-Still to come in Phase 08: **08b** the compact signup and the payout-setup
-surface (§33.2.2, §33.2.3), **08c** the preparing reveal and the Campaign kit
+Still to come in Phase 08: **08c**, the preparing reveal and the Campaign kit
 (§33.2.4, and the second half of §33.1.9).
 
 ## Layout
@@ -69,7 +69,8 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/admin/          the production-prerequisites panel
   src/invitations/    Founder prospects, the invitation, the retention sweep
   src/vetting/        the §9 answers and their provenance, the §10 account claim
-  src/affiliates/     Creator recruitment, verification, the private invitation
+  src/affiliates/     Creator recruitment, verification, the private
+                      invitation, and the §11 compact signup
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
@@ -78,6 +79,7 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          prerequisites
   src/surfaces/          the unusable-link page
   src/surfaces/draft/    the Founder journey: vetting, result, account claim
+  src/surfaces/creator/  the Creator's compact signup and waiting state
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
@@ -318,6 +320,61 @@ name, quality tier, verification evidence, or internal notes. The query that
 serves that view does not select those columns at all — there is no filtering
 step in it that a later change could forget.
 
+## The Creator's signup
+
+One page. Spec §11 gives the flow a single primary action — `Confirm and create
+account` — and then exactly one more, `Finish payout setup`. It forbids the
+alternatives by name: no welcome tour, no multi-page education sequence, no
+separate banking page, no public signup. So there is one route serving the whole
+flow, one primary button on the page, and no step counter anywhere.
+
+**Proovd does not ask for bank or tax details, and could not store them.**
+Getting paid needs a Stripe account in the Creator's name, and Stripe collects
+the identity, tax, and banking data through its own onboarding. Spec §11 forbids
+reproducing those fields in a custom form and Spec §5.3 says Proovd stores
+statuses and IDs and "never full bank details" — so there is no route here that
+accepts one, no column that could hold one, and a database constraint that keeps
+the connected-account column looking like a Stripe account reference and nothing
+else. The payout step lands in Phase 10; until then the panel reports its true
+status and renders no control, because a button that does nothing is worse than
+no button.
+
+**Everything Proovd prefilled says so, and every correction is kept.** The
+recruitment record fills in the name, handle, channel, niche, audience metric,
+and the Admin-written bio; each one carries a line saying Proovd wrote it, and
+that line flips the moment the Creator changes it. What Proovd originally
+suggested survives beside what replaced it — that pairing is what Spec §11 means
+by Admin seeing "corrections to prefilled fields".
+
+The channel *type* is shown but not editable. It is Admin's classification under
+Spec §5.3, and it decides which verification evidence was required and recorded;
+a Creator flipping it would silently invalidate a verification. A correction
+there goes to support.
+
+**Five confirmations, five separate controls.** Spec §11 asks a Creator to
+confirm they are 18+, US-based, the actual operator behind the channel, not
+running duplicate accounts, and sanctions-eligible. Spec §28.4 forbids bundling
+optional consent, so each is its own unchecked control, its own field, and its
+own column. There is no "accept all", and nothing in the save path can set more
+than one.
+
+**Two agreements, and they are still drafts.** Spec §11 names Terms and the
+Creator acceptable-use policy — not the privacy policy, which §10's Founder
+claim takes because §10's own list names it. Collecting an acceptance the Spec
+does not ask for is as wrong as skipping one it does. Both documents are with
+the lawyers, so the claim refuses in the open exactly as the Founder's does: it
+says why, says nothing was created and nothing entered was lost, and renders no
+button.
+
+**The waiting state is named and owns itself.** Once the account exists and the
+Founder has not finished their own setup, the same page confirms the signup,
+names the campaign, says the Founder is still setting up, says Proovd owns the
+step, says when the next update comes, and says `No action needed` — Spec §11's
+exact words, which live in one exported constant that the surface and the
+confirmation email both read. Accept, decline, propose, and link activation are
+unreachable: none of them exists yet, and the formal opportunity only opens
+after the listing fee is paid.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -438,11 +495,14 @@ The frontend and shared suites need neither Docker nor a database.
   documents.** Spec §8 states it for Creators; it applies everywhere. An email
   that asks for those trains people to answer the one that isn't from us.
 - **There is no public signup, for any role.** Accounts are created server-side
-  by `seedAccount` in [backend/src/auth/seed.ts](backend/src/auth/seed.ts) and
-  by the Founder account claim, which is reachable only with a valid invitation
-  token. Neither exposes a route anyone can find without being invited. Creators
-  are the same: every route that can record one sits behind the Admin guards,
-  and a test scans the tree for a second way in.
+  by `seedAccount` in [backend/src/auth/seed.ts](backend/src/auth/seed.ts), by
+  the Founder account claim, and by the Creator's signup — the last two
+  reachable only with a valid invitation token. None exposes a route anyone can
+  find without being invited, and a test scans the tree for a second way in.
+- **Proovd never collects bank, tax, or identity-document fields.** Stripe's own
+  onboarding does, and Proovd stores only statuses and provider IDs (Spec §5.3,
+  §11). There is no such route, no such column, and a database constraint on the
+  connected-account reference to keep it that way.
 - **An internal quality tier is never a rate.** Spec §8 makes it assessment data
   and forbids it acting as a commission floor. It is stored as free text with no
   ordering, and a database constraint refuses a bare number or percentage — so

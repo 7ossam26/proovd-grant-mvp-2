@@ -26,7 +26,16 @@ const OWNER_TAG: Record<StateOwner, TagVariant> = {
   Stripe: 'mint',
 };
 
-const NO_ACTION = 'No action needed' as const;
+/**
+ * §27.1's "what can I do now" when the honest answer is nothing, and §11's
+ * exact words for the Creator waiting state — which §33.2.3 tests for.
+ *
+ * Exported so the surfaces and the emails that must say it verbatim read it
+ * from here rather than each carrying their own copy. A paraphrase is a softer
+ * promise that leaves the reader wondering whether something is expected of
+ * them, and two copies of a sentence are two sentences waiting to disagree.
+ */
+export const NO_ACTION = 'No action needed' as const;
 
 interface StatePanelProps {
   /** The state in plain language — the hero line. */

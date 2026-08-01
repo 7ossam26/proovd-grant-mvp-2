@@ -9,6 +9,7 @@ import { createAuthRouter } from './routes/auth.js';
 import { createAdminRouter } from './routes/admin.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
+import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
 import { createDraftRouter } from './routes/draft.js';
 import { createVettingRouter } from './routes/vetting.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
@@ -153,6 +154,21 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       tokens,
       notifier,
       context: config.invitationContext,
+    }),
+  );
+  // Phase 08b (§11, §33.2.1–33.2.3). The one route a Creator reaches with no
+  // account. It takes a token, never an association id, so there is nothing in
+  // the request to substitute — see `routes/affiliate-invitation.ts`.
+  app.use(
+    createAffiliateInvitationRouter({
+      db,
+      auth,
+      tokens,
+      notifier,
+      context: config.invitationContext,
+      ...(config.draftVerifyLimit !== undefined
+        ? { verifyLimit: config.draftVerifyLimit }
+        : {}),
     }),
   );
   // Phase 06b (§7, §33.1.1). The one route a Founder reaches with no account.
