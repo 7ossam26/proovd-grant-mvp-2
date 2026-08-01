@@ -55,6 +55,8 @@ import { describeSaveState } from '../../lib/autosave.js';
 import { supportMailto } from '../../features/public/states.js';
 import { LinkUnavailable } from '../LinkUnavailable.js';
 import { useAutosave } from '../../lib/useAutosave.js';
+import { PayoutOnboarding, type PayoutState } from '../payouts/PayoutOnboarding.js';
+import { fetchPayouts, requestOnboardingLink } from '../payouts/api.js';
 import {
   fetchInvitation,
   saveInvitation,
@@ -171,7 +173,7 @@ function WaitingState({ state }: { state: CreatorInvitationState }) {
         getHelp={{ href: supportMailto(`Creator signup — ${state.landing.reference}`) }}
       />
 
-      <PayoutPanel status={state.profile.payout.status} />
+      <PayoutPanel />
     </Measure>
   );
 }
@@ -182,29 +184,47 @@ function WaitingState({ state }: { state: CreatorInvitationState }) {
  * `Finish payout setup` — a handoff, not a form.
  *
  * §11: it "opens the Stripe-controlled connected-account onboarding required
- * for identity, tax, bank, transfer capability, and payout." Stripe lands in
- * Phase 10 (§32.1 orders signup first, deliberately), so today this panel
- * reports the true status — not started, because it cannot be started yet — and
- * renders no control. §1.4: a button that does nothing is worse than no button,
- * and a form that collected the fields here would be the §11 violation the
- * whole panel exists to avoid.
+ * for identity, tax, bank, transfer capability, and payout."
+ *
+ * Phase 08b built this panel with no control, because §32.1 orders signup
+ * before Stripe and a button that did nothing would have been worse than none
+ * (§1.4). Phase 10b gives it the real handoff: `PayoutOnboarding` renders
+ * whichever of §13's four states is true and issues a hosted link. There is
+ * still no form here, and still no route behind it that would take a bank or
+ * tax field — that absence is what §11 and §5.3 actually require.
+ *
+ * The state is read on mount rather than taken from the signup profile: the
+ * profile's `payout_status` is one campaign's view, and the account itself
+ * belongs to the person (§11's reuse across campaigns).
  */
-function PayoutPanel({ status }: { status: string }) {
-  return (
-    <StatePanel
-      state="Payout setup is not open yet"
-      whatHappened={
-        status === 'not_started'
-          ? 'Getting paid needs a Stripe account in your name, for identity, tax, and bank details. That step is not open yet.'
-          : `Your payout setup is ${status.replace(/_/g, ' ')}.`
-      }
-      next="When it opens you will set it up with Stripe directly. Proovd never asks for your bank or tax details, and never stores them."
-      owner="Proovd"
-      nextUpdate="We will email you when payout setup opens."
-      action={NO_ACTION}
-      reference="Payout setup"
-    />
-  );
+function PayoutPanel() {
+  const [payouts, setPayouts] = useState<PayoutState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPayouts('creator')
+      .then((result) => {
+        if (!cancelled) setPayouts(result.payouts);
+      })
+      .catch(() => {
+        // A Creator who cannot read their payout state has still signed up.
+        // Leaving the panel absent is better than an error where a status
+        // belongs — the waiting state above already says what is happening.
+        if (!cancelled) setPayouts(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const start = useCallback(async () => {
+    const link = await requestOnboardingLink('creator');
+    window.location.assign(link.url);
+  }, []);
+
+  if (!payouts) return null;
+
+  return <PayoutOnboarding payouts={payouts} role="creator" onStart={start} />;
 }
 
 /* ── §11's compact flow ───────────────────────────────────────────────────── */

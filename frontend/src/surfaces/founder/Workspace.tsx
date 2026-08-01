@@ -55,6 +55,8 @@ import { describeSaveState } from '../../lib/autosave.js';
 import { FeePreview, HighEffortPanel } from './FeePreview.js';
 import { HelperResources } from './HelperResources.js';
 import { InterviewEmbed } from './InterviewBooking.js';
+import { PayoutOnboarding, type PayoutState } from '../payouts/PayoutOnboarding.js';
+import { fetchPayouts, requestOnboardingLink } from '../payouts/api.js';
 import {
   fetchWorkspace,
   saveWorkspace,
@@ -209,6 +211,43 @@ function UploadControl({
       {failure ? <p className="field__error">{failure}</p> : null}
     </div>
   );
+}
+
+/**
+ * §13's onboarding, in the workspace's secondary surface.
+ *
+ * Read on mount rather than folded into the workspace response: the account
+ * belongs to the *person* and is reused across their campaigns (§11's rule,
+ * which applies to a Founder with two campaigns as much as to a Creator), so it
+ * is not a property of this campaign's workspace.
+ */
+function FounderPayouts() {
+  const [payouts, setPayouts] = useState<PayoutState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPayouts('founder')
+      .then((result) => {
+        if (!cancelled) setPayouts(result.payouts);
+      })
+      .catch(() => {
+        // A Founder who cannot read their payout state can still work on their
+        // campaign. An error card where a status belongs would stop the page
+        // being about the five items.
+        if (!cancelled) setPayouts(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const start = useCallback(async () => {
+    const link = await requestOnboardingLink('founder');
+    window.location.assign(link.url);
+  }, []);
+
+  if (!payouts) return null;
+  return <PayoutOnboarding payouts={payouts} role="founder" onStart={start} />;
 }
 
 /* ── The surface ──────────────────────────────────────────────────────────── */
@@ -675,6 +714,11 @@ export function CampaignWorkspace() {
       <div className="workspace__secondary">
         <FeePreview fee={state.fee} />
         <HighEffortPanel highEffort={state.highEffort} />
+        {/* §13: Stripe-hosted onboarding happens "before listing-fee payment",
+            and the Founder reaches it from here. `PayoutOnboarding` renders
+            whichever of §13's four states is true — including the restricted
+            one, which deliberately offers no path to payment. */}
+        <FounderPayouts />
       </div>
       </Measure>
     </Section>

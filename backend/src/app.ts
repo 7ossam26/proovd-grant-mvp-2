@@ -19,6 +19,7 @@ import { unconfiguredStorage, type ObjectStorage } from './storage/object-storag
 import { unconfiguredScheduler, type Scheduler } from './interviews/calcom.js';
 import { createCalcomWebhookRouter } from './routes/calcom-webhook.js';
 import { createStripeWebhookRouter } from './routes/stripe-webhooks.js';
+import { createPayoutRouter } from './routes/payouts.js';
 import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
@@ -74,6 +75,12 @@ export interface AppConfig {
    * separation, and idempotent replay without a network.
    */
   stripeGateway?: StripeGateway;
+  /**
+   * §32.2's Connect return/refresh URLs. Absent means hosted onboarding cannot
+   * be offered, and the surfaces say so rather than issuing a link Stripe would
+   * bounce (§1.4).
+   */
+  stripeConnectUrls?: { returnUrl: string; refreshUrl: string };
   /** §7 / §27.8 addresses and origins the invitation is built from. */
   invitationContext: InvitationContext;
   /**
@@ -287,6 +294,19 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         gateway: config.stripeGateway,
         audit: (event) => audit({ ...event, targetId: event.targetId }),
         ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
+      }),
+    );
+    // Phase 10b (§13, §11). Stripe-hosted onboarding for both roles, the return
+    // and refresh landings, Admin reconciliation, and the §11 tax-accountability
+    // record that gates Phase 19's Transfers. No route here accepts a bank, tax,
+    // or identity field — the absence is the enforcement.
+    app.use(
+      createPayoutRouter({
+        db,
+        auth,
+        gateway: config.stripeGateway,
+        audit: (event) => audit({ ...event, targetId: event.targetId }),
+        ...(config.stripeConnectUrls ?? {}),
       }),
     );
   }

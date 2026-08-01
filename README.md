@@ -23,10 +23,9 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–09 are
-complete and Phase 10 is half built**; 10b — the two Stripe onboarding surfaces
-and the tax-accountability gate — is next. No money moves yet, and the live-mode
-gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–10 are
+complete**; Phase 11 — the listing-fee Checkout and the clocks that start with
+it — is next. No money has moved yet, and the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -45,6 +44,7 @@ gate stays shut.
 | 09a | The campaign workspace, the five optional items and their evidence, uploads, high-effort, the itemised listing fee |
 | 09b | The embedded interview: the signed booking webhook, reconciliation, and the four interview notifications |
 | 10a | Stripe foundations: the pinned client, both signed webhook endpoints, idempotent event handling, and the provider-object ledger |
+| 10b | Hosted onboarding for Founders and Creators, its four return states, and the tax-accountability gate |
 
 Three briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -91,7 +91,8 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/interviews/     the booking provider, its signed webhook, the campaign
                       reference that binds a booking, and the reminder job
   src/payments/       the pinned Stripe client, connected accounts and their
-                      four onboarding states, and the provider-object ledger
+                      four onboarding states, hosted onboarding, the
+                      provider-object ledger, and the tax-accountability gate
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
@@ -104,6 +105,8 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          preparing Campaign kit
   src/surfaces/founder/  the campaign workspace: five optional items as a flow,
                          the fee preview, and the helper resources
+  src/surfaces/payouts/  Stripe onboarding for both roles, and where Stripe
+                         sends people back to
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
@@ -619,6 +622,59 @@ its campaign and needs to be able to take charges; a Creator account only ever
 receives, and needs to be able to be paid out. One shared definition would
 either block Creators on a capability they never use or pass Founders who cannot
 sell.
+
+## Getting paid
+
+Founders sell through a Stripe account in their own name; Creators are paid into
+one. Proovd issues a link and reads a status, and that is the entire
+integration.
+
+**Proovd never collects the details and could not store them.** Stripe takes the
+identity, tax, and bank information through its own onboarding. There is no route
+here that accepts one of those fields, no input on the surface, and no column
+that could hold one — the absence is the enforcement, not a policy someone has to
+remember. A test posts a bank account number at five plausible addresses and
+asserts none of it lands anywhere.
+
+**Coming back from Stripe always lands on one of four plain statuses.** Finished;
+more information needed, naming exactly what and offering a way to carry on;
+under review, saying who owns it and when to expect news; or stopped, with a
+route to a person and no invitation to try again. Never a spinner, never a raw
+list of requirement codes.
+
+The state is re-read from Stripe on the way back rather than taken from the last
+webhook — someone who finishes and lands back within the second would otherwise
+be shown the state from before they started. And landing back does not mean
+success: Stripe returns people who abandoned halfway just as it returns people
+who finished.
+
+**A stopped account is offered support, not another attempt.** It also cannot
+reach payment. Sending someone through onboarding that will fail the same way is
+worse than telling them plainly, and showing a stopped account a way to pay is
+the specific failure the rule exists to prevent.
+
+**Onboarding is reused, never repeated.** The account belongs to the person, not
+to a campaign, so a Creator recruited to a second campaign is already done. It
+also keeps payouts on one account rather than splitting them across several that
+Stripe treats as unrelated people.
+
+**What incomplete onboarding blocks, and what it does not.** A Creator whose
+setup is unfinished cannot activate a tracking link or receive payment — but
+campaign review carries on. Blocking the review too would stall a Founder over
+something a different person has not done yet.
+
+**Before any Creator is paid, someone has to have written down who is
+responsible for tax.** Not a checkbox: seven recorded facts — the payer, who
+files the 1099, which form and what data is required, the threshold, how
+corrections are handled, and who reconciles — with a named approver and a
+reference to where the approval lives. Until that record exists, Creator payment
+is blocked, and it is blocked separately for test and live. The record holds who
+is *responsible* for tax data and never the data itself; a value shaped like a
+taxpayer identification number is refused by the database.
+
+That gate is built now rather than in the phase that first pays a Creator. A
+gate written in the phase it is meant to stop is a gate written under deadline by
+someone who wants it open.
 
 ## Retention
 

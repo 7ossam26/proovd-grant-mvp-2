@@ -286,3 +286,73 @@ export const providerObjects = pgTable(
 export type StripeConnectedAccount = typeof stripeConnectedAccounts.$inferSelect;
 export type StripeAccountEvent = typeof stripeAccountEvents.$inferSelect;
 export type ProviderObject = typeof providerObjects.$inferSelect;
+
+/* ── tax_accountability_config (§11, §34) ─────────────────────────────────── */
+
+/**
+ * §11: "Connected-account records do not alone decide who must issue US tax
+ * forms. Before any live Affiliate payment, the approved tax/accounting
+ * configuration must record payer, 1099 filing responsibility, required tax
+ * data/form, thresholds, corrections, and reconciliation responsibilities
+ * without duplicating sensitive provider-held data."
+ *
+ * Seven facts, seven columns, and a gate that reads them. Built in Phase 10b
+ * rather than in Phase 19 where it first bites: a gate written in the phase it
+ * is meant to stop is a gate written under deadline by someone who wants it
+ * open.
+ *
+ * ── It is a record, not a flag ─────────────────────────────────────────────
+ * §1.3 makes manual work valid only when the app records it, and §34 asks for
+ * conditions "recorded as complete" rather than asserted. A `tax_configured`
+ * boolean would satisfy a query and answer none of §11's seven questions, and
+ * the person who set it would be unfindable.
+ *
+ * ── What is deliberately absent ────────────────────────────────────────────
+ * Any column that could hold a TIN, a W-9, or an individual's tax details.
+ * Stripe holds those; this holds *who is responsible* for each of them. A CHECK
+ * refuses a value shaped like a US taxpayer identification number in the
+ * free-text fields, because a value like that is a paste rather than an answer.
+ */
+export const taxAccountabilityConfig = pgTable(
+  'tax_accountability_config',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    /** §11: "payer". */
+    payer: text('payer').notNull(),
+    /** §11: "1099 filing responsibility". Who files, not whether one is due. */
+    filingResponsibility: text('filing_responsibility').notNull(),
+    /** §11: "required tax data/form". Named, never stored. */
+    requiredForm: text('required_form').notNull(),
+    requiredData: text('required_data').notNull(),
+    /** §11: "thresholds". Stated by the operator; §1 rule 6 forbids assuming one. */
+    thresholds: text('thresholds').notNull(),
+    /** §11: "corrections". */
+    correctionsProcess: text('corrections_process').notNull(),
+    /** §11: "reconciliation responsibilities". */
+    reconciliationResponsibility: text('reconciliation_responsibility').notNull(),
+
+    /* §34's own words: "recorded as complete". */
+    approvedBy: text('approved_by').notNull(),
+    approvedAt: timestamp('approved_at', { withTimezone: true }).notNull().defaultNow(),
+    evidenceReference: text('evidence_reference').notNull(),
+
+    /** A test-mode configuration never satisfies the gate for live payments. */
+    mode: stripeMode('mode').notNull(),
+
+    /* Retired rather than deleted — a superseded row explains what was in force
+       when an earlier payment went out. */
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+    supersededBy: uuid('superseded_by'),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    /** One live configuration per mode. Two would make "which is in force" a question. */
+    liveIdx: uniqueIndex('tax_accountability_live_idx')
+      .on(t.mode)
+      .where(sql`${t.supersededAt} IS NULL`),
+  }),
+);
+
+export type TaxAccountabilityConfig = typeof taxAccountabilityConfig.$inferSelect;

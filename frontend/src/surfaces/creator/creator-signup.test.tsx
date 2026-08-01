@@ -115,6 +115,40 @@ const PUBLISHED_POLICIES = [
 
 const DRAFT_POLICIES = PUBLISHED_POLICIES.map((p) => ({ ...p, status: 'draft' }));
 
+/**
+ * §13's onboarding state, as the server would report it.
+ *
+ * Phase 10b's panel reads `/api/creator/payouts` on mount, so every case that
+ * renders the signed-up surface needs one — a case that does not stub it gets
+ * no panel at all, which is the honest behaviour when the state is unreadable.
+ */
+function stubPayouts(overrides: Record<string, unknown> = {}) {
+  handlers.push((url) =>
+    url === '/api/creator/payouts'
+      ? {
+          status: 200,
+          body: {
+            payouts: {
+              state: 'not_started',
+              stripeAccountId: null,
+              missingRequirements: [],
+              pendingVerification: [],
+              disabledReason: null,
+              canResume: false,
+              onboardingAvailable: false,
+              listingFeeEligible: false,
+              linkActivationBlocked: true,
+              paymentReceiptBlocked: true,
+              campaignReviewBlocked: false,
+              lastSyncedAt: null,
+              ...overrides,
+            },
+          },
+        }
+      : undefined,
+  );
+}
+
 function stubInvitation(options: {
   profile?: Record<string, unknown>;
   conditional?: Record<string, unknown>;
@@ -318,14 +352,67 @@ describe('§33.2.2 — the compact flow', () => {
     }
   });
 
-  it('reports the payout step as a status with no control (§11)', async () => {
+  it('reports the payout step as a status with no control while Stripe is unconfigured (§11, §1.4)', async () => {
     stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubPayouts({ onboardingAvailable: false });
     await renderSignup();
 
     expect(await screen.findByText(/payout setup is not open yet/i)).toBeTruthy();
     expect(screen.getByText(/proovd never asks for your bank or tax details/i)).toBeTruthy();
-    // §1.4: a control that would do nothing is worse than none.
+    // §1.4: a control that would do nothing is worse than none. Phase 10b gives
+    // this panel a real handoff; while the provider is unconfigured it still
+    // renders none.
     expect(screen.queryByRole('button', { name: /finish payout setup/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /set up payouts/i })).toBeNull();
+  });
+
+  it('offers the Stripe handoff once it is available, and still no form (§11, §5.3)', async () => {
+    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubPayouts({ onboardingAvailable: true, canResume: true });
+    await renderSignup();
+
+    expect(await screen.findByRole('button', { name: /set up payouts/i })).toBeTruthy();
+
+    // §11 forbids reproducing provider-controlled fields and §5.3 says Proovd
+    // stores statuses and IDs and never full bank details. The handoff is the
+    // whole integration — there is no field here to collect one.
+    for (const label of [/bank/i, /routing/i, /account number/i, /tax id/i, /ssn/i]) {
+      expect(screen.queryByLabelText(label)).toBeNull();
+    }
+  });
+
+  it('names the exact missing requirement rather than saying "more information" (§13)', async () => {
+    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubPayouts({
+      state: 'more_information_required',
+      onboardingAvailable: true,
+      canResume: true,
+      missingRequirements: ['external_account', 'individual.verification.document'],
+    });
+    await renderSignup();
+
+    expect(
+      await screen.findByText(/a bank account to be paid into.*a photo of your ID/i),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: /finish payout setup/i })).toBeTruthy();
+  });
+
+  it('offers a restricted account support and no way to try again (§13)', async () => {
+    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubPayouts({
+      state: 'restricted',
+      onboardingAvailable: true,
+      canResume: false,
+      disabledReason: 'rejected.fraud',
+    });
+    await renderSignup();
+
+    expect(await screen.findByText(/stripe cannot continue with this account/i)).toBeTruthy();
+    // §13: a safe support path, and no resume — looping someone through
+    // onboarding that will fail again is the §1.4 failure with a spinner on it.
+    expect(screen.queryByRole('button', { name: /payout/i })).toBeNull();
+    // §13 again: restricted must never offer a route to payment.
+    expect(screen.queryByRole('button', { name: /pay/i })).toBeNull();
   });
 });
 

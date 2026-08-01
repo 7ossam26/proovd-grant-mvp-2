@@ -49,6 +49,20 @@ export interface VerifiedStripeEvent {
   endpoint: WebhookEndpoint;
 }
 
+/** What Stripe's hosted onboarding needs, and what it gives back (§13, §11). */
+export interface AccountLink {
+  url: string;
+  expiresAt: Date;
+}
+
+export interface CreateAccountInput {
+  /** §24.1's two roles. Decides which capabilities are requested. */
+  role: 'founder_seller' | 'affiliate_recipient';
+  email?: string | undefined;
+  /** §2.2 launches US-only; the caller states it rather than this assuming. */
+  country: string;
+}
+
 export interface StripeGateway {
   readonly mode: StripeModeValue;
   readonly apiVersion: string;
@@ -65,8 +79,33 @@ export interface StripeGateway {
     rawBody: Buffer,
     signature: string | undefined,
   ): VerifiedStripeEvent | null;
-  /** The underlying SDK, for the phases that create objects. */
-  readonly client: Stripe;
+
+  /* ── Hosted onboarding (§13, §11) ──────────────────────────────────────── */
+
+  /** Creates the connected account. Returns its `acct_…` id. */
+  createConnectedAccount(input: CreateAccountInput): Promise<string>;
+  /**
+   * A single-use, short-lived link into Stripe's own onboarding.
+   *
+   * §13 and §11 both require the collection to be Stripe-hosted: §11 forbids
+   * "reproducing provider-controlled fields" and §5.3 says Proovd stores
+   * statuses and IDs and "never full bank details". A link is the whole
+   * integration — there is no form on Proovd's side to bypass it.
+   */
+  createAccountLink(input: {
+    accountId: string;
+    returnUrl: string;
+    refreshUrl: string;
+  }): Promise<AccountLink>;
+  /**
+   * Reads the account back. The reconciliation path for a missed
+   * `account.updated`, and what the return route uses so a Founder who lands
+   * back sees the truth rather than the last webhook.
+   */
+  retrieveAccount(accountId: string): Promise<Record<string, unknown> | null>;
+
+  /** The underlying SDK, for the phases that create payment objects. */
+  readonly client: Stripe | null;
 }
 
 export interface StripeGatewayConfig {
@@ -100,20 +139,161 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
     },
 
     verifyEvent(endpoint, rawBody, signature) {
-      const secret = secretFor(endpoint);
-      // No secret and a wrong signature are the same answer. A deployment that
-      // has not been given a secret must not be one that accepts anything —
-      // the `unconfiguredScheduler` decision, applied to money.
-      if (!secret || !signature) return null;
+      return verifyWithSecret(secretFor(endpoint), rawBody, signature, endpoint);
+    },
 
-      let event: Stripe.Event;
+    async createConnectedAccount(input) {
+      const account = await client.accounts.create({
+        country: input.country,
+        ...(input.email ? { email: input.email } : {}),
+        // §24.1: the Founder account is the seller and needs to take charges;
+        // the Affiliate account "is a recipient only… never processes the
+        // Backer charge and is never MoR" and needs only to be paid. Asking for
+        // `card_payments` on a recipient would request a capability §24.1 says
+        // it must never use.
+        capabilities:
+          input.role === 'founder_seller'
+            ? { card_payments: { requested: true }, transfers: { requested: true } }
+            : { transfers: { requested: true } },
+      });
+      return account.id;
+    },
+
+    async createAccountLink({ accountId, returnUrl, refreshUrl }) {
+      const link = await client.accountLinks.create({
+        account: accountId,
+        type: 'account_onboarding',
+        return_url: returnUrl,
+        refresh_url: refreshUrl,
+      });
+      return { url: link.url, expiresAt: new Date(link.expires_at * 1000) };
+    },
+
+    async retrieveAccount(accountId) {
       try {
-        event = Stripe.webhooks.constructEvent(rawBody, signature, secret);
+        const account = await client.accounts.retrieve(accountId);
+        return account as unknown as Record<string, unknown>;
       } catch {
         return null;
       }
+    },
+  };
+}
 
-      return toVerifiedEvent(event, endpoint);
+/**
+ * Verification, shared by the real gateway and the suite's.
+ *
+ * `Stripe.webhooks.constructEvent` is a static, so an in-memory gateway can run
+ * the real verifier over the real bytes. That matters: what the acceptance suite
+ * has to exercise is Stripe's signature check, not a second implementation of
+ * it written to pass its own tests.
+ */
+function verifyWithSecret(
+  secret: string | undefined,
+  rawBody: Buffer,
+  signature: string | undefined,
+  endpoint: WebhookEndpoint,
+): VerifiedStripeEvent | null {
+  // No secret and a wrong signature are the same answer. A deployment that has
+  // not been given a secret must not be one that accepts anything — the
+  // `unconfiguredScheduler` decision, applied to money.
+  if (!secret || !signature) return null;
+
+  let event: Stripe.Event;
+  try {
+    event = Stripe.webhooks.constructEvent(rawBody, signature, secret);
+  } catch {
+    return null;
+  }
+
+  return toVerifiedEvent(event, endpoint);
+}
+
+/* ── An in-memory gateway, for tests ──────────────────────────────────────── */
+
+export interface MemoryStripeGateway extends StripeGateway {
+  /** Sets what `retrieveAccount` will answer, and what a webhook would carry. */
+  setAccount(accountId: string, account: Record<string, unknown>): void;
+  /** Every account-link request, so a test can assert one was issued. */
+  readonly links: Array<{ accountId: string; returnUrl: string; refreshUrl: string }>;
+  readonly created: Array<{ id: string; role: string; country: string }>;
+}
+
+/**
+ * Real signature verification, fake account API.
+ *
+ * Not a mock of Stripe — the half that decides whether a request is authentic
+ * runs Stripe's own code, and only the half that would require a network is
+ * replaced. A suite that stubbed verification would prove its stub worked.
+ */
+export function createMemoryStripeGateway(config: {
+  mode?: StripeModeValue;
+  apiVersion?: string;
+  platformAccountId?: string;
+  platformWebhookSecret?: string;
+  connectWebhookSecret?: string;
+}): MemoryStripeGateway {
+  const accounts = new Map<string, Record<string, unknown>>();
+  const links: Array<{ accountId: string; returnUrl: string; refreshUrl: string }> = [];
+  const created: Array<{ id: string; role: string; country: string }> = [];
+  let counter = 0;
+
+  return {
+    mode: config.mode ?? 'test',
+    apiVersion: config.apiVersion ?? '2026-07-29.dahlia',
+    platformAccountId: config.platformAccountId ?? 'acct_platformtestaccount',
+    client: null,
+    links,
+    created,
+
+    hasSecretFor(endpoint) {
+      return Boolean(
+        endpoint === 'platform' ? config.platformWebhookSecret : config.connectWebhookSecret,
+      );
+    },
+
+    verifyEvent(endpoint, rawBody, signature) {
+      const secret =
+        endpoint === 'platform' ? config.platformWebhookSecret : config.connectWebhookSecret;
+      return verifyWithSecret(secret, rawBody, signature, endpoint);
+    },
+
+    setAccount(accountId, account) {
+      accounts.set(accountId, account);
+    },
+
+    async createConnectedAccount(input) {
+      counter += 1;
+      const id = `acct_memory${String(counter).padStart(10, '0')}`;
+      created.push({ id, role: input.role, country: input.country });
+      accounts.set(id, {
+        id,
+        object: 'account',
+        charges_enabled: false,
+        payouts_enabled: false,
+        details_submitted: false,
+        capabilities: {},
+        requirements: {
+          currently_due: ['external_account'],
+          past_due: [],
+          eventually_due: [],
+          pending_verification: [],
+          disabled_reason: null,
+        },
+      });
+      return id;
+    },
+
+    async createAccountLink(input) {
+      links.push(input);
+      return {
+        url: `https://connect.stripe.test/setup/${encodeURIComponent(input.accountId)}`,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      };
+    },
+
+    async retrieveAccount(accountId) {
+      return accounts.get(accountId) ?? null;
     },
   };
 }

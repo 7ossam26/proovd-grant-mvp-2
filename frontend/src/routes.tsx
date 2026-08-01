@@ -19,6 +19,7 @@ import { FounderDetail } from './features/admin/FounderDetail.js';
 import { CampaignCreators } from './features/admin/CampaignCreators.js';
 import { CampaignWorkspacePanel } from './features/admin/CampaignWorkspace.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
+import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
   CreatorCampaigns,
@@ -172,6 +173,18 @@ const rootChildren: RouteObject[] = [
     // session and re-checked against the caller's own claim on every request.
     path: 'campaigns/:campaignId/workspace',
     element: <CampaignWorkspace />,
+  },
+  {
+    // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing
+    // points — finished, and link-expired — and both land on one of §13's four
+    // human-readable states rather than on a spinner. Outside both shells: this
+    // is reached by returning from a third party, not by browsing.
+    path: 'stripe/return',
+    element: <StripeReturn event="returned" />,
+  },
+  {
+    path: 'stripe/refresh',
+    element: <StripeReturn event="refreshed" />,
   },
   {
     // Phase 04 (§5.5). One route for every token failure — invalid, expired,

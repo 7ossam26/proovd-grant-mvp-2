@@ -146,6 +146,14 @@ async function main() {
     objectStorage,
     interviewScheduler,
     stripeGateway,
+    ...(env.STRIPE_CONNECT_RETURN_URL && env.STRIPE_CONNECT_REFRESH_URL
+      ? {
+          stripeConnectUrls: {
+            returnUrl: env.STRIPE_CONNECT_RETURN_URL,
+            refreshUrl: env.STRIPE_CONNECT_REFRESH_URL,
+          },
+        }
+      : {}),
     invitationContext: {
       appBaseUrl: env.APP_BASE_URL,
       // §27.8's published address, and the one the footer already renders.
