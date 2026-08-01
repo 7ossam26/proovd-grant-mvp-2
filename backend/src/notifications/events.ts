@@ -51,11 +51,29 @@ export const AFFILIATE_SIGNUP_CONFIRMED = 'affiliate_signup_confirmed' as const;
  */
 export const AFFILIATE_FOUNDER_SIGNUP_COMPLETED = 'affiliate_founder_signup_completed' as const;
 
+/**
+ * §27.3's four interview events, sent by `interviews/notifications.ts`.
+ *
+ * §12: "Send confirmation, reminder, reschedule, and cancellation
+ * notifications." They arrive together in Phase 09b because that is the phase
+ * that gained a sender for them — Phase 09a built the booking record and
+ * deliberately left these keys out, since a key with no sender claims a message
+ * the product does not send (§1.4).
+ */
+export const FOUNDER_INTERVIEW_CONFIRMED = 'founder_interview_confirmed' as const;
+export const FOUNDER_INTERVIEW_REMINDER = 'founder_interview_reminder' as const;
+export const FOUNDER_INTERVIEW_RESCHEDULED = 'founder_interview_rescheduled' as const;
+export const FOUNDER_INTERVIEW_CANCELED = 'founder_interview_canceled' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
   AFFILIATE_SIGNUP_CONFIRMED,
   AFFILIATE_FOUNDER_SIGNUP_COMPLETED,
+  FOUNDER_INTERVIEW_CONFIRMED,
+  FOUNDER_INTERVIEW_REMINDER,
+  FOUNDER_INTERVIEW_RESCHEDULED,
+  FOUNDER_INTERVIEW_CANCELED,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

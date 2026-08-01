@@ -16,6 +16,8 @@ import { createCreatorRouter } from './routes/creator.js';
 import { createFounderRouter } from './routes/founder.js';
 import { createAdminWorkspaceRouter } from './routes/admin-workspace.js';
 import { unconfiguredStorage, type ObjectStorage } from './storage/object-storage.js';
+import { unconfiguredScheduler, type Scheduler } from './interviews/calcom.js';
+import { createCalcomWebhookRouter } from './routes/calcom-webhook.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
@@ -56,6 +58,13 @@ export interface AppConfig {
    * bucket exists — earning a US$2 discount for a file that is not there (§1.4).
    */
   objectStorage?: ObjectStorage;
+  /**
+   * §12's booking provider (tech-stack §12). Defaults to the port that refuses
+   * loudly: Cal.com is Track A4, and an unconfigured deployment must render no
+   * embed rather than an empty frame, and must accept no webhook rather than
+   * any webhook (§1.4).
+   */
+  interviewScheduler?: Scheduler;
   /** §7 / §27.8 addresses and origins the invitation is built from. */
   invitationContext: InvitationContext;
   /**
@@ -222,11 +231,36 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // five optional items, the evidence that completes them, the interview
   // booking, and the itemised listing fee. First session-bearing Founder
   // routes; every one re-derives the campaign from the caller's own claim.
+  const interviewScheduler = config.interviewScheduler ?? unconfiguredScheduler;
+  const interviewContext = {
+    supportEmail: config.invitationContext.supportEmail,
+    fromAddress: config.invitationContext.fromAddress,
+  };
+
   app.use(
     createFounderRouter({
       db,
       auth,
       storage: config.objectStorage ?? unconfiguredStorage,
+      scheduler: interviewScheduler,
+      notifier,
+      context: interviewContext,
+      referenceSecret: config.authSecret,
+    }),
+  );
+  // Phase 09b (§12, tech-stack §12). The booking provider's webhook. Mounts its
+  // own raw-body parser, because the signature covers the exact bytes that were
+  // sent — the same constraint Phase 10's Stripe endpoint has, and the reason
+  // there is still no global `express.json()` above.
+  app.use(
+    createCalcomWebhookRouter({
+      db,
+      scheduler: interviewScheduler,
+      notifier,
+      audit: (event) => audit({ ...event, targetId: event.targetId }),
+      context: interviewContext,
+      referenceSecret: config.authSecret,
+      ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
     }),
   );
   // Phase 09a (§12 Admin, §25.6). Every item, its evidence, the discount line,

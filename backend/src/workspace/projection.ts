@@ -205,6 +205,20 @@ export interface FounderWorkspaceView {
     missingSettings: string[];
     providers: string[];
     availability: string | null;
+    /**
+     * What the surface needs to mount the provider's embed (Phase 09b).
+     *
+     * `reference` is the HMAC that binds whatever gets booked to this campaign.
+     * It is issued only to the authenticated Founder of this campaign, on this
+     * response, and the ingest recomputes it — see `interviews/reference.ts`.
+     * `available` is false while the scheduling provider is unconfigured, and
+     * the surface then renders no embed at all rather than an empty frame.
+     */
+    embed: {
+      available: boolean;
+      eventTypeLink: string | null;
+      reference: string | null;
+    };
     booking: {
       id: string;
       status: string;
@@ -223,7 +237,12 @@ export interface FounderWorkspaceView {
 
 export async function readFounderWorkspace(
   db: Database,
-  input: { campaignId: string; uploadsAvailable: boolean },
+  input: {
+    campaignId: string;
+    uploadsAvailable: boolean;
+    /** Phase 09b. Absent while the scheduling provider is unconfigured. */
+    interviewEmbed?: { eventTypeLink: string; reference: string } | undefined;
+  },
 ): Promise<FounderWorkspaceView | null> {
   const rows = await loadWorkspaceRows(db, input.campaignId);
   if (!rows) return null;
@@ -280,6 +299,14 @@ export async function readFounderWorkspace(
       missingSettings: config.missingSettings,
       providers: config.providers,
       availability: config.availability,
+      embed: {
+        // Both have to hold: §6's settings say interviews are offered at all,
+        // and Track A4 says there is a provider to offer them through. Either
+        // missing means no embed, and the surface says which (§1.4).
+        available: config.bookable && input.interviewEmbed !== undefined,
+        eventTypeLink: input.interviewEmbed?.eventTypeLink ?? null,
+        reference: input.interviewEmbed?.reference ?? null,
+      },
       booking: rows.booking
         ? {
             id: rows.booking.id,

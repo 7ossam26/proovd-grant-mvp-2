@@ -1577,6 +1577,17 @@ main:focus { outline: none; }          /* programmatic focus target, not a contr
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 
+/* ---- The embedded interview (§12, tech-stack §12), added Phase 09b.
+   An iframe rather than an injected script: this page holds the Founder's
+   session and their unreleased product information, and a third-party script in
+   it can read both. Sized so the vendor's own layout has room at 320px without
+   the host page scrolling sideways. */
+.interview-embed { display: grid; gap: var(--sp-8); }
+.interview-embed__frame {
+  width: 100%; min-height: 34rem; border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius); background: var(--mode-bg);
+}
+
 /* ---- Admin's evidence view (§12, §26). Density lives here and nowhere else. */
 .admin-workspace { display: grid; gap: var(--sp-24); }
 .admin-workspace__head {

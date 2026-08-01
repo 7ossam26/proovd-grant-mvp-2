@@ -74,6 +74,21 @@ const schema = z.object({
   // before the phase that needs it, not during it.
   R2_BUCKET_SENSITIVE: z.string().optional(),
 
+  // ── Scheduling — Cal.com Cloud (tech-stack §12, Spec §12) ────────────────
+  // The Founder books a human Proovd interview without leaving the product,
+  // and our database is the source of truth for the booking — Cal.com is a
+  // source of events. Optional to boot for the same reason Resend and R2 are:
+  // the app has to start before an Admin can see it is missing.
+  //
+  // All three or none. A webhook secret without an API key cannot reconcile a
+  // missed delivery, and an event link without a secret would mount an embed
+  // whose bookings we could never verify.
+  CALCOM_API_KEY: z.string().optional(),
+  CALCOM_WEBHOOK_SECRET: z.string().optional(),
+  // The public embed identifier, e.g. `proovd/founder-interview`. Not a secret:
+  // it is in the page a Founder loads.
+  CALCOM_EVENT_TYPE_LINK: z.string().optional(),
+
   // ── Jobs ─────────────────────────────────────────────────────────────────
   // Must be present and ≥32 chars. Protects close-batch and cron endpoints.
   CRON_SECRET: z.string().min(32, 'CRON_SECRET must be at least 32 characters'),
@@ -166,6 +181,29 @@ function checkObjectStorage(data: Env): void {
   }
 }
 
+/**
+ * The scheduling provider is configured or it is not (tech-stack §12).
+ *
+ * Two of the three would mount an embed whose bookings cannot be verified, or
+ * leave a verified booking that cannot be reconciled. Fail at boot, like Google
+ * OAuth and object storage.
+ */
+function checkScheduler(data: Env): void {
+  const parts = [data.CALCOM_API_KEY, data.CALCOM_WEBHOOK_SECRET, data.CALCOM_EVENT_TYPE_LINK];
+  const present = parts.filter(Boolean).length;
+  if (present !== 0 && present !== parts.length) {
+    throw new Error(
+      'The scheduling provider is half-configured: set CALCOM_API_KEY, ' +
+        'CALCOM_WEBHOOK_SECRET, and CALCOM_EVENT_TYPE_LINK, or none of them.',
+    );
+  }
+}
+
+/** True only when all three Cal.com values are present. Read by `createApp`. */
+export function schedulerConfigured(env: Env): boolean {
+  return Boolean(env.CALCOM_API_KEY && env.CALCOM_WEBHOOK_SECRET && env.CALCOM_EVENT_TYPE_LINK);
+}
+
 /** True only when all four R2 values are present. Read by `createApp`. */
 export function objectStorageConfigured(env: Env): boolean {
   return Boolean(
@@ -217,6 +255,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
   checkStripeMode(result.data);
   checkGoogleOAuth(result.data);
   checkObjectStorage(result.data);
+  checkScheduler(result.data);
   return result.data;
 }
 

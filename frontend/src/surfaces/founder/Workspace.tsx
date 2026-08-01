@@ -54,6 +54,7 @@ import { useAutosave } from '../../lib/useAutosave.js';
 import { describeSaveState } from '../../lib/autosave.js';
 import { FeePreview, HighEffortPanel } from './FeePreview.js';
 import { HelperResources } from './HelperResources.js';
+import { InterviewEmbed } from './InterviewBooking.js';
 import {
   fetchWorkspace,
   saveWorkspace,
@@ -470,6 +471,20 @@ export function CampaignWorkspace() {
                 </Button>
               ) : null}
             </Card>
+          ) : null}
+
+          {/* §12: "book a human Proovd interview without leaving the product."
+              The embed only mounts when §6's settings are stated AND the
+              provider is configured — the server folds both into
+              `embed.available`. */}
+          {state.interview.embed.available &&
+          state.interview.embed.eventTypeLink &&
+          state.interview.embed.reference &&
+          !state.interview.booking ? (
+            <InterviewEmbed
+              eventTypeLink={state.interview.embed.eventTypeLink}
+              reference={state.interview.embed.reference}
+            />
           ) : null}
 
           {/* §6 names the interview providers, availability, interviewers, and

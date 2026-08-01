@@ -345,6 +345,22 @@ export const founderInterviewBookings = pgTable(
     externalSource: text('external_source'),
     externalBookingId: text('external_booking_id'),
 
+    /**
+     * Proovd's reference for the campaign whose embed produced this booking,
+     * added Phase 09b.
+     *
+     * An HMAC over the campaign id, computed server-side and handed only to the
+     * authenticated Founder of that campaign. It exists because the provider
+     * lets the *booker* prefill metadata: a campaign id in the payload is a
+     * value the Founder chose, and trusting it would let one attach a booking —
+     * and the US$2 discount and high-effort input that follow — to someone
+     * else's campaign. The signature proves where the payload came from, not
+     * who typed what into it.
+     *
+     * Immutable by trigger. The binding is the security property.
+     */
+    proovdReference: text('proovd_reference'),
+
     createdBy: text('created_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

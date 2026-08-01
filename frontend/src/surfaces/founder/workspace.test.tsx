@@ -113,6 +113,7 @@ function workspace(overrides: Record<string, unknown> = {}) {
       missingSettings: ['interview_providers', 'interviewers'],
       providers: [],
       availability: null,
+      embed: { available: false, eventTypeLink: null, reference: null },
       booking: null,
     },
     lastSavedAt: null,

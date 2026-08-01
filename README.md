@@ -23,9 +23,8 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–08 are
-complete and Phase 09 is half built**; 09b — the Cal.com interview integration
-and its four notifications — is next.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–09 are
+complete**; Phase 10 — the Stripe foundations, in test mode — is next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -42,6 +41,7 @@ and its four notifications — is next.
 | 08b | The Creator's compact signup, the payout handoff, the named waiting state |
 | 08c | The preparing reveal, the Campaign kit, access logging and revocation |
 | 09a | The campaign workspace, the five optional items and their evidence, uploads, high-effort, the itemised listing fee |
+| 09b | The embedded interview: the signed booking webhook, reconciliation, and the four interview notifications |
 
 Three briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -52,12 +52,12 @@ and lands its own named acceptance tests. Every named test from §33.1.1 to
 §33.1.9 passes, so does every one from §33.2.1 to §33.2.4, and so does every one
 from §33.3.1 to §33.3.4.
 
-Phase 09b is the Cal.com wiring alone. The interview *booking record* is already
-here and is the source of truth for it — a vendor is a source of events, not of
-domain state — so the four §12 booking conditions, the reschedule history, and
-the recalculation on cancellation are all built and tested. What 09b adds is the
-embedded booking surface, the webhooks that feed the record, and the four
-interview notifications.
+Phase 09 split along the line between a domain record and a vendor. The booking
+record went first and is the source of truth — a scheduling provider is a source
+of events, not of domain state — so the four booking conditions, the reschedule
+history, and the recalculation on cancellation were built and tested before any
+webhook existed. That ordering is what makes a confirmed interview reachable
+when a delivery is missed, rather than a thing only the vendor can grant.
 
 ## Layout
 
@@ -85,6 +85,8 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/workspace/      the §12 evidence rules, the interview booking record,
                       high-effort, and the listing-fee calculation
   src/storage/        presigned R2 uploads and what a stored object really is
+  src/interviews/     the booking provider, its signed webhook, the campaign
+                      reference that binds a booking, and the reminder job
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
@@ -511,6 +513,61 @@ defers AI rewriting by name. So the prompts sit beside a copy control, there is
 no model client anywhere in the repository, and a test scans the guidance to keep
 it that way. A transcript is not a story, and neither is a summary.
 
+## The embedded interview
+
+A Founder books a conversation with someone at Proovd without leaving the
+product, and a confirmed booking takes US$2 off their listing fee and changes
+how a Creator may be paid. That makes an ordinary calendar integration a path
+into a commercial decision, and the code is shaped by that rather than by the
+vendor's happy path.
+
+**Our database is the source of truth; the provider is a source of events.**
+The booking record, its four states, its reschedule history, and the
+recalculation on cancellation were all built and tested before any webhook
+existed. A confirmed interview is therefore reachable when a delivery is
+missed — Admin reconciles it through the same code the webhook uses, and the
+history records which arrived how. A vendor outage costs a Founder nothing.
+
+**Two independent facts have to agree before a booking binds to a campaign.**
+The provider lets whoever opens the booking form prefill its metadata, so a
+campaign id in the payload is a value the *booker* chose. Trusting it would let
+one Founder attach a booking, its saving, and its effect on Creator pay to
+someone else's campaign — and the webhook signature would not help, because it
+proves where the payload came from, not who typed what into it. So Proovd issues
+its own signed reference to the authenticated Founder of one campaign and
+recomputes it on the way back in, **and** separately checks that the person who
+booked is that campaign's Founder. A delivery that satisfies one and not the
+other is recorded and routed to a person rather than guessed into place.
+
+**A redelivery changes nothing.** The provider's event id is claimed before any
+work happens, in the same table Stripe's events will use. A repeat increments a
+counter, writes an audit row, and stops — one booking, one history entry, one
+email, however many times it arrives.
+
+**Each of the four emails is deduplicated at its own granularity.** A
+confirmation and a cancellation happen once per booking. A reschedule happens as
+often as the Founder moves it, and a reminder belongs to a particular scheduled
+time — so both are keyed on the booking *and* the time. Keying a reschedule on
+the booking alone would send the first move and silently swallow every one
+after it.
+
+**The emails say what actually happened to the money.** Cancelling before the
+listing fee is paid gives the US$2 back; cancelling after it does not change what
+was paid. The sentence is composed against the campaign's real state rather than
+written into the template, because a template that assumed either would be wrong
+for half of its readers.
+
+**The booking form is an iframe, not a script in our page.** That page holds the
+Founder's session and their unreleased product information, and a third-party
+script in it can read both. The live-chat widget on the public pages does inject
+a script; those pages hold neither.
+
+Booking is switched off until an operator states the interview providers, hours,
+interviewers, and reminder lead time — Spec §6 names all four and fixes none —
+and until a scheduling account exists. Until then no booking control renders at
+all, the reminder job sends nothing and says so in the log, and the webhook
+accepts nothing. Every other optional item still counts toward the fee.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -556,7 +613,9 @@ mid-upload.
 The four `R2_*` values are all-or-nothing and optional to boot. With none of
 them set, uploads refuse loudly and the campaign workspace says so; with three
 of them set, the app exits rather than issuing signed URLs a bucket will
-reject.
+reject. The three `CALCOM_*` values behave the same way: none of them means no
+booking embed and a webhook that accepts nothing, and two of them means the app
+does not start.
 
 `ADMIN_REAUTH_WINDOW_SECONDS` deliberately has no default. Spec §6 names the
 Admin reauthentication window as a setting and fixes no value, so the operator
@@ -633,6 +692,10 @@ The frontend and shared suites need neither Docker nor a database.
   throws; it does not silently succeed. Spec §1.4 forbids implying automation
   that does not exist, and an Admin must never see an invitation reported as
   sent when nothing left the building.
+- **So does an unconfigured scheduling provider.** No booking embed renders, the
+  reminder job sends nothing and records that it did, and the webhook accepts
+  nothing at all — "no secret configured" and "wrong signature" are the same
+  answer.
 - **So does unconfigured object storage.** Same decision, same reason: a no-op
   would let a Founder see "visual uploaded", earn a US$2 saving for it, and find
   out at the campaign page. With no bucket configured the workspace renders no
@@ -648,6 +711,13 @@ The frontend and shared suites need neither Docker nor a database.
 - **Money is calculated once, on the server.** The listing fee is read from the
   Spec §6 settings and rendered by the browser. A second implementation in a
   component is how a preview and a charge diverge.
+- **A third-party payload never names its own campaign.** A scheduling webhook
+  is bound by a reference Proovd issued and recomputes, *and* by checking that
+  the person who booked owns that campaign. A signature proves where a payload
+  came from, not who filled it in.
+- **Provider events are claimed before any work happens.** One table, unique on
+  the provider's event id, shared by every integration. A redelivery updates
+  audit and produces no second state and no second message.
 - **No message ever asks for bank details, tax details, a password, or identity
   documents.** Spec §8 states it for Creators; it applies everywhere. An email
   that asks for those trains people to answer the one that isn't from us.

@@ -153,6 +153,12 @@ export interface WorkspaceState {
     missingSettings: string[];
     providers: string[];
     availability: string | null;
+    /** Phase 09b. `available` is false while §6 or Track A4 is outstanding. */
+    embed: {
+      available: boolean;
+      eventTypeLink: string | null;
+      reference: string | null;
+    };
     booking: {
       id: string;
       status: string;

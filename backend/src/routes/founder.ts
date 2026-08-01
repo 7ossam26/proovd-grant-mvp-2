@@ -35,6 +35,13 @@ import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
 import type { ObjectStorage } from '../storage/object-storage.js';
+import type { Scheduler } from '../interviews/calcom.js';
+import { interviewReference } from '../interviews/reference.js';
+import {
+  notifyInterview,
+  type InterviewNotificationContext,
+} from '../interviews/notifications.js';
+import type { Notifier } from '../notifications/send.js';
 import {
   ensureWorkspace,
   findFounderCampaign,
@@ -66,6 +73,15 @@ export interface FounderRouterConfig {
   auth: Auth;
   /** Defaults to the transport that refuses loudly (Track A4 is open). */
   storage: ObjectStorage;
+  /** §12's booking provider. Also refuses loudly while unconfigured. */
+  scheduler: Scheduler;
+  notifier: Notifier;
+  context: InterviewNotificationContext;
+  /**
+   * Keys the campaign reference the embed carries. `BETTER_AUTH_SECRET`,
+   * domain-separated — see `interviews/reference.ts`.
+   */
+  referenceSecret: string;
 }
 
 /** §27.1: a refusal says what happened and what to do next. */
@@ -80,7 +96,7 @@ function notFound(res: express.Response): void {
 }
 
 export function createFounderRouter(config: FounderRouterConfig): Router {
-  const { db, auth, storage } = config;
+  const { db, auth, storage, scheduler, notifier, context, referenceSecret } = config;
   const router = Router();
   const founder = requireRole(auth, 'founder');
   const json = express.json({ limit: '256kb' });
@@ -117,6 +133,17 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
     const view = await readFounderWorkspace(db, {
       campaignId,
       uploadsAvailable: storage.configured,
+      // The reference is minted per response and handed only to the
+      // authenticated Founder of this campaign. It binds whatever they book to
+      // this campaign and nothing else — see `interviews/reference.ts`.
+      ...(scheduler.configured
+        ? {
+            interviewEmbed: {
+              eventTypeLink: scheduler.eventTypeLink,
+              reference: interviewReference(campaignId, referenceSecret),
+            },
+          }
+        : {}),
     });
     res.json({ workspace: view });
   }
@@ -513,6 +540,13 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
         notFound(res);
         return;
       }
+
+      // §12's reschedule notification, after the transaction committed. Keyed
+      // on the booking AND the new time, so every move sends and none repeats.
+      await notifyInterview(db, notifier, context, {
+        bookingId: result.bookingId,
+        kind: 'rescheduled',
+      });
       await respond(res, campaignId);
     },
   );
@@ -546,6 +580,14 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
         notFound(res);
         return;
       }
+
+      // §12's cancellation notification. The email says whether the listing fee
+      // moved, which is a fact only the campaign's state knows — see
+      // `interviews/notifications.ts`.
+      await notifyInterview(db, notifier, context, {
+        bookingId: result.bookingId,
+        kind: 'canceled',
+      });
       await respond(res, campaignId);
     },
   );
@@ -584,6 +626,11 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
         });
         return;
       }
+
+      await notifyInterview(db, notifier, context, {
+        bookingId: result.bookingId,
+        kind: 'confirmed',
+      });
       await respond(res, campaignId);
     },
   );

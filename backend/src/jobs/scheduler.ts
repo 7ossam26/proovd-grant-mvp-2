@@ -28,6 +28,14 @@ import { PgBoss } from 'pg-boss';
 import type { Database } from '../db/client.js';
 import type { TokenService } from '../auth/token-service.js';
 import { sweepUnclaimedDrafts } from '../invitations/retention.js';
+import {
+  sendDueReminders,
+  sweepAbandonedBookings,
+  reconcilePendingBookings,
+} from '../interviews/jobs.js';
+import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
+import type { Notifier } from '../notifications/send.js';
+import type { InterviewNotificationContext } from '../interviews/notifications.js';
 
 /**
  * §3 bans `Day 30` as a name anywhere, including job names. The window is 30
@@ -43,18 +51,50 @@ export const UNCLAIMED_DRAFT_RETENTION_JOB = 'unclaimed-draft-retention';
  */
 export const RETENTION_SCHEDULE_CRON = '0 3 * * *';
 
+/**
+ * §12's interview jobs, added Phase 09b.
+ *
+ * `interview-reminders` sends §27.3's reminder for every confirmed booking
+ * inside the §6 lead window, and does nothing at all while that setting is
+ * unset. `interview-reconciliation` asks the provider about bookings we may
+ * have missed a webhook for, and marks a never-confirmed slot that has now
+ * passed as abandoned.
+ *
+ * Both are safe to run twice — the reminder's dedup swallows a repeat and the
+ * abandonment sweep's conditional UPDATE matches nothing on a second pass —
+ * which is the §28.3 property every job here has to have.
+ */
+export const INTERVIEW_REMINDER_JOB = 'interview-reminders';
+export const INTERVIEW_RECONCILIATION_JOB = 'interview-reconciliation';
+
+/**
+ * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
+ * has to be accurate to well inside an hour; a minutely job would buy nothing
+ * and quadruple the churn. The reconciliation runs on the same tick because a
+ * missed webhook and an unsent reminder are noticed by the same person.
+ */
+export const INTERVIEW_SCHEDULE_CRON = '*/15 * * * *';
+
 export interface SchedulerDeps {
   db: Database;
   tokens: TokenService;
   connectionString: string;
   /** Structured log sink. Job outcomes belong in the operational record. */
   log: (message: string, detail?: Record<string, unknown>) => void;
+  /** §12's interview jobs. Phase 09b. */
+  interviews: {
+    scheduler: SchedulerPort;
+    notifier: Notifier;
+    context: InterviewNotificationContext;
+  };
 }
 
 export interface Scheduler {
   boss: PgBoss;
   /** Runs the sweep now, outside the schedule. Used by tests and by Admin. */
   runRetentionNow: () => Promise<void>;
+  /** Runs the §12 interview jobs now. Used by tests and by Admin. */
+  runInterviewJobsNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -63,6 +103,7 @@ export async function startScheduler({
   tokens,
   connectionString,
   log,
+  interviews,
 }: SchedulerDeps): Promise<Scheduler> {
   const boss = new PgBoss({ connectionString, schema: 'pgboss' });
 
@@ -89,10 +130,58 @@ export async function startScheduler({
     tz: 'UTC',
   });
 
+  /* ── §12's interview jobs (Phase 09b) ─────────────────────────────────── */
+
+  await boss.createQueue(INTERVIEW_REMINDER_JOB);
+  await boss.work(INTERVIEW_REMINDER_JOB, async () => {
+    const result = await sendDueReminders(db, interviews.notifier, interviews.context);
+    if (result.leadHours === null) {
+      // §6 names the lead time and fixes no value. Saying so every run is how
+      // an operator finds out that no reminders are going anywhere — a silent
+      // no-op would look identical to "nothing was due" (§1.4).
+      log('interview reminders skipped: §6 lead time is not configured');
+      return;
+    }
+    log('interview reminders complete', {
+      leadHours: result.leadHours,
+      considered: result.considered,
+      sent: result.sent,
+      duplicates: result.duplicates,
+      skipped: result.skipped,
+    });
+  });
+
+  await boss.createQueue(INTERVIEW_RECONCILIATION_JOB);
+  await boss.work(INTERVIEW_RECONCILIATION_JOB, async () => {
+    const abandoned = await sweepAbandonedBookings(db);
+    const reconciled = await reconcilePendingBookings(
+      db,
+      interviews.scheduler,
+      interviews.notifier,
+      interviews.context,
+    );
+    log('interview reconciliation complete', {
+      abandoned: abandoned.abandoned.length,
+      checked: reconciled.checked,
+      confirmed: reconciled.confirmed.length,
+      canceled: reconciled.canceled.length,
+      providerUnavailable: reconciled.unavailable,
+    });
+  });
+
+  await boss.schedule(INTERVIEW_REMINDER_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });
+  await boss.schedule(INTERVIEW_RECONCILIATION_JOB, INTERVIEW_SCHEDULE_CRON, undefined, {
+    tz: 'UTC',
+  });
+
   return {
     boss,
     runRetentionNow: async () => {
       await boss.send(UNCLAIMED_DRAFT_RETENTION_JOB, {});
+    },
+    runInterviewJobsNow: async () => {
+      await boss.send(INTERVIEW_REMINDER_JOB, {});
+      await boss.send(INTERVIEW_RECONCILIATION_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

@@ -110,6 +110,12 @@ export interface BookingInput {
   interviewer?: string | null;
   externalSource?: string | null;
   externalBookingId?: string | null;
+  /**
+   * The campaign reference the provider's embed carried (Phase 09b). Recorded
+   * so a booking always says which campaign's embed produced it; immutable by
+   * trigger, because the binding is the security property.
+   */
+  proovdReference?: string | null;
   actor: string;
   source: string;
 }
@@ -178,6 +184,7 @@ export async function recordBooking(db: Database, input: BookingInput): Promise<
         interviewer: input.interviewer ?? null,
         externalSource: input.externalSource ?? null,
         externalBookingId: input.externalBookingId ?? null,
+        proovdReference: input.proovdReference ?? null,
         createdBy: input.actor,
       })
       .returning();

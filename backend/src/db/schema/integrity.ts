@@ -73,6 +73,13 @@ export const providerEvents = pgTable(
     provider: text('provider').notNull().default('stripe'),
     providerEventId: text('provider_event_id').notNull(),
     eventType: text('event_type'),
+    /**
+     * The provider's identifier for the *thing* the event is about — a Cal.com
+     * booking uid, later a Stripe object id. Added Phase 09b so an Admin
+     * chasing a missed delivery can find it in the provider without a second
+     * lookup table. Never authoritative: the domain record is.
+     */
+    subjectId: text('subject_id'),
     receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
     processedAt: timestamp('processed_at', { withTimezone: true }),
     /** Duplicate deliveries update audit only (§28.3): count + last-seen. */

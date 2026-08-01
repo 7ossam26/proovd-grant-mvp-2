@@ -97,7 +97,7 @@ async function main() {
   // an unconfigured deployment refuses uploads loudly rather than reporting a
   // file as stored when no bucket exists.
   const { createR2Storage, unconfiguredStorage } = await import('./storage/object-storage.js');
-  const { objectStorageConfigured } = await import('./env.js');
+  const { objectStorageConfigured, schedulerConfigured } = await import('./env.js');
   const objectStorage = objectStorageConfigured(env)
     ? createR2Storage({
         accountId: env.R2_ACCOUNT_ID!,
@@ -107,8 +107,22 @@ async function main() {
       })
     : unconfiguredStorage;
 
+  // §12's booking provider (tech-stack §12). Same shape again: an unconfigured
+  // deployment renders no embed and accepts no webhook, rather than an empty
+  // frame and anything that arrives.
+  const { createCalcomScheduler, unconfiguredScheduler } = await import(
+    './interviews/calcom.js'
+  );
+  const interviewScheduler = schedulerConfigured(env)
+    ? createCalcomScheduler({
+        apiKey: env.CALCOM_API_KEY!,
+        webhookSecret: env.CALCOM_WEBHOOK_SECRET!,
+        eventTypeLink: env.CALCOM_EVENT_TYPE_LINK!,
+      })
+    : unconfiguredScheduler;
+
   const publicDir = path.join(__dirname, '..', 'public');
-  const { app, tokens } = createApp(db, {
+  const { app, tokens, notifier } = createApp(db, {
     appBaseUrl: env.APP_BASE_URL,
     nodeEnv: env.NODE_ENV,
     publicDir,
@@ -117,6 +131,7 @@ async function main() {
     prerequisiteEnvironment: prerequisiteFacts(env),
     emailTransport,
     objectStorage,
+    interviewScheduler,
     invitationContext: {
       appBaseUrl: env.APP_BASE_URL,
       // §27.8's published address, and the one the footer already renders.
@@ -153,6 +168,17 @@ async function main() {
     tokens,
     connectionString: env.DATABASE_URL,
     log: (message, detail) => logger.info(detail ?? {}, message),
+    // §12's interview reminder and reconciliation (Phase 09b). Both are no-ops
+    // while §6's lead time is unset or the provider is unconfigured, and both
+    // say so in the log rather than passing silently (§1.4).
+    interviews: {
+      scheduler: interviewScheduler,
+      notifier,
+      context: {
+        supportEmail: 'support@proovd.co',
+        fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
+      },
+    },
   });
   logger.info('Job scheduler started');
 
