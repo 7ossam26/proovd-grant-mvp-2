@@ -18,6 +18,8 @@ import { createAdminWorkspaceRouter } from './routes/admin-workspace.js';
 import { unconfiguredStorage, type ObjectStorage } from './storage/object-storage.js';
 import { unconfiguredScheduler, type Scheduler } from './interviews/calcom.js';
 import { createCalcomWebhookRouter } from './routes/calcom-webhook.js';
+import { createStripeWebhookRouter } from './routes/stripe-webhooks.js';
+import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
@@ -65,6 +67,13 @@ export interface AppConfig {
    * any webhook (§1.4).
    */
   interviewScheduler?: Scheduler;
+  /**
+   * §32.2's Stripe client. Unlike the other three ports this has no
+   * "unconfigured" default — `env.ts` has always required the keys, so a running
+   * process always has one. The suite injects its own to drive signatures, mode
+   * separation, and idempotent replay without a network.
+   */
+  stripeGateway?: StripeGateway;
   /** §7 / §27.8 addresses and origins the invitation is built from. */
   invitationContext: InvitationContext;
   /**
@@ -250,7 +259,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   );
   // Phase 09b (§12, tech-stack §12). The booking provider's webhook. Mounts its
   // own raw-body parser, because the signature covers the exact bytes that were
-  // sent — the same constraint Phase 10's Stripe endpoint has, and the reason
+  // sent — the same constraint Phase 10's Stripe endpoints have, and the reason
   // there is still no global `express.json()` above.
   app.use(
     createCalcomWebhookRouter({
@@ -267,6 +276,20 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // the high-effort inputs, the fee, interview state, invalidation history, and
   // the recorded override.
   app.use(createAdminWorkspaceRouter({ db, auth }));
+  // Phase 10a (§32.3, §28.3). Two Stripe endpoints with two signing secrets —
+  // platform for Proovd's own listing money, Connect for the Founder's campaign
+  // money (§24.1). Both mount raw-body parsing themselves, for the reason the
+  // note above this block has stated since Phase 01.
+  if (config.stripeGateway) {
+    app.use(
+      createStripeWebhookRouter({
+        db,
+        gateway: config.stripeGateway,
+        audit: (event) => audit({ ...event, targetId: event.targetId }),
+        ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
+      }),
+    );
+  }
 
   // ── SPA fallback ──────────────────────────────────────────────────────────
   // /api/* routes go above. Everything else returns index.html so the SPA

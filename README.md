@@ -24,7 +24,9 @@ Working rules for contributors and for Claude Code sessions live in
 ## Status
 
 Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–09 are
-complete**; Phase 10 — the Stripe foundations, in test mode — is next.
+complete and Phase 10 is half built**; 10b — the two Stripe onboarding surfaces
+and the tax-accountability gate — is next. No money moves yet, and the live-mode
+gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -42,6 +44,7 @@ complete**; Phase 10 — the Stripe foundations, in test mode — is next.
 | 08c | The preparing reveal, the Campaign kit, access logging and revocation |
 | 09a | The campaign workspace, the five optional items and their evidence, uploads, high-effort, the itemised listing fee |
 | 09b | The embedded interview: the signed booking webhook, reconciliation, and the four interview notifications |
+| 10a | Stripe foundations: the pinned client, both signed webhook endpoints, idempotent event handling, and the provider-object ledger |
 
 Three briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -87,6 +90,8 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/storage/        presigned R2 uploads and what a stored object really is
   src/interviews/     the booking provider, its signed webhook, the campaign
                       reference that binds a booking, and the reminder job
+  src/payments/       the pinned Stripe client, connected accounts and their
+                      four onboarding states, and the provider-object ledger
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
@@ -568,6 +573,53 @@ and until a scheduling account exists. Until then no booking control renders at
 all, the reminder job sends nothing and says so in the log, and the webhook
 accepts nothing. Every other optional item still counts toward the fee.
 
+## Stripe foundations
+
+No money moves yet. This is the plumbing every later payment phase runs through,
+and it is built to be right about four things before anything is built on it.
+
+**The API version is locked by the operator, not by the package.** Inheriting
+whatever version the SDK happened to ship would mean a routine dependency update
+silently changing the shape of every object the ledger reads. The app refuses to
+start without an explicit dated version.
+
+**Two webhook endpoints, two signing secrets, and they may not be the same.**
+One is for Proovd's own money — the listing fee, where Proovd is the seller. The
+other is for campaign money, where the Founder is. A single secret shared
+between them would let either endpoint accept the other's events, and the
+separation between those two streams would stop being enforced by anything. The
+app refuses to boot if the two match.
+
+It is also honest about what it cannot check. A test signing secret and a live
+one look identical, so no startup check can prove which mode a secret belongs
+to — what proves it is signature verification at the endpoint, which fails
+closed. A check that claimed otherwise would pass while being wrong.
+
+**A duplicate delivery can never move anything twice.** The provider's event id
+is claimed before any work happens; a redelivery increments a counter, records
+an audit row, and stops. When a handler fails partway the claim deliberately
+stays — the event is visibly unfinished and the retry is visibly a retry, rather
+than a fresh delivery that could repeat half-completed work.
+
+**Nothing is stored that Proovd should not hold.** Stripe collects identity
+documents during onboarding; Proovd stores statuses, requirement names, and
+references. There is no column that could hold a document, the requirement lists
+are filtered to names and constrained to arrays at the database, and no raw
+provider payload is kept anywhere.
+
+**An account's state is one of four words, and a refusal outranks everything.**
+Stripe reports an account as booleans, four requirement lists, and a disabled
+reason. A Founder needs to know one thing: complete, more information required,
+under review, or restricted. Every Stripe reason is mapped by name, and one that
+has never been seen resolves to restricted — the safe direction, because a
+restricted account must not be offered a way to pay.
+
+What "complete" means depends on the role. A Founder account is the seller for
+its campaign and needs to be able to take charges; a Creator account only ever
+receives, and needs to be able to be paid out. One shared definition would
+either block Creators on a capability they never use or pass Founders who cannot
+sell.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -718,6 +770,13 @@ The frontend and shared suites need neither Docker nor a database.
 - **Provider events are claimed before any work happens.** One table, unique on
   the provider's event id, shared by every integration. A redelivery updates
   audit and produces no second state and no second message.
+- **Webhook signatures are verified on the raw bytes, before anything parses
+  them.** A global JSON body parser would destroy the bytes and the failure
+  would read as a provider misconfiguration. No route in this app installs one.
+- **Test and live never share a row.** Every stored provider object records the
+  mode it came from, mode is part of its identity, and a database trigger
+  refuses to change it — because Spec §34 asks Proovd to *prove* the two never
+  mixed.
 - **No message ever asks for bank details, tax details, a password, or identity
   documents.** Spec §8 states it for Creators; it applies everywhere. An email
   that asks for those trains people to answer the one that isn't from us.

@@ -11,9 +11,27 @@ const schema = z.object({
   STRIPE_PLATFORM_SECRET_KEY: z.string().min(1),
   STRIPE_PLATFORM_PUBLISHABLE_KEY: z.string().min(1),
 
+  /**
+   * §32.2: "Locked API version." Required, and deliberately not defaulted to
+   * the SDK's own pinned version — an SDK upgrade would then silently change
+   * the shape of every provider object the ledger reads. The operator states
+   * the version; `payments/stripe-client.ts` passes it to every call.
+   */
+  STRIPE_API_VERSION: z.string().min(1, 'STRIPE_API_VERSION is required and must be locked'),
+
+  /** §32.2: "Platform account ID." The account the listing fee is charged on. */
+  STRIPE_PLATFORM_ACCOUNT_ID: z.string().min(1),
+
   // Required for webhook verification (Phases 10+), optional to boot
   STRIPE_WEBHOOK_SECRET_PLATFORM: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_CONNECT: z.string().optional(),
+
+  // §32.2: "Connect return/refresh URLs and OAuth client ID if used."
+  // Optional to boot: onboarding is Phase 10b, and an app that refused to start
+  // without them could not serve the §6 prerequisites panel that reports them.
+  STRIPE_CONNECT_RETURN_URL: z.string().url().optional(),
+  STRIPE_CONNECT_REFRESH_URL: z.string().url().optional(),
+  STRIPE_CONNECT_CLIENT_ID: z.string().optional(),
 
   // Test-mode connected accounts (Phase 10+)
   STRIPE_TEST_FOUNDER_CONNECTED_ACCOUNT_ID: z.string().optional(),
@@ -140,6 +158,80 @@ function checkStripeMode(data: Env): void {
         'These are test-mode identifiers. Remove them for live mode.',
     );
   }
+
+  // §32.2: every account reference is an account reference. A publishable key,
+  // a secret, or a copied-and-truncated value in one of these fields would
+  // otherwise be discovered on the first API call, in production.
+  for (const [name, value] of [
+    ['STRIPE_PLATFORM_ACCOUNT_ID', data.STRIPE_PLATFORM_ACCOUNT_ID],
+    ['STRIPE_TEST_FOUNDER_CONNECTED_ACCOUNT_ID', data.STRIPE_TEST_FOUNDER_CONNECTED_ACCOUNT_ID],
+    ['STRIPE_TEST_AFFILIATE_CONNECTED_ACCOUNT_ID', data.STRIPE_TEST_AFFILIATE_CONNECTED_ACCOUNT_ID],
+  ] as const) {
+    if (value && !value.startsWith('acct_')) {
+      throw new Error(`${name} must be a Stripe account id starting with acct_ (got ${value.slice(0, 8)}...)`);
+    }
+  }
+
+  if (data.STRIPE_CONNECT_CLIENT_ID && !data.STRIPE_CONNECT_CLIENT_ID.startsWith('ca_')) {
+    throw new Error('STRIPE_CONNECT_CLIENT_ID must start with ca_');
+  }
+
+  // §32.2 asks for a locked API version. Stripe's are dated, and a value that is
+  // not one is a typo that would be sent on every request.
+  if (!/^\d{4}-\d{2}-\d{2}(\.[a-z]+)?$/.test(data.STRIPE_API_VERSION)) {
+    throw new Error(
+      `STRIPE_API_VERSION must be a locked Stripe API version such as 2026-07-29.dahlia (got ${data.STRIPE_API_VERSION})`,
+    );
+  }
+}
+
+/**
+ * The two webhook secrets (§6, §32.2, §28.3).
+ *
+ * ── What can be checked, and what deliberately is not ───────────────────────
+ * §6 asks the environment to refuse "a webhook secret/mode mismatch". A Stripe
+ * signing secret carries no mode marker — a test secret and a live secret are
+ * both `whsec_...` — so no string check here can prove which mode a secret
+ * belongs to, and one that pretended to would be a check that passes while
+ * being wrong. What actually proves it is signature verification at the
+ * endpoint, which fails closed on a secret from the wrong mode.
+ *
+ * So this enforces the two things that ARE decidable from the values:
+ *
+ *  1. Each looks like a signing secret rather than an API key. A `sk_live_`
+ *     pasted into a webhook-secret field is the kind of mistake that otherwise
+ *     surfaces as "signature verification failed" and gets debugged as a Stripe
+ *     problem.
+ *  2. The two differ. §32.3 gives the platform and Connect endpoints separate
+ *     secrets precisely so each verifies only its own traffic; one secret used
+ *     for both makes either endpoint accept the other's events, and the
+ *     separation §24.1 draws between Proovd-as-MoR and Founder-as-MoR money
+ *     stops being enforced by anything.
+ */
+function checkWebhookSecrets(data: Env): void {
+  const secrets = [
+    ['STRIPE_WEBHOOK_SECRET_PLATFORM', data.STRIPE_WEBHOOK_SECRET_PLATFORM],
+    ['STRIPE_WEBHOOK_SECRET_CONNECT', data.STRIPE_WEBHOOK_SECRET_CONNECT],
+  ] as const;
+
+  for (const [name, value] of secrets) {
+    if (value && !value.startsWith('whsec_')) {
+      throw new Error(
+        `${name} must be a Stripe signing secret starting with whsec_. A signing secret is not ` +
+          'an API key; verification would fail in a way that looks like a Stripe configuration problem.',
+      );
+    }
+  }
+
+  if (
+    data.STRIPE_WEBHOOK_SECRET_PLATFORM &&
+    data.STRIPE_WEBHOOK_SECRET_PLATFORM === data.STRIPE_WEBHOOK_SECRET_CONNECT
+  ) {
+    throw new Error(
+      'STRIPE_WEBHOOK_SECRET_PLATFORM and STRIPE_WEBHOOK_SECRET_CONNECT are the same value. ' +
+        '§32.3 gives the two endpoints separate secrets so each verifies only its own traffic.',
+    );
+  }
 }
 
 /**
@@ -234,7 +326,12 @@ export function prerequisiteFacts(env: Env): {
     stripeMode: env.STRIPE_MODE,
     stripeKeysMatchMode:
       env.STRIPE_PLATFORM_SECRET_KEY.startsWith(expectedSecret) &&
-      env.STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith(expectedPublishable),
+      env.STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith(expectedPublishable) &&
+      // §34 condition 5 is "test/live key separation and webhook signatures
+      // pass". Separation is only real if the two endpoints hold different
+      // secrets — `checkWebhookSecrets` refuses otherwise, and this records
+      // that it held rather than assuming it.
+      env.STRIPE_WEBHOOK_SECRET_PLATFORM !== env.STRIPE_WEBHOOK_SECRET_CONNECT,
     platformWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_PLATFORM),
     connectWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_CONNECT),
     transactionalEmailConfigured: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM),
@@ -254,6 +351,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
   }
   checkStripeMode(result.data);
   checkGoogleOAuth(result.data);
+  checkWebhookSecrets(result.data);
   checkObjectStorage(result.data);
   checkScheduler(result.data);
   return result.data;

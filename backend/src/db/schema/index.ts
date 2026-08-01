@@ -29,4 +29,8 @@ export * from './affiliate-signup.js';
 // evidence that completes them, uploaded assets by reference, the interview
 // booking record, and the append-only high-effort and listing-fee calculations.
 export * from './workspace.js';
+// Phase 10: the §32.4 provider-object store, the §13/§11 connected accounts and
+// their four human-readable onboarding states, and the append-only record of
+// every return, refresh, and provider-driven status change.
+export * from './payments.js';
 

@@ -121,6 +121,19 @@ async function main() {
       })
     : unconfiguredScheduler;
 
+  // §32.2's Stripe client, with the locked API version. `env.ts` requires the
+  // keys and fails closed on any mode mismatch, so this always constructs — the
+  // separation §34 condition 5 asks about was already proven at boot.
+  const { createStripeGateway } = await import('./payments/stripe-client.js');
+  const stripeGateway = createStripeGateway({
+    mode: env.STRIPE_MODE,
+    apiVersion: env.STRIPE_API_VERSION,
+    secretKey: env.STRIPE_PLATFORM_SECRET_KEY,
+    platformAccountId: env.STRIPE_PLATFORM_ACCOUNT_ID,
+    platformWebhookSecret: env.STRIPE_WEBHOOK_SECRET_PLATFORM,
+    connectWebhookSecret: env.STRIPE_WEBHOOK_SECRET_CONNECT,
+  });
+
   const publicDir = path.join(__dirname, '..', 'public');
   const { app, tokens, notifier } = createApp(db, {
     appBaseUrl: env.APP_BASE_URL,
@@ -132,6 +145,7 @@ async function main() {
     emailTransport,
     objectStorage,
     interviewScheduler,
+    stripeGateway,
     invitationContext: {
       appBaseUrl: env.APP_BASE_URL,
       // §27.8's published address, and the one the footer already renders.

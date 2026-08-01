@@ -17,6 +17,11 @@ const validBase = {
   STRIPE_MODE: 'test' as const,
   STRIPE_PLATFORM_SECRET_KEY: FAKE_TEST_SK,
   STRIPE_PLATFORM_PUBLISHABLE_KEY: FAKE_TEST_PK,
+  // §32.2's locked API version and platform account. Required from Phase 10 —
+  // an unlocked version would let an SDK upgrade change the shape of every
+  // object the ledger reads.
+  STRIPE_API_VERSION: '2026-07-29.dahlia',
+  STRIPE_PLATFORM_ACCOUNT_ID: 'acct_platformtestaccount',
   CRON_SECRET: 'a-32-character-or-longer-cron-secret-for-tests',
   BETTER_AUTH_SECRET: 'a-32-character-or-longer-better-auth-secret-for-tests',
   ADMIN_REAUTH_WINDOW_SECONDS: '300',
