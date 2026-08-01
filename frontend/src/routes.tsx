@@ -17,6 +17,8 @@ import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
 import { FoundersPage } from './features/admin/FoundersPage.js';
 import { FounderDetail } from './features/admin/FounderDetail.js';
 import { CampaignCreators } from './features/admin/CampaignCreators.js';
+import { CampaignWorkspacePanel } from './features/admin/CampaignWorkspace.js';
+import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
   CreatorCampaigns,
@@ -102,6 +104,10 @@ const rootChildren: RouteObject[] = [
       // because §8's recruitment is always for one campaign and §11 keeps the
       // Creator tied to it.
       { path: 'creators', element: <CampaignCreators /> },
+      // Phase 09a (§12 Admin, §26.2). Scoped to one campaign by query string,
+      // like the Creators panel and for the same reason: §12's optional items
+      // are always one campaign's.
+      { path: 'optional-items', element: <CampaignWorkspacePanel /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
@@ -157,6 +163,15 @@ const rootChildren: RouteObject[] = [
     // Creator who bookmarks a campaign gets that campaign back.
     path: 'creator/campaigns/:associationId',
     element: <CreatorCampaignKit />,
+  },
+  {
+    // Phase 09a (§12, DNA §5.9). The signed-in Founder's campaign workspace.
+    // Outside the public shell and outside the Admin shell, for the reasons the
+    // Creator routes document: §26 licenses dashboard density in Admin only,
+    // and this is not a public page — everything on it is scoped to the
+    // session and re-checked against the caller's own claim on every request.
+    path: 'campaigns/:campaignId/workspace',
+    element: <CampaignWorkspace />,
   },
   {
     // Phase 04 (§5.5). One route for every token failure — invalid, expired,

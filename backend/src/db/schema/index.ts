@@ -25,4 +25,8 @@ export * from './affiliates.js';
 // Phase 8b: the §11 compact signup profile — what Proovd prefilled, what the
 // Creator corrected, the five confirmations, and the payout-onboarding status.
 export * from './affiliate-signup.js';
+// Phase 9: the §12 Founder campaign workspace — the five optional items and the
+// evidence that completes them, uploaded assets by reference, the interview
+// booking record, and the append-only high-effort and listing-fee calculations.
+export * from './workspace.js';
 

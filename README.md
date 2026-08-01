@@ -24,7 +24,8 @@ Working rules for contributors and for Claude Code sessions live in
 ## Status
 
 Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–08 are
-complete**; Phase 09 is next.
+complete and Phase 09 is half built**; 09b — the Cal.com interview integration
+and its four notifications — is next.
 
 | Phase | Delivered |
 | --- | --- |
@@ -40,13 +41,23 @@ complete**; Phase 09 is next.
 | 08a | Creator recruitment, subtype verification evidence, the private invitation |
 | 08b | The Creator's compact signup, the payout handoff, the named waiting state |
 | 08c | The preparing reveal, the Campaign kit, access logging and revocation |
+| 09a | The campaign workspace, the five optional items and their evidence, uploads, high-effort, the itemised listing fee |
 
-Two briefs have been built in halves. Phase 06 bundles four independent
+Three briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
-the preparing reveal with its Campaign kit. Splitting them was a scheduling
-decision, not a scope one: each half is built against the same brief and lands
-its own named acceptance tests. Every named test from §33.1.1 to §33.1.9 passes,
-and so does every one from §33.2.1 to §33.2.4.
+the preparing reveal with its Campaign kit; Phase 09 bundles the optional-item
+workspace and a third-party scheduling integration. Splitting them was a
+scheduling decision, not a scope one: each half is built against the same brief
+and lands its own named acceptance tests. Every named test from §33.1.1 to
+§33.1.9 passes, so does every one from §33.2.1 to §33.2.4, and so does every one
+from §33.3.1 to §33.3.4.
+
+Phase 09b is the Cal.com wiring alone. The interview *booking record* is already
+here and is the source of truth for it — a vendor is a source of events, not of
+domain state — so the four §12 booking conditions, the reschedule history, and
+the recalculation on cancellation are all built and tested. What 09b adds is the
+embedded booking surface, the webhooks that feed the record, and the four
+interview notifications.
 
 ## Layout
 
@@ -59,6 +70,9 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/vetting/    the §9 vetting sequence, its copy, and the two campaign paths
   src/affiliates/ the §5.3 subtypes and their evidence, §8's recruitment
                   record, and §2.2's active-partnership slot rule
+  src/workspace/  the §12 optional items, what does not count as evidence for
+                  each, the copy-ready helper resources, and the interview
+                  statuses
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -68,6 +82,9 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/vetting/        the §9 answers and their provenance, the §10 account claim
   src/affiliates/     Creator recruitment, verification, the private
                       invitation, and the §11 compact signup
+  src/workspace/      the §12 evidence rules, the interview booking record,
+                      high-effort, and the listing-fee calculation
+  src/storage/        presigned R2 uploads and what a stored object really is
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
@@ -78,6 +95,8 @@ frontend/   React 19 + Vite, styled solely by proovd.css
   src/surfaces/draft/    the Founder journey: vetting, result, account claim
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
                          preparing Campaign kit
+  src/surfaces/founder/  the campaign workspace: five optional items as a flow,
+                         the fee preview, and the helper resources
 docs/       Spec, DNA, tech stack, master plan, phase briefs
 ```
 
@@ -426,6 +445,72 @@ link activation do not exist as routes or as buttons. The surface says, in the
 same view as the material, that reading is not accepting and that the material
 is confidential.
 
+## The optional items and the listing fee
+
+A Founder can do five optional things — visuals, branding, an interview with
+someone at Proovd, a story, and a public profile — and each one takes US$2 off
+their listing fee. Spec §12 governs it, and one sentence in it decides the whole
+shape of the code: each item completes **only on objective evidence**.
+
+**Saying it is done never counts.** There is no route, no field, and no column
+that lets a Founder mark an item complete. The server re-derives all five
+decisions from the stored content every time anything changes, and it rejects
+each near-miss Spec §12 names by name: an empty file, a placeholder, the same
+file twice, a link that does not open, a story that has been written but not
+approved, an interview slot that was picked but never confirmed. A discount
+handed out for a self-report would not be a discount for doing the work.
+
+**Approval is of a version, not of a box.** A Founder who approves a story and
+then rewrites it has an unapproved draft again, so the edit clears the approval
+in the same statement. They always approve the words that will actually be
+published.
+
+**Files go from the browser straight to storage and never touch our server.**
+The browser asks for a signed URL, uploads to it, and the server then reads the
+object back out of the bucket and decides what it actually is — from the bytes,
+not from what the browser claimed. A document renamed to `.png` is not an image.
+The signature covers the exact object, its type, and its size, so a URL issued
+for one photo cannot be reused for anything else, and it expires in minutes.
+
+**Admin can take a completion back, and must say why twice.** Spec §12 allows an
+invalidation before payment with a reason, and gives the Founder the correction.
+The internal reason and the sentence the Founder reads are separate fields, both
+required — an invalidation nobody can read is one nobody can correct. Granting a
+completion without evidence is a *different* act, recorded as an override with
+the evidence it rests on, and it survives every later save: an override the next
+autosave silently withdrew would not be one.
+
+**The fee is calculated on the server and only ever displayed in the browser.**
+The base, each earned saving as its own line, and the subtotal all come from the
+server, which reads the four Spec §6 numbers from configuration rather than from
+code. There is no arithmetic on a fee anywhere in the frontend — that is how a
+preview and a charge come to disagree. Sales tax is added at Checkout by Stripe
+Tax, so no tax line and no "total due now" appears before then: a zero would be
+a claim nobody has made. The 5% Proovd keeps from what a campaign collects is a
+different stream and says so, in a sentence that travels with every preview.
+
+**High effort describes preparation, never quality.** A campaign is classified
+high-effort only when there are no visuals, no branding, and no interview. It
+controls exactly one thing — whether a Creator may propose a percentage above the
+base rate — and it controls nothing about fixed payments. The surface says all of
+that, because a Founder who reads the phrase with no context reads it as a
+verdict.
+
+**Uploads and interviews are both switched off, and both say so.** The storage
+bucket and the scheduling account are outstanding setup, and Spec §6 names the
+interview providers, hours, interviewers, and reminder timing as settings while
+fixing a value for none of them. So an unconfigured deployment renders no upload
+control and no booking control at all, rather than one that would fail — and the
+workspace names what is missing instead of going quiet. Every other item still
+counts toward the fee.
+
+**The guidance is text you copy, not a button that writes for you.** Spec §12
+asks for copy-ready help with competition, branding, visuals, and story,
+including reusable prompts — and rules out an embedded AI product; Spec §30
+defers AI rewriting by name. So the prompts sit beside a copy control, there is
+no model client anywhere in the repository, and a test scans the guidance to keep
+it that way. A transcript is not a story, and neither is a summary.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -464,8 +549,14 @@ npm run dev:frontend
 `backend/src/env.ts` is Zod-validated and **fails closed** on any live/test key
 or mode mismatch — a `sk_live_` key with `STRIPE_MODE=test` exits non-zero at
 boot, by design. It also refuses to boot without `BETTER_AUTH_SECRET` or
-`ADMIN_REAUTH_WINDOW_SECONDS`, and rejects a half-configured Google OAuth rather
-than failing later at the redirect.
+`ADMIN_REAUTH_WINDOW_SECONDS`, and rejects a half-configured Google OAuth or a
+half-configured storage bucket rather than failing later at the redirect or
+mid-upload.
+
+The four `R2_*` values are all-or-nothing and optional to boot. With none of
+them set, uploads refuse loudly and the campaign workspace says so; with three
+of them set, the app exits rather than issuing signed URLs a bucket will
+reject.
 
 `ADMIN_REAUTH_WINDOW_SECONDS` deliberately has no default. Spec §6 names the
 Admin reauthentication window as a setting and fixes no value, so the operator
@@ -542,6 +633,21 @@ The frontend and shared suites need neither Docker nor a database.
   throws; it does not silently succeed. Spec §1.4 forbids implying automation
   that does not exist, and an Admin must never see an invitation reported as
   sent when nothing left the building.
+- **So does unconfigured object storage.** Same decision, same reason: a no-op
+  would let a Founder see "visual uploaded", earn a US$2 saving for it, and find
+  out at the campaign page. With no bucket configured the workspace renders no
+  upload control at all, and the app refuses to boot on a half-configured one.
+- **No file ever reaches the application server.** The browser uploads to a
+  signed URL scoped to one object, and the server reads the object back to
+  decide what it is. There is no upload route, no multipart parser, and nothing
+  written to the container's disk (tech stack §9).
+- **An item completes on evidence or it does not complete.** Spec §12's discount
+  rules are decided server-side from stored content, on every change. Nothing a
+  Founder can send sets a completion, and an Admin who grants one without
+  evidence is recorded as having done exactly that.
+- **Money is calculated once, on the server.** The listing fee is read from the
+  Spec §6 settings and rendered by the browser. A second implementation in a
+  component is how a preview and a charge diverge.
 - **No message ever asks for bank details, tax details, a password, or identity
   documents.** Spec §8 states it for Creators; it applies everywhere. An email
   that asks for those trains people to answer the one that isn't from us.

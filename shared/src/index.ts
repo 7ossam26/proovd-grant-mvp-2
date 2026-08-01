@@ -8,3 +8,4 @@ export * from './policies/index.js';
 export * from './settings/index.js';
 export * from './vetting/index.js';
 export * from './affiliates/index.js';
+export * from './workspace/index.js';

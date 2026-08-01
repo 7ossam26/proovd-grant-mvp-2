@@ -699,3 +699,147 @@ export const recordPrerequisite = (
     method: 'POST',
     body: JSON.stringify({ status, note, evidenceLinks }),
   });
+
+/* ── Phase 09a: the §12 optional items, evidence, and the fee ─────────────── */
+
+export type AdminOptionalItemKey = 'visuals' | 'branding' | 'interview' | 'story' | 'socials';
+
+/**
+ * §12 Admin: "every item, evidence, status, discount line, high-effort inputs,
+ * fee preview, interview state, invalidation history, and override."
+ *
+ * `evidence` and `invalidatedReason` are the two fields the Founder never sees:
+ * the snapshot each decision rested on, and §25.6's internal reason, which is
+ * kept in its own column precisely so it can stay internal.
+ */
+export interface AdminOptionalItem {
+  item: AdminOptionalItemKey;
+  complete: boolean;
+  completedAt: string | null;
+  decisionSource: string | null;
+  rejections: string[];
+  locked: boolean;
+  invalidated: { at: string | null; explanation: string | null };
+  evidence: unknown;
+  invalidatedReason: string | null;
+  invalidatedBy: string | null;
+  evaluatedAt: string | null;
+}
+
+export interface AdminWorkspace {
+  campaignId: string;
+  items: AdminOptionalItem[];
+  fee: {
+    baseCents: string;
+    itemDiscountCents: string;
+    completedItems: number;
+    discountLines: Array<{ item: AdminOptionalItemKey; discountCents: string }>;
+    discountCents: string;
+    subtotalCents: string;
+    minSubtotalCents: string;
+    calculatedAt: string | null;
+    locked: boolean;
+    separateStreamNote: string;
+  } | null;
+  highEffort: {
+    visualsCompleted: boolean;
+    brandingCompleted: boolean;
+    interviewScheduledOrConfirmed: boolean;
+    highEffort: boolean;
+    calculatedAt: string | null;
+  } | null;
+  assets: Array<{
+    id: string;
+    purpose: string;
+    state: string;
+    rejection: string | null;
+    approved: boolean;
+    removed: boolean;
+    filename: string | null;
+    contentType: string;
+    byteSize: string | null;
+    width: number | null;
+    height: number | null;
+    storageKey: string;
+    createdBy: string;
+    createdAt: string;
+  }>;
+  socials: Array<{
+    id: string;
+    url: string;
+    accessible: boolean | null;
+    httpStatus: number | null;
+    rejection: string | null;
+    controlsConfirmedByFounder: boolean;
+    removed: boolean;
+    checkedAt: string | null;
+  }>;
+  interview: {
+    configuration: {
+      bookable: boolean;
+      missingSettings: string[];
+      providers: string[];
+      interviewers: string[];
+      availability: string | null;
+      reminderLeadHours: number | null;
+    };
+    booking: Record<string, unknown> | null;
+    history: Array<Record<string, unknown>>;
+  };
+  itemHistory: Array<{
+    id: string;
+    item: AdminOptionalItemKey;
+    event: string;
+    priorComplete: boolean | null;
+    newComplete: boolean | null;
+    reason: string | null;
+    customerExplanation: string | null;
+    actor: string;
+    occurredAt: string;
+  }>;
+}
+
+export interface AdminWorkspaceResponse {
+  workspace: AdminWorkspace | null;
+  whatHappened?: string;
+}
+
+const workspaceBase = (campaignId: string) =>
+  `/api/admin/campaigns/${encodeURIComponent(campaignId)}/workspace`;
+
+export const fetchAdminWorkspace = (campaignId: string): Promise<AdminWorkspaceResponse> =>
+  call(workspaceBase(campaignId));
+
+export const recheckWorkspace = (campaignId: string): Promise<AdminWorkspaceResponse> =>
+  call(`${workspaceBase(campaignId)}/recheck`, { method: 'POST', body: JSON.stringify({}) });
+
+export const invalidateOptionalItem = (
+  campaignId: string,
+  item: AdminOptionalItemKey,
+  body: { reason: string; explanation: string },
+): Promise<AdminWorkspaceResponse> =>
+  call(`${workspaceBase(campaignId)}/items/${item}/invalidate`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const reinstateOptionalItem = (
+  campaignId: string,
+  item: AdminOptionalItemKey,
+  reason: string,
+): Promise<AdminWorkspaceResponse> =>
+  call(`${workspaceBase(campaignId)}/items/${item}/reinstate`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+/** §12: an override requires reason, explanation, and the evidence it rests on. */
+export const overrideOptionalItem = (
+  campaignId: string,
+  item: AdminOptionalItemKey,
+  body: { complete: boolean; reason: string; explanation: string; evidence: string },
+): Promise<AdminWorkspaceResponse> =>
+  call(`${workspaceBase(campaignId)}/items/${item}/override`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

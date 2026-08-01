@@ -54,7 +54,7 @@ import {
 import { describeSaveState } from '../../lib/autosave.js';
 import { supportMailto } from '../../features/public/states.js';
 import { LinkUnavailable } from '../LinkUnavailable.js';
-import { useAutosave } from '../draft/useAutosave.js';
+import { useAutosave } from '../../lib/useAutosave.js';
 import {
   fetchInvitation,
   saveInvitation,

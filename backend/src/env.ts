@@ -55,6 +55,25 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
 
+  // ── Object storage (tech-stack §9, Spec §12) ─────────────────────────────
+  // Cloudflare R2. Optional to boot for the same reason Resend is: the app has
+  // to start before an Admin can see in the §6 prerequisites panel that it is
+  // missing. Absent, `unconfiguredStorage` refuses every upload loudly and the
+  // workspace says uploads are unavailable rather than pretending (§1.4).
+  //
+  // All four or none — a half-configured bucket fails at the first presign, in
+  // production, on a Founder mid-upload, which is the same failure shape
+  // `checkGoogleOAuth` exists to prevent.
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
+  // tech-stack §9: "W-9s and dispute packets are sensitive. Keep them in a
+  // separate bucket or prefix with its own lifecycle policy." Nothing in this
+  // phase writes to it; it is declared here so the separation is configured
+  // before the phase that needs it, not during it.
+  R2_BUCKET_SENSITIVE: z.string().optional(),
+
   // ── Jobs ─────────────────────────────────────────────────────────────────
   // Must be present and ≥32 chars. Protects close-batch and cron endpoints.
   CRON_SECRET: z.string().min(32, 'CRON_SECRET must be at least 32 characters'),
@@ -125,6 +144,36 @@ function checkGoogleOAuth(data: Env): void {
 }
 
 /**
+ * Object storage is configured or it is not (tech-stack §9).
+ *
+ * Three of the four values will presign a URL that R2 rejects, and the rejection
+ * arrives at the browser as an opaque failure mid-upload. Fail at boot instead,
+ * for the same reason `checkGoogleOAuth` does.
+ */
+function checkObjectStorage(data: Env): void {
+  const parts = [
+    data.R2_ACCOUNT_ID,
+    data.R2_ACCESS_KEY_ID,
+    data.R2_SECRET_ACCESS_KEY,
+    data.R2_BUCKET,
+  ];
+  const present = parts.filter(Boolean).length;
+  if (present !== 0 && present !== parts.length) {
+    throw new Error(
+      'Object storage is half-configured: set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, ' +
+        'R2_SECRET_ACCESS_KEY, and R2_BUCKET, or none of them.',
+    );
+  }
+}
+
+/** True only when all four R2 values are present. Read by `createApp`. */
+export function objectStorageConfigured(env: Env): boolean {
+  return Boolean(
+    env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET,
+  );
+}
+
+/**
  * The environment facts the §6 prerequisites panel reads.
  *
  * Derived from the same predicates `checkStripeMode` enforces, so the panel
@@ -167,6 +216,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
   }
   checkStripeMode(result.data);
   checkGoogleOAuth(result.data);
+  checkObjectStorage(result.data);
   return result.data;
 }
 

@@ -13,6 +13,9 @@ import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.j
 import { createDraftRouter } from './routes/draft.js';
 import { createVettingRouter } from './routes/vetting.js';
 import { createCreatorRouter } from './routes/creator.js';
+import { createFounderRouter } from './routes/founder.js';
+import { createAdminWorkspaceRouter } from './routes/admin-workspace.js';
+import { unconfiguredStorage, type ObjectStorage } from './storage/object-storage.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
@@ -46,6 +49,13 @@ export interface AppConfig {
    * invitation as sent when nothing left the building (§1.4).
    */
   emailTransport?: EmailTransport;
+  /**
+   * §12 uploads (tech-stack §9). Defaults to the port that refuses loudly, for
+   * the same reason `emailTransport` does: R2 is Track A4 and is not
+   * provisioned, and a no-op would let a Founder see "visual uploaded" while no
+   * bucket exists — earning a US$2 discount for a file that is not there (§1.4).
+   */
+  objectStorage?: ObjectStorage;
   /** §7 / §27.8 addresses and origins the invitation is built from. */
   invitationContext: InvitationContext;
   /**
@@ -208,6 +218,21 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator: their campaigns and
   // the preparing Campaign kit, every read of it logged and revocable.
   app.use(createCreatorRouter(db, auth));
+  // Phase 09a (§12, §33.3.1–4). The signed-in Founder's campaign workspace: the
+  // five optional items, the evidence that completes them, the interview
+  // booking, and the itemised listing fee. First session-bearing Founder
+  // routes; every one re-derives the campaign from the caller's own claim.
+  app.use(
+    createFounderRouter({
+      db,
+      auth,
+      storage: config.objectStorage ?? unconfiguredStorage,
+    }),
+  );
+  // Phase 09a (§12 Admin, §25.6). Every item, its evidence, the discount line,
+  // the high-effort inputs, the fee, interview state, invalidation history, and
+  // the recorded override.
+  app.use(createAdminWorkspaceRouter({ db, auth }));
 
   // ── SPA fallback ──────────────────────────────────────────────────────────
   // /api/* routes go above. Everything else returns index.html so the SPA

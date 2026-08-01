@@ -23,16 +23,21 @@
  * the value and refused it — and retrying it would loop forever under a status
  * line promising progress. `isRetryable` draws that line once, for every
  * surface.
+ *
+ * ── Why it lives in `lib` ───────────────────────────────────────────────────
+ * Phase 07 moved the three status phrases here for exactly this reason and the
+ * hook stayed behind in `surfaces/draft`. By Phase 09 four surfaces autosave —
+ * the vetting flow, the account claim, the Creator's signup, and the campaign
+ * workspace — and three of them were reaching into a fourth's folder to do it.
+ * The hook is shared vocabulary, not one surface's implementation detail.
+ *
+ * It takes the *class* rather than one surface's re-export because every client
+ * throws the same error type under a different name.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  isRetryable,
-  retryDelayMs,
-  MAX_SAVE_ATTEMPTS,
-  type SaveState,
-} from '../../lib/autosave.js';
-import { DraftRequestError } from './api.js';
+import { isRetryable, retryDelayMs, MAX_SAVE_ATTEMPTS, type SaveState } from './autosave.js';
+import { AdminRequestError as RequestError } from '../features/admin/api.js';
 
 /** How long typing settles before a save goes out. */
 const DEBOUNCE_MS = 700;
@@ -82,7 +87,7 @@ export function useAutosave<Patch extends object>(
     } catch (error) {
       inFlight.current = false;
       const detail =
-        error instanceof DraftRequestError
+        error instanceof RequestError
           ? error.detail
           : { status: 0, title: 'Proovd could not be reached', whatHappened: undefined, next: undefined };
 

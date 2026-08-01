@@ -50,7 +50,7 @@ import {
 import { describeSaveState } from '../../lib/autosave.js';
 import { supportMailto } from '../../features/public/states.js';
 import { LinkUnavailable } from '../LinkUnavailable.js';
-import { useAutosave } from './useAutosave.js';
+import { useAutosave } from '../../lib/useAutosave.js';
 import {
   fetchVetting,
   saveVetting,

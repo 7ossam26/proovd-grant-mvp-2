@@ -1463,6 +1463,148 @@ main:focus { outline: none; }          /* programmatic focus target, not a contr
 }
 
 
+/* ════════════════════════════════════ PHASE 09 — the Founder campaign
+   workspace: five optional items, their evidence, and the itemised listing
+   fee. Spec §12, §24.6; DNA §5.9 (one thing per screen), §5.10 (no
+   manufactured urgency), §5.14 (Glance → Act → Explore).
+
+   A Founder surface, so PHASE 06's density does not apply — §26 licenses that
+   in Admin and nowhere else. The Flow primitive owns the sequencing; these
+   rules only dress what sits inside one step and the secondary summary beside
+   it. Mode slots and tokens only, px for borders, radii, and the 44px touch
+   minimum. */
+
+.workspace__head {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: var(--sp-12) var(--sp-24);
+  margin-bottom: var(--sp-24);
+}
+.autosave-status {
+  margin: 0; color: var(--grey); font-weight: 700; font-size: 0.9375rem;
+  /* Reserved, like the vetting flow's, so the step below never jumps under a
+     finger already moving toward Continue. */
+  min-height: 1.5rem; min-width: 11ch;
+}
+
+/* One step. Everything in it is the one decision plus what explains it. */
+.step { display: grid; gap: var(--sp-24); }
+.step > .lede { margin: 0; max-width: var(--measure); }
+
+/* Whether an item counts, and why not. Quiet — it is a status, not an alarm;
+   the palette has no error hue and §12's criteria are neutral by instruction. */
+.item-status { display: grid; gap: var(--sp-8); }
+.item-status__reasons {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--sp-4);
+  color: var(--grey); max-width: var(--measure);
+}
+.item-status--done { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8); }
+
+/* Uploaded files and social profiles. One row per thing, reflowing to a stack
+   at the narrowest width so nothing is clipped and every control keeps its
+   44px target. */
+.asset-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-12); }
+.asset-row {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--sp-8) var(--sp-16);
+  padding-bottom: var(--sp-12);
+  border-bottom: var(--bw) solid var(--grey-light);
+}
+.asset-row__name { font-weight: 900; color: var(--mode-title); overflow-wrap: anywhere; }
+.asset-row__note { color: var(--grey); }
+
+/* The file input is replaced by its own label, styled as a secondary button.
+   Kept in the accessibility tree and keyboard-reachable — `display: none` on the
+   input would take it out of both. */
+.upload { display: grid; gap: var(--sp-8); justify-items: start; }
+.upload__input {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.upload__label { cursor: pointer; }
+.upload__input:focus-visible + .upload__label {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+
+/* ---- The fee preview (§12, §24.6)
+   The base line, each earned saving on its own labeled line, and the subtotal.
+   No progress bar toward a discount and no countdown: DNA §5.10 and §30 forbid
+   manufactured urgency, and a saving that is always available needs none. */
+.fee-preview { margin: var(--sp-16) 0 0; display: grid; gap: var(--sp-8); }
+.fee-preview__row {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: var(--sp-8) var(--sp-24);
+}
+.fee-preview__row dt { color: var(--mode-body); }
+.fee-preview__row dd {
+  margin: 0; font-weight: 900; color: var(--mode-title);
+  font-variant-numeric: tabular-nums;
+}
+.fee-preview__row--saving dd { color: var(--moss); }
+.fee-preview__row--quiet dt,
+.fee-preview__row--quiet dd { color: var(--grey); font-weight: 400; }
+.fee-preview__row--total {
+  margin-top: var(--sp-8); padding-top: var(--sp-12);
+  border-top: var(--bw) solid var(--grey-light);
+}
+.fee-preview__row--total dt { font-weight: 900; color: var(--mode-title); }
+
+/* §24.6's separate-stream sentence. Set apart so the 5% is never read as part
+   of this total. */
+.fine--separated {
+  margin-top: var(--sp-16); padding-top: var(--sp-16);
+  border-top: var(--bw) solid var(--grey-light);
+}
+
+.workspace__secondary { display: grid; gap: var(--sp-24); margin-top: var(--sp-32); }
+
+/* ---- §12's helper resources. Static guidance, staged behind one gesture. */
+.helper { display: grid; gap: var(--sp-16); }
+.helper__points, .helper__limits {
+  margin: 0; padding-left: var(--sp-24);
+  display: grid; gap: var(--sp-8); max-width: var(--measure);
+}
+.helper__limits { color: var(--grey); }
+.helper__prompt {
+  display: grid; gap: var(--sp-8); justify-items: start;
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light); border-radius: var(--radius);
+}
+.helper__prompt-title { margin: 0; font-weight: 900; color: var(--mode-title); }
+.helper__prompt-text {
+  margin: 0; color: var(--mode-body); max-width: var(--measure);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+/* ---- Admin's evidence view (§12, §26). Density lives here and nowhere else. */
+.admin-workspace { display: grid; gap: var(--sp-24); }
+.admin-workspace__head {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: var(--sp-12) var(--sp-24);
+}
+.admin-item__head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-8);
+  margin-bottom: var(--sp-12);
+}
+.admin-item__head .section-title { margin: 0; }
+.admin-item__reasons {
+  list-style: none; margin: 0 0 var(--sp-12); padding: 0;
+  display: grid; gap: var(--sp-4); color: var(--grey);
+}
+.admin-item__evidence > summary {
+  cursor: pointer; font-weight: 700; color: var(--mode-title);
+  min-height: var(--touch); display: flex; align-items: center;
+}
+.admin-item__evidence pre {
+  margin: 0; overflow-x: auto; color: var(--mode-body);
+  font-size: 0.875rem;
+}
+.admin-item__form { display: grid; gap: var(--sp-16); margin-top: var(--sp-16); }
+.admin-item__actions { display: flex; flex-wrap: wrap; gap: var(--sp-12); }
+.admin-history { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-8); }
+
+
 /* ─── FOCUS — declared after every stroke outline so the keyboard ring
    always wins on :focus-visible */
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }

@@ -93,6 +93,20 @@ async function main() {
     ? createResendTransport(env.RESEND_API_KEY)
     : unconfiguredTransport;
 
+  // §12 uploads (tech-stack §9). Same shape, same reasoning: R2 is Track A4 and
+  // an unconfigured deployment refuses uploads loudly rather than reporting a
+  // file as stored when no bucket exists.
+  const { createR2Storage, unconfiguredStorage } = await import('./storage/object-storage.js');
+  const { objectStorageConfigured } = await import('./env.js');
+  const objectStorage = objectStorageConfigured(env)
+    ? createR2Storage({
+        accountId: env.R2_ACCOUNT_ID!,
+        accessKeyId: env.R2_ACCESS_KEY_ID!,
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY!,
+        bucket: env.R2_BUCKET!,
+      })
+    : unconfiguredStorage;
+
   const publicDir = path.join(__dirname, '..', 'public');
   const { app, tokens } = createApp(db, {
     appBaseUrl: env.APP_BASE_URL,
@@ -102,6 +116,7 @@ async function main() {
     adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
     prerequisiteEnvironment: prerequisiteFacts(env),
     emailTransport,
+    objectStorage,
     invitationContext: {
       appBaseUrl: env.APP_BASE_URL,
       // §27.8's published address, and the one the footer already renders.

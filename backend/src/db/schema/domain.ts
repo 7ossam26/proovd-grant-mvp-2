@@ -21,6 +21,7 @@ import {
   pgEnum,
   uuid,
   bigint,
+  boolean,
   char,
   text,
   timestamp,
@@ -194,6 +195,21 @@ export const campaigns = pgTable(
 
     /* §21: the three anchors are DEDICATED columns, set by the event that
        defines them and never inferred from created_at/updated_at. */
+    /* ── §12's high-effort result, added Phase 09 (migration 0012) ──────────
+       §25.1 requires the campaign record to store "high-effort inputs/result".
+       The inputs and every past result live in `high_effort_classifications`,
+       which is append-only and is the explanation; this is the current answer,
+       so Phase 12's six-cell compensation matrix reads one column rather than a
+       correlated subquery.
+
+       It is NOT a lifecycle value. §23.1 is lifecycle only, and high-effort
+       controls one commercial thing — whether a Creator may bid above the base
+       percentage — which is exactly the kind of flag §23.1 keeps out of
+       `status`. Nullable because a campaign that has never been evaluated has
+       no classification, and `false` would claim one. */
+    highEffort: boolean('high_effort'),
+    highEffortCalculatedAt: timestamp('high_effort_calculated_at', { withTimezone: true }),
+
     listingPaidAt: timestamp('listing_paid_at', { withTimezone: true }),
     campaignLiveAt: timestamp('campaign_live_at', { withTimezone: true }),
     campaignCloseAt: timestamp('campaign_close_at', { withTimezone: true }),
