@@ -42,4 +42,8 @@ export * from './listing.js';
 // tracking link, the §14.3 Creator-specific bonus, and the §14.6 deadline
 // evaluation record.
 export * from './decisions.js';
+// Phase 12b: the §14.4 Founder-built campaign page, the §15 six-rule launch
+// readiness records, the Admin review rounds and grouped feedback, and the
+// general §15 materiality/reacceptance machine (reused in Phase 17).
+export * from './build.js';
 

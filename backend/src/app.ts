@@ -25,6 +25,11 @@ import { createAdminListingRouter } from './routes/admin-listing.js';
 import { createCreatorDecisionRouter } from './routes/creator-decisions.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
+import {
+  createFounderBuildRouter,
+  createCreatorReacceptanceRouter,
+} from './routes/founder-build.js';
+import { createAdminReviewRouter } from './routes/admin-review.js';
 import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
@@ -288,6 +293,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // the high-effort inputs, the fee, interview state, invalidation history, and
   // the recorded override.
   app.use(createAdminWorkspaceRouter({ db, auth }));
+  // Phase 12b (§14.4, §15). The Founder's parallel campaign build, the review
+  // submission gated on derived `review_ready`, the preview that collects no
+  // payment, and the Creator's materiality reacceptance; Admin's review,
+  // roster finalization, and the general materiality machine. No Stripe
+  // dependency, so mounted with the other session routes.
+  app.use(createFounderBuildRouter({ db, auth, audit }));
+  app.use(createCreatorReacceptanceRouter({ db, auth, audit }));
+  app.use(createAdminReviewRouter({ db, auth, audit }));
   // Phase 10a (§32.3, §28.3). Two Stripe endpoints with two signing secrets —
   // platform for Proovd's own listing money, Connect for the Founder's campaign
   // money (§24.1). Both mount raw-body parsing themselves, for the reason the

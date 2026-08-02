@@ -452,3 +452,151 @@ export const respondToProposal = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── Campaign building, preview, and review (§14.4, §15) — Phase 12b ─────────── */
+
+export interface BuildFields {
+  title: string | null;
+  founderDisplayName: string | null;
+  founderEntityDisplay: string | null;
+  founderCountry: string | null;
+  founderProfileUrl: string | null;
+  opensAt: string | null;
+  closesAt: string | null;
+  orderThreshold: number | null;
+  internalTargetCents: string | null;
+  brandPerception: string | null;
+  brandVoice: string | null;
+  requiredWording: string | null;
+  prohibitedClaims: string | null;
+  communityUrl: string | null;
+  heroPreference: string | null;
+  publicStory: string | null;
+  deliveryWindow: string | null;
+  earlyProductDisclaimer: string | null;
+  risksAndChallenges: string | null;
+  refundPolicyText: string | null;
+  refundPolicyTitle: string | null;
+  refundPolicySourceUrl: string | null;
+  refundPolicyVersion: string | null;
+  refundPolicyEffectiveDate: string | null;
+}
+
+export interface RewardPackageView {
+  id: string;
+  sku: string;
+  title: string;
+  priceCents: string;
+  contents: string;
+  fulfillmentCommitment: string;
+  delivery: string;
+  limitedQuantity: number | null;
+  sortOrder: number;
+}
+
+export interface ReviewReadiness {
+  rosterStatus: string;
+  buildStatus: string;
+  reviewReady: boolean;
+}
+
+export interface BuildState {
+  build: BuildFields | null;
+  rewardPackages: RewardPackageView[];
+  faqs: Array<{ id: string; question: string; answer: string }>;
+  buildStatus: string;
+  missing: string[];
+  campaignStatus: string;
+  reviewReadiness: ReviewReadiness;
+}
+
+export const fetchBuild = (campaignId: string): Promise<BuildState> =>
+  call(`${base(campaignId)}/build`);
+
+export const saveBuild = (
+  campaignId: string,
+  patch: Partial<BuildFields>,
+): Promise<{ buildStatus: string; missing: string[]; build: BuildFields | null }> =>
+  call(`${base(campaignId)}/build`, { method: 'PATCH', body: JSON.stringify(patch) });
+
+export const saveRewardPackage = (
+  campaignId: string,
+  reward: {
+    packageId?: string;
+    sku: string;
+    title: string;
+    priceCents: string;
+    contents: string;
+    fulfillmentCommitment: string;
+    delivery: string;
+    limitedQuantity?: number | null;
+  },
+): Promise<{ package: RewardPackageView }> =>
+  call(`${base(campaignId)}/build/rewards`, { method: 'PUT', body: JSON.stringify(reward) });
+
+export const submitForReview = (
+  campaignId: string,
+): Promise<{ review: { id: string; round: number; status: string } }> =>
+  call(`${base(campaignId)}/submit`, { method: 'POST' });
+
+export interface CampaignPreview {
+  model: 'idea' | 'product';
+  title: string;
+  tagline: string;
+  founder: { legalName: string; entity: string; country: string; profile: string };
+  opensAt: string | null;
+  closesAt: string | null;
+  rewards: Array<{
+    sku: string;
+    title: string;
+    priceCents: string;
+    contents: string[];
+    delivery: string;
+    fulfillment: string;
+    limitedQuantity: number | null;
+  }>;
+  featuredRewardSku: string | null;
+  example: { rewardSubtotalCents: string; salesTaxCents: string; totalCents: string } | null;
+  orderThreshold: number | null;
+  internalTargetCents: string | null;
+  statementDescriptor: string;
+  story: string | null;
+  faq: Array<{ question: string; answer: string }>;
+  founderRefundPolicy: {
+    title: string | null;
+    version: string | null;
+    effectiveDate: string | null;
+    sourceUrl: string | null;
+    text: string | null;
+  } | null;
+  earlyProductDisclaimer: string | null;
+  risksAndChallenges: string | null;
+  isPreview: true;
+}
+
+export const fetchPreview = (campaignId: string): Promise<{ preview: CampaignPreview | null }> =>
+  call(`${base(campaignId)}/preview`);
+
+export interface ReviewFeedback {
+  area: string;
+  body: string;
+  deepLink: string;
+  owner: string;
+  dueExpectation: string | null;
+  enforcementInvolved: boolean;
+}
+
+export interface LatestReview {
+  round: number;
+  outcome: string;
+  reviewer: string | null;
+  nextUpdateExpectation: string | null;
+  submittedAt: string;
+  decidedAt: string | null;
+  required: ReviewFeedback[];
+  optional: ReviewFeedback[];
+}
+
+export const fetchLatestReview = (
+  campaignId: string,
+): Promise<{ review: LatestReview | null }> => call(`${base(campaignId)}/review`);

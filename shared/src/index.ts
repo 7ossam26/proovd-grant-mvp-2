@@ -10,3 +10,4 @@ export * from './vetting/index.js';
 export * from './affiliates/index.js';
 export * from './workspace/index.js';
 export * from './checkout/index.js';
+export * from './campaign/index.js';

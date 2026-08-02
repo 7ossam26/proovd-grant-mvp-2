@@ -20,6 +20,8 @@ import { CampaignCreators } from './features/admin/CampaignCreators.js';
 import { CampaignWorkspacePanel } from './features/admin/CampaignWorkspace.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
+import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
+import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -188,6 +190,18 @@ const rootChildren: RouteObject[] = [
     // Beside the workspace, outside both shells, for the same reasons.
     path: 'campaigns/:campaignId/roster',
     element: <FounderRoster />,
+  },
+  {
+    // Phase 12b (§14.4, §15). The Founder's parallel campaign build and the
+    // review submission. Its own address beside the workspace and roster.
+    path: 'campaigns/:campaignId/build',
+    element: <CampaignBuild />,
+  },
+  {
+    // Phase 12b (§15). The Founder preview — the public campaign as a Backer
+    // will see it, collecting no payment information.
+    path: 'campaigns/:campaignId/preview',
+    element: <CampaignPreview />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

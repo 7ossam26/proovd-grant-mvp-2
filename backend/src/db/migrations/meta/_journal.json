@@ -127,6 +127,13 @@
       "when": 1785535200000,
       "tag": "0017_affiliate_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785538800000,
+      "tag": "0018_campaign_build_and_review",
+      "breakpoints": true
     }
   ]
 }
