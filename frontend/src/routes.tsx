@@ -11,6 +11,7 @@ import { Safety } from './features/public/Safety.js';
 import { PolicyPage } from './features/public/PolicyPage.js';
 import { NotFoundSurface, PageLoading } from './features/public/states.js';
 import { CampaignPage } from './features/public/campaign/CampaignPage.js';
+import { LiveCampaignPage } from './features/public/campaign/LiveCampaignPage.js';
 import { AdminLayout } from './features/admin/AdminLayout.js';
 import { SettingsPage } from './features/admin/SettingsPage.js';
 import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
@@ -91,6 +92,14 @@ const rootChildren: RouteObject[] = [
       {
         path: 'campaign/sample-pre-launch',
         element: <CampaignPage campaign={SAMPLE_PRODUCT_CAMPAIGN} />,
+      },
+      // Phase 14b (§18, §33.6). Approved live campaigns, by id. The two static
+      // sample paths above take precedence over this dynamic one, so
+      // `/campaign/sample-pre-build` still renders the sample. A `/c/:code`
+      // tracking-link click redirects here after setting the attribution cookie.
+      {
+        path: 'campaign/:campaignId',
+        element: <LiveCampaignPage />,
       },
       { path: '*', element: <NotFoundSurface /> },
     ],

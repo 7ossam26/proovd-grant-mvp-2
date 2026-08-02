@@ -156,6 +156,12 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.3',
     description: 'Campaign live',
   },
+  founder_campaign_discovery_opened: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description:
+      '§18 Day 8 discovery opened — the one factual notice on browse/index eligibility and how organic, house, and Creator attribution differ',
+  },
   founder_idea_threshold_reached: {
     audience: 'founder',
     specRef: '§27.3',

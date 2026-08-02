@@ -214,6 +214,15 @@ export const campaigns = pgTable(
     campaignLiveAt: timestamp('campaign_live_at', { withTimezone: true }),
     campaignCloseAt: timestamp('campaign_close_at', { withTimezone: true }),
 
+    /* ── §18's Day 8 browse/index switch, added Phase 14b (migration 0021) ────
+       §18: "Beginning Day 8 the campaign may enter Proovd browse/indexable
+       discovery." NULL through Days 1–7 (known-link-only); the discovery sweep
+       stamps it seven days after `campaign_live_at` and sends the Founder one
+       factual notice. It is a one-time fact — a trigger refuses to move it, and
+       the switch never rewrites existing attribution (§33.6.5). Not inferred
+       from an anchor: it IS the anchor for "is this campaign discoverable yet". */
+    discoveryOpenedAt: timestamp('discovery_opened_at', { withTimezone: true }),
+
     /* Ledger — campaign-level aggregates of the §24.3 waterfall, integer
        cents in bigint (tech-stack §4.1). Populated by capture/reconciliation
        phases; skeleton starts at 0. */

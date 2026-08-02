@@ -54,4 +54,7 @@ export * from './creator-payment.js';
 // §29.6's required-Creator-failure with its non-resettable three-business-day
 // replacement deadline.
 export * from './launch.js';
+// Phase 14b: the §18 attribution click ledger — every arrival through a
+// Creator's tracking link, valid or ignored, with the reason it earned nothing.
+export * from './attribution.js';
 

@@ -41,6 +41,7 @@ import {
 import { sweepScheduledLaunches } from '../launch/launch.js';
 import { sweepCreatorReplacementDeadlines } from '../launch/creator-failure.js';
 import { notifyCampaignLive, type LaunchNotificationContext } from '../launch/notifications.js';
+import { sweepDiscovery } from '../campaign/discovery.js';
 import { notifyListingRefund } from '../payments/listing-notifications.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
@@ -100,6 +101,14 @@ export const CAMPAIGN_LAUNCH_JOB = 'campaign-launch';
 export const CREATOR_REPLACEMENT_JOB = 'creator-replacement-deadline';
 
 /**
+ * Phase 14b's §18 discovery sweep. Opens Day 8 browse/index eligibility for
+ * every live campaign whose seventh day has passed, and sends each Founder the
+ * one factual notice. Safe to run twice: the open is a conditional UPDATE and
+ * the notice dedups on the campaign.
+ */
+export const CAMPAIGN_DISCOVERY_JOB = 'campaign-discovery';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -141,6 +150,8 @@ export interface Scheduler {
   runListingDeadlinesNow: () => Promise<void>;
   /** Runs the §17 launch sweep and §29.6 replacement sweep now. */
   runLaunchJobsNow: () => Promise<void>;
+  /** Runs the §18 Day 8 discovery sweep now. Used by tests and by Admin. */
+  runDiscoveryNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -293,6 +304,24 @@ export async function startScheduler({
   });
   await boss.schedule(CREATOR_REPLACEMENT_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });
 
+  /* ── Phase 14b's §18 discovery sweep ───────────────────────────────────── */
+
+  await boss.createQueue(CAMPAIGN_DISCOVERY_JOB);
+  await boss.work(CAMPAIGN_DISCOVERY_JOB, async () => {
+    // The §18 notice reuses the launch notifier/context; without it the switch
+    // still opens (the page stops being noindex) and sends no email.
+    const { opened } = await sweepDiscovery(
+      db,
+      {
+        audit,
+        ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
+      },
+      new Date(),
+    );
+    log('discovery sweep complete', { opened: opened.length });
+  });
+  await boss.schedule(CAMPAIGN_DISCOVERY_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -308,6 +337,9 @@ export async function startScheduler({
     runLaunchJobsNow: async () => {
       await boss.send(CAMPAIGN_LAUNCH_JOB, {});
       await boss.send(CREATOR_REPLACEMENT_JOB, {});
+    },
+    runDiscoveryNow: async () => {
+      await boss.send(CAMPAIGN_DISCOVERY_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

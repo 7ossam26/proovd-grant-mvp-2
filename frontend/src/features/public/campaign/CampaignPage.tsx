@@ -19,7 +19,7 @@
  */
 
 import { Link as RouterLink } from 'react-router';
-import { formatUsd } from '@proovd/shared';
+import { formatUsd, attributionMayEarn } from '@proovd/shared';
 import {
   Accordion,
   Button,
@@ -41,7 +41,12 @@ import {
   consentPreview,
   expandedMorBlock,
 } from './consent.js';
-import { findReward, type CampaignView } from './types.js';
+import {
+  findReward,
+  type CampaignView,
+  type EndedKind,
+  type AttributionBanner as AttributionBannerModel,
+} from './types.js';
 
 const MODEL_LABEL: Record<CampaignView['model'], string> = {
   idea: 'Idea Campaign',
@@ -63,6 +68,124 @@ function SampleBanner() {
     <div className="sample-banner" role="note">
       <span className="sample-banner__text">{SAMPLE_BANNER}</span>
     </div>
+  );
+}
+
+/**
+ * §18: "Creator-link arrival shows `You came through [handle]` and explains that
+ * the Creator may earn if the later charge succeeds." The earn line shows only
+ * while the attribution can still finalize (provisional/verified) — never for a
+ * paused link, which would promise an earning that cannot happen.
+ */
+function AttributionArrival({ attribution }: { attribution: AttributionBannerModel }) {
+  const handle = attribution.handle ?? 'a Creator';
+  return (
+    <div className="attribution-arrival" role="note">
+      <p className="attribution-arrival__lead">
+        You came through <strong>{handle}</strong>.
+      </p>
+      <p className="attribution-arrival__note">
+        {attributionMayEarn(attribution.status)
+          ? `If you place a pre-order on this browser and your card is later charged, ${handle} may earn a commission — at no extra cost to you. This works on this browser only.`
+          : `${handle}'s link is not currently earning on this campaign. Your pre-order and price are unaffected.`}
+      </p>
+    </div>
+  );
+}
+
+interface EndedCopy {
+  title: string;
+  why: string;
+  charge: string;
+  next: string;
+}
+
+/** §18's outcome-specific ended copy. Never one generic "Campaign ended". */
+function endedCopy(kind: EndedKind, campaign: CampaignView): EndedCopy {
+  const closed = `Pre-orders closed on ${formatUtcInstant(campaign.closesAt)}.`;
+  switch (kind) {
+    case 'closed':
+      return {
+        title: 'This campaign has closed',
+        why: closed,
+        charge:
+          'If you placed a pre-order, your saved card was charged the exact total you authorized. ' +
+          'Open your backer page — the magic link is in your confirmation email — to see your charge and receipt. ' +
+          'If you never pre-ordered, nothing was charged.',
+        next: 'The Founder now fulfills the rewards on the delivery dates shown above.',
+      };
+    case 'no_charge':
+      return {
+        title: 'This campaign closed without any charge',
+        why:
+          campaign.model === 'idea'
+            ? 'This Idea Campaign did not reach its order threshold by the close date.'
+            : 'This campaign was ended before any charge was created.',
+        charge:
+          'No card was charged — not yours, not anyone’s. Any saved card has lost future-charge eligibility for this campaign.',
+        next: 'Nothing further happens, and you were not billed.',
+      };
+    case 'suspended':
+      return {
+        title: 'This campaign is on hold',
+        why: 'Proovd has paused this campaign while it reviews it. Pre-orders and new comments are closed for now.',
+        charge:
+          'Whether a charge has occurred depends on where the campaign was in its cycle. ' +
+          'Open your backer page, or contact support, to see your exact status.',
+        next: 'Proovd will update Backers as the review concludes.',
+      };
+    case 'killed':
+      return {
+        title: 'This campaign has been stopped',
+        why: 'This campaign was stopped and is no longer running.',
+        charge:
+          'If you were charged, refund handling follows Proovd’s Refund Policy and the recovery path for a stopped campaign. ' +
+          'Open your backer page or contact support to see your exact status.',
+        next: 'Proovd is handling any charged pre-orders under the recovery path.',
+      };
+  }
+}
+
+/**
+ * §18's ended-state contract: the page stays accessible, new pre-orders and
+ * comments are disabled, and the copy states why it ended, whether the viewer
+ * was charged, what happens next, and where existing Backers get help. The
+ * viewer's own charge status lives on their magic-link backer page (they have no
+ * session here), so this states it conditionally and points them there.
+ */
+function EndedBanner({ kind, campaign }: { kind: EndedKind; campaign: CampaignView }) {
+  const copy = endedCopy(kind, campaign);
+  return (
+    <Mode kind="dark">
+      <Section aria-labelledby="campaign-ended">
+        <Measure>
+          <Tag variant="live">Ended</Tag>
+          <h2 className="h2" id="campaign-ended">
+            {copy.title}
+          </h2>
+          <dl className="ended-banner">
+            <div className="ended-banner__row">
+              <dt>Why it ended</dt>
+              <dd>{copy.why}</dd>
+            </div>
+            <div className="ended-banner__row">
+              <dt>Were you charged?</dt>
+              <dd>{copy.charge}</dd>
+            </div>
+            <div className="ended-banner__row">
+              <dt>What happens next</dt>
+              <dd>{copy.next}</dd>
+            </div>
+          </dl>
+          <p>
+            Need help with an existing pre-order? Email{' '}
+            <a href={supportMailto(`Ended campaign — ${campaign.title}`)}>{SUPPORT_EMAIL}</a>, or
+            open your backer page from the magic link in your confirmation email. See also the{' '}
+            <RouterLink to="/refunds">Refund Policy</RouterLink>.
+          </p>
+        </Measure>
+      </Section>
+    </Mode>
   );
 }
 
@@ -108,13 +231,93 @@ function ConsentPreviewBlock({ campaign }: { campaign: CampaignView }) {
   );
 }
 
+/** The note beside the pre-order action — honest about what this page does (§1.4). */
+function preorderNote(campaign: CampaignView, ended: EndedKind | null): React.ReactNode {
+  if (ended) {
+    return (
+      <>
+        <strong>Pre-orders for this campaign are closed.</strong> See the notice above for what
+        this means for you. No card field is shown and no payment is collected here.
+      </>
+    );
+  }
+  if (campaign.isSample) {
+    return (
+      <>
+        <strong>This is a sample campaign, so there is nothing to reserve.</strong> No card field is
+        shown on this page and none is loaded behind it — no payment information of any kind is
+        collected here.
+      </>
+    );
+  }
+  // A real, live campaign. The pre-order checkout is a separate guided step
+  // (Phase 15); until then, say plainly that nothing is collected here.
+  return (
+    <>
+      Pre-ordering happens through a secure Stripe checkout as a separate, guided step. No card
+      field is shown on this page and no payment information is collected here.
+    </>
+  );
+}
+
+/**
+ * Item 9's consent. A sample reproduces the full A.3/A.4 consent with its
+ * figures (§34's proof that no card is charged today); a real campaign shows the
+ * full consent at checkout with a real tax total, so here it states that the
+ * consent — amounts, charge rule, merchant of record — is read before any card
+ * is entered, and shows no example amount that a Backer might mistake for theirs.
+ */
+function PreorderConsent({ campaign, ended }: { campaign: CampaignView; ended: EndedKind | null }) {
+  if (campaign.isSample) {
+    const consent = consentPreview(campaign);
+    return (
+      <>
+        <h3>What you would agree to</h3>
+        <p>
+          This is the consent text a Backer reads on a real {MODEL_LABEL[campaign.model]},
+          reproduced in full with this sample&rsquo;s figures. The amounts below are sample data.
+        </p>
+        {/* Open by default. DNA §5.12 stages dense text one gesture below, but
+            §34's condition is that the samples *prove* no-charge-today consent —
+            a proof nobody has to click for. */}
+        <Accordion
+          defaultValue="consent"
+          items={[
+            {
+              value: 'consent',
+              head: `The ${MODEL_LABEL[campaign.model]} consent, in full`,
+              body: <ConsentPreviewBlock campaign={campaign} />,
+            },
+          ]}
+        />
+        <p className="consent__appendix">
+          Reproduced from Proovd&rsquo;s canonical consent text (Appendix {consent.appendix}).
+        </p>
+      </>
+    );
+  }
+  if (ended) return null;
+  return (
+    <p>
+      Before any card is entered, you read and authorize the full pre-order consent — the exact
+      reward subtotal, the sales tax for your billing address, the total you authorize, the charge
+      rule, and the merchant of record — at checkout. Nothing on this page is a charge.
+    </p>
+  );
+}
+
 export function CampaignPage({ campaign }: { campaign: CampaignView }) {
   const featured = findReward(campaign, campaign.featuredRewardSku);
-  const consent = consentPreview(campaign);
+  const ended = campaign.ended ?? null;
 
   return (
     <>
+      {/* §18 discovery: Days 1–7 are excluded from indexing. React 19 hoists this. */}
+      {campaign.indexable === false ? <meta name="robots" content="noindex, nofollow" /> : null}
+
       {campaign.isSample ? <SampleBanner /> : null}
+      {ended ? <EndedBanner kind={ended} campaign={campaign} /> : null}
+      {campaign.attribution ? <AttributionArrival attribution={campaign.attribution} /> : null}
 
       {/* 1. Campaign title */}
       <Section breathe>
@@ -272,17 +475,21 @@ export function CampaignPage({ campaign }: { campaign: CampaignView }) {
                 active pre-order at the close date. A cancelled pre-order does
                 not count.
               </p>
-              <Progress
-                label="Progress toward the order threshold"
-                value={(campaign.thresholdProgress ?? 0) / campaign.orderThreshold}
-                valueText={`${campaign.thresholdProgress ?? 0} of ${
-                  campaign.orderThreshold
-                } unique Backers`}
-              />
-              <p>
-                {campaign.thresholdProgress ?? 0} of {campaign.orderThreshold}{' '}
-                unique Backers — sample data.
-              </p>
+              {campaign.thresholdProgress !== null ? (
+                <>
+                  <Progress
+                    label="Progress toward the order threshold"
+                    value={campaign.thresholdProgress / campaign.orderThreshold}
+                    valueText={`${campaign.thresholdProgress} of ${campaign.orderThreshold} unique Backers`}
+                  />
+                  <p>
+                    {campaign.thresholdProgress} of {campaign.orderThreshold} unique Backers —{' '}
+                    {campaign.isSample ? 'sample data' : 'so far'}.
+                  </p>
+                </>
+              ) : (
+                <p>Progress toward the threshold appears here as pre-orders come in.</p>
+              )}
             </Measure>
           </Section>
         </Mode>
@@ -373,39 +580,11 @@ export function CampaignPage({ campaign }: { campaign: CampaignView }) {
             you authorize anything.
           </p>
           <Button tier="primary" disabled aria-describedby="campaign-preorder-note">
-            Reserve a pre-order
+            {ended ? 'Pre-orders are closed' : 'Reserve a pre-order'}
           </Button>
-          <p id="campaign-preorder-note">
-            <strong>
-              This is a sample campaign, so there is nothing to reserve.
-            </strong>{' '}
-            No card field is shown on this page and none is loaded behind it — no
-            payment information of any kind is collected here.
-          </p>
+          <p id="campaign-preorder-note">{preorderNote(campaign, ended)}</p>
 
-          <h3>What you would agree to</h3>
-          <p>
-            This is the consent text a Backer reads on a real{' '}
-            {MODEL_LABEL[campaign.model]}, reproduced in full with this
-            sample&rsquo;s figures. The amounts below are sample data.
-          </p>
-          {/* Open by default. DNA §5.12 stages dense text one gesture below,
-              but §34's condition is that the samples *prove* no-charge-today
-              consent — a proof nobody has to click for. */}
-          <Accordion
-            defaultValue="consent"
-            items={[
-              {
-                value: 'consent',
-                head: `The ${MODEL_LABEL[campaign.model]} consent, in full`,
-                body: <ConsentPreviewBlock campaign={campaign} />,
-              },
-            ]}
-          />
-          <p className="consent__appendix">
-            Reproduced from Proovd&rsquo;s canonical consent text (Appendix{' '}
-            {consent.appendix}).
-          </p>
+          <PreorderConsent campaign={campaign} ended={ended} />
         </Measure>
       </Section>
 
@@ -453,9 +632,13 @@ export function CampaignPage({ campaign }: { campaign: CampaignView }) {
           </h2>
           <EmptyPanel
             state="No updates have been posted yet"
-            whatHappened="Updates appear here once the campaign is live. This sample has none."
-            next="On a real campaign, the Founder posts progress here and Backers are emailed. Material delivery changes show the previous and the revised commitment together."
-            reference={`${campaign.title} — sample campaign`}
+            whatHappened={
+              campaign.isSample
+                ? 'Updates appear here once the campaign is live. This sample has none.'
+                : "The Founder hasn't posted an update yet. When they do, it appears here and Backers are emailed."
+            }
+            next="The Founder posts progress here and Backers are emailed. Material delivery changes show the previous and the revised commitment together."
+            reference={campaign.isSample ? `${campaign.title} — sample campaign` : campaign.title}
             helpSubject="Question about a campaign update"
           />
         </Measure>
@@ -468,16 +651,23 @@ export function CampaignPage({ campaign }: { campaign: CampaignView }) {
             Comments
           </h2>
           <p>
-            On a real campaign, only a Backer signed in through the link in their
-            confirmation email can post, and comments show a Backer number or a
-            chosen display name — never an email address. New comments close when
-            the campaign does.
+            Only a Backer signed in through the link in their confirmation email can post, and
+            comments show a Backer number or a chosen display name — never an email address. New
+            comments close when the campaign does.
           </p>
           <EmptyPanel
-            state="No comments on this sample"
-            whatHappened="Nobody can post on a sample campaign, because a sample has no Backers."
-            next="Open a live campaign to see the real thread."
-            reference={`${campaign.title} — sample campaign`}
+            state={campaign.isSample ? 'No comments on this sample' : 'The comment thread is not open yet'}
+            whatHappened={
+              campaign.isSample
+                ? 'Nobody can post on a sample campaign, because a sample has no Backers.'
+                : 'Commenting opens for Backers of this campaign shortly. No comments have been posted yet.'
+            }
+            next={
+              campaign.isSample
+                ? 'Open a live campaign to see the real thread.'
+                : 'Backers can post from their backer page once commenting opens.'
+            }
+            reference={campaign.isSample ? `${campaign.title} — sample campaign` : campaign.title}
             helpSubject="Question about campaign comments"
           />
         </Measure>

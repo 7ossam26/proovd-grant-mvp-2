@@ -13,7 +13,22 @@
  * is a pre-order, never a reservation.
  */
 
+import type { AttributionStatus } from '@proovd/shared';
+
 export type CampaignModel = 'idea' | 'product';
+
+/**
+ * §18's ended-state kinds. A real campaign renders one when it is no longer
+ * open; a sample or preview never does. The page composes outcome-specific copy
+ * from the kind — §18 forbids one generic "Campaign ended" message.
+ */
+export type EndedKind = 'closed' | 'no_charge' | 'suspended' | 'killed';
+
+/** §18: "Creator-link arrival shows `You came through [handle]`." */
+export interface AttributionBanner {
+  handle: string | null;
+  status: AttributionStatus;
+}
 
 export interface RewardPackage {
   /** §18 item 3: title/SKU. */
@@ -108,6 +123,21 @@ export interface CampaignView {
 
   /** Renders the permanent Appendix A.6 banner and mounts no payment field. */
   isSample: boolean;
+
+  /* ── Real live campaigns only (Phase 14b). Absent on samples/preview ──────── */
+
+  /**
+   * §18's ended state, or null while the campaign is open. When set, the page
+   * disables the pre-order action and renders outcome-specific ended copy.
+   */
+  ended?: EndedKind | null;
+  /** §18's attribution banner, or null when no Creator link is attributed. */
+  attribution?: AttributionBanner | null;
+  /**
+   * §18 discovery: false renders the page `noindex` during Days 1–7. Absent on
+   * samples (which are never indexable anyway) and the preview.
+   */
+  indexable?: boolean;
 }
 
 export function findReward(campaign: CampaignView, sku: string): RewardPackage {

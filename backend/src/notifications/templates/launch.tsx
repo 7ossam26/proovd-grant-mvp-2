@@ -1,14 +1,17 @@
 /**
- * Launch and first-post verification emails — Spec §17, §27.2, §27.3, §27.4.
+ * Launch, first-post verification, and discovery emails — Spec §17, §18, §27.2,
+ * §27.3, §27.4.
  *
- * Five messages share one shell: at most one primary action (§27.2), a
+ * Six messages share one shell: at most one primary action (§27.2), a
  * plain-text part carrying the support route and the reference, and no
  * countdown pressure (§30) — any deadline is a stated time, once, labeled UTC.
  *
  * The first-post messages never imply money moved: §17/§33.4.7 make
  * verification a compliance gate, so `renderFirstPostPass` says earnings still
  * depend on captured, attributed charges and that nothing was released by the
- * verification itself.
+ * verification itself. The Phase 14b discovery notice (§18) is factual, not a
+ * nudge: it states what browse/index eligibility changed and how organic,
+ * house, and Creator attribution differ.
  */
 
 import {
@@ -284,6 +287,45 @@ export async function renderFirstPostReject(v: FirstPostRejectVariables) {
       },
     ],
     action: { label: 'Contact support', url: v.campaignUrl },
+    reference: v.reference,
+    supportEmail: v.supportEmail,
+  });
+}
+
+/* ── Discovery opened — Founder (§18, §27.3) ──────────────────────────────── */
+
+export interface CampaignDiscoveryOpenedVariables {
+  founderName: string | null;
+  productName: string | null;
+  campaignUrl: string;
+  reference: string;
+  supportEmail: string;
+}
+
+export async function renderCampaignDiscoveryOpened(v: CampaignDiscoveryOpenedVariables) {
+  const product = named(v.productName, '[PRODUCT NAME]');
+  return renderShell({
+    subject: `Your campaign can now be discovered — ${product}`,
+    preview: `${product} can now appear in Proovd browse and search.`,
+    heading: `${named(v.founderName, '[FOUNDER NAME]')}, ${product} can now be discovered.`,
+    sections: [
+      {
+        label: 'What changed',
+        lines: [
+          'For its first seven days your campaign was reachable only through links you and your Creators shared. From today it can appear in Proovd browse and be indexed by search engines.',
+          'Nothing about your pre-orders, your Creators, or their agreements changed. This does not rewrite any attribution already recorded.',
+        ],
+      },
+      {
+        label: 'How attribution works from here',
+        lines: [
+          'A pre-order that arrives through a Creator’s tracking link may earn that Creator a commission if the later charge succeeds.',
+          'A pre-order that arrives organically — from browse, search, or a direct visit — carries no Creator commission.',
+          'Proovd-house traffic is tracked separately from your Creators’ performance.',
+        ],
+      },
+    ],
+    action: { label: 'Open your campaign', url: v.campaignUrl },
     reference: v.reference,
     supportEmail: v.supportEmail,
   });

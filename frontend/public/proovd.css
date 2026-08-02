@@ -1664,3 +1664,35 @@ html.no-motion [data-splash] { display: none !important; }
   max-width: var(--measure);
   overflow-wrap: anywhere;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PHASE 14b — attribution arrival + ended state (§18), added 2026-08-02.
+
+   `.attribution-arrival` is §18's "You came through [handle]" note: a quiet
+   mint strip at the top of a live campaign, never a countdown or a pressure
+   device (§30). `.ended-banner` renders §18's outcome-specific ended state
+   inside a dark Mode, so it reads its colours from the mode slots.
+   ──────────────────────────────────────────────────────────────────────────── */
+.attribution-arrival {
+  max-width: var(--measure);
+  margin: var(--sp-16) auto 0;
+  padding: var(--sp-12) var(--sp-16);
+  background: var(--mint);
+  color: var(--dark);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--sp-4);
+}
+.attribution-arrival__lead { margin: 0; font-weight: 700; }
+.attribution-arrival__note { margin: 0; color: var(--moss); }
+
+.ended-banner {
+  display: grid;
+  gap: var(--sp-16);
+  margin: 0 0 var(--sp-16);
+  max-width: var(--measure);
+}
+.ended-banner__row { display: grid; gap: var(--sp-4); }
+.ended-banner__row dt { color: var(--grey); font-weight: 700; }
+.ended-banner__row dd { margin: 0; color: var(--mode-body); }

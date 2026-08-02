@@ -115,6 +115,15 @@ export const AFFILIATE_FIRST_POST_PASS = 'affiliate_first_post_pass' as const;
 export const AFFILIATE_FIRST_POST_CORRECTION = 'affiliate_first_post_correction' as const;
 export const AFFILIATE_FIRST_POST_REJECT = 'affiliate_first_post_reject' as const;
 
+/**
+ * Phase 14b's one, sent by `campaign/discovery.ts`.
+ *
+ * §18 — the single factual notice a Founder receives when the Day 8 browse/index
+ * switch opens, explaining what changed and how organic, house, and Creator
+ * attribution differ. Deduped on the campaign: the switch happens once.
+ */
+export const FOUNDER_CAMPAIGN_DISCOVERY_OPENED = 'founder_campaign_discovery_opened' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -142,6 +151,7 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   AFFILIATE_FIRST_POST_PASS,
   AFFILIATE_FIRST_POST_CORRECTION,
   AFFILIATE_FIRST_POST_REJECT,
+  FOUNDER_CAMPAIGN_DISCOVERY_OPENED,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

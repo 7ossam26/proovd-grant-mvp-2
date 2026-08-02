@@ -49,7 +49,7 @@ function utcMinute(instant: Date): string {
 
 /* ── Identity reads ───────────────────────────────────────────────────────── */
 
-async function loadFounder(
+export async function loadFounder(
   db: Database,
   campaignId: string,
 ): Promise<{ email: string | null; name: string | null; productName: string | null }> {

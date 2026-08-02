@@ -23,6 +23,8 @@ import { createPayoutRouter } from './routes/payouts.js';
 import { createFounderListingRouter } from './routes/founder-listing.js';
 import { createAdminListingRouter } from './routes/admin-listing.js';
 import { createCreatorDecisionRouter } from './routes/creator-decisions.js';
+import { createAttributionRouter } from './routes/attribution.js';
+import { createPublicCampaignRouter } from './routes/public-campaign.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
 import {
@@ -188,6 +190,17 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     }),
   );
   app.use(createHealthRouter(db));
+  // Phase 14b (§18, §33.6). Two public, session-less routes: `/c/:code` records
+  // a tracking-link click, sets the per-browser attribution cookie, and
+  // redirects to the live page; `/api/campaign/:id` returns the Backer-facing
+  // view and the attribution the cookie resolves to. Mounted early, before every
+  // guarded router and the SPA fallback, because a visitor arriving through a
+  // Creator's link carries no session — whoever clicks is a visitor, not an
+  // account. The `Secure` cookie attribute is set only on an https origin, so
+  // the loopback integration suite still receives the cookies it carries.
+  const cookiesSecure = config.appBaseUrl.startsWith('https://');
+  app.use(createAttributionRouter({ db, secret: config.authSecret, secure: cookiesSecure }));
+  app.use(createPublicCampaignRouter({ db, secret: config.authSecret }));
   // Phase 06 (§6, §26). The first product routes any guard is mounted on:
   // everything under /api/admin requires a session, the admin role, and a
   // registered TOTP factor, and every write additionally requires a recent
