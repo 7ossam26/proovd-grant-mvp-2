@@ -107,6 +107,21 @@ export interface ListingCheckoutSession {
   expiresAt: Date | null;
 }
 
+/**
+ * The Founder-funding Checkout for the optional fixed Creator payment (§16,
+ * §24.7). Collected on the platform account, exactly like the listing fee, but a
+ * distinct stream with descriptor `PROOVD CREATOR PAY` and NO tax line — §24.7
+ * excludes sales tax from it. The amount is the exact accepted allocation.
+ */
+export interface FundingCheckoutInput {
+  customerEmail?: string | undefined;
+  amountCents: bigint;
+  successUrl: string;
+  cancelUrl: string;
+  idempotencyKey: string;
+  metadata: Record<string, string>;
+}
+
 export interface RefundInput {
   paymentIntentId: string;
   /** Always the full Checkout total (§13). The caller states it explicitly. */
@@ -184,6 +199,14 @@ export interface StripeGateway {
    * ones the A.5 consent named.
    */
   createListingCheckoutSession(input: ListingCheckoutInput): Promise<ListingCheckoutSession>;
+
+  /**
+   * Stripe Checkout on the platform account for the fixed Creator payment
+   * (§16, §24.7). Descriptor `PROOVD CREATOR PAY`; one product line, no tax
+   * line. Never a Connect charge — the Transfer to the Creator's recipient
+   * account is Phase 19.
+   */
+  createFundingCheckoutSession(input: FundingCheckoutInput): Promise<ListingCheckoutSession>;
 
   /** Reads a session back — Admin reconciliation for a missed delivery. */
   retrieveCheckoutSession(sessionId: string): Promise<Record<string, unknown> | null>;
@@ -290,6 +313,42 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
           ],
           payment_intent_data: {
             statement_descriptor: 'PROOVD LISTING',
+            metadata: input.metadata,
+          },
+          metadata: input.metadata,
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+        },
+        { idempotencyKey: input.idempotencyKey },
+      );
+      return {
+        id: session.id,
+        url: session.url ?? '',
+        paymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : null,
+        expiresAt: session.expires_at ? new Date(session.expires_at * 1000) : null,
+      };
+    },
+
+    async createFundingCheckoutSession(input) {
+      const session = await client.checkout.sessions.create(
+        {
+          mode: 'payment',
+          ...(input.customerEmail ? { customer_email: input.customerEmail } : {}),
+          // One product line, the exact accepted amount. §24.7 excludes sales
+          // tax from this stream, so there is no tax line and `automatic_tax`
+          // stays off.
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: 'usd',
+                unit_amount: Number(input.amountCents),
+                product_data: { name: 'Secured Creator payment' },
+              },
+            },
+          ],
+          payment_intent_data: {
+            statement_descriptor: 'PROOVD CREATOR PAY',
             metadata: input.metadata,
           },
           metadata: input.metadata,
@@ -496,6 +555,39 @@ export function createMemoryStripeGateway(config: {
         paymentIntentId,
         subtotalCents: input.subtotalCents,
         taxCents: input.taxCents,
+        metadata: input.metadata,
+        idempotencyKey: input.idempotencyKey,
+      });
+      return {
+        id,
+        url: `https://checkout.stripe.test/pay/${id}`,
+        paymentIntentId,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      };
+    },
+
+    async createFundingCheckoutSession(input) {
+      // The same platform-Checkout machinery as the listing fee, minus tax:
+      // one product line for the exact amount.
+      const existing = sessionsByKey.get(input.idempotencyKey);
+      if (existing !== undefined) {
+        const found = sessions[existing]!;
+        return {
+          id: found.id,
+          url: `https://checkout.stripe.test/pay/${found.id}`,
+          paymentIntentId: found.paymentIntentId,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        };
+      }
+      counter += 1;
+      const id = `cs_fundmemory${String(counter).padStart(10, '0')}`;
+      const paymentIntentId = `pi_fundmemory${String(counter).padStart(10, '0')}`;
+      sessionsByKey.set(input.idempotencyKey, sessions.length);
+      sessions.push({
+        id,
+        paymentIntentId,
+        subtotalCents: input.amountCents,
+        taxCents: 0n,
         metadata: input.metadata,
         idempotencyKey: input.idempotencyKey,
       });

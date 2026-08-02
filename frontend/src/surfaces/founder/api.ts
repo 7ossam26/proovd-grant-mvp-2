@@ -600,3 +600,48 @@ export interface LatestReview {
 export const fetchLatestReview = (
   campaignId: string,
 ): Promise<{ review: LatestReview | null }> => call(`${base(campaignId)}/review`);
+
+/* ── Creator readiness and fixed-payment funding (§16) — Phase 13 ───────────── */
+
+export interface FounderFixedPayment {
+  applicable: boolean;
+  status?: string;
+  label?: string;
+  amountCents?: string;
+  fundingDeadlineAt?: string | null;
+  fundedAt?: string | null;
+  canceledAt?: string | null;
+}
+
+export interface FounderReadinessCreator {
+  associationId: string;
+  publicHandle: string | null;
+  status: string;
+  canBeginWork: boolean;
+  fixedPayment: FounderFixedPayment;
+  /** The applicable incomplete §16 items, with their owner. */
+  blockers: Array<{ key: string; label: string; owner: string }>;
+  nextDate: string | null;
+}
+
+export interface FounderReadiness {
+  campaignId: string;
+  campaignStatus: string;
+  campaignLiveAt: string | null;
+  /** §16: the Founder cannot ask a Creator to begin early. Always false. */
+  canAskToBegin: boolean;
+  creators: FounderReadinessCreator[];
+}
+
+export const fetchCreatorReadiness = (
+  campaignId: string,
+): Promise<{ readiness: FounderReadiness }> => call(`${base(campaignId)}/creator-readiness`);
+
+export const fundSecuredPayment = (
+  campaignId: string,
+  associationId: string,
+): Promise<{ funding: { url: string; sessionId: string; amountCents: string; descriptor: string } }> =>
+  call(`${base(campaignId)}/creators/${encodeURIComponent(associationId)}/fund`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });

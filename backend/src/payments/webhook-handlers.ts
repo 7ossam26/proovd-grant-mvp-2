@@ -51,6 +51,12 @@ import {
   notifyListingPayment,
   type ListingNotificationContext,
 } from './listing-notifications.js';
+import {
+  FUNDING_PURPOSE,
+  applyAllocationFunding,
+  recordFundingFailed,
+} from '../creator-payment/allocations.js';
+import { evaluateCreatorReadiness } from '../creator-payment/readiness.js';
 
 export const STRIPE_PROVIDER = 'stripe';
 
@@ -414,6 +420,15 @@ async function handleCheckoutCompleted(
   context: HandlerContext,
   event: VerifiedStripeEvent,
 ): Promise<void> {
+  // Phase 13 (§16, §24.7). The fixed-Creator-payment funding rides the same
+  // platform Checkout as the listing fee; the purpose discriminator in the
+  // metadata Proovd's own API wrote decides which stream this is.
+  const metadata = (event.object['metadata'] as Record<string, string> | undefined) ?? {};
+  if (metadata['proovd_purpose'] === FUNDING_PURPOSE) {
+    await handleFundingCompleted(context, event);
+    return;
+  }
+
   const bound = await bindCheckoutDelivery(context, event);
   if (!bound) return;
 
@@ -466,9 +481,72 @@ async function handleCheckoutCompleted(
 }
 
 /**
- * `checkout.session.expired` — §13's abandonment path. The campaign stays
- * `listing_fee_pending`, no clock starts, every Founder input survives, and a
- * fresh attempt duplicates neither a charge nor an association.
+ * The fixed-Creator-payment funding completed (§16, §24.7, §33.4.3). The exact
+ * full amount marks the allocation `funded`; a partial or wrong amount leaves it
+ * `payment_failed`, never funded. A successful funding re-evaluates the
+ * Creator's readiness, so a `readiness_blocked` Creator whose only gap was the
+ * allocation can move to `ready` (§16 item 12).
+ */
+async function handleFundingCompleted(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  const object = event.object;
+  const sessionId = typeof object['id'] === 'string' ? object['id'] : '';
+  const metadata = (object['metadata'] as Record<string, string> | undefined) ?? {};
+  const allocationId = metadata['proovd_allocation_id'] ?? '';
+  const campaignId = metadata['proovd_campaign_id'] ?? '';
+  const associationId = metadata['proovd_association_id'] ?? '';
+
+  const stored = sessionId ? await findStoredSession(context.db, context.gateway, sessionId) : null;
+  if (!sessionId || !allocationId || !campaignId || !associationId || !stored) {
+    await context.audit({
+      action: 'creator_payment.funding_unbindable',
+      targetType: 'provider_event',
+      targetId: event.id,
+      internalReason:
+        `a signed funding ${event.type} for session "${sessionId || 'unknown'}" could not be bound; ` +
+        'recorded and routed to Admin, nothing applied',
+    });
+    return;
+  }
+
+  const amountTotal = object['amount_total'];
+  const paymentIntentId =
+    typeof object['payment_intent'] === 'string' ? object['payment_intent'] : null;
+
+  const outcome = await applyAllocationFunding(
+    context.db,
+    { gateway: context.gateway, audit: context.audit },
+    {
+      allocationId,
+      campaignId,
+      associationId,
+      checkoutSessionId: sessionId,
+      paymentIntentId,
+      amountTotalCents: typeof amountTotal === 'number' ? BigInt(amountTotal) : -1n,
+      paidAt: event.created,
+      providerEventId: event.id,
+      actor: 'system:stripe-webhook',
+    },
+  );
+
+  if (outcome.status === 'funded') {
+    // §16 item 12 is now complete; a Creator blocked only on funding can move to
+    // ready. Idempotent by the conditional transition.
+    await evaluateCreatorReadiness(
+      context.db,
+      { audit: context.audit, mode: context.gateway.mode },
+      { associationId: outcome.associationId, actor: 'system:stripe-webhook' },
+    );
+  }
+}
+
+/**
+ * `checkout.session.expired` — §13's/§16's abandonment path. A listing session
+ * keeps the campaign `listing_fee_pending`; a funding session leaves the
+ * allocation `payment_failed`, preserving the accepted amount and blocking work.
+ * Either way a fresh attempt duplicates nothing.
  */
 async function handleCheckoutExpired(
   context: HandlerContext,
@@ -479,6 +557,19 @@ async function handleCheckoutExpired(
   if (!sessionId) return;
 
   const metadata = (object['metadata'] as Record<string, string> | undefined) ?? {};
+
+  if (metadata['proovd_purpose'] === FUNDING_PURPOSE) {
+    const allocationId = metadata['proovd_allocation_id'] ?? '';
+    if (allocationId) {
+      await recordFundingFailed(
+        context.db,
+        { gateway: context.gateway, audit: context.audit },
+        { allocationId, checkoutSessionId: sessionId, providerEventId: event.id },
+      );
+    }
+    return;
+  }
+
   const stored = await findStoredSession(context.db, context.gateway, sessionId);
 
   await recordCheckoutExpired(

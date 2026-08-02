@@ -46,4 +46,8 @@ export * from './decisions.js';
 // readiness records, the Admin review rounds and grouped feedback, and the
 // general §15 materiality/reacceptance machine (reused in Phase 17).
 export * from './build.js';
+// Phase 13: the optional fixed Creator payment as a fourth money stream (§24.7)
+// — the exact-amount allocation, its §16 funding state machine, and the
+// append-only funding attempts. No percentage, no tax base, no cap.
+export * from './creator-payment.js';
 

@@ -843,3 +843,91 @@ export const overrideOptionalItem = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── Creator readiness and fixed-payment funding (§16) — Phase 13 ───────────── */
+
+export interface AdminReadinessItem {
+  key: string;
+  label: string;
+  owner: string;
+  specRef: string;
+  complete: boolean;
+  applicable: boolean;
+}
+
+export interface AdminReadinessFixedPayment {
+  applicable: boolean;
+  status?: string;
+  label?: string;
+  amountCents?: string;
+  fundingDeadlineAt?: string | null;
+  fundedAt?: string | null;
+  canceledAt?: string | null;
+  proposalVersionId?: string | null;
+}
+
+export interface AdminReadinessCreator {
+  associationId: string;
+  publicHandle: string | null;
+  legalName: string | null;
+  status: string;
+  canBeginWork: boolean;
+  items: AdminReadinessItem[];
+  fixedPayment: AdminReadinessFixedPayment;
+}
+
+export interface AdminReadiness {
+  campaignId: string;
+  campaignStatus: string;
+  campaignLiveAt: string | null;
+  scheduleBlockers: string[];
+  canScheduleLive: boolean;
+  creators: AdminReadinessCreator[];
+}
+
+const readinessBase = (campaignId: string) =>
+  `/api/admin/campaigns/${encodeURIComponent(campaignId)}`;
+
+export const fetchAdminCreatorReadiness = (
+  campaignId: string,
+): Promise<{ readiness: AdminReadiness }> =>
+  call(`${readinessBase(campaignId)}/creator-readiness`);
+
+export const confirmCreatorDeliverables = (
+  campaignId: string,
+  associationId: string,
+  confirmed: boolean,
+): Promise<unknown> =>
+  call(`${readinessBase(campaignId)}/creators/${encodeURIComponent(associationId)}/confirm-deliverables`, {
+    method: 'POST',
+    body: JSON.stringify({ confirmed }),
+  });
+
+export const setFundingDeadline = (
+  campaignId: string,
+  associationId: string,
+  deadlineAt: string,
+): Promise<unknown> =>
+  call(`${readinessBase(campaignId)}/creators/${encodeURIComponent(associationId)}/funding-deadline`, {
+    method: 'POST',
+    body: JSON.stringify({ deadlineAt }),
+  });
+
+export const cancelFundingLapse = (
+  campaignId: string,
+  associationId: string,
+  reason: string,
+): Promise<unknown> =>
+  call(`${readinessBase(campaignId)}/creators/${encodeURIComponent(associationId)}/cancel-funding-lapse`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+export const scheduleCampaignLive = (
+  campaignId: string,
+  liveAt: string,
+): Promise<{ campaign: { campaignLiveAt: string } }> =>
+  call(`${readinessBase(campaignId)}/schedule-live`, {
+    method: 'POST',
+    body: JSON.stringify({ liveAt }),
+  });

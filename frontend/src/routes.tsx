@@ -22,6 +22,8 @@ import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
+import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
+import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -113,6 +115,9 @@ const rootChildren: RouteObject[] = [
       // like the Creators panel and for the same reason: §12's optional items
       // are always one campaign's.
       { path: 'optional-items', element: <CampaignWorkspacePanel /> },
+      // Phase 13 (§16). Scoped to one campaign by query string, like the
+      // Creators and optional-items panels: readiness is always one campaign's.
+      { path: 'creator-readiness', element: <CreatorReadinessPanel /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
@@ -202,6 +207,12 @@ const rootChildren: RouteObject[] = [
     // will see it, collecting no payment information.
     path: 'campaigns/:campaignId/preview',
     element: <CampaignPreview />,
+  },
+  {
+    // Phase 13 (§16). The Founder's Creator-readiness and fixed-payment funding.
+    // Beside the workspace, roster, build, and preview, outside both shells.
+    path: 'campaigns/:campaignId/creator-readiness',
+    element: <CreatorReadiness />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

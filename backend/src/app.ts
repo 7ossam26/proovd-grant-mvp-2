@@ -30,6 +30,8 @@ import {
   createCreatorReacceptanceRouter,
 } from './routes/founder-build.js';
 import { createAdminReviewRouter } from './routes/admin-review.js';
+import { createFounderCreatorPaymentRouter } from './routes/founder-creator-payment.js';
+import { createAdminCreatorReadinessRouter } from './routes/admin-creator-readiness.js';
 import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
@@ -386,6 +388,29 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       }),
     );
     app.use(createAdminDecisionRouter({ db, auth, audit }));
+    // Phase 13 (§16, §24.7, §33.4.3, §33.4.4). The optional fixed Creator
+    // payment as a fourth money stream — the Founder funds the exact accepted
+    // amount, and no Creator begins work until every applicable §16 readiness
+    // item is complete. Admin verifies each item, sets the funding deadline,
+    // and schedules the one campaign_live_at. Behind the Stripe gateway because
+    // the connected-account readiness item and the funding Checkout both need it.
+    app.use(
+      createFounderCreatorPaymentRouter({
+        db,
+        auth,
+        gateway: config.stripeGateway,
+        audit: (event) => audit({ ...event, targetId: event.targetId }),
+        appBaseUrl: config.appBaseUrl,
+      }),
+    );
+    app.use(
+      createAdminCreatorReadinessRouter({
+        db,
+        auth,
+        gateway: config.stripeGateway,
+        audit: (event) => audit({ ...event, targetId: event.targetId }),
+      }),
+    );
   }
 
   // ── SPA fallback ──────────────────────────────────────────────────────────
