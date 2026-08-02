@@ -57,4 +57,7 @@ export * from './launch.js';
 // Phase 14b: the §18 attribution click ledger — every arrival through a
 // Creator's tracking link, valid or ignored, with the reason it earned nothing.
 export * from './attribution.js';
+// Phase 14c: the §18 campaign updates — Founder-authored, append-only, with the
+// Idea-only milestone audience and the material-delivery-change pairing.
+export * from './updates.js';
 

@@ -19,7 +19,7 @@
  */
 
 import { Link as RouterLink } from 'react-router';
-import { formatUsd, attributionMayEarn } from '@proovd/shared';
+import { formatUsd, attributionMayEarn, UPDATE_AUDIENCE_LABELS } from '@proovd/shared';
 import {
   Accordion,
   Button,
@@ -44,6 +44,7 @@ import {
 import {
   findReward,
   type CampaignView,
+  type CampaignUpdate,
   type EndedKind,
   type AttributionBanner as AttributionBannerModel,
 } from './types.js';
@@ -306,9 +307,50 @@ function PreorderConsent({ campaign, ended }: { campaign: CampaignView; ended: E
   );
 }
 
+/** §18 item 12 — one published update, with its audience label and local time. */
+function UpdateEntry({ update }: { update: CampaignUpdate }) {
+  return (
+    <article className="update">
+      <p className="update__meta">
+        <span className="update__audience">{UPDATE_AUDIENCE_LABELS[update.audience]}</span>
+        <When instant={new Date(update.publishedAt)} />
+      </p>
+      {update.title ? <h3 className="update__title">{update.title}</h3> : null}
+      {update.isMaterialDeliveryChange &&
+      update.priorCommitment &&
+      update.revisedCommitment ? (
+        <dl className="update__change">
+          <div className="update__change-row">
+            <dt>Previously</dt>
+            <dd>{update.priorCommitment}</dd>
+          </div>
+          <div className="update__change-row">
+            <dt>Now</dt>
+            <dd>{update.revisedCommitment}</dd>
+          </div>
+        </dl>
+      ) : null}
+      {update.body.split('\n\n').map((paragraph) => (
+        <p key={paragraph.slice(0, 40)}>{paragraph}</p>
+      ))}
+      {update.imageUrl ? (
+        <img className="update__image" src={update.imageUrl} alt="" loading="lazy" />
+      ) : null}
+      {update.videoUrl ? (
+        <p>
+          <a href={update.videoUrl} target="_blank" rel="noopener noreferrer">
+            Watch the video
+          </a>
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
 export function CampaignPage({ campaign }: { campaign: CampaignView }) {
   const featured = findReward(campaign, campaign.featuredRewardSku);
   const ended = campaign.ended ?? null;
+  const updates = campaign.updates ?? [];
 
   return (
     <>
@@ -630,17 +672,25 @@ export function CampaignPage({ campaign }: { campaign: CampaignView }) {
           <h2 className="h2" id="campaign-updates">
             Updates
           </h2>
-          <EmptyPanel
-            state="No updates have been posted yet"
-            whatHappened={
-              campaign.isSample
-                ? 'Updates appear here once the campaign is live. This sample has none.'
-                : "The Founder hasn't posted an update yet. When they do, it appears here and Backers are emailed."
-            }
-            next="The Founder posts progress here and Backers are emailed. Material delivery changes show the previous and the revised commitment together."
-            reference={campaign.isSample ? `${campaign.title} — sample campaign` : campaign.title}
-            helpSubject="Question about a campaign update"
-          />
+          {updates.length > 0 ? (
+            <div className="update-list">
+              {updates.map((update) => (
+                <UpdateEntry key={update.id} update={update} />
+              ))}
+            </div>
+          ) : (
+            <EmptyPanel
+              state="No updates have been posted yet"
+              whatHappened={
+                campaign.isSample
+                  ? 'Updates appear here once the campaign is live. This sample has none.'
+                  : "The Founder hasn't posted an update yet. When they do, it appears here and Backers are emailed."
+              }
+              next="The Founder posts progress here and Backers are emailed. Material delivery changes show the previous and the revised commitment together."
+              reference={campaign.isSample ? `${campaign.title} — sample campaign` : campaign.title}
+              helpSubject="Question about a campaign update"
+            />
+          )}
         </Measure>
       </Section>
 

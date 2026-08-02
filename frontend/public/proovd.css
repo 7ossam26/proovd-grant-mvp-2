@@ -1696,3 +1696,37 @@ html.no-motion [data-splash] { display: none !important; }
 .ended-banner__row { display: grid; gap: var(--sp-4); }
 .ended-banner__row dt { color: var(--grey); font-weight: 700; }
 .ended-banner__row dd { margin: 0; color: var(--mode-body); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PHASE 14c — campaign updates (§18), added 2026-08-02.
+
+   The update list on the campaign page and the Founder's authoring surface. A
+   material delivery change (`.update__change`) sets the previous and revised
+   commitment side by side, so a Backer sees exactly what moved.
+   ──────────────────────────────────────────────────────────────────────────── */
+.update-list { display: grid; gap: var(--sp-24); max-width: var(--measure); }
+.update { display: grid; gap: var(--sp-8); }
+.update__meta {
+  display: flex; flex-wrap: wrap; gap: var(--sp-8) var(--sp-16); align-items: baseline;
+  margin: 0; color: var(--grey); font-size: 0.9375rem;
+}
+.update__audience {
+  font-weight: 700; color: var(--moss); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.update__title { margin: 0; }
+.update__image { max-width: 100%; height: auto; border-radius: var(--radius); }
+.update__change {
+  display: grid; gap: var(--sp-8); margin: 0 0 var(--sp-8);
+  padding: var(--sp-12) var(--sp-16); background: var(--mint); border-radius: var(--radius);
+}
+.update__change-row { display: grid; gap: var(--sp-4); }
+.update__change-row dt { font-weight: 700; color: var(--grey); }
+.update__change-row dd { margin: 0; color: var(--dark); }
+
+/* A native select for the Founder's audience choice — matches the Input frame. */
+.pv-select {
+  width: 100%; min-height: 44px; padding: var(--sp-8) var(--sp-16);
+  border: var(--bw) solid var(--grey); border-radius: var(--radius);
+  background: var(--mode-bg, transparent); color: var(--mode-body); font: inherit;
+}
+.pv-select:focus-visible { outline: none; border-color: var(--brand); }

@@ -13,9 +13,24 @@
  * is a pre-order, never a reservation.
  */
 
-import type { AttributionStatus } from '@proovd/shared';
+import type { AttributionStatus, UpdateAudience } from '@proovd/shared';
 
 export type CampaignModel = 'idea' | 'product';
+
+/** §18 item 12 — a published campaign update, as the public page renders it. */
+export interface CampaignUpdate {
+  id: string;
+  audience: UpdateAudience;
+  title: string | null;
+  body: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  /** ISO instant; rendered local-primary with UTC secondary (§27.1). */
+  publishedAt: string;
+  isMaterialDeliveryChange: boolean;
+  priorCommitment: string | null;
+  revisedCommitment: string | null;
+}
 
 /**
  * §18's ended-state kinds. A real campaign renders one when it is no longer
@@ -138,6 +153,8 @@ export interface CampaignView {
    * samples (which are never indexable anyway) and the preview.
    */
   indexable?: boolean;
+  /** §18 item 12 — the public updates. Absent on samples (which have none). */
+  updates?: readonly CampaignUpdate[];
 }
 
 export function findReward(campaign: CampaignView, sku: string): RewardPackage {

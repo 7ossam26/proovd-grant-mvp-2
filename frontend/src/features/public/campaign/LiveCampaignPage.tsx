@@ -77,6 +77,7 @@ function toCampaignView(res: LiveCampaignResponse): CampaignView | null {
     ended: res.ended?.kind ?? null,
     attribution: res.attribution,
     indexable: res.indexable,
+    updates: res.updates,
   };
 }
 

@@ -24,6 +24,7 @@ import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
+import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
@@ -222,6 +223,12 @@ const rootChildren: RouteObject[] = [
     // Beside the workspace, roster, build, and preview, outside both shells.
     path: 'campaigns/:campaignId/creator-readiness',
     element: <CreatorReadiness />,
+  },
+  {
+    // Phase 14c (§18). The Founder posts and reviews campaign updates once live.
+    // Beside the other campaign surfaces, outside both shells.
+    path: 'campaigns/:campaignId/updates',
+    element: <CampaignUpdates />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

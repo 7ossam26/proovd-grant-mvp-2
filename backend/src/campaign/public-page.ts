@@ -39,7 +39,7 @@ interface Lifecycle {
   ended: EndedKind | null;
 }
 
-function classifyLifecycle(status: string): Lifecycle {
+export function classifyLifecycle(status: string): Lifecycle {
   switch (status) {
     case 'live':
       return { isPublic: true, ended: null };

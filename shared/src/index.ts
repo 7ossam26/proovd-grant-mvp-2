@@ -14,3 +14,4 @@ export * from './campaign/index.js';
 export * from './creator-payment/index.js';
 export * from './launch/index.js';
 export * from './attribution/index.js';
+export * from './updates/index.js';

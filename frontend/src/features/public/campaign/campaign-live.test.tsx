@@ -181,3 +181,54 @@ describe('the live campaign page — ended state is outcome-specific (§18)', ()
     expect(suspended).not.toBe(killed);
   });
 });
+
+describe('the live campaign page — updates (§18 item 12)', () => {
+  it('renders posted updates with their audience label, and a material change shows both commitments', () => {
+    const { container } = renderView(
+      baseView({
+        updates: [
+          {
+            id: 'u1',
+            audience: 'general_public',
+            title: 'We shipped the beta',
+            body: 'First paragraph.\n\nSecond paragraph.',
+            imageUrl: null,
+            videoUrl: 'https://example.com/v',
+            publishedAt: '2026-08-15T15:00:00Z',
+            isMaterialDeliveryChange: false,
+            priorCommitment: null,
+            revisedCommitment: null,
+          },
+          {
+            id: 'u2',
+            audience: 'milestone_progress',
+            title: null,
+            body: 'Delivery moved.',
+            imageUrl: null,
+            videoUrl: null,
+            publishedAt: '2026-08-16T15:00:00Z',
+            isMaterialDeliveryChange: true,
+            priorCommitment: 'December 2026',
+            revisedCommitment: 'February 2027',
+          },
+        ],
+      }),
+    );
+    const section = container.querySelector('#campaign-updates')?.closest('section') as HTMLElement;
+    const text = textOf(section);
+    expect(text).toContain('We shipped the beta');
+    expect(text).toContain('First paragraph.');
+    expect(text).toContain('Second paragraph.');
+    // Audience labels render.
+    expect(text).toContain('Public');
+    expect(text).toContain('Milestone');
+    // A material delivery change shows the previous and revised commitment together.
+    expect(text).toContain('Previously');
+    expect(text).toContain('December 2026');
+    expect(text).toContain('February 2027');
+    // A video link is offered.
+    expect(section.querySelector('a[href="https://example.com/v"]')).not.toBeNull();
+    // The empty panel is not shown once there are updates.
+    expect(text).not.toContain('No updates have been posted yet');
+  });
+});

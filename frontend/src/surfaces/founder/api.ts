@@ -645,3 +645,43 @@ export const fundSecuredPayment = (
     method: 'POST',
     body: JSON.stringify({}),
   });
+
+/* ── Updates (§18, Phase 14c) ─────────────────────────────────────────────── */
+
+export interface FounderUpdate {
+  id: string;
+  audience: 'general_public' | 'backer_only' | 'milestone_progress';
+  title: string | null;
+  body: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  publishedAt: string;
+  isMaterialDeliveryChange: boolean;
+  priorCommitment: string | null;
+  revisedCommitment: string | null;
+}
+
+export interface FounderUpdatesView {
+  updates: FounderUpdate[];
+  canPost: boolean;
+  campaignStatus: string;
+  model: 'idea' | 'product';
+}
+
+export interface PostUpdateBody {
+  audience: FounderUpdate['audience'];
+  title?: string;
+  body: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  deliveryChange?: { prior: string; revised: string };
+}
+
+export const fetchUpdates = (campaignId: string): Promise<FounderUpdatesView> =>
+  call(`${base(campaignId)}/updates`);
+
+export const postUpdate = (
+  campaignId: string,
+  update: PostUpdateBody,
+): Promise<{ update: FounderUpdate }> =>
+  call(`${base(campaignId)}/updates`, { method: 'POST', body: JSON.stringify(update) });

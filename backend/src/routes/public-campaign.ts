@@ -16,6 +16,7 @@
 import { Router } from 'express';
 import type { Database } from '../db/client.js';
 import { buildPublicCampaign } from '../campaign/public-page.js';
+import { listPublicUpdates, serializeUpdate } from '../campaign/updates.js';
 import { resolveAttribution } from '../attribution/service.js';
 import { attributionCookieName, verifyAttribution, parseCookieHeader } from '../attribution/cookies.js';
 
@@ -56,11 +57,15 @@ export function createPublicCampaignRouter(deps: PublicCampaignRouterDeps): Rout
       if (resolved) attribution = { handle: resolved.handle, status: resolved.status };
     }
 
+    // §18 item 12: the public updates (general + milestone; never Backer-only).
+    const updates = await listPublicUpdates(db, campaignId);
+
     res.json({
       campaign: result.campaign,
       ended: result.ended,
       indexable: result.indexable,
       attribution,
+      updates: updates.map(serializeUpdate),
     });
   });
 

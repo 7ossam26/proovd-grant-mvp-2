@@ -24,6 +24,12 @@ import { readBuild, saveBuild, upsertRewardPackage, type BuildPatch } from '../c
 import { submitForReview, readReviewReadiness, readLatestReview } from '../campaign/review.js';
 import { buildCampaignPreview } from '../campaign/preview.js';
 import { listPendingReacceptances, decideReacceptance } from '../campaign/materiality.js';
+import {
+  postUpdate,
+  listFounderUpdates,
+  serializeUpdate,
+  type UpdateAudience,
+} from '../campaign/updates.js';
 import { campaignAffiliateAssociations } from '../db/schema/domain.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 
@@ -203,6 +209,47 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
           .map(serializeFeedback),
       },
     });
+  });
+
+  /* ── Updates (§18, Phase 14c) ───────────────────────────────────────────── */
+
+  router.get('/api/founder/campaigns/:campaignId/updates', founder, async (req, res) => {
+    const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+    if (!campaign) return notFound(res);
+    const updates = await listFounderUpdates(db, campaign.campaignId);
+    res.json({
+      updates: updates.map(serializeUpdate),
+      canPost: campaign.status === 'live' || campaign.status === 'ended_no_charge',
+      campaignStatus: campaign.status,
+      model: campaign.campaignType === 'pre_build' ? 'idea' : 'product',
+    });
+  });
+
+  router.post('/api/founder/campaigns/:campaignId/updates', founder, json, async (req, res) => {
+    const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+    if (!campaign) return notFound(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const delivery = body['deliveryChange'] as { prior?: unknown; revised?: unknown } | undefined;
+    const result = await postUpdate(db, { audit }, {
+      campaignId: campaign.campaignId,
+      author: actor(req),
+      audience: String(body['audience'] ?? '') as UpdateAudience,
+      ...(typeof body['title'] === 'string' ? { title: body['title'] } : {}),
+      body: String(body['body'] ?? ''),
+      ...(typeof body['imageUrl'] === 'string' ? { imageUrl: body['imageUrl'] } : {}),
+      ...(typeof body['videoUrl'] === 'string' ? { videoUrl: body['videoUrl'] } : {}),
+      ...(delivery && typeof delivery.prior === 'string' && typeof delivery.revised === 'string'
+        ? { deliveryChange: { prior: delivery.prior, revised: delivery.revised } }
+        : {}),
+    });
+    if (result.status !== 'posted') {
+      res.status(result.status === 'not_found' ? 404 : 422).json({
+        error: result.status,
+        whatHappened: 'message' in result ? result.message : 'That update could not be posted.',
+      });
+      return;
+    }
+    res.status(201).json({ update: serializeUpdate(result.update) });
   });
 
   return router;

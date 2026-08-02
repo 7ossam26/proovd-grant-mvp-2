@@ -8,7 +8,7 @@
  */
 
 import type { AttributionStatus } from '@proovd/shared';
-import type { EndedKind } from './types.js';
+import type { EndedKind, CampaignUpdate } from './types.js';
 
 export interface PublicCampaignPayload {
   campaignId: string;
@@ -46,6 +46,7 @@ export interface LiveCampaignResponse {
   ended: { kind: EndedKind } | null;
   indexable: boolean;
   attribution: { handle: string | null; status: AttributionStatus } | null;
+  updates: CampaignUpdate[];
 }
 
 /** The campaign, or null when there is no public page at this id (404). */
