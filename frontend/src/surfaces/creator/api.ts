@@ -357,3 +357,54 @@ export const creatorSignIn = (email: string, password: string): Promise<unknown>
 
 export const creatorSignOut = (): Promise<unknown> =>
   sessionCall('/api/auth/sign-out', { method: 'POST', body: JSON.stringify({}) });
+
+/* ── The active-partnership surface (§18, Phase 14c) ──────────────────────── */
+
+export interface CreatorPartnership {
+  associationId: string;
+  campaignId: string;
+  status: string;
+  joinedAt: string;
+  rosterMembership: string;
+  founder: { displayName: string };
+  product: { title: string; model: 'idea' | 'product'; publicUrl: string; closesAt: string | null };
+  trackingLink: {
+    url: string;
+    testUrl: string;
+    active: boolean;
+    activatedAt: string | null;
+    pausedAt: string | null;
+    disclosureText: string;
+  } | null;
+  brandRules: {
+    requiredWording: string | null;
+    prohibitedClaims: string | null;
+    brandPerception: string | null;
+    brandVoice: string | null;
+  };
+  rewards: Array<{ title: string; priceCents: string; delivery: string }>;
+  compensation: {
+    basePercent: number;
+    bidIncreasePercent: number;
+    totalPercent: number;
+    fixedPaymentCents: string | null;
+  } | null;
+  fixedPayment:
+    | { applicable: true; status: string; label: string; amountCents: string | null; fundedAt: string | null }
+    | { applicable: false };
+  firstPost: {
+    status: string | null;
+    submittedAt: string | null;
+    verifiedAt: string | null;
+    correctionDetail: string | null;
+  };
+  readiness: { state: string; ready: boolean; label: string };
+  clicks: { total: number; attributed: number };
+  pending: { available: false; note: string; fields: string[] };
+  updatedAt: string;
+}
+
+export const fetchPartnership = (
+  associationId: string,
+): Promise<{ partnership: CreatorPartnership }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/partnership`);

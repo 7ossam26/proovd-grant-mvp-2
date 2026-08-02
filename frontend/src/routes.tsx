@@ -33,6 +33,7 @@ import {
   CreatorCampaignKit,
 } from './surfaces/creator/CreatorCampaigns.js';
 import { FormalOpportunity } from './surfaces/creator/FormalOpportunity.js';
+import { CreatorPartnership } from './surfaces/creator/CreatorPartnership.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
 import { CreatorResult } from './surfaces/draft/CreatorResult.js';
@@ -190,6 +191,12 @@ const rootChildren: RouteObject[] = [
     // this is a commercial decision, and a bookmark to either gets it back.
     path: 'creator/campaigns/:associationId/opportunity',
     element: <FormalOpportunity />,
+  },
+  {
+    // Phase 14c (§18). The Creator's active-partnership dashboard once accepted:
+    // their link, disclosure, terms, readiness, first-post state, and clicks.
+    path: 'creator/campaigns/:associationId/partnership',
+    element: <CreatorPartnership />,
   },
   {
     // Phase 09a (§12, DNA §5.9). The signed-in Founder's campaign workspace.

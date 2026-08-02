@@ -1730,3 +1730,10 @@ html.no-motion [data-splash] { display: none !important; }
   background: var(--mode-bg, transparent); color: var(--mode-body); font: inherit;
 }
 .pv-select:focus-visible { outline: none; border-color: var(--brand); }
+
+/* The required FTC disclosure on the Creator partnership surface (§18, Phase 14c). */
+.disclosure-text {
+  margin: 0 0 var(--sp-8); padding: var(--sp-12) var(--sp-16);
+  background: var(--mint); color: var(--dark); border-radius: var(--radius);
+  white-space: pre-line;
+}

@@ -37,10 +37,16 @@ import type { AuditWriter } from '../auth/audit.js';
 import { readPreparingKit, listCreatorCampaigns } from '../affiliates/kit.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import { submitPost } from '../launch/post-verification.js';
+import { buildCreatorPartnership } from '../affiliates/partnership.js';
 
 export const CREATOR_PATH = '/api/creator';
 
-export function createCreatorRouter(db: Database, auth: Auth, audit: AuditWriter): Router {
+export function createCreatorRouter(
+  db: Database,
+  auth: Auth,
+  audit: AuditWriter,
+  appBaseUrl: string,
+): Router {
   const router = Router();
   const creator = requireRole(auth, 'affiliate');
   const json: RequestHandler = express.json({ limit: '8kb' });
@@ -157,6 +163,34 @@ export function createCreatorRouter(db: Database, auth: Auth, audit: AuditWriter
       return;
     }
     res.status(404).json({ error: 'not_found', title: 'Campaign not found' });
+  });
+
+  /**
+   * §18 item 6 — the Creator active-partnership surface. Scoped by session: an
+   * association that is not the caller's answers `not_found`, the same answer a
+   * non-existent one gets. Available once the Creator has accepted; before that
+   * the opportunity/kit surfaces apply, so a pre-acceptance association answers
+   * 409 pointing there.
+   */
+  router.get(`${CREATOR_PATH}/campaigns/:associationId/partnership`, creator, async (req, res) => {
+    const associationId = req.params['associationId'] as string;
+    if (!(await ownsAssociation(associationId, actorId(req)))) {
+      res.status(404).json({ error: 'not_found', title: 'Campaign not found' });
+      return;
+    }
+    const result = await buildCreatorPartnership(db, { associationId, appBaseUrl });
+    if (!result.ok) {
+      res.status(result.code === 'not_found' ? 404 : 409).json({
+        error: result.code,
+        title: result.code === 'not_active' ? 'Not an active partnership yet' : 'Campaign not found',
+        whatHappened:
+          result.code === 'not_active'
+            ? 'This becomes your partnership dashboard once you accept the campaign. Review the opportunity first.'
+            : 'That campaign could not be found.',
+      });
+      return;
+    }
+    res.json({ partnership: result.partnership });
   });
 
   return router;

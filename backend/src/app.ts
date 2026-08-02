@@ -269,7 +269,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator: their campaigns and
   // the preparing Campaign kit, every read of it logged and revocable. Phase 14a
   // adds the §17 first-post URL submission, scoped by session.
-  app.use(createCreatorRouter(db, auth, audit));
+  app.use(createCreatorRouter(db, auth, audit, config.appBaseUrl));
   // Phase 09a (§12, §33.3.1–4). The signed-in Founder's campaign workspace: the
   // five optional items, the evidence that completes them, the interview
   // booking, and the itemised listing fee. First session-bearing Founder
