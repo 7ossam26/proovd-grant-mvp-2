@@ -100,6 +100,21 @@ export const FOUNDER_CREATOR_PROPOSAL_RECEIVED = 'founder_creator_proposal_recei
 export const FOUNDER_CREATOR_PROPOSAL_REVISION = 'founder_creator_proposal_revision' as const;
 export const FOUNDER_CREATOR_PROPOSAL_DECISION = 'founder_creator_proposal_decision' as const;
 
+/**
+ * Phase 14a's five, sent by `launch/notifications.ts`.
+ *
+ * §27.3 — "Campaign live" (Founder); §27.4 — "Campaign live" (Creator),
+ * "First-post verification pass", "First-post correction required",
+ * "First-post rejected". They arrive together because §17's launch and its
+ * first-post verification are this phase's senders. The §29.6 refund reuses
+ * Phase 11's `founder_listing_fee_refund` — one refund message, one key.
+ */
+export const FOUNDER_CAMPAIGN_LIVE = 'founder_campaign_live' as const;
+export const AFFILIATE_CAMPAIGN_LIVE = 'affiliate_campaign_live' as const;
+export const AFFILIATE_FIRST_POST_PASS = 'affiliate_first_post_pass' as const;
+export const AFFILIATE_FIRST_POST_CORRECTION = 'affiliate_first_post_correction' as const;
+export const AFFILIATE_FIRST_POST_REJECT = 'affiliate_first_post_reject' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -122,6 +137,11 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_CREATOR_PROPOSAL_RECEIVED,
   FOUNDER_CREATOR_PROPOSAL_REVISION,
   FOUNDER_CREATOR_PROPOSAL_DECISION,
+  FOUNDER_CAMPAIGN_LIVE,
+  AFFILIATE_CAMPAIGN_LIVE,
+  AFFILIATE_FIRST_POST_PASS,
+  AFFILIATE_FIRST_POST_CORRECTION,
+  AFFILIATE_FIRST_POST_REJECT,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

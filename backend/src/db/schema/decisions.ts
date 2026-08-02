@@ -185,6 +185,16 @@ export const trackingLinks = pgTable(
     /** §14.2: inactive until approval and Creator readiness. Phase 14 flips it. */
     active: boolean('active').notNull().default(false),
     activatedAt: timestamp('activated_at', { withTimezone: true }),
+    /* ── §17/§18's pause, added Phase 14a (migration 0020) ──────────────────────
+       §18: "Links used before activated_at, while paused, or after close cannot
+       create payable attribution." A paused link is distinct from an inactive
+       one: it *was* activated (so `active`/`activated_at` stay set and the CHECK
+       that pairs them still holds), but is not currently resolving to payable
+       attribution. §33.4.8 pauses it on a correction/rejection; resuming clears
+       `paused_at`. The audit log is the history of record. */
+    pausedAt: timestamp('paused_at', { withTimezone: true }),
+    pausedReason: text('paused_reason'),
+    pausedBy: text('paused_by'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

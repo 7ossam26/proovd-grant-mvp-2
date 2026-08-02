@@ -215,6 +215,16 @@ async function main() {
         fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
       },
     },
+    // Phase 14a: the §17 launch sweep sends the campaign-live confirmations; the
+    // §29.6 replacement sweep reuses the listing gateway above for its refund.
+    launch: {
+      notifier,
+      context: {
+        appBaseUrl: env.APP_BASE_URL,
+        supportEmail: 'support@proovd.co',
+        fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
+      },
+    },
   });
   logger.info('Job scheduler started');
 

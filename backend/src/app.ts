@@ -30,6 +30,7 @@ import {
   createCreatorReacceptanceRouter,
 } from './routes/founder-build.js';
 import { createAdminReviewRouter } from './routes/admin-review.js';
+import { createAdminLaunchRouter } from './routes/admin-launch.js';
 import { createFounderCreatorPaymentRouter } from './routes/founder-creator-payment.js';
 import { createAdminCreatorReadinessRouter } from './routes/admin-creator-readiness.js';
 import type { StripeGateway } from './payments/stripe-client.js';
@@ -253,8 +254,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     }),
   );
   // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator: their campaigns and
-  // the preparing Campaign kit, every read of it logged and revocable.
-  app.use(createCreatorRouter(db, auth));
+  // the preparing Campaign kit, every read of it logged and revocable. Phase 14a
+  // adds the §17 first-post URL submission, scoped by session.
+  app.use(createCreatorRouter(db, auth, audit));
   // Phase 09a (§12, §33.3.1–4). The signed-in Founder's campaign workspace: the
   // five optional items, the evidence that completes them, the interview
   // booking, and the itemised listing fee. First session-bearing Founder
@@ -303,6 +305,17 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   app.use(createFounderBuildRouter({ db, auth, audit }));
   app.use(createCreatorReacceptanceRouter({ db, auth, audit }));
   app.use(createAdminReviewRouter({ db, auth, audit }));
+  // Phase 14a (§17, §29.6, §33.4.5–9). The coordinated launch (page → links),
+  // Admin first-post verification with its three outcomes, and the required-
+  // Creator-failure replacement window. No Stripe dependency for the launch or
+  // the verification; the §29.6 miss-path refund runs in the scheduled sweep,
+  // which has the gateway. Mounted with the other session routes.
+  const launchContext = {
+    appBaseUrl: config.appBaseUrl,
+    supportEmail: config.invitationContext.supportEmail,
+    fromAddress: config.invitationContext.fromAddress,
+  };
+  app.use(createAdminLaunchRouter({ db, auth, audit, notifier, context: launchContext }));
   // Phase 10a (§32.3, §28.3). Two Stripe endpoints with two signing secrets —
   // platform for Proovd's own listing money, Connect for the Founder's campaign
   // money (§24.1). Both mount raw-body parsing themselves, for the reason the

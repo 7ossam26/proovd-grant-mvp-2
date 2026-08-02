@@ -50,4 +50,8 @@ export * from './build.js';
 // — the exact-amount allocation, its §16 funding state machine, and the
 // append-only funding attempts. No percentage, no tax base, no cap.
 export * from './creator-payment.js';
+// Phase 14a: the coordinated launch record, §17's first-post verification, and
+// §29.6's required-Creator-failure with its non-resettable three-business-day
+// replacement deadline.
+export * from './launch.js';
 

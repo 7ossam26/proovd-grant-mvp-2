@@ -27,21 +27,41 @@
  * there is no route here to reach them early — not a disabled one, absent.
  */
 
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import express from 'express';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
+import type { AuditWriter } from '../auth/audit.js';
 import { readPreparingKit, listCreatorCampaigns } from '../affiliates/kit.js';
+import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
+import { submitPost } from '../launch/post-verification.js';
 
 export const CREATOR_PATH = '/api/creator';
 
-export function createCreatorRouter(db: Database, auth: Auth): Router {
+export function createCreatorRouter(db: Database, auth: Auth, audit: AuditWriter): Router {
   const router = Router();
   const creator = requireRole(auth, 'affiliate');
+  const json: RequestHandler = express.json({ limit: '8kb' });
 
   function actorId(req: express.Request): string {
     return req.authUser?.id ?? '';
+  }
+
+  /** True when this association belongs to the caller — scoped inside the query. */
+  async function ownsAssociation(associationId: string, userId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: affiliateSignupProfiles.id })
+      .from(affiliateSignupProfiles)
+      .where(
+        and(
+          eq(affiliateSignupProfiles.associationId, associationId),
+          eq(affiliateSignupProfiles.claimedUserId, userId),
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
   }
 
   /** The Creator's own campaigns. Scoped by session; no id in the request. */
@@ -87,6 +107,56 @@ export function createCreatorRouter(db: Database, auth: Auth): Router {
     }
 
     res.json({ kit: result.kit });
+  });
+
+  /**
+   * §17 step 4: the Creator submits the public post URL. Scoped by session —
+   * an association that is not the caller's answers `not_found`, the same answer
+   * as one that does not exist. Refused until the link is live (post third,
+   * after link second).
+   */
+  router.post(`${CREATOR_PATH}/campaigns/:associationId/submit-post`, creator, json, async (req, res) => {
+    const associationId = req.params['associationId'] as string;
+    const userId = actorId(req);
+    if (!(await ownsAssociation(associationId, userId))) {
+      res.status(404).json({ error: 'not_found', title: 'Campaign not found' });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const postUrl = typeof body['postUrl'] === 'string' ? body['postUrl'].trim() : '';
+    if (!/^https?:\/\/\S+$/i.test(postUrl)) {
+      res.status(422).json({
+        error: 'invalid_url',
+        whatHappened: 'Enter the full public URL of your post, starting with http:// or https://.',
+      });
+      return;
+    }
+
+    const result = await submitPost(db, { audit }, {
+      associationId,
+      postUrl,
+      channel: typeof body['channel'] === 'string' ? body['channel'] : undefined,
+      submittedBy: `user:${userId}`,
+    });
+
+    if (result.status === 'submitted') {
+      res.json({
+        submission: {
+          id: result.submission.id,
+          status: result.submission.status,
+          postUrl: result.submission.postUrl,
+          submittedAt: result.submission.submittedAt.toISOString(),
+          alreadyExisted: result.alreadyExisted,
+        },
+      });
+      return;
+    }
+    if (result.status === 'not_active') {
+      res.status(409).json({ error: 'not_active', whatHappened: result.message });
+      return;
+    }
+    res.status(404).json({ error: 'not_found', title: 'Campaign not found' });
   });
 
   return router;
