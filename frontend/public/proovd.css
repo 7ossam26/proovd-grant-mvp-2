@@ -1644,3 +1644,23 @@ html.no-motion .toggle.is-on .toggle__knob {
 html.no-motion .progress__fill { transform: scaleX(var(--p, 0)); }
 html.no-motion .accordion__body { height: auto !important; }
 html.no-motion [data-splash] { display: none !important; }
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PHASE 11 — the listing-fee consent (§13, Appendix A.5), added 2026-08-02.
+
+   Appendix A.5 is exact text, and its line breaks are part of it: the Spec
+   ships it as a fixed block and §1 rule 6 forbids "improving" it. So the body
+   preserves the newlines it was given rather than reflowing them, and stays
+   inside the reading measure at every width. `white-space: pre-line` collapses
+   the runs of spaces the Spec's wrapping introduces while keeping the
+   paragraph breaks — reflowing to `pre-wrap` would force a horizontal scroll
+   at 320px, and stripping the breaks would run two legal paragraphs together.
+   ──────────────────────────────────────────────────────────────────────────── */
+.consent__body {
+  margin: 0;
+  white-space: pre-line;
+  color: var(--mode-body);
+  max-width: var(--measure);
+  overflow-wrap: anywhere;
+}

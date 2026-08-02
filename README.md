@@ -23,9 +23,10 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–10 are
-complete**; Phase 11 — the listing-fee Checkout and the clocks that start with
-it — is next. No money has moved yet, and the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–11 are
+complete**; Phase 12 — the formal Creator opportunity and the 72-hour decision
+the listing payment now starts — is next. Money moves in test mode only, and
+the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -45,15 +46,17 @@ it — is next. No money has moved yet, and the live-mode gate stays shut.
 | 09b | The embedded interview: the signed booking webhook, reconciliation, and the four interview notifications |
 | 10a | Stripe foundations: the pinned client, both signed webhook endpoints, idempotent event handling, and the provider-object ledger |
 | 10b | Hosted onboarding for Founders and Creators, its four return states, and the tax-accountability gate |
+| 11 | The listing-fee Checkout, its seven atomic effects, the two clocks, the single full refund, and Founder cancellation |
 
-Three briefs have been built in halves. Phase 06 bundles four independent
+Four briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
 the preparing reveal with its Campaign kit; Phase 09 bundles the optional-item
-workspace and a third-party scheduling integration. Splitting them was a
-scheduling decision, not a scope one: each half is built against the same brief
-and lands its own named acceptance tests. Every named test from §33.1.1 to
+workspace and a third-party scheduling integration; Phase 10 bundles the
+payments substrate and the two onboarding surfaces built on it. Splitting them
+was a scheduling decision, not a scope one: each half is built against the same
+brief and lands its own named acceptance tests. Every named test from §33.1.1 to
 §33.1.9 passes, so does every one from §33.2.1 to §33.2.4, and so does every one
-from §33.3.1 to §33.3.4.
+from §33.3.1 to §33.3.8, plus §33.3.11.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
 record went first and is the source of truth — a scheduling provider is a source
@@ -76,6 +79,8 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/workspace/  the §12 optional items, what does not count as evidence for
                   each, the copy-ready helper resources, and the interview
                   statuses
+  src/checkout/   the Appendix A.5 listing-fee consent, verbatim, and the
+                  resolver that fills in its two amounts
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -92,7 +97,9 @@ backend/    Express 5 + Drizzle + Postgres 16
                       reference that binds a booking, and the reminder job
   src/payments/       the pinned Stripe client, connected accounts and their
                       four onboarding states, hosted onboarding, the
-                      provider-object ledger, and the tax-accountability gate
+                      provider-object ledger, the tax-accountability gate, the
+                      listing Checkout and its seven atomic effects, the single
+                      full refund, Founder cancellation, and the two clocks
   src/notifications/  the deduplicating sender, Resend, the email templates
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
@@ -104,7 +111,8 @@ frontend/   React 19 + Vite, styled solely by proovd.css
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
                          preparing Campaign kit
   src/surfaces/founder/  the campaign workspace: five optional items as a flow,
-                         the fee preview, and the helper resources
+                         the fee preview, the helper resources, and the listing
+                         payment with its Appendix A.5 consent
   src/surfaces/payouts/  Stripe onboarding for both roles, and where Stripe
                          sends people back to
 docs/       Spec, DNA, tech stack, master plan, phase briefs
@@ -578,8 +586,9 @@ accepts nothing. Every other optional item still counts toward the fee.
 
 ## Stripe foundations
 
-No money moves yet. This is the plumbing every later payment phase runs through,
-and it is built to be right about four things before anything is built on it.
+This is the plumbing every payment phase runs through — built and proved on its
+own before any money ran over it, and right about four things before anything
+was built on top.
 
 **The API version is locked by the operator, not by the package.** Inheriting
 whatever version the SDK happened to ship would mean a routine dependency update
@@ -676,6 +685,76 @@ That gate is built now rather than in the phase that first pays a Creator. A
 gate written in the phase it is meant to stop is a gate written under deadline by
 someone who wants it open.
 
+## Paying the listing fee
+
+The first real money in the product, and the only place Proovd is the merchant
+of record rather than the Founder. A Founder pays a one-off fee to list their
+campaign, and that single successful payment does seven things at once.
+
+**The total is agreed before it is charged.** Spec Appendix A.5 fixes the
+consent word for word, and it names an exact total — which means the sales tax
+has to be known before the Founder agrees to anything, not worked out afterwards
+at the payment page. So the surface asks for a billing address, the server
+calculates the tax and stores that calculation, and the Checkout session charges
+exactly the number the consent showed. If the tax cannot be calculated there is
+no consent to show and no way to pay: a total nobody was shown must never be
+charged, and a zero caused by missing configuration is not evidence that no tax
+is due.
+
+**The consent is rendered, never rewritten.** It lives as one constant compared
+against the Spec's own appendix by a test, beside the sentences Spec §7 and §8
+fix for the two invitations. Only the two amounts are substituted, and the
+resolver refuses anything that is not a formatted amount — a consent with a
+bracket left in it records agreement to nothing.
+
+**Seven effects, one transaction.** A successful payment stores the money and
+its itemisation, locks the fee calculation and the evidence behind it, moves the
+campaign on, opens the formal opportunity for every eligible Creator, starts a
+72-hour deadline and a 48-hour cancellation window, begins campaign building,
+and sends the receipt and the Creator notices. All of it or none of it: the
+worst possible outcome here is a partial application, because a clock that
+started beside a lock that did not looks fine until the fee changes under
+someone.
+
+**The lock is total.** After payment, nothing recalculates — not the completed
+items, not the discounts, not the high-effort classification, and not the amount.
+Cancelling the interview afterwards does not claw back its saving, because the
+Founder was charged against a record and that record no longer moves. Editing
+the campaign is still allowed; it just changes nothing about what was paid.
+
+**The clocks are stored, not recomputed.** Both deadlines are written down at
+payment along with the window lengths that produced them, and a database
+constraint ties each one to the moment of payment. Changing the configured
+window later moves future deadlines and never a promise already made. A
+background sweep notices each deadline exactly once.
+
+**The refund is the whole charge, once.** Spec §13 promises the entire Checkout
+amount back — the fee plus its sales tax — under three conditions, and every one
+of them goes through a single refund path built here so the later phases that
+trigger it call it rather than writing a second one. "Once" is a unique index,
+"never partial" is a database trigger comparing the refund against the payment,
+and a retried refund is the same refund at Stripe. The record is written before
+the provider is called, so a failure halfway leaves something visible and
+retryable rather than money that moved with no trace of it.
+
+**Cancelling has two paths and the code takes the one the rule takes.** Inside
+the stored 48-hour window and before the campaign is live, a Founder cancels and
+gets everything back including tax, automatically. After that, or once live, it
+becomes a request a person decides — with no automatic refund, said plainly on
+the surface rather than discovered later.
+
+**A Creator whose access was withdrawn does not get it back by someone else
+paying.** The payment opens the formal opportunity for Creators who are prepared
+and whose Campaign kit access is intact. One that an Admin consciously revoked
+is skipped, recorded, and left to a person. And listing money never mixes with
+campaign money: the tables that hold it have no column that could reference a
+pre-order or a Founder's connected account, and the webhook that applies it is
+reachable only from Proovd's own endpoint.
+
+**Never a promised settlement date.** Refund messages say the bank typically
+takes 5–10 business days and that an exact date cannot be promised, because that
+timing genuinely is not ours to promise.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -724,6 +803,12 @@ of them set, the app exits rather than issuing signed URLs a bucket will
 reject. The three `CALCOM_*` values behave the same way: none of them means no
 booking embed and a webhook that accepts nothing, and two of them means the app
 does not start.
+
+`STRIPE_TAX_ENABLED` gates the listing payment for the same reason. The consent
+a Founder signs names an exact total including sales tax, so with tax switched
+off there is no exact total to show and the payment surface says so instead of
+offering a way to pay. A zero tax line produced by missing configuration is not
+evidence that no tax is due (Spec §31.7), so it is never rendered as one.
 
 `ADMIN_REAUTH_WINDOW_SECONDS` deliberately has no default. Spec §6 names the
 Admin reauthentication window as a setting and fixes no value, so the operator
@@ -819,6 +904,19 @@ The frontend and shared suites need neither Docker nor a database.
 - **Money is calculated once, on the server.** The listing fee is read from the
   Spec §6 settings and rendered by the browser. A second implementation in a
   component is how a preview and a charge diverge.
+- **Exact customer copy is a constant compared against the Spec.** Appendix
+  A.5's listing-fee consent, Appendix A.1's trust strip, and the Spec §27.8
+  contact block are each pinned by a test that reads the specification itself.
+  Only named variables are substituted, and a resolver refuses a value that
+  would leave a bracket in the rendered text.
+- **A deadline is stored with the window that produced it.** Both listing clocks
+  are written at payment and tied to it by a database constraint, so changing a
+  configured window later moves future deadlines and never one already promised
+  (Spec §29.6).
+- **A refund is the whole charge, once.** A unique index makes it once, a
+  database trigger makes it whole, and a stable idempotency key makes a retry
+  the same refund rather than a second one. Refund messages never promise a
+  settlement date.
 - **A third-party payload never names its own campaign.** A scheduling webhook
   is bound by a reference Proovd issued and recomputes, *and* by checking that
   the person who booked owns that campaign. A signature proves where a payload

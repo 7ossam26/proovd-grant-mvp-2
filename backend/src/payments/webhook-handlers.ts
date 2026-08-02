@@ -35,12 +35,22 @@ import { and, eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { providerEvents } from '../db/schema/integrity.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Notifier } from '../notifications/send.js';
 import type { StripeGateway, VerifiedStripeEvent, WebhookEndpoint } from './stripe-client.js';
 import {
   findAccountByStripeId,
   readAccountFacts,
   upsertConnectedAccount,
 } from './connected-accounts.js';
+import {
+  applyListingPayment,
+  recordCheckoutExpired,
+  findStoredSession,
+} from './listing-checkout.js';
+import {
+  notifyListingPayment,
+  type ListingNotificationContext,
+} from './listing-notifications.js';
 
 export const STRIPE_PROVIDER = 'stripe';
 
@@ -48,6 +58,13 @@ export interface HandlerContext {
   db: Database;
   gateway: StripeGateway;
   audit: AuditWriter;
+  /**
+   * §13's effect 7. Optional in the type because Phase 10's account handlers
+   * never send; the app always supplies both, and the payment handler records
+   * honestly when a context without them cannot send (§1.4).
+   */
+  notifier?: Notifier | undefined;
+  notificationContext?: ListingNotificationContext | undefined;
 }
 
 export type EventHandler = (
@@ -58,16 +75,17 @@ export type EventHandler = (
 /**
  * §32.3's platform/listing set.
  *
- * Every one of these belongs to an object a later phase creates, so the map is
- * empty and the events are recorded-and-ignored until then. Listing them here
- * as comments rather than as no-op handlers is deliberate: a registered handler
- * that does nothing reads as "handled", and this build does not handle them.
+ * Phase 11 registered the two Checkout events — the only objects Proovd's own
+ * account creates so far. The rest belong to later phases and stay
+ * recorded-and-ignored until a sender exists:
  *
- *   Phase 11 — checkout.session.completed, checkout.session.expired
  *   Phase 18 — payment_intent.succeeded, payment_intent.payment_failed
  *   Phase 20 — charge.refunded, charge.dispute.created/updated/closed
  */
-export const PLATFORM_HANDLERS: Record<string, EventHandler> = {};
+export const PLATFORM_HANDLERS: Record<string, EventHandler> = {
+  'checkout.session.completed': handleCheckoutCompleted,
+  'checkout.session.expired': handleCheckoutExpired,
+};
 
 /**
  * §32.3's connected-account/campaign set.
@@ -308,4 +326,168 @@ async function handleAccountDeauthorized(
     targetId: stripeAccountId,
     internalReason: 'the connected account was deauthorized; it can no longer act as seller or recipient',
   });
+}
+
+/* ── Phase 11: the listing Checkout (§13, §33.3.5–8) ──────────────────────── */
+
+/**
+ * Reads the session facts a delivery carries and binds them to a campaign.
+ *
+ * The metadata was written by Proovd's own API call at session creation — the
+ * payer never holds it — but it is still cross-checked against the stored
+ * §32.4 session row, and a delivery that does not reconcile is recorded and
+ * routed to Admin rather than guessed into place (§1 rule 6). Returns null
+ * when the delivery cannot be bound.
+ */
+async function bindCheckoutDelivery(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<{
+  sessionId: string;
+  campaignId: string;
+  calculationId: string;
+  subtotalCents: bigint;
+  taxCents: bigint;
+  taxCalculationId: string | null;
+  newsletterOptIn: boolean;
+} | null> {
+  const object = event.object;
+  const sessionId = typeof object['id'] === 'string' ? object['id'] : '';
+  const metadata = (object['metadata'] as Record<string, string> | undefined) ?? {};
+  const campaignId = metadata['proovd_campaign_id'] ?? '';
+  const calculationId = metadata['proovd_calculation_id'] ?? '';
+
+  const stored = sessionId
+    ? await findStoredSession(context.db, context.gateway, sessionId)
+    : null;
+
+  if (!sessionId || !campaignId || !calculationId || !stored || stored.campaignId !== campaignId) {
+    await context.audit({
+      action: 'listing.checkout_unbindable',
+      targetType: 'provider_event',
+      targetId: event.id,
+      internalReason:
+        `a signed ${event.type} for session "${sessionId || 'unknown'}" could not be bound: ` +
+        (stored
+          ? `stored session belongs to campaign ${stored.campaignId ?? 'none'}, delivery names "${campaignId || 'none'}"`
+          : 'no stored session row exists for it') +
+        '. Recorded and routed to Admin; nothing was applied.',
+    });
+    return null;
+  }
+
+  let subtotalCents: bigint;
+  let taxCents: bigint;
+  try {
+    subtotalCents = BigInt(metadata['proovd_subtotal_cents'] ?? '');
+    taxCents = BigInt(metadata['proovd_tax_cents'] ?? '');
+  } catch {
+    await context.audit({
+      action: 'listing.checkout_unbindable',
+      targetType: 'provider_event',
+      targetId: event.id,
+      internalReason: `session ${sessionId} carries unreadable amount metadata; routed to Admin`,
+    });
+    return null;
+  }
+
+  return {
+    sessionId,
+    campaignId,
+    calculationId,
+    subtotalCents,
+    taxCents,
+    taxCalculationId: metadata['proovd_tax_calculation_id'] || null,
+    newsletterOptIn: metadata['proovd_newsletter_opt_in'] === '1',
+  };
+}
+
+/**
+ * `checkout.session.completed` — §13's seven atomic effects, then effect 7's
+ * messages after the transaction has committed. A throw from the atomic block
+ * leaves the event claim unprocessed and answers 500, so Stripe retries a
+ * payment that did not fully apply; an unbindable or duplicate delivery is
+ * recorded and answers 200, because retrying it would produce a queue of
+ * identical failures instead of the one audit row an Admin needs.
+ */
+async function handleCheckoutCompleted(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  const bound = await bindCheckoutDelivery(context, event);
+  if (!bound) return;
+
+  const object = event.object;
+  const amountTotal = object['amount_total'];
+  const paymentIntentId =
+    typeof object['payment_intent'] === 'string' ? object['payment_intent'] : null;
+
+  const outcome = await applyListingPayment(
+    context.db,
+    { gateway: context.gateway, audit: context.audit },
+    {
+      campaignId: bound.campaignId,
+      calculationId: bound.calculationId,
+      checkoutSessionId: bound.sessionId,
+      paymentIntentId,
+      amountTotalCents: typeof amountTotal === 'number' ? BigInt(amountTotal) : -1n,
+      subtotalCents: bound.subtotalCents,
+      taxCents: bound.taxCents,
+      taxCalculationId: bound.taxCalculationId,
+      newsletterOptIn: bound.newsletterOptIn,
+      // §33.3.7: the clock starts at successful payment — the completion
+      // event's own moment, not receipt time and not any earlier act.
+      paidAt: event.created,
+      providerEventId: event.id,
+      actor: 'system:stripe-webhook',
+    },
+  );
+
+  if (outcome.status !== 'applied') return;
+
+  // Effect 7, after the commit. A refusal is recorded by the notifier and the
+  // claim stays visible; money never rolls back because an email bounced.
+  if (context.notifier && context.notificationContext) {
+    await notifyListingPayment(context.db, context.notifier, context.notificationContext, {
+      campaignId: bound.campaignId,
+      paymentId: outcome.paymentId,
+      responseDeadlineAt: outcome.responseDeadlineAt,
+      openedAssociationIds: outcome.openedAssociationIds,
+    });
+  } else {
+    await context.audit({
+      action: 'listing.notifications_unavailable',
+      targetType: 'campaign',
+      targetId: bound.campaignId,
+      internalReason:
+        'the payment applied but this process has no notifier configured; the §13 messages were not sent',
+    });
+  }
+}
+
+/**
+ * `checkout.session.expired` — §13's abandonment path. The campaign stays
+ * `listing_fee_pending`, no clock starts, every Founder input survives, and a
+ * fresh attempt duplicates neither a charge nor an association.
+ */
+async function handleCheckoutExpired(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  const object = event.object;
+  const sessionId = typeof object['id'] === 'string' ? object['id'] : '';
+  if (!sessionId) return;
+
+  const metadata = (object['metadata'] as Record<string, string> | undefined) ?? {};
+  const stored = await findStoredSession(context.db, context.gateway, sessionId);
+
+  await recordCheckoutExpired(
+    context.db,
+    { gateway: context.gateway, audit: context.audit },
+    {
+      checkoutSessionId: sessionId,
+      campaignId: stored?.campaignId ?? metadata['proovd_campaign_id'] ?? null,
+      providerEventId: event.id,
+    },
+  );
 }

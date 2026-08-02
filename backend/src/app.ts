@@ -20,6 +20,8 @@ import { unconfiguredScheduler, type Scheduler } from './interviews/calcom.js';
 import { createCalcomWebhookRouter } from './routes/calcom-webhook.js';
 import { createStripeWebhookRouter } from './routes/stripe-webhooks.js';
 import { createPayoutRouter } from './routes/payouts.js';
+import { createFounderListingRouter } from './routes/founder-listing.js';
+import { createAdminListingRouter } from './routes/admin-listing.js';
 import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
@@ -288,12 +290,48 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // money (§24.1). Both mount raw-body parsing themselves, for the reason the
   // note above this block has stated since Phase 01.
   if (config.stripeGateway) {
+    // Phase 11 (§13, §24.6). The listing notifications ride the platform
+    // webhook: effect 7 sends after the seven-effect transaction commits.
+    const listingContext = {
+      appBaseUrl: config.appBaseUrl,
+      supportEmail: config.invitationContext.supportEmail,
+      fromAddress: config.invitationContext.fromAddress,
+    };
     app.use(
       createStripeWebhookRouter({
         db,
         gateway: config.stripeGateway,
         audit: (event) => audit({ ...event, targetId: event.targetId }),
+        notifier,
+        notificationContext: listingContext,
         ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
+      }),
+    );
+    // Phase 11 (§13, §31.6, §33.3.5, §33.3.11). The Founder's listing payment:
+    // the pre-payment state, the Checkout session for the consented A.5 total,
+    // and the cancellation decision.
+    app.use(
+      createFounderListingRouter({
+        db,
+        auth,
+        gateway: config.stripeGateway,
+        audit: (event) => audit({ ...event, targetId: event.targetId }),
+        notifier,
+        context: listingContext,
+        ...(config.stripeConnectUrls ? { connectUrls: config.stripeConnectUrls } : {}),
+      }),
+    );
+    // Phase 11 (§13 Admin, §33.3.6, §33.3.8). Listing reconciliation, the exact
+    // clocks, the idempotent direct refund, and cancellation decisions — reads
+    // behind requireAdmin, money and decisions behind requireFreshSession.
+    app.use(
+      createAdminListingRouter({
+        db,
+        auth,
+        gateway: config.stripeGateway,
+        audit: (event) => audit({ ...event, targetId: event.targetId }),
+        notifier,
+        context: listingContext,
       }),
     );
     // Phase 10b (§13, §11). Stripe-hosted onboarding for both roles, the return

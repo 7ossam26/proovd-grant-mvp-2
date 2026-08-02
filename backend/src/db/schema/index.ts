@@ -33,4 +33,8 @@ export * from './workspace.js';
 // their four human-readable onboarding states, and the append-only record of
 // every return, refresh, and provider-driven status change.
 export * from './payments.js';
+// Phase 11: the §24.6 listing-fee stream — the successful payment with its two
+// §6 clocks, the single full refund the three §13 triggers share, and the
+// §31.6 cancellation decision record.
+export * from './listing.js';
 

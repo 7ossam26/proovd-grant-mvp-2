@@ -318,6 +318,86 @@ export const removeSocial = (
 ): Promise<{ workspace: WorkspaceState }> =>
   call(`${base(campaignId)}/socials/${encodeURIComponent(socialId)}`, { method: 'DELETE' });
 
+/* ── The listing fee (§13, §24.6, §31.6 — Phase 11) ───────────────────────── */
+
+/** §13's pre-payment state, or §24.6's record once the fee is paid. */
+export interface ListingState {
+  paid: boolean;
+  /* Before payment. */
+  onboardingState?: string;
+  listingFeeEligible?: boolean;
+  taxAvailable?: boolean;
+  checkoutAvailable?: boolean;
+  /* After payment — every amount a string of integer cents. */
+  payment?: {
+    baseCents: string;
+    discountLines: Array<{ item: OptionalItemKey; discountCents: string }>;
+    discountCents: string;
+    promotionCents: string;
+    subtotalCents: string;
+    taxCents: string;
+    totalCents: string;
+    descriptor: string;
+    receiptUrl: string | null;
+    paidAt: string;
+    responseDeadlineAt: string;
+    freeCancellationDeadlineAt: string;
+  };
+  refund?: {
+    status: string;
+    trigger: string;
+    totalRefundedCents: string;
+    explanation: string;
+  } | null;
+  cancellation?: { status: string; kind: string; explanation: string } | null;
+}
+
+/**
+ * What the Checkout call returns: the session to send the Founder to, and the
+ * exact amounts A.5's consent named. The browser formats them and computes
+ * nothing (Phase 09's rule).
+ */
+export interface CheckoutQuote {
+  url: string;
+  sessionId: string;
+  baseCents: string;
+  discountLines: Array<{ item: OptionalItemKey; discountCents: string }>;
+  discountCents: string;
+  subtotalCents: string;
+  taxCents: string;
+  totalCents: string;
+  descriptor: string;
+}
+
+export interface BillingAddress {
+  postalCode: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  line1?: string;
+}
+
+export const fetchListing = (campaignId: string): Promise<{ listing: ListingState }> =>
+  call(`${base(campaignId)}/listing`);
+
+export const openListingCheckout = (
+  campaignId: string,
+  input: { address: BillingAddress; newsletterOptIn: boolean },
+): Promise<{ checkout: CheckoutQuote }> =>
+  call(`${base(campaignId)}/listing/checkout`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+
+export const cancelListing = (
+  campaignId: string,
+  reason: string,
+): Promise<{ cancellation: { status: string; refund?: string; explanation: string } }> =>
+  call(`${base(campaignId)}/listing/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
 /* ── The interview ────────────────────────────────────────────────────────── */
 
 export const cancelInterview = (

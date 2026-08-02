@@ -53,6 +53,7 @@ import { PageLoading } from '../../features/public/states.js';
 import { useAutosave } from '../../lib/useAutosave.js';
 import { describeSaveState } from '../../lib/autosave.js';
 import { FeePreview, HighEffortPanel } from './FeePreview.js';
+import { ListingPayment } from './ListingPayment.js';
 import { HelperResources } from './HelperResources.js';
 import { InterviewEmbed } from './InterviewBooking.js';
 import { PayoutOnboarding, type PayoutState } from '../payouts/PayoutOnboarding.js';
@@ -719,6 +720,11 @@ export function CampaignWorkspace() {
             whichever of §13's four states is true — including the restricted
             one, which deliberately offers no path to payment. */}
         <FounderPayouts />
+        {/* §13 / §24.6 (Phase 11): the itemised fee, Appendix A.5's consent
+            with its resolved total, and the one payment action — or, after
+            payment, the §24.6 record and §31.6's cancellation decision. It
+            renders no way to pay while onboarding is incomplete or restricted. */}
+        <ListingPayment campaignId={campaignId} />
       </div>
       </Measure>
     </Section>

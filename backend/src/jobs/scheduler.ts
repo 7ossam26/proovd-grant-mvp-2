@@ -27,12 +27,14 @@
 import { PgBoss } from 'pg-boss';
 import type { Database } from '../db/client.js';
 import type { TokenService } from '../auth/token-service.js';
+import { createAuditWriter } from '../auth/audit.js';
 import { sweepUnclaimedDrafts } from '../invitations/retention.js';
 import {
   sendDueReminders,
   sweepAbandonedBookings,
   reconcilePendingBookings,
 } from '../interviews/jobs.js';
+import { sweepListingDeadlines } from '../payments/listing-clocks.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -68,6 +70,16 @@ export const INTERVIEW_REMINDER_JOB = 'interview-reminders';
 export const INTERVIEW_RECONCILIATION_JOB = 'interview-reconciliation';
 
 /**
+ * Phase 11's two §6 clocks — the 72-hour response deadline (§14.6) and the
+ * 48-hour free-cancellation window (§31.6). The deadlines themselves were
+ * computed at payment and stored (§29.6); the sweep only notices them, exactly
+ * once each, and routes the reached deadline to Admin until Phase 12's
+ * evaluation exists. Safe to run twice: each firing pivots on
+ * `idempotency_keys`.
+ */
+export const LISTING_DEADLINE_JOB = 'listing-deadlines';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -95,6 +107,8 @@ export interface Scheduler {
   runRetentionNow: () => Promise<void>;
   /** Runs the §12 interview jobs now. Used by tests and by Admin. */
   runInterviewJobsNow: () => Promise<void>;
+  /** Runs the §14.6/§31.6 deadline sweep now. Used by tests and by Admin. */
+  runListingDeadlinesNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -174,6 +188,21 @@ export async function startScheduler({
     tz: 'UTC',
   });
 
+  /* ── Phase 11's listing-deadline clocks (§14.6, §31.6) ─────────────────── */
+
+  const audit = createAuditWriter(db);
+  await boss.createQueue(LISTING_DEADLINE_JOB);
+  await boss.work(LISTING_DEADLINE_JOB, async () => {
+    const result = await sweepListingDeadlines(db, audit);
+    // Every run says what it noticed — a quiet run and a dead job must not
+    // look alike when the thing being watched is a refund promise (§1.4).
+    log('listing deadline sweep complete', {
+      responseDeadlinesReached: result.responseDeadlinesReached.length,
+      freeWindowsClosed: result.freeWindowsClosed.length,
+    });
+  });
+  await boss.schedule(LISTING_DEADLINE_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -182,6 +211,9 @@ export async function startScheduler({
     runInterviewJobsNow: async () => {
       await boss.send(INTERVIEW_REMINDER_JOB, {});
       await boss.send(INTERVIEW_RECONCILIATION_JOB, {});
+    },
+    runListingDeadlinesNow: async () => {
+      await boss.send(LISTING_DEADLINE_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

@@ -65,6 +65,21 @@ export const FOUNDER_INTERVIEW_REMINDER = 'founder_interview_reminder' as const;
 export const FOUNDER_INTERVIEW_RESCHEDULED = 'founder_interview_rescheduled' as const;
 export const FOUNDER_INTERVIEW_CANCELED = 'founder_interview_canceled' as const;
 
+/**
+ * Phase 11's four, sent by `payments/listing-notifications.ts`.
+ *
+ * §27.3 — "Listing-fee receipt" and "Listing-fee refund"; §27.4 — "Formal
+ * opportunity available"; §27.6 — "Listing paid / deadline started". They
+ * arrive together because §13's effect 7 is the sender for the first three and
+ * the internal one rides the same commit.
+ */
+export const FOUNDER_LISTING_FEE_RECEIPT = 'founder_listing_fee_receipt' as const;
+export const FOUNDER_LISTING_FEE_REFUND = 'founder_listing_fee_refund' as const;
+export const AFFILIATE_FORMAL_OPPORTUNITY_AVAILABLE =
+  'affiliate_formal_opportunity_available' as const;
+export const INTERNAL_LISTING_PAID_DEADLINE_STARTED =
+  'internal_listing_paid_deadline_started' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -74,6 +89,10 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INTERVIEW_REMINDER,
   FOUNDER_INTERVIEW_RESCHEDULED,
   FOUNDER_INTERVIEW_CANCELED,
+  FOUNDER_LISTING_FEE_RECEIPT,
+  FOUNDER_LISTING_FEE_REFUND,
+  AFFILIATE_FORMAL_OPPORTUNITY_AVAILABLE,
+  INTERNAL_LISTING_PAID_DEADLINE_STARTED,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

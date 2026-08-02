@@ -39,6 +39,13 @@ export interface AuditEventInput {
   actorId?: string | null;
   mfaContext?: string | null;
   reauthContext?: string | null;
+  /* §25.6's money columns, first used by Phase 11's listing payment. The
+     columns have existed since migration 0001; an event that moves money states
+     the amount and the provider objects it moved through. */
+  amountCents?: bigint | null;
+  currency?: string | null;
+  providerObjectIds?: Record<string, unknown> | null;
+  evidenceLinks?: Record<string, unknown> | null;
 }
 
 export type AuditWriter = (event: AuditEventInput) => Promise<void>;
@@ -56,6 +63,10 @@ export function createAuditWriter(db: Database): AuditWriter {
       customerExplanation: event.customerExplanation ?? null,
       priorValue: event.priorValue ?? null,
       newValue: event.newValue ?? null,
+      amountCents: event.amountCents ?? null,
+      currency: event.currency ?? null,
+      providerObjectIds: event.providerObjectIds ?? null,
+      evidenceLinks: event.evidenceLinks ?? null,
     });
   };
 }

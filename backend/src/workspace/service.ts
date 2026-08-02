@@ -336,14 +336,21 @@ export async function evaluateWorkspace(
     settled.some((row) => row.item === key && row.complete),
   );
 
-  const highEffort = await recordHighEffort(db, {
-    campaignId: input.campaignId,
-    actor: input.actor,
-    trigger: input.trigger,
-    visualsCompleted: completed.includes('visuals'),
-    brandingCompleted: completed.includes('branding'),
-    interviewScheduledOrConfirmed: interviewCountsForHighEffort(rows.booking?.status ?? null),
-  });
+  // §33.3.4: "High-effort … locks at payment." The item decisions above are
+  // frozen by their own locked_at, but the interview input reads the LIVE
+  // booking — and a Founder canceling the meeting after payment must not flip
+  // a classification that was charged against (Phase 11 sets the lock; this is
+  // the half of it that lives here). While locked, the stored answer stands.
+  const highEffort = locked
+    ? await readLatestHighEffort(db, input.campaignId)
+    : await recordHighEffort(db, {
+        campaignId: input.campaignId,
+        actor: input.actor,
+        trigger: input.trigger,
+        visualsCompleted: completed.includes('visuals'),
+        brandingCompleted: completed.includes('branding'),
+        interviewScheduledOrConfirmed: interviewCountsForHighEffort(rows.booking?.status ?? null),
+      });
 
   const fee = await recordListingFee(db, {
     campaignId: input.campaignId,
@@ -356,6 +363,38 @@ export async function evaluateWorkspace(
 }
 
 /* ── High-effort (§12) ────────────────────────────────────────────────────── */
+
+/**
+ * The classification in force, read without recomputing. Used while §12's
+ * post-payment lock stands; falls back to a fresh recording only for a
+ * workspace that has somehow never been evaluated, which no locked campaign
+ * can be.
+ */
+async function readLatestHighEffort(
+  db: Executor,
+  campaignId: string,
+): Promise<EvaluationResult['highEffort']> {
+  const [latest] = await db
+    .select()
+    .from(highEffortClassifications)
+    .where(eq(highEffortClassifications.campaignId, campaignId))
+    .orderBy(desc(highEffortClassifications.calculatedAt))
+    .limit(1);
+
+  if (!latest) {
+    throw new Error(
+      `campaign ${campaignId} is locked but has no high-effort classification — a payment cannot have preceded evaluation`,
+    );
+  }
+
+  return {
+    visualsCompleted: latest.visualsCompleted,
+    brandingCompleted: latest.brandingCompleted,
+    interviewScheduledOrConfirmed: latest.interviewScheduledOrConfirmed,
+    highEffort: latest.highEffort,
+    calculatedAt: latest.calculatedAt,
+  };
+}
 
 /**
  * §12: "`high_effort = true` only when all three are absent at calculation
@@ -455,12 +494,29 @@ export async function recordListingFee(
     completed: readonly OptionalItemKey[];
   },
 ): Promise<ListingFeeResult> {
-  const [latest] = await db
+  // §12's lock: the CHARGED calculation wins, whether or not it is the latest
+  // row — a Founder editing between session creation and payment can leave a
+  // newer unlocked row behind, and the record the money followed is the locked
+  // one (Phase 11 stamps it).
+  const [lockedRow] = await db
     .select()
     .from(listingFeeCalculations)
-    .where(eq(listingFeeCalculations.campaignId, input.campaignId))
-    .orderBy(desc(listingFeeCalculations.calculatedAt))
+    .where(
+      and(
+        eq(listingFeeCalculations.campaignId, input.campaignId),
+        sql`${listingFeeCalculations.lockedAt} IS NOT NULL`,
+      ),
+    )
     .limit(1);
+
+  const [latest] = lockedRow
+    ? [lockedRow]
+    : await db
+        .select()
+        .from(listingFeeCalculations)
+        .where(eq(listingFeeCalculations.campaignId, input.campaignId))
+        .orderBy(desc(listingFeeCalculations.calculatedAt))
+        .limit(1);
 
   if (latest?.lockedAt) {
     return {

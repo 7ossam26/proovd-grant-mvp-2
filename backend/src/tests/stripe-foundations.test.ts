@@ -320,8 +320,11 @@ describe('§32.3 — two endpoints, two handler maps', () => {
   it('registers no handler for an object no phase creates yet', () => {
     // §1 rule 6 applied to a vendor's vocabulary: a registered no-op handler
     // reads as "handled", and this build does not handle these.
+    //
+    // `checkout.session.*` left this list in Phase 11 — that is the phase whose
+    // Checkout creates the object, and it registers both on the platform map.
+    // The rest still belong to objects later phases create.
     for (const type of [
-      'checkout.session.completed',
       'payment_intent.succeeded',
       'setup_intent.succeeded',
       'transfer.created',
@@ -332,12 +335,21 @@ describe('§32.3 — two endpoints, two handler maps', () => {
     }
   });
 
+  it('registers Phase 11’s Checkout events on platform and not on Connect', () => {
+    // §24.6 and §33.3.6: the listing fee is Proovd's own money. A Connect
+    // delivery must not be able to reach a platform-side effect.
+    for (const type of ['checkout.session.completed', 'checkout.session.expired']) {
+      expect(PLATFORM_HANDLERS[type]).toBeDefined();
+      expect(CONNECT_HANDLERS[type]).toBeUndefined();
+    }
+  });
+
   it('records an unhandled event and answers 200', async () => {
     // Stripe retries a non-2xx for days. An event whose phase has not been
     // built is not a delivery problem.
     const payload = eventBody({
-      type: 'checkout.session.completed',
-      object: { id: 'cs_test_unhandled' },
+      type: 'payment_intent.succeeded',
+      object: { id: 'pi_test_unhandled' },
     });
     const response = await deliver(
       STRIPE_PLATFORM_WEBHOOK_PATH,

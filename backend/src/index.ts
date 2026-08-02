@@ -132,6 +132,9 @@ async function main() {
     platformAccountId: env.STRIPE_PLATFORM_ACCOUNT_ID,
     platformWebhookSecret: env.STRIPE_WEBHOOK_SECRET_PLATFORM,
     connectWebhookSecret: env.STRIPE_WEBHOOK_SECRET_CONNECT,
+    // §12 puts Stripe Tax on the listing Checkout; while this is false the
+    // payment surface refuses loudly rather than charging an untaxed total.
+    taxEnabled: env.STRIPE_TAX_ENABLED,
   });
 
   const publicDir = path.join(__dirname, '..', 'public');

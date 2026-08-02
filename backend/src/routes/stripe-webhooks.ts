@@ -37,8 +37,10 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import type { Database } from '../db/client.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Notifier } from '../notifications/send.js';
 import type { StripeGateway, WebhookEndpoint } from '../payments/stripe-client.js';
 import { ingestStripeEvent } from '../payments/webhook-handlers.js';
+import type { ListingNotificationContext } from '../payments/listing-notifications.js';
 
 export const STRIPE_PLATFORM_WEBHOOK_PATH = '/api/webhooks/stripe/platform';
 export const STRIPE_CONNECT_WEBHOOK_PATH = '/api/webhooks/stripe/connect';
@@ -50,6 +52,9 @@ export interface StripeWebhookDeps {
   db: Database;
   gateway: StripeGateway;
   audit: AuditWriter;
+  /** §13's effect 7 — Phase 11's payment handler sends through these. */
+  notifier?: Notifier;
+  notificationContext?: ListingNotificationContext;
   /** Raised only by the integration suite, which drives many deliveries. */
   limit?: number;
 }
@@ -58,6 +63,8 @@ export function createStripeWebhookRouter({
   db,
   gateway,
   audit,
+  notifier,
+  notificationContext,
   limit,
 }: StripeWebhookDeps): Router {
   const router = Router();
@@ -97,7 +104,10 @@ export function createStripeWebhookRouter({
         return;
       }
 
-      const outcome = await ingestStripeEvent({ db, gateway, audit }, event);
+      const outcome = await ingestStripeEvent(
+        { db, gateway, audit, notifier, notificationContext },
+        event,
+      );
 
       if (outcome.status === 'failed') {
         // Stripe should retry this one. The claim stays unprocessed, so the
