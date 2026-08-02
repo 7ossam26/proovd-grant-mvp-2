@@ -22,6 +22,9 @@ import { createStripeWebhookRouter } from './routes/stripe-webhooks.js';
 import { createPayoutRouter } from './routes/payouts.js';
 import { createFounderListingRouter } from './routes/founder-listing.js';
 import { createAdminListingRouter } from './routes/admin-listing.js';
+import { createCreatorDecisionRouter } from './routes/creator-decisions.js';
+import { createFounderRosterRouter } from './routes/founder-roster.js';
+import { createAdminDecisionRouter } from './routes/admin-decisions.js';
 import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
@@ -347,6 +350,29 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         ...(config.stripeConnectUrls ?? {}),
       }),
     );
+    // Phase 12a (§14.2, §14.5, §33.2.5–13). The Creator's three formal
+    // decisions and the immutable proposal versions; the Founder's roster view
+    // and response; Admin's overview and mediation reject. Behind the same
+    // role guards as their Phase 08c/09a/06a siblings.
+    app.use(
+      createCreatorDecisionRouter({
+        db,
+        auth,
+        audit,
+        notifier,
+        context: listingContext,
+      }),
+    );
+    app.use(
+      createFounderRosterRouter({
+        db,
+        auth,
+        audit,
+        notifier,
+        context: listingContext,
+      }),
+    );
+    app.use(createAdminDecisionRouter({ db, auth, audit }));
   }
 
   // ── SPA fallback ──────────────────────────────────────────────────────────

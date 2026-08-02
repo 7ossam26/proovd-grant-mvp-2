@@ -409,3 +409,46 @@ export const cancelInterview = (
     method: 'POST',
     body: JSON.stringify({ reason }),
   });
+
+/* ── The §14.5 roster view and the Founder's proposal responses (Phase 12a) ── */
+
+export interface RosterCreator {
+  associationId: string;
+  handle: string | null;
+  channelType: string | null;
+  audienceMetric: string | null;
+  niche: string | null;
+  bio: string | null;
+  statusLabel: string;
+  openProposal: {
+    versionId: string;
+    versionNumber: number;
+    awaitingYou: boolean;
+    bidTotalPercent: number | null;
+    fixedPaymentRequestCents: string | null;
+    note: string;
+  } | null;
+  lockedTerms: { totalPercent: number; fixedPaymentCents: string | null } | null;
+}
+
+export interface RosterView {
+  responseDeadlineAt: string | null;
+  fullRefundOutcome: string;
+  pendingProposalNote: string;
+  creators: RosterCreator[];
+}
+
+export const fetchRoster = (campaignId: string): Promise<{ roster: RosterView }> =>
+  call(`${base(campaignId)}/roster`);
+
+export const respondToProposal = (
+  versionId: string,
+  body:
+    | { action: 'accept' }
+    | { action: 'decline' }
+    | { action: 'revise'; bidTotalPercent?: number; fixedPaymentRequestCents?: string },
+): Promise<{ response: { outcome: string } }> =>
+  call(`/api/founder/proposals/${encodeURIComponent(versionId)}/respond`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

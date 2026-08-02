@@ -204,6 +204,17 @@ async function main() {
         fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
       },
     },
+    // Phase 12a: the §14.6 evaluation runs inside the deadline sweep and needs
+    // the gateway (for the refund) and the notifier (for the messages).
+    listing: {
+      gateway: stripeGateway,
+      notifier,
+      notificationContext: {
+        appBaseUrl: env.APP_BASE_URL,
+        supportEmail: 'support@proovd.co',
+        fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
+      },
+    },
   });
   logger.info('Job scheduler started');
 

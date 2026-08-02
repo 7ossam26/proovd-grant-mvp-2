@@ -592,7 +592,20 @@ export async function applyListingPayment(
           input.actor,
           tx,
         );
-        if (openedNow) openedAssociationIds.push(association.id);
+        if (openedNow) {
+          // §25.4's "formal activation" fact, stamped once with the payment
+          // moment the whole §14 window hangs on (Phase 12a, migration 0017).
+          await tx
+            .update(campaignAffiliateAssociations)
+            .set({ formalOpenedAt: input.paidAt })
+            .where(
+              and(
+                eq(campaignAffiliateAssociations.id, association.id),
+                isNull(campaignAffiliateAssociations.formalOpenedAt),
+              ),
+            );
+          openedAssociationIds.push(association.id);
+        }
       }
       const skippedRevoked = eligible.filter((a) => a.revokedAt).map((a) => a.id);
 

@@ -253,6 +253,101 @@ export const fetchPreparingKit = (
     `/api/creator/campaigns/${encodeURIComponent(associationId)}?section=${section}`,
   );
 
+/* ── The formal opportunity and the three decisions (§14.1, §14.2) ────────── */
+
+export interface FormalOpportunity {
+  associationId: string;
+  campaignId: string;
+  associationStatus: string;
+  whyThisFitsYourAudience: string | null;
+  campaignStateLabel: string;
+  responseDeadlineAt: string | null;
+  highEffort: {
+    result: boolean;
+    basis: {
+      visualsCompleted: boolean;
+      brandingCompleted: boolean;
+      interviewScheduledOrConfirmed: boolean;
+    } | null;
+  };
+  compensation: {
+    basePercent: number;
+    basePercentWithFixed: number | null;
+    bidAllowed: boolean;
+    fixedPaymentAvailable: boolean;
+    ceilingPercent: number;
+  };
+  decisionsAvailable: boolean;
+  versions: Array<{
+    id: string;
+    versionNumber: number;
+    proposedBy: string;
+    bidTotalPercent: number | null;
+    fixedPaymentRequestCents: string | null;
+    state: string;
+    createdAt: string;
+  }>;
+  agreement: { totalPercent: number; fixedPaymentCents: string | null; source: string } | null;
+  trackingLink: {
+    url: string;
+    testUrl: string;
+    active: boolean;
+    disclosureText: string;
+  } | null;
+}
+
+export const fetchFormalOpportunity = (
+  associationId: string,
+): Promise<{ opportunity: FormalOpportunity }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/opportunity`);
+
+/** §28.4: four separate confirmations from four separate controls. */
+export interface DecisionConfirmations {
+  compensationTerms: boolean;
+  ipAgreement: boolean;
+  ftcDisclosure: boolean;
+  termsAup: boolean;
+}
+
+export const acceptStandardTerms = (
+  associationId: string,
+  confirmations: DecisionConfirmations,
+): Promise<{ accepted: { totalPercent: number } }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/accept`, {
+    method: 'POST',
+    body: JSON.stringify(confirmations),
+  });
+
+export const declineOpportunity = (
+  associationId: string,
+  reason: string,
+): Promise<{ declined: { recordedAt: string } }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/decline`, {
+    method: 'POST',
+    body: JSON.stringify(reason.trim() ? { reason } : {}),
+  });
+
+export const submitProposal = (
+  associationId: string,
+  proposal: { bidTotalPercent?: number; fixedPaymentRequestCents?: string },
+): Promise<{ proposal: { versionId: string; versionNumber: number } }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/proposals`, {
+    method: 'POST',
+    body: JSON.stringify(proposal),
+  });
+
+export const respondToVersion = (
+  versionId: string,
+  body:
+    | ({ action: 'accept' } & DecisionConfirmations)
+    | { action: 'decline' }
+    | { action: 'counter'; bidTotalPercent?: number; fixedPaymentRequestCents?: string },
+): Promise<{ response: { outcome: string } }> =>
+  sessionCall(`/api/creator/proposals/${encodeURIComponent(versionId)}/respond`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
 /** §5.3: email + password. No second factor — §5.1 makes that Admin's rule. */
 export const creatorSignIn = (email: string, password: string): Promise<unknown> =>
   sessionCall('/api/auth/sign-in/email', {

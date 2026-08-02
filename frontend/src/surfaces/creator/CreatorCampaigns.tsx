@@ -142,6 +142,16 @@ export function CreatorCampaigns() {
   );
 }
 
+/** §14.2's window and its afterstates — where the list routes to the decision. */
+const FORMAL_STATUSES = new Set([
+  'formal_decision_open',
+  'reviewing',
+  'proposal_pending',
+  'accepted',
+  'declined',
+  'expired_no_acceptance',
+]);
+
 function CampaignRow({ row }: { row: CreatorCampaign }) {
   const navigate = useNavigate();
   const name = row.productName ?? 'A campaign';
@@ -175,6 +185,34 @@ function CampaignRow({ row }: { row: CreatorCampaign }) {
         action={NO_ACTION}
         reference={row.campaignId}
       />
+    );
+  }
+
+  if (FORMAL_STATUSES.has(row.status)) {
+    // Phase 12a (§14.2): listing payment made the opportunity actionable, so
+    // the row's action is the formal decision. The kit stays one gesture away
+    // inside it.
+    return (
+      <Card>
+        <Tag variant="mint">
+          {row.status === 'accepted'
+            ? 'Accepted'
+            : row.status === 'declined'
+              ? 'Declined'
+              : row.status === 'expired_no_acceptance'
+                ? 'Ended'
+                : 'Formal decision open'}
+        </Tag>
+        <h2>{name}</h2>
+        <div className="claim__actions">
+          <Button
+            tier="primary"
+            onClick={() => void navigate(`/creator/campaigns/${row.associationId}/opportunity`)}
+          >
+            Open the formal opportunity
+          </Button>
+        </div>
+      </Card>
     );
   }
 

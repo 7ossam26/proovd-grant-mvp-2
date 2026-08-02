@@ -34,7 +34,10 @@ import {
   sweepAbandonedBookings,
   reconcilePendingBookings,
 } from '../interviews/jobs.js';
-import { sweepListingDeadlines } from '../payments/listing-clocks.js';
+import {
+  sweepListingDeadlines,
+  type DeadlineEvaluationDeps,
+} from '../payments/listing-clocks.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -99,6 +102,9 @@ export interface SchedulerDeps {
     notifier: Notifier;
     context: InterviewNotificationContext;
   };
+  /** The §14.6 evaluation's needs (Phase 12a). Optional: without a gateway the
+      sweep still records reached deadlines and the evaluation waits. */
+  listing?: DeadlineEvaluationDeps;
 }
 
 export interface Scheduler {
@@ -118,6 +124,7 @@ export async function startScheduler({
   connectionString,
   log,
   interviews,
+  listing,
 }: SchedulerDeps): Promise<Scheduler> {
   const boss = new PgBoss({ connectionString, schema: 'pgboss' });
 
@@ -193,12 +200,17 @@ export async function startScheduler({
   const audit = createAuditWriter(db);
   await boss.createQueue(LISTING_DEADLINE_JOB);
   await boss.work(LISTING_DEADLINE_JOB, async () => {
-    const result = await sweepListingDeadlines(db, audit);
+    const result = await sweepListingDeadlines(db, audit, new Date(), listing);
     // Every run says what it noticed — a quiet run and a dead job must not
     // look alike when the thing being watched is a refund promise (§1.4).
     log('listing deadline sweep complete', {
       responseDeadlinesReached: result.responseDeadlinesReached.length,
       freeWindowsClosed: result.freeWindowsClosed.length,
+      evaluations: result.evaluations.map(({ campaignId, result: r }) => ({
+        campaignId,
+        status: r.status,
+        outcome: r.status === 'evaluated' ? r.outcome : undefined,
+      })),
     });
   });
   await boss.schedule(LISTING_DEADLINE_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });

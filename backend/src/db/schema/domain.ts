@@ -332,6 +332,16 @@ export const campaignAffiliateAssociations = pgTable(
     kitAccessRevokedReason: text('kit_access_revoked_reason'),
     kitAccessRevokedBy: text('kit_access_revoked_by'),
 
+    /* ── §25.4's response facts, added Phase 12a (migration 0017) ───────────
+       "Formal activation, response, joined-at": `formal_opened_at` is stamped
+       once by the payment's effect 4 when the association reaches
+       `formal_decision_open`; the decline record is §14.2's "Store decision
+       time and optional reason". Acceptance times live on the compensation
+       agreement row, which is where the accepted terms are. */
+    formalOpenedAt: timestamp('formal_opened_at', { withTimezone: true }),
+    declinedAt: timestamp('declined_at', { withTimezone: true }),
+    declineReason: text('decline_reason'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

@@ -321,8 +321,24 @@ export function createAdminListingRouter(deps: AdminListingDeps): Router {
   /* ── Running the deadline sweep now — the recovery action (§1.1) ─────────── */
 
   router.post(`${ADMIN_LISTING_PATH}/run-deadline-sweep`, admin, fresh, async (_req, res) => {
-    const result = await sweepListingDeadlines(db, audit);
-    res.json({ sweep: result });
+    const result = await sweepListingDeadlines(db, audit, new Date(), {
+      gateway,
+      notifier,
+      notificationContext: context,
+    });
+    res.json({
+      sweep: {
+        responseDeadlinesReached: result.responseDeadlinesReached,
+        freeWindowsClosed: result.freeWindowsClosed,
+        // Flattened: evaluation rows carry bigints and Dates the wire cannot.
+        evaluations: result.evaluations.map(({ campaignId, result: r }) => ({
+          campaignId,
+          status: r.status,
+          outcome: r.status === 'evaluated' ? r.outcome : null,
+          refund: r.status === 'evaluated' && r.refund ? r.refund.status : null,
+        })),
+      },
+    });
   });
 
   /* ── A pending-cancellations queue for the Admin shell ───────────────────── */

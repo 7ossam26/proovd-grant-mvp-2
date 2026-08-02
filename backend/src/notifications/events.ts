@@ -80,6 +80,26 @@ export const AFFILIATE_FORMAL_OPPORTUNITY_AVAILABLE =
 export const INTERNAL_LISTING_PAID_DEADLINE_STARTED =
   'internal_listing_paid_deadline_started' as const;
 
+/**
+ * Phase 12a's eight, sent by `affiliates/decision-notifications.ts`.
+ *
+ * §27.3 — "Creator proposal received", "Creator proposal revision activity",
+ * "Creator decision on a proposal version"; §27.4 — "Proposal version
+ * submitted", "Founder revision received", "Founder decision on a proposal
+ * version", "Proposal deadline expiry", "Acceptance confirmation", "Decline
+ * confirmation". They arrive together because §14.2's three decisions and the
+ * §14.6 expiry are this phase's senders.
+ */
+export const AFFILIATE_ACCEPT_CONFIRMATION = 'affiliate_accept_confirmation' as const;
+export const AFFILIATE_DECLINE_CONFIRMATION = 'affiliate_decline_confirmation' as const;
+export const AFFILIATE_PROPOSAL_SUBMITTED = 'affiliate_proposal_submitted' as const;
+export const AFFILIATE_FOUNDER_REVISION = 'affiliate_founder_revision' as const;
+export const AFFILIATE_FOUNDER_DECISION = 'affiliate_founder_decision' as const;
+export const AFFILIATE_PROPOSAL_EXPIRED = 'affiliate_proposal_expired' as const;
+export const FOUNDER_CREATOR_PROPOSAL_RECEIVED = 'founder_creator_proposal_received' as const;
+export const FOUNDER_CREATOR_PROPOSAL_REVISION = 'founder_creator_proposal_revision' as const;
+export const FOUNDER_CREATOR_PROPOSAL_DECISION = 'founder_creator_proposal_decision' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -93,6 +113,15 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_LISTING_FEE_REFUND,
   AFFILIATE_FORMAL_OPPORTUNITY_AVAILABLE,
   INTERNAL_LISTING_PAID_DEADLINE_STARTED,
+  AFFILIATE_ACCEPT_CONFIRMATION,
+  AFFILIATE_DECLINE_CONFIRMATION,
+  AFFILIATE_PROPOSAL_SUBMITTED,
+  AFFILIATE_FOUNDER_REVISION,
+  AFFILIATE_FOUNDER_DECISION,
+  AFFILIATE_PROPOSAL_EXPIRED,
+  FOUNDER_CREATOR_PROPOSAL_RECEIVED,
+  FOUNDER_CREATOR_PROPOSAL_REVISION,
+  FOUNDER_CREATOR_PROPOSAL_DECISION,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

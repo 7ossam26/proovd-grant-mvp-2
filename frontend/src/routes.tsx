@@ -19,12 +19,14 @@ import { FounderDetail } from './features/admin/FounderDetail.js';
 import { CampaignCreators } from './features/admin/CampaignCreators.js';
 import { CampaignWorkspacePanel } from './features/admin/CampaignWorkspace.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
+import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
   CreatorCampaigns,
   CreatorCampaignKit,
 } from './surfaces/creator/CreatorCampaigns.js';
+import { FormalOpportunity } from './surfaces/creator/FormalOpportunity.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
 import { CreatorResult } from './surfaces/draft/CreatorResult.js';
@@ -166,6 +168,13 @@ const rootChildren: RouteObject[] = [
     element: <CreatorCampaignKit />,
   },
   {
+    // Phase 12a (§14.1, §14.2, §33.2.6). The formal opportunity and the three
+    // decisions. Its own address beside the kit: the kit is reading material,
+    // this is a commercial decision, and a bookmark to either gets it back.
+    path: 'creator/campaigns/:associationId/opportunity',
+    element: <FormalOpportunity />,
+  },
+  {
     // Phase 09a (§12, DNA §5.9). The signed-in Founder's campaign workspace.
     // Outside the public shell and outside the Admin shell, for the reasons the
     // Creator routes document: §26 licenses dashboard density in Admin only,
@@ -173,6 +182,12 @@ const rootChildren: RouteObject[] = [
     // session and re-checked against the caller's own claim on every request.
     path: 'campaigns/:campaignId/workspace',
     element: <CampaignWorkspace />,
+  },
+  {
+    // Phase 12a (§14.5). The Founder's roster view during the 72-hour clock.
+    // Beside the workspace, outside both shells, for the same reasons.
+    path: 'campaigns/:campaignId/roster',
+    element: <FounderRoster />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

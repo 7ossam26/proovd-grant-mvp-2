@@ -37,4 +37,9 @@ export * from './payments.js';
 // §6 clocks, the single full refund the three §13 triggers share, and the
 // §31.6 cancellation decision record.
 export * from './listing.js';
+// Phase 12a: the §14.2 formal decisions — immutable proposal versions, the
+// locked compensation agreement, the acceptance confirmations, the inactive
+// tracking link, the §14.3 Creator-specific bonus, and the §14.6 deadline
+// evaluation record.
+export * from './decisions.js';
 
