@@ -29,6 +29,8 @@ import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { LedgerPage } from './features/admin/Ledger.js';
 import { MoneyControlsPage } from './features/admin/MoneyControls.js';
 import { RiskPanelPage } from './features/admin/RiskPanel.js';
+import { SupportQueuePage } from './features/admin/SupportQueue.js';
+import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -140,6 +142,11 @@ const rootChildren: RouteObject[] = [
       { path: 'ledger', element: <LedgerPage /> },
       { path: 'money', element: <MoneyControlsPage /> },
       { path: 'risk', element: <RiskPanelPage /> },
+      // Phase 16b (§26.7, §26.8, §27.8). The support queue sweeps every case and
+      // opens one by query string; campaign operations — timeline, enforcement,
+      // and relationship touches — is campaign-scoped like the panels above.
+      { path: 'support', element: <SupportQueuePage /> },
+      { path: 'campaign-operations', element: <CampaignOperationsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],

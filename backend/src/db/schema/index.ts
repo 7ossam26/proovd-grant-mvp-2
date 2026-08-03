@@ -69,3 +69,9 @@ export * from './reservations.js';
 // §26.6's enforceable customer-consequence preview, and §33.12.4's insert-only
 // override record with its five required facts.
 export * from './admin-operations.js';
+// Phase 16b: §26.7/§27.8 support cases with their business-day response promise,
+// the append-only thread and its customer-facing flag, §26.8's four-field handoff
+// note, §26.7's suspend/kill decision with reason category AND free text, and
+// §26.8's one-time relationship touches. No timeline table — §26.8's timeline
+// composes existing events and has no writer.
+export * from './support.js';

@@ -1800,3 +1800,15 @@ html.no-motion [data-splash] { display: none !important; }
 @media (max-width: 600px) {
   .ops-filters { grid-template-columns: 1fr; }
 }
+
+/* ---- Support operations, the composed timeline, and enforcement, added Phase
+   16b. §26 licenses dashboard density in the Admin shell; these extend the
+   Phase 16a operations vocabulary rather than introducing a second one. */
+.ops-thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-16); }
+.ops-thread__body { margin: var(--sp-4) 0 0; white-space: pre-line; }
+.ops-timeline { margin: 0; padding-left: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-16); }
+.ops-timeline__summary { margin: var(--sp-4) 0 0; }
+/* The customer-reads-this control is its own labelled checkbox — §28.4's
+   no-bundling rule applied to an internal surface, because the consequence of
+   getting it wrong is a §33.9.11 leak. */
+.ops-check { display: flex; align-items: center; gap: var(--sp-8); min-height: 44px; }

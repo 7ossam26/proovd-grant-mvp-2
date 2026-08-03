@@ -1060,3 +1060,176 @@ export const executeOverride = (body: {
   previewId: string;
 }): Promise<{ overrideId: string; priorValue: unknown; newValue: unknown; replayed: boolean }> =>
   call('/api/admin/overrides', { method: 'POST', body: JSON.stringify(body) });
+
+/* ── Phase 16b: §26.7/§27.8 support, §26.7 enforcement, §26.8 timeline ────── */
+
+export interface QueueEntryState {
+  caseId: string;
+  reference: string;
+  topic: string;
+  owner: string;
+  status: string;
+  humanResponseDueAt: string;
+  nextPromisedUpdateAt: string | null;
+  founderFollowupDueAt: string | null;
+  responseOverdue: boolean;
+  promiseOverdue: boolean;
+  founderFollowupOverdue: boolean;
+  requesterEmail: string;
+  campaignId: string | null;
+}
+
+export interface SupportQueueState {
+  entries: QueueEntryState[];
+  dueCount: number;
+  overdueCount: number;
+}
+
+export const fetchSupportQueue = (): Promise<SupportQueueState> =>
+  call<SupportQueueState>('/api/admin/support/queue');
+
+export interface CaseDetailState {
+  reference: string;
+  topic: string;
+  owner: string;
+  status: string;
+  humanResponseDueAt: string;
+  nextPromisedUpdateAt: string | null;
+  founderFollowupDueAt: string | null;
+  requesterEmail: string;
+  campaign: { id: string; title: string | null; status: string } | null;
+  reservation: {
+    id: string;
+    status: string;
+    rewardTitle: string | null;
+    subtotalCents: string;
+    taxCents: string;
+    totalAuthorizedCents: string | null;
+    statementDescriptor: string | null;
+    reservedAt: string | null;
+  } | null;
+  messages: Array<{
+    id: string;
+    direction: string;
+    customerFacing: boolean;
+    body: string;
+    author: string;
+    occurredAt: string;
+  }>;
+  handoffs: Array<{
+    id: string;
+    verifiedFacts: string;
+    currentOwner: string;
+    nextCustomerPromise: string;
+    statementsToKeepConsistent: string;
+    occurredAt: string;
+  }>;
+  templates: Array<{ key: string; label: string; specRef: string; useWhen: string }>;
+}
+
+export const fetchCase = (caseId: string): Promise<CaseDetailState> =>
+  call<CaseDetailState>(`/api/admin/support/cases/${encodeURIComponent(caseId)}`);
+
+export const fetchTemplateDraft = (
+  caseId: string,
+  templateKey: string,
+): Promise<{ key: string; label: string; draft: string; preservedFacts: Record<string, string>; note: string }> =>
+  call(
+    `/api/admin/support/cases/${encodeURIComponent(caseId)}/templates/${encodeURIComponent(templateKey)}`,
+  );
+
+export const addCaseMessage = (
+  caseId: string,
+  body: { direction: 'inbound' | 'outbound'; customerFacing: boolean; body: string; templateKey?: string },
+): Promise<{ messageId: string }> =>
+  call(`/api/admin/support/cases/${encodeURIComponent(caseId)}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const transferCase = (
+  caseId: string,
+  body: {
+    toOwner: string;
+    verifiedFacts: string;
+    currentOwner: string;
+    nextCustomerPromise: string;
+    statementsToKeepConsistent: string;
+  },
+): Promise<{ handoffId: string }> =>
+  call(`/api/admin/support/cases/${encodeURIComponent(caseId)}/transfer`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export interface TimelineState {
+  subject: string;
+  subjectId: string;
+  entries: Array<{
+    kind: string;
+    occurredAt: string;
+    summary: string;
+    actor: string | null;
+    composedFrom: string;
+    detail?: Record<string, unknown>;
+  }>;
+  sourcesRead: string[];
+}
+
+export const fetchTimeline = (subject: string, subjectId: string): Promise<TimelineState> =>
+  call<TimelineState>(
+    `/api/admin/timeline/${encodeURIComponent(subject)}/${encodeURIComponent(subjectId)}`,
+  );
+
+export interface EnforcementState {
+  actions: Array<{
+    id: string;
+    action: string;
+    phase: string;
+    reasonCategory: string;
+    reasonDetail: string;
+    customerExplanation: string;
+    priorCampaignStatus: string;
+    newCampaignStatus: string;
+    effectsApplied: string[];
+    reservationsClosed: number;
+    paymentMethodsDetached: number;
+    actor: string;
+    occurredAt: string;
+  }>;
+  reasonCategories: string[];
+}
+
+export const fetchEnforcement = (campaignId: string): Promise<EnforcementState> =>
+  call<EnforcementState>(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/enforcement`);
+
+export const enforceCampaign = (
+  campaignId: string,
+  body: {
+    action: string;
+    reasonCategory: string;
+    reasonDetail: string;
+    customerExplanation: string;
+  },
+): Promise<{ phase: string; reservationsClosed: number; effectsApplied: string[] }> =>
+  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/enforcement`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const fetchRelationshipTouches = (
+  campaignId: string,
+): Promise<{
+  touches: Array<{ id: string; kind: string; note: string; recordedBy: string; occurredAt: string }>;
+  kinds: string[];
+  note: string;
+}> => call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/relationship-touches`);
+
+export const recordRelationshipTouch = (
+  campaignId: string,
+  body: { kind: string; note: string },
+): Promise<{ touchId: string }> =>
+  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/relationship-touches`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

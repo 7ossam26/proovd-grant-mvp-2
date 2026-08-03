@@ -40,6 +40,9 @@ const NAV = [
   { to: '/admin/ledger', label: 'Ledger' },
   { to: '/admin/money', label: 'Money controls' },
   { to: '/admin/risk', label: 'Risk controls' },
+  // Phase 16b (§26.7, §26.8, §27.8).
+  { to: '/admin/support', label: 'Support queue' },
+  { to: '/admin/campaign-operations', label: 'Campaign operations' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];

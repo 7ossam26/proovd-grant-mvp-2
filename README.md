@@ -23,10 +23,9 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–15 are
-complete, and Phase 16 is half built**; Phase 16b — support operations, suspend
-and kill, and the chronological customer timeline — is next. Money moves in test
-mode only, and the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–16 are
+complete**; Phase 17 — live campaign operations, comments, and materiality — is
+next. Money moves in test mode only, and the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -57,6 +56,7 @@ mode only, and the live-mode gate stays shut.
 | 15a | The Backer pre-order: eligibility, the atomic cap, reservation-time tax, the exact consent, the SetupIntent, and the immediate Founder operational share |
 | 15b | The campaign-scoped magic link, free cancellation, the practical-deduplication queue, and the pre-charge reminder |
 | 16a | The reservation and charge ledger, the money controls, the risk-control inventory, and the high-impact override machine |
+| 16b | Support cases against the published SLA, the handoff note, campaign suspension and kill, and the composed customer timeline |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -68,7 +68,8 @@ Splitting them was a scheduling decision, not a scope one: each half is built
 against the same brief and lands its own named acceptance tests. Every named
 test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.13, every
 one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one from
-§33.5.1 to §33.5.13, every one from §33.6.1 to §33.6.5, and §33.12.4.
+§33.5.1 to §33.5.13, every one from §33.6.1 to §33.6.5, and §33.12.4, §33.9.10,
+and §33.9.11.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
 record went first and is the source of truth — a scheduling provider is a source
@@ -108,6 +109,9 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/admin/      the eleven ledger dimensions, what may leave in an export,
                   the nine money-control lines, the money-status vocabulary,
                   the ten risk signals, and the overridable-field register
+  src/support/    the support topics and owners, the published SLA numbers, the
+                  Appendix B.8 acknowledgement, the four handoff facts, the
+                  eight suspend/kill reason categories, and the timeline sources
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -864,6 +868,83 @@ not hold anyone's money; Stripe settles to the Founder's own account, so a scree
 that said otherwise would be describing an arrangement that does not exist. Where
 money is blocked, the requirement blocking it is named — "blocked" with no reason
 is the same euphemism wearing a different word.
+
+## Support, suspension, and the timeline
+
+The other half of the operations surface: not what Admin reads, but what Admin
+does — and the record it leaves behind.
+
+**The published SLA is a real deadline, computed on the real calendar.** Spec
+§27.8 commits Proovd to a response "within one (1) business day, Monday–Friday,
+excluding U.S. federal holidays". That makes it a business-day deadline in the
+same sense as the Creator replacement window, so it is computed once from the
+committed versioned holiday calendar, stored with the version that produced it,
+and fixed by a database trigger. A promise made to a person is not moved by a
+later edit — and both deadlines read the same calendar, because two would
+eventually disagree on a public holiday.
+
+**A case carries everything the system already knows.** The campaign, the
+reward, the subtotal, the tax, the exact authorized total, the statement
+descriptor, the date the card was saved. Spec §26.8 requires that a user is
+never asked to repeat facts Proovd already holds, so responses start from
+editable templates already filled in with them. Templates are starting points:
+nothing sends itself, because a person who writes in deserves an answer from a
+person.
+
+**Raw provider and fraud codes never reach a customer.** A decline code or a
+fraud rule is genuinely useful — to support, on an internal note, which is
+exactly where Spec §26.8 puts it. The same code in a reply the customer reads is
+refused by the server, and so is one in the public explanation of why a campaign
+was stopped. No shipped template contains one either, because a template that
+did would put a support agent one keystroke from a leak.
+
+**The queue shows what is late, not just what is due.** An SLA nobody can see
+breached is an SLA that gets breached, so a case that went past its deadline last
+week is still in the queue, still badged, and sorted to the top. There are three
+clocks — the one-business-day response, the next promised update, and the
+48-hour follow-up when a Founder owes the answer — and a case can be fine on one
+and late on another. An internal note does not clear the breach: a case that
+looked answered while the person waiting had heard nothing would be the SLA
+failing quietly, which is the only way it really fails.
+
+**Changing owner requires a handoff note, and the note comes first.** Four
+things: what has actually been verified, who is taking it, what the customer has
+already been promised, and what must not now be contradicted. All four are
+required by the database and named individually when one is missing. A note that
+could be written afterwards is one that gets skipped and backfilled, so the note
+and the ownership change are a single transaction.
+
+**Suspension and kill need a category and a reason, and the phase is not the
+operator's to declare.** Whether a campaign is before or after capture is read
+from its own lifecycle — a caller who could assert "this is pre-capture" could
+close pre-orders that have already been charged. Before capture, the full set
+runs: every active pre-order closes without a charge, no future payment can be
+created for that campaign, cards are detached only where no other live
+transaction still needs them, roles are notified, and the page stays up saying
+what happened. After capture the decision, the audit, and the notice are
+recorded and no money moves — refunds and reversals belong to a later phase, and
+a second refund path is exactly what this one was told not to build.
+
+**A saved card that was authorized stays part of the record.** A killed pre-order
+moves to its own state — distinct from one the Backer cancelled, because who
+ended it matters — and the successful SetupIntent behind it is never rewritten.
+It happened; the record says so.
+
+**The timeline composes; it does not duplicate.** There is no timeline table, no
+writer, and no job that appends to one. Every entry is read at request time out
+of the record that already owns that fact, and each says which table it came
+from — so the timeline cannot drift from the ledger, which is the only property
+that makes it worth having during a dispute. A pre-order's timeline includes its
+campaign's events, because someone asking what happened to their pre-order needs
+to know the campaign was stopped.
+
+**Human touches are logged once and cannot be scheduled.** Spec §26.8 lets Admin
+record five personal moments with a first-cohort Founder — an introduction, a
+launch-eve check, a mid-campaign welcome, a close thank-you, a debrief — and
+insists they never become a sequence. So each may be logged once per campaign,
+there is no date field, no recurrence, no template, and no job that sends one. A
+second attempt is refused rather than quietly accepted: it is either a mistake or
+the beginning of the thing the rule forbids.
 
 ## Retention
 

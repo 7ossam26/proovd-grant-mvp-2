@@ -8,6 +8,7 @@ import { createHealthRouter } from './routes/health.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createAdminRouter } from './routes/admin.js';
 import { createAdminOperationsRouter } from './routes/admin-operations.js';
+import { createAdminSupportRouter } from './routes/admin-support.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
@@ -220,6 +221,24 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       db,
       auth,
       mode: config.stripeGateway?.mode ?? 'test',
+    }),
+  );
+  // Phase 16b (§26.7, §26.8, §27.8). Support cases with their business-day
+  // response promise and daily due/overdue queue, the four-field handoff note,
+  // suspend/kill with its complete pre-capture behaviour, and the read-only
+  // timeline composed from records that already exist. Kill/suspend and the
+  // relationship-touch log take the freshness gate; the queue and the timeline
+  // do not — support is daily work, and a gate on looking teaches an Admin to
+  // reauthenticate reflexively.
+  app.use(
+    createAdminSupportRouter({
+      db,
+      auth,
+      ...(config.stripeGateway
+        ? {
+            detachPaymentMethod: (input) => config.stripeGateway!.detachPaymentMethod(input),
+          }
+        : {}),
     }),
   );
   app.use(
