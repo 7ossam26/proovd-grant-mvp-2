@@ -355,6 +355,12 @@ export async function createPreorder(
           rewardSku: reward.sku,
           rewardTitle: reward.title,
           rewardDelivery: reward.delivery,
+          // §26.5's ledger dimension, stamped by the code that actually made the
+          // decision. Reaching this line means the capacity hold succeeded, so
+          // the answer is `within_cap` — a refusal returns before any
+          // reservation exists (§33.5.4), which is why no row ever carries
+          // `rejected_cap_exceeded`.
+          capResult: 'within_cap',
           backerEmail: input.contact.email,
           backerPhone: input.contact.phone,
           billingCountry: input.billing.country,
@@ -839,6 +845,8 @@ export async function replaceIdeaReward(
           rewardSku: reward.sku,
           rewardTitle: reward.title,
           rewardDelivery: reward.delivery,
+          // §26.5, as above: the replacement reservation also passed the hold.
+          capResult: 'within_cap',
           backerEmail: identity.email,
           backerPhone: identity.phone,
           billingCountry: input.billing.country,

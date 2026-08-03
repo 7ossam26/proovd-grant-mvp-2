@@ -23,10 +23,10 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–11 are
-complete**; Phase 12 — the formal Creator opportunity and the 72-hour decision
-the listing payment now starts — is next. Money moves in test mode only, and
-the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–15 are
+complete, and Phase 16 is half built**; Phase 16b — support operations, suspend
+and kill, and the chronological customer timeline — is next. Money moves in test
+mode only, and the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -47,16 +47,28 @@ the live-mode gate stays shut.
 | 10a | Stripe foundations: the pinned client, both signed webhook endpoints, idempotent event handling, and the provider-object ledger |
 | 10b | Hosted onboarding for Founders and Creators, its four return states, and the tax-accountability gate |
 | 11 | The listing-fee Checkout, its seven atomic effects, the two clocks, the single full refund, and Founder cancellation |
+| 12a | The formal Creator opportunity, the three decisions, immutable proposal versions, the bilateral lock, and the no-acceptance deadline |
+| 12b | Campaign building, the six roster-readiness rules, Admin review rounds, the approved snapshot, and the general materiality machine |
+| 13 | The optional fixed Creator payment as a fourth money stream, and the thirteen-item Creator-readiness checklist |
+| 14a | The coordinated launch, first-post verification and its three outcomes, and the required-Creator failure with its replacement window |
+| 14b | The live public campaign page, the attribution contract, discovery timing, and the outcome-specific ended state |
+| 14c | Founder-authored campaign updates: the audience-by-model rule, the material-delivery-change pairing, and the public rendering |
+| 14d | The Creator active-partnership dashboard — link, locked terms, readiness, first-post state, and clicks |
+| 15a | The Backer pre-order: eligibility, the atomic cap, reservation-time tax, the exact consent, the SetupIntent, and the immediate Founder operational share |
+| 15b | The campaign-scoped magic link, free cancellation, the practical-deduplication queue, and the pre-charge reminder |
+| 16a | The reservation and charge ledger, the money controls, the risk-control inventory, and the high-impact override machine |
 
-Four briefs have been built in halves. Phase 06 bundles four independent
+Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
 the preparing reveal with its Campaign kit; Phase 09 bundles the optional-item
 workspace and a third-party scheduling integration; Phase 10 bundles the
-payments substrate and the two onboarding surfaces built on it. Splitting them
-was a scheduling decision, not a scope one: each half is built against the same
-brief and lands its own named acceptance tests. Every named test from §33.1.1 to
-§33.1.9 passes, so does every one from §33.2.1 to §33.2.4, and so does every one
-from §33.3.1 to §33.3.8, plus §33.3.11.
+payments substrate and the two onboarding surfaces built on it; Phase 12, 14,
+15, and 16 each bundle two or more full deliverables with their own named tests.
+Splitting them was a scheduling decision, not a scope one: each half is built
+against the same brief and lands its own named acceptance tests. Every named
+test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.13, every
+one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one from
+§33.5.1 to §33.5.13, every one from §33.6.1 to §33.6.5, and §33.12.4.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
 record went first and is the source of truth — a scheduling provider is a source
@@ -64,6 +76,13 @@ of events, not of domain state — so the four booking conditions, the reschedul
 history, and the recalculation on cancellation were built and tested before any
 webhook existed. That ordering is what makes a confirmed interview reachable
 when a delivery is missed, rather than a thing only the vendor can grant.
+
+Phase 16 split along a different line: between surfaces that **read and
+reconcile** records that already exist, and operations that **create new records
+and new customer messages**. The ledger, the money controls, and the risk
+inventory are all reads over what Phases 03 through 15 already wrote; support
+cases, suspension, and the timeline are not. The acceptance tests fall the same
+way, which is usually the sign that a seam is real rather than convenient.
 
 ## Layout
 
@@ -79,13 +98,25 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/workspace/  the §12 optional items, what does not count as evidence for
                   each, the copy-ready helper resources, and the interview
                   statuses
-  src/checkout/   the Appendix A.5 listing-fee consent, verbatim, and the
-                  resolver that fills in its two amounts
+  src/checkout/   the Appendix A.5 listing-fee consent and the A.3/A.4 pre-order
+                  consents, verbatim, and the resolvers that fill in their
+                  amounts
+  src/build/      the §14.4 build ingredients and the six roster-readiness rules
+  src/launch/     the launch step order and the first-post verification checks
+  src/attribution/ the click outcomes, the four attribution statuses, and the
+                  Day 8 discovery window
+  src/admin/      the eleven ledger dimensions, what may leave in an export,
+                  the nine money-control lines, the money-status vocabulary,
+                  the ten risk signals, and the overridable-field register
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
   src/settings/       reading, validating, and versioning the §6 constants
-  src/admin/          the production-prerequisites panel
+  src/admin/          the production-prerequisites panel, the reservation and
+                      charge ledger, the money controls, the risk inventory,
+                      and the high-impact preview/override machine
+  src/reservations/   the Backer pre-order, the atomic cap, reservation-time
+                      tax, cancellation, deduplication, and the magic link
   src/invitations/    Founder prospects, the invitation, the retention sweep
   src/vetting/        the §9 answers and their provenance, the §10 account claim
   src/affiliates/     Creator recruitment, verification, the private
@@ -105,7 +136,8 @@ backend/    Express 5 + Drizzle + Postgres 16
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
   src/features/admin/    the Admin shell, Founders, Creators, configuration,
-                         prerequisites
+                         prerequisites, the reservation and charge ledger, the
+                         money controls, and the risk inventory
   src/surfaces/          the unusable-link page
   src/surfaces/draft/    the Founder journey: vetting, result, account claim
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
@@ -755,6 +787,84 @@ reachable only from Proovd's own endpoint.
 takes 5–10 business days and that an exact date cannot be promised, because that
 timing genuinely is not ours to promise.
 
+## Admin operations
+
+Spec §2 says the MVP is manual behind a polished surface. This is that surface —
+every reservation and charge, the money as it reconciles, and the risks a person
+has to look at before a campaign closes.
+
+**Eleven filters, and the list is not kept by hand.** Spec §26.5 names eleven
+dimensions the ledger filters and exports by. A list in prose is a list nobody
+can test, so it is a register: the server restates it, the query builder walks
+it, the filter form renders it, and a test fails if a dimension is quietly
+dropped or a twelfth appears with no Spec line behind it. The same is true of the
+nine money-control lines and the ten risk signals — and the panels *throw* if any
+registered line is missing from what they built, because a reconciliation an
+Admin no longer performs would otherwise just disappear.
+
+**Seeing is not exporting.** Spec §25.7 limits what Admin may hand out, not only
+what Admin may see. The Backer's email, phone, billing address, survey answers,
+and card fingerprint all render on screen, because support and risk work needs
+them in front of a person. None of them can enter an export: the export reads its
+column list from the register rather than from whoever asked, there is no
+override parameter, and the screen says which columns will be withheld before the
+button is pressed rather than leaving someone to conclude the data is missing.
+
+**Not yet populated is not zero.** Most money-control lines fill in later phases,
+and every ledger column defaults to zero — so a naïve reconciliation screen would
+say "Proovd's 5%: US$0.00" for a campaign whose close batch simply has not run.
+That is indistinguishable from a campaign that captured nothing, and only one of
+the two is a fact. Each line therefore says *not yet populated* and names what it
+is waiting for. The risk inventory draws the same distinction: a fraud check that
+cannot run until there are payments to check reports **not yet observable**, never
+"no risk found".
+
+**A zero tax line is never treated as proof that no tax is due.** Spec §31.7 says
+it outright, and it is the one risk signal with no clean-looking state: a
+`not_collecting` result is always a blocking risk, and a campaign whose seller tax
+readiness has not been recorded is itself an instance of it. Readiness is four
+recorded facts — head-office location, product tax code, registration, and active
+provider tax settings — and three of four does not make a campaign ready. Nothing
+is scored or ranked into an index, because a risk score is an eligibility rule
+with arithmetic in front of it, and the Spec forbids inventing those.
+
+**Moving money without seeing what the customer will be told is how support ends
+up contradicting the ledger.** So a high-impact action needs four things: a recent
+sign-in, a preview of the customer-visible consequences, idempotency, and an
+immutable audit row. Three of those already had a home. The preview did not — and
+a preview that is merely *displayed* is one nothing enforces, because the next
+caller can post straight past it. It is therefore a record: computed for an exact
+payload, frozen with a hash of it, and cited by the execution. Change the payload
+after reading the consequences and the hash no longer matches, which is the whole
+point.
+
+**An override without a before is unauditable.** The prior value is read from the
+row itself, under lock, inside the transaction that changes it — never taken from
+the caller, because a caller that supplies both halves can supply a flattering
+pair. The record is insert-only at the database level: update and delete are
+revoked, so the "before" cannot be rewritten later, which is the only reason it is
+worth anything. And the fields that *can* be overridden are a fixed list; a route
+that accepted any field name would happily record an override of something that
+does not exist, leaving an audit trail that looks complete and points at nothing.
+
+**Admin never re-types what the system already holds.** User and provider data
+auto-populates, and Admin adds only review, decision, evidence, and override
+data. The enforcement is the absence of a route: there is nowhere to send a
+corrected email address, a different tax amount, or a substituted payment
+reference. A test posts forged values at every plausible address and asserts
+nothing moved.
+
+**Internal codes never become customer copy.** A Stripe decline code or a fraud
+signal in an explanation a Backer reads is refused at the point an Admin can fix
+it, rather than discovered in a support transcript. The internal reason may name
+it — those two are separate columns for exactly this reason.
+
+**Money is `eligible`, `blocked`, or `released`, and never "held".** Proovd does
+not hold anyone's money; Stripe settles to the Founder's own account, so a screen
+that said otherwise would be describing an arrangement that does not exist. Where
+money is blocked, the requirement blocking it is named — "blocked" with no reason
+is the same euphemism wearing a different word.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -969,6 +1079,24 @@ The frontend and shared suites need neither Docker nor a database.
   revoked, claimed, malformed, rate-limited, and never-existed are
   indistinguishable to the caller; the real reason goes only to the audit log.
   Never add a reason field, and never let a rate limiter answer with a 429.
+- **What Admin may see and what Admin may export are different sets.** Spec
+  §25.7's limits apply to what Admin can hand out, not only to what Admin can
+  look at. The exporter reads its permitted columns from a register, never from
+  the caller, and there is no override flag to add one.
+- **A ledger surface never prints a zero it did not compute.** A money line whose
+  phase has not run says so and names what it is waiting for. A risk check that
+  cannot yet run reports *not yet observable*, not *clear*. Spec §1.4 forbids
+  implying an answer the system does not have.
+- **A high-impact action shows the customer-visible consequences first.** The
+  preview is a stored record hashed against the exact payload, not a screen the
+  execution merely followed — so changing the payload after reading it refuses.
+- **An override records before, after, reason, actor, and time, and the before
+  is read from the row.** The record is insert-only at the database level, since
+  a "before" that can be rewritten afterwards protects nothing (Spec §33.12.4).
+- **Money is never described as `held`.** Spec §22.3 gives three accurate words —
+  `eligible`, `blocked` with the named requirement, and `released`. Proovd holds
+  no one's money, so the euphemism would describe an arrangement that does not
+  exist, and Spec §3.2 already bans the rest of that vocabulary everywhere.
 - Secrets live in the deployment environment, never in the repo, the frontend
   bundle, email, or documentation. `.env.example` documents variable *names*
   and non-secret shape only.

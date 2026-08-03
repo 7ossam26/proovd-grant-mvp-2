@@ -1769,3 +1769,34 @@ html.no-motion [data-splash] { display: none !important; }
 .checkout__success-zero { margin: 0; font-weight: 900; font-size: 1.25rem; }
 .checkout__today-trigger { margin: 0; color: var(--grey); }
 .checkout__magic-note { margin: 0; color: var(--grey); font-size: 0.9375rem; }
+
+/* ---- Admin operations: the §26.5 ledger, §26.6 money controls, and the §31.7
+   risk inventory, added Phase 16a. §26 licenses dashboard density here and
+   nowhere else, so these are dense by design and are scoped to the Admin shell.
+   Everything reads a slot; no hex literal and no arbitrary spacing value. */
+.ops-block { display: flex; flex-direction: column; gap: var(--sp-8); }
+.ops-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: var(--sp-16); flex-wrap: wrap;
+}
+.ops-tags { display: flex; gap: var(--sp-8); align-items: center; flex-wrap: wrap; }
+.ops-filters {
+  display: grid; gap: var(--sp-16);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin-bottom: var(--sp-16);
+}
+.ops-stats {
+  display: grid; gap: var(--sp-16);
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+.ops-stat__label { display: block; color: var(--grey); font-size: 0.9375rem; }
+.ops-stat__value {
+  display: block; font-size: 1.25rem; font-weight: 900;
+  color: var(--mode-body); font-variant-numeric: tabular-nums;
+}
+/* The ledger table can exceed the viewport at 320px; it scrolls inside its own
+   container so the page body never scrolls horizontally (§33.11.1). */
+.admin-table-scroll .admin-table td { vertical-align: top; }
+@media (max-width: 600px) {
+  .ops-filters { grid-template-columns: 1fr; }
+}

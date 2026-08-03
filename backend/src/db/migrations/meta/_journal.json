@@ -169,6 +169,13 @@
       "when": 1785556800000,
       "tag": "0023_backer_preorder",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785560400000,
+      "tag": "0024_admin_operations",
+      "breakpoints": true
     }
   ]
 }

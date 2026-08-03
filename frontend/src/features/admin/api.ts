@@ -931,3 +931,132 @@ export const scheduleCampaignLive = (
     method: 'POST',
     body: JSON.stringify({ liveAt }),
   });
+
+/* ── Phase 16a: §26.5 ledger, §26.6 money, §31.7 risk, §33.12.4 overrides ─── */
+
+export interface LedgerRowState {
+  reservationId: string;
+  campaignId: string;
+  campaignType: string | null;
+  status: string;
+  reservedAt: string | null;
+  rewardSku: string | null;
+  rewardTitle: string | null;
+  rewardSubtotalCents: string;
+  salesTaxCents: string;
+  totalAuthorizedCents: string | null;
+  totalCapturedCents: string;
+  taxJurisdiction: string | null;
+  taxabilityReason: string | null;
+  taxCalculationExpiresAt: string | null;
+  taxCloseUsable: boolean | null;
+  consentAppendix: string | null;
+  consentVersion: string | null;
+  founderMarketingConsent: boolean;
+  newsletterConsent: boolean;
+  attributionSource: string | null;
+  attributionStatus: string | null;
+  linkActivatedAt: string | null;
+  capResult: string | null;
+  duplicateCaseStatus: string | null;
+  /** §25.7 restricted — rendered on screen, never written into an export. */
+  backerEmail: string | null;
+  backerPhone: string | null;
+}
+
+export interface LedgerPageState {
+  dimensions: string[];
+  rows: LedgerRowState[];
+  total: number;
+  summary: {
+    uniqueBackers: number;
+    transactions: number;
+    subtotalCents: string;
+    taxCents: string;
+    capturedCents: string;
+  };
+}
+
+export const fetchLedger = (query: string): Promise<LedgerPageState> =>
+  call<LedgerPageState>(`/api/admin/ledger${query ? `?${query}` : ''}`);
+
+export interface MoneyControlLineState {
+  key: string;
+  amounts: Record<string, string>;
+  populated: boolean;
+  populatedBy: string;
+  awaiting: string | null;
+}
+
+export interface MoneyPanelState {
+  campaignId: string;
+  campaignStatus: string;
+  lines: MoneyControlLineState[];
+  provisionalReconciles: boolean | null;
+  taxExcludedFromFees: boolean | null;
+}
+
+export const fetchMoneyControls = (campaignId: string): Promise<MoneyPanelState> =>
+  call<MoneyPanelState>(`/api/admin/money/${encodeURIComponent(campaignId)}`);
+
+export interface RiskSignalState {
+  key: string;
+  severity: 'blocking' | 'review' | 'monitor';
+  count: number;
+  instances: Array<{ id: string; detail: string }>;
+  notYetObservable: boolean;
+}
+
+export interface RiskPanelState {
+  campaignId: string | null;
+  signals: RiskSignalState[];
+  blockingKeys: string[];
+  sellerTaxReadiness: {
+    recorded: boolean;
+    ready: boolean;
+    missingFacts: string[];
+    recordedBy: string | null;
+    evidenceReference: string | null;
+    recordedAt: string | null;
+  };
+}
+
+export const fetchRiskPanel = (campaignId?: string): Promise<RiskPanelState> =>
+  call<RiskPanelState>(
+    `/api/admin/risk${campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : ''}`,
+  );
+
+export const recordSellerTaxReadiness = (
+  campaignId: string,
+  body: Record<string, string>,
+): Promise<{ ready: boolean; missingFacts: string[] }> =>
+  call(`/api/admin/risk/${encodeURIComponent(campaignId)}/seller-tax-readiness`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export interface OverridePreviewState {
+  previewId: string;
+  consequences: Array<{ audience: string; text: string }>;
+  expiresAt: string;
+}
+
+export const previewOverride = (
+  fieldKey: string,
+  targetId: string,
+  newValue: unknown,
+): Promise<OverridePreviewState> =>
+  call('/api/admin/overrides/preview', {
+    method: 'POST',
+    body: JSON.stringify({ fieldKey, targetId, newValue }),
+  });
+
+export const executeOverride = (body: {
+  fieldKey: string;
+  targetId: string;
+  newValue: unknown;
+  internalReason: string;
+  customerExplanation: string;
+  previewId: string;
+}): Promise<{ overrideId: string; priorValue: unknown; newValue: unknown; replayed: boolean }> =>
+  call('/api/admin/overrides', { method: 'POST', body: JSON.stringify(body) });

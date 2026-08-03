@@ -16,3 +16,4 @@ export * from './launch/index.js';
 export * from './attribution/index.js';
 export * from './updates/index.js';
 export * from './reservation/index.js';
+export * from './admin/index.js';

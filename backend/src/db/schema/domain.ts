@@ -494,6 +494,17 @@ export const reservations = pgTable(
     /** §24.12 statement descriptor, validated at checkout and stored. */
     statementDescriptor: text('statement_descriptor'),
 
+    /* ── §26.5's cap result, added Phase 16a (migration 0024) ────────────────
+       §26.5 filters the ledger by "cap result", and Phase 15 enforced the §2.2
+       ceiling without recording the answer on the transaction. It is a stored
+       fact rather than a recomputation because the cap in force at pre-order is
+       not necessarily the cap in force now — `campaign_reservation_capacity`
+       freezes its own ceiling for exactly that reason.
+
+       `not_evaluated` is a real value: a reservation that never reached the cap
+       check must not read as having passed it (§1.4). A CHECK pins the three. */
+    capResult: text('cap_result'),
+
     /** §25.2 replacement history for an Idea reward change (§19). */
     replacesReservationId: uuid('replaces_reservation_id'),
     replacedByReservationId: uuid('replaced_by_reservation_id'),

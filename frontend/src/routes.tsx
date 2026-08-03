@@ -26,6 +26,9 @@ import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
 import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
+import { LedgerPage } from './features/admin/Ledger.js';
+import { MoneyControlsPage } from './features/admin/MoneyControls.js';
+import { RiskPanelPage } from './features/admin/RiskPanel.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -130,6 +133,13 @@ const rootChildren: RouteObject[] = [
       // Phase 13 (§16). Scoped to one campaign by query string, like the
       // Creators and optional-items panels: readiness is always one campaign's.
       { path: 'creator-readiness', element: <CreatorReadinessPanel /> },
+      // Phase 16a (§26.5, §26.6, §31.7). The ledger sweeps every campaign by
+      // default and narrows by filter; money and risk are per-campaign, scoped
+      // by query string like the panels above — money reconciles per campaign
+      // and §31.7's seller tax readiness is a campaign's own gate.
+      { path: 'ledger', element: <LedgerPage /> },
+      { path: 'money', element: <MoneyControlsPage /> },
+      { path: 'risk', element: <RiskPanelPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],

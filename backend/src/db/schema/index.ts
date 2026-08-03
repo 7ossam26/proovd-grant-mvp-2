@@ -65,4 +65,7 @@ export * from './updates.js';
 // Admin case queue, §19's immediate immutable Founder operational share, and the
 // §2.2 US$50,000 pre-tax cap enforced by a CHECK and a conditional UPDATE.
 export * from './reservations.js';
-
+// Phase 16a: Admin operations — §31.7's four-fact seller tax readiness gate,
+// §26.6's enforceable customer-consequence preview, and §33.12.4's insert-only
+// override record with its five required facts.
+export * from './admin-operations.js';

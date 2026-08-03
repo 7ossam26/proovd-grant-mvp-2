@@ -36,6 +36,10 @@ import { AdminSignIn } from './AdminSignIn.js';
 const NAV = [
   { to: '/admin/founders', label: 'Founders' },
   { to: '/admin/creators', label: 'Creators' },
+  // Phase 16a (§26.5, §26.6, §31.7).
+  { to: '/admin/ledger', label: 'Ledger' },
+  { to: '/admin/money', label: 'Money controls' },
+  { to: '/admin/risk', label: 'Risk controls' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];

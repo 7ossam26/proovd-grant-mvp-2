@@ -7,6 +7,7 @@ import type { Database } from './db/client.js';
 import { createHealthRouter } from './routes/health.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createAdminRouter } from './routes/admin.js';
+import { createAdminOperationsRouter } from './routes/admin-operations.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
@@ -208,6 +209,19 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // registered TOTP factor, and every write additionally requires a recent
   // sign-in.
   app.use(createAdminRouter({ db, auth, environment: config.prerequisiteEnvironment }));
+  // Phase 16a (§26.5, §26.6, §31.7, §33.12.4). The reservation and charge
+  // ledger with §25.7's permitted export, the money controls read against the
+  // Phase 03 ledger columns, the ten §31.7 risk signals, and the general
+  // high-impact/override machine Phases 18–20 reuse. Reads are `admin`; the
+  // seller-tax-readiness record and every override additionally take the
+  // freshness gate, because both are §5.1 high-impact actions.
+  app.use(
+    createAdminOperationsRouter({
+      db,
+      auth,
+      mode: config.stripeGateway?.mode ?? 'test',
+    }),
+  );
   app.use(
     createAdminFoundersRouter({
       db,
