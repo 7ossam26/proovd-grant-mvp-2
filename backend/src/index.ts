@@ -225,6 +225,13 @@ async function main() {
         fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
       },
     },
+    // Phase 15b: the §20 pre-charge reminder. Reuses the notifier and the magic
+    // link's token service; an unconfigured transport refuses loudly anyway.
+    backer: {
+      notifier,
+      fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
+      appBaseUrl: env.APP_BASE_URL,
+    },
   });
   logger.info('Job scheduler started');
 

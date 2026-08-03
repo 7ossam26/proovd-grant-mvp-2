@@ -1,0 +1,160 @@
+/**
+ * The Backer magic-link routes — Spec §19, §20, §33.5.13, §33.7 (Phase 15b).
+ *
+ * All mounted under `/api/link/:token` behind `requireMagicLinkToken`, so the
+ * raw token is redacted in logs (`token-routes.ts`) and every route reads the
+ * campaign and Backer identity from the verified subject — never from a body a
+ * caller could forge. A Backer has no account (§5.4); this link is the whole of
+ * their authenticated surface.
+ *
+ * `GET  …/page`                          the campaign + this Backer's transactions
+ * `POST …/reservations/:id/cancel`       §20 cancellation (one action, no cost)
+ * `POST …/reservations/:id/change-reward`§19 Idea reward change (replacement-first)
+ */
+
+import { Router, json } from 'express';
+import { eq } from 'drizzle-orm';
+import type { Database } from '../db/client.js';
+import type { StripeGateway } from '../payments/stripe-client.js';
+import type { AuditWriter } from '../auth/audit.js';
+import type { TokenService } from '../auth/token-service.js';
+import type { Notifier } from '../notifications/send.js';
+import { MAGIC_LINK_TOKEN_PATH, TOKEN_PARAM } from '../auth/token-routes.js';
+import { requireMagicLinkToken } from '../auth/token-middleware.js';
+import { campaignBuild } from '../db/schema/build.js';
+import { readBackerPage } from '../reservations/magic-link-read.js';
+import { cancelReservation } from '../reservations/cancellation.js';
+import { replaceIdeaReward } from '../reservations/preorder.js';
+import { findCampaignFounderUserId } from '../reservations/context.js';
+import { findAccountForOwner } from '../payments/connected-accounts.js';
+
+export interface BackerRouterDeps {
+  db: Database;
+  tokens: TokenService;
+  gateway: StripeGateway;
+  audit: AuditWriter;
+  notifier: Notifier;
+  secret: string;
+  appBaseUrl: string;
+  fromAddress: string;
+}
+
+async function connectedAccountFor(
+  db: Database,
+  gateway: StripeGateway,
+  campaignId: string,
+): Promise<string | undefined> {
+  const founderUserId = await findCampaignFounderUserId(db, campaignId);
+  if (!founderUserId) return undefined;
+  const account = await findAccountForOwner(db, {
+    ownerUserId: founderUserId,
+    role: 'founder_seller',
+    mode: gateway.mode,
+  });
+  return account?.stripeAccountId;
+}
+
+async function campaignTitleFor(db: Database, campaignId: string): Promise<string> {
+  const [row] = await db
+    .select({ title: campaignBuild.title })
+    .from(campaignBuild)
+    .where(eq(campaignBuild.campaignId, campaignId))
+    .limit(1);
+  return row?.title ?? 'your campaign';
+}
+
+export function createBackerRouter(deps: BackerRouterDeps): Router {
+  const router = Router();
+  router.use(json());
+  const base = `${MAGIC_LINK_TOKEN_PATH}/:${TOKEN_PARAM}`;
+  const guard = requireMagicLinkToken(deps.tokens);
+
+  router.get(`${base}/page`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const page = await readBackerPage(deps.db, {
+      campaignId: subject.campaignId,
+      backerIdentityId: subject.backerIdentityId,
+    });
+    res.json(page);
+  });
+
+  router.post(`${base}/reservations/:reservationId/cancel`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const reservationId = String(req.params.reservationId);
+    const connectedAccountId = await connectedAccountFor(deps.db, deps.gateway, subject.campaignId);
+    const campaignTitle = await campaignTitleFor(deps.db, subject.campaignId);
+
+    const outcome = await cancelReservation(
+      {
+        db: deps.db,
+        gateway: deps.gateway,
+        audit: deps.audit,
+        notifier: deps.notifier,
+        fromAddress: deps.fromAddress,
+        ...(connectedAccountId ? { connectedAccountId } : {}),
+      },
+      { reservationId, backerIdentityId: subject.backerIdentityId, actor: `backer:${subject.backerIdentityId}`, campaignTitle },
+    );
+
+    if (outcome.status === 'not_found') {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    if (outcome.status === 'not_cancelable') {
+      res.status(409).json({ error: 'not_cancelable', current: outcome.current });
+      return;
+    }
+    // `canceled` and `already_canceled` both report success — a duplicate cancel
+    // is harmless (§33.7.3).
+    res.json({ status: outcome.status, amountCharged: 'US$0' });
+  });
+
+  router.post(`${base}/reservations/:reservationId/change-reward`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const b = req.body as Record<string, unknown>;
+    const billing = (b['billing'] ?? {}) as Record<string, unknown>;
+    if (
+      typeof b['newRewardSku'] !== 'string' ||
+      typeof billing['country'] !== 'string' ||
+      typeof billing['postalCode'] !== 'string' ||
+      typeof b['paymentMethodId'] !== 'string'
+    ) {
+      res.status(422).json({ error: { code: 'invalid_request', message: 'Missing required fields.' } });
+      return;
+    }
+
+    const result = await replaceIdeaReward(
+      {
+        db: deps.db,
+        gateway: deps.gateway,
+        audit: deps.audit,
+        tokenService: deps.tokens,
+        notifier: deps.notifier,
+        secret: deps.secret,
+        appBaseUrl: deps.appBaseUrl,
+        emailFrom: deps.fromAddress,
+      },
+      {
+        campaignId: subject.campaignId,
+        backerIdentityId: subject.backerIdentityId,
+        newRewardSku: b['newRewardSku'],
+        billing: {
+          country: billing['country'] as string,
+          postalCode: billing['postalCode'] as string,
+          ...(typeof billing['state'] === 'string' ? { state: billing['state'] } : {}),
+          ...(typeof billing['city'] === 'string' ? { city: billing['city'] } : {}),
+          ...(typeof billing['line1'] === 'string' ? { line1: billing['line1'] } : {}),
+        },
+        paymentMethodId: b['paymentMethodId'] as string,
+      },
+    );
+
+    if (!result.ok) {
+      res.status(result.refusal.code === 'setup_failed' ? 402 : 409).json({ error: result.refusal });
+      return;
+    }
+    res.status(201).json(result.success);
+  });
+
+  return router;
+}

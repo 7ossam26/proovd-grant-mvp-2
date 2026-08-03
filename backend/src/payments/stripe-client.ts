@@ -84,6 +84,10 @@ export interface TaxCalculationResult {
   id: string | null;
   taxCents: bigint;
   expiresAt: Date | null;
+  /** §25.2: the reservation stores jurisdiction, rate, and taxability reason. */
+  jurisdiction: string | null;
+  rate: string | null;
+  taxabilityReason: string | null;
 }
 
 export interface ListingCheckoutInput {
@@ -133,6 +137,54 @@ export interface RefundInput {
 export interface RefundResult {
   id: string;
   status: string;
+}
+
+/* ── The reservation SetupIntent (§19, §24.2 — Phase 15) ───────────────────── */
+
+/**
+ * §24.1's direct-charge model puts the Backer's Customer and saved card on the
+ * Founder's connected account, not the platform: the Founder is merchant of
+ * record for every campaign charge, so the payment method that a later
+ * off-session PaymentIntent uses must live where that charge is made.
+ */
+export interface CreateCustomerInput {
+  email?: string | undefined;
+  connectedAccountId: string;
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface ConfirmSetupIntentInput {
+  customerId: string;
+  connectedAccountId: string;
+  /** A PaymentMethod created client-side via Stripe Elements. */
+  paymentMethodId: string;
+  /** Stripe-side idempotency, so a double-submit confirms one SetupIntent. */
+  idempotencyKey: string;
+  metadata?: Record<string, string> | undefined;
+}
+
+export interface SetupIntentResult {
+  id: string;
+  /** Stripe's SetupIntent status. Only `succeeded` may create a reservation. */
+  status:
+    | 'succeeded'
+    | 'requires_action'
+    | 'requires_payment_method'
+    | 'requires_confirmation'
+    | 'processing'
+    | 'canceled';
+  paymentMethodId: string | null;
+  /** The card fingerprint — a §4.1 deduplication signal when available. */
+  fingerprint: string | null;
+  brand: string | null;
+  last4: string | null;
+  /** For a `requires_action` result the client must complete. */
+  clientSecret: string | null;
+}
+
+export interface DetachPaymentMethodInput {
+  paymentMethodId: string;
+  connectedAccountId: string;
 }
 
 export interface StripeGateway {
@@ -186,12 +238,39 @@ export interface StripeGateway {
    */
   readonly taxEnabled: boolean;
 
-  /** A Stripe Tax calculation for the listing subtotal at one billing address. */
+  /**
+   * A Stripe Tax calculation for one subtotal at one billing address.
+   *
+   * `connectedAccountId` routes the calculation to the Founder's seller account
+   * (§19: reservation tax is calculated "using Founder seller/account"); omit it
+   * for the platform-account listing fee (§13).
+   */
   createTaxCalculation(input: {
     amountCents: bigint;
     address: TaxAddress;
     reference: string;
+    connectedAccountId?: string | undefined;
   }): Promise<TaxCalculationResult>;
+
+  /* ── The reservation SetupIntent (§19, §24.2 — Phase 15) ─────────────────── */
+
+  /** A Customer on the Founder's connected account, for the saved card (§24.1). */
+  createCustomer(input: CreateCustomerInput): Promise<string>;
+
+  /**
+   * Creates and confirms an off-session SetupIntent on the Founder's connected
+   * account. Only a `succeeded` result may create a reservation (§33.5.4). No
+   * card data is ever returned to Proovd beyond the safe fingerprint/brand/last4
+   * (§28.3, §5.3).
+   */
+  confirmSetupIntent(input: ConfirmSetupIntentInput): Promise<SetupIntentResult>;
+
+  /**
+   * Detaches a saved PaymentMethod on cancellation (§20). Reference-safety —
+   * not detaching a method another active transaction still uses — is the
+   * caller's decision (§33.7.2); this performs the detach it is told to.
+   */
+  detachPaymentMethod(input: DetachPaymentMethodInput): Promise<void>;
 
   /**
    * Stripe Checkout on Proovd's platform account — never a Connect charge
@@ -256,29 +335,110 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
     },
 
     async createTaxCalculation(input) {
-      // No product tax code is stated here on purpose: which code applies to
-      // the listing service is a tax decision the operator records in the
-      // Stripe dashboard's preset, not something this code invents (§1 rule 6,
-      // §31.7's "active provider tax settings").
-      const calculation = await client.tax.calculations.create({
-        currency: 'usd',
-        line_items: [{ amount: Number(input.amountCents), reference: input.reference }],
-        customer_details: {
-          address: {
-            country: input.address.country,
-            postal_code: input.address.postalCode,
-            ...(input.address.state ? { state: input.address.state } : {}),
-            ...(input.address.city ? { city: input.address.city } : {}),
-            ...(input.address.line1 ? { line1: input.address.line1 } : {}),
+      // No product tax code is stated here on purpose: which code applies is a
+      // tax decision the operator records in the Stripe dashboard's preset, not
+      // something this code invents (§1 rule 6, §31.7's "active provider tax
+      // settings"). `stripeAccount` routes a reservation calculation to the
+      // Founder's seller account (§19); the listing fee omits it (platform).
+      const calculation = await client.tax.calculations.create(
+        {
+          currency: 'usd',
+          line_items: [{ amount: Number(input.amountCents), reference: input.reference }],
+          customer_details: {
+            address: {
+              country: input.address.country,
+              postal_code: input.address.postalCode,
+              ...(input.address.state ? { state: input.address.state } : {}),
+              ...(input.address.city ? { city: input.address.city } : {}),
+              ...(input.address.line1 ? { line1: input.address.line1 } : {}),
+            },
+            address_source: 'billing',
           },
-          address_source: 'billing',
         },
-      });
+        input.connectedAccountId ? { stripeAccount: input.connectedAccountId } : undefined,
+      );
+      // The SDK types tax_breakdown loosely across versions; read defensively.
+      const breakdown = (calculation.tax_breakdown?.[0] ?? {}) as {
+        jurisdiction?: { display_name?: string };
+        tax_rate_details?: { percentage_decimal?: string };
+        taxability_reason?: string;
+      };
       return {
         id: calculation.id ?? null,
         taxCents: BigInt(calculation.tax_amount_exclusive ?? 0),
         expiresAt: calculation.expires_at ? new Date(calculation.expires_at * 1000) : null,
+        jurisdiction: breakdown.jurisdiction?.display_name ?? null,
+        rate: breakdown.tax_rate_details?.percentage_decimal ?? null,
+        taxabilityReason: breakdown.taxability_reason ?? null,
       };
+    },
+
+    async createCustomer(input) {
+      const customer = await client.customers.create(
+        {
+          ...(input.email ? { email: input.email } : {}),
+          ...(input.metadata ? { metadata: input.metadata } : {}),
+        },
+        { stripeAccount: input.connectedAccountId },
+      );
+      return customer.id;
+    },
+
+    async confirmSetupIntent(input) {
+      const intent = await client.setupIntents.create(
+        {
+          customer: input.customerId,
+          payment_method: input.paymentMethodId,
+          confirm: true,
+          usage: 'off_session',
+          // The Backer is present now; the future charge is off-session. Cards
+          // only — no redirect flows a later off-session charge could not use.
+          payment_method_types: ['card'],
+          ...(input.metadata ? { metadata: input.metadata } : {}),
+        },
+        { stripeAccount: input.connectedAccountId, idempotencyKey: input.idempotencyKey },
+      );
+
+      const paymentMethodId =
+        typeof intent.payment_method === 'string'
+          ? intent.payment_method
+          : (intent.payment_method?.id ?? input.paymentMethodId);
+
+      let fingerprint: string | null = null;
+      let brand: string | null = null;
+      let last4: string | null = null;
+      if (paymentMethodId) {
+        try {
+          const pm = await client.paymentMethods.retrieve(
+            paymentMethodId,
+            {},
+            { stripeAccount: input.connectedAccountId },
+          );
+          fingerprint = pm.card?.fingerprint ?? null;
+          brand = pm.card?.brand ?? null;
+          last4 = pm.card?.last4 ?? null;
+        } catch {
+          // The SetupIntent stands; the safe display fields are best-effort.
+        }
+      }
+
+      return {
+        id: intent.id,
+        status: intent.status as SetupIntentResult['status'],
+        paymentMethodId,
+        fingerprint,
+        brand,
+        last4,
+        clientSecret: intent.client_secret ?? null,
+      };
+    },
+
+    async detachPaymentMethod(input) {
+      await client.paymentMethods.detach(
+        input.paymentMethodId,
+        {},
+        { stripeAccount: input.connectedAccountId },
+      );
     },
 
     async createListingCheckoutSession(input) {
@@ -475,6 +635,23 @@ export interface MemoryStripeGateway extends StripeGateway {
   readonly refunds: Array<{ id: string; paymentIntentId: string; amountCents: bigint }>;
   /** Makes the next `createRefund` throw once — the crash-between test. */
   failNextRefund(message: string): void;
+
+  /* ── Phase 15 controls ─────────────────────────────────────────────────── */
+  readonly customers: Array<{ id: string; connectedAccountId: string; email?: string }>;
+  readonly setupIntents: Array<{
+    id: string;
+    connectedAccountId: string;
+    customerId: string;
+    paymentMethodId: string;
+    status: SetupIntentResult['status'];
+  }>;
+  readonly detachedPaymentMethods: Array<{ paymentMethodId: string; connectedAccountId: string }>;
+  /** Forces the next `confirmSetupIntent` to return this status (default succeeded). */
+  setNextSetupOutcome(status: SetupIntentResult['status']): void;
+  /** Makes the next `confirmSetupIntent` throw once — the provider-error path. */
+  failNextSetup(message: string): void;
+  /** Pins a payment method's card fingerprint, for §4.1 dedup tests. */
+  setCardFingerprint(paymentMethodId: string, fingerprint: string): void;
 }
 
 /**
@@ -499,11 +676,18 @@ export function createMemoryStripeGateway(config: {
   const sessionsByKey = new Map<string, number>();
   const refunds: MemoryStripeGateway['refunds'] = [];
   const refundsByKey = new Map<string, RefundResult>();
+  const customers: MemoryStripeGateway['customers'] = [];
+  const setupIntents: MemoryStripeGateway['setupIntents'] = [];
+  const setupIntentsByKey = new Map<string, SetupIntentResult>();
+  const detachedPaymentMethods: MemoryStripeGateway['detachedPaymentMethods'] = [];
+  const cardFingerprints = new Map<string, string>();
   let counter = 0;
   // A flat 8% unless a test says otherwise. Test infrastructure only — the
   // number is never customer-facing and never leaves the suite.
   let taxRate = 0.08;
   let nextRefundFailure: string | null = null;
+  let nextSetupOutcome: SetupIntentResult['status'] = 'succeeded';
+  let nextSetupFailure: string | null = null;
 
   return {
     mode: config.mode ?? 'test',
@@ -515,6 +699,9 @@ export function createMemoryStripeGateway(config: {
     created,
     sessions,
     refunds,
+    customers,
+    setupIntents,
+    detachedPaymentMethods,
 
     setTaxRate(rate) {
       taxRate = rate;
@@ -524,6 +711,72 @@ export function createMemoryStripeGateway(config: {
       nextRefundFailure = message;
     },
 
+    setNextSetupOutcome(status) {
+      nextSetupOutcome = status;
+    },
+
+    failNextSetup(message) {
+      nextSetupFailure = message;
+    },
+
+    setCardFingerprint(paymentMethodId, fingerprint) {
+      cardFingerprints.set(paymentMethodId, fingerprint);
+    },
+
+    async createCustomer(input) {
+      counter += 1;
+      const id = `cus_memory${String(counter).padStart(10, '0')}`;
+      customers.push({
+        id,
+        connectedAccountId: input.connectedAccountId,
+        ...(input.email ? { email: input.email } : {}),
+      });
+      return id;
+    },
+
+    async confirmSetupIntent(input) {
+      if (nextSetupFailure) {
+        const message = nextSetupFailure;
+        nextSetupFailure = null;
+        throw new Error(message);
+      }
+      // Stripe-side idempotency: the same key confirms one SetupIntent.
+      const cached = setupIntentsByKey.get(input.idempotencyKey);
+      if (cached) return cached;
+
+      const status = nextSetupOutcome;
+      nextSetupOutcome = 'succeeded';
+      counter += 1;
+      const id = `seti_memory${String(counter).padStart(10, '0')}`;
+      setupIntents.push({
+        id,
+        connectedAccountId: input.connectedAccountId,
+        customerId: input.customerId,
+        paymentMethodId: input.paymentMethodId,
+        status,
+      });
+      const fingerprint =
+        cardFingerprints.get(input.paymentMethodId) ?? `fp_${input.paymentMethodId}`;
+      const result: SetupIntentResult = {
+        id,
+        status,
+        paymentMethodId: status === 'succeeded' ? input.paymentMethodId : null,
+        fingerprint: status === 'succeeded' ? fingerprint : null,
+        brand: status === 'succeeded' ? 'visa' : null,
+        last4: status === 'succeeded' ? '4242' : null,
+        clientSecret: status === 'succeeded' ? null : `${id}_secret`,
+      };
+      setupIntentsByKey.set(input.idempotencyKey, result);
+      return result;
+    },
+
+    async detachPaymentMethod(input) {
+      detachedPaymentMethods.push({
+        paymentMethodId: input.paymentMethodId,
+        connectedAccountId: input.connectedAccountId,
+      });
+    },
+
     async createTaxCalculation(input) {
       counter += 1;
       const taxCents = BigInt(Math.round(Number(input.amountCents) * taxRate));
@@ -531,6 +784,9 @@ export function createMemoryStripeGateway(config: {
         id: `taxcalc_memory${String(counter).padStart(10, '0')}`,
         taxCents,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        jurisdiction: input.address.state ?? input.address.country,
+        rate: (taxRate * 100).toFixed(4),
+        taxabilityReason: taxCents > 0n ? 'standard_rated' : 'not_collecting',
       };
     },
 

@@ -25,6 +25,8 @@ import { createAdminListingRouter } from './routes/admin-listing.js';
 import { createCreatorDecisionRouter } from './routes/creator-decisions.js';
 import { createAttributionRouter } from './routes/attribution.js';
 import { createPublicCampaignRouter } from './routes/public-campaign.js';
+import { createBackerPreorderRouter } from './routes/backer-preorder.js';
+import { createBackerRouter } from './routes/backer.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
 import {
@@ -435,6 +437,37 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         auth,
         gateway: config.stripeGateway,
         audit: (event) => audit({ ...event, targetId: event.targetId }),
+      }),
+    );
+    // Phase 15 (§19, §33.5). The public Backer pre-order: a card save that
+    // charges nothing, the atomic §2.2 cap, reservation-time tax, and the
+    // magic-link confirmation. Public and session-less (§5.4) — mounted with the
+    // Stripe gateway because the SetupIntent, Customer, and tax all need it.
+    app.use(
+      createBackerPreorderRouter({
+        db,
+        gateway: config.stripeGateway,
+        audit,
+        tokenService: tokens,
+        notifier,
+        secret: config.authSecret,
+        appBaseUrl: config.appBaseUrl,
+        fromAddress: config.invitationContext.fromAddress,
+      }),
+    );
+    // Phase 15b (§19, §20, §33.7). The Backer magic-link surface: the page data,
+    // §20 cancellation with reference-safe detach, and the §19 Idea reward change.
+    // Behind requireMagicLinkToken; the raw token is redacted in logs.
+    app.use(
+      createBackerRouter({
+        db,
+        tokens,
+        gateway: config.stripeGateway,
+        audit,
+        notifier,
+        secret: config.authSecret,
+        appBaseUrl: config.appBaseUrl,
+        fromAddress: config.invitationContext.fromAddress,
       }),
     );
   }

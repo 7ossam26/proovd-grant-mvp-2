@@ -1737,3 +1737,35 @@ html.no-motion [data-splash] { display: none !important; }
   background: var(--mint); color: var(--dark); border-radius: var(--radius);
   white-space: pre-line;
 }
+
+/* ---- The Backer pre-order checkout (§19, App. A.3/A.4, B.2), added Phase 15.
+   Opens in a Drawer from the live campaign page; the card field is Stripe's own
+   iframe, never styled here. Leads with the not-charged fact throughout. */
+.checkout { display: flex; flex-direction: column; gap: var(--sp-16); }
+.checkout__lead { margin: 0; }
+.checkout__error {
+  margin: 0; padding: var(--sp-12) var(--sp-16);
+  border: var(--bw) solid var(--brand); border-radius: var(--radius); color: var(--mode-body);
+}
+.checkout__section { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-12); }
+.checkout__section legend { font-weight: 700; padding: 0; margin: 0 0 var(--sp-4); }
+.checkout__amounts { margin: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+.checkout__amounts div { display: flex; justify-content: space-between; gap: var(--sp-16); }
+.checkout__amounts dt { color: var(--grey); }
+.checkout__amounts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.checkout__amounts-total { font-weight: 900; border-top: var(--bw) solid var(--grey); padding-top: var(--sp-8); }
+.checkout__facts { margin: 0; padding-left: var(--sp-16); display: flex; flex-direction: column; gap: var(--sp-4); }
+.checkout__consent { border: var(--bw) solid var(--grey); border-radius: var(--radius); padding: var(--sp-12) var(--sp-16); }
+.checkout__consent summary { font-weight: 700; cursor: pointer; }
+.checkout__consent-body { white-space: pre-line; margin: var(--sp-12) 0 0; font-size: 0.9375rem; }
+.checkout__sharing {
+  margin: 0; padding: var(--sp-12) var(--sp-16);
+  background: var(--mint); color: var(--dark); border-radius: var(--radius);
+}
+.checkout__consents { display: flex; flex-direction: column; gap: var(--sp-16); }
+.checkout__card { min-height: 44px; padding: var(--sp-12) var(--sp-16); border: var(--bw) solid var(--grey); border-radius: var(--radius); }
+.checkout__card-note { margin: 0; color: var(--grey); font-size: 0.9375rem; }
+.checkout__success-lead { margin: 0; }
+.checkout__success-zero { margin: 0; font-weight: 900; font-size: 1.25rem; }
+.checkout__today-trigger { margin: 0; color: var(--grey); }
+.checkout__magic-note { margin: 0; color: var(--grey); font-size: 0.9375rem; }

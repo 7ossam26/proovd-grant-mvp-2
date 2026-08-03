@@ -34,6 +34,7 @@ import {
 } from '../../../components/index.js';
 import { EmptyPanel, supportMailto } from '../states.js';
 import { SUPPORT_EMAIL } from '../site.js';
+import { CheckoutDrawer } from '../checkout/CheckoutDrawer.js';
 import { formatLocalInstant, formatUtcInstant, formatCalendarDate } from './format.js';
 import {
   SAMPLE_BANNER,
@@ -347,7 +348,14 @@ function UpdateEntry({ update }: { update: CampaignUpdate }) {
   );
 }
 
-export function CampaignPage({ campaign }: { campaign: CampaignView }) {
+export function CampaignPage({
+  campaign,
+  checkout,
+}: {
+  campaign: CampaignView;
+  /** Present only for a real live campaign (§19). Samples never mount a card. */
+  checkout?: { campaignId: string };
+}) {
   const featured = findReward(campaign, campaign.featuredRewardSku);
   const ended = campaign.ended ?? null;
   const updates = campaign.updates ?? [];
@@ -621,9 +629,25 @@ export function CampaignPage({ campaign }: { campaign: CampaignView }) {
             Sales tax is added at checkout and the exact total is shown before
             you authorize anything.
           </p>
-          <Button tier="primary" disabled aria-describedby="campaign-preorder-note">
-            {ended ? 'Pre-orders are closed' : 'Reserve a pre-order'}
-          </Button>
+          {checkout && !ended && !campaign.isSample ? (
+            // §19: the real pre-order checkout opens in a Drawer. A card field is
+            // mounted only here, for a live campaign — never on a sample.
+            <CheckoutDrawer
+              campaignId={checkout.campaignId}
+              reward={{
+                sku: featured.sku,
+                title: featured.title,
+                priceCents: featured.priceCents,
+                delivery: featured.delivery,
+              }}
+              model={campaign.model}
+              founderLegalName={campaign.founder.legalName}
+            />
+          ) : (
+            <Button tier="primary" disabled aria-describedby="campaign-preorder-note">
+              {ended ? 'Pre-orders are closed' : 'Reserve a pre-order'}
+            </Button>
+          )}
           <p id="campaign-preorder-note">{preorderNote(campaign, ended)}</p>
 
           <PreorderConsent campaign={campaign} ended={ended} />

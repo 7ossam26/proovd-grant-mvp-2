@@ -24,6 +24,7 @@ import {
   boolean,
   char,
   text,
+  integer,
   timestamp,
   jsonb,
   index,
@@ -411,12 +412,104 @@ export const reservations = pgTable(
     stripeFeeCents: bigint('stripe_fee_cents', { mode: 'bigint' }).notNull().default(sql`0`),
     founderNetCents: bigint('founder_net_cents', { mode: 'bigint' }).notNull().default(sql`0`),
 
+    /* ── §25.2 pre-order facts, added Phase 15 (migration 0023) ─────────────
+       Phase 03 created the skeleton with the ledger columns above; these are
+       everything §25.2 asks a reservation to store, set once at pre-order and
+       (for the authorization facts) immutable by trigger — a successful
+       SetupIntent and the exact total it authorized are historical forever,
+       even after cancellation (§23.5). Cross-file FKs (reward package, backer
+       identity) are declared in the migration SQL, not here, to keep the schema
+       modules free of import cycles. */
+
+    /** The one selected reward (§19 step 1). Snapshot fields survive an edit. */
+    rewardPackageId: uuid('reward_package_id'),
+    rewardSku: text('reward_sku'),
+    rewardTitle: text('reward_title'),
+    rewardDelivery: text('reward_delivery'),
+
+    /** Backer contact snapshot (§25.2). The canonical copy is on backer_identities. */
+    backerEmail: text('backer_email'),
+    backerPhone: text('backer_phone'),
+
+    /** §2.2: US-only billing. Full address only where tax/payment requires it. */
+    billingCountry: char('billing_country', { length: 2 }),
+    billingPostalCode: text('billing_postal_code'),
+    billingLine1: text('billing_line1'),
+    billingCity: text('billing_city'),
+    billingState: text('billing_state'),
+
+    /** §19 step 4: 18+/US confirmation, unchecked by default, with version+time. */
+    ageConfirmed: boolean('age_confirmed').notNull().default(false),
+    ageConfirmedVersion: text('age_confirmed_version'),
+    ageConfirmedAt: timestamp('age_confirmed_at', { withTimezone: true }),
+
+    /** Reservation-time tax (§19 step 5, §25.2). `taxCloseUsable` is Phase 18's. */
+    taxCalculationId: text('tax_calculation_id'),
+    taxJurisdiction: text('tax_jurisdiction'),
+    taxRate: text('tax_rate'),
+    taxabilityReason: text('taxability_reason'),
+    taxCalculationExpiresAt: timestamp('tax_calculation_expires_at', { withTimezone: true }),
+    taxCalculatedAt: timestamp('tax_calculated_at', { withTimezone: true }),
+    taxCloseUsable: boolean('tax_close_usable'),
+    /** The exact consented total = reward_subtotal + sales_tax. Never substituted (§19). */
+    totalAuthorizedCents: bigint('total_authorized_cents', { mode: 'bigint' }),
+
+    /** Stripe references (§24.2, §25.2). Proovd never receives raw card data (§28.3). */
+    stripeCustomerId: text('stripe_customer_id'),
+    setupIntentId: text('setup_intent_id'),
+    paymentMethodId: text('payment_method_id'),
+    paymentMethodFingerprint: text('payment_method_fingerprint'),
+    paymentMethodBrand: text('payment_method_brand'),
+    paymentMethodLast4: text('payment_method_last4'),
+
+    /** Consent + disclosure + policy versions/hashes (§19 step 3/6, §25.2). */
+    consentAppendix: text('consent_appendix'),
+    consentVersion: text('consent_version'),
+    consentHash: text('consent_hash'),
+    consentText: text('consent_text'),
+    campaignDisclosureVersion: text('campaign_disclosure_version'),
+    policyVersions: jsonb('policy_versions'),
+
+    /** The fixed demand survey (§19 step 2). */
+    surveyWhy: text('survey_why'),
+    surveyRecommend: integer('survey_recommend'),
+
+    /** §19 steps 6–8, §28.4: mandatory operational-sharing ack + two optional consents. */
+    operationalSharingAck: boolean('operational_sharing_ack').notNull().default(false),
+    operationalSharingAckVersion: text('operational_sharing_ack_version'),
+    operationalSharingAckAt: timestamp('operational_sharing_ack_at', { withTimezone: true }),
+    founderMarketingConsent: boolean('founder_marketing_consent').notNull().default(false),
+    founderMarketingConsentAt: timestamp('founder_marketing_consent_at', { withTimezone: true }),
+    newsletterConsent: boolean('newsletter_consent').notNull().default(false),
+    newsletterConsentAt: timestamp('newsletter_consent_at', { withTimezone: true }),
+
+    /** §18 attribution snapshot (§25.2). Status is computed at reservation time. */
+    attributionSource: text('attribution_source'),
+    attributionTrackingLinkId: uuid('attribution_tracking_link_id'),
+    attributionAssociationId: uuid('attribution_association_id'),
+    attributionClickedAt: timestamp('attribution_clicked_at', { withTimezone: true }),
+    attributionStatus: text('attribution_status'),
+    sameDeviceLimitation: boolean('same_device_limitation').notNull().default(false),
+
+    /** §24.12 statement descriptor, validated at checkout and stored. */
+    statementDescriptor: text('statement_descriptor'),
+
+    /** §25.2 replacement history for an Idea reward change (§19). */
+    replacesReservationId: uuid('replaces_reservation_id'),
+    replacedByReservationId: uuid('replaced_by_reservation_id'),
+
+    /** Lifecycle stamps distinct from created_at/updated_at (§21). */
+    reservedAt: timestamp('reserved_at', { withTimezone: true }),
+    canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
     campaignIdx: index('reservations_campaign_idx').on(t.campaignId, t.status),
     backerIdx: index('reservations_backer_idx').on(t.backerIdentityId),
+    rewardIdx: index('reservations_reward_idx').on(t.rewardPackageId),
   }),
 );
 

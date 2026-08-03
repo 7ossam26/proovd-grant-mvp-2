@@ -43,6 +43,7 @@ import { sweepCreatorReplacementDeadlines } from '../launch/creator-failure.js';
 import { notifyCampaignLive, type LaunchNotificationContext } from '../launch/notifications.js';
 import { sweepDiscovery } from '../campaign/discovery.js';
 import { notifyListingRefund } from '../payments/listing-notifications.js';
+import { sweepPrechargeReminders } from '../reservations/reminder.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -109,6 +110,13 @@ export const CREATOR_REPLACEMENT_JOB = 'creator-replacement-deadline';
 export const CAMPAIGN_DISCOVERY_JOB = 'campaign-discovery';
 
 /**
+ * Phase 15b's §20 pre-charge reminder. Runs on the shared 15-minute tick; the
+ * ~24-hour window means minute-level accuracy is not needed, and the reminder
+ * dedups on the reservation so a repeated tick sends nothing twice.
+ */
+export const PRECHARGE_REMINDER_JOB = 'precharge-reminder';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -138,6 +146,13 @@ export interface SchedulerDeps {
     notifier: Notifier;
     context: LaunchNotificationContext;
   };
+  /** Phase 15b. The §20 pre-charge reminder; without it the reminder does not
+      send (an unconfigured transport would refuse loudly anyway). */
+  backer?: {
+    notifier: Notifier;
+    fromAddress: string;
+    appBaseUrl: string;
+  };
 }
 
 export interface Scheduler {
@@ -152,6 +167,8 @@ export interface Scheduler {
   runLaunchJobsNow: () => Promise<void>;
   /** Runs the §18 Day 8 discovery sweep now. Used by tests and by Admin. */
   runDiscoveryNow: () => Promise<void>;
+  /** Runs the §20 pre-charge reminder sweep now. Used by tests and by Admin. */
+  runPrechargeRemindersNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -163,6 +180,7 @@ export async function startScheduler({
   interviews,
   listing,
   launch,
+  backer,
 }: SchedulerDeps): Promise<Scheduler> {
   const boss = new PgBoss({ connectionString, schema: 'pgboss' });
 
@@ -322,6 +340,25 @@ export async function startScheduler({
   });
   await boss.schedule(CAMPAIGN_DISCOVERY_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });
 
+  /* ── Phase 15b's §20 pre-charge reminder ───────────────────────────────── */
+
+  await boss.createQueue(PRECHARGE_REMINDER_JOB);
+  await boss.work(PRECHARGE_REMINDER_JOB, async () => {
+    if (!backer) {
+      log('pre-charge reminder skipped: no notifier configured');
+      return;
+    }
+    const result = await sweepPrechargeReminders({
+      db,
+      notifier: backer.notifier,
+      tokenService: tokens,
+      fromAddress: backer.fromAddress,
+      appBaseUrl: backer.appBaseUrl,
+    });
+    log('pre-charge reminder sweep complete', { claimed: result.claimed, sent: result.sent });
+  });
+  await boss.schedule(PRECHARGE_REMINDER_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -340,6 +377,9 @@ export async function startScheduler({
     },
     runDiscoveryNow: async () => {
       await boss.send(CAMPAIGN_DISCOVERY_JOB, {});
+    },
+    runPrechargeRemindersNow: async () => {
+      await boss.send(PRECHARGE_REMINDER_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

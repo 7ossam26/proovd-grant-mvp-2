@@ -35,6 +35,7 @@ import {
 import { FormalOpportunity } from './surfaces/creator/FormalOpportunity.js';
 import { CreatorPartnership } from './surfaces/creator/CreatorPartnership.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
+import { BackerPage } from './features/public/backer/BackerPage.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
 import { CreatorResult } from './surfaces/draft/CreatorResult.js';
 import { AccountClaim } from './surfaces/draft/AccountClaim.js';
@@ -141,6 +142,14 @@ const rootChildren: RouteObject[] = [
     // else, and this is a Founder surface.
     path: 'draft/:token',
     element: <DraftLanding />,
+  },
+  {
+    // Phase 15 (§19, §20). The Backer's long-lived campaign-scoped magic-link
+    // page: their transactions, the not-charged fact, and cancel-before-close.
+    // Outside PublicLayout for the same reason the draft link is — it is reached
+    // by an account-less Backer through a token, not a navigable site path.
+    path: 'backer/:token',
+    element: <BackerPage />,
   },
   {
     // Phase 07 (§9, §10). The vetting sequence, its result, and the account

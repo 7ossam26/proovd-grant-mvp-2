@@ -124,6 +124,29 @@ export const AFFILIATE_FIRST_POST_REJECT = 'affiliate_first_post_reject' as cons
  */
 export const FOUNDER_CAMPAIGN_DISCOVERY_OPENED = 'founder_campaign_discovery_opened' as const;
 
+/**
+ * Phase 15's first Backer event (§27.5), sent by `notifications/backer.ts`.
+ *
+ * §27.5 — "Pre-order confirmation", carrying the magic link. It is the first
+ * message a Backer ever receives and leads with `Pre-order saved — you were not
+ * charged`, never anything implying a completed charge (§19, §30).
+ * `backer_cancellation_confirmation` and `backer_precharge_reminder` are 15b's;
+ * they appear here when their senders exist, since a key with no sender claims a
+ * message the product does not send (§1.4).
+ */
+export const BACKER_PREORDER_CONFIRMATION = 'backer_preorder_confirmation' as const;
+
+/**
+ * Phase 15b's two Backer events (§27.5), sent by `notifications/backer.ts`.
+ *
+ * §27.5 — "Cancellation confirmation" (Appendix B.4, sent by
+ * `reservations/cancellation.ts`) and "Pre-charge reminder" (Appendix B.3, sent
+ * by the `precharge-reminder` sweep). Both lead with a not-charged statement and
+ * dedup on the reservation.
+ */
+export const BACKER_CANCELLATION_CONFIRMATION = 'backer_cancellation_confirmation' as const;
+export const BACKER_PRECHARGE_REMINDER = 'backer_precharge_reminder' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -152,6 +175,9 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   AFFILIATE_FIRST_POST_CORRECTION,
   AFFILIATE_FIRST_POST_REJECT,
   FOUNDER_CAMPAIGN_DISCOVERY_OPENED,
+  BACKER_PREORDER_CONFIRMATION,
+  BACKER_CANCELLATION_CONFIRMATION,
+  BACKER_PRECHARGE_REMINDER,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

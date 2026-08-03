@@ -60,4 +60,9 @@ export * from './attribution.js';
 // Phase 14c: the §18 campaign updates — Founder-authored, append-only, with the
 // Idea-only milestone audience and the material-delivery-change pairing.
 export * from './updates.js';
+// Phase 15: the Backer pre-order surround — the pseudonymous per-campaign backer
+// identity (§28.1), §25.3's least-privilege deduplication record and §4.1's
+// Admin case queue, §19's immediate immutable Founder operational share, and the
+// §2.2 US$50,000 pre-tax cap enforced by a CHECK and a conditional UPDATE.
+export * from './reservations.js';
 

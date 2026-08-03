@@ -110,5 +110,6 @@ export function LiveCampaignPage() {
 
   if (state.status === 'loading') return <PageLoading />;
   if (state.status === 'not_found') return <NotFoundSurface />;
-  return <CampaignPage campaign={state.view} />;
+  // §19: a real live campaign gets the pre-order checkout. Samples never do.
+  return <CampaignPage campaign={state.view} checkout={{ campaignId }} />;
 }
