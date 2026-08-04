@@ -29,7 +29,12 @@ import {
 } from '../db/schema/close.js';
 import { deduplicationCases } from '../db/schema/reservations.js';
 import { creatorPostSubmissions } from '../db/schema/launch.js';
-import { trackingLinks } from '../db/schema/decisions.js';
+import {
+  trackingLinks,
+  associationCompensationAgreements,
+  creatorBonuses,
+} from '../db/schema/decisions.js';
+import { creatorCompletionDecisions, creatorEarnings } from '../db/schema/earnings.js';
 import type { AuditWriter } from '../auth/audit.js';
 import {
   RECONCILIATION_ITEMS,
@@ -294,6 +299,52 @@ export async function readReconciliation(
     .from(trackingLinks)
     .where(and(eq(trackingLinks.campaignId, campaignId), sql`${trackingLinks.pausedAt} is not null`));
 
+  // Phase 19a's §22.1/§24.4 records, gathered for the four earnings items.
+  const [agreementCount] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(associationCompensationAgreements)
+    .where(eq(associationCompensationAgreements.campaignId, campaignId));
+  const decisionRows = await db
+    .select({ outcome: creatorCompletionDecisions.outcome })
+    .from(creatorCompletionDecisions)
+    .where(eq(creatorCompletionDecisions.campaignId, campaignId));
+  const [bonusFacts] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+      recorded: sql<number>`count(*) filter (where ${creatorBonuses.earnedRecordedAt} is not null)::int`,
+      triggered: sql<number>`count(*) filter (where ${creatorBonuses.earnedPercent} > 0)::int`,
+    })
+    .from(creatorBonuses)
+    .where(eq(creatorBonuses.campaignId, campaignId));
+  const [finalizationFacts] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(creatorEarnings)
+    .where(eq(creatorEarnings.campaignId, campaignId));
+  const [aggregates] = await db
+    .select({
+      provisional: sql<string>`${campaigns.affiliateProvisionalCents}::text`,
+      earned: sql<string>`${campaigns.affiliateEarnedCents}::text`,
+      returned: sql<string>`${campaigns.affiliateUnearnedReturnedCents}::text`,
+    })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+  const earningsFacts = {
+    agreements: Number(agreementCount?.count ?? 0),
+    decisions: decisionRows.length,
+    outcomes: decisionRows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.outcome] = (acc[row.outcome] ?? 0) + 1;
+      return acc;
+    }, {}),
+    bonuses: Number(bonusFacts?.count ?? 0),
+    bonusesRecorded: Number(bonusFacts?.recorded ?? 0),
+    bonusesTriggered: Number(bonusFacts?.triggered ?? 0),
+    finalizations: Number(finalizationFacts?.count ?? 0),
+    provisionalCents: aggregates?.provisional ?? '0',
+    earnedCents: aggregates?.earned ?? '0',
+    returnedCents: aggregates?.returned ?? '0',
+  };
+
   const derivedByKey: Partial<Record<ReconciliationItemKey, Record<string, unknown>>> = {
     batch_completeness: {
       batchComplete: Boolean(batch?.completedAt),
@@ -316,6 +367,38 @@ export async function readReconciliation(
       attributedAssociations: attributedAssociations.length,
       associationsWithPassedFirstPost: passedAssociations,
       pausedLinks: Number(pausedLinks?.count ?? 0),
+    },
+    // Phase 19a fills the four §22.1/§24.4 items 18b left derived: null. The
+    // verification is still an Admin's; these are the app's own records for
+    // the Admin to verify against.
+    creator_deliverables: {
+      creatorsWithLockedTerms: earningsFacts.agreements,
+      completionDecisions: earningsFacts.decisions,
+      outcomes: earningsFacts.outcomes,
+    },
+    creator_bonus_triggers: {
+      bonusesRecorded: earningsFacts.bonuses,
+      bonusesWithEarnedResult: earningsFacts.bonusesRecorded,
+      triggered: earningsFacts.bonusesTriggered,
+    },
+    provisional_vs_earned: {
+      finalizations: earningsFacts.finalizations,
+      provisionalCents: earningsFacts.provisionalCents,
+      earnedCents: earningsFacts.earnedCents,
+      unearnedReturnedCents: earningsFacts.returnedCents,
+      // §24.4's identity, compared — null while nothing is provisional.
+      identityHolds:
+        BigInt(earningsFacts.provisionalCents) > 0n
+          ? BigInt(earningsFacts.earnedCents) + BigInt(earningsFacts.returnedCents) ===
+            BigInt(earningsFacts.provisionalCents)
+          : null,
+    },
+    unearned_return: {
+      unearnedReturnedCents: earningsFacts.returnedCents,
+      // Under the approved direct-charge configuration no platform-side fee
+      // was debited at capture, so the unearned remainder is already with the
+      // Founder; the return is the ledger resolution recorded at finalization.
+      providerDebitToReverse: false,
     },
   };
 

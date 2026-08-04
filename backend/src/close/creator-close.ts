@@ -5,15 +5,15 @@
  * attributed pre-orders/capture, estimated/final earnings, next review date,
  * and a factual thank-you without public ranking."
  *
- * ── Estimated is now a number, and it is still not final ────────────────────
+ * ── Estimated until the finalization row exists, then the real state ────────
  * Phase 17b deliberately rendered no B.7 — nothing had been captured, so
  * "US$0.00 recorded" would have read as "you earned nothing". After close
- * there IS a captured, attributed subtotal, so the block renders with the
- * estimated amount — the locked percentage over captured attributed pre-tax
- * subtotal (§22.1's base) — and says plainly why it is not paid yet:
- * finalization is §22.1's verification, Phase 19's work. The bonus is reported
- * as pending for the same reason; its earned result does not exist until a
- * person verifies the trigger (§14.3).
+ * there IS a captured, attributed subtotal, so the block renders the estimate —
+ * the locked percentage over captured attributed pre-tax subtotal (§22.1's
+ * base) — and says plainly why it is not paid yet. Once Phase 19a's §22.1
+ * finalization records the numbers, THIS view renders the recorded state and
+ * amounts from that one row — the same record the emails render, one source,
+ * many renderers (§33.8.13).
  *
  * ── No ranking, structurally ────────────────────────────────────────────────
  * Nothing in this view reads another association's rows. There is no rank, no
@@ -27,12 +27,14 @@ import { campaigns, campaignAffiliateAssociations, reservations } from '../db/sc
 import { campaignBuild } from '../db/schema/build.js';
 import { associationCompensationAgreements, creatorBonuses } from '../db/schema/decisions.js';
 import { creatorPostSubmissions } from '../db/schema/launch.js';
+import { creatorEarnings } from '../db/schema/earnings.js';
 import { findAllocation } from '../creator-payment/allocations.js';
 import { formatCents } from '../reservations/restated.js';
 import {
   EARNINGS_STATE_LABELS,
   NO_ACTION_NEEDED,
   resolveAffiliateMoneyStatus,
+  type EarningsState,
 } from '../campaign/editing-logic.js';
 import { percentOfCents } from './logic.js';
 
@@ -59,22 +61,33 @@ export interface CreatorCloseView {
     capturedSubtotalCents: string;
   };
 
-  /** §21/§22.1: estimated earnings now, final earnings pending Phase 19. */
+  /** §21/§22.1: estimated before finalization; the real B.7 state after it. */
   earnings: {
-    state: 'estimated';
+    state: EarningsState;
     label: string;
     lockedPercent: number | null;
+    /** The B.7 amount: the estimate before finalization, the recorded total after. */
     estimatedCents: string;
     reason: string;
     nextUpdate: string;
     action: string;
     /** Appendix B.7, rendered server-side — the same block the email carries. */
     statusBlock: string;
-    finalization: 'pending';
+    finalization: 'pending' | 'recorded';
     finalizationNote: string;
+    /** Present once §22.1 finalization recorded the numbers (Phase 19a). */
+    final: {
+      earnedPercent: number;
+      commissionCents: string;
+      bonusCents: string;
+      eligibleFixedCents: string;
+      totalCents: string;
+    } | null;
   };
 
-  bonus: { recorded: number; finalization: 'pending'; note: string } | null;
+  bonus:
+    | { recorded: number; finalization: 'pending' | 'recorded'; note: string }
+    | null;
 
   fixedPayment:
     | { applicable: true; status: string; amountCents: string }
@@ -184,31 +197,82 @@ export async function readCreatorClose(
 
   const allocation = await findAllocation(db, association.id);
 
+  // Phase 19a: the §22.1 finalization row, when one exists — the real B.7
+  // state replaces the estimate, computed once and rendered everywhere from
+  // the same record (§33.8.13).
+  const [finalized] = await db
+    .select()
+    .from(creatorEarnings)
+    .where(eq(creatorEarnings.associationId, association.id))
+    .limit(1);
+
   const capturedSubtotal = BigInt(attributed?.capturedSubtotal ?? '0');
   const lockedPercent = agreement?.totalPercent ?? null;
   const estimatedCents =
     lockedPercent !== null ? percentOfCents(capturedSubtotal, lockedPercent) : 0n;
 
   const nextReviewAt = campaign.closeAt ? dayAfterClose(campaign.closeAt, 3) : null;
-  const nextReviewLine = nextReviewAt
-    ? `Next review: Proovd finalizes Creator earnings and creates payments on or after ${nextReviewAt.toISOString().slice(0, 10)} (Day 3 after close), once deliverables are verified.`
-    : 'Next review: Proovd finalizes Creator earnings once deliverables are verified after close.';
+  const nextReviewLine = finalized
+    ? 'Your earnings are finalized — the record below is the one Proovd pays from.'
+    : nextReviewAt
+      ? `Next review: Proovd finalizes Creator earnings and creates payments on or after ${nextReviewAt.toISOString().slice(0, 10)} (Day 3 after close), once deliverables are verified.`
+      : 'Next review: Proovd finalizes Creator earnings once deliverables are verified after close.';
+
+  const state: EarningsState = (finalized?.state as EarningsState | undefined) ?? 'estimated';
+  const finalTotal = finalized
+    ? finalized.commissionCents + finalized.bonusCents + finalized.eligibleFixedCents
+    : 0n;
+
+  // §22.1: every non-paid state names amount, reason, owner, next date/action.
+  const nextByState: Record<string, string> = {
+    finalized: nextReviewAt
+      ? `On or after ${nextReviewAt.toISOString().slice(0, 10)} — the earliest your one campaign Transfer can be created`
+      : 'When your one campaign Transfer is approved',
+    approved_for_transfer: nextReviewAt
+      ? `On or after ${nextReviewAt.toISOString().slice(0, 10)} — your one campaign Transfer`
+      : 'When your one campaign Transfer is created',
+    transferred: 'When your bank posts the payout',
+    paid_out: 'None — this campaign Transfer has been paid out',
+    payout_failed: 'Once your payout details are updated with Stripe',
+    adjusted: 'Support will contact you with the recorded adjustment',
+  };
+  const reasonByState: Record<string, string> = {
+    finalized: 'Your earnings are finalized and awaiting approval for your one campaign Transfer.',
+    approved_for_transfer:
+      'A named reviewer approved your earnings; your one campaign Transfer is created on or after Day 3.',
+    transferred:
+      'Proovd has sent your Transfer; your bank payout follows your Stripe payout schedule.',
+    paid_out: '',
+    payout_failed:
+      'Stripe could not pay out your balance to your bank; your earnings are unchanged.',
+    adjusted:
+      'Your earnings were adjusted after completion review. Support can walk you through the record.',
+  };
 
   // §22.1: estimated until verification finalizes it — the reason is stated,
   // never implied (§1.4). The window/bonus caveat keeps the estimate honest.
-  const reason =
+  const estimatedReason =
     campaign.status === 'ended_no_charge'
       ? 'The campaign closed without any charge, so there is no commission to pay.'
       : 'Earnings are estimated from captured charges attributed to your link. They finalize after the payment window ends and Proovd verifies your deliverables (§22.1) — a bonus you qualified for can still raise this number.';
 
-  const statusBlock = resolveAffiliateMoneyStatus({
-    amount: formatCents(estimatedCents),
-    state: 'estimated',
-    reason,
-    nextUpdate: nextReviewAt
+  const reason = finalized ? (reasonByState[state] ?? '') : estimatedReason;
+  const nextUpdate = finalized
+    ? (nextByState[state] ?? 'After the next review')
+    : nextReviewAt
       ? `On or after ${nextReviewAt.toISOString().slice(0, 10)}`
-      : 'After deliverable verification',
-    action: NO_ACTION_NEEDED,
+      : 'After deliverable verification';
+  const action =
+    state === 'payout_failed'
+      ? 'Update your payout details through your Stripe-managed payout setup'
+      : NO_ACTION_NEEDED;
+
+  const statusBlock = resolveAffiliateMoneyStatus({
+    amount: formatCents(finalized ? finalTotal : estimatedCents),
+    state,
+    reason,
+    nextUpdate,
+    action,
   });
 
   return {
@@ -231,27 +295,44 @@ export async function readCreatorClose(
         capturedSubtotalCents: capturedSubtotal.toString(),
       },
       earnings: {
-        state: 'estimated',
-        label: EARNINGS_STATE_LABELS.estimated,
+        state,
+        label: EARNINGS_STATE_LABELS[state],
         lockedPercent,
-        estimatedCents: estimatedCents.toString(),
+        estimatedCents: (finalized ? finalTotal : estimatedCents).toString(),
         reason,
-        nextUpdate: nextReviewAt
-          ? `On or after ${nextReviewAt.toISOString().slice(0, 10)}`
-          : 'After deliverable verification',
-        action: NO_ACTION_NEEDED,
+        nextUpdate,
+        action,
         statusBlock,
-        finalization: 'pending',
-        finalizationNote:
-          'Final earnings are recorded when Proovd verifies deliverables and finalizes results after the payment window — they are not final yet (§22.1).',
+        finalization: finalized ? 'recorded' : 'pending',
+        finalizationNote: finalized
+          ? 'These amounts are finalized under §22.1 — the recorded completion decision and the captured, validly attributed ledger are what they were computed from.'
+          : 'Final earnings are recorded when Proovd verifies deliverables and finalizes results after the payment window — they are not final yet (§22.1).',
+        final: finalized
+          ? {
+              earnedPercent: finalized.earnedPercent,
+              commissionCents: finalized.commissionCents.toString(),
+              bonusCents: finalized.bonusCents.toString(),
+              eligibleFixedCents: finalized.eligibleFixedCents.toString(),
+              totalCents: finalTotal.toString(),
+            }
+          : null,
       },
       bonus:
         bonuses.length > 0
-          ? {
-              recorded: bonuses.length,
-              finalization: 'pending',
-              note: 'Your Creator-specific bonus is evaluated against your own captured results during finalization — it is not decided yet.',
-            }
+          ? finalized
+            ? {
+                recorded: bonuses.length,
+                finalization: 'recorded',
+                note:
+                  finalized.earnedBonusPercent > 0
+                    ? `Your Creator-specific bonus triggered on your own captured results: +${finalized.earnedBonusPercent}%.`
+                    : 'Your Creator-specific bonus did not reach its trigger on your own captured results.',
+              }
+            : {
+                recorded: bonuses.length,
+                finalization: 'pending',
+                note: 'Your Creator-specific bonus is evaluated against your own captured results during finalization — it is not decided yet.',
+              }
           : null,
       fixedPayment:
         allocation !== null

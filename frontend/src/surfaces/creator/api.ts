@@ -420,7 +420,16 @@ export interface CreatorCloseView {
   contentVerified: { status: string | null; line: string };
   attributed: { preorders: number; captured: number; capturedSubtotalCents: string };
   earnings: {
-    state: 'estimated';
+    /** Appendix B.7's states — `estimated` until §22.1 finalization records
+        the numbers (Phase 19a), then the real recorded state. */
+    state:
+      | 'estimated'
+      | 'finalized'
+      | 'approved_for_transfer'
+      | 'transferred'
+      | 'paid_out'
+      | 'payout_failed'
+      | 'adjusted';
     label: string;
     lockedPercent: number | null;
     estimatedCents: string;
@@ -428,10 +437,17 @@ export interface CreatorCloseView {
     nextUpdate: string;
     action: string;
     statusBlock: string;
-    finalization: 'pending';
+    finalization: 'pending' | 'recorded';
     finalizationNote: string;
+    final: {
+      earnedPercent: number;
+      commissionCents: string;
+      bonusCents: string;
+      eligibleFixedCents: string;
+      totalCents: string;
+    } | null;
   };
-  bonus: { recorded: number; finalization: 'pending'; note: string } | null;
+  bonus: { recorded: number; finalization: 'pending' | 'recorded'; note: string } | null;
   fixedPayment: { applicable: true; status: string; amountCents: string } | { applicable: false };
   nextReviewAt: string | null;
   nextReviewLine: string;

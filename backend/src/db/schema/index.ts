@@ -91,3 +91,9 @@ export * from './live-editing.js';
 // window anchored at the first failure, plus the capture attempt claimed under
 // its stable idempotency key BEFORE the provider call (§33.7.7).
 export * from './close.js';
+// Phase 19a: §22.1 completion decisions and earnings finalization with the
+// §24.4 identity CHECK-pinned, the ONE per-association Affiliate Transfer
+// claimed before the provider call (§33.8.3/4), the §22.1 contractual recovery
+// record, and §22.2's recognition-or-payment thank-you with no path to a
+// campaign balance.
+export * from './earnings.js';

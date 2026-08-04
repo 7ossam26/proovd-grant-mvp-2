@@ -47,6 +47,7 @@ import { sweepPrechargeReminders } from '../reservations/reminder.js';
 import { sweepThresholdCrossings } from '../live/thresholds.js';
 import { sweepCampaignCloses } from '../close/close-batch.js';
 import { sweepRetryWindowEnds } from '../close/retry.js';
+import { sweepTransferRetries } from '../close/earnings.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -148,6 +149,18 @@ export const CAMPAIGN_CLOSE_JOB = 'campaign-close';
 export const CAMPAIGN_CLOSE_CRON = '*/5 * * * *';
 
 /**
+ * Phase 19a's §33.8.4 Transfer retry.
+ *
+ * A Transfer creation failure is a synchronous API error with no
+ * `transfer.failed` webhook behind it (§32.3), so a sweep is the recovery
+ * path: every `failed` row and every stale `initiated` claim (a crash between
+ * claim and confirmation) is re-driven through the same service under the SAME
+ * stable key — the retry is the same Transfer at Stripe, never a second.
+ */
+export const AFFILIATE_TRANSFER_RETRY_JOB = 'affiliate-transfer-retry';
+export const AFFILIATE_TRANSFER_RETRY_CRON = '*/15 * * * *';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -204,6 +217,8 @@ export interface Scheduler {
   runThresholdReconciliationNow: () => Promise<void>;
   /** Runs the §21 close batch sweep now. Used by tests and by Admin. */
   runCampaignCloseNow: () => Promise<void>;
+  /** Runs the §33.8.4 Transfer retry sweep now. Used by tests and by Admin. */
+  runTransferRetriesNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -457,6 +472,32 @@ export async function startScheduler({
   });
   await boss.schedule(CAMPAIGN_CLOSE_JOB, CAMPAIGN_CLOSE_CRON, undefined, { tz: 'UTC' });
 
+  /* ── Phase 19a's §33.8.4 Transfer retry ────────────────────────────────── */
+
+  await boss.createQueue(AFFILIATE_TRANSFER_RETRY_JOB);
+  await boss.work(AFFILIATE_TRANSFER_RETRY_JOB, async () => {
+    if (!listing) {
+      log('affiliate transfer retry sweep skipped: no Stripe gateway configured');
+      return;
+    }
+    const result = await sweepTransferRetries(
+      {
+        db,
+        gateway: listing.gateway,
+        audit,
+        ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
+      },
+      new Date(),
+    );
+    log('affiliate transfer retry sweep complete', {
+      retried: result.retried,
+      created: result.created,
+    });
+  });
+  await boss.schedule(AFFILIATE_TRANSFER_RETRY_JOB, AFFILIATE_TRANSFER_RETRY_CRON, undefined, {
+    tz: 'UTC',
+  });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -484,6 +525,9 @@ export async function startScheduler({
     },
     runCampaignCloseNow: async () => {
       await boss.send(CAMPAIGN_CLOSE_JOB, {});
+    },
+    runTransferRetriesNow: async () => {
+      await boss.send(AFFILIATE_TRANSFER_RETRY_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

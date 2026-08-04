@@ -27,6 +27,19 @@ Phase 18 green — the retry window has closed and reconciliation has begun. Pha
 
 ---
 
+## The seam
+
+Fourteen named tests is more than one session — more than Phase 12's thirteen, which split, and Phases 14–18 all split at less. There is a real seam in this brief: scope 1–5 are **Creator money** — completion verification, earnings finalization, the one Transfer, the §24.4 provisional reconciliation, and the discretionary thank-you — while 6–7 are **Founder money**: the W-9 block and the payment schedules. The dependency runs one way through the eligible-Founder-share formula (scope 7 subtracts the *finalized* Creator compensation scope 4 produces), and the acceptance tests fall the same way, which is the usual sign a seam is real rather than convenient. Scope 8 (§33.8.13, one source many renderers) is testable only once both halves' amounts exist, so it closes 19b.
+
+| Half | Scope | Acceptance | State |
+|---|---|---|---|
+| **19a** | §22.1 completion verification and the five fixed-payment outcomes, earnings finalization and the B.7 states, the one idempotent Transfer with its synchronous-failure retry, the §24.4 provisional/earned reconciliation with the unearned return, the §11 tax gate on every Transfer, and the §22.2 thank-you | **§33.8.1–§33.8.8, §33.8.14**, the tax-gate done-when | **built** |
+| **19b** | §22.3 W-9 request/verification and the block, the Idea single payment, the Product 40%/60% schedule, evidence-gated early release that never skips Day 14, and the money surface consistency pass | **§33.8.9–§33.8.13** | next session |
+
+19a writes no Founder payment object and no W-9 record. 19b reads 19a's finalized amounts rather than recomputing them.
+
+---
+
 ## Scope
 
 ### 1. Creator completion and earnings

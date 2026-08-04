@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
+import { formatUsd } from '@proovd/shared';
 import { Section, Measure } from '../../components/index.js';
 import { fetchCreatorClose, CreatorRequestError, type CreatorCloseView } from './api.js';
 
@@ -100,9 +101,30 @@ export function CreatorCampaignClose() {
           </div>
         </dl>
 
-        {/* Appendix B.7, exact — the estimated-earnings status block. */}
+        {/* Appendix B.7, exact — server-rendered, the same block the emails
+            carry. Estimated until §22.1 finalization; then the recorded state. */}
         <h2 className="h3">Your earnings</h2>
         <p className="backer__recovery-body">{c.earnings.statusBlock}</p>
+        {c.earnings.final ? (
+          <dl className="checkout__amounts">
+            <div>
+              <dt>Finalized commission</dt>
+              <dd>{formatUsd(BigInt(c.earnings.final.commissionCents))}</dd>
+            </div>
+            <div>
+              <dt>Earned bonus</dt>
+              <dd>{formatUsd(BigInt(c.earnings.final.bonusCents))}</dd>
+            </div>
+            <div>
+              <dt>Fixed Creator payment eligible</dt>
+              <dd>{formatUsd(BigInt(c.earnings.final.eligibleFixedCents))}</dd>
+            </div>
+            <div>
+              <dt>Transfer total</dt>
+              <dd>{formatUsd(BigInt(c.earnings.final.totalCents))}</dd>
+            </div>
+          </dl>
+        ) : null}
         <p className="backer__recovery-note">{c.earnings.finalizationNote}</p>
         {c.bonus ? <p className="backer__recovery-note">{c.bonus.note}</p> : null}
         {c.fixedPayment.applicable ? (

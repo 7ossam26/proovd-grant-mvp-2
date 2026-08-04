@@ -58,8 +58,9 @@ import {
 } from '../creator-payment/allocations.js';
 import { evaluateCreatorReadiness } from '../creator-payment/readiness.js';
 import type { TokenService } from '../auth/token-service.js';
-import { readProviderObject } from './provider-objects.js';
+import { readProviderObject, recordProviderObject } from './provider-objects.js';
 import { applyCaptureSuccess, applyCaptureFailure } from '../close/capture.js';
+import { applyPayoutEvent } from '../close/earnings.js';
 import { classifyCaptureFailure } from '../close/logic.js';
 import {
   notifyChargeReceipt,
@@ -114,8 +115,13 @@ export const PLATFORM_HANDLERS: Record<string, EventHandler> = {
  *
  *   Phase 15 — setup_intent.*, payment_method.detached
  *   Phase 18 — payment_intent.*
- *   Phase 19 — transfer.created/updated/reversed, payout.paid/failed
- *   Phase 20 — charge.refunded, charge.dispute.*
+ *   Phase 20 — charge.refunded, charge.dispute.*, transfer.reversed
+ *
+ * Phase 19a registered `payout.paid`/`payout.failed` — Appendix B.7's tail.
+ * `transfer.created`/`transfer.updated` stay recorded-and-ignored: the §22.1
+ * Transfer is created by Proovd's own synchronous API call and stored under
+ * §32.4 at creation, a creation failure is a synchronous error with NO
+ * `transfer.failed` webhook (§32.3), and the reversal is Phase 20's §24.8.
  *
  * `account.application.deauthorized` is registered because it is not a future
  * phase's: it means the account is gone *now*, and silently continuing to treat
@@ -134,6 +140,8 @@ export const CONNECT_HANDLERS: Record<string, EventHandler> = {
   'payment_intent.payment_failed': handlePaymentIntentFailed,
   'payment_intent.requires_action': handlePaymentIntentRequiresAction,
   'payment_intent.canceled': handlePaymentIntentCanceled,
+  'payout.paid': handlePayoutPaid,
+  'payout.failed': handlePayoutFailed,
 };
 
 export function handlersFor(endpoint: WebhookEndpoint): Record<string, EventHandler> {
@@ -735,6 +743,83 @@ async function handlePaymentIntentCanceled(
     targetId: event.id,
     internalReason: `payment_intent.canceled received for ${paymentIntentId}; recorded for reconciliation, no reservation transition applied`,
   });
+}
+
+/**
+ * `payout.paid` / `payout.failed` — Appendix B.7's tail (§22.1, Phase 19a).
+ *
+ * A payout is balance-level on the Creator's connected account, so it applies
+ * to every `transferred` earnings row whose Transfer landed there. The §32.4
+ * store records the payout either way; `payout.failed` routes the fix to the
+ * Stripe-managed update path — the code stays internal (§25.6, §33.9.11).
+ */
+async function applyPayoutDelivery(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+  kind: 'paid' | 'failed',
+): Promise<void> {
+  const payoutId = typeof event.object['id'] === 'string' ? event.object['id'] : null;
+  if (!payoutId || !event.account) {
+    await context.audit({
+      action: 'earnings.payout_unbindable',
+      targetType: 'provider_event',
+      targetId: event.id,
+      internalReason: `payout.${kind} delivery could not be bound to a connected account; recorded for Admin reconciliation, applied to nothing (§1 rule 6)`,
+    });
+    return;
+  }
+
+  await recordProviderObject(context.db, {
+    mode: context.gateway.mode,
+    objectType: 'payout',
+    providerObjectId: payoutId,
+    accountContext: 'connected',
+    stripeAccountId: event.account,
+    amountCents:
+      typeof event.object['amount'] === 'number' ? BigInt(event.object['amount']) : null,
+    status: typeof event.object['status'] === 'string' ? event.object['status'] : kind,
+    failureCode:
+      typeof event.object['failure_code'] === 'string' ? event.object['failure_code'] : null,
+    failureMessage:
+      typeof event.object['failure_message'] === 'string' ? event.object['failure_message'] : null,
+  });
+
+  const applied = await applyPayoutEvent(
+    {
+      db: context.db,
+      gateway: context.gateway,
+      audit: context.audit,
+      notifier: context.notifier,
+      context: context.notificationContext,
+    },
+    {
+      kind,
+      stripeAccountId: event.account,
+      payoutId,
+      actor: 'system:stripe-webhook',
+    },
+  );
+
+  await context.audit({
+    action: `earnings.payout_${kind}`,
+    targetType: 'provider_event',
+    targetId: event.id,
+    internalReason: `payout.${kind} for ${event.account} moved ${applied.moved} earnings record(s) (Appendix B.7)`,
+  });
+}
+
+async function handlePayoutPaid(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyPayoutDelivery(context, event, 'paid');
+}
+
+async function handlePayoutFailed(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyPayoutDelivery(context, event, 'failed');
 }
 
 /**

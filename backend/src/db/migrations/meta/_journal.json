@@ -211,6 +211,13 @@
       "when": 1785578400000,
       "tag": "0029_close_recovery_results",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1785582000000,
+      "tag": "0030_creator_earnings",
+      "breakpoints": true
     }
   ]
 }

@@ -35,6 +35,7 @@ import type { Database } from '../db/client.js';
 import { campaigns, reservations } from '../db/schema/domain.js';
 import { creatorPaymentAllocations } from '../db/schema/creator-payment.js';
 import { providerObjects } from '../db/schema/payments.js';
+import { thankYouRecords } from '../db/schema/earnings.js';
 import {
   MONEY_CONTROL_KEYS,
   MONEY_STATUSES,
@@ -147,6 +148,17 @@ export async function readMoneyControls(
   const provisional = campaign.affiliateProvisionalCents;
   const resolved = campaign.affiliateEarnedCents + campaign.affiliateUnearnedReturnedCents;
 
+  // Phase 19a: §22.2's separate expense — its own table with no ledger column,
+  // which is exactly why this line reads it rather than a campaign aggregate.
+  const [thankYou] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+      paidCents: sql<string>`coalesce(sum(${thankYouRecords.amountCents}) FILTER (WHERE ${thankYouRecords.kind} = 'payment'), 0)::text`,
+      recognitions: sql<number>`count(*) FILTER (WHERE ${thankYouRecords.kind} = 'recognition')::int`,
+    })
+    .from(thankYouRecords)
+    .where(eq(thankYouRecords.campaignId, campaignId));
+
   const lines: MoneyControlValue[] = [
     {
       key: 'captured_amounts',
@@ -226,10 +238,16 @@ export async function readMoneyControls(
     },
     {
       key: 'thank_you_expense',
-      amounts: {},
-      populated: false,
+      amounts: {
+        paidCents: thankYou?.paidCents ?? '0',
+        recognitionCount: String(thankYou?.recognitions ?? 0),
+      },
+      populated: (thankYou?.count ?? 0) > 0,
       populatedBy: 'phase_19',
-      awaiting: 'The discretionary good-effort payment is decided after completion (§22.2).',
+      awaiting:
+        (thankYou?.count ?? 0) > 0
+          ? null
+          : 'The discretionary good-effort payment is decided after completion (§22.2).',
     },
   ];
 

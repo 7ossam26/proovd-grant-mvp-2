@@ -212,6 +212,28 @@ export const AFFILIATE_CAMPAIGN_CLOSED = 'affiliate_campaign_closed' as const;
 export const INTERNAL_RETRY_RECONCILIATION_COMPLETE =
   'internal_retry_reconciliation_complete' as const;
 
+/*
+ * Phase 19a — the Creator money messages (§22.1, §27.4).
+ *
+ * §27.4 — "Completion / fixed-payment decision", deduped per DECISION row
+ * (append-only decisions; a genuinely new outcome is a new message, a
+ * double-submit is refused upstream); "Commission finalized" and "Transfer
+ * created", each deduped on the association-singular row that caused them;
+ * "Transfer failure", deduped on the transfer row — one notice per Transfer
+ * however many times the sweep retries it (§32.3, §33.8.4); "Payout paid" /
+ * "Payout failed", deduped per earnings row and payout event.
+ *
+ * There is deliberately NO thank-you key: §27 names no §22.2 message, and
+ * §22.2's "never promised" makes an automated congratulations exactly the
+ * promise the product must not manufacture (§1.4, §1 rule 6).
+ */
+export const AFFILIATE_COMPLETION_DECISION = 'affiliate_completion_decision' as const;
+export const AFFILIATE_COMMISSION_FINALIZED = 'affiliate_commission_finalized' as const;
+export const AFFILIATE_TRANSFER_CREATED = 'affiliate_transfer_created' as const;
+export const AFFILIATE_TRANSFER_FAILURE = 'affiliate_transfer_failure' as const;
+export const AFFILIATE_PAYOUT_PAID = 'affiliate_payout_paid' as const;
+export const AFFILIATE_PAYOUT_FAILED = 'affiliate_payout_failed' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -257,6 +279,12 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_RESULTS_READY,
   AFFILIATE_CAMPAIGN_CLOSED,
   INTERNAL_RETRY_RECONCILIATION_COMPLETE,
+  AFFILIATE_COMPLETION_DECISION,
+  AFFILIATE_COMMISSION_FINALIZED,
+  AFFILIATE_TRANSFER_CREATED,
+  AFFILIATE_TRANSFER_FAILURE,
+  AFFILIATE_PAYOUT_PAID,
+  AFFILIATE_PAYOUT_FAILED,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

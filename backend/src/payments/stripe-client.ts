@@ -139,6 +139,26 @@ export interface RefundResult {
   status: string;
 }
 
+/* ── The Affiliate Transfer (§22.1, §24.1 — Phase 19) ──────────────────────── */
+
+export interface TransferInput {
+  /** The Creator's recipient connected account (§24.1: recipient only). */
+  destinationAccountId: string;
+  /** Finalized commission + earned bonus + eligible fixed amount (§33.8.3). */
+  amountCents: bigint;
+  /**
+   * The stable per-association key. A synchronous failure is retried under the
+   * SAME key, so the retry is the same Transfer at Stripe, never a second
+   * (§33.8.4). There is no `transfer.failed` webhook to wait for (§32.3).
+   */
+  idempotencyKey: string;
+  metadata: Record<string, string>;
+}
+
+export interface TransferResult {
+  id: string;
+}
+
 /* ── The reservation SetupIntent (§19, §24.2 — Phase 15) ───────────────────── */
 
 /**
@@ -346,6 +366,16 @@ export interface StripeGateway {
 
   /** A full refund to the original payment method (§13, §33.3.8). */
   createRefund(input: RefundInput): Promise<RefundResult>;
+
+  /**
+   * The one campaign-specific Affiliate Transfer (§22.1), platform → recipient
+   * account. Deliberately NO `source_transaction` and no campaign charge
+   * reference: the Creator never receives Backer funds before Transfer creation
+   * (§22.1), and §22.2's thank-you reuses this same shape precisely because it
+   * cannot reach a campaign balance. A creation failure here is a synchronous
+   * API error — record it and retry under the same key (§32.3, §33.8.4).
+   */
+  createTransfer(input: TransferInput): Promise<TransferResult>;
 
   /** The underlying SDK, for the phases that create payment objects. */
   readonly client: Stripe | null;
@@ -637,6 +667,21 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
       }
     },
 
+    async createTransfer(input) {
+      // No `source_transaction`: the Transfer draws on the platform balance,
+      // never on a specific campaign charge (§22.1, §22.2, §24.1).
+      const transfer = await client.transfers.create(
+        {
+          amount: Number(input.amountCents),
+          currency: 'usd',
+          destination: input.destinationAccountId,
+          metadata: input.metadata,
+        },
+        { idempotencyKey: input.idempotencyKey },
+      );
+      return { id: transfer.id };
+    },
+
     async createRefund(input) {
       const refund = await client.refunds.create(
         {
@@ -789,6 +834,19 @@ export interface MemoryStripeGateway extends StripeGateway {
   /** Makes the next `createOffSessionPaymentIntent` throw once — the crash test. */
   failNextPaymentIntent(message: string): void;
 
+  /* ── Phase 19 controls ─────────────────────────────────────────────────── */
+  /** Every Transfer this gateway created, newest last. A replayed idempotency
+      key returns the cached result and adds NO entry — §33.8.4's count. */
+  readonly transfers: Array<{
+    id: string;
+    destinationAccountId: string;
+    amountCents: bigint;
+    idempotencyKey: string;
+    metadata: Record<string, string>;
+  }>;
+  /** Makes the next `createTransfer` throw once — the synchronous-failure test. */
+  failNextTransfer(message: string): void;
+
   /* ── Phase 15 controls ─────────────────────────────────────────────────── */
   readonly customers: Array<{ id: string; connectedAccountId: string; email?: string }>;
   readonly setupIntents: Array<{
@@ -829,6 +887,9 @@ export function createMemoryStripeGateway(config: {
   const sessionsByKey = new Map<string, number>();
   const refunds: MemoryStripeGateway['refunds'] = [];
   const refundsByKey = new Map<string, RefundResult>();
+  const transfers: MemoryStripeGateway['transfers'] = [];
+  const transfersByKey = new Map<string, TransferResult>();
+  let nextTransferFailure: string | null = null;
   const customers: MemoryStripeGateway['customers'] = [];
   const setupIntents: MemoryStripeGateway['setupIntents'] = [];
   const setupIntentsByKey = new Map<string, SetupIntentResult>();
@@ -859,6 +920,7 @@ export function createMemoryStripeGateway(config: {
     created,
     sessions,
     refunds,
+    transfers,
     customers,
     setupIntents,
     detachedPaymentMethods,
@@ -878,6 +940,10 @@ export function createMemoryStripeGateway(config: {
 
     failNextRefund(message) {
       nextRefundFailure = message;
+    },
+
+    failNextTransfer(message) {
+      nextTransferFailure = message;
     },
 
     setNextSetupOutcome(status) {
@@ -1095,6 +1161,31 @@ export function createMemoryStripeGateway(config: {
         metadata: found.metadata,
         status: 'open',
       };
+    },
+
+    async createTransfer(input) {
+      if (nextTransferFailure) {
+        // A synchronous API error: whether the Transfer exists is unknown. The
+        // caller records the failure and retries under the SAME key (§33.8.4).
+        const message = nextTransferFailure;
+        nextTransferFailure = null;
+        throw new Error(message);
+      }
+      // Stripe-side idempotency: the same key answers with the same Transfer
+      // and records no second entry — what §33.8.3's "once" counts.
+      const cachedTransfer = transfersByKey.get(input.idempotencyKey);
+      if (cachedTransfer) return cachedTransfer;
+      counter += 1;
+      const result: TransferResult = { id: `tr_memory${String(counter).padStart(10, '0')}` };
+      transfersByKey.set(input.idempotencyKey, result);
+      transfers.push({
+        id: result.id,
+        destinationAccountId: input.destinationAccountId,
+        amountCents: input.amountCents,
+        idempotencyKey: input.idempotencyKey,
+        metadata: input.metadata,
+      });
+      return result;
     },
 
     async createRefund(input) {

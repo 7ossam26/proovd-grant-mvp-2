@@ -22,6 +22,8 @@
 
 import { ideaThresholdMet } from '../money/thresholds.js';
 
+export * from './earnings.js';
+
 /* ── §21's eight close-batch steps, as data ─────────────────────────────────── */
 
 export const CLOSE_BATCH_STEPS = [

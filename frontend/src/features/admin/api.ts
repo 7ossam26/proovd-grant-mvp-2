@@ -1353,3 +1353,105 @@ export const prepareCloseResults = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── §22.1/§22.2 Creator earnings (Phase 19a) ──────────────────────────────── */
+
+export interface EarningsCreatorRow {
+  associationId: string;
+  associationStatus: string;
+  publicHandle: string | null;
+  email: string | null;
+  attributedCaptured: number;
+  validSubtotalCents: string;
+  latestDecision: {
+    id: string;
+    outcome: string;
+    deliverablesNote: string;
+    waiver: string | null;
+    decidedBy: string;
+    decidedAt: string;
+  } | null;
+  earnings: {
+    id: string;
+    state: string;
+    earnedPercent: number;
+    earnedBonusPercent: number;
+    commissionCents: string;
+    bonusCents: string;
+    eligibleFixedCents: string;
+    provisionalTotalCents: string;
+    earnedTotalCents: string;
+    unearnedReturnedCents: string;
+  } | null;
+  transfer: {
+    id: string;
+    status: string;
+    totalCents: string;
+    providerTransferId: string | null;
+    attemptCount: number;
+  } | null;
+  allocation: { status: string; amountCents: string } | null;
+  thankYou: Array<{ kind: string; amountCents: string | null; createdAt: string }>;
+  transferEarliestAt: string | null;
+}
+
+export interface CampaignEarningsState {
+  creators: EarningsCreatorRow[];
+  completionOutcomes: Array<{ key: string; spec: string }>;
+  thankYouEligibilityFacts: Array<{ key: string; label: string }>;
+}
+
+export const fetchCampaignEarnings = (campaignId: string): Promise<CampaignEarningsState> =>
+  call<CampaignEarningsState>(`/api/admin/close/${encodeURIComponent(campaignId)}/earnings`);
+
+export const recordCompletionDecision = (
+  associationId: string,
+  body: {
+    outcome: string;
+    deliverablesNote: string;
+    waiver?: string;
+    waiverAgreedByFounder?: boolean;
+    waiverAgreedByAdmin?: boolean;
+  },
+): Promise<{ decision: unknown; fixedAction: string }> =>
+  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/completion`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const finalizeCreatorEarnings = (associationId: string): Promise<{ earnings: unknown }> =>
+  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/finalize`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const approveCreatorEarnings = (associationId: string): Promise<{ earnings: unknown }> =>
+  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const createCreatorTransfer = (associationId: string): Promise<{ transfer: unknown }> =>
+  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/transfer`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const recordCreatorThankYou = (
+  associationId: string,
+  body: {
+    kind: 'recognition' | 'payment';
+    reason: string;
+    amountCents?: string;
+    minimumWorkCompleted: boolean;
+    clickThresholdMet: boolean;
+    brandAupCompliant: boolean;
+    approvalReference?: string;
+    approvedBy?: string;
+    taxTreatment?: string;
+  },
+): Promise<{ record: unknown }> =>
+  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/thank-you`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

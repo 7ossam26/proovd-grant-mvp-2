@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { formatUsd } from '@proovd/shared';
 import { Button, Card, Field, Input, Tag, Textarea } from '../../components/index.js';
 import {
   fetchCloseOperations,
@@ -29,10 +30,20 @@ import {
   resumeCloseBatch,
   recordCloseReconciliation,
   prepareCloseResults,
+  fetchCampaignEarnings,
+  recordCompletionDecision,
+  finalizeCreatorEarnings,
+  approveCreatorEarnings,
+  createCreatorTransfer,
+  recordCreatorThankYou,
   AdminRequestError,
   type CloseOperationsState,
   type CloseBatchDetailState,
+  type CampaignEarningsState,
+  type EarningsCreatorRow,
 } from './api.js';
+
+const usd = (cents: string) => formatUsd(BigInt(cents));
 
 const when = (iso: string | null) => (iso ? `${iso.replace('T', ' ').slice(0, 16)} UTC` : '—');
 
@@ -247,6 +258,8 @@ function CloseDetail({
         </details>
       </Card>
 
+      <EarningsPanel campaignId={d.campaignId} onError={onError} />
+
       {recon ? (
         <ReconciliationPanel
           campaignId={d.campaignId}
@@ -256,6 +269,359 @@ function CloseDetail({
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * The §22.1 Creator money queue: decide → finalize → approve → transfer, in
+ * the Spec's own order, one Creator at a time. Every number here is the stored
+ * record the Creator's own view and emails render — one source, many
+ * renderers (§33.8.13). The §22.2 thank-you form computes nothing: the amount
+ * is typed or there is no amount.
+ */
+function EarningsPanel({
+  campaignId,
+  onError,
+}: {
+  campaignId: string;
+  onError: (message: string | null) => void;
+}) {
+  const [state, setState] = useState<CampaignEarningsState | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setState(await fetchCampaignEarnings(campaignId));
+    } catch (err) {
+      onError(errorText(err, 'Creator earnings could not be read.'));
+    }
+  }, [campaignId, onError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!state) return null;
+
+  const act = async (work: () => Promise<unknown>) => {
+    setBusy(true);
+    onError(null);
+    try {
+      await work();
+      await load();
+    } catch (err) {
+      onError(errorText(err, 'The earnings action could not be recorded.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <h2>Creator earnings (§22.1)</h2>
+      {state.creators.length === 0 ? (
+        <p>No Creator on this campaign has locked compensation terms.</p>
+      ) : (
+        <ul className="ops-thread">
+          {state.creators.map((row) => (
+            <EarningsCreator key={row.associationId} row={row} state={state} busy={busy} act={act} />
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+function EarningsCreator({
+  row,
+  state,
+  busy,
+  act,
+}: {
+  row: EarningsCreatorRow;
+  state: CampaignEarningsState;
+  busy: boolean;
+  act: (work: () => Promise<unknown>) => Promise<void>;
+}) {
+  const [outcome, setOutcome] = useState('');
+  const [note, setNote] = useState('');
+  const [waiver, setWaiver] = useState('');
+  const [waiverFounder, setWaiverFounder] = useState(false);
+  const [waiverAdmin, setWaiverAdmin] = useState(false);
+  const [tyKind, setTyKind] = useState<'recognition' | 'payment'>('recognition');
+  const [tyReason, setTyReason] = useState('');
+  const [tyAmount, setTyAmount] = useState('');
+  const [tyFacts, setTyFacts] = useState<Record<string, boolean>>({});
+  const [tyApprovalRef, setTyApprovalRef] = useState('');
+  const [tyApprovedBy, setTyApprovedBy] = useState('');
+  const [tyTax, setTyTax] = useState('');
+
+  const e = row.earnings;
+  const earliest = row.transferEarliestAt ? when(row.transferEarliestAt) : null;
+
+  return (
+    <li>
+      <div className="ops-head">
+        <strong>{row.publicHandle ?? row.email ?? row.associationId}</strong>
+        <span className="ops-tags">
+          <Tag>{row.associationStatus}</Tag>
+          <Tag>{e ? e.state.replace(/_/g, ' ') : 'not finalized'}</Tag>
+          {row.transfer ? <Tag>transfer {row.transfer.status}</Tag> : null}
+        </span>
+      </div>
+      <p className="ops-thread__body">
+        {row.attributedCaptured} captured attributed charge
+        {row.attributedCaptured === 1 ? '' : 's'}; validly attributed pre-tax subtotal{' '}
+        {usd(row.validSubtotalCents)}.
+        {row.allocation
+          ? ` Fixed allocation ${usd(row.allocation.amountCents)} — ${row.allocation.status.replace(/_/g, ' ')}.`
+          : ' No fixed Creator payment.'}
+        {earliest ? ` The one Transfer may be created on or after ${earliest} (Day 3).` : ''}
+      </p>
+
+      {row.latestDecision ? (
+        <p className="ops-thread__body">
+          Completion decision: <strong>{row.latestDecision.outcome.replace(/_/g, ' ')}</strong> —{' '}
+          {row.latestDecision.deliverablesNote} ({row.latestDecision.decidedBy},{' '}
+          {when(row.latestDecision.decidedAt)})
+          {row.latestDecision.waiver ? ` Waiver: ${row.latestDecision.waiver}` : ''}
+        </p>
+      ) : (
+        <p className="ops-thread__body">
+          No completion decision is recorded yet — §22.1 verifies every agreed deliverable before
+          earnings finalize.
+        </p>
+      )}
+
+      <details>
+        <summary>Record a completion decision</summary>
+        <Field label="Outcome (§22.1)" id={`outcome-${row.associationId}`}>
+          <select
+            id={`outcome-${row.associationId}`}
+            className="input"
+            value={outcome}
+            onChange={(event) => setOutcome(event.target.value)}
+          >
+            <option value="">Choose the verified outcome…</option>
+            {state.completionOutcomes.map((o) => (
+              <option key={o.key} value={o.key} title={o.spec}>
+                {o.key.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Deliverables verified — what and how (§1.3)" id={`note-${row.associationId}`}>
+          <Textarea
+            id={`note-${row.associationId}`}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+        </Field>
+        <Field
+          label="Waiver (only if Founder AND Admin agreed one)"
+          id={`waiver-${row.associationId}`}
+        >
+          <Input
+            id={`waiver-${row.associationId}`}
+            value={waiver}
+            onChange={(event) => setWaiver(event.target.value)}
+          />
+        </Field>
+        {waiver.trim() ? (
+          <>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={waiverFounder}
+                onChange={(event) => setWaiverFounder(event.target.checked)}
+              />{' '}
+              The Founder agreed this waiver
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={waiverAdmin}
+                onChange={(event) => setWaiverAdmin(event.target.checked)}
+              />{' '}
+              Admin agreed this waiver
+            </label>
+          </>
+        ) : null}
+        <Button
+          disabled={busy || !outcome || !note.trim()}
+          onClick={() =>
+            void act(() =>
+              recordCompletionDecision(row.associationId, {
+                outcome,
+                deliverablesNote: note,
+                ...(waiver.trim()
+                  ? {
+                      waiver,
+                      waiverAgreedByFounder: waiverFounder,
+                      waiverAgreedByAdmin: waiverAdmin,
+                    }
+                  : {}),
+              }),
+            )
+          }
+        >
+          Record decision
+        </Button>
+      </details>
+
+      {e ? (
+        <p className="ops-thread__body">
+          Finalized at {e.earnedPercent}% (bonus {e.earnedBonusPercent}%): commission{' '}
+          {usd(e.commissionCents)} + bonus {usd(e.bonusCents)} + eligible fixed{' '}
+          {usd(e.eligibleFixedCents)}. Provisional {usd(e.provisionalTotalCents)} resolved as earned{' '}
+          {usd(e.earnedTotalCents)} + returned to Founder {usd(e.unearnedReturnedCents)} (§24.4,
+          once).
+        </p>
+      ) : null}
+
+      <div className="ops-tags">
+        {!e ? (
+          <Button
+            tier="secondary"
+            disabled={busy || !row.latestDecision}
+            onClick={() => void act(() => finalizeCreatorEarnings(row.associationId))}
+          >
+            Finalize earnings
+          </Button>
+        ) : null}
+        {e && e.state === 'finalized' ? (
+          <Button
+            tier="secondary"
+            disabled={busy}
+            onClick={() => void act(() => approveCreatorEarnings(row.associationId))}
+          >
+            Approve for transfer
+          </Button>
+        ) : null}
+        {e && e.state === 'approved_for_transfer' ? (
+          <Button
+            disabled={busy}
+            onClick={() => void act(() => createCreatorTransfer(row.associationId))}
+          >
+            Create the one Transfer
+          </Button>
+        ) : null}
+      </div>
+      {row.transfer ? (
+        <p className="ops-thread__body">
+          Transfer {row.transfer.status} — {usd(row.transfer.totalCents)}
+          {row.transfer.providerTransferId ? ` (${row.transfer.providerTransferId})` : ''}, attempt{' '}
+          {row.transfer.attemptCount}.
+          {row.transfer.status === 'failed'
+            ? ' The retry sweep re-drives it under the same key — it cannot become a second Transfer.'
+            : ''}
+        </p>
+      ) : null}
+
+      {/* §22.2 — no estimate anywhere: the amount is typed or absent. */}
+      <details>
+        <summary>Discretionary thank-you (§22.2)</summary>
+        {row.thankYou.length > 0 ? (
+          <p className="ops-thread__body">
+            Recorded:{' '}
+            {row.thankYou
+              .map((t) => `${t.kind}${t.amountCents ? ` ${usd(t.amountCents)}` : ''}`)
+              .join('; ')}
+          </p>
+        ) : null}
+        <Field label="Kind" id={`ty-kind-${row.associationId}`}>
+          <select
+            id={`ty-kind-${row.associationId}`}
+            className="input"
+            value={tyKind}
+            onChange={(event) => setTyKind(event.target.value === 'payment' ? 'payment' : 'recognition')}
+          >
+            <option value="recognition">Recognition only — no money is promised or sent</option>
+            <option value="payment">Payment — needs recorded tax/accounting approval</option>
+          </select>
+        </Field>
+        <Field label="Reason" id={`ty-reason-${row.associationId}`}>
+          <Textarea
+            id={`ty-reason-${row.associationId}`}
+            value={tyReason}
+            onChange={(event) => setTyReason(event.target.value)}
+          />
+        </Field>
+        {state.thankYouEligibilityFacts.map((fact) => (
+          <label className="checkbox" key={fact.key}>
+            <input
+              type="checkbox"
+              checked={tyFacts[fact.key] ?? false}
+              onChange={(event) =>
+                setTyFacts((prev) => ({ ...prev, [fact.key]: event.target.checked }))
+              }
+            />{' '}
+            {fact.label}
+          </label>
+        ))}
+        {tyKind === 'payment' ? (
+          <>
+            <Field
+              label="Amount in cents — typed, never calculated (§22.2)"
+              id={`ty-amount-${row.associationId}`}
+            >
+              <Input
+                id={`ty-amount-${row.associationId}`}
+                inputMode="numeric"
+                value={tyAmount}
+                onChange={(event) => setTyAmount(event.target.value)}
+              />
+            </Field>
+            <Field label="Tax/accounting approval reference" id={`ty-ref-${row.associationId}`}>
+              <Input
+                id={`ty-ref-${row.associationId}`}
+                value={tyApprovalRef}
+                onChange={(event) => setTyApprovalRef(event.target.value)}
+              />
+            </Field>
+            <Field label="Approved by" id={`ty-by-${row.associationId}`}>
+              <Input
+                id={`ty-by-${row.associationId}`}
+                value={tyApprovedBy}
+                onChange={(event) => setTyApprovedBy(event.target.value)}
+              />
+            </Field>
+            <Field label="Tax treatment" id={`ty-tax-${row.associationId}`}>
+              <Input
+                id={`ty-tax-${row.associationId}`}
+                value={tyTax}
+                onChange={(event) => setTyTax(event.target.value)}
+              />
+            </Field>
+          </>
+        ) : null}
+        <Button
+          tier="secondary"
+          disabled={busy || !tyReason.trim()}
+          onClick={() =>
+            void act(() =>
+              recordCreatorThankYou(row.associationId, {
+                kind: tyKind,
+                reason: tyReason,
+                minimumWorkCompleted: tyFacts['minimum_work_completed'] ?? false,
+                clickThresholdMet: tyFacts['click_threshold_met'] ?? false,
+                brandAupCompliant: tyFacts['brand_aup_compliant'] ?? false,
+                ...(tyKind === 'payment'
+                  ? {
+                      amountCents: tyAmount.trim(),
+                      approvalReference: tyApprovalRef,
+                      approvedBy: tyApprovedBy,
+                      taxTreatment: tyTax,
+                    }
+                  : {}),
+              }),
+            )
+          }
+        >
+          {tyKind === 'payment' ? 'Record and send the thank-you payment' : 'Record recognition'}
+        </Button>
+      </details>
+    </li>
   );
 }
 
@@ -451,3 +817,4 @@ function ReconciliationPanel({
     </>
   );
 }
+
