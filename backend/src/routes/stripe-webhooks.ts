@@ -41,6 +41,7 @@ import type { Notifier } from '../notifications/send.js';
 import type { StripeGateway, WebhookEndpoint } from '../payments/stripe-client.js';
 import { ingestStripeEvent } from '../payments/webhook-handlers.js';
 import type { ListingNotificationContext } from '../payments/listing-notifications.js';
+import type { TokenService } from '../auth/token-service.js';
 
 export const STRIPE_PLATFORM_WEBHOOK_PATH = '/api/webhooks/stripe/platform';
 export const STRIPE_CONNECT_WEBHOOK_PATH = '/api/webhooks/stripe/connect';
@@ -55,6 +56,8 @@ export interface StripeWebhookDeps {
   /** §13's effect 7 — Phase 11's payment handler sends through these. */
   notifier?: Notifier;
   notificationContext?: ListingNotificationContext;
+  /** Phase 18a: the Backer receipt/recovery messages carry a magic link. */
+  tokens?: TokenService;
   /** Raised only by the integration suite, which drives many deliveries. */
   limit?: number;
 }
@@ -65,6 +68,7 @@ export function createStripeWebhookRouter({
   audit,
   notifier,
   notificationContext,
+  tokens,
   limit,
 }: StripeWebhookDeps): Router {
   const router = Router();
@@ -105,7 +109,7 @@ export function createStripeWebhookRouter({
       }
 
       const outcome = await ingestStripeEvent(
-        { db, gateway, audit, notifier, notificationContext },
+        { db, gateway, audit, notifier, notificationContext, tokens },
         event,
       );
 

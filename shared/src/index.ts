@@ -19,3 +19,4 @@ export * from './reservation/index.js';
 export * from './admin/index.js';
 export * from './support/index.js';
 export * from './live/index.js';
+export * from './close/index.js';

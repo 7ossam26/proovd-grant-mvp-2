@@ -514,6 +514,18 @@ export const reservations = pgTable(
     canceledAt: timestamp('canceled_at', { withTimezone: true }),
     reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
 
+    /* ── §21/§25.2 capture facts, added Phase 18a (migration 0028) ──────────
+       "PaymentIntent/charge IDs" and the charge context. Written by the close
+       batch and the payment_intent webhooks through one `applyCaptureOutcome`.
+       `capture_reason` holds the §33.7.8 failure kind or the drop reason
+       (`tax_calculation_unusable`) — internal vocabulary, never rendered raw
+       to a customer (§25.6, §33.9.11). */
+    paymentIntentId: text('payment_intent_id'),
+    chargeId: text('charge_id'),
+    capturedAt: timestamp('captured_at', { withTimezone: true }),
+    captureFailedAt: timestamp('capture_failed_at', { withTimezone: true }),
+    captureReason: text('capture_reason'),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

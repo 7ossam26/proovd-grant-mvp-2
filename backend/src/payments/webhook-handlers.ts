@@ -57,6 +57,15 @@ import {
   recordFundingFailed,
 } from '../creator-payment/allocations.js';
 import { evaluateCreatorReadiness } from '../creator-payment/readiness.js';
+import type { TokenService } from '../auth/token-service.js';
+import { readProviderObject } from './provider-objects.js';
+import { applyCaptureSuccess, applyCaptureFailure } from '../close/capture.js';
+import { classifyCaptureFailure } from '../close/logic.js';
+import {
+  notifyChargeReceipt,
+  notifyCaptureFailed,
+  type CloseNotificationDeps,
+} from '../close/notifications.js';
 
 export const STRIPE_PROVIDER = 'stripe';
 
@@ -71,6 +80,9 @@ export interface HandlerContext {
    */
   notifier?: Notifier | undefined;
   notificationContext?: ListingNotificationContext | undefined;
+  /** Phase 18a: mints the Backer magic link for the receipt/recovery messages.
+      Absent → the messages still send with the support-route fallback. */
+  tokens?: TokenService | undefined;
 }
 
 export type EventHandler = (
@@ -107,10 +119,20 @@ export const PLATFORM_HANDLERS: Record<string, EventHandler> = {
  * `account.application.deauthorized` is registered because it is not a future
  * phase's: it means the account is gone *now*, and silently continuing to treat
  * a deauthorized account as a seller is the §1.4 failure with money attached.
+ *
+ * Phase 18a registered the `payment_intent.*` set — §24.1's direct charges
+ * live on the Founder's connected account, so the campaign-money deliveries
+ * arrive HERE, never at the platform endpoint. Each one applies through the
+ * same `applyCaptureOutcome` path the close batch uses, which is what makes a
+ * duplicate delivery a no-op rather than a second charge/email (§33.7.7).
  */
 export const CONNECT_HANDLERS: Record<string, EventHandler> = {
   'account.updated': handleAccountUpdated,
   'account.application.deauthorized': handleAccountDeauthorized,
+  'payment_intent.succeeded': handlePaymentIntentSucceeded,
+  'payment_intent.payment_failed': handlePaymentIntentFailed,
+  'payment_intent.requires_action': handlePaymentIntentRequiresAction,
+  'payment_intent.canceled': handlePaymentIntentCanceled,
 };
 
 export function handlersFor(endpoint: WebhookEndpoint): Record<string, EventHandler> {
@@ -540,6 +562,168 @@ async function handleFundingCompleted(
       { associationId: outcome.associationId, actor: 'system:stripe-webhook' },
     );
   }
+}
+
+/* ── Phase 18a: the off-session campaign charges (§21, §32.3, §33.7.7) ─────── */
+
+/**
+ * Binds a `payment_intent.*` delivery to its reservation.
+ *
+ * The anchor is the §32.4 provider object the close batch stored at creation —
+ * the delivery's metadata was written by Proovd's own API call, but it is
+ * still cross-checked against that stored row, and a delivery that does not
+ * reconcile is recorded and routed to Admin rather than guessed into place
+ * (§1 rule 6, the 09b/11 binding rule). Returns null when unbindable.
+ */
+async function bindPaymentIntentDelivery(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<{ paymentIntentId: string; reservationId: string } | null> {
+  const object = event.object;
+  const paymentIntentId = typeof object['id'] === 'string' ? object['id'] : '';
+  const metadata = (object['metadata'] as Record<string, string> | undefined) ?? {};
+  const claimedReservationId = metadata['proovd_reservation_id'] ?? '';
+
+  const stored = paymentIntentId
+    ? await readProviderObject(context.db, {
+        mode: context.gateway.mode,
+        providerObjectId: paymentIntentId,
+      })
+    : null;
+
+  if (!stored?.reservationId || (claimedReservationId && stored.reservationId !== claimedReservationId)) {
+    await context.audit({
+      action: 'close.payment_intent_unbindable',
+      targetType: 'provider_event',
+      targetId: event.id,
+      internalReason:
+        `a signed ${event.type} for PaymentIntent "${paymentIntentId || 'unknown'}" could not be bound: ` +
+        (stored
+          ? `the stored object names reservation ${stored.reservationId ?? 'none'}, the delivery names "${claimedReservationId || 'none'}"`
+          : 'no stored §32.4 object exists for it') +
+        '. Recorded and routed to Admin; nothing was applied.',
+    });
+    return null;
+  }
+
+  return { paymentIntentId, reservationId: stored.reservationId };
+}
+
+function closeNotificationDeps(context: HandlerContext): CloseNotificationDeps | null {
+  if (!context.notifier || !context.notificationContext) return null;
+  return {
+    db: context.db,
+    notifier: context.notifier,
+    context: context.notificationContext,
+    tokens: context.tokens,
+  };
+}
+
+/**
+ * `payment_intent.succeeded` — the asynchronous confirmation of a close-batch
+ * capture. The same applier the batch calls: a delivery for a reservation the
+ * batch already captured is a no-op with no second ledger write and no second
+ * receipt (§33.7.7).
+ */
+async function handlePaymentIntentSucceeded(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  const bound = await bindPaymentIntentDelivery(context, event);
+  if (!bound) return;
+
+  const chargeId =
+    typeof event.object['latest_charge'] === 'string' ? event.object['latest_charge'] : null;
+
+  const applied = await applyCaptureSuccess(
+    { db: context.db, audit: context.audit },
+    {
+      reservationId: bound.reservationId,
+      paymentIntentId: bound.paymentIntentId,
+      chargeId,
+      stripeFeeCents: null,
+      actor: 'system:stripe-webhook',
+    },
+  );
+
+  if (applied.applied) {
+    const notify = closeNotificationDeps(context);
+    if (notify) await notifyChargeReceipt(notify, applied.reservation);
+  }
+}
+
+/**
+ * `payment_intent.payment_failed` / `payment_intent.requires_action` — the
+ * §33.7.8 recovery entry, through the same applier as the batch. A duplicate
+ * delivery matches nothing and sends nothing.
+ */
+async function applyPaymentIntentFailure(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+  status: string | null,
+): Promise<void> {
+  const bound = await bindPaymentIntentDelivery(context, event);
+  if (!bound) return;
+
+  const lastError =
+    (event.object['last_payment_error'] as { code?: string; decline_code?: string } | undefined) ??
+    {};
+  const kind = classifyCaptureFailure({
+    status,
+    declineCode: lastError.decline_code ?? null,
+  });
+
+  const applied = await applyCaptureFailure(
+    { db: context.db, audit: context.audit },
+    {
+      reservationId: bound.reservationId,
+      kind,
+      paymentIntentId: bound.paymentIntentId,
+      failureCode: lastError.decline_code ?? lastError.code ?? null,
+      actor: 'system:stripe-webhook',
+    },
+  );
+
+  if (applied.applied) {
+    const notify = closeNotificationDeps(context);
+    if (notify) {
+      await notifyCaptureFailed(notify, applied.reservation, {
+        retryDeadlineAt: applied.retryDeadlineAt,
+      });
+    }
+  }
+}
+
+async function handlePaymentIntentFailed(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyPaymentIntentFailure(context, event, null);
+}
+
+async function handlePaymentIntentRequiresAction(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyPaymentIntentFailure(context, event, 'requires_action');
+}
+
+/**
+ * `payment_intent.canceled` — recorded, applied to nothing. §32.3 lists it;
+ * the close batch never cancels an intent it created, so a cancellation is a
+ * provider-side fact for Admin reconciliation, not a reservation transition.
+ */
+async function handlePaymentIntentCanceled(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  const paymentIntentId = typeof event.object['id'] === 'string' ? event.object['id'] : 'unknown';
+  await context.audit({
+    action: 'close.payment_intent_canceled',
+    targetType: 'provider_event',
+    targetId: event.id,
+    internalReason: `payment_intent.canceled received for ${paymentIntentId}; recorded for reconciliation, no reservation transition applied`,
+  });
 }
 
 /**

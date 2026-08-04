@@ -321,17 +321,32 @@ describe('§32.3 — two endpoints, two handler maps', () => {
     // §1 rule 6 applied to a vendor's vocabulary: a registered no-op handler
     // reads as "handled", and this build does not handle these.
     //
-    // `checkout.session.*` left this list in Phase 11 — that is the phase whose
-    // Checkout creates the object, and it registers both on the platform map.
-    // The rest still belong to objects later phases create.
+    // `checkout.session.*` left this list in Phase 11 and `payment_intent.*`
+    // in Phase 18a — each the phase whose objects those are. The rest still
+    // belong to objects later phases create (Transfers 19, disputes 20).
     for (const type of [
-      'payment_intent.succeeded',
       'setup_intent.succeeded',
       'transfer.created',
       'charge.dispute.created',
+      'charge.refunded',
     ]) {
       expect(PLATFORM_HANDLERS[type]).toBeUndefined();
       expect(CONNECT_HANDLERS[type]).toBeUndefined();
+    }
+  });
+
+  it('registers Phase 18a’s payment_intent events on Connect and not on platform', () => {
+    // §24.1: campaign charges are direct charges on the Founder's connected
+    // account, so their deliveries arrive at the Connect endpoint. A platform
+    // delivery must not be able to reach a capture effect.
+    for (const type of [
+      'payment_intent.succeeded',
+      'payment_intent.payment_failed',
+      'payment_intent.requires_action',
+      'payment_intent.canceled',
+    ]) {
+      expect(CONNECT_HANDLERS[type]).toBeDefined();
+      expect(PLATFORM_HANDLERS[type]).toBeUndefined();
     }
   });
 

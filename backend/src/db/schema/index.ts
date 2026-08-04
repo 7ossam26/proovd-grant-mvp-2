@@ -86,3 +86,8 @@ export * from './live.js';
 // with its per-campaign Backer number and its route-to-a-person flag, and the
 // frozen remaining-time terms a mid-campaign Creator accepted.
 export * from './live-editing.js';
+// Phase 18a: the §21 close batch — one batch record per campaign carrying the
+// Idea threshold decision fixed at close (§33.7.5) and the one 48-hour retry
+// window anchored at the first failure, plus the capture attempt claimed under
+// its stable idempotency key BEFORE the provider call (§33.7.7).
+export * from './close.js';

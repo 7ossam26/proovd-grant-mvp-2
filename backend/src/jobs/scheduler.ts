@@ -45,6 +45,7 @@ import { sweepDiscovery } from '../campaign/discovery.js';
 import { notifyListingRefund } from '../payments/listing-notifications.js';
 import { sweepPrechargeReminders } from '../reservations/reminder.js';
 import { sweepThresholdCrossings } from '../live/thresholds.js';
+import { sweepCampaignCloses } from '../close/close-batch.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -133,6 +134,19 @@ export const PRECHARGE_REMINDER_JOB = 'precharge-reminder';
 export const THRESHOLD_RECONCILIATION_JOB = 'threshold-reconciliation';
 
 /**
+ * Phase 18a's §21 close batch.
+ *
+ * Closes every live campaign whose `campaign_close_at` has arrived and resumes
+ * every batch left incomplete (§33.7.12). Independently idempotent all the way
+ * down — a sweep that runs twice, overlaps itself, or dies mid-run charges
+ * nothing twice (§33.7.7). Its own tighter cron: the anchor itself gates
+ * cancellation and joining, but a card should be charged close to the minute
+ * the consent named, and fifteen minutes of drift is more than five buys.
+ */
+export const CAMPAIGN_CLOSE_JOB = 'campaign-close';
+export const CAMPAIGN_CLOSE_CRON = '*/5 * * * *';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -187,6 +201,8 @@ export interface Scheduler {
   runPrechargeRemindersNow: () => Promise<void>;
   /** Runs the §20 threshold reconciliation now. Used by tests and by Admin. */
   runThresholdReconciliationNow: () => Promise<void>;
+  /** Runs the §21 close batch sweep now. Used by tests and by Admin. */
+  runCampaignCloseNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -394,6 +410,43 @@ export async function startScheduler({
     tz: 'UTC',
   });
 
+  /* ── Phase 18a's §21 close batch ───────────────────────────────────────── */
+
+  await boss.createQueue(CAMPAIGN_CLOSE_JOB);
+  await boss.work(CAMPAIGN_CLOSE_JOB, async () => {
+    // The batch creates PaymentIntents, so it needs the gateway; without one
+    // the sweep says so loudly rather than quietly closing nothing (§1.4).
+    if (!listing) {
+      log('campaign close sweep skipped: no Stripe gateway configured');
+      return;
+    }
+    const { result, batches } = await sweepCampaignCloses(
+      {
+        db,
+        gateway: listing.gateway,
+        audit,
+        ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
+        tokens,
+      },
+      new Date(),
+    );
+    log('campaign close sweep complete', {
+      started: result.started.length,
+      resumed: result.resumed.length,
+      complete: result.complete.length,
+      waitingOnDedup: result.waiting.length,
+      batches: batches.map((b) => ({
+        campaignId: b.campaignId,
+        status: b.status,
+        captured: b.captured,
+        failed: b.failed,
+        dropped: b.dropped,
+        errored: b.errored,
+      })),
+    });
+  });
+  await boss.schedule(CAMPAIGN_CLOSE_JOB, CAMPAIGN_CLOSE_CRON, undefined, { tz: 'UTC' });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -418,6 +471,9 @@ export async function startScheduler({
     },
     runThresholdReconciliationNow: async () => {
       await boss.send(THRESHOLD_RECONCILIATION_JOB, {});
+    },
+    runCampaignCloseNow: async () => {
+      await boss.send(CAMPAIGN_CLOSE_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

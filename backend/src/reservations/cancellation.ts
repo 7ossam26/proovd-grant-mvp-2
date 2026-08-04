@@ -25,7 +25,12 @@
 
 import { and, eq, ne } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
-import { reservations, reservationStatusHistory, type Reservation } from '../db/schema/domain.js';
+import {
+  campaigns,
+  reservations,
+  reservationStatusHistory,
+  type Reservation,
+} from '../db/schema/domain.js';
 import { founderOperationalShares } from '../db/schema/reservations.js';
 import { releaseCapacity } from './capacity.js';
 import type { StripeGateway } from '../payments/stripe-client.js';
@@ -86,6 +91,22 @@ export async function cancelReservation(
   }
 
   const now = new Date();
+
+  // §21 step 3: `campaign_close_at` ends Backer cancellation — at the anchor
+  // itself, not at whatever minute the close sweep happens to run. The close
+  // batch will decide this reservation's outcome; a cancellation the batch has
+  // not yet locked out must not slip through the gap between the two.
+  const [campaignRow] = await db
+    .select({ campaignCloseAt: campaigns.campaignCloseAt })
+    .from(campaigns)
+    .where(eq(campaigns.id, existing.campaignId))
+    .limit(1);
+  if (
+    campaignRow?.campaignCloseAt &&
+    campaignRow.campaignCloseAt.getTime() <= now.getTime()
+  ) {
+    return { status: 'not_cancelable', current: 'campaign_closed' };
+  }
 
   // Reference-safe detach decision (§33.7.2): is this PaymentMethod still used by
   // ANOTHER active reservation for this Backer? Decided before the cancel so the

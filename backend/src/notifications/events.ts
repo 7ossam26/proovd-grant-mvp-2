@@ -166,6 +166,24 @@ export const FOUNDER_IDEA_THRESHOLD_LOST = 'founder_idea_threshold_lost' as cons
 export const INTERNAL_THRESHOLD_REACHED = 'internal_threshold_reached' as const;
 export const INTERNAL_THRESHOLD_LOST = 'internal_threshold_lost' as const;
 
+/**
+ * Phase 18a's six, sent by `close/notifications.ts`.
+ *
+ * §27.3 — "Campaign ended" (separately from "Results ready", which is Phase
+ * 18b's and is deliberately NOT restated here — a key with no sender claims a
+ * message the product does not send, §1.4, and §33.7.11 is exactly about the
+ * two being separate). §27.5 — the threshold-miss/no-charge closure, the
+ * charge receipt, the failed-charge/update-card recovery (Appendix B.5), and
+ * the dropped notice (§21's tax-unusable drop; the retry-window-end drop is
+ * 18b's second sender for the same key). §27.6 — the charge batch result.
+ */
+export const FOUNDER_CAMPAIGN_ENDED = 'founder_campaign_ended' as const;
+export const BACKER_THRESHOLD_MISS_NO_CHARGE = 'backer_threshold_miss_no_charge' as const;
+export const BACKER_CHARGE_RECEIPT = 'backer_charge_receipt' as const;
+export const BACKER_CHARGE_FAILED_UPDATE_CARD = 'backer_charge_failed_update_card' as const;
+export const BACKER_RETRY_DROPPED = 'backer_retry_dropped' as const;
+export const INTERNAL_CHARGE_BATCH_RESULT = 'internal_charge_batch_result' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -201,6 +219,12 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_IDEA_THRESHOLD_LOST,
   INTERNAL_THRESHOLD_REACHED,
   INTERNAL_THRESHOLD_LOST,
+  FOUNDER_CAMPAIGN_ENDED,
+  BACKER_THRESHOLD_MISS_NO_CHARGE,
+  BACKER_CHARGE_RECEIPT,
+  BACKER_CHARGE_FAILED_UPDATE_CARD,
+  BACKER_RETRY_DROPPED,
+  INTERNAL_CHARGE_BATCH_RESULT,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

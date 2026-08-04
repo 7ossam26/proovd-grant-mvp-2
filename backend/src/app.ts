@@ -403,6 +403,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         audit: (event) => audit({ ...event, targetId: event.targetId }),
         notifier,
         notificationContext: listingContext,
+        // Phase 18a: the payment_intent.* handlers mint the Backer magic link
+        // for the receipt/recovery messages.
+        tokens,
         ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
       }),
     );

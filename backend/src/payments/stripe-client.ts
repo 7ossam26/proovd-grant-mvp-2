@@ -187,6 +187,41 @@ export interface DetachPaymentMethodInput {
   connectedAccountId: string;
 }
 
+/* ── The close-batch off-session PaymentIntent (§21, §24.2 — Phase 18) ─────── */
+
+export interface OffSessionPaymentIntentInput {
+  /** The Founder's seller account — §24.1's direct-charge model. The saved
+      Customer and PaymentMethod live there, so the charge is made there. */
+  connectedAccountId: string;
+  customerId: string;
+  paymentMethodId: string;
+  /** The exact authorized total. Never recalculated, never substituted (§19). */
+  amountCents: bigint;
+  /** The stable reservation/attempt key (§21 step 6, §33.7.7). A retried call
+      under the same key is the SAME PaymentIntent at Stripe, not a second. */
+  idempotencyKey: string;
+  /** §24.12: the validated descriptor stored on the reservation. */
+  statementDescriptorSuffix?: string | undefined;
+  metadata?: Record<string, string> | undefined;
+}
+
+/**
+ * The provider's answer, normalized. A card decline is a *result* here, not an
+ * exception — the batch records every outcome the same way, and only a
+ * transport/API error (where whether the intent exists is unknown) throws.
+ */
+export interface OffSessionPaymentIntentResult {
+  id: string;
+  status: 'succeeded' | 'requires_action' | 'failed';
+  chargeId: string | null;
+  /** The connected account's processing fee, when the provider reports it. */
+  stripeFeeCents: bigint | null;
+  /** Raw provider codes — internal detail only, never the message (§25.6). */
+  failureCode: string | null;
+  declineCode: string | null;
+  failureMessage: string | null;
+}
+
 export interface StripeGateway {
   readonly mode: StripeModeValue;
   readonly apiVersion: string;
@@ -271,6 +306,17 @@ export interface StripeGateway {
    * caller's decision (§33.7.2); this performs the detach it is told to.
    */
   detachPaymentMethod(input: DetachPaymentMethodInput): Promise<void>;
+
+  /**
+   * One off-session PaymentIntent on the Founder's connected account for the
+   * exact authorized total, confirmed immediately (§21 step 6, §24.2 step 8).
+   * A decline or a pending customer action is a normalized *result*; only a
+   * transport error — where the intent's existence is unknown — throws, and
+   * the caller retries under the SAME idempotency key (§33.7.7).
+   */
+  createOffSessionPaymentIntent(
+    input: OffSessionPaymentIntentInput,
+  ): Promise<OffSessionPaymentIntentResult>;
 
   /**
    * Stripe Checkout on Proovd's platform account — never a Connect charge
@@ -441,6 +487,55 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
       );
     },
 
+    async createOffSessionPaymentIntent(input) {
+      try {
+        const intent = await client.paymentIntents.create(
+          {
+            amount: Number(input.amountCents),
+            currency: 'usd',
+            customer: input.customerId,
+            payment_method: input.paymentMethodId,
+            // The Backer is not present (§24.2). `confirm: true` makes the
+            // one call the one charge attempt; `error_on_requires_action` is
+            // deliberately NOT set — §21 routes `requires_action` to a
+            // customer-action recovery rather than converting it to a failure.
+            off_session: true,
+            confirm: true,
+            payment_method_types: ['card'],
+            ...(input.statementDescriptorSuffix
+              ? { statement_descriptor_suffix: input.statementDescriptorSuffix.slice(0, 22) }
+              : {}),
+            ...(input.metadata ? { metadata: input.metadata } : {}),
+            expand: ['latest_charge.balance_transaction'],
+          },
+          { stripeAccount: input.connectedAccountId, idempotencyKey: input.idempotencyKey },
+        );
+        return normalizePaymentIntent(intent);
+      } catch (error) {
+        // A card error carries the PaymentIntent it created — that is a
+        // *result* (the attempt happened, the card said no), not a transport
+        // failure, and the batch records it as one (§33.7.8).
+        const stripeError = error as {
+          type?: string;
+          code?: string;
+          decline_code?: string;
+          message?: string;
+          payment_intent?: Stripe.PaymentIntent;
+        };
+        if (stripeError.type === 'StripeCardError' && stripeError.payment_intent) {
+          const normalized = normalizePaymentIntent(stripeError.payment_intent);
+          return {
+            ...normalized,
+            status: 'failed',
+            failureCode: stripeError.code ?? normalized.failureCode,
+            declineCode: stripeError.decline_code ?? normalized.declineCode,
+            failureMessage: stripeError.message ?? normalized.failureMessage,
+          };
+        }
+        throw error;
+      }
+    },
+
     async createListingCheckoutSession(input) {
       const session = await client.checkout.sessions.create(
         {
@@ -583,6 +678,34 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
   };
 }
 
+/** Reduces a provider PaymentIntent to the §21 result the batch records. */
+function normalizePaymentIntent(intent: Stripe.PaymentIntent): OffSessionPaymentIntentResult {
+  const charge =
+    typeof intent.latest_charge === 'object' && intent.latest_charge !== null
+      ? intent.latest_charge
+      : null;
+  const balance =
+    charge && typeof charge.balance_transaction === 'object' && charge.balance_transaction !== null
+      ? charge.balance_transaction
+      : null;
+  const lastError = intent.last_payment_error ?? null;
+
+  return {
+    id: intent.id,
+    status:
+      intent.status === 'succeeded'
+        ? 'succeeded'
+        : intent.status === 'requires_action'
+          ? 'requires_action'
+          : 'failed',
+    chargeId: charge?.id ?? (typeof intent.latest_charge === 'string' ? intent.latest_charge : null),
+    stripeFeeCents: balance ? BigInt(balance.fee) : null,
+    failureCode: lastError?.code ?? null,
+    declineCode: lastError?.decline_code ?? null,
+    failureMessage: lastError?.message ?? null,
+  };
+}
+
 /**
  * Verification, shared by the real gateway and the suite's.
  *
@@ -636,6 +759,27 @@ export interface MemoryStripeGateway extends StripeGateway {
   /** Makes the next `createRefund` throw once — the crash-between test. */
   failNextRefund(message: string): void;
 
+  /* ── Phase 18 controls ─────────────────────────────────────────────────── */
+  /** Every off-session PaymentIntent this gateway created, newest last. A
+      replayed idempotency key returns the cached result and adds NO entry —
+      which is exactly what §33.7.7's assertions count. */
+  readonly paymentIntents: Array<{
+    id: string;
+    connectedAccountId: string;
+    customerId: string;
+    paymentMethodId: string;
+    amountCents: bigint;
+    idempotencyKey: string;
+    status: 'succeeded' | 'requires_action' | 'failed';
+  }>;
+  /** Pins the outcome of a capture on this PaymentMethod (default succeeded). */
+  setCaptureOutcome(
+    paymentMethodId: string,
+    outcome: 'succeeded' | 'card_declined' | 'insufficient_funds' | 'requires_action',
+  ): void;
+  /** Makes the next `createOffSessionPaymentIntent` throw once — the crash test. */
+  failNextPaymentIntent(message: string): void;
+
   /* ── Phase 15 controls ─────────────────────────────────────────────────── */
   readonly customers: Array<{ id: string; connectedAccountId: string; email?: string }>;
   readonly setupIntents: Array<{
@@ -681,6 +825,13 @@ export function createMemoryStripeGateway(config: {
   const setupIntentsByKey = new Map<string, SetupIntentResult>();
   const detachedPaymentMethods: MemoryStripeGateway['detachedPaymentMethods'] = [];
   const cardFingerprints = new Map<string, string>();
+  const paymentIntents: MemoryStripeGateway['paymentIntents'] = [];
+  const paymentIntentsByKey = new Map<string, OffSessionPaymentIntentResult>();
+  const captureOutcomes = new Map<
+    string,
+    'succeeded' | 'card_declined' | 'insufficient_funds' | 'requires_action'
+  >();
+  let nextPaymentIntentFailure: string | null = null;
   let counter = 0;
   // A flat 8% unless a test says otherwise. Test infrastructure only — the
   // number is never customer-facing and never leaves the suite.
@@ -702,9 +853,18 @@ export function createMemoryStripeGateway(config: {
     customers,
     setupIntents,
     detachedPaymentMethods,
+    paymentIntents,
 
     setTaxRate(rate) {
       taxRate = rate;
+    },
+
+    setCaptureOutcome(paymentMethodId, outcome) {
+      captureOutcomes.set(paymentMethodId, outcome);
+    },
+
+    failNextPaymentIntent(message) {
+      nextPaymentIntentFailure = message;
     },
 
     failNextRefund(message) {
@@ -775,6 +935,64 @@ export function createMemoryStripeGateway(config: {
         paymentMethodId: input.paymentMethodId,
         connectedAccountId: input.connectedAccountId,
       });
+    },
+
+    async createOffSessionPaymentIntent(input) {
+      if (nextPaymentIntentFailure) {
+        // A transport error: whether the intent exists is unknown. The caller
+        // retries under the SAME key — which is what the cache below proves.
+        const message = nextPaymentIntentFailure;
+        nextPaymentIntentFailure = null;
+        throw new Error(message);
+      }
+      // Stripe-side idempotency: the same key answers with the same intent and
+      // records no second attempt (§33.7.7).
+      const cached = paymentIntentsByKey.get(input.idempotencyKey);
+      if (cached) return cached;
+
+      const outcome = captureOutcomes.get(input.paymentMethodId) ?? 'succeeded';
+      counter += 1;
+      const id = `pi_capture${String(counter).padStart(10, '0')}`;
+      const status =
+        outcome === 'succeeded'
+          ? 'succeeded'
+          : outcome === 'requires_action'
+            ? 'requires_action'
+            : 'failed';
+
+      paymentIntents.push({
+        id,
+        connectedAccountId: input.connectedAccountId,
+        customerId: input.customerId,
+        paymentMethodId: input.paymentMethodId,
+        amountCents: input.amountCents,
+        idempotencyKey: input.idempotencyKey,
+        status,
+      });
+
+      // Test-infrastructure numbers only (2.9% + 30¢): never customer-facing,
+      // never leaves the suite — the taxRate constant's reasoning.
+      const fee =
+        status === 'succeeded'
+          ? BigInt(Math.round(Number(input.amountCents) * 0.029)) + 30n
+          : null;
+
+      const result: OffSessionPaymentIntentResult = {
+        id,
+        status,
+        chargeId: status === 'succeeded' ? `ch_capture${String(counter).padStart(10, '0')}` : null,
+        stripeFeeCents: fee,
+        failureCode: status === 'failed' ? 'card_declined' : null,
+        declineCode:
+          outcome === 'insufficient_funds'
+            ? 'insufficient_funds'
+            : outcome === 'card_declined'
+              ? 'generic_decline'
+              : null,
+        failureMessage: status === 'failed' ? 'Your card was declined.' : null,
+      };
+      paymentIntentsByKey.set(input.idempotencyKey, result);
+      return result;
     },
 
     async createTaxCalculation(input) {
