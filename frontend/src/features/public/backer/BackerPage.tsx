@@ -15,6 +15,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router';
 import { Button, Section, Measure } from '../../../components/index.js';
+import { CommentThread } from './CommentThread.js';
 import {
   fetchBackerPage,
   cancelReservation,
@@ -89,6 +90,13 @@ export function BackerPage() {
             ))}
           </ul>
         )}
+
+        {/* §18's general thread. It lives here rather than on the public
+            campaign page because §18 lets only a magic-link-authenticated
+            Backer post, and this is the only place a Backer is authenticated
+            at all — a comment box on the public page would be one nobody
+            could use. */}
+        <CommentThread token={token} heading="Comments on this campaign" />
       </Measure>
     </Section>
   );

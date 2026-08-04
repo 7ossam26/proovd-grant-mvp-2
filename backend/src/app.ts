@@ -40,6 +40,11 @@ import { createAdminLaunchRouter } from './routes/admin-launch.js';
 import { createFounderCreatorPaymentRouter } from './routes/founder-creator-payment.js';
 import { createAdminCreatorReadinessRouter } from './routes/admin-creator-readiness.js';
 import { createFounderHomeRouter } from './routes/founder-home.js';
+import {
+  createFounderLiveEditRouter,
+  createBackerCommentRouter,
+  createAdminLiveOpsRouter,
+} from './routes/live-editing.js';
 import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
@@ -371,6 +376,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // §20's "only after the rendered state is successfully delivered". No Stripe
   // dependency — it reads records every earlier phase already wrote.
   app.use(createFounderHomeRouter({ db, auth, audit }));
+  // Phase 17b (§20, §15, §33.6.12). One Founder edit route, and §20's tier
+  // register decides what it does: written now with version history, routed to
+  // Admin as a change request, or refused outright. A route per tier would let a
+  // caller pick which rules apply by picking a URL.
+  app.use(createFounderLiveEditRouter({ db, auth, audit }));
+  // Phase 17b (§20, §18, §33.6.13). Admin decides change requests and comment
+  // flags, and adds a Creator mid-campaign. Writes take the freshness gate.
+  app.use(createAdminLiveOpsRouter({ db, auth, audit }));
   // Phase 10a (§32.3, §28.3). Two Stripe endpoints with two signing secrets —
   // platform for Proovd's own listing money, Connect for the Founder's campaign
   // money (§24.1). Both mount raw-body parsing themselves, for the reason the
@@ -517,6 +530,11 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         notificationContext: launchContext,
       }),
     );
+    // Phase 17b (§18). The comment thread — the last piece of §18, and it waited
+    // for the Backer identity and magic-link session Phase 15 mints. Behind the
+    // same token guard; the campaign comes from the token subject, never the
+    // body, so a link for one campaign cannot post to another.
+    app.use(createBackerCommentRouter({ db, tokens, audit }));
   }
 
   // ── SPA fallback ──────────────────────────────────────────────────────────

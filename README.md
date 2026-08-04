@@ -23,10 +23,10 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–17a are
-complete**; Phase 17b — live editing, mid-campaign Creators, and the Backer
-before close including comments — is next. Money moves in test mode only, and
-the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–17 are
+complete**; Phase 18 — the campaign close, the charge batch, failed-payment
+recovery, and results — is next, and the plan calls it the critical phase. Money
+moves in test mode only, and the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -59,6 +59,7 @@ the live-mode gate stays shut.
 | 16a | The reservation and charge ledger, the money controls, the risk-control inventory, and the high-impact override machine |
 | 16b | Support cases against the published SLA, the handoff note, campaign suspension and kill, and the composed customer timeline |
 | 17a | The Founder's live campaign home — Glance, one ranked action, Explore — with the delivery receipt behind the last-visit delta, the composed pre-order counts, and the threshold crossings that fire once each |
+| 17b | Live editing's three tiers and the FAQ loophole, the Backer comment thread, mid-campaign Creators with no retroactive credit, and the Creator's named earnings states |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -70,7 +71,7 @@ tests. Splitting them was a scheduling decision, not a scope one: each half is
 built against the same brief and lands its own named acceptance tests. Every
 named test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.13,
 every one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one
-from §33.5.1 to §33.5.13, every one from §33.6.1 to §33.6.11, and §33.12.4,
+from §33.5.1 to §33.5.13, **every one from §33.6.1 to §33.6.13**, and §33.12.4,
 §33.9.10, and §33.9.11.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
@@ -124,7 +125,9 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
                   eight suspend/kill reason categories, and the timeline sources
   src/live/       the five ranked next actions, the exact Glance and caught-up
                   copy, the eleven Explore sections and their definitions, the
-                  four milestones, and the count and threshold derivations
+                  four milestones, the count and threshold derivations, the
+                  three live-editing tiers, the comment rules, and the seven
+                  Creator earnings states with Appendix B.7
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -138,6 +141,9 @@ backend/    Express 5 + Drizzle + Postgres 16
                       last-visit delta, the composed pre-order counts, the ranked
                       next action and its corrections, Explore, and the threshold
                       crossings and milestones
+  src/campaign/       campaign building and review, materiality, updates, the
+                      public page, and live editing's one tiered door plus the
+                      comment thread
   src/invitations/    Founder prospects, the invitation, the retention sweep
   src/vetting/        the §9 answers and their provenance, the §10 account claim
   src/affiliates/     Creator recruitment, verification, the private
@@ -1029,6 +1035,86 @@ conversion rate with no clicks behind it is reported as undefined rather than as
 0%. Freshness is stated as a time and the page says it refreshes when loaded;
 nothing anywhere claims to be live or real time.
 
+## Changing a campaign that is already running
+
+Once real people have committed money, an edit is not just an edit. Spec §20
+sorts every change into three tiers, and the sorting is done by the *field*
+rather than by what the Founder calls the change — a reviewed field has no
+direct write path while a campaign is live, whatever anybody names it. There is
+exactly one edit route, because a route per tier would let a caller pick which
+rules apply by picking a URL.
+
+**Typos, brand notes, the community link, and FAQ clarifications publish
+immediately**, and every one writes a history row carrying the value before and
+after. The "before" is read from the stored row, never taken from the request:
+a caller who supplies both halves can supply a flattering pair, and a history
+like that is worth nothing.
+
+**Claims, rewards, prices, dates, delivery promises, refund terms, and Creator
+channel rules cannot publish directly.** The Founder describes what they want
+and why, and it becomes a request a reviewer decides. Applying it runs the same
+materiality machinery the pre-launch review uses — it versions the change,
+invalidates the affected Creators' readiness, and creates one reacceptance task
+each — and a database constraint refuses to mark a request applied without a
+recorded change behind it.
+
+**The campaign type, the order threshold, the internal target, what a Backer
+already agreed to buy, and accepted Creator compensation cannot be changed at
+all.** That tier is not a slower version of the second one; it is a different
+answer, and no request is opened for it.
+
+**An FAQ answer cannot quietly move a delivery date.** The FAQ is in the first
+tier, which without a check would make it the one unreviewed path to every
+promise in the second. So an answer that states a date, a price, a refund term,
+or a shipping commitment is redirected to review. The detector is deliberately
+broad: a false positive costs a day, and a miss moves a date nobody accepted.
+
+## Comments
+
+Spec §18 gives each campaign one general thread and one thread per update, and
+only a Backer holding a magic link may post — which is why the thread lives on
+the magic-link page rather than on the public campaign page, where nobody is
+authenticated.
+
+**A Backer is a number, and the number means nothing.** `Backer 7` is a
+per-campaign sequence assigned at their first comment: not derived from their
+email, their id, or anything else, and restarted per campaign so it does not
+leak how many comments the platform has seen. A chosen display name is allowed —
+except one that is the local part of the Backer's own email address, which is
+refused outright. Someone typing that has almost certainly not realised the
+thread is public, and the cost of being wrong is publishing part of an address.
+
+**Reporting a comment routes it to a person and hides nothing.** There is no
+automatic moderation in the Spec and none was invented; a flagged comment stays
+up until an Admin decides, because auto-hiding would hand every reader a removal
+button. The confirmation says exactly that rather than implying the comment went
+away. New comments close when the campaign does, and reading stays open.
+
+## Joining a campaign that is already running
+
+Admin can recruit a Creator after launch, through the same private invitation
+and the same compact signup — nothing about that path is duplicated. What is
+specific to joining late is three things.
+
+**The terms are for the time that is actually left**, and they are stored as
+they were shown. A Creator who joined with nine days remaining agreed to a
+nine-day deliverable, and recomputing that later would show them a window that
+has shrunk since. The campaign's high-effort classification is copied at the
+moment they join rather than read back afterwards, and a database trigger
+refuses to move any of it.
+
+**Their link activates now, not when the campaign launched.** That single choice
+is the whole of "no retroactive attribution" — the click ledger already decides
+every click against the link's own activation time and records anything earlier
+as earning nothing, with the reason written down. So traffic from before they
+existed on the campaign stays with the campaign, and the record says why.
+
+**Nothing else moves.** Adding a Creator does not change public terms, does not
+touch another Creator's locked agreement, and does not reopen campaign review.
+The three-active-partnership cap is checked before the Creator is asked to
+accept anything, because telling someone they cannot start after they have
+agreed is asking them to agree to something they could not do.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -1270,6 +1356,17 @@ The frontend and shared suites need neither Docker nor a database.
 - **An empty next-action list is a designed ending, not a gap.** The caught-up
   sentence is exact copy and renders with no control beside it; there is no
   branch that manufactures a call to action (Spec §20, DNA §5.4).
+- **What a live edit is allowed to do is decided by the field, not by the
+  editor.** Spec §20's three tiers are a register; a reviewed field has no
+  direct write path and an unchangeable one has no request path either. An FAQ
+  answer stating a date, price, or refund term routes to review, because
+  otherwise the FAQ is the unreviewed way to move every promise beside it.
+- **A comment is what people read.** Its body and its author are fixed once
+  posted; only the moderation decision may be written afterwards, and reporting
+  one routes it to a person rather than hiding it (Spec §18).
+- **A mid-campaign Creator's link activates at activation, never at launch.**
+  That is what makes prior traffic earn nothing, and the click ledger already
+  records the reason against every earlier click.
 - **Money is never described as `held`.** Spec §22.3 gives three accurate words —
   `eligible`, `blocked` with the named requirement, and `released`. Proovd holds
   no one's money, so the euphemism would describe an arrangement that does not

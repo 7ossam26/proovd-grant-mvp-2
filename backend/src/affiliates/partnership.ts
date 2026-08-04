@@ -35,6 +35,9 @@ import { trackingLinkClicks } from '../db/schema/attribution.js';
 import { findAllocation } from '../creator-payment/allocations.js';
 import { CREATOR_DISCLOSURE_TEXT } from './decisions.js';
 import { LINK_TEST_MARKER } from './roster-labels.js';
+import { midCampaignAdditions } from '../db/schema/live-editing.js';
+import { EARNINGS_STATE_LABELS } from '../campaign/editing-logic.js';
+import { CREATOR_OBLIGATIONS, NO_ACTION_NEEDED } from './obligations.js';
 
 export interface CreatorPartnership {
   associationId: string;
@@ -100,6 +103,44 @@ export interface CreatorPartnership {
     note: string;
     fields: string[];
   };
+
+  /**
+   * §20 / §22.1's earnings state, rendered as Appendix B.7 (Phase 17b).
+   *
+   * Seven distinct states, and this reports the one the Creator is actually in.
+   * During a live campaign that is `estimated` with nothing captured — §22.1
+   * finalizes after the retry window and creates the Transfer on or after Day 3,
+   * both Phase 19 — so the amount is null and the block names what it is waiting
+   * for rather than showing a number nobody has computed (§1.4).
+   */
+  earnings: {
+    state: string;
+    label: string;
+    /** Null until there is a captured, attributed amount to state. */
+    amountCents: string | null;
+    /** §20: reason, owner, and next date/action on every unpaid state. */
+    reason: string;
+    owner: string;
+    nextUpdate: string;
+    action: string;
+    actionRequired: boolean;
+    /** Appendix B.7, rendered — or null while there is no amount to render. */
+    statusBlock: string | null;
+  };
+
+  /** §20's obligations, surfaced on the Creator's own working surface. */
+  obligations: Array<{ key: string; statement: string; enforcement: string }>;
+
+  /**
+   * §20 mid-campaign addition: the remaining-time terms this Creator accepted,
+   * when they joined late. Null for the initial roster.
+   */
+  midCampaign: {
+    joinedWithHoursRemaining: number;
+    adjustedDeliverables: string;
+    /** §20: no retroactive attribution — stated, because it is money. */
+    attributionNote: string;
+  } | null;
 
   /** §18/§30: the refresh instant. The surface renders "Updated [local time]". */
   updatedAt: string;
@@ -201,6 +242,18 @@ export async function buildCreatorPartnership(
   const readiness = READINESS_LABELS[association.status] ?? { ready: false, label: 'Not active' };
   const fixedApplicable = agreement?.fixedPaymentCents != null;
 
+  // §20 (Phase 17b): the remaining-time terms a mid-campaign Creator accepted.
+  // Read rather than recomputed — recomputing would show them a window that has
+  // shrunk since they agreed to it, which is not what they agreed to.
+  const [addition] = await db
+    .select({
+      remainingHours: midCampaignAdditions.remainingHours,
+      adjustedDeliverables: midCampaignAdditions.adjustedDeliverables,
+    })
+    .from(midCampaignAdditions)
+    .where(eq(midCampaignAdditions.associationId, input.associationId))
+    .limit(1);
+
   return {
     ok: true,
     partnership: {
@@ -277,6 +330,41 @@ export async function buildCreatorPartnership(
           'Transfer and payout state',
         ],
       },
+
+      // §20/§22.1. `estimated` is the honest state while a campaign runs: no
+      // charge has been captured, so nothing has been earned. Appendix B.7 is
+      // not rendered because it names an exact amount and there is not one yet
+      // — a rendered "US$0.00 recorded" would read as "you earned nothing".
+      earnings: {
+        state: 'estimated',
+        label: EARNINGS_STATE_LABELS.estimated,
+        amountCents: null,
+        reason:
+          'The campaign has not closed, so no charge has been captured and nothing has been earned yet. Your earnings come from captured charges attributed to your link.',
+        owner: 'Proovd',
+        nextUpdate: campaign?.closesAt
+          ? `After the campaign closes on ${campaign.closesAt.toISOString().slice(0, 10)}`
+          : 'After the campaign closes',
+        action: NO_ACTION_NEEDED,
+        actionRequired: false,
+        statusBlock: null,
+      },
+
+      obligations: CREATOR_OBLIGATIONS.map((obligation) => ({
+        key: obligation.key,
+        statement: obligation.statement,
+        enforcement: obligation.enforcement,
+      })),
+
+      midCampaign: addition
+        ? {
+            joinedWithHoursRemaining: addition.remainingHours,
+            adjustedDeliverables: addition.adjustedDeliverables,
+            attributionNote:
+              'Your link went live when you joined. Clicks and pre-orders that happened before then belong to the campaign, not to you — they cannot be credited to your link.',
+          }
+        : null,
+
       updatedAt: new Date().toISOString(),
     },
   };

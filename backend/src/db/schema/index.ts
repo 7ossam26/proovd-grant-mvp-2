@@ -81,3 +81,8 @@ export * from './support.js';
 // milestones, and §31.9's insert-only Act rank corrections. No counters table:
 // new/canceled/net compose from `reservation_status_history`.
 export * from './live.js';
+// Phase 17b: §20's live-editing tiers — the insert-only direct-edit history and
+// the change request a Founder cannot apply themselves — §18's comment thread
+// with its per-campaign Backer number and its route-to-a-person flag, and the
+// frozen remaining-time terms a mid-campaign Creator accepted.
+export * from './live-editing.js';

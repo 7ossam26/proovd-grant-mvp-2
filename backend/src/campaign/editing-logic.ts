@@ -1,0 +1,431 @@
+/**
+ * §20's live-editing register and the FAQ commitment check, restated.
+ *
+ * The backend cannot import `@proovd/shared` at runtime — same constraint as the
+ * state enums, the policy slugs, the launch checklist, the support registers, and
+ * 17a's `live/logic.ts`; same answer. `src/tests/live-editing.test.ts` walks every
+ * field and every commitment case through both, so a tier that changed in one
+ * place and not the other fails the suite rather than quietly letting a Founder
+ * publish a promise nobody accepted.
+ */
+
+export const EDIT_TIERS = ['direct_versioned', 'requires_review', 'never_direct'] as const;
+export type EditTier = (typeof EDIT_TIERS)[number];
+
+export const EDIT_SURFACES = [
+  'build',
+  'faq',
+  'reward_package',
+  'reservation',
+  'agreement',
+  'campaign',
+] as const;
+export type EditSurface = (typeof EDIT_SURFACES)[number];
+
+export interface EditableFieldDefinition {
+  field: string;
+  tier: EditTier;
+  label: string;
+  surface: EditSurface;
+  reason: string;
+  specRef: string;
+}
+
+export const EDITABLE_FIELDS: readonly EditableFieldDefinition[] = [
+  /* Column 1 — directly allowed, with version history. */
+  {
+    field: 'communityUrl',
+    tier: 'direct_versioned',
+    label: 'Community link',
+    surface: 'build',
+    reason: '§20 allows the community link to be changed directly while live.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'brandPerception',
+    tier: 'direct_versioned',
+    label: 'How you want the brand perceived',
+    surface: 'build',
+    reason:
+      '§20 allows brand notes that do not alter approved claims to be changed directly. Approved claims live in the story and the required wording, which are reviewed.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'brandVoice',
+    tier: 'direct_versioned',
+    label: 'Brand voice',
+    surface: 'build',
+    reason: '§20 allows brand notes that do not alter approved claims.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'heroPreference',
+    tier: 'direct_versioned',
+    label: 'Hero preference',
+    surface: 'build',
+    reason: 'A presentation preference. It states no claim, price, date, or promise.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'founderProfileUrl',
+    tier: 'direct_versioned',
+    label: 'Your profile link',
+    surface: 'build',
+    reason: 'A link to you. It states no claim about the product.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'question',
+    tier: 'direct_versioned',
+    label: 'FAQ question',
+    surface: 'faq',
+    reason: '§20 allows a non-material FAQ clarification directly.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'answer',
+    tier: 'direct_versioned',
+    label: 'FAQ answer',
+    surface: 'faq',
+    reason:
+      '§20 allows a non-material FAQ clarification directly — but an FAQ cannot silently change a promise locked elsewhere, so an answer that states a date, a price, or a refund term goes to review.',
+    specRef: '§20 live editing, column 1',
+  },
+
+  /* Column 2 — Admin review + affected-Creator reacceptance. */
+  {
+    field: 'publicStory',
+    tier: 'requires_review',
+    label: 'Your public story',
+    surface: 'build',
+    reason: '§20 puts claims behind review, and the story is where claims live.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'requiredWording',
+    tier: 'requires_review',
+    label: 'Required wording',
+    surface: 'build',
+    reason:
+      '§20 puts Creator channel rules behind review — Creators accepted these terms and must accept a change to them.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'prohibitedClaims',
+    tier: 'requires_review',
+    label: 'Prohibited claims',
+    surface: 'build',
+    reason: '§20 puts Creator channel rules behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'opensAt',
+    tier: 'requires_review',
+    label: 'Open date',
+    surface: 'build',
+    reason: '§20 puts campaign dates and duration behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'closesAt',
+    tier: 'requires_review',
+    label: 'Close date',
+    surface: 'build',
+    reason:
+      '§20 puts campaign dates and duration behind review. Backers agreed to a charge rule that names this date.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'deliveryWindow',
+    tier: 'requires_review',
+    label: 'Delivery window',
+    surface: 'build',
+    reason: '§20 puts delivery promises behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'earlyProductDisclaimer',
+    tier: 'requires_review',
+    label: 'Early-product disclaimer',
+    surface: 'build',
+    reason: '§20 puts delivery promises and claims behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'risksAndChallenges',
+    tier: 'requires_review',
+    label: 'Risks and challenges',
+    surface: 'build',
+    reason: '§20 puts claims behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'refundPolicyText',
+    tier: 'requires_review',
+    label: 'Refund policy',
+    surface: 'build',
+    reason: '§20 puts refund terms behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'refundPolicyTitle',
+    tier: 'requires_review',
+    label: 'Refund policy title',
+    surface: 'build',
+    reason: '§20 puts refund terms behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'refundPolicySourceUrl',
+    tier: 'requires_review',
+    label: 'Refund policy source',
+    surface: 'build',
+    reason: '§20 puts refund terms behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'refundPolicyVersion',
+    tier: 'requires_review',
+    label: 'Refund policy version',
+    surface: 'build',
+    reason: '§20 puts refund terms behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'refundPolicyEffectiveDate',
+    tier: 'requires_review',
+    label: 'Refund policy effective date',
+    surface: 'build',
+    reason: '§20 puts refund terms behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'title',
+    tier: 'requires_review',
+    label: 'Campaign title',
+    surface: 'build',
+    reason: 'The title is the campaign a Backer agreed to and a Creator promoted.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'priceCents',
+    tier: 'requires_review',
+    label: 'Reward price',
+    surface: 'reward_package',
+    reason: '§20 puts rewards and prices behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'contents',
+    tier: 'requires_review',
+    label: 'What the reward contains',
+    surface: 'reward_package',
+    reason: '§20 puts rewards behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'fulfillmentCommitment',
+    tier: 'requires_review',
+    label: 'Fulfillment commitment',
+    surface: 'reward_package',
+    reason: '§20 puts delivery promises behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'delivery',
+    tier: 'requires_review',
+    label: 'Reward delivery date',
+    surface: 'reward_package',
+    reason: '§20 puts delivery promises behind review.',
+    specRef: '§20 live editing, column 2',
+  },
+
+  /* Column 3 — cannot be changed directly at all. */
+  {
+    field: 'type',
+    tier: 'never_direct',
+    label: 'Campaign type',
+    surface: 'campaign',
+    reason:
+      '§9 locks the campaign type permanently at submission and there is no migration path. A wrong type is corrected by archiving and starting again, never by converting.',
+    specRef: '§20 live editing, column 3',
+  },
+  {
+    field: 'orderThreshold',
+    tier: 'never_direct',
+    label: 'Order threshold',
+    surface: 'build',
+    reason:
+      'Backers agreed to a charge rule that names this number, and it is fixed when the campaign closes.',
+    specRef: '§20 live editing, column 3',
+  },
+  {
+    field: 'internalTargetCents',
+    tier: 'never_direct',
+    label: 'Internal momentum target',
+    surface: 'build',
+    reason:
+      'The internal target is not a public funding gate and is not changed once the campaign is running.',
+    specRef: '§20 live editing, column 3',
+  },
+  {
+    field: 'rewardSku',
+    tier: 'never_direct',
+    label: 'A pre-order’s reward',
+    surface: 'reservation',
+    reason:
+      'This is what a Backer actually agreed to buy. It is recorded once when they pre-order and never rewritten.',
+    specRef: '§20 live editing, column 3',
+  },
+  {
+    field: 'rewardSubtotalCents',
+    tier: 'never_direct',
+    label: 'A pre-order’s price',
+    surface: 'reservation',
+    reason: 'This is the amount a Backer agreed to. It is recorded once and never rewritten.',
+    specRef: '§20 live editing, column 3',
+  },
+  {
+    field: 'totalAuthorizedCents',
+    tier: 'never_direct',
+    label: 'A pre-order’s authorized total',
+    surface: 'reservation',
+    reason:
+      'The exact total a Backer consented to, including sales tax. It is recorded once and never rewritten.',
+    specRef: '§20 live editing, column 3',
+  },
+  {
+    field: 'basePercent',
+    tier: 'never_direct',
+    label: 'Accepted Creator compensation',
+    surface: 'agreement',
+    reason:
+      'Both sides accepted these exact terms. A change is a new proposal both sides accept, never an edit.',
+    specRef: '§20 live editing, column 3',
+  },
+  {
+    field: 'fixedPaymentCents',
+    tier: 'never_direct',
+    label: 'Accepted fixed Creator payment',
+    surface: 'agreement',
+    reason: 'Both sides accepted this exact amount. A change is a new proposal, never an edit.',
+    specRef: '§20 live editing, column 3',
+  },
+] as const;
+
+const BY_KEY = new Map<string, EditableFieldDefinition>(
+  EDITABLE_FIELDS.map((definition) => [`${definition.surface}:${definition.field}`, definition]),
+);
+
+/** Throws on an unregistered field — no default in either direction (see shared). */
+export function tierFor(surface: EditSurface, field: string): EditableFieldDefinition {
+  const definition = BY_KEY.get(`${surface}:${field}`);
+  if (!definition) {
+    throw new Error(
+      `"${field}" on ${surface} is not in the §20 live-editing register, so it has no live write path`,
+    );
+  }
+  return definition;
+}
+
+export function fieldsInTier(tier: EditTier): EditableFieldDefinition[] {
+  return EDITABLE_FIELDS.filter((definition) => definition.tier === tier);
+}
+
+/* ── The §20 FAQ loophole ──────────────────────────────────────────────────── */
+
+export const COMMITMENT_KINDS = ['date', 'price', 'refund', 'delivery'] as const;
+export type CommitmentKind = (typeof COMMITMENT_KINDS)[number];
+
+const MONTHS =
+  '(january|february|march|april|may|june|july|august|september|october|november|december)';
+
+/**
+ * Deliberately broad. A false positive costs a review; a false negative moves a
+ * delivery date without anybody accepting it, which is what §20's third column
+ * exists to prevent. The asymmetry decides the tuning.
+ */
+export function commitmentsIn(text: string): CommitmentKind[] {
+  const found = new Set<CommitmentKind>();
+  const value = text.toLowerCase();
+
+  if (
+    new RegExp(`${MONTHS}\\s+\\d{4}`).test(value) ||
+    /\b\d{4}-\d{2}-\d{2}\b/.test(value) ||
+    /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/.test(value) ||
+    new RegExp(`\\b\\d{1,2}(st|nd|rd|th)?\\s+of\\s+${MONTHS}`).test(value)
+  ) {
+    found.add('date');
+  }
+  if (/\bus\$\s?\d|\$\s?\d|\b\d+(\.\d{2})?\s?(usd|dollars)\b/.test(value)) {
+    found.add('price');
+  }
+  if (/\brefund(s|ed|ing|able)?\b|\bmoney[- ]back\b|\bguarantee(d|s)?\b/.test(value)) {
+    found.add('refund');
+  }
+  if (
+    /\b(ship|ships|shipping|shipped|deliver|delivers|delivered|delivery|arrive|arrives|available)\b/.test(
+      value,
+    ) &&
+    /\b(by|before|on|within|no later than|in)\b/.test(value)
+  ) {
+    found.add('delivery');
+  }
+  return [...found];
+}
+
+/* ── §18's comment rules, restated ─────────────────────────────────────────── */
+
+export const COMMENT_FLAG_STATES = ['open', 'upheld', 'dismissed'] as const;
+export const COMMENT_VISIBILITY = ['visible', 'removed'] as const;
+
+export function defaultCommentAuthorName(backerNumber: number): string {
+  return `Backer ${backerNumber}`;
+}
+
+export type DisplayNameRefusal = 'too_short' | 'too_long' | 'email_local_part' | 'looks_like_email';
+
+export function displayNameRefusal(
+  chosen: string,
+  backerEmail: string,
+): DisplayNameRefusal | null {
+  const name = chosen.trim();
+  if (name.length < 2) return 'too_short';
+  if (name.length > 40) return 'too_long';
+  if (/@/.test(name)) return 'looks_like_email';
+  const localPart = backerEmail.split('@')[0]?.trim().toLowerCase() ?? '';
+  if (localPart.length >= 3 && name.toLowerCase() === localPart) return 'email_local_part';
+  return null;
+}
+
+/** §18: new comments are disabled after close, suspension, or kill. */
+export function commentsOpenFor(campaignStatus: string): boolean {
+  return campaignStatus === 'live';
+}
+
+/* ── §20/§22.1 earnings states, restated ───────────────────────────────────── */
+
+export const EARNINGS_STATES = [
+  'estimated',
+  'finalized',
+  'approved_for_transfer',
+  'transferred',
+  'paid_out',
+  'payout_failed',
+  'adjusted',
+] as const;
+export type EarningsState = (typeof EARNINGS_STATES)[number];
+
+export const EARNINGS_STATE_LABELS: Readonly<Record<EarningsState, string>> = {
+  estimated: 'ESTIMATED',
+  finalized: 'FINALIZED',
+  approved_for_transfer: 'APPROVED FOR TRANSFER',
+  transferred: 'TRANSFERRED',
+  paid_out: 'PAID OUT',
+  payout_failed: 'PAYOUT FAILED',
+  adjusted: 'ADJUSTED',
+};
+
+export function requiresExplanation(state: EarningsState): boolean {
+  return state !== 'paid_out';
+}

@@ -52,3 +52,77 @@ export async function cancelReservation(
   );
   return { ok: res.ok };
 }
+
+/* ── The §18 comment thread (Phase 17b) ────────────────────────────────────── */
+
+export interface BackerComment {
+  id: string;
+  updateId: string | null;
+  authorDisplay: string;
+  body: string;
+  postedAt: string;
+  mine: boolean;
+}
+
+export interface CommentThread {
+  /** §18: whether NEW comments are open. Reading is always open. */
+  open: boolean;
+  closedReason: string | null;
+  comments: BackerComment[];
+}
+
+export async function fetchComments(
+  token: string,
+  updateId?: string,
+): Promise<CommentThread | null> {
+  const query = updateId ? `?updateId=${encodeURIComponent(updateId)}` : '';
+  const res = await fetch(`/api/link/${encodeURIComponent(token)}/comments${query}`, {
+    credentials: 'include',
+  });
+  if (!res.ok) return null;
+  return ((await res.json()) as { thread: CommentThread }).thread;
+}
+
+export type PostCommentResult =
+  | { ok: true }
+  | { ok: false; whatHappened: string; next: string };
+
+export async function postComment(
+  token: string,
+  input: { body: string; updateId?: string; displayName?: string },
+): Promise<PostCommentResult> {
+  const res = await fetch(`/api/link/${encodeURIComponent(token)}/comments`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (res.ok) return { ok: true };
+  const detail = (await res.json().catch(() => null)) as
+    | { whatHappened?: string; next?: string }
+    | null;
+  return {
+    ok: false,
+    whatHappened: detail?.whatHappened ?? 'That comment was not posted.',
+    next: detail?.next ?? 'Nothing you typed was lost.',
+  };
+}
+
+export async function flagComment(
+  token: string,
+  commentId: string,
+  reason: string,
+): Promise<{ ok: boolean; next?: string }> {
+  const res = await fetch(
+    `/api/link/${encodeURIComponent(token)}/comments/${encodeURIComponent(commentId)}/flag`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    },
+  );
+  if (!res.ok) return { ok: false };
+  const body = (await res.json().catch(() => null)) as { next?: string } | null;
+  return { ok: true, ...(body?.next ? { next: body.next } : {}) };
+}

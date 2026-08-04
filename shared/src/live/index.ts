@@ -598,3 +598,9 @@ export const EXPLORE_SECTIONS: readonly ExploreSectionDefinition[] = [
  */
 export const ATTRIBUTION_BREAKDOWN_SOURCES = ['direct', 'organic', 'house', 'creator'] as const;
 export type AttributionBreakdownSource = (typeof ATTRIBUTION_BREAKDOWN_SOURCES)[number];
+
+/* Phase 17b: §20's live-editing tiers, the FAQ commitment check, and §18's
+   comment thread. Separate file, same module — 17a owns what the Founder reads
+   and 17b owns what people change while it runs. */
+export * from './editing.js';
+export * from './earnings.js';
