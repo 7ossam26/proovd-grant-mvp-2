@@ -60,6 +60,7 @@ import {
   applyCaptureFailure,
   applyCaptureSuccess,
 } from './capture.js';
+import { requestFounderW9 } from './founder-payments.js';
 import {
   notifyBatchResult,
   notifyCampaignEnded,
@@ -765,6 +766,23 @@ async function applyChargePath(
     if (totals.retrying === 0) {
       await notifyCreatorsCampaignClosed(notify, { campaignId });
     }
+  }
+
+  // §22.3 (19b): "Immediately after close, request W-9." After the batch
+  // transaction, the 08c reveal shape: idempotent by the one-per-campaign
+  // index, so a crash here costs a retry (the schedule sweep re-drives it),
+  // never a duplicate. Only a campaign with captured money has a Founder
+  // payment coming; a retry-window recovery is picked up by the sweep.
+  if (totals.captured > 0) {
+    await requestFounderW9(
+      {
+        db,
+        audit,
+        notifier: deps.notifier,
+        ...(deps.context ? { context: deps.context } : {}),
+      },
+      { campaignId, actor, now },
+    );
   }
 
   return summary('complete', campaignId, {

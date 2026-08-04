@@ -55,6 +55,24 @@ import {
   THANK_YOU_ELIGIBILITY_FACTS,
   type CompletionOutcomeKey,
 } from '../close/earnings-logic.js';
+import {
+  readFounderPaymentStatus,
+  requestFounderW9,
+  recordW9Submitted,
+  decideW9,
+  recordEarlyReleaseEvidence,
+  decideEarlyRemaining,
+  createFounderPayment,
+  releaseFounderPayment,
+} from '../close/founder-payments.js';
+import {
+  FOUNDER_PAYMENT_KINDS,
+  EARLY_RELEASE_EVIDENCE_FACTS,
+  FOUNDER_PAYMENT_STATUS_FACTS,
+  type FounderPaymentKind,
+} from '../close/founder-payments-logic.js';
+import { earlyReleaseRequests } from '../db/schema/founder-payments.js';
+import { desc, eq } from 'drizzle-orm';
 
 export const ADMIN_CLOSE_BASE_PATH = '/api/admin/close';
 
@@ -585,6 +603,364 @@ export function createAdminCloseRouter(deps: AdminCloseRouterDeps): Router {
               message: 'All three §22.2 eligibility facts must be confirmed before a payment.',
             },
           });
+          return;
+        default:
+          res.status(404).json({ error: { code: 'not_found' } });
+      }
+    },
+  );
+
+  /* ── §22.3: the Founder payment queue (Phase 19b) ───────────────────────── */
+
+  /**
+   * The Admin read serves the SAME `readFounderPaymentStatus` view the Founder
+   * route serves — one source, many renderers (§33.8.13) — plus the request
+   * history and the registers the surface renders by definition.
+   */
+  router.get(`${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments`, admin, async (req, res) => {
+    const campaignId = String(req.params['campaignId']);
+    const status = await readFounderPaymentStatus(db, { campaignId });
+    if (!status) {
+      res.status(404).json({ error: { code: 'not_found' } });
+      return;
+    }
+    const requests = await db
+      .select()
+      .from(earlyReleaseRequests)
+      .where(eq(earlyReleaseRequests.campaignId, campaignId))
+      .orderBy(desc(earlyReleaseRequests.createdAt));
+    res.json({
+      status,
+      requests,
+      evidenceFacts: EARLY_RELEASE_EVIDENCE_FACTS,
+      statusFacts: FOUNDER_PAYMENT_STATUS_FACTS,
+    });
+  });
+
+  router.post(
+    `${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments/w9/request`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const outcome = await requestFounderW9(closeDeps(), {
+        campaignId: String(req.params['campaignId']),
+        actor: actorOf(req),
+      });
+      switch (outcome.status) {
+        case 'requested':
+          res.status(201).json({ record: outcome.record });
+          return;
+        case 'already_requested':
+          res.status(409).json({ error: { code: 'already_requested' }, record: outcome.record });
+          return;
+        case 'nothing_captured':
+          res.status(409).json({
+            error: {
+              code: 'nothing_captured',
+              message: 'No charge was captured — there is no Founder payment to collect a W-9 for.',
+            },
+          });
+          return;
+        case 'not_closed':
+          res.status(409).json({ error: { code: 'not_closed', current: outcome.current } });
+          return;
+        default:
+          res.status(404).json({ error: { code: 'not_found' } });
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments/w9/submitted`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      if (typeof b['reference'] !== 'string' || !b['reference'].trim()) {
+        res.status(422).json({
+          error: { code: 'invalid_request', message: 'A receipt reference is required (§1.3).' },
+        });
+        return;
+      }
+      const outcome = await recordW9Submitted(closeDeps(), {
+        campaignId: String(req.params['campaignId']),
+        reference: b['reference'],
+        actor: actorOf(req),
+      });
+      switch (outcome.status) {
+        case 'recorded':
+          res.status(201).json({ record: outcome.record });
+          return;
+        case 'tin_rejected':
+          res.status(422).json({
+            error: {
+              code: 'tin_rejected',
+              message:
+                'The reference names where the form is kept — it may never contain a taxpayer identification number (§11).',
+            },
+          });
+          return;
+        case 'already_submitted':
+        case 'already_verified':
+          res.status(409).json({ error: { code: outcome.status } });
+          return;
+        default:
+          res.status(409).json({ error: { code: 'not_requested' } });
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments/w9/decide`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const decision =
+        b['decision'] === 'verified'
+          ? ('verified' as const)
+          : b['decision'] === 'resubmission_required'
+            ? ('resubmission_required' as const)
+            : null;
+      if (!decision || typeof b['note'] !== 'string' || (decision === 'resubmission_required' && !b['note'].trim())) {
+        res.status(422).json({
+          error: {
+            code: 'invalid_request',
+            message: 'A decision (verified or resubmission_required) is required; a return needs its reason.',
+          },
+        });
+        return;
+      }
+      const outcome = await decideW9(closeDeps(), {
+        campaignId: String(req.params['campaignId']),
+        decision,
+        note: b['note'],
+        actor: actorOf(req),
+      });
+      switch (outcome.status) {
+        case 'verified':
+        case 'returned':
+          res.json({ record: outcome.record, status: outcome.status });
+          return;
+        case 'tin_rejected':
+          res.status(422).json({
+            error: {
+              code: 'tin_rejected',
+              message: 'A verification note may never contain a taxpayer identification number (§11).',
+            },
+          });
+          return;
+        default:
+          res.status(409).json({ error: { code: 'not_submitted', current: outcome.current } });
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments/evidence`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const raw = (b['facts'] ?? {}) as Record<string, unknown>;
+      const facts: Record<string, { recorded: boolean; detail: string }> = {};
+      for (const fact of EARLY_RELEASE_EVIDENCE_FACTS) {
+        const entry = (raw[fact.key] ?? {}) as Record<string, unknown>;
+        facts[fact.key] = {
+          recorded: entry['recorded'] === true,
+          detail: typeof entry['detail'] === 'string' ? entry['detail'] : '',
+        };
+      }
+      const outcome = await recordEarlyReleaseEvidence(closeDeps(), {
+        campaignId: String(req.params['campaignId']),
+        facts: facts as Parameters<typeof recordEarlyReleaseEvidence>[1]['facts'],
+        actor: actorOf(req),
+      });
+      switch (outcome.status) {
+        case 'recorded':
+          res.status(201).json({ evidence: outcome.evidence, missing: outcome.missing });
+          return;
+        case 'detail_missing':
+          res.status(422).json({
+            error: {
+              code: 'detail_missing',
+              fact: outcome.fact,
+              message:
+                'Every §22.3 answer needs its evidence detail — internal readiness alone is insufficient.',
+            },
+          });
+          return;
+        case 'wrong_model':
+          res.status(409).json({
+            error: { code: 'wrong_model', message: 'Only a Product campaign has a remaining payment.' },
+          });
+          return;
+        case 'not_closed':
+          res.status(409).json({ error: { code: 'not_closed', current: outcome.current } });
+          return;
+        default:
+          res.status(404).json({ error: { code: 'not_found' } });
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments/early-release/decide`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const decision =
+        b['decision'] === 'approved'
+          ? ('approved' as const)
+          : b['decision'] === 'declined'
+            ? ('declined' as const)
+            : null;
+      if (!decision || typeof b['reason'] !== 'string' || !b['reason'].trim()) {
+        res.status(422).json({
+          error: { code: 'invalid_request', message: 'A decision and its reason are required (§25.6).' },
+        });
+        return;
+      }
+      const outcome = await decideEarlyRemaining(closeDeps(), {
+        campaignId: String(req.params['campaignId']),
+        decision,
+        reason: b['reason'],
+        actor: actorOf(req),
+      });
+      switch (outcome.status) {
+        case 'approved':
+        case 'declined':
+          res.json({ request: outcome.request, status: outcome.status });
+          return;
+        case 'no_pending_request':
+          res.status(409).json({ error: { code: 'no_pending_request' } });
+          return;
+        case 'early_release_disabled':
+          res.status(409).json({
+            error: {
+              code: 'early_release_disabled',
+              message: 'The §6 early-remaining-payment control is disabled.',
+            },
+          });
+          return;
+        case 'w9_not_verified':
+          res.status(409).json({ error: { code: 'w9_not_verified' } });
+          return;
+        case 'first_payment_not_released':
+          res.status(409).json({ error: { code: 'first_payment_not_released' } });
+          return;
+        case 'before_day_3':
+          res.status(409).json({
+            error: { code: 'before_day_3', earliestAt: outcome.earliestAt.toISOString() },
+          });
+          return;
+        case 'evidence_incomplete':
+          res.status(409).json({ error: { code: 'evidence_incomplete', missing: outcome.missing } });
+          return;
+        default:
+          res.status(404).json({ error: { code: 'not_found' } });
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const b = (req.body ?? {}) as Record<string, unknown>;
+      const kind = FOUNDER_PAYMENT_KINDS.find((k) => k === b['kind']);
+      if (!kind) {
+        res.status(422).json({
+          error: { code: 'unknown_kind', message: 'kind must be a §22.3 payment kind.' },
+        });
+        return;
+      }
+      const outcome = await createFounderPayment(closeDeps(), {
+        campaignId: String(req.params['campaignId']),
+        kind,
+        checksNote: typeof b['checksNote'] === 'string' ? b['checksNote'] : undefined,
+        approvedBy: typeof b['approvedBy'] === 'string' ? b['approvedBy'] : undefined,
+        actor: actorOf(req),
+      });
+      switch (outcome.status) {
+        case 'created':
+          res.status(201).json({ payment: outcome.payment });
+          return;
+        case 'already_exists':
+          res.status(409).json({ error: { code: 'already_exists' }, payment: outcome.payment });
+          return;
+        case 'before_scheduled_day':
+          res.status(409).json({
+            error: { code: 'before_scheduled_day', dueAt: outcome.dueAt.toISOString() },
+          });
+          return;
+        case 'before_day_3':
+          res.status(409).json({
+            error: { code: 'before_day_3', earliestAt: outcome.earliestAt.toISOString() },
+          });
+          return;
+        case 'evidence_incomplete':
+          res.status(409).json({ error: { code: 'evidence_incomplete', missing: outcome.missing } });
+          return;
+        case 'retry_incomplete':
+        case 'not_creatable':
+          res.status(409).json({ error: { code: outcome.status, current: outcome.current } });
+          return;
+        case 'w9_not_verified':
+          res.status(409).json({ error: { code: 'w9_not_verified', current: outcome.current } });
+          return;
+        case 'wrong_model':
+        case 'nothing_payable':
+        case 'w9_missing':
+        case 'creator_earnings_not_finalized':
+        case 'checks_missing':
+        case 'approval_missing':
+        case 'first_payment_not_released':
+        case 'no_approved_early_request':
+        case 'early_release_disabled':
+          res.status(409).json({ error: { code: outcome.status } });
+          return;
+        default:
+          res.status(404).json({ error: { code: 'not_found' } });
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CLOSE_BASE_PATH}/:campaignId/founder-payments/:kind/release`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const kind = FOUNDER_PAYMENT_KINDS.find((k) => k === req.params['kind']);
+      if (!kind) {
+        res.status(422).json({
+          error: { code: 'unknown_kind', message: 'kind must be a §22.3 payment kind.' },
+        });
+        return;
+      }
+      const outcome = await releaseFounderPayment(closeDeps(), {
+        campaignId: String(req.params['campaignId']),
+        kind: kind as FounderPaymentKind,
+        actor: actorOf(req),
+      });
+      switch (outcome.status) {
+        case 'released':
+          res.json({ payment: outcome.payment });
+          return;
+        case 'already_released':
+          res.status(409).json({ error: { code: 'already_released' }, payment: outcome.payment });
+          return;
+        case 'not_releasable':
+          res.status(409).json({ error: { code: 'not_releasable', current: outcome.current } });
           return;
         default:
           res.status(404).json({ error: { code: 'not_found' } });

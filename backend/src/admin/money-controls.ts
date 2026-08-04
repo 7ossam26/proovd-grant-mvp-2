@@ -36,6 +36,7 @@ import { campaigns, reservations } from '../db/schema/domain.js';
 import { creatorPaymentAllocations } from '../db/schema/creator-payment.js';
 import { providerObjects } from '../db/schema/payments.js';
 import { thankYouRecords } from '../db/schema/earnings.js';
+import { readFounderPaymentStatus } from '../close/founder-payments.js';
 import {
   MONEY_CONTROL_KEYS,
   MONEY_STATUSES,
@@ -159,6 +160,31 @@ export async function readMoneyControls(
     .from(thankYouRecords)
     .where(eq(thankYouRecords.campaignId, campaignId));
 
+  // Phase 19b: the §22.3 status, read from the one resolver so this line can
+  // never disagree with the Founder surface or the emails (§33.8.13).
+  const founderView = await readFounderPaymentStatus(db, { campaignId });
+  const founderPaymentPopulated = Boolean(
+    founderView && (founderView.w9.state !== 'not_requested' || founderView.payments.some((p) => p.status !== 'blocked')),
+  );
+  const founderPaymentAmounts: Record<string, string> = {};
+  if (founderView && founderPaymentPopulated) {
+    founderPaymentAmounts['eligibleShareCents'] = founderView.eligibleShare.amountCents;
+    for (const line of founderView.payments) {
+      founderPaymentAmounts[`${line.kind}_cents`] = line.amountCents;
+    }
+    founderPaymentAmounts['releasedTotalCents'] = founderView.payments
+      .filter((p) => p.status === 'released')
+      .reduce((sum, p) => sum + BigInt(p.amountCents), 0n)
+      .toString();
+  }
+  const earlyEvidencePopulated = Boolean(founderView?.earlyRelease?.evidence);
+  const earlyEvidenceAmounts: Record<string, string> = founderView?.earlyRelease?.evidence
+    ? {
+        factsRecorded: String(4 - founderView.earlyRelease.evidence.missingFacts.length),
+        factsRequired: '4',
+      }
+    : {};
+
   const lines: MoneyControlValue[] = [
     {
       key: 'captured_amounts',
@@ -223,18 +249,25 @@ export async function readMoneyControls(
     },
     {
       key: 'founder_payment',
-      amounts: {},
-      populated: false,
+      // Phase 19b: every number here is the ONE §22.3 resolver's — the same
+      // amounts the Founder read and the release emails carry (§33.8.13).
+      amounts: founderPaymentAmounts,
+      populated: founderPaymentPopulated,
       populatedBy: 'phase_19',
-      awaiting: 'W-9 collection and the Founder payment schedule begin immediately after close (§22.3).',
+      awaiting: founderPaymentPopulated
+        ? null
+        : 'W-9 collection and the Founder payment schedule begin immediately after close (§22.3).',
     },
     {
       key: 'early_release_evidence',
-      amounts: {},
-      populated: false,
+      amounts: earlyEvidenceAmounts,
+      populated: earlyEvidencePopulated,
       populatedBy: 'phase_19',
-      awaiting:
-        'Early release of the remaining payment is decided after Day 3, on recorded evidence (§22.3).',
+      awaiting: earlyEvidencePopulated
+        ? null
+        : founderView?.model === 'idea'
+          ? 'An Idea campaign has one single payment — there is no remaining payment to release early (§22.3).'
+          : 'Early release of the remaining payment is decided after Day 3, on recorded evidence (§22.3).',
     },
     {
       key: 'thank_you_expense',

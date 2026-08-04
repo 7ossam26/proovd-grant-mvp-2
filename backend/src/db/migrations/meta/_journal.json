@@ -218,6 +218,13 @@
       "when": 1785582000000,
       "tag": "0030_creator_earnings",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1785585600000,
+      "tag": "0031_founder_payments",
+      "breakpoints": true
     }
   ]
 }

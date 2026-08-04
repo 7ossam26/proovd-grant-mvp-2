@@ -868,3 +868,74 @@ export interface FounderResultsView {
 export const fetchCampaignResults = (
   campaignId: string,
 ): Promise<{ results: FounderResultsView }> => call(`${base(campaignId)}/results`);
+
+/* ── §22.3 Founder payment status (Phase 19b) ──────────────────────────────── */
+
+export interface FounderPaymentLineView {
+  kind: 'single_payment' | 'first_payment' | 'remaining_payment';
+  label: string;
+  percent: number;
+  amountCents: string;
+  amountExact: boolean;
+  status: 'blocked' | 'eligible' | 'released';
+  blockers: string[];
+  secureAction: string | null;
+  noActionNeeded: boolean;
+  dueAt: string;
+  releasedAt: string | null;
+  releasedEarly: boolean;
+}
+
+export interface FounderPaymentStatusView {
+  campaignId: string;
+  model: 'idea' | 'product';
+  campaignStatus: string;
+  closedAt: string | null;
+  currency: 'USD';
+  applicable: boolean;
+  notApplicableReason: string | null;
+  w9: {
+    state: 'not_requested' | 'requested' | 'submitted' | 'verified';
+    line: string;
+    action: string;
+    requestedAt: string | null;
+    submittedAt: string | null;
+    verifiedAt: string | null;
+    returnReason: string | null;
+    blocksPayments: boolean;
+  };
+  eligibleShare: {
+    exact: boolean;
+    amountCents: string;
+    note: string;
+    basis: {
+      rewardSubtotalCapturedCents: string;
+      proovdFeeCents: string;
+      finalizedCreatorCompensationCents: string;
+      causeBasedAdjustmentsCents: string;
+      stripeFeesAllocatedToFounderCents: string;
+    };
+  };
+  payments: FounderPaymentLineView[];
+  nextReviewDate: string | null;
+  day14: { dueAt: string; line: string } | null;
+  earlyRelease: {
+    settingEnabled: boolean;
+    evidence: { id: string; recordedAt: string; missingFacts: string[] } | null;
+    pendingRequest: { id: string; createdAt: string } | null;
+    neverSkipsDay14: string;
+  } | null;
+}
+
+export const fetchFounderPayments = (
+  campaignId: string,
+): Promise<{ payments: FounderPaymentStatusView }> => call(`${base(campaignId)}/payments`);
+
+export const requestEarlyRemainingRelease = (
+  campaignId: string,
+  message: string,
+): Promise<{ request: { id: string } }> =>
+  call(`${base(campaignId)}/early-remaining-request`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });

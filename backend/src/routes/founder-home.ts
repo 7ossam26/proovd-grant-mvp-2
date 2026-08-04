@@ -27,9 +27,12 @@ import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { findFounderCampaign } from '../workspace/service.js';
 import { readCampaignHome } from '../live/home.js';
 import { readFounderResults } from '../close/results.js';
+import { readFounderPaymentStatus, requestEarlyRemaining } from '../close/founder-payments.js';
 import { readExplore } from '../live/explore.js';
 import { acknowledgeDelivery } from '../live/glance.js';
 import { acknowledgeMilestone } from '../live/thresholds.js';
@@ -53,6 +56,9 @@ export interface FounderHomeRouterDeps {
   db: Database;
   auth: Auth;
   audit: AuditWriter;
+  /** Phase 19b: the early-release request acknowledgement (§22.3). */
+  notifier?: Notifier | undefined;
+  notificationContext?: LaunchNotificationContext | undefined;
 }
 
 function notFound(res: express.Response): void {
@@ -124,6 +130,94 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
     }
     res.json({ results });
   });
+
+  /**
+   * §22.3's Founder payment status (Phase 19b) — the SAME
+   * `readFounderPaymentStatus` view the Admin queue reads, so the two can
+   * never disagree on an amount, a status, or a reason (§33.8.13). It answers
+   * the §22.3 list: exact amount affected, requirement or blocker, secure
+   * action, submitted/verified state, next review date, and `No action needed`
+   * while under review.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/payments`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+
+    const payments = await readFounderPaymentStatus(db, { campaignId });
+    if (!payments) {
+      notFound(res);
+      return;
+    }
+    res.json({ payments });
+  });
+
+  /**
+   * §22.3's early remaining payment request (Phase 19b). Recording it promises
+   * nothing — the §6 setting's own words: each request is evidence-gated and
+   * decided by an Admin. One pending request per campaign.
+   */
+  router.post(
+    `${FOUNDER_HOME_PATH}/campaigns/:campaignId/early-remaining-request`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const message = String((req.body as Record<string, unknown>)['message'] ?? '').trim();
+      if (!message) {
+        res.status(422).json({
+          error: 'message_required',
+          title: 'That request could not be recorded',
+          whatHappened: 'An early-release request says what is ready and for whom.',
+          next: 'Describe what affected Backers can already reach, then send it again.',
+        });
+        return;
+      }
+
+      const outcome = await requestEarlyRemaining(
+        {
+          db,
+          audit,
+          notifier: deps.notifier,
+          ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+        },
+        { campaignId, requestedBy: actorId(req), message },
+      );
+
+      switch (outcome.status) {
+        case 'requested':
+          res.status(201).json({ request: outcome.request });
+          return;
+        case 'already_pending':
+          res.status(409).json({
+            error: 'already_pending',
+            title: 'A request is already waiting',
+            whatHappened: 'Your earlier early-release request has not been decided yet.',
+            next: 'You will receive the decision with its reason. No action needed.',
+          });
+          return;
+        case 'wrong_model':
+          res.status(409).json({
+            error: 'wrong_model',
+            title: 'This campaign has one payment',
+            whatHappened: 'Only a Product campaign has a remaining payment to release early.',
+            next: 'Nothing has changed.',
+          });
+          return;
+        case 'not_closed':
+          res.status(409).json({
+            error: 'not_closed',
+            title: 'Your campaign has not closed yet',
+            whatHappened: 'Early release is decided after close, once charges settle.',
+            next: 'Nothing has changed.',
+          });
+          return;
+        default:
+          notFound(res);
+      }
+    },
+  );
 
   /**
    * §33.6.6. The acknowledgement, and the only thing that advances last-seen.

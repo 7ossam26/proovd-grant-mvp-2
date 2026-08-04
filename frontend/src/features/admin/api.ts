@@ -1455,3 +1455,121 @@ export const recordCreatorThankYou = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── §22.3: the Founder payment queue (Phase 19b) ──────────────────────────── */
+
+export interface AdminFounderPaymentLine {
+  kind: 'single_payment' | 'first_payment' | 'remaining_payment';
+  label: string;
+  percent: number;
+  amountCents: string;
+  amountExact: boolean;
+  status: 'blocked' | 'eligible' | 'released';
+  blockers: string[];
+  secureAction: string | null;
+  noActionNeeded: boolean;
+  dueAt: string;
+  releasedAt: string | null;
+  releasedEarly: boolean;
+}
+
+export interface AdminFounderPaymentState {
+  status: {
+    campaignId: string;
+    model: 'idea' | 'product';
+    campaignStatus: string;
+    applicable: boolean;
+    notApplicableReason: string | null;
+    w9: {
+      state: 'not_requested' | 'requested' | 'submitted' | 'verified';
+      line: string;
+      action: string;
+      requestedAt: string | null;
+      submittedAt: string | null;
+      verifiedAt: string | null;
+      returnReason: string | null;
+      blocksPayments: boolean;
+    };
+    eligibleShare: { exact: boolean; amountCents: string; note: string };
+    payments: AdminFounderPaymentLine[];
+    nextReviewDate: string | null;
+    day14: { dueAt: string; line: string } | null;
+    earlyRelease: {
+      settingEnabled: boolean;
+      evidence: { id: string; recordedAt: string; missingFacts: string[] } | null;
+      pendingRequest: { id: string; createdAt: string } | null;
+      neverSkipsDay14: string;
+    } | null;
+  };
+  requests: Array<{
+    id: string;
+    status: 'pending' | 'approved' | 'declined';
+    message: string;
+    requestedBy: string;
+    createdAt: string;
+    decisionReason: string | null;
+  }>;
+  evidenceFacts: Array<{ key: string; label: string; note: string | null }>;
+}
+
+const founderPaymentsBase = (campaignId: string) =>
+  `/api/admin/close/${encodeURIComponent(campaignId)}/founder-payments`;
+
+export const fetchFounderPaymentQueue = (campaignId: string): Promise<AdminFounderPaymentState> =>
+  call<AdminFounderPaymentState>(founderPaymentsBase(campaignId));
+
+export const requestW9 = (campaignId: string): Promise<{ record: unknown }> =>
+  call(`${founderPaymentsBase(campaignId)}/w9/request`, { method: 'POST', body: JSON.stringify({}) });
+
+export const recordW9Receipt = (
+  campaignId: string,
+  reference: string,
+): Promise<{ record: unknown }> =>
+  call(`${founderPaymentsBase(campaignId)}/w9/submitted`, {
+    method: 'POST',
+    body: JSON.stringify({ reference }),
+  });
+
+export const decideW9 = (
+  campaignId: string,
+  decision: 'verified' | 'resubmission_required',
+  note: string,
+): Promise<{ record: unknown; status: string }> =>
+  call(`${founderPaymentsBase(campaignId)}/w9/decide`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, note }),
+  });
+
+export const recordEarlyEvidence = (
+  campaignId: string,
+  facts: Record<string, { recorded: boolean; detail: string }>,
+): Promise<{ evidence: unknown; missing: string[] }> =>
+  call(`${founderPaymentsBase(campaignId)}/evidence`, {
+    method: 'POST',
+    body: JSON.stringify({ facts }),
+  });
+
+export const decideEarlyRelease = (
+  campaignId: string,
+  decision: 'approved' | 'declined',
+  reason: string,
+): Promise<{ request: unknown; status: string }> =>
+  call(`${founderPaymentsBase(campaignId)}/early-release/decide`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, reason }),
+  });
+
+export const createFounderPayment = (
+  campaignId: string,
+  body: { kind: string; checksNote?: string; approvedBy?: string },
+): Promise<{ payment: unknown }> =>
+  call(founderPaymentsBase(campaignId), { method: 'POST', body: JSON.stringify(body) });
+
+export const releaseFounderPayment = (
+  campaignId: string,
+  kind: string,
+): Promise<{ payment: unknown }> =>
+  call(`${founderPaymentsBase(campaignId)}/${encodeURIComponent(kind)}/release`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });

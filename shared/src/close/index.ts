@@ -23,6 +23,7 @@
 import { ideaThresholdMet } from '../money/thresholds.js';
 
 export * from './earnings.js';
+export * from './founder-payments.js';
 
 /* ── §21's eight close-batch steps, as data ─────────────────────────────────── */
 

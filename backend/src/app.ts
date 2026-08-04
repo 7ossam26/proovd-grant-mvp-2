@@ -376,7 +376,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // `POST .../home/seen` is the acknowledgement that moves last-seen, which is
   // §20's "only after the rendered state is successfully delivered". No Stripe
   // dependency — it reads records every earlier phase already wrote.
-  app.use(createFounderHomeRouter({ db, auth, audit }));
+  app.use(
+    createFounderHomeRouter({ db, auth, audit, notifier, notificationContext: launchContext }),
+  );
   // Phase 17b (§20, §15, §33.6.12). One Founder edit route, and §20's tier
   // register decides what it does: written now with version history, routed to
   // Admin as a change request, or refused outright. A route per tier would let a

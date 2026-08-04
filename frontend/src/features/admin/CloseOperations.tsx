@@ -36,11 +36,20 @@ import {
   approveCreatorEarnings,
   createCreatorTransfer,
   recordCreatorThankYou,
+  fetchFounderPaymentQueue,
+  requestW9,
+  recordW9Receipt,
+  decideW9,
+  recordEarlyEvidence,
+  decideEarlyRelease,
+  createFounderPayment,
+  releaseFounderPayment,
   AdminRequestError,
   type CloseOperationsState,
   type CloseBatchDetailState,
   type CampaignEarningsState,
   type EarningsCreatorRow,
+  type AdminFounderPaymentState,
 } from './api.js';
 
 const usd = (cents: string) => formatUsd(BigInt(cents));
@@ -260,6 +269,8 @@ function CloseDetail({
 
       <EarningsPanel campaignId={d.campaignId} onError={onError} />
 
+      <FounderPaymentsPanel campaignId={d.campaignId} onError={onError} />
+
       {recon ? (
         <ReconciliationPanel
           campaignId={d.campaignId}
@@ -328,6 +339,252 @@ function EarningsPanel({
           ))}
         </ul>
       )}
+    </Card>
+  );
+}
+
+/**
+ * The §22.3 Founder payment queue (Phase 19b): the W-9 (request → receipt →
+ * decision), the schedule with each payment's named blockers, and the
+ * evidence-gated early release. Every amount and status is the ONE server
+ * resolver's — the same view the Founder reads (§33.8.13). Nothing here
+ * computes an amount.
+ */
+function FounderPaymentsPanel({
+  campaignId,
+  onError,
+}: {
+  campaignId: string;
+  onError: (message: string | null) => void;
+}) {
+  const [state, setState] = useState<AdminFounderPaymentState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [receiptRef, setReceiptRef] = useState('');
+  const [w9Note, setW9Note] = useState('');
+  const [checksNote, setChecksNote] = useState('');
+  const [approvedBy, setApprovedBy] = useState('');
+  const [decisionReason, setDecisionReason] = useState('');
+  const [evidence, setEvidence] = useState<Record<string, { recorded: boolean; detail: string }>>({});
+
+  const load = useCallback(async () => {
+    try {
+      setState(await fetchFounderPaymentQueue(campaignId));
+    } catch (err) {
+      onError(errorText(err, 'The Founder payment status could not be read.'));
+    }
+  }, [campaignId, onError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!state) return null;
+  const s = state.status;
+
+  const act = async (work: () => Promise<unknown>) => {
+    setBusy(true);
+    onError(null);
+    try {
+      await work();
+      await load();
+    } catch (err) {
+      onError(errorText(err, 'The Founder payment action could not be recorded.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!s.applicable) {
+    return (
+      <Card>
+        <h2>Founder payment (§22.3)</h2>
+        <p>{s.notApplicableReason}</p>
+      </Card>
+    );
+  }
+
+  const factsComplete = state.evidenceFacts.every(
+    (f) => evidence[f.key]?.detail?.trim(),
+  );
+
+  return (
+    <Card>
+      <h2>Founder payment (§22.3)</h2>
+
+      {/* ── The W-9 machine ────────────────────────────────────────────────── */}
+      <p>
+        <Tag variant={s.w9.state === 'verified' ? 'mint' : 'default'}>
+          W-9 {s.w9.state === 'not_requested' ? 'not requested' : s.w9.state}
+        </Tag>{' '}
+        {s.w9.line}
+        {s.w9.returnReason ? ` Returned: ${s.w9.returnReason}` : ''}
+      </p>
+      {s.w9.state === 'not_requested' ? (
+        <Button disabled={busy} onClick={() => void act(() => requestW9(campaignId))}>
+          Request W-9
+        </Button>
+      ) : null}
+      {s.w9.state === 'requested' ? (
+        <>
+          <Field label="Where the received form is kept (never a tax number)">
+            <Input value={receiptRef} onChange={(e) => setReceiptRef(e.currentTarget.value)} />
+          </Field>
+          <Button
+            disabled={busy || !receiptRef.trim()}
+            onClick={() => void act(() => recordW9Receipt(campaignId, receiptRef))}
+          >
+            Record W-9 receipt
+          </Button>
+        </>
+      ) : null}
+      {s.w9.state === 'submitted' ? (
+        <>
+          <Field label="Verification note / return reason">
+            <Input value={w9Note} onChange={(e) => setW9Note(e.currentTarget.value)} />
+          </Field>
+          <Button
+            disabled={busy}
+            onClick={() => void act(() => decideW9(campaignId, 'verified', w9Note))}
+          >
+            Verify W-9
+          </Button>{' '}
+          <Button
+            tier="tertiary"
+            disabled={busy || !w9Note.trim()}
+            onClick={() => void act(() => decideW9(campaignId, 'resubmission_required', w9Note))}
+          >
+            Return for resubmission
+          </Button>
+        </>
+      ) : null}
+
+      {/* ── The eligible share and the schedule ────────────────────────────── */}
+      <p>
+        Eligible Founder share: <strong>{usd(s.eligibleShare.amountCents)}</strong>
+        {s.eligibleShare.exact ? '' : ' at minimum'}. {s.eligibleShare.note}
+      </p>
+      <ul className="ops-thread">
+        {s.payments.map((p) => (
+          <li key={p.kind}>
+            <strong>{p.label}</strong> — {usd(p.amountCents)} ({p.percent}%), due{' '}
+            {when(p.dueAt)}: <Tag variant={p.status === 'released' ? 'mint' : 'default'}>{p.status}</Tag>
+            {p.releasedEarly ? ' (early, on recorded evidence)' : ''}
+            {p.status === 'blocked' && p.blockers.length > 0 ? (
+              <ul>
+                {p.blockers.map((blocker, index) => (
+                  <li key={index}>{blocker}</li>
+                ))}
+              </ul>
+            ) : null}
+            {p.status === 'blocked' ? (
+              <>
+                {p.kind === 'single_payment' ? (
+                  <>
+                    <Field label="Payment/risk checks (recorded judgement, §22.3)">
+                      <Input value={checksNote} onChange={(e) => setChecksNote(e.currentTarget.value)} />
+                    </Field>
+                    <Field label="Approved by (named Admin)">
+                      <Input value={approvedBy} onChange={(e) => setApprovedBy(e.currentTarget.value)} />
+                    </Field>
+                  </>
+                ) : null}
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() =>
+                      createFounderPayment(campaignId, {
+                        kind: p.kind,
+                        ...(p.kind === 'single_payment'
+                          ? { checksNote, approvedBy }
+                          : {}),
+                      }),
+                    )
+                  }
+                >
+                  Record {p.label} eligible
+                </Button>
+              </>
+            ) : null}
+            {p.status === 'eligible' ? (
+              <Button
+                disabled={busy}
+                onClick={() => void act(() => releaseFounderPayment(campaignId, p.kind))}
+              >
+                Release {p.label}
+              </Button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {s.day14 ? <p>{s.day14.line}</p> : null}
+
+      {/* ── Early release: evidence, then the request decision ─────────────── */}
+      {s.model === 'product' ? (
+        <details>
+          <summary>
+            Early remaining release{' '}
+            {s.earlyRelease?.settingEnabled ? '' : '(the §6 control is disabled)'}
+            {s.earlyRelease?.pendingRequest ? ' — a request is waiting' : ''}
+          </summary>
+          {state.requests.length > 0 ? (
+            <ul className="ops-thread">
+              {state.requests.map((r) => (
+                <li key={r.id}>
+                  {when(r.createdAt)} — {r.status}
+                  {r.decisionReason ? `: ${r.decisionReason}` : ''} — “{r.message}”
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No early-release request has been made.</p>
+          )}
+          <h3>Record the four §22.3 proofs</h3>
+          {s.earlyRelease?.evidence ? (
+            <p>
+              Latest evidence {when(s.earlyRelease.evidence.recordedAt)}:{' '}
+              {s.earlyRelease.evidence.missingFacts.length === 0
+                ? 'complete.'
+                : `missing ${s.earlyRelease.evidence.missingFacts.join(', ')}.`}
+            </p>
+          ) : null}
+          {state.evidenceFacts.map((fact) => (
+            <Field key={fact.key} label={`${fact.label}${fact.note ? ` — ${fact.note}` : ''}`}>
+              <Input
+                value={evidence[fact.key]?.detail ?? ''}
+                onChange={(e) =>
+                  setEvidence((prev) => ({
+                    ...prev,
+                    [fact.key]: { recorded: e.currentTarget.value.trim().length > 0, detail: e.currentTarget.value },
+                  }))
+                }
+              />
+            </Field>
+          ))}
+          <Button
+            disabled={busy || !factsComplete}
+            onClick={() => void act(() => recordEarlyEvidence(campaignId, evidence))}
+          >
+            Record evidence
+          </Button>
+          <Field label="Decision reason">
+            <Input value={decisionReason} onChange={(e) => setDecisionReason(e.currentTarget.value)} />
+          </Field>
+          <Button
+            disabled={busy || !decisionReason.trim() || !s.earlyRelease?.pendingRequest}
+            onClick={() => void act(() => decideEarlyRelease(campaignId, 'approved', decisionReason))}
+          >
+            Approve early release
+          </Button>{' '}
+          <Button
+            tier="tertiary"
+            disabled={busy || !decisionReason.trim() || !s.earlyRelease?.pendingRequest}
+            onClick={() => void act(() => decideEarlyRelease(campaignId, 'declined', decisionReason))}
+          >
+            Decline
+          </Button>
+          {s.earlyRelease ? <p>{s.earlyRelease.neverSkipsDay14}</p> : null}
+        </details>
+      ) : null}
     </Card>
   );
 }

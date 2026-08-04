@@ -48,6 +48,7 @@ import { sweepThresholdCrossings } from '../live/thresholds.js';
 import { sweepCampaignCloses } from '../close/close-batch.js';
 import { sweepRetryWindowEnds } from '../close/retry.js';
 import { sweepTransferRetries } from '../close/earnings.js';
+import { sweepFounderPaymentSchedule } from '../close/founder-payments.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -161,6 +162,18 @@ export const AFFILIATE_TRANSFER_RETRY_JOB = 'affiliate-transfer-retry';
 export const AFFILIATE_TRANSFER_RETRY_CRON = '*/15 * * * *';
 
 /**
+ * Phase 19b's §22.3 schedule sweep.
+ *
+ * Requests the W-9 wherever the close-batch hook missed it (a crash, or a
+ * retry-window campaign whose first capture arrived by webhook), and at each
+ * model's first payment day sends the §27.6 internal due notices, moves a
+ * still-unverified campaign to `captured_pending_w9`, and sends the W-9 block
+ * with the exact amount affected. Everything dedups; safe to run twice.
+ */
+export const FOUNDER_PAYMENT_SCHEDULE_JOB = 'founder-payment-schedule';
+export const FOUNDER_PAYMENT_SCHEDULE_CRON = '*/15 * * * *';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -219,6 +232,8 @@ export interface Scheduler {
   runCampaignCloseNow: () => Promise<void>;
   /** Runs the §33.8.4 Transfer retry sweep now. Used by tests and by Admin. */
   runTransferRetriesNow: () => Promise<void>;
+  /** Runs the §22.3 Founder payment schedule sweep now. */
+  runFounderPaymentScheduleNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -498,6 +513,29 @@ export async function startScheduler({
     tz: 'UTC',
   });
 
+  /* ── Phase 19b's §22.3 Founder payment schedule ─────────────────────────── */
+
+  await boss.createQueue(FOUNDER_PAYMENT_SCHEDULE_JOB);
+  await boss.work(FOUNDER_PAYMENT_SCHEDULE_JOB, async () => {
+    const result = await sweepFounderPaymentSchedule(
+      {
+        db,
+        audit,
+        ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
+      },
+      new Date(),
+    );
+    log('founder payment schedule sweep complete', {
+      w9Requested: result.w9Requested,
+      w9Blocked: result.w9Blocked,
+      moneyDecisionsDue: result.moneyDecisionsDue,
+      deliverableVerificationDue: result.deliverableVerificationDue,
+    });
+  });
+  await boss.schedule(FOUNDER_PAYMENT_SCHEDULE_JOB, FOUNDER_PAYMENT_SCHEDULE_CRON, undefined, {
+    tz: 'UTC',
+  });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -528,6 +566,9 @@ export async function startScheduler({
     },
     runTransferRetriesNow: async () => {
       await boss.send(AFFILIATE_TRANSFER_RETRY_JOB, {});
+    },
+    runFounderPaymentScheduleNow: async () => {
+      await boss.send(FOUNDER_PAYMENT_SCHEDULE_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

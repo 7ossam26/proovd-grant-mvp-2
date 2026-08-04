@@ -19,11 +19,185 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { Section, Measure } from '../../components/index.js';
+import { Button, Field, Measure, Section, Tag, Textarea } from '../../components/index.js';
 import { formatUsd } from '@proovd/shared';
-import { fetchCampaignResults, type FounderResultsView, FounderRequestError } from './api.js';
+import {
+  fetchCampaignResults,
+  fetchFounderPayments,
+  requestEarlyRemainingRelease,
+  type FounderResultsView,
+  type FounderPaymentStatusView,
+  FounderRequestError,
+} from './api.js';
 
 const usd = (cents: string): string => formatUsd(BigInt(cents));
+
+/**
+ * §22.3's Founder payment status (Phase 19b) — rendered from the ONE server
+ * resolver, never recomputed here (§33.8.13). It answers §22.3's list: the
+ * exact amount affected, the requirement or blocker by name, the secure
+ * action, the submitted/verified W-9 state, the next review date, and `No
+ * action needed` while under review. Status words are `eligible`, `blocked`,
+ * or `released` — never a fourth.
+ */
+function FounderPaymentsPanel({ campaignId }: { campaignId: string }) {
+  const [view, setView] = useState<FounderPaymentStatusView | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [message, setMessage] = useState('');
+  const [requestState, setRequestState] = useState<'idle' | 'sending' | 'sent' | 'refused'>('idle');
+  const [refusal, setRefusal] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { payments } = await fetchFounderPayments(campaignId);
+        if (!cancelled) setView(payments);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId]);
+
+  if (failed) {
+    return (
+      <>
+        <h2 className="h3">Your payment</h2>
+        <p>Your payment status could not be loaded. Nothing has changed — reload to try again.</p>
+      </>
+    );
+  }
+  if (!view) return null;
+  if (!view.applicable) {
+    return (
+      <>
+        <h2 className="h3">Your payment</h2>
+        <p>{view.notApplicableReason}</p>
+      </>
+    );
+  }
+
+  const remaining = view.payments.find((p) => p.kind === 'remaining_payment');
+  const first = view.payments.find((p) => p.kind === 'first_payment');
+  const canAskEarly =
+    view.model === 'product' &&
+    remaining?.status !== 'released' &&
+    first?.status === 'released' &&
+    !view.earlyRelease?.pendingRequest &&
+    requestState !== 'sent';
+
+  async function submitRequest() {
+    setRequestState('sending');
+    try {
+      await requestEarlyRemainingRelease(campaignId, message);
+      setRequestState('sent');
+    } catch (error) {
+      setRequestState('refused');
+      setRefusal(
+        error instanceof FounderRequestError
+          ? `${error.detail.whatHappened ?? error.detail.title} ${error.detail.next ?? ''}`.trim()
+          : 'The request could not be recorded. Nothing has changed — try again.',
+      );
+    }
+  }
+
+  return (
+    <>
+      <h2 className="h3">Your payment</h2>
+
+      {/* ── The W-9: requirement, state, and the secure action (§22.3) ─────── */}
+      <p>
+        <Tag variant={view.w9.state === 'verified' ? 'mint' : 'default'}>
+          {view.w9.state === 'not_requested'
+            ? 'W-9 not requested yet'
+            : `W-9 ${view.w9.state}`}
+        </Tag>
+      </p>
+      <p>{view.w9.line}</p>
+      <p>
+        <strong>{view.w9.action}</strong>
+      </p>
+
+      {/* ── The eligible share, with what it is made of ────────────────────── */}
+      <p>
+        Eligible Founder share: <strong>{usd(view.eligibleShare.amountCents)}</strong>
+        {view.eligibleShare.exact ? '' : ' at minimum'}. {view.eligibleShare.note}
+      </p>
+
+      {/* ── Each scheduled payment: amount, status, named blockers ─────────── */}
+      <ul>
+        {view.payments.map((p) => (
+          <li key={p.kind}>
+            <strong>{p.label}</strong> — {usd(p.amountCents)}
+            {p.amountExact ? '' : ' at minimum'} ({p.percent}%), due{' '}
+            {p.dueAt.slice(0, 10)}:{' '}
+            <Tag
+              variant={
+                p.status === 'released' ? 'mint' : p.status === 'eligible' ? 'sage' : 'default'
+              }
+            >
+              {p.status}
+            </Tag>
+            {p.status === 'released' && p.releasedAt ? ` on ${p.releasedAt.slice(0, 10)}` : ''}
+            {p.releasedEarly ? ' (released early on recorded evidence)' : ''}
+            {p.status === 'blocked' && p.blockers.length > 0 ? (
+              <ul>
+                {p.blockers.map((blocker, index) => (
+                  <li key={index}>{blocker}</li>
+                ))}
+              </ul>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+
+      {view.nextReviewDate ? <p>Next review date: {view.nextReviewDate.slice(0, 10)}.</p> : null}
+      {view.day14 ? <p className="backer__recovery-note">{view.day14.line}</p> : null}
+
+      {/* ── The early remaining release ask (§22.3) ────────────────────────── */}
+      {view.earlyRelease?.pendingRequest ? (
+        <p>
+          Your early-release request from{' '}
+          {view.earlyRelease.pendingRequest.createdAt.slice(0, 10)} is being reviewed against
+          recorded delivery, communication, tax, and risk evidence. You will receive the decision
+          with its reason. No action needed.
+        </p>
+      ) : null}
+      {requestState === 'sent' ? (
+        <p>
+          Your early-release request was received. Proovd decides it on recorded evidence and you
+          will get the decision with its reason. No action needed.
+        </p>
+      ) : canAskEarly ? (
+        <>
+          <Field label="Ask for the remaining payment early">
+            <Textarea
+              value={message}
+              onChange={(event) => setMessage(event.currentTarget.value)}
+              rows={3}
+              placeholder="What can affected backers already reach, and what did you send them?"
+            />
+          </Field>
+          <p className="field-hint">
+            Early release needs recorded proof that the promised reward or access is actually
+            available to affected backers — internal readiness alone is not enough — and it does not
+            skip the Day 14 status review.
+          </p>
+          <Button
+            onClick={() => void submitRequest()}
+            disabled={requestState === 'sending' || message.trim().length === 0}
+          >
+            {requestState === 'sending' ? 'Sending…' : 'Request early release'}
+          </Button>
+          {requestState === 'refused' ? <p role="alert">{refusal}</p> : null}
+        </>
+      ) : null}
+    </>
+  );
+}
 
 type State =
   | { status: 'loading' }
@@ -102,6 +276,11 @@ export function CampaignResults() {
             Owner: {r.preparing!.owner}. Questions without losing context:{' '}
             <a href="mailto:support@proovd.co">support@proovd.co</a>.
           </p>
+
+          {/* §22.3: the W-9 is requested immediately after close, so the
+              payment status renders here too — before results are ready. */}
+          <FounderPaymentsPanel campaignId={r.campaignId} />
+
           <p>
             <Link to={`/campaigns/${r.campaignId}/home`}>Back to your campaign</Link>
           </p>
@@ -253,6 +432,9 @@ export function CampaignResults() {
             ))}
           </ul>
         ) : null}
+
+        {/* ── §22.3: your payment — one source, many renderers (§33.8.13) ─── */}
+        <FounderPaymentsPanel campaignId={r.campaignId} />
 
         <p>
           <Link to={`/campaigns/${r.campaignId}/home`}>Back to your campaign</Link>

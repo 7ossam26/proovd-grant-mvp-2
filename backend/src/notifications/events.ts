@@ -234,6 +234,41 @@ export const AFFILIATE_TRANSFER_FAILURE = 'affiliate_transfer_failure' as const;
 export const AFFILIATE_PAYOUT_PAID = 'affiliate_payout_paid' as const;
 export const AFFILIATE_PAYOUT_FAILED = 'affiliate_payout_failed' as const;
 
+/*
+ * Phase 19b — the Founder money messages (§22.3, §27.3, §27.6), sent by
+ * `close/founder-payment-notifications.ts`.
+ *
+ * §27.3 — the W-9 prompt, deduped per W-9 EVENT row (a recorded resubmission
+ * request is a genuinely new message; a retry of the same request is not);
+ * the W-9 block, once per campaign (§33.8.9's message, with the exact amount
+ * affected); the three release notices, each deduped on the singular payment
+ * row (§33.8.10); the early-release request acknowledgement and its result,
+ * each deduped on the request row.
+ *
+ * §27.6 — `internal_money_decisions_due` and
+ * `internal_deliverable_verification_due`, deliberately UNSENT in 19a because
+ * no §6 setting fixed a due time. The §22.3 schedule objects fix it — the
+ * model's first payment day — so the schedule sweep sends both now, once per
+ * campaign.
+ *
+ * `founder_payment_blocked` remains deliberately unsent: every §22.3 block
+ * this phase can detect is the W-9 (its own key above) or a checks/risk
+ * judgement whose records are Phase 20's cause-based machinery. A key sent on
+ * no detectable trigger claims a message the product does not send (§1.4).
+ * `founder_day_14_review_result` is Phase 21's — the review itself is out of
+ * scope here (§22.4).
+ */
+export const FOUNDER_W9_PROMPT = 'founder_w9_prompt' as const;
+export const FOUNDER_W9_BLOCK = 'founder_w9_block' as const;
+export const FOUNDER_SINGLE_PAYMENT_RELEASED = 'founder_single_payment_released' as const;
+export const FOUNDER_FIRST_PAYMENT_RELEASED = 'founder_first_payment_released' as const;
+export const FOUNDER_REMAINING_PAYMENT_RELEASED = 'founder_remaining_payment_released' as const;
+export const FOUNDER_EARLY_REMAINING_REQUEST = 'founder_early_remaining_request' as const;
+export const FOUNDER_EARLY_REMAINING_RESULT = 'founder_early_remaining_result' as const;
+export const INTERNAL_MONEY_DECISIONS_DUE = 'internal_money_decisions_due' as const;
+export const INTERNAL_DELIVERABLE_VERIFICATION_DUE =
+  'internal_deliverable_verification_due' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -285,6 +320,15 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   AFFILIATE_TRANSFER_FAILURE,
   AFFILIATE_PAYOUT_PAID,
   AFFILIATE_PAYOUT_FAILED,
+  FOUNDER_W9_PROMPT,
+  FOUNDER_W9_BLOCK,
+  FOUNDER_SINGLE_PAYMENT_RELEASED,
+  FOUNDER_FIRST_PAYMENT_RELEASED,
+  FOUNDER_REMAINING_PAYMENT_RELEASED,
+  FOUNDER_EARLY_REMAINING_REQUEST,
+  FOUNDER_EARLY_REMAINING_RESULT,
+  INTERNAL_MONEY_DECISIONS_DUE,
+  INTERNAL_DELIVERABLE_VERIFICATION_DUE,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

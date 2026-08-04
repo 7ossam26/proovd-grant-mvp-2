@@ -34,7 +34,7 @@ Fourteen named tests is more than one session — more than Phase 12's thirteen,
 | Half | Scope | Acceptance | State |
 |---|---|---|---|
 | **19a** | §22.1 completion verification and the five fixed-payment outcomes, earnings finalization and the B.7 states, the one idempotent Transfer with its synchronous-failure retry, the §24.4 provisional/earned reconciliation with the unearned return, the §11 tax gate on every Transfer, and the §22.2 thank-you | **§33.8.1–§33.8.8, §33.8.14**, the tax-gate done-when | **built** |
-| **19b** | §22.3 W-9 request/verification and the block, the Idea single payment, the Product 40%/60% schedule, evidence-gated early release that never skips Day 14, and the money surface consistency pass | **§33.8.9–§33.8.13** | next session |
+| **19b** | §22.3 W-9 request/verification and the block, the Idea single payment, the Product 40%/60% schedule, evidence-gated early release that never skips Day 14, and the money surface consistency pass | **§33.8.9–§33.8.13** | **built** |
 
 19a writes no Founder payment object and no W-9 record. 19b reads 19a's finalized amounts rather than recomputing them.
 

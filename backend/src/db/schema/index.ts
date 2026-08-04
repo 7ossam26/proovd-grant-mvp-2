@@ -97,3 +97,9 @@ export * from './close.js';
 // record, and §22.2's recognition-or-payment thank-you with no path to a
 // campaign balance.
 export * from './earnings.js';
+// Phase 19b: §22.3 — the one-per-campaign Founder W-9 record with its
+// append-only events and no column that can take a TIN, the §22.3 payment
+// objects (one per campaign/kind, refusing to exist without a verified W-9),
+// the four-proof early-release evidence, and the Founder's early-release
+// request an Admin decides.
+export * from './founder-payments.js';
