@@ -32,6 +32,17 @@ export interface BackerTransaction {
     deadlineIso: string;
     available: boolean;
   } | null;
+  /**
+   * The §24.8 refund states (§33.9.2, Phase 20a): the exact Appendix B.6 body
+   * per refund of this pre-order — amount, destination, start date, typical
+   * bank timing as a range, status, and the quotable reference.
+   */
+  refunds: Array<{
+    reference: string;
+    status: 'submitted' | 'succeeded' | 'failed';
+    body: string;
+    action: string;
+  }>;
 }
 
 export interface BackerPageData {

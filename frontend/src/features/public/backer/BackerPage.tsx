@@ -191,6 +191,18 @@ function BackerTransactionRow({
           {...(createPaymentMethodFn ? { createPaymentMethodFn } : {})}
         />
       ) : null}
+      {(tx.refunds ?? []).map((refund) => (
+        // Appendix B.6 as a surface: the exact body the email carried, with
+        // its one action — get help without losing context (§27.1). No
+        // competing action shares the block (§30).
+        <div className="backer__recovery" key={refund.reference} aria-live="polite">
+          <p className="backer__recovery-body">{refund.body}</p>
+          <p className="backer__recovery-note">
+            <a href="mailto:support@proovd.co">{refund.action}</a> — quote reference{' '}
+            {refund.reference} and we will have everything in front of us.
+          </p>
+        </div>
+      ))}
     </li>
   );
 }

@@ -279,3 +279,56 @@ describe('§33.7.9 — the B.5 update-card recovery state', () => {
     expect(screen.queryByRole('button', { name: 'Update card' })).not.toBeInTheDocument();
   });
 });
+
+describe('§33.9.2 — the B.6 refund state (Phase 20a)', () => {
+  it('renders the exact B.6 block with its one help action and the quotable reference', async () => {
+    const B6_BODY = [
+      'Refund started — US$27.00',
+      '',
+      'Sent to: your original payment method',
+      'Started: August 4, 2026 (UTC)',
+      'Typical bank timing: 5–10 business days, typically',
+      'Status: SUCCEEDED',
+      'Reference: RF-7K2M9-Q4WPX',
+    ].join('\n');
+    stubFetch(() => ({
+      status: 200,
+      body: {
+        ...PAGE,
+        transactions: [
+          {
+            ...PAGE.transactions[0],
+            status: 'refunded',
+            statusLabel: 'Refunded',
+            chargeOccurred: true,
+            notChargedYet: false,
+            canCancel: false,
+            refunds: [
+              {
+                reference: 'RF-7K2M9-Q4WPX',
+                status: 'succeeded',
+                body: B6_BODY,
+                action: 'View pre-order or get help',
+              },
+            ],
+          },
+        ],
+      },
+    }));
+
+    renderAt('validtoken123');
+
+    // The B.6 body renders whole — amount, destination, typical timing as a
+    // range (never a promised date), status, and the reference.
+    expect(await screen.findByText(/Refund started — US\$27\.00/)).toBeInTheDocument();
+    const block = screen.getByText(/Refund started — US\$27\.00/);
+    expect(block.textContent).toContain('Typical bank timing: 5–10 business days, typically');
+    expect(block.textContent).toContain('Status: SUCCEEDED');
+    expect(block.textContent).toContain('Reference: RF-7K2M9-Q4WPX');
+    // B.6's one action — help without losing context, and nothing competing.
+    expect(
+      screen.getByRole('link', { name: 'View pre-order or get help' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Update card' })).not.toBeInTheDocument();
+  });
+});

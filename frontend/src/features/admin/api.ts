@@ -1573,3 +1573,91 @@ export const releaseFounderPayment = (
     method: 'POST',
     body: JSON.stringify({}),
   });
+
+/* ── Phase 20a: refunds and §24.8 cause allocation ─────────────────────────── */
+
+export interface RefundCaseState {
+  refundId: string;
+  reference: string;
+  reservationId: string;
+  campaignId: string;
+  status: 'requested' | 'submitted' | 'succeeded' | 'failed';
+  amountCents: string;
+  ideaExceptionReason: string | null;
+  cause: string;
+  affiliateTreatment: string;
+  proovdFeeTreatment: string;
+  affiliateInvalidCents: string | null;
+  founderLiabilityCents: string;
+  evidence: string;
+  mandate: string | null;
+  recoveryNote: string | null;
+  decidedBy: string;
+  failureMessage: string | null;
+  providerRefundId: string | null;
+  createdAt: string;
+}
+
+export interface RefundQueueState {
+  cases: RefundCaseState[];
+  unreconciled: Array<{
+    providerRefundId: string;
+    reservationId: string | null;
+    campaignId: string | null;
+    amountCents: string | null;
+    status: string | null;
+    recordedAt: string;
+  }>;
+  bestEffortRecovery: string;
+  causes: Array<{
+    key: string;
+    label: string;
+    allocation: string;
+    permittedAffiliateTreatments: string[];
+    requiresMandate: boolean;
+  }>;
+  ideaExceptions: Array<{ key: string; label: string }>;
+  proovdFeeTreatments: string[];
+}
+
+export const fetchRefundQueue = (campaignId?: string): Promise<RefundQueueState> =>
+  call<RefundQueueState>(
+    `/api/admin/refunds${campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : ''}`,
+  );
+
+export interface RecordRefundCaseBody {
+  reservationId: string;
+  cause: string;
+  affiliateTreatment: string;
+  proovdFeeTreatment: string;
+  affiliateInvalidCents?: string | null;
+  founderLiabilityCents: string;
+  evidence: string;
+  recoveryNote?: string | null;
+  mandate?: string | null;
+  amountCents: string;
+  ideaExceptionReason?: string | null;
+  providerRefundId?: string | null;
+}
+
+export const recordRefundCase = (
+  body: RecordRefundCaseBody,
+): Promise<{ refund: { id: string; reference: string; status: string }; allocationId: string }> =>
+  call('/api/admin/refunds/case', { method: 'POST', body: JSON.stringify(body) });
+
+export const previewRefund = (
+  refundId: string,
+): Promise<{ previewId: string; consequences: Array<{ audience: string; text: string }>; expiresAt: string }> =>
+  call(`/api/admin/refunds/${encodeURIComponent(refundId)}/preview`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const executeRefund = (
+  refundId: string,
+  previewId: string,
+): Promise<{ status: string; refund?: { id: string; reference: string; status: string } }> =>
+  call(`/api/admin/refunds/${encodeURIComponent(refundId)}/execute`, {
+    method: 'POST',
+    body: JSON.stringify({ previewId }),
+  });

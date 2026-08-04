@@ -68,6 +68,11 @@ import {
   notifyRetrySuccess,
   type CloseNotificationDeps,
 } from '../close/notifications.js';
+import {
+  applyConnectChargeRefunded,
+  applyPlatformChargeRefunded,
+  type RefundDeps,
+} from '../refunds/service.js';
 
 export const STRIPE_PROVIDER = 'stripe';
 
@@ -100,11 +105,17 @@ export type EventHandler = (
  * recorded-and-ignored until a sender exists:
  *
  *   Phase 18 — payment_intent.succeeded, payment_intent.payment_failed
- *   Phase 20 — charge.refunded, charge.dispute.created/updated/closed
+ *   Phase 20b — charge.dispute.created/updated/closed
+ *
+ * Phase 20a registered `charge.refunded`: on the platform endpoint it belongs
+ * to the listing stream, whose refund Phase 11 confirms synchronously — so the
+ * handler reconciles rather than applies, and an unknown refund is recorded
+ * and routed to Admin (§1 rule 6).
  */
 export const PLATFORM_HANDLERS: Record<string, EventHandler> = {
   'checkout.session.completed': handleCheckoutCompleted,
   'checkout.session.expired': handleCheckoutExpired,
+  'charge.refunded': handlePlatformChargeRefunded,
 };
 
 /**
@@ -115,13 +126,23 @@ export const PLATFORM_HANDLERS: Record<string, EventHandler> = {
  *
  *   Phase 15 — setup_intent.*, payment_method.detached
  *   Phase 18 — payment_intent.*
- *   Phase 20 — charge.refunded, charge.dispute.*, transfer.reversed
+ *   Phase 20b — charge.dispute.*, transfer.reversed
  *
  * Phase 19a registered `payout.paid`/`payout.failed` — Appendix B.7's tail.
  * `transfer.created`/`transfer.updated` stay recorded-and-ignored: the §22.1
  * Transfer is created by Proovd's own synchronous API call and stored under
  * §32.4 at creation, a creation failure is a synchronous error with NO
- * `transfer.failed` webhook (§32.3), and the reversal is Phase 20's §24.8.
+ * `transfer.failed` webhook (§32.3), and the reversal is Phase 20b's — it
+ * pairs with the dispute/enforcement recovery operations, and 20a's
+ * contractual recovery RECORD needs no provider leg (§24.9: best-effort).
+ *
+ * Phase 20a registered `charge.refunded` — §24.1's direct charges mean a
+ * campaign refund lives on the Founder's account, so its confirmations arrive
+ * HERE. The handler either confirms a refund Proovd recorded (by provider
+ * refund id, through the same applier the execute path uses — a duplicate
+ * delivery matches nothing, §33.7.7) or records a Founder-issued refund
+ * (§24.10 lets the MoR issue one) and routes it to Admin for its §24.8
+ * classification, never guessing one into place (§1 rule 6).
  *
  * `account.application.deauthorized` is registered because it is not a future
  * phase's: it means the account is gone *now*, and silently continuing to treat
@@ -142,6 +163,7 @@ export const CONNECT_HANDLERS: Record<string, EventHandler> = {
   'payment_intent.canceled': handlePaymentIntentCanceled,
   'payout.paid': handlePayoutPaid,
   'payout.failed': handlePayoutFailed,
+  'charge.refunded': handleConnectChargeRefunded,
 };
 
 export function handlersFor(endpoint: WebhookEndpoint): Record<string, EventHandler> {
@@ -820,6 +842,40 @@ async function handlePayoutFailed(
   event: VerifiedStripeEvent,
 ): Promise<void> {
   await applyPayoutDelivery(context, event, 'failed');
+}
+
+/* ── Phase 20a: the refund confirmations (§24.8, §32.3) ────────────────────── */
+
+function refundDeps(context: HandlerContext): RefundDeps {
+  return {
+    db: context.db,
+    gateway: context.gateway,
+    audit: context.audit,
+    notifier: context.notifier,
+    context: context.notificationContext,
+    tokens: context.tokens,
+  };
+}
+
+async function handleConnectChargeRefunded(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyConnectChargeRefunded(refundDeps(context), {
+    id: event.id,
+    object: event.object,
+    account: event.account ?? null,
+  });
+}
+
+async function handlePlatformChargeRefunded(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyPlatformChargeRefunded(refundDeps(context), {
+    id: event.id,
+    object: event.object,
+  });
 }
 
 /**

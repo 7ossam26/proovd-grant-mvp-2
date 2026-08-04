@@ -43,6 +43,11 @@ import {
   relationshipTouches,
 } from '../db/schema/support.js';
 import { campaignUpdates } from '../db/schema/updates.js';
+import {
+  refundCauseAllocations,
+  reservationRefunds,
+  reservationRefundEvents,
+} from '../db/schema/refunds.js';
 import { RELATIONSHIP_TOUCH_KINDS, type TimelineKind } from './logic.js';
 
 export type TimelineSubject = 'campaign' | 'reservation' | 'association';
@@ -351,6 +356,51 @@ export async function readTimeline(
         composedFrom: 'relationship_touches',
         detail: { note: row.note },
       });
+    }
+  }
+
+  /* ── §24.8 refunds and cause allocation (Phase 20a) ──────────────────────── */
+
+  if (campaignId || subject === 'reservation') {
+    const rows = await db
+      .select({
+        refund: reservationRefunds,
+        allocation: refundCauseAllocations,
+      })
+      .from(reservationRefunds)
+      .innerJoin(
+        refundCauseAllocations,
+        eq(refundCauseAllocations.id, reservationRefunds.allocationId),
+      )
+      .where(
+        subject === 'reservation'
+          ? eq(reservationRefunds.reservationId, subjectId)
+          : eq(reservationRefunds.campaignId, campaignId!),
+      );
+    sourcesRead.push('reservation_refunds');
+    sourcesRead.push('refund_cause_allocations');
+    for (const { refund, allocation } of rows) {
+      const events = await db
+        .select()
+        .from(reservationRefundEvents)
+        .where(eq(reservationRefundEvents.refundId, refund.id));
+      for (const event of events) {
+        entries.push({
+          kind: 'refund',
+          occurredAt: event.occurredAt.toISOString(),
+          summary:
+            event.toStatus === 'requested'
+              ? `Refund ${refund.reference} recorded (${allocation.cause}, US$${(Number(refund.amountCents) / 100).toFixed(2)})`
+              : `Refund ${refund.reference} ${event.toStatus}`,
+          actor: event.actor,
+          composedFrom: 'reservation_refunds, refund_cause_allocations',
+          detail: {
+            cause: allocation.cause,
+            affiliateTreatment: allocation.affiliateTreatment,
+            proovdFeeTreatment: allocation.proovdFeeTreatment,
+          },
+        });
+      }
     }
   }
 

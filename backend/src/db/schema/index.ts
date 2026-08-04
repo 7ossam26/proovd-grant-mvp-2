@@ -103,3 +103,8 @@ export * from './earnings.js';
 // the four-proof early-release evidence, and the Founder's early-release
 // request an Admin decides.
 export * from './founder-payments.js';
+// Phase 20a: §24.8 — the insert-only cause allocation (the cause/treatment
+// matrix is a CHECK; 19b's adjustments term sums founder_liability_cents), the
+// reservation refund with its requested/submitted/succeeded/failed lifecycle
+// claimed before the provider call, and its append-only events.
+export * from './refunds.js';

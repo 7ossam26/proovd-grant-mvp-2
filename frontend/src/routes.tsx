@@ -34,6 +34,7 @@ import { RiskPanelPage } from './features/admin/RiskPanel.js';
 import { SupportQueuePage } from './features/admin/SupportQueue.js';
 import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
 import { CloseOperationsPage } from './features/admin/CloseOperations.js';
+import { RefundsPage } from './features/admin/Refunds.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -156,6 +157,10 @@ const rootChildren: RouteObject[] = [
       // reconciliation and results preparation, scoped per campaign by query
       // string like the panels above.
       { path: 'close', element: <CloseOperationsPage /> },
+      // Phase 20a (§24.8, §24.9). Refund cases with their cause allocation,
+      // the Founder-issued provider refunds awaiting classification, and the
+      // preview-then-execute machine — campaign-scoped by query string.
+      { path: 'refunds', element: <RefundsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],

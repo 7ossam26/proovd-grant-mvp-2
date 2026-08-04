@@ -50,6 +50,7 @@ import {
   type ThankYouRecord,
 } from '../db/schema/earnings.js';
 import { creatorPaymentAllocations, creatorPaymentFundingAttempts } from '../db/schema/creator-payment.js';
+import { refundCauseAllocations } from '../db/schema/refunds.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import { associationCompensationAgreements, creatorBonuses } from '../db/schema/decisions.js';
 import { idempotencyKeys } from '../db/schema/integrity.js';
@@ -514,6 +515,115 @@ async function applyDisqualificationAdjustment(
   });
 }
 
+/* ── §24.8's post-finalization Affiliate treatments (Phase 20a) ────────────── */
+
+export type CauseAdjustmentOutcome =
+  | { status: 'adjusted'; recoveryRecordId: string | null }
+  | { status: 'already_adjusted' }
+  | { status: 'not_finalized' };
+
+/**
+ * §24.8's two post-finalization Affiliate treatments, applied through the ONE
+ * earnings state machine rather than a second writer: `cancel_unpaid_invalid`
+ * (finalized, not yet transferred) moves the earnings to `adjusted` with the
+ * invalid amount named; `contractual_recovery` (already transferred)
+ * additionally records the negative balance — the recovery record IS the
+ * negative balance (19a's rule) — carrying ONLY the invalid amount, never the
+ * whole Transfer (§33.9.4). The finalized amounts themselves stay immutable by
+ * trigger; the adjustment is its own recorded act (§22.1).
+ *
+ * Idempotent through the conditional state move: `adjusted` is terminal, so a
+ * second call finds it and changes nothing.
+ */
+export async function applyCauseBasedAffiliateAdjustment(
+  deps: EarningsDeps,
+  input: {
+    associationId: string;
+    campaignId: string;
+    treatment: 'cancel_unpaid_invalid' | 'contractual_recovery';
+    invalidCents: bigint;
+    /** The §24.8 allocation record this adjustment executes. */
+    allocationId: string;
+    reason: string;
+    actor: string;
+    now?: Date;
+  },
+): Promise<CauseAdjustmentOutcome> {
+  const now = input.now ?? new Date();
+
+  const [earnings] = await deps.db
+    .select()
+    .from(creatorEarnings)
+    .where(eq(creatorEarnings.associationId, input.associationId))
+    .limit(1);
+  if (!earnings) return { status: 'not_finalized' };
+  if (earnings.state === 'adjusted') return { status: 'already_adjusted' };
+
+  const [transfer] =
+    input.treatment === 'contractual_recovery'
+      ? await deps.db
+          .select()
+          .from(affiliateTransfers)
+          .where(
+            and(
+              eq(affiliateTransfers.associationId, input.associationId),
+              eq(affiliateTransfers.status, 'created'),
+            ),
+          )
+          .limit(1)
+      : [undefined];
+
+  let recoveryRecordId: string | null = null;
+  const moved = await deps.db.transaction(async (tx) => {
+    const ok = await moveEarningsState(
+      tx,
+      earnings,
+      'adjusted',
+      input.actor,
+      `§24.8 ${input.treatment}: ${input.reason}`,
+      now,
+      { adjustedReason: input.reason, adjustedBy: input.actor, adjustedAt: now },
+    );
+    if (!ok) return false;
+
+    if (input.treatment === 'contractual_recovery') {
+      const [record] = await tx
+        .insert(contractualRecoveryRecords)
+        .values({
+          associationId: input.associationId,
+          campaignId: input.campaignId,
+          earningsId: earnings.id,
+          transferId: transfer?.id ?? null,
+          amountCents: input.invalidCents,
+          reason: `§24.8 contractual recovery (allocation ${input.allocationId}): ${input.reason}`,
+          createdBy: input.actor,
+          createdAt: now,
+        })
+        .returning({ id: contractualRecoveryRecords.id });
+      recoveryRecordId = record?.id ?? null;
+    }
+    return true;
+  });
+  if (!moved) return { status: 'already_adjusted' };
+
+  await deps.audit({
+    action: 'earnings.cause_adjusted',
+    targetType: 'campaign_affiliate_association',
+    targetId: input.associationId,
+    internalReason:
+      `§24.8 ${input.treatment} under allocation ${input.allocationId}: invalid ` +
+      `US$${(Number(input.invalidCents) / 100).toFixed(2)}${
+        input.treatment === 'contractual_recovery'
+          ? ' — negative balance and contractual recovery recorded; execution is best-effort (§24.9)'
+          : ' — unpaid invalid amount canceled'
+      }`,
+    newValue: { allocationId: input.allocationId, recoveryRecordId },
+    actorId: input.actor,
+  });
+
+  return { status: 'adjusted', recoveryRecordId };
+}
+
 /* ── §22.1/§24.4: finalization (§33.8.1, §33.8.2, §33.8.5–7) ───────────────── */
 
 export type FinalizeEarningsOutcome =
@@ -578,10 +688,13 @@ export async function finalizeCreatorEarnings(
   const ceilingSetting = await readSettingValue(deps.db, 'affiliate_percentage_ceiling');
   const ceilingPercent = typeof ceilingSetting === 'number' ? ceilingSetting : 50;
 
-  // The ledger rows this Creator's percentages apply to: captured charges
-  // attributed to this association. `validlyAttributed` is the §18
-  // verification result — an unverified or blocked attribution earns nothing
-  // and its whole provisional amount returns (§22.1 "validly attributed").
+  // The ledger rows this Creator's percentages apply to: ever-captured charges
+  // attributed to this association — `refunded`/`reversed`/`disputed` are only
+  // reachable FROM `captured` (§23.5), and their provisional amounts were
+  // written at capture, so dropping them here would leave the campaign's
+  // §24.4 identity unresolvable. `validlyAttributed` is the §18 verification
+  // result — an unverified or blocked attribution earns nothing and its whole
+  // provisional amount returns (§22.1 "validly attributed").
   const rows = await deps.db
     .select({
       id: reservations.id,
@@ -595,19 +708,52 @@ export async function finalizeCreatorEarnings(
       and(
         eq(reservations.campaignId, context.campaignId),
         eq(reservations.attributionAssociationId, input.associationId),
-        eq(sql`${reservations.status}::text`, 'captured'),
+        inArray(sql`${reservations.status}::text`, [
+          'captured',
+          'refunded',
+          'reversed',
+          'disputed',
+        ]),
       ),
     );
+
+  // §24.8: "unfinalized earnings on the refunded transaction may cancel" — MAY,
+  // an Admin decision recorded as the case's allocation, applied here where the
+  // money resolves. A canceled row still resolves (earned 0, returned =
+  // provisional) so the §24.4 identity holds at every level; an
+  // `earnings_remain` decision leaves the row finalizing normally, refund
+  // notwithstanding — that cost sits where the cause put it, never with the
+  // Creator (§33.9.3).
+  const canceledByAllocation = new Set<string>(
+    rows.length > 0
+      ? (
+          await deps.db
+            .select({ reservationId: refundCauseAllocations.reservationId })
+            .from(refundCauseAllocations)
+            .where(
+              and(
+                inArray(
+                  refundCauseAllocations.reservationId,
+                  rows.map((r) => r.id),
+                ),
+                eq(refundCauseAllocations.affiliateTreatment, 'cancel_unfinalized'),
+              ),
+            )
+        ).map((r) => r.reservationId)
+      : [],
+  );
 
   const captureRows = rows.map((row) => ({
     reservationId: row.id,
     rewardSubtotalCents: row.rewardSubtotalCents,
     provisionalCents: row.provisionalCents,
-    validlyAttributed: row.attributionStatus === 'verified',
+    validlyAttributed: row.attributionStatus === 'verified' && !canceledByAllocation.has(row.id),
   }));
 
   const validBackers = new Set(
-    rows.filter((r) => r.attributionStatus === 'verified').map((r) => r.backerIdentityId),
+    rows
+      .filter((r) => r.attributionStatus === 'verified' && !canceledByAllocation.has(r.id))
+      .map((r) => r.backerIdentityId),
   );
 
   const [bonus] = await deps.db

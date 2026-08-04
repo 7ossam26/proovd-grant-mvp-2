@@ -181,6 +181,7 @@ export const TIMELINE_KINDS = [
   'admin_action',
   'enforcement',
   'relationship_touch',
+  'refund',
 ] as const;
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
 

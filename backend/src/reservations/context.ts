@@ -41,6 +41,13 @@ export interface PreorderContext {
     version: string | null;
     effectiveDate: string | null;
     sourceUrl: string | null;
+    /**
+     * §24.10's "preserve exact text": the operative policy text as it stood at
+     * this reservation. The build row can later change through an Admin-applied
+     * change request, so the transaction carries its own copy — a later website
+     * edit cannot alter an existing transaction (§33.9.1).
+     */
+    text: string | null;
   } | null;
 }
 
@@ -165,6 +172,7 @@ export async function loadPreorderContext(
               version: build.refundPolicyVersion ?? null,
               effectiveDate: build.refundPolicyEffectiveDate ?? null,
               sourceUrl: build.refundPolicySourceUrl ?? null,
+              text: build.refundPolicyText ?? null,
             }
           : null,
     },

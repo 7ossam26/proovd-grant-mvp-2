@@ -52,6 +52,7 @@ import {
   type EarlyReleaseRequest,
 } from '../db/schema/founder-payments.js';
 import { creatorCompletionDecisions } from '../db/schema/earnings.js';
+import { refundCauseAllocations } from '../db/schema/refunds.js';
 import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
@@ -187,13 +188,21 @@ function creatorEarningsResolved(campaign: CampaignMoneyRow): boolean {
   );
 }
 
-/** §24.8's cause-based adjustments — Phase 20 writes the records this sums;
-    until they exist the only honest value is the sum of no records. */
-function causeBasedAdjustmentsCents(): bigint {
-  return 0n;
+/** §24.8's cause-based adjustments: the sum of the recorded Founder-liability
+    amounts across the campaign's §24.8 cases (Phase 20a's insert-only
+    `refund_cause_allocations`). A recorded judgement with its evidence, never
+    a number this module derives (§1 rule 6) — this only sums the records. */
+async function causeBasedAdjustmentsCents(db: Database, campaignId: string): Promise<bigint> {
+  const [row] = await db
+    .select({
+      total: sql<string>`COALESCE(SUM(${refundCauseAllocations.founderLiabilityCents}), 0)`,
+    })
+    .from(refundCauseAllocations)
+    .where(eq(refundCauseAllocations.campaignId, campaignId));
+  return BigInt(row?.total ?? '0');
 }
 
-function shareFor(campaign: CampaignMoneyRow, exact: boolean): bigint {
+function shareFor(campaign: CampaignMoneyRow, exact: boolean, adjustmentsCents: bigint): bigint {
   return eligibleFounderShareCents({
     rewardSubtotalCapturedCents: campaign.rewardSubtotalCapturedCents,
     proovdFeeCents: campaign.proovdFeeCents,
@@ -202,7 +211,7 @@ function shareFor(campaign: CampaignMoneyRow, exact: boolean): bigint {
     finalizedCreatorCompensationCents: exact
       ? campaign.affiliateEarnedCents
       : campaign.affiliateProvisionalCents,
-    causeBasedAdjustmentsCents: causeBasedAdjustmentsCents(),
+    causeBasedAdjustmentsCents: adjustmentsCents,
     stripeFeesAllocatedToFounderCents: campaign.stripeFeeCents,
   });
 }
@@ -602,7 +611,8 @@ export async function readFounderPaymentStatus(
   };
 
   const resolved = creatorEarningsResolved(campaign);
-  const share = shareFor(campaign, resolved);
+  const adjustments = await causeBasedAdjustmentsCents(db, input.campaignId);
+  const share = shareFor(campaign, resolved, adjustments);
   const shareNote = resolved
     ? FOUNDER_SHARE_TAX_NOTE
     : `${FOUNDER_SHARE_TAX_NOTE} Creator earnings finalization is not complete, so this is the minimum: the exact share is fixed when every provisional Creator amount resolves (§24.4).`;
@@ -736,7 +746,7 @@ export async function readFounderPaymentStatus(
           ? campaign.affiliateEarnedCents
           : campaign.affiliateProvisionalCents
         ).toString(),
-        causeBasedAdjustmentsCents: causeBasedAdjustmentsCents().toString(),
+        causeBasedAdjustmentsCents: adjustments.toString(),
         stripeFeesAllocatedToFounderCents: campaign.stripeFeeCents.toString(),
       },
     },
@@ -828,7 +838,11 @@ export async function createFounderPayment(
   // change — refuse until every provisioned cent resolved (§1.4).
   if (!creatorEarningsResolved(campaign)) return { status: 'creator_earnings_not_finalized' };
 
-  const share = shareFor(campaign, true);
+  const share = shareFor(
+    campaign,
+    true,
+    await causeBasedAdjustmentsCents(deps.db, input.campaignId),
+  );
   if (share === 0n) return { status: 'nothing_payable' };
 
   const day = await readNumberSetting(deps.db, entry.daySettingKey);

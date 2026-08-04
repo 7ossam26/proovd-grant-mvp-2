@@ -30,6 +30,7 @@ import { createPublicCampaignRouter } from './routes/public-campaign.js';
 import { createBackerPreorderRouter } from './routes/backer-preorder.js';
 import { createBackerRouter } from './routes/backer.js';
 import { createAdminCloseRouter } from './routes/admin-close.js';
+import { createAdminRefundsRouter } from './routes/admin-refunds.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
 import {
@@ -548,6 +549,22 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     // reconciliation, and results take the freshness gate.
     app.use(
       createAdminCloseRouter({
+        db,
+        auth,
+        audit,
+        gateway: config.stripeGateway,
+        notifier,
+        notificationContext: launchContext,
+        tokens,
+      }),
+    );
+    // Phase 20a (§24.8, §24.9, §33.9.2–6). Admin's refund operations: the case
+    // queue with the Founder-issued refunds awaiting classification, recording
+    // the §24.8 cause allocation, the §26.6 customer-consequence preview, and
+    // the execution under the stable per-case key. Reads are `admin`; the
+    // money decisions take the freshness gate.
+    app.use(
+      createAdminRefundsRouter({
         db,
         auth,
         audit,

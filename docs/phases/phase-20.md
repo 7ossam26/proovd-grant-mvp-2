@@ -107,6 +107,19 @@ Fulfillment, Day 14, and the ghost ban — Phase 21. The full in-product dispute
 
 ---
 
+## Where this phase splits
+
+Thirteen named tests is level with Phase 12, which split, and two of them (§33.9.10, §33.9.11) already pass from Phase 16b. The brief does not name a seam, so this session added one (master-plan §1.3 step 6), on the boundary between **the refund money machine** and **the operations and enforcement that invoke it**. The dependency runs one way: a post-capture kill *invokes* the refund/reversal/recovery policy, and a dispute's allocation reuses the same §24.8 cause register.
+
+| Half | Scope | Acceptance | State |
+|---|---|---|---|
+| **20a** | The §24.8 cause register and allocation records (feeding 19b's `causeBasedAdjustmentsCents`), the reservation-refund lifecycle `requested/submitted/succeeded/failed` with Appendix B.6, the §24.9 Idea exception register with no voluntary-refund path, §24.10 hardening (the consent's policy snapshot preserves text + hash), the earnings treatments per cause (cancel-unfinalized at finalization, adjusted + contractual recovery post-transfer), `charge.refunded` on both endpoints, and the Admin refund-case surface | **§33.9.1–§33.9.5**, the allocation half of **§33.9.6** | built |
+| **20b** | §24.11 dispute records, the 24-hour Admin task, and the evidence packet; `charge.dispute.*` + `transfer.reversed`; §24.12 descriptor consolidation across the seven surfaces; §26.7/§29.7 post-capture suspension/kill invoking 20a's machinery; the outcome-specific ended pages; §29.1–29.5 and §29.8–29.10 enforcement records including the Backer support path; the §33.9.12 suppression record | **§33.9.7–§33.9.9**, the dispute-ingestion half of **§33.9.6**, **§33.9.12**, **§33.9.13** | — |
+
+20a builds no dispute object and no enforcement change; 20b classifies its dispute and kill cases through 20a's cause register rather than a second one.
+
+---
+
 ## Traps
 
 - **A Founder-caused refund does not claw back finalized valid Affiliate earnings.** §33.9.3. This is the most tempting wrong simplification in the phase.

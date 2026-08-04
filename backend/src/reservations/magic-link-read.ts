@@ -15,11 +15,17 @@
  * moved.
  */
 
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { reservations } from '../db/schema/domain.js';
 import { campaigns } from '../db/schema/domain.js';
 import { campaignCloseBatches } from '../db/schema/close.js';
+import { reservationRefunds } from '../db/schema/refunds.js';
+import {
+  resolveRefundNotice,
+  REFUND_DESTINATION_FALLBACK,
+  TYPICAL_BANK_TIMING,
+} from '../refunds/logic.js';
 import { buildPublicCampaign, type PublicCampaign } from '../campaign/public-page.js';
 import {
   resolveFailedPaymentCopy,
@@ -98,6 +104,18 @@ export interface BackerTransaction {
     deadlineIso: string;
     available: boolean;
   } | null;
+  /**
+   * The §24.8 refund states (§33.9.2, Phase 20a): the same resolved Appendix
+   * B.6 block the email carried, per refund of this reservation. A `requested`
+   * case is Admin work-in-progress and renders nothing here — B.6 begins when
+   * a refund is actually started at the provider.
+   */
+  refunds: Array<{
+    reference: string;
+    status: 'submitted' | 'succeeded' | 'failed';
+    body: string;
+    action: string;
+  }>;
 }
 
 export interface BackerPage {
@@ -141,8 +159,20 @@ export async function readBackerPage(
     .where(eq(reservations.backerIdentityId, input.backerIdentityId))
     .orderBy(desc(reservations.createdAt));
 
-  const transactions: BackerTransaction[] = rows
-    .filter((r) => r.campaignId === input.campaignId)
+  const mine = rows.filter((r) => r.campaignId === input.campaignId);
+
+  // The §24.8 refunds of these reservations, rendered as Appendix B.6 below —
+  // the same resolver the email uses, one source many renderers.
+  const refundRows =
+    mine.length > 0
+      ? await db
+          .select()
+          .from(reservationRefunds)
+          .where(inArray(reservationRefunds.reservationId, mine.map((r) => r.id)))
+          .orderBy(desc(reservationRefunds.createdAt))
+      : [];
+
+  const transactions: BackerTransaction[] = mine
     .map((r) => {
       const status = deriveBackerStatus(r.status);
       const isActive = r.status === 'reserved_active';
@@ -173,6 +203,26 @@ export async function readBackerPage(
         };
       }
 
+      // §33.9.2: each visible refund state renders the exact B.6 block.
+      const refunds = refundRows
+        .filter((f) => f.reservationId === r.id && f.status !== 'requested')
+        .map((f) => {
+          const resolved = resolveRefundNotice({
+            amount: formatCents(f.amountCents),
+            destination: f.destination ?? REFUND_DESTINATION_FALLBACK,
+            startedDate: formatUtcInstant(f.submittedAt ?? f.createdAt),
+            bankTiming: TYPICAL_BANK_TIMING,
+            status: f.status as 'submitted' | 'succeeded' | 'failed',
+            reference: f.reference,
+          });
+          return {
+            reference: f.reference,
+            status: f.status as 'submitted' | 'succeeded' | 'failed',
+            body: resolved.body,
+            action: resolved.action,
+          };
+        });
+
       return {
         reservationId: r.id,
         rewardSku: r.rewardSku,
@@ -190,6 +240,7 @@ export async function readBackerPage(
         canCancel: isActive && open,
         canChangeReward: isActive && open && model === 'idea',
         recovery,
+        refunds,
       };
     });
 

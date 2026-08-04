@@ -269,6 +269,18 @@ export const INTERNAL_MONEY_DECISIONS_DUE = 'internal_money_decisions_due' as co
 export const INTERNAL_DELIVERABLE_VERIFICATION_DUE =
   'internal_deliverable_verification_due' as const;
 
+/**
+ * Phase 20a — §24.8/§27.5's three refund messages, each carrying the same
+ * resolved Appendix B.6 block the magic-link page renders. Deduped per REFUND
+ * row: a duplicate `charge.refunded` delivery sends nothing (§33.9.12), while
+ * a second, separately-recorded refund of the same reservation sends its own.
+ * `backer_refund_failed` sends only from `submitted` — a synchronous creation
+ * failure the Admin retries was never announced, so its failure is not either.
+ */
+export const BACKER_REFUND_STARTED = 'backer_refund_started' as const;
+export const BACKER_REFUND_COMPLETED = 'backer_refund_completed' as const;
+export const BACKER_REFUND_FAILED = 'backer_refund_failed' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -309,6 +321,9 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   BACKER_CHARGE_RECEIPT,
   BACKER_CHARGE_FAILED_UPDATE_CARD,
   BACKER_RETRY_DROPPED,
+  BACKER_REFUND_STARTED,
+  BACKER_REFUND_COMPLETED,
+  BACKER_REFUND_FAILED,
   INTERNAL_CHARGE_BATCH_RESULT,
   BACKER_RETRY_SUCCESS,
   FOUNDER_RESULTS_READY,

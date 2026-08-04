@@ -16,6 +16,7 @@
  *    calculation and its total are what a later charge is bound to (§33.5.11).
  */
 
+import { createHash } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { reservations, reservationStatusHistory, type Reservation } from '../db/schema/domain.js';
@@ -389,7 +390,17 @@ export async function createPreorder(
           consentText: consent.text,
           policyVersions: {
             referenced: ['terms', 'acceptable-use', 'refund', 'fulfillment', 'privacy'],
-            founderRefundPolicy: context.refundPolicy,
+            // §24.10/§33.9.1: the immutable Founder policy version — identity,
+            // exact text, and its hash — preserved with THIS transaction. A
+            // later website edit changes the build row, never this record.
+            founderRefundPolicy: context.refundPolicy
+              ? {
+                  ...context.refundPolicy,
+                  textHash: context.refundPolicy.text
+                    ? createHash('sha256').update(context.refundPolicy.text, 'utf8').digest('hex')
+                    : null,
+                }
+              : null,
           },
           surveyWhy: survey.value.why,
           surveyRecommend: survey.value.recommend,

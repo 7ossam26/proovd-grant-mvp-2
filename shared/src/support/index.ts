@@ -379,6 +379,12 @@ export const TIMELINE_SOURCES: readonly TimelineSource[] = [
     specRef: '§26.8',
     composedFrom: 'relationship_touches',
   },
+  {
+    kind: 'refund',
+    label: 'Refunds and cause allocation',
+    specRef: '§24.8',
+    composedFrom: 'reservation_refunds, refund_cause_allocations',
+  },
 ] as const;
 
 export type TimelineKind = (typeof TIMELINE_SOURCES)[number]['kind'];

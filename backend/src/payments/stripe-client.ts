@@ -128,10 +128,20 @@ export interface FundingCheckoutInput {
 
 export interface RefundInput {
   paymentIntentId: string;
-  /** Always the full Checkout total (§13). The caller states it explicitly. */
+  /**
+   * The exact amount to return — the full Checkout total for the platform-side
+   * listing stream (§13), or the recorded case amount for a campaign charge
+   * (§24.8, which permits a partial refund such as §24.9's wrong-amount case).
+   */
   amountCents: bigint;
   /** Stripe-side idempotency: a retried refund is the same refund, not a second. */
   idempotencyKey: string;
+  /**
+   * §24.1: a campaign charge is a direct charge on the Founder's connected
+   * account, so its refund is created there. Absent for the listing stream,
+   * whose charge lives on the platform account.
+   */
+  connectedAccountId?: string | undefined;
 }
 
 export interface RefundResult {
@@ -688,7 +698,10 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
           payment_intent: input.paymentIntentId,
           amount: Number(input.amountCents),
         },
-        { idempotencyKey: input.idempotencyKey },
+        {
+          idempotencyKey: input.idempotencyKey,
+          ...(input.connectedAccountId ? { stripeAccount: input.connectedAccountId } : {}),
+        },
       );
       return { id: refund.id, status: refund.status ?? 'pending' };
     },
@@ -809,7 +822,12 @@ export interface MemoryStripeGateway extends StripeGateway {
     idempotencyKey: string;
   }>;
   /** Every refund call, so a test can assert exactly one reached the provider. */
-  readonly refunds: Array<{ id: string; paymentIntentId: string; amountCents: bigint }>;
+  readonly refunds: Array<{
+    id: string;
+    paymentIntentId: string;
+    amountCents: bigint;
+    connectedAccountId: string | null;
+  }>;
   /** Makes the next `createRefund` throw once — the crash-between test. */
   failNextRefund(message: string): void;
 
@@ -1206,6 +1224,7 @@ export function createMemoryStripeGateway(config: {
         id: result.id,
         paymentIntentId: input.paymentIntentId,
         amountCents: input.amountCents,
+        connectedAccountId: input.connectedAccountId ?? null,
       });
       return result;
     },

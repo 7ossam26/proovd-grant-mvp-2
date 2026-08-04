@@ -45,6 +45,8 @@ const NAV = [
   { to: '/admin/campaign-operations', label: 'Campaign operations' },
   // Phase 18b (§21, §33.7.12).
   { to: '/admin/close', label: 'Close operations' },
+  // Phase 20a (§24.8, §24.9).
+  { to: '/admin/refunds', label: 'Refunds' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];
