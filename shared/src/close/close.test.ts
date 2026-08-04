@@ -16,6 +16,10 @@ import {
   resolveFailedPaymentCopy,
   THRESHOLD_MISS_REASON,
   TAX_UNUSABLE_DROP_REASON,
+  RETRY_WINDOW_DROP_REASON,
+  RECONCILIATION_ITEMS,
+  RECONCILIATION_RESULTS,
+  RESULTS_NARRATIVE_FIELDS,
 } from './index.js';
 
 describe('§21 close-batch step register', () => {
@@ -144,10 +148,74 @@ describe('Appendix B.5 — failed payment', () => {
 });
 
 describe('the US$0 closures state US$0', () => {
-  it('both no-charge reasons say US$0 and never a provider word', () => {
-    for (const reason of [THRESHOLD_MISS_REASON, TAX_UNUSABLE_DROP_REASON]) {
+  it('all three no-charge reasons say US$0 and never a provider word', () => {
+    for (const reason of [
+      THRESHOLD_MISS_REASON,
+      TAX_UNUSABLE_DROP_REASON,
+      RETRY_WINDOW_DROP_REASON,
+    ]) {
       expect(reason).toContain('US$0');
       expect(reason.toLowerCase()).not.toContain('decline');
+    }
+  });
+
+  it('the retry-window drop does not shame the Backer (§30)', () => {
+    for (const banned of ['declined', 'insufficient', 'your fault', 'failed to pay']) {
+      expect(RETRY_WINDOW_DROP_REASON.toLowerCase()).not.toContain(banned);
+    }
+  });
+});
+
+describe('§21 reconciliation register (Phase 18b)', () => {
+  it('names all nine §21 items in §21 order', () => {
+    expect(RECONCILIATION_ITEMS.map((i) => i.key)).toEqual([
+      'batch_completeness',
+      'tax_charge_reconciliation',
+      'attribution_post_verification',
+      'creator_deliverables',
+      'creator_bonus_triggers',
+      'provisional_vs_earned',
+      'unearned_return',
+      'founder_share_w9',
+      'refund_risk_dispute',
+    ]);
+    for (const item of RECONCILIATION_ITEMS) {
+      expect(item.spec).toContain('§21');
+    }
+  });
+
+  it('the charge/retry items gate Results ready; the money items name what they wait on', () => {
+    const required = RECONCILIATION_ITEMS.filter((i) => i.requiredForResults).map((i) => i.key);
+    expect(required).toEqual([
+      'batch_completeness',
+      'tax_charge_reconciliation',
+      'attribution_post_verification',
+      'refund_risk_dispute',
+    ]);
+    for (const item of RECONCILIATION_ITEMS) {
+      if (!item.requiredForResults) {
+        // §1.4: an unverifiable item names its phase instead of reading as done.
+        expect(item.waitsOn).toBeTruthy();
+      }
+    }
+  });
+
+  it('a verification result is verified or discrepancy — never a free string', () => {
+    expect([...RECONCILIATION_RESULTS]).toEqual(['verified', 'discrepancy']);
+  });
+});
+
+describe('§21 results narrative fields (Phase 18b)', () => {
+  it('names the five Admin-authored plain-language fields', () => {
+    expect(RESULTS_NARRATIVE_FIELDS.map((f) => f.key)).toEqual([
+      'strongest_signal',
+      'weakest_signal',
+      'leading_survey_reason',
+      'what_this_proves',
+      'what_this_does_not_prove',
+    ]);
+    for (const field of RESULTS_NARRATIVE_FIELDS) {
+      expect(field.label.length).toBeGreaterThan(0);
     }
   });
 });

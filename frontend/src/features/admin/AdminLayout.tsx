@@ -43,6 +43,8 @@ const NAV = [
   // Phase 16b (§26.7, §26.8, §27.8).
   { to: '/admin/support', label: 'Support queue' },
   { to: '/admin/campaign-operations', label: 'Campaign operations' },
+  // Phase 18b (§21, §33.7.12).
+  { to: '/admin/close', label: 'Close operations' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];

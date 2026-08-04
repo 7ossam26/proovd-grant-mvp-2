@@ -1233,3 +1233,123 @@ export const recordRelationshipTouch = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── §21 close operations (Phase 18b) ──────────────────────────────────────── */
+
+export interface CloseOperationsState {
+  operations: {
+    incomplete: Array<{
+      campaignId: string;
+      batchStatus: string;
+      campaignStatus: string;
+      startedAt: string;
+      lockedReservations: number;
+      unresolvedAttempts: number;
+      openDedupCases: number;
+      recovery: string;
+    }>;
+    retryWindow: Array<{
+      campaignId: string;
+      firstFailureAt: string | null;
+      retryDeadlineAt: string | null;
+      retrying: number;
+    }>;
+    reconciling: Array<{
+      campaignId: string;
+      campaignStatus: string;
+      requiredItemsVerified: number;
+      requiredItemsTotal: number;
+      resultsPrepared: boolean;
+    }>;
+  };
+  reconciliationItems: Array<{
+    key: string;
+    spec: string;
+    evaluation: 'app' | 'admin';
+    requiredForResults: boolean;
+    waitsOn: string | null;
+  }>;
+  narrativeFields: Array<{ key: string; label: string }>;
+}
+
+export interface CloseBatchDetailState {
+  detail: {
+    campaignId: string;
+    campaignStatus: string;
+    batch: {
+      status: string;
+      startedAt: string;
+      completedAt: string | null;
+      thresholdDecision: { met: boolean; unique: number; required: number } | null;
+      retryWindowHours: number;
+      firstFailureAt: string | null;
+      retryDeadlineAt: string | null;
+    } | null;
+    reservationsByStatus: Record<string, number>;
+    attempts: Array<{
+      reservationId: string;
+      attemptNumber: number;
+      idempotencyKey: string;
+      amountCents: string;
+      outcome: string | null;
+      paymentIntentId: string | null;
+      requestedAt: string;
+      resolvedAt: string | null;
+    }>;
+  };
+  reconciliation: {
+    campaignId: string;
+    campaignStatus: string;
+    open: boolean;
+    openReason: string | null;
+    items: Array<{
+      key: string;
+      spec: string;
+      evaluation: 'app' | 'admin';
+      requiredForResults: boolean;
+      derived: Record<string, unknown> | null;
+      waitsOn: string | null;
+      latest: { result: string; note: string; actor: string; recordedAt: string } | null;
+      history: Array<{ result: string; note: string; actor: string; recordedAt: string }>;
+    }>;
+    resultsPrepared: boolean;
+  } | null;
+}
+
+export const fetchCloseOperations = (): Promise<CloseOperationsState> =>
+  call<CloseOperationsState>('/api/admin/close');
+
+export const fetchCloseDetail = (campaignId: string): Promise<CloseBatchDetailState> =>
+  call<CloseBatchDetailState>(`/api/admin/close/${encodeURIComponent(campaignId)}`);
+
+export const resumeCloseBatch = (
+  campaignId: string,
+): Promise<{ batch: { status: string }; windowEnd: { status: string } }> =>
+  call(`/api/admin/close/${encodeURIComponent(campaignId)}/resume`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const recordCloseReconciliation = (
+  campaignId: string,
+  body: { itemKey: string; result: 'verified' | 'discrepancy'; note: string },
+): Promise<{ record: unknown }> =>
+  call(`/api/admin/close/${encodeURIComponent(campaignId)}/reconciliation`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const prepareCloseResults = (
+  campaignId: string,
+  body: {
+    strongestSignal: string;
+    weakestSignal: string;
+    leadingSurveyReason: string;
+    whatThisProves: string;
+    whatThisDoesNotProve: string;
+  },
+): Promise<{ results: unknown }> =>
+  call(`/api/admin/close/${encodeURIComponent(campaignId)}/results`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

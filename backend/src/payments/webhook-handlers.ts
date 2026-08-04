@@ -64,6 +64,7 @@ import { classifyCaptureFailure } from '../close/logic.js';
 import {
   notifyChargeReceipt,
   notifyCaptureFailed,
+  notifyRetrySuccess,
   type CloseNotificationDeps,
 } from '../close/notifications.js';
 
@@ -648,7 +649,17 @@ async function handlePaymentIntentSucceeded(
 
   if (applied.applied) {
     const notify = closeNotificationDeps(context);
-    if (notify) await notifyChargeReceipt(notify, applied.reservation);
+    if (notify) {
+      // §27.5 names "Charge receipt" and "Retry success" as separate events: a
+      // capture that applied FROM the recovery window — the requires-action
+      // completion, or a retry whose confirmation arrived asynchronously — is
+      // the retry-success message, never a second receipt (Phase 18b).
+      if (applied.from === 'capture_failed_retrying') {
+        await notifyRetrySuccess(notify, applied.reservation);
+      } else {
+        await notifyChargeReceipt(notify, applied.reservation);
+      }
+    }
   }
 }
 

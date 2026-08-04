@@ -1829,3 +1829,20 @@ html.no-motion [data-splash] { display: none !important; }
 .comment__meta { margin: 0; color: var(--grey); font-size: 0.9375rem; }
 /* A comment is what a person wrote; their line breaks are part of it. */
 .comment__body { margin: var(--sp-4) 0 var(--sp-8); white-space: pre-line; }
+
+/* ---- The B.5 recovery state on the Backer magic-link page, added Phase 18b.
+   A customer surface (public rhythm, not Admin density): the exact failed-
+   payment block with its ONE Update card action (§21), the Stripe-hosted card
+   field, and the requires-action state. No competing action shares the block
+   (§30). Everything reads a slot; no hex literal, no arbitrary spacing. */
+.backer__recovery {
+  margin-top: var(--sp-16);
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--mode-body);
+  border-radius: var(--radius);
+  display: flex; flex-direction: column; gap: var(--sp-12);
+}
+/* Appendix B.5 is exact text; its line breaks are part of it. */
+.backer__recovery-body { margin: 0; white-space: pre-line; }
+.backer__recovery-card { min-height: 44px; }
+.backer__recovery-note { margin: 0; color: var(--grey); font-size: 0.9375rem; }

@@ -14,6 +14,16 @@
  *    from `shared/close` (restated in `close/notifications.ts`);
  *  - the Founder's `Campaign ended` — fires at close, deliberately separate
  *    from `Results ready` (§21, §33.7.11), and says results follow separately.
+ *
+ * Phase 18b added three more:
+ *
+ *  - the Backer's retry success — §27.5's "Retry success", the campaign-aware
+ *    confirmation for a charge recovered through the B.5 update-card path;
+ *  - the Founder's `Results ready` — §21's separate results event, sent only
+ *    once charge, retry, and reconciliation results are prepared (§33.7.11);
+ *  - the Creator's campaign-closed notice — §27.4's "Campaign closed", with
+ *    the Appendix B.7 money status and a factual thank-you without public
+ *    ranking (§30 forbids leaderboards).
  */
 
 import { Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
@@ -313,6 +323,265 @@ export async function renderCampaignEnded(v: CampaignEndedVariables): Promise<Re
       '',
       'OPEN YOUR CAMPAIGN',
       v.campaignHomeUrl,
+      '',
+      '---',
+      `Questions: ${v.supportEmail} — ${SLA_LINE}`,
+      '',
+      `Reference: ${v.reference}`,
+    ].join('\n'),
+  };
+}
+
+/* ── The retry success (§21, §27.5 — Phase 18b) ─────────────────────────────── */
+
+export const RETRY_SUCCESS_LEAD = 'Your updated card completed this pre-order charge.';
+
+export interface RetrySuccessVariables {
+  campaignTitle: string;
+  founderLegalName: string;
+  rewardTitle: string;
+  rewardSubtotal: string;
+  salesTax: string;
+  totalCaptured: string;
+  statementDescriptor: string;
+  delivery: string;
+  magicLinkUrl: string;
+  reference: string;
+  supportEmail: string;
+}
+
+function RetrySuccessEmail({ v }: { v: RetrySuccessVariables }) {
+  return (
+    <Html lang="en">
+      <Head />
+      <Preview>{`${RETRY_SUCCESS_LEAD} US$${v.totalCaptured} for ${v.campaignTitle}.`}</Preview>
+      <Body style={body}>
+        <Container style={container}>
+          <Text style={eyebrow}>Proovd</Text>
+          <Heading style={heading}>{RETRY_SUCCESS_LEAD}</Heading>
+          <Section style={section}>
+            <Text style={text}>
+              The earlier payment issue on this pre-order is resolved — nothing more is needed from
+              you.
+            </Text>
+            <Text style={text}>Campaign: {v.campaignTitle}</Text>
+            <Text style={text}>Seller: {v.founderLegalName}</Text>
+            <Text style={text}>Reward: {v.rewardTitle}</Text>
+            <Text style={text}>Reward subtotal: US${v.rewardSubtotal}</Text>
+            <Text style={text}>Sales tax: US${v.salesTax}</Text>
+            <Text style={text}>Total charged: US${v.totalCaptured}</Text>
+            <Text style={text}>Your statement shows: {v.statementDescriptor}</Text>
+            <Text style={text}>Expected delivery: {v.delivery}</Text>
+          </Section>
+          <Section style={section}>
+            <Button style={button} href={v.magicLinkUrl}>
+              View your pre-order
+            </Button>
+          </Section>
+          <Hr style={rule} />
+          <Section style={section}>
+            <Text style={quiet}>
+              Questions: {v.supportEmail} — {SLA_LINE}
+            </Text>
+            <Text style={quiet}>Reference: {v.reference}</Text>
+          </Section>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+export async function renderRetrySuccess(v: RetrySuccessVariables): Promise<RenderedCloseEmail> {
+  return {
+    subject: `Payment complete — US$${v.totalCaptured} for ${v.campaignTitle}`,
+    html: await render(<RetrySuccessEmail v={v} />),
+    text: [
+      RETRY_SUCCESS_LEAD,
+      '',
+      'The earlier payment issue on this pre-order is resolved — nothing more is needed from you.',
+      '',
+      `Campaign: ${v.campaignTitle}`,
+      `Seller: ${v.founderLegalName}`,
+      `Reward: ${v.rewardTitle}`,
+      `Reward subtotal: US$${v.rewardSubtotal}`,
+      `Sales tax: US$${v.salesTax}`,
+      `Total charged: US$${v.totalCaptured}`,
+      `Your statement shows: ${v.statementDescriptor}`,
+      `Expected delivery: ${v.delivery}`,
+      '',
+      'VIEW YOUR PRE-ORDER',
+      v.magicLinkUrl,
+      '',
+      '---',
+      `Questions: ${v.supportEmail} — ${SLA_LINE}`,
+      '',
+      `Reference: ${v.reference}`,
+    ].join('\n'),
+  };
+}
+
+/* ── The Founder's Results ready (§21, §33.7.11 — Phase 18b) ────────────────── */
+
+export const RESULTS_READY_LEAD = 'Results ready — your campaign results are prepared.';
+
+export interface ResultsReadyVariables {
+  founderName: string;
+  campaignTitle: string;
+  /** The three §21 totals, stated separately. */
+  rewardSubtotalCaptured: string;
+  salesTaxCaptured: string;
+  totalCaptured: string;
+  capturedCount: number;
+  resultsUrl: string;
+  reference: string;
+  supportEmail: string;
+}
+
+function ResultsReadyEmail({ v }: { v: ResultsReadyVariables }) {
+  return (
+    <Html lang="en">
+      <Head />
+      <Preview>{`${RESULTS_READY_LEAD} ${v.campaignTitle}.`}</Preview>
+      <Body style={body}>
+        <Container style={container}>
+          <Text style={eyebrow}>Proovd</Text>
+          <Heading style={heading}>{RESULTS_READY_LEAD}</Heading>
+          <Section style={section}>
+            <Text style={text}>Hi {v.founderName},</Text>
+            <Text style={text}>
+              Charge, retry, and reconciliation results for {v.campaignTitle} are prepared. This is
+              the separate results message your `Campaign ended` notice referred to.
+            </Text>
+            <Text style={text}>Pre-orders captured: {v.capturedCount}</Text>
+            <Text style={text}>Reward subtotal captured: US${v.rewardSubtotalCaptured}</Text>
+            <Text style={text}>Sales tax captured: US${v.salesTaxCaptured}</Text>
+            <Text style={text}>Total captured: US${v.totalCaptured}</Text>
+          </Section>
+          <Section style={section}>
+            <Button style={button} href={v.resultsUrl}>
+              Open your results
+            </Button>
+          </Section>
+          <Hr style={rule} />
+          <Section style={section}>
+            <Text style={quiet}>
+              Questions: {v.supportEmail} — {SLA_LINE}
+            </Text>
+            <Text style={quiet}>Reference: {v.reference}</Text>
+          </Section>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+export async function renderResultsReady(v: ResultsReadyVariables): Promise<RenderedCloseEmail> {
+  return {
+    subject: `Results ready — ${v.campaignTitle}`,
+    html: await render(<ResultsReadyEmail v={v} />),
+    text: [
+      RESULTS_READY_LEAD,
+      '',
+      `Hi ${v.founderName},`,
+      '',
+      `Charge, retry, and reconciliation results for ${v.campaignTitle} are prepared. This is the`,
+      'separate results message your `Campaign ended` notice referred to.',
+      '',
+      `Pre-orders captured: ${v.capturedCount}`,
+      `Reward subtotal captured: US$${v.rewardSubtotalCaptured}`,
+      `Sales tax captured: US$${v.salesTaxCaptured}`,
+      `Total captured: US$${v.totalCaptured}`,
+      '',
+      'OPEN YOUR RESULTS',
+      v.resultsUrl,
+      '',
+      '---',
+      `Questions: ${v.supportEmail} — ${SLA_LINE}`,
+      '',
+      `Reference: ${v.reference}`,
+    ].join('\n'),
+  };
+}
+
+/* ── The Creator's campaign-closed notice (§21, §27.4 — Phase 18b) ──────────── */
+
+export const CREATOR_CLOSED_LEAD = 'The campaign you promoted has closed.';
+
+export interface CreatorClosedVariables {
+  campaignTitle: string;
+  /** First-post verification, stated as a fact. */
+  contentVerifiedLine: string;
+  attributedPreorders: number;
+  attributedCaptured: number;
+  /** Appendix B.7, rendered — the estimated-earnings status block. */
+  moneyStatusBlock: string;
+  /** §22.1: the on-or-after Day 3 review date. */
+  nextReviewLine: string;
+  partnershipUrl: string;
+  reference: string;
+  supportEmail: string;
+}
+
+/** §21: "a factual thank-you without public ranking" (§30 forbids leaderboards). */
+export const CREATOR_THANK_YOU =
+  'Thank you for the work you put into this campaign. What happens next is verification and reconciliation, not a leaderboard — your results are your own.';
+
+function CreatorClosedEmail({ v }: { v: CreatorClosedVariables }) {
+  return (
+    <Html lang="en">
+      <Head />
+      <Preview>{`${CREATOR_CLOSED_LEAD} ${v.campaignTitle}.`}</Preview>
+      <Body style={body}>
+        <Container style={container}>
+          <Text style={eyebrow}>Proovd</Text>
+          <Heading style={heading}>{CREATOR_CLOSED_LEAD}</Heading>
+          <Section style={section}>
+            <Text style={text}>Campaign: {v.campaignTitle}</Text>
+            <Text style={text}>{v.contentVerifiedLine}</Text>
+            <Text style={text}>Attributed pre-orders: {v.attributedPreorders}</Text>
+            <Text style={text}>Attributed captured charges: {v.attributedCaptured}</Text>
+            <Text style={{ ...text, whiteSpace: 'pre-line' as const }}>{v.moneyStatusBlock}</Text>
+            <Text style={text}>{v.nextReviewLine}</Text>
+            <Text style={text}>{CREATOR_THANK_YOU}</Text>
+          </Section>
+          <Section style={section}>
+            <Button style={button} href={v.partnershipUrl}>
+              Open your campaign view
+            </Button>
+          </Section>
+          <Hr style={rule} />
+          <Section style={section}>
+            <Text style={quiet}>
+              Questions: {v.supportEmail} — {SLA_LINE}
+            </Text>
+            <Text style={quiet}>Reference: {v.reference}</Text>
+          </Section>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+export async function renderCreatorClosed(v: CreatorClosedVariables): Promise<RenderedCloseEmail> {
+  return {
+    subject: `Campaign closed — ${v.campaignTitle}`,
+    html: await render(<CreatorClosedEmail v={v} />),
+    text: [
+      CREATOR_CLOSED_LEAD,
+      '',
+      `Campaign: ${v.campaignTitle}`,
+      v.contentVerifiedLine,
+      `Attributed pre-orders: ${v.attributedPreorders}`,
+      `Attributed captured charges: ${v.attributedCaptured}`,
+      '',
+      v.moneyStatusBlock,
+      '',
+      v.nextReviewLine,
+      '',
+      CREATOR_THANK_YOU,
+      '',
+      'OPEN YOUR CAMPAIGN VIEW',
+      v.partnershipUrl,
       '',
       '---',
       `Questions: ${v.supportEmail} — ${SLA_LINE}`,

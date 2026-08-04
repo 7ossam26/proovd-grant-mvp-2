@@ -17,36 +17,51 @@
  * happened whether or not the email left the building.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
-import { campaigns, type Reservation } from '../db/schema/domain.js';
+import {
+  campaigns,
+  campaignAffiliateAssociations,
+  reservations,
+  type Reservation,
+} from '../db/schema/domain.js';
 import { campaignBuild } from '../db/schema/build.js';
+import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import type { CampaignCloseBatch } from '../db/schema/close.js';
 import type { Notifier } from '../notifications/send.js';
 import type { TokenService } from '../auth/token-service.js';
 import {
   FOUNDER_CAMPAIGN_ENDED,
+  FOUNDER_RESULTS_READY,
   BACKER_THRESHOLD_MISS_NO_CHARGE,
   BACKER_CHARGE_RECEIPT,
   BACKER_CHARGE_FAILED_UPDATE_CARD,
   BACKER_RETRY_DROPPED,
+  BACKER_RETRY_SUCCESS,
+  AFFILIATE_CAMPAIGN_CLOSED,
   INTERNAL_CHARGE_BATCH_RESULT,
+  INTERNAL_RETRY_RECONCILIATION_COMPLETE,
 } from '../notifications/events.js';
 import {
   renderCampaignEnded,
   renderChargeReceipt,
   renderFailedPayment,
   renderNoChargeClosure,
+  renderRetrySuccess,
+  renderResultsReady,
+  renderCreatorClosed,
 } from '../notifications/templates/close.js';
 import { loadFounder, type LaunchNotificationContext } from '../launch/notifications.js';
 import { formatCents } from '../reservations/restated.js';
 import { formatUtcInstant } from '../reservations/consent.js';
 import { mintOrReissueMagicLink } from '../reservations/magic-link.js';
+import { readCreatorClose } from './creator-close.js';
 import {
   resolveFailedPaymentCopy,
   NO_MONEY_MOVED_STATE,
   THRESHOLD_MISS_REASON,
   TAX_UNUSABLE_DROP_REASON,
+  RETRY_WINDOW_DROP_REASON,
 } from './restated.js';
 
 export interface CloseNotificationDeps {
@@ -266,6 +281,231 @@ export async function notifyCaptureDropped(
     from: deps.context.fromAddress,
     replyTo: deps.context.supportEmail,
     ...rendered,
+  });
+}
+
+/* ── §27.5: the retry success (Phase 18b) ───────────────────────────────────── */
+
+/**
+ * The campaign-aware confirmation for a charge recovered through the B.5
+ * update-card path. §27.5 names "Charge receipt" and "Retry success" as
+ * separate events, so a recovered charge sends THIS and never both — the
+ * receipt key belongs to the close batch's first-attempt success.
+ */
+export async function notifyRetrySuccess(
+  deps: CloseNotificationDeps,
+  reservation: Reservation,
+): Promise<void> {
+  if (!reservation.backerEmail) return;
+  const title = await campaignTitleFor(deps.db, reservation.campaignId);
+  const seller = await founderDisplayFor(deps.db, reservation.campaignId);
+  const magicLinkUrl = await magicLinkFor(deps, {
+    campaignId: reservation.campaignId,
+    backerIdentityId: reservation.backerIdentityId,
+  });
+
+  const rendered = await renderRetrySuccess({
+    campaignTitle: title,
+    founderLegalName: seller,
+    rewardTitle: reservation.rewardTitle ?? 'your reward',
+    rewardSubtotal: formatCents(reservation.rewardSubtotalCents),
+    salesTax: formatCents(reservation.salesTaxCents),
+    totalCaptured: formatCents(reservation.totalCapturedCents),
+    statementDescriptor: reservation.statementDescriptor ?? 'the campaign descriptor',
+    delivery: reservation.rewardDelivery ?? 'as stated on the campaign page',
+    magicLinkUrl,
+    reference: reservation.id,
+    supportEmail: deps.context.supportEmail,
+  });
+
+  await deps.notifier.send({
+    eventKey: BACKER_RETRY_SUCCESS,
+    entityType: 'reservation',
+    // One recovery confirmation per reservation — a duplicate update-card
+    // submission or a racing webhook sends none (§33.7.9, §27.2).
+    entityId: reservation.id,
+    to: reservation.backerEmail,
+    from: deps.context.fromAddress,
+    replyTo: deps.context.supportEmail,
+    ...rendered,
+  });
+}
+
+/* ── §27.5: the retry-window-end drop (Phase 18b) ───────────────────────────── */
+
+/**
+ * The US$0 closure for a reservation dropped at the retry window's end — the
+ * second sender for `backer_retry_dropped` (the first is the close batch's
+ * tax-unusable drop). Different reservations, same key, same dedup.
+ */
+export async function notifyRetryWindowDropped(
+  deps: CloseNotificationDeps,
+  reservation: Reservation,
+): Promise<void> {
+  if (!reservation.backerEmail) return;
+  const title = await campaignTitleFor(deps.db, reservation.campaignId);
+  const rendered = await renderNoChargeClosure({
+    reason: RETRY_WINDOW_DROP_REASON,
+    campaignTitle: title,
+    rewardTitle: reservation.rewardTitle ?? 'your reward',
+    reference: reservation.id,
+    supportEmail: deps.context.supportEmail,
+  });
+
+  await deps.notifier.send({
+    eventKey: BACKER_RETRY_DROPPED,
+    entityType: 'reservation',
+    entityId: reservation.id,
+    to: reservation.backerEmail,
+    from: deps.context.fromAddress,
+    replyTo: deps.context.supportEmail,
+    ...rendered,
+  });
+}
+
+/* ── §27.3: Results ready — its own event, never Campaign ended (§33.7.11) ──── */
+
+export async function notifyResultsReady(
+  deps: CloseNotificationDeps,
+  input: { campaignId: string },
+): Promise<void> {
+  const founder = await loadFounder(deps.db, input.campaignId);
+  if (!founder.email) return;
+  const title = await campaignTitleFor(deps.db, input.campaignId);
+
+  const [aggregates] = await deps.db
+    .select({
+      rewardSubtotal: campaigns.rewardSubtotalCapturedCents,
+      salesTax: campaigns.salesTaxCapturedCents,
+      total: campaigns.totalCapturedCents,
+    })
+    .from(campaigns)
+    .where(eq(campaigns.id, input.campaignId))
+    .limit(1);
+  const [captured] = await deps.db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(reservations)
+    .where(and(eq(reservations.campaignId, input.campaignId), eq(reservations.status, 'captured')));
+
+  const rendered = await renderResultsReady({
+    founderName: founder.name ?? 'there',
+    campaignTitle: title,
+    rewardSubtotalCaptured: formatCents(aggregates?.rewardSubtotal ?? 0n),
+    salesTaxCaptured: formatCents(aggregates?.salesTax ?? 0n),
+    totalCaptured: formatCents(aggregates?.total ?? 0n),
+    capturedCount: Number(captured?.count ?? 0),
+    resultsUrl: `${deps.context.appBaseUrl}/campaigns/${input.campaignId}/results`,
+    reference: input.campaignId,
+    supportEmail: deps.context.supportEmail,
+  });
+
+  await deps.notifier.send({
+    eventKey: FOUNDER_RESULTS_READY,
+    entityType: 'campaign',
+    // Once per campaign — and a different key from `founder_campaign_ended`,
+    // which is the whole of §33.7.11.
+    entityId: input.campaignId,
+    to: founder.email,
+    from: deps.context.fromAddress,
+    replyTo: deps.context.supportEmail,
+    ...rendered,
+  });
+}
+
+/* ── §27.4: the Creator's campaign-closed notice (Phase 18b) ────────────────── */
+
+/**
+ * One factual close notice per Creator whose partnership reached the campaign
+ * — sent when the campaign's charge outcomes are final (a clean batch's
+ * completion, the retry window's end, or the threshold-miss close). Deduped on
+ * the association, so whichever path runs first sends it and the others send
+ * nothing.
+ */
+export async function notifyCreatorsCampaignClosed(
+  deps: CloseNotificationDeps,
+  input: { campaignId: string },
+): Promise<void> {
+  const rows = await deps.db
+    .select({
+      associationId: campaignAffiliateAssociations.id,
+      status: campaignAffiliateAssociations.status,
+      email: affiliateSignupProfiles.email,
+    })
+    .from(campaignAffiliateAssociations)
+    .leftJoin(
+      affiliateSignupProfiles,
+      eq(affiliateSignupProfiles.associationId, campaignAffiliateAssociations.id),
+    )
+    .where(
+      and(
+        eq(campaignAffiliateAssociations.campaignId, input.campaignId),
+        inArray(campaignAffiliateAssociations.status, [
+          'active',
+          'paused',
+          'ended',
+          'successfully_completed',
+        ]),
+      ),
+    );
+
+  for (const row of rows) {
+    const to = row.email?.trim();
+    if (!to) continue;
+
+    const close = await readCreatorClose(deps.db, { associationId: row.associationId });
+    if (!close.ok) continue;
+
+    const rendered = await renderCreatorClosed({
+      campaignTitle: close.view.campaignTitle,
+      contentVerifiedLine: close.view.contentVerified.line,
+      attributedPreorders: close.view.attributed.preorders,
+      attributedCaptured: close.view.attributed.captured,
+      moneyStatusBlock: close.view.earnings.statusBlock,
+      nextReviewLine: close.view.nextReviewLine,
+      partnershipUrl: `${deps.context.appBaseUrl}/creator/campaigns/${row.associationId}/close`,
+      reference: row.associationId,
+      supportEmail: deps.context.supportEmail,
+    });
+
+    await deps.notifier.send({
+      eventKey: AFFILIATE_CAMPAIGN_CLOSED,
+      entityType: 'campaign_affiliate_association',
+      entityId: row.associationId,
+      to,
+      from: deps.context.fromAddress,
+      replyTo: deps.context.supportEmail,
+      ...rendered,
+    });
+  }
+}
+
+/* ── §27.6: the retry window's end, to the staffed inbox (Phase 18b) ────────── */
+
+export async function notifyRetryReconciliationComplete(
+  deps: CloseNotificationDeps,
+  input: {
+    campaignId: string;
+    recovered: number;
+    dropped: number;
+    captured: number;
+  },
+): Promise<void> {
+  const summary =
+    `The 48-hour retry window for campaign ${input.campaignId} has ended: ` +
+    `${input.recovered} recovered, ${input.dropped} dropped, ${input.captured} captured in total. ` +
+    'Dropped reservations count as no revenue, no Creator commission, and no Founder share (§21). ' +
+    'Reconciliation can begin.';
+
+  await deps.notifier.send({
+    eventKey: INTERNAL_RETRY_RECONCILIATION_COMPLETE,
+    entityType: 'campaign',
+    // Once per campaign; the window ends once (the batch trigger pins it).
+    entityId: input.campaignId,
+    to: deps.context.supportEmail,
+    from: deps.context.fromAddress,
+    subject: `Retry window ended — campaign ${input.campaignId}`,
+    html: `<p>${summary}</p>`,
+    text: summary,
   });
 }
 

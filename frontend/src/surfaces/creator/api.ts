@@ -408,3 +408,37 @@ export const fetchPartnership = (
   associationId: string,
 ): Promise<{ partnership: CreatorPartnership }> =>
   sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/partnership`);
+
+/* ── §21 Creator close view (Phase 18b) ────────────────────────────────────── */
+
+export interface CreatorCloseView {
+  associationId: string;
+  campaignId: string;
+  campaignTitle: string;
+  campaignStatus: string;
+  closedAt: string | null;
+  contentVerified: { status: string | null; line: string };
+  attributed: { preorders: number; captured: number; capturedSubtotalCents: string };
+  earnings: {
+    state: 'estimated';
+    label: string;
+    lockedPercent: number | null;
+    estimatedCents: string;
+    reason: string;
+    nextUpdate: string;
+    action: string;
+    statusBlock: string;
+    finalization: 'pending';
+    finalizationNote: string;
+  };
+  bonus: { recorded: number; finalization: 'pending'; note: string } | null;
+  fixedPayment: { applicable: true; status: string; amountCents: string } | { applicable: false };
+  nextReviewAt: string | null;
+  nextReviewLine: string;
+  thankYou: string;
+}
+
+export const fetchCreatorClose = (
+  associationId: string,
+): Promise<{ close: CreatorCloseView }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/close`);

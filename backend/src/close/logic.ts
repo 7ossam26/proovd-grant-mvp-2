@@ -147,6 +147,91 @@ export function provisionalPercent(input: {
   return Math.min(max, input.ceilingPercent);
 }
 
+/* ── §21 reconciliation register (drift-tested, Phase 18b) ──────────────────── */
+
+export const RECONCILIATION_ITEMS = [
+  {
+    key: 'batch_completeness',
+    spec: '§21: Batch completeness and all reservation terminal/retry states.',
+    evaluation: 'app',
+    requiredForResults: true,
+    waitsOn: null,
+  },
+  {
+    key: 'tax_charge_reconciliation',
+    spec: '§21: Tax calculation/charge reconciliation.',
+    evaluation: 'app',
+    requiredForResults: true,
+    waitsOn: null,
+  },
+  {
+    key: 'attribution_post_verification',
+    spec: '§21: Attribution validity and post verification.',
+    evaluation: 'app',
+    requiredForResults: true,
+    waitsOn: null,
+  },
+  {
+    key: 'creator_deliverables',
+    spec: '§21: Every Creator deliverable/waiver/availability period.',
+    evaluation: 'admin',
+    requiredForResults: false,
+    waitsOn: '§22.1 deliverable verification after the retry window (Phase 19)',
+  },
+  {
+    key: 'creator_bonus_triggers',
+    spec: '§21: Creator-specific bonus trigger.',
+    evaluation: 'admin',
+    requiredForResults: false,
+    waitsOn: '§22.1 earnings finalization (Phase 19)',
+  },
+  {
+    key: 'provisional_vs_earned',
+    spec: '§21: Provisional versus earned Creator amount.',
+    evaluation: 'admin',
+    requiredForResults: false,
+    waitsOn: '§22.1 earnings finalization (Phase 19)',
+  },
+  {
+    key: 'unearned_return',
+    spec: '§21: Return of unearned provisional amount to Founder through the approved adjustment path.',
+    evaluation: 'admin',
+    requiredForResults: false,
+    waitsOn: '§24.4 unearned-remainder return (Phase 19)',
+  },
+  {
+    key: 'founder_share_w9',
+    spec: '§21: Founder share and W-9 block.',
+    evaluation: 'admin',
+    requiredForResults: false,
+    waitsOn: '§22.3 W-9 collection and Founder payment schedule (Phase 19)',
+  },
+  {
+    key: 'refund_risk_dispute',
+    spec: '§21: Refund/risk/dispute flags.',
+    evaluation: 'admin',
+    requiredForResults: true,
+    waitsOn: null,
+  },
+] as const;
+
+export type ReconciliationItemKey = (typeof RECONCILIATION_ITEMS)[number]['key'];
+
+export const RECONCILIATION_RESULTS = ['verified', 'discrepancy'] as const;
+export type ReconciliationResult = (typeof RECONCILIATION_RESULTS)[number];
+
+/* ── §21 results narrative fields (drift-tested, Phase 18b) ─────────────────── */
+
+export const RESULTS_NARRATIVE_FIELDS = [
+  { key: 'strongest_signal', label: 'Strongest signal' },
+  { key: 'weakest_signal', label: 'Weakest signal' },
+  { key: 'leading_survey_reason', label: 'Leading survey reason' },
+  { key: 'what_this_proves', label: 'What this result proves' },
+  { key: 'what_this_does_not_prove', label: 'What this result does not prove' },
+] as const;
+
+export type ResultsNarrativeFieldKey = (typeof RESULTS_NARRATIVE_FIELDS)[number]['key'];
+
 /* ── §21 step 6's usability validation ──────────────────────────────────────── */
 
 export type CaptureUsability =

@@ -153,5 +153,73 @@ export const reservationCaptureAttempts = pgTable(
   }),
 );
 
+/* ── campaign_results (§21 results narrative, Phase 18b) ───────────────────── */
+
+/**
+ * §21's Founder-results narrative — the Admin-authored plain-language section
+ * ("strongest signal, weakest signal, leading survey reason, and what the
+ * result does/does not prove, reviewed by Admin to avoid false causality").
+ * One row per campaign; insert-only at the database level. The *numbers* in
+ * the results are deliberately not stored here — they are computed from the
+ * ledger at read time, because a snapshot table is a second event store
+ * waiting to drift (§26.8's trap).
+ */
+export const campaignResults = pgTable(
+  'campaign_results',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id),
+    strongestSignal: text('strongest_signal').notNull(),
+    weakestSignal: text('weakest_signal').notNull(),
+    leadingSurveyReason: text('leading_survey_reason').notNull(),
+    whatThisProves: text('what_this_proves').notNull(),
+    whatThisDoesNotProve: text('what_this_does_not_prove').notNull(),
+    /** §1.3: the named Admin whose review makes the narrative valid. */
+    reviewedBy: text('reviewed_by').notNull(),
+    preparedAt: timestamp('prepared_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    /** One results record per campaign, ever — `Results ready` happens once. */
+    campaignIdx: uniqueIndex('campaign_results_campaign_idx').on(t.campaignId),
+  }),
+);
+
+/* ── campaign_reconciliations (§21 Admin reconciliation, Phase 18b) ────────── */
+
+/**
+ * One row per verification of one §21 reconciliation item, append-only. A
+ * discrepancy later resolved gets a NEW row — the earlier answer survives
+ * (§25.6). The item key is CHECK-pinned in migration 0029 to the nine
+ * registered items, so a route cannot record a verification of something that
+ * does not exist.
+ */
+export const campaignReconciliations = pgTable(
+  'campaign_reconciliations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id),
+    itemKey: text('item_key').notNull(),
+    /** `verified` | `discrepancy` (CHECK-pinned). */
+    result: text('result').notNull(),
+    note: text('note').notNull(),
+    actor: text('actor').notNull(),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    campaignIdx: index('campaign_reconciliations_campaign_idx').on(
+      t.campaignId,
+      t.itemKey,
+      t.recordedAt,
+    ),
+  }),
+);
+
 export type CampaignCloseBatch = typeof campaignCloseBatches.$inferSelect;
 export type ReservationCaptureAttempt = typeof reservationCaptureAttempts.$inferSelect;
+export type CampaignResults = typeof campaignResults.$inferSelect;
+export type CampaignReconciliation = typeof campaignReconciliations.$inferSelect;

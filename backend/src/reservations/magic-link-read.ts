@@ -19,8 +19,15 @@ import { desc, eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { reservations } from '../db/schema/domain.js';
 import { campaigns } from '../db/schema/domain.js';
+import { campaignCloseBatches } from '../db/schema/close.js';
 import { buildPublicCampaign, type PublicCampaign } from '../campaign/public-page.js';
+import {
+  resolveFailedPaymentCopy,
+  NO_MONEY_MOVED_STATE,
+  UPDATE_CARD_ACTION,
+} from '../close/restated.js';
 import { formatCents } from './restated.js';
+import { formatUtcInstant } from './consent.js';
 
 export interface BackerStatus {
   /** The §31.8 stage label for the current reservation status. */
@@ -78,6 +85,19 @@ export interface BackerTransaction {
   canCancel: boolean;
   /** Idea only: whether the reward may still be changed before close (§19). */
   canChangeReward: boolean;
+  /**
+   * The B.5 update-card state (§21, §33.7.9, Phase 18b). Present only while
+   * the reservation is `capture_failed_retrying`: the exact Appendix B.5 body,
+   * the ONE `Update card` action, and the retry deadline. `available` is false
+   * once the stored deadline has passed — the anchor gates, not the sweep tick.
+   */
+  recovery: {
+    body: string;
+    action: string;
+    deadlineUtc: string;
+    deadlineIso: string;
+    available: boolean;
+  } | null;
 }
 
 export interface BackerPage {
@@ -101,10 +121,19 @@ async function campaignIsOpen(db: Database, campaignId: string): Promise<{ open:
 
 export async function readBackerPage(
   db: Database,
-  input: { campaignId: string; backerIdentityId: string },
+  input: { campaignId: string; backerIdentityId: string; now?: Date },
 ): Promise<BackerPage> {
+  const now = input.now ?? new Date();
   const campaign = await buildPublicCampaign(db, input.campaignId);
   const { open, model } = await campaignIsOpen(db, input.campaignId);
+
+  // The one retry window, when this campaign opened one (§21 step 8).
+  const [batch] = await db
+    .select({ retryDeadlineAt: campaignCloseBatches.retryDeadlineAt })
+    .from(campaignCloseBatches)
+    .where(eq(campaignCloseBatches.campaignId, input.campaignId))
+    .limit(1);
+  const retryDeadlineAt = batch?.retryDeadlineAt ?? null;
 
   const rows = await db
     .select()
@@ -117,6 +146,33 @@ export async function readBackerPage(
     .map((r) => {
       const status = deriveBackerStatus(r.status);
       const isActive = r.status === 'reserved_active';
+
+      // §21: the magic-link failed state IS Appendix B.5 — the same resolved
+      // body the email carried, with its one action and the stored deadline.
+      let recovery: BackerTransaction['recovery'] = null;
+      if (r.status === 'capture_failed_retrying' && retryDeadlineAt) {
+        const deadlineUtc = formatUtcInstant(retryDeadlineAt);
+        const resolved = resolveFailedPaymentCopy({
+          moneyMovedState: NO_MONEY_MOVED_STATE,
+          campaignTitle: campaign?.campaign.title ?? 'this campaign',
+          rewardTitle: r.rewardTitle ?? 'your reward',
+          rewardSubtotal: formatCents(r.rewardSubtotalCents),
+          salesTax: formatCents(r.salesTaxCents),
+          totalAttempted: formatCents(r.totalAuthorizedCents ?? 0n),
+          // §27.1 wants local + UTC; no Backer timezone is stored (§25.2), so
+          // the one instant renders as UTC in both positions — the email's rule.
+          updateByLocal: deadlineUtc,
+          updateByUtc: deadlineUtc,
+        });
+        recovery = {
+          body: resolved.body,
+          action: UPDATE_CARD_ACTION,
+          deadlineUtc,
+          deadlineIso: retryDeadlineAt.toISOString(),
+          available: retryDeadlineAt.getTime() > now.getTime(),
+        };
+      }
+
       return {
         reservationId: r.id,
         rewardSku: r.rewardSku,
@@ -133,6 +189,7 @@ export async function readBackerPage(
         canceledAt: r.canceledAt?.toISOString() ?? null,
         canCancel: isActive && open,
         canChangeReward: isActive && open && model === 'idea',
+        recovery,
       };
     });
 

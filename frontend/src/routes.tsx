@@ -26,12 +26,14 @@ import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
 import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { CampaignHome } from './surfaces/founder/CampaignHome.js';
+import { CampaignResults } from './surfaces/founder/CampaignResults.js';
 import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { LedgerPage } from './features/admin/Ledger.js';
 import { MoneyControlsPage } from './features/admin/MoneyControls.js';
 import { RiskPanelPage } from './features/admin/RiskPanel.js';
 import { SupportQueuePage } from './features/admin/SupportQueue.js';
 import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
+import { CloseOperationsPage } from './features/admin/CloseOperations.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -40,6 +42,7 @@ import {
 } from './surfaces/creator/CreatorCampaigns.js';
 import { FormalOpportunity } from './surfaces/creator/FormalOpportunity.js';
 import { CreatorPartnership } from './surfaces/creator/CreatorPartnership.js';
+import { CreatorCampaignClose } from './surfaces/creator/CreatorCampaignClose.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { BackerPage } from './features/public/backer/BackerPage.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
@@ -148,6 +151,11 @@ const rootChildren: RouteObject[] = [
       // and relationship touches — is campaign-scoped like the panels above.
       { path: 'support', element: <SupportQueuePage /> },
       { path: 'campaign-operations', element: <CampaignOperationsPage /> },
+      // Phase 18b (§21, §33.7.12). The close-operations queue: incomplete
+      // batches first (visibly recoverable), then open retry windows, then
+      // reconciliation and results preparation, scoped per campaign by query
+      // string like the panels above.
+      { path: 'close', element: <CloseOperationsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
@@ -226,6 +234,13 @@ const rootChildren: RouteObject[] = [
     element: <CreatorPartnership />,
   },
   {
+    // Phase 18b (§21). The Creator's campaign close view: content verified,
+    // attributed pre-orders/captures, estimated earnings as Appendix B.7, the
+    // next review date, and a factual thank-you — no ranking anywhere (§30).
+    path: 'creator/campaigns/:associationId/close',
+    element: <CreatorCampaignClose />,
+  },
+  {
     // Phase 09a (§12, DNA §5.9). The signed-in Founder's campaign workspace.
     // Outside the public shell and outside the Admin shell, for the reasons the
     // Creator routes document: §26 licenses dashboard density in Admin only,
@@ -271,6 +286,13 @@ const rootChildren: RouteObject[] = [
     // this is deliberately a chronological workspace rather than a widget grid.
     path: 'campaigns/:campaignId/home',
     element: <CampaignHome />,
+  },
+  {
+    // Phase 18b (§21, §33.7.11). The Founder's campaign results — the waiting
+    // state until `Results ready` fires, then every §21 number with the
+    // Admin-reviewed "what this does and does not prove" section.
+    path: 'campaigns/:campaignId/results',
+    element: <CampaignResults />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

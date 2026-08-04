@@ -29,6 +29,7 @@ import { requireRole } from '../auth/guards.js';
 import type { AuditWriter } from '../auth/audit.js';
 import { findFounderCampaign } from '../workspace/service.js';
 import { readCampaignHome } from '../live/home.js';
+import { readFounderResults } from '../close/results.js';
 import { readExplore } from '../live/explore.js';
 import { acknowledgeDelivery } from '../live/glance.js';
 import { acknowledgeMilestone } from '../live/thresholds.js';
@@ -103,6 +104,25 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
       return;
     }
     res.json({ home });
+  });
+
+  /**
+   * §21's Founder results (Phase 18b). One read, two states: `preparing` — the
+   * honest waiting state until `Results ready` has actually fired — and `ready`,
+   * carrying every §21 number plus the Admin-reviewed narrative. Survey answers
+   * appear only where the Backer consented, and Creators appear as public
+   * handles only (§11) — both enforced in the read itself.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/results`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+
+    const results = await readFounderResults(db, { campaignId });
+    if (!results) {
+      notFound(res);
+      return;
+    }
+    res.json({ results });
   });
 
   /**

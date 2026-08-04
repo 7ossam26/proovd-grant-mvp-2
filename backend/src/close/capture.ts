@@ -93,7 +93,14 @@ export async function provisionalPercentFor(
 }
 
 export type ApplySuccessResult =
-  | { applied: true; reservation: Reservation }
+  | {
+      applied: true;
+      reservation: Reservation;
+      /** The state the capture applied FROM — `capture_failed_retrying` means
+          this was a §21 recovery, and §27.5 gives that its own message
+          ("Retry success"), never a second receipt. */
+      from: 'pending_capture' | 'capture_failed_retrying';
+    }
   | { applied: false; reason: 'already_captured' | 'not_capturable'; current: string }
   | { applied: false; reason: 'not_found' };
 
@@ -151,6 +158,7 @@ export async function applyCaptureSuccess(
       // machine forbids (§23.5).
       return { applied: false, reason: 'not_capturable', current: row.status };
     }
+    const from = row.status;
 
     // The exactly-once pivot for the ledger write (§33.7.7).
     try {
@@ -233,7 +241,7 @@ export async function applyCaptureSuccess(
         ),
       );
 
-    return { applied: true, reservation: moved[0]! };
+    return { applied: true, reservation: moved[0]!, from };
   });
 
   if (result.applied) {

@@ -10,6 +10,9 @@
  * `GET  …/page`                          the campaign + this Backer's transactions
  * `POST …/reservations/:id/cancel`       §20 cancellation (one action, no cost)
  * `POST …/reservations/:id/change-reward`§19 Idea reward change (replacement-first)
+ * `POST …/reservations/:id/update-card`  §21's B.5 recovery (Phase 18b): save a
+ *                                        new card, retry once under the next
+ *                                        stable attempt key (§33.7.9)
  */
 
 import { Router, json } from 'express';
@@ -25,6 +28,7 @@ import { campaignBuild } from '../db/schema/build.js';
 import { readBackerPage } from '../reservations/magic-link-read.js';
 import { cancelReservation } from '../reservations/cancellation.js';
 import { replaceIdeaReward } from '../reservations/preorder.js';
+import { updateCardAndRetry } from '../close/retry.js';
 import { findCampaignFounderUserId } from '../reservations/context.js';
 import { findAccountForOwner } from '../payments/connected-accounts.js';
 import { evaluateAndNotifyThreshold } from '../live/thresholds.js';
@@ -206,6 +210,97 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
     await evaluateThreshold(deps, subject.campaignId, 'system:reward-replacement');
 
     res.status(201).json(result.success);
+  });
+
+  /**
+   * §21's B.5 recovery (Phase 18b, §33.7.9): save a new card and retry once
+   * under the next stable attempt key. The response never carries a provider
+   * code (§33.9.11) — the neutral outcome is the message, and the raw code
+   * stays on the attempt row for support.
+   */
+  router.post(`${base}/reservations/:reservationId/update-card`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (typeof b['paymentMethodId'] !== 'string' || !b['paymentMethodId'].trim()) {
+      res.status(422).json({ error: { code: 'invalid_request', message: 'Missing payment method.' } });
+      return;
+    }
+
+    const outcome = await updateCardAndRetry(
+      {
+        db: deps.db,
+        gateway: deps.gateway,
+        audit: deps.audit,
+        notifier: deps.notifier,
+        ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+        tokens: deps.tokens,
+      },
+      {
+        reservationId: String(req.params.reservationId),
+        backerIdentityId: subject.backerIdentityId,
+        paymentMethodId: b['paymentMethodId'],
+        ...(typeof b['requestId'] === 'string' ? { requestId: b['requestId'] } : {}),
+        actor: `backer:${subject.backerIdentityId}`,
+      },
+    );
+
+    switch (outcome.status) {
+      case 'captured':
+        res.json({
+          status: 'captured',
+          message: 'Your updated card completed this pre-order charge. Nothing more is needed.',
+        });
+        return;
+      case 'already_captured':
+        // A double submit after success is harmless (§33.7.9).
+        res.json({
+          status: 'already_captured',
+          message: 'This pre-order charge is already complete. Nothing more is needed.',
+        });
+        return;
+      case 'requires_action':
+        // §21: routed to a customer-action surface, never silent.
+        res.json({
+          status: 'requires_action',
+          clientSecret: outcome.clientSecret,
+          message:
+            'Your bank asks you to confirm this charge. Complete the confirmation to finish — nothing has been charged yet.',
+        });
+        return;
+      case 'failed_again':
+        res.status(402).json({
+          status: 'failed_again',
+          message:
+            'This charge could not be completed with that card. No money has moved — you can try a different card before the update deadline.',
+        });
+        return;
+      case 'setup_failed':
+        res.status(402).json({
+          status: 'setup_failed',
+          message: 'That card could not be saved. No money has moved — you can try another card.',
+        });
+        return;
+      case 'retry_window_closed':
+        res.status(409).json({
+          status: 'retry_window_closed',
+          deadline: outcome.deadline.toISOString(),
+          message:
+            'The update window for this pre-order has ended, so the card can no longer be updated here. No money has moved.',
+        });
+        return;
+      case 'not_recoverable':
+        res.status(409).json({ status: 'not_recoverable', current: outcome.current });
+        return;
+      case 'provider_error':
+        res.status(503).json({
+          status: 'provider_error',
+          message:
+            'We could not reach the payment provider. Nothing was charged twice — trying again is safe.',
+        });
+        return;
+      default:
+        res.status(404).json({ error: 'not_found' });
+    }
   });
 
   return router;

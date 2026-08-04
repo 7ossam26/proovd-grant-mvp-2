@@ -1,21 +1,26 @@
 /**
- * Phase 15 — the Backer magic-link page (§19, §20, §33.5.13).
+ * Phase 15 — the Backer magic-link page (§19, §20, §33.5.13) — and Phase 18b's
+ * B.5 update-card recovery state (§21, §33.7.9).
  *
  * A valid link shows the Backer's transactions with the not-charged fact and a
  * cancel action; an invalid link renders one recovery state that exposes nothing
- * (§5.5). The network is stubbed — the page's content and the cancel round-trip
- * are what is under test.
+ * (§5.5). A failed off-session charge renders Appendix B.5 with its ONE
+ * `Update card` action; success reloads to the derived Captured state, and
+ * `requires_action` renders a customer-action state rather than a silent
+ * outcome. The network is stubbed — the surfaces and their round-trips are what
+ * is under test (the card-recovery surface is one of the toolchain's named
+ * Testing Library targets).
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { BackerPage } from './BackerPage.js';
+import { BackerPage, type BackerPageProps } from './BackerPage.js';
 
-function renderAt(token: string) {
+function renderAt(token: string, props: BackerPageProps = {}) {
   const router = createMemoryRouter(
-    [{ path: '/backer/:token', element: <BackerPage /> }],
+    [{ path: '/backer/:token', element: <BackerPage {...props} /> }],
     { initialEntries: [`/backer/${token}`] },
   );
   render(<RouterProvider router={router} />);
@@ -103,5 +108,174 @@ describe('§33.5.13 — the Backer magic-link page', () => {
     // No PII, no reservation, no campaign detail is leaked on a rejected link.
     expect(screen.queryByText('The Focus Timer')).not.toBeInTheDocument();
     expect(screen.getByText(/support@proovd.co/)).toBeInTheDocument();
+  });
+});
+
+/* ── Phase 18b — the B.5 update-card state (§21, §33.7.9) ──────────────────── */
+
+const B5_BODY = [
+  'We could not complete this pre-order charge.',
+  '',
+  'No money has moved — the charge did not complete and nothing was taken from your card.',
+  'Campaign: The Focus Timer',
+  'Reward: Founding backer',
+  'Reward subtotal: US$25.00',
+  'Sales tax: US$2.00',
+  'Total attempted: US$27.00',
+  'Update by: August 6, 2026 at 7:40 PM UTC (August 6, 2026 at 7:40 PM UTC)',
+  '',
+  'If you do nothing, this pre-order will be canceled after the retry window.',
+].join('\n');
+
+const FAILED_TX = {
+  ...PAGE.transactions[0],
+  status: 'capture_failed_retrying',
+  statusLabel: 'Payment failed — retrying',
+  canCancel: false,
+  recovery: {
+    body: B5_BODY,
+    action: 'Update card',
+    deadlineUtc: 'August 6, 2026 at 7:40 PM UTC',
+    deadlineIso: '2026-08-06T19:40:00.000Z',
+    available: true,
+  },
+};
+
+describe('§33.7.9 — the B.5 update-card recovery state', () => {
+  it('renders Appendix B.5 with one Update card action, and success clears the stale failure', async () => {
+    let recovered = false;
+    stubFetch((url, init) => {
+      if (url.includes('/update-card')) {
+        expect(JSON.parse(String(init?.body))).toEqual({ paymentMethodId: 'pm_new_card' });
+        recovered = true;
+        return {
+          status: 200,
+          body: { status: 'captured', message: 'Your updated card completed this pre-order charge.' },
+        };
+      }
+      if (recovered) {
+        return {
+          status: 200,
+          body: {
+            ...PAGE,
+            transactions: [
+              {
+                ...PAGE.transactions[0],
+                status: 'captured',
+                statusLabel: 'Captured',
+                chargeOccurred: true,
+                canCancel: false,
+                recovery: null,
+              },
+            ],
+          },
+        };
+      }
+      return { status: 200, body: { ...PAGE, transactions: [FAILED_TX] } };
+    });
+
+    renderAt('validtoken123', {
+      createPaymentMethodFn: async () => ({ ok: true, paymentMethodId: 'pm_new_card' }),
+    });
+
+    // The exact B.5 facts: money moved, the total attempted, the deadline.
+    expect(
+      await screen.findByText(/We could not complete this pre-order charge/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/No money has moved/)).toBeInTheDocument();
+    expect(screen.getByText(/Total attempted: US\$27\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/Update by: August 6, 2026/)).toBeInTheDocument();
+    // ONE Update card action (§21) and no competing control beside it (§30).
+    const updateButtons = screen.getAllByRole('button', { name: 'Update card' });
+    expect(updateButtons).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Cancel pre-order' })).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(updateButtons[0]!);
+
+    // Success reloads: the derived state is Captured and the failure block is
+    // gone — removed by the state itself, not an optimistic hide (§33.7.9).
+    expect(await screen.findByText('Captured')).toBeInTheDocument();
+    expect(screen.queryByText(/We could not complete this pre-order charge/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Update card' })).not.toBeInTheDocument();
+  });
+
+  it('requires_action renders the customer-action state — never a silent outcome (§21)', async () => {
+    stubFetch((url) => {
+      if (url.includes('/update-card')) {
+        return {
+          status: 200,
+          body: {
+            status: 'requires_action',
+            clientSecret: 'pi_secret',
+            message:
+              'Your bank asks you to confirm this charge. Complete the confirmation to finish — nothing has been charged yet.',
+          },
+        };
+      }
+      return { status: 200, body: { ...PAGE, transactions: [FAILED_TX] } };
+    });
+
+    renderAt('validtoken123', {
+      createPaymentMethodFn: async () => ({ ok: true, paymentMethodId: 'pm_3ds_card' }),
+    });
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Update card' }));
+
+    expect(await screen.findByText(/Your bank asks you to confirm this charge/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing is charged until your bank confirms/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /I completed the confirmation/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('a repeat failure stays neutral and non-shaming, and the card can be tried again', async () => {
+    stubFetch((url) => {
+      if (url.includes('/update-card')) {
+        return {
+          status: 402,
+          body: {
+            status: 'failed_again',
+            message:
+              'This charge could not be completed with that card. No money has moved — you can try a different card before the update deadline.',
+          },
+        };
+      }
+      return { status: 200, body: { ...PAGE, transactions: [FAILED_TX] } };
+    });
+
+    renderAt('validtoken123', {
+      createPaymentMethodFn: async () => ({ ok: true, paymentMethodId: 'pm_declining' }),
+    });
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Update card' }));
+
+    const status = await screen.findByRole('status');
+    expect(status.textContent).toContain('No money has moved');
+    // Neutral copy: no shaming, no provider code (§33.9.11, §30).
+    expect(status.textContent?.toLowerCase()).not.toContain('declined');
+    // The action survives for another try inside the window.
+    expect(screen.getByRole('button', { name: 'Update card' })).toBeInTheDocument();
+  });
+
+  it('after the deadline the block says the window ended and offers no card field', async () => {
+    stubFetch(() => ({
+      status: 200,
+      body: {
+        ...PAGE,
+        transactions: [
+          { ...FAILED_TX, recovery: { ...FAILED_TX.recovery, available: false } },
+        ],
+      },
+    }));
+
+    renderAt('validtoken123');
+
+    expect(await screen.findByText(/The update window ended at/)).toBeInTheDocument();
+    // Both the B.5 body and the closing note state the no-money fact.
+    expect(screen.getAllByText(/No money has moved/i).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Update card' })).not.toBeInTheDocument();
   });
 });

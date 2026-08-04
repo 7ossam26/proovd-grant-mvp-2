@@ -46,6 +46,7 @@ import { notifyListingRefund } from '../payments/listing-notifications.js';
 import { sweepPrechargeReminders } from '../reservations/reminder.js';
 import { sweepThresholdCrossings } from '../live/thresholds.js';
 import { sweepCampaignCloses } from '../close/close-batch.js';
+import { sweepRetryWindowEnds } from '../close/retry.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -420,16 +421,18 @@ export async function startScheduler({
       log('campaign close sweep skipped: no Stripe gateway configured');
       return;
     }
-    const { result, batches } = await sweepCampaignCloses(
-      {
-        db,
-        gateway: listing.gateway,
-        audit,
-        ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
-        tokens,
-      },
-      new Date(),
-    );
+    const closeSweepDeps = {
+      db,
+      gateway: listing.gateway,
+      audit,
+      ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
+      tokens,
+    };
+    const { result, batches } = await sweepCampaignCloses(closeSweepDeps, new Date());
+    // Phase 18b (§21): the same tick ends every retry window whose stored
+    // deadline has passed — recoveries stay captured, the rest drop at US$0,
+    // and the campaign enters closed_reconciling. Independently idempotent.
+    const windowEnds = await sweepRetryWindowEnds(closeSweepDeps, new Date());
     log('campaign close sweep complete', {
       started: result.started.length,
       resumed: result.resumed.length,
@@ -442,6 +445,13 @@ export async function startScheduler({
         failed: b.failed,
         dropped: b.dropped,
         errored: b.errored,
+      })),
+      retryWindowsEnded: windowEnds.map((w) => ({
+        campaignId: w.campaignId,
+        status: w.status,
+        recovered: w.recovered,
+        dropped: w.dropped,
+        unresolved: w.unresolved,
       })),
     });
   });

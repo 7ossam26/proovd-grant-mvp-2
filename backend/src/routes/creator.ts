@@ -38,6 +38,7 @@ import { readPreparingKit, listCreatorCampaigns } from '../affiliates/kit.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import { submitPost } from '../launch/post-verification.js';
 import { buildCreatorPartnership } from '../affiliates/partnership.js';
+import { readCreatorClose } from '../close/creator-close.js';
 
 export const CREATOR_PATH = '/api/creator';
 
@@ -191,6 +192,33 @@ export function createCreatorRouter(
       return;
     }
     res.json({ partnership: result.partnership });
+  });
+
+  /**
+   * §21's Creator close surface (Phase 18b): content verified, attributed
+   * pre-orders and captures, estimated earnings as Appendix B.7, the next
+   * review date, and a factual thank-you — with no ranking anywhere (§30).
+   * Scoped by session exactly as the partnership read is.
+   */
+  router.get(`${CREATOR_PATH}/campaigns/:associationId/close`, creator, async (req, res) => {
+    const associationId = req.params['associationId'] as string;
+    if (!(await ownsAssociation(associationId, actorId(req)))) {
+      res.status(404).json({ error: 'not_found', title: 'Campaign not found' });
+      return;
+    }
+    const result = await readCreatorClose(db, { associationId });
+    if (!result.ok) {
+      res.status(result.code === 'not_found' ? 404 : 409).json({
+        error: result.code,
+        title: result.code === 'not_closed' ? 'The campaign has not closed yet' : 'Campaign not found',
+        whatHappened:
+          result.code === 'not_closed'
+            ? 'Close results exist once the campaign closes. Until then your partnership dashboard is the live view.'
+            : 'That campaign could not be found.',
+      });
+      return;
+    }
+    res.json({ close: result.view });
   });
 
   return router;

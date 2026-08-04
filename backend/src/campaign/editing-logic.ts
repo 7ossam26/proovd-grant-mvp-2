@@ -429,3 +429,59 @@ export const EARNINGS_STATE_LABELS: Readonly<Record<EarningsState, string>> = {
 export function requiresExplanation(state: EarningsState): boolean {
   return state !== 'paid_out';
 }
+
+/* ── Appendix B.7, restated (shared/live/earnings — drift-tested) ──────────── */
+
+/**
+ * Phase 17b restated the states but deliberately never rendered B.7 — there
+ * was no amount to state. Phase 18b has one: a captured, attributed subtotal
+ * exists after close, so the Creator close surface and the §27.4 close notice
+ * render the block server-side, and the resolver arrives with them.
+ */
+export const AFFILIATE_MONEY_STATUS_TEMPLATE = `US$[AMOUNT] recorded
+
+Status: [ESTIMATED / FINALIZED / APPROVED FOR TRANSFER / TRANSFERRED /
+PAID OUT / PAYOUT FAILED / ADJUSTED]
+Why it is not paid yet: [REASON]
+Expected next update: [DATE]
+Your action: [ACTION or "No action needed"]`;
+
+/** §11's exact phrase, shared by the waiting states and this one. */
+export const NO_ACTION_NEEDED = 'No action needed';
+
+export interface AffiliateMoneyStatusVariables {
+  amount: string;
+  state: EarningsState;
+  reason: string;
+  nextUpdate: string;
+  action?: string | undefined;
+}
+
+export function resolveAffiliateMoneyStatus(v: AffiliateMoneyStatusVariables): string {
+  if (!/^[\d,]+\.\d{2}$/.test(v.amount)) {
+    throw new Error(`Appendix B.7 needs a formatted amount such as "1,234.50", got "${v.amount}"`);
+  }
+  if (requiresExplanation(v.state) && !v.reason.trim()) {
+    throw new Error(`§20 requires a reason for the ${v.state} state`);
+  }
+  if (!v.nextUpdate.trim()) {
+    throw new Error('§20 requires an expected next update');
+  }
+
+  const action = v.action?.trim() || NO_ACTION_NEEDED;
+  const reason = v.reason.trim() || 'It has been paid out.';
+
+  const rendered = AFFILIATE_MONEY_STATUS_TEMPLATE.replace('[AMOUNT]', v.amount)
+    .replace(
+      '[ESTIMATED / FINALIZED / APPROVED FOR TRANSFER / TRANSFERRED /\nPAID OUT / PAYOUT FAILED / ADJUSTED]',
+      EARNINGS_STATE_LABELS[v.state],
+    )
+    .replace('[REASON]', reason)
+    .replace('[DATE]', v.nextUpdate.trim())
+    .replace('[ACTION or "No action needed"]', action);
+
+  if (/\[[^\]]+\]/.test(rendered)) {
+    throw new Error(`Appendix B.7 rendered with an unfilled marker: ${rendered}`);
+  }
+  return rendered;
+}

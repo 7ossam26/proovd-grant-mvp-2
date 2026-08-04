@@ -220,6 +220,14 @@ export interface OffSessionPaymentIntentResult {
   failureCode: string | null;
   declineCode: string | null;
   failureMessage: string | null;
+  /**
+   * Present on `requires_action`: what the customer-action recovery surface
+   * needs to complete authentication in the Backer's browser (§21 — routed to
+   * a customer action, never silently succeeded or silently failed). Not a
+   * secret in the credential sense: it is scoped to this one intent and is how
+   * Stripe designs the hand-off.
+   */
+  clientSecret: string | null;
 }
 
 export interface StripeGateway {
@@ -703,6 +711,7 @@ function normalizePaymentIntent(intent: Stripe.PaymentIntent): OffSessionPayment
     failureCode: lastError?.code ?? null,
     declineCode: lastError?.decline_code ?? null,
     failureMessage: lastError?.message ?? null,
+    clientSecret: intent.status === 'requires_action' ? (intent.client_secret ?? null) : null,
   };
 }
 
@@ -990,6 +999,7 @@ export function createMemoryStripeGateway(config: {
               ? 'generic_decline'
               : null,
         failureMessage: status === 'failed' ? 'Your card was declined.' : null,
+        clientSecret: status === 'requires_action' ? `${id}_secret` : null,
       };
       paymentIntentsByKey.set(input.idempotencyKey, result);
       return result;

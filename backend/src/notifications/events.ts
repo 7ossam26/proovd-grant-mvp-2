@@ -169,10 +169,9 @@ export const INTERNAL_THRESHOLD_LOST = 'internal_threshold_lost' as const;
 /**
  * Phase 18a's six, sent by `close/notifications.ts`.
  *
- * §27.3 — "Campaign ended" (separately from "Results ready", which is Phase
- * 18b's and is deliberately NOT restated here — a key with no sender claims a
- * message the product does not send, §1.4, and §33.7.11 is exactly about the
- * two being separate). §27.5 — the threshold-miss/no-charge closure, the
+ * §27.3 — "Campaign ended" (separately from "Results ready", which arrived in
+ * Phase 18b with its sender — the two stayed separate keys throughout, and
+ * §33.7.11 is exactly about that). §27.5 — the threshold-miss/no-charge closure, the
  * charge receipt, the failed-charge/update-card recovery (Appendix B.5), and
  * the dropped notice (§21's tax-unusable drop; the retry-window-end drop is
  * 18b's second sender for the same key). §27.6 — the charge batch result.
@@ -183,6 +182,35 @@ export const BACKER_CHARGE_RECEIPT = 'backer_charge_receipt' as const;
 export const BACKER_CHARGE_FAILED_UPDATE_CARD = 'backer_charge_failed_update_card' as const;
 export const BACKER_RETRY_DROPPED = 'backer_retry_dropped' as const;
 export const INTERNAL_CHARGE_BATCH_RESULT = 'internal_charge_batch_result' as const;
+
+/**
+ * Phase 18b's four, sent by `close/notifications.ts`.
+ *
+ * §27.5 — "Retry success": the campaign-aware confirmation for a charge
+ * recovered through the B.5 update-card path; the Backer whose close-batch
+ * charge succeeded first time gets `backer_charge_receipt`, and a recovered
+ * one gets THIS — §27.5 names "Charge receipt" and "Retry success" as separate
+ * events, so a recovery is never two emails.
+ *
+ * §27.3 — "Results ready", deliberately a different key from
+ * `founder_campaign_ended` (§33.7.11): it fires only after charge, retry, and
+ * reconciliation results are prepared, and `prepareResults` is its one sender.
+ *
+ * §27.4 — "Campaign closed": the Creator's factual close notice, deduped on
+ * the association, sent when the campaign's charge outcomes are final.
+ *
+ * §27.6 — "Retry/reconciliation complete": the internal notice that the one
+ * 48-hour window has ended and reconciliation can begin.
+ *
+ * `internal_failed_payment_spike` remains deliberately unsent: "spike" needs a
+ * threshold and §6 names none — inventing one is §1 rule 6, and a key with no
+ * sender claims a message the product does not send (§1.4).
+ */
+export const BACKER_RETRY_SUCCESS = 'backer_retry_success' as const;
+export const FOUNDER_RESULTS_READY = 'founder_results_ready' as const;
+export const AFFILIATE_CAMPAIGN_CLOSED = 'affiliate_campaign_closed' as const;
+export const INTERNAL_RETRY_RECONCILIATION_COMPLETE =
+  'internal_retry_reconciliation_complete' as const;
 
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
@@ -225,6 +253,10 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   BACKER_CHARGE_FAILED_UPDATE_CARD,
   BACKER_RETRY_DROPPED,
   INTERNAL_CHARGE_BATCH_RESULT,
+  BACKER_RETRY_SUCCESS,
+  FOUNDER_RESULTS_READY,
+  AFFILIATE_CAMPAIGN_CLOSED,
+  INTERNAL_RETRY_RECONCILIATION_COMPLETE,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

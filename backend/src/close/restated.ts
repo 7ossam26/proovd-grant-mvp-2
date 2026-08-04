@@ -89,3 +89,6 @@ export const THRESHOLD_MISS_REASON =
 
 export const TAX_UNUSABLE_DROP_REASON =
   'The sales-tax calculation stored with your pre-order could no longer be used at close, so no charge occurred — Proovd never substitutes a different total. Amount charged: US$0.';
+
+export const RETRY_WINDOW_DROP_REASON =
+  'The update window for this pre-order has ended without a completed charge, so it was canceled. No charge occurred. Amount charged: US$0.';

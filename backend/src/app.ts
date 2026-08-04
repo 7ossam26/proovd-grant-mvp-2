@@ -29,6 +29,7 @@ import { createAttributionRouter } from './routes/attribution.js';
 import { createPublicCampaignRouter } from './routes/public-campaign.js';
 import { createBackerPreorderRouter } from './routes/backer-preorder.js';
 import { createBackerRouter } from './routes/backer.js';
+import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
 import {
@@ -538,6 +539,22 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     // same token guard; the campaign comes from the token subject, never the
     // body, so a link for one campaign cannot post to another.
     app.use(createBackerCommentRouter({ db, tokens, audit }));
+    // Phase 18b (§21, §33.7.12). Admin's close operations: the visibly
+    // recoverable batch queue, resume (the same idempotent machine the sweep
+    // runs), §21 reconciliation records, and results preparation — the one
+    // sender of `Results ready` (§33.7.11). Reads are `admin`; resume,
+    // reconciliation, and results take the freshness gate.
+    app.use(
+      createAdminCloseRouter({
+        db,
+        auth,
+        audit,
+        gateway: config.stripeGateway,
+        notifier,
+        notificationContext: launchContext,
+        tokens,
+      }),
+    );
   }
 
   // ── SPA fallback ──────────────────────────────────────────────────────────

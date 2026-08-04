@@ -803,3 +803,68 @@ export const recordActCorrection = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── §21 Founder results (Phase 18b) ───────────────────────────────────────── */
+
+export interface FounderResultsView {
+  campaignId: string;
+  campaignTitle: string;
+  model: 'idea' | 'product';
+  state: 'preparing' | 'ready';
+  campaignStatus: string;
+  closedAt: string | null;
+  threshold: { required: number; uniqueActiveBackers: number; met: boolean } | null;
+  preorders: { placed: number; captured: number; canceled: number; noCharge: number };
+  uniqueBackers: number;
+  productTransactions: { transactions: number; units: number } | null;
+  money: {
+    rewardSubtotalCapturedCents: string;
+    salesTaxCapturedCents: string;
+    totalCapturedCents: string;
+  };
+  payments: { failed: number; recovered: number; dropped: number };
+  conversion: {
+    clicks: number;
+    placed: number;
+    conversionRate: string | null;
+    canceled: number;
+    dropOffRate: string | null;
+  };
+  survey: {
+    consentedCount: number;
+    totalPreorderCount: number;
+    averageRecommend: string | null;
+    reasons: string[];
+  };
+  perCreator: Array<{
+    associationId: string;
+    handle: string | null;
+    clicks: number;
+    attributedPlaced: number;
+    attributedCaptured: number;
+    capturedSubtotalCents: string;
+    provisionalCents: string;
+    lockedPercent: number | null;
+  }>;
+  revenueBySource: { creatorAttributedCents: string; directCents: string; note: string };
+  bonuses: Array<{ associationId: string; earnedPercent: number | null; status: string }>;
+  finalization: {
+    creatorEarnings: 'pending';
+    note: string;
+    fixedPayments: Array<{ associationId: string; status: string }>;
+  };
+  narrative: {
+    strongestSignal: string;
+    weakestSignal: string;
+    leadingSurveyReason: string;
+    whatThisProves: string;
+    whatThisDoesNotProve: string;
+    reviewedBy: string;
+    preparedAt: string;
+  } | null;
+  preparing: { whatHappened: string; whatNext: string; owner: string } | null;
+}
+
+export const fetchCampaignResults = (
+  campaignId: string,
+): Promise<{ results: FounderResultsView }> => call(`${base(campaignId)}/results`);

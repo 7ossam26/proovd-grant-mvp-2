@@ -67,6 +67,7 @@ import {
   notifyCaptureFailed,
   notifyChargeReceipt,
   notifyThresholdMissClosure,
+  notifyCreatorsCampaignClosed,
   type CloseNotificationDeps,
 } from './notifications.js';
 
@@ -555,6 +556,9 @@ async function applyThresholdMiss(
         noCharge: applied.noCharge,
       });
     }
+    // §27.4 (18b): the campaign's charge outcome is final at the miss — the
+    // Creator's factual close notice sends now, deduped on the association.
+    await notifyCreatorsCampaignClosed(notify, { campaignId });
   }
 
   const [finalBatch] = await db
@@ -754,6 +758,13 @@ async function applyChargePath(
       dropped: totals.dropped,
       noCharge: 0,
     });
+    // §27.4 (18b): a clean batch's outcomes are final at completion — the
+    // Creator close notices send now. A batch that opened the retry window
+    // sends them at the window's end instead, when the numbers are final;
+    // the association-level dedup makes whichever path runs first the sender.
+    if (totals.retrying === 0) {
+      await notifyCreatorsCampaignClosed(notify, { campaignId });
+    }
   }
 
   return summary('complete', campaignId, {

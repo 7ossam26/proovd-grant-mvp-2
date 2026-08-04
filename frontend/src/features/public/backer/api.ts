@@ -20,6 +20,18 @@ export interface BackerTransaction {
   notChargedYet: boolean;
   canCancel: boolean;
   canChangeReward: boolean;
+  /**
+   * The B.5 update-card state (§21, Phase 18b): the exact failed-payment body,
+   * its ONE action, and the retry deadline. Null unless the charge failed and
+   * is inside the one 48-hour window.
+   */
+  recovery: {
+    body: string;
+    action: string;
+    deadlineUtc: string;
+    deadlineIso: string;
+    available: boolean;
+  } | null;
 }
 
 export interface BackerPageData {
@@ -51,6 +63,50 @@ export async function cancelReservation(
     { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'include', body: '{}' },
   );
   return { ok: res.ok };
+}
+
+/* ── The B.5 update-card retry (§21, §33.7.9 — Phase 18b) ──────────────────── */
+
+export type UpdateCardResult =
+  | { status: 'captured' | 'already_captured'; message: string }
+  | { status: 'requires_action'; clientSecret: string | null; message: string }
+  | { status: 'failed_again' | 'setup_failed' | 'provider_error'; message: string }
+  | { status: 'retry_window_closed'; message: string }
+  | { status: 'error'; message: string };
+
+export async function updateCardAndRetry(
+  token: string,
+  reservationId: string,
+  paymentMethodId: string,
+): Promise<UpdateCardResult> {
+  const res = await fetch(
+    `/api/link/${encodeURIComponent(token)}/reservations/${encodeURIComponent(reservationId)}/update-card`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ paymentMethodId }),
+    },
+  );
+  const body = (await res.json().catch(() => null)) as
+    | { status?: string; message?: string; clientSecret?: string | null }
+    | null;
+  const message = body?.message ?? 'Something went wrong. No money has moved.';
+  switch (body?.status) {
+    case 'captured':
+    case 'already_captured':
+      return { status: body.status, message };
+    case 'requires_action':
+      return { status: 'requires_action', clientSecret: body.clientSecret ?? null, message };
+    case 'failed_again':
+    case 'setup_failed':
+    case 'provider_error':
+      return { status: body.status, message };
+    case 'retry_window_closed':
+      return { status: 'retry_window_closed', message };
+    default:
+      return { status: 'error', message };
+  }
 }
 
 /* ── The §18 comment thread (Phase 17b) ────────────────────────────────────── */
