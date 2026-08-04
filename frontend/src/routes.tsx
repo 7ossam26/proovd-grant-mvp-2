@@ -25,6 +25,7 @@ import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
 import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
+import { CampaignHome } from './surfaces/founder/CampaignHome.js';
 import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { LedgerPage } from './features/admin/Ledger.js';
 import { MoneyControlsPage } from './features/admin/MoneyControls.js';
@@ -262,6 +263,14 @@ const rootChildren: RouteObject[] = [
     // Beside the other campaign surfaces, outside both shells.
     path: 'campaigns/:campaignId/updates',
     element: <CampaignUpdates />,
+  },
+  {
+    // Phase 17a (§20, DNA §5.2, §5.3). The Founder's live campaign home —
+    // Glance, one ranked Act, Explore. Beside the other campaign surfaces,
+    // outside both shells: §26 licenses dashboard density in Admin only, and
+    // this is deliberately a chronological workspace rather than a widget grid.
+    path: 'campaigns/:campaignId/home',
+    element: <CampaignHome />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

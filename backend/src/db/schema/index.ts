@@ -75,3 +75,9 @@ export * from './admin-operations.js';
 // §26.8's one-time relationship touches. No timeline table — §26.8's timeline
 // composes existing events and has no writer.
 export * from './support.js';
+// Phase 17a: §20's live campaign operations — the acknowledge-once delivery
+// receipt that makes "successfully delivered" a fact, the per-viewer last-seen
+// position it advances, the alternating threshold crossing, the four one-time
+// milestones, and §31.9's insert-only Act rank corrections. No counters table:
+// new/canceled/net compose from `reservation_status_history`.
+export * from './live.js';

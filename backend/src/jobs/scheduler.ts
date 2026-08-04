@@ -44,6 +44,7 @@ import { notifyCampaignLive, type LaunchNotificationContext } from '../launch/no
 import { sweepDiscovery } from '../campaign/discovery.js';
 import { notifyListingRefund } from '../payments/listing-notifications.js';
 import { sweepPrechargeReminders } from '../reservations/reminder.js';
+import { sweepThresholdCrossings } from '../live/thresholds.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -117,6 +118,21 @@ export const CAMPAIGN_DISCOVERY_JOB = 'campaign-discovery';
 export const PRECHARGE_REMINDER_JOB = 'precharge-reminder';
 
 /**
+ * Phase 17a's §20 threshold reconciliation.
+ *
+ * **Not** a scheduled engagement email (§33.6.11). It sends nothing unless a
+ * campaign genuinely crossed its threshold since the last evaluation — the
+ * crossing is deduplicated by state transition, so a run with no crossing writes
+ * nothing and sends nothing. Its purpose is to catch count changes that did not
+ * go through a Backer action, such as §26.7's kill closing active pre-orders.
+ *
+ * It is a safety net, not the primary path: a campaign that crossed up and back
+ * down between two runs owes two notices this could never send, which is why
+ * every mutation site calls `evaluateAndNotifyThreshold` directly.
+ */
+export const THRESHOLD_RECONCILIATION_JOB = 'threshold-reconciliation';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -169,6 +185,8 @@ export interface Scheduler {
   runDiscoveryNow: () => Promise<void>;
   /** Runs the §20 pre-charge reminder sweep now. Used by tests and by Admin. */
   runPrechargeRemindersNow: () => Promise<void>;
+  /** Runs the §20 threshold reconciliation now. Used by tests and by Admin. */
+  runThresholdReconciliationNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -359,6 +377,23 @@ export async function startScheduler({
   });
   await boss.schedule(PRECHARGE_REMINDER_JOB, INTERVIEW_SCHEDULE_CRON, undefined, { tz: 'UTC' });
 
+  /* ── Phase 17a's §20 threshold reconciliation ──────────────────────────── */
+
+  await boss.createQueue(THRESHOLD_RECONCILIATION_JOB);
+  await boss.work(THRESHOLD_RECONCILIATION_JOB, async () => {
+    const result = await sweepThresholdCrossings(db, {
+      audit,
+      ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
+    });
+    log('threshold reconciliation complete', {
+      evaluated: result.evaluated,
+      crossings: result.crossings,
+    });
+  });
+  await boss.schedule(THRESHOLD_RECONCILIATION_JOB, INTERVIEW_SCHEDULE_CRON, undefined, {
+    tz: 'UTC',
+  });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -380,6 +415,9 @@ export async function startScheduler({
     },
     runPrechargeRemindersNow: async () => {
       await boss.send(PRECHARGE_REMINDER_JOB, {});
+    },
+    runThresholdReconciliationNow: async () => {
+      await boss.send(THRESHOLD_RECONCILIATION_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

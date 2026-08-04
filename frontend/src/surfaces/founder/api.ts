@@ -685,3 +685,121 @@ export const postUpdate = (
   update: PostUpdateBody,
 ): Promise<{ update: FounderUpdate }> =>
   call(`${base(campaignId)}/updates`, { method: 'POST', body: JSON.stringify(update) });
+
+/* ── The live campaign home (§20, Phase 17a) ───────────────────────────────── */
+
+export interface HomeDelta {
+  count: number;
+  since: string;
+}
+
+export interface GlanceView {
+  activePreorderCount: number;
+  delta: HomeDelta | null;
+  model: 'idea' | 'product';
+  remainingToThreshold: number | null;
+  closesAt: string | null;
+  notYetChargedNotice: string;
+  activeCreators: number | null;
+  readAt: string;
+  freshnessBasis: 'refresh';
+  /** §33.6.6: the receipt this render must acknowledge once it succeeded. */
+  deliveryId: string;
+  counts: {
+    newCount: number;
+    canceledCount: number;
+    otherExits: number;
+    activeCount: number;
+    netChange: number;
+    uniqueActiveBackers: number;
+    everHadPreorder: boolean;
+  };
+}
+
+export interface ActCandidate {
+  kind: string;
+  rank: 1 | 2 | 3 | 4 | 5;
+  label: string;
+  detail: string;
+  href: string;
+  sourceTable: string;
+  sourceId: string;
+  occurredAt: string;
+}
+
+export type ActView =
+  | {
+      state: 'action';
+      action: ActCandidate;
+      overridden: boolean;
+      override: { reason: string; actor: string; recordedAt: string } | null;
+      deferred: ActCandidate[];
+    }
+  | { state: 'caught_up'; closesAt: string | null };
+
+export interface ExploreSection {
+  key: string;
+  title: string;
+  definition: string;
+  data: Record<string, unknown> | null;
+  awaiting: string | null;
+}
+
+export interface ExploreView {
+  sections: ExploreSection[];
+  readAt: string;
+  freshnessBasis: 'refresh';
+}
+
+export interface CampaignHomeView {
+  campaignId: string;
+  status: string;
+  glance: GlanceView;
+  act: ActView;
+  explore: ExploreView;
+  milestoneHistory: { kind: string; occurredAt: string; acknowledgedAt: string | null }[];
+}
+
+export const fetchCampaignHome = (campaignId: string): Promise<{ home: CampaignHomeView }> =>
+  call(`${base(campaignId)}/home`);
+
+/**
+ * §33.6.6. Called only after the render succeeded — a failed render must never
+ * advance the last-seen position, or the Founder loses a delta permanently.
+ */
+export const acknowledgeHomeDelivery = (
+  campaignId: string,
+  deliveryId: string,
+): Promise<{ acknowledged: boolean; advanced: boolean }> =>
+  call(`${base(campaignId)}/home/seen`, {
+    method: 'POST',
+    body: JSON.stringify({ deliveryId }),
+  });
+
+export const acknowledgeMilestone = (
+  campaignId: string,
+  kind: string,
+): Promise<{ movedToHistory: boolean }> =>
+  call(`${base(campaignId)}/home/milestones/${encodeURIComponent(kind)}/seen`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export interface ActCorrectionBody {
+  actionKind: string;
+  correctionKind: 'correction' | 'dismissal' | 'reclassification' | 'safety_override';
+  priorRank: number;
+  newRank?: number;
+  reason: string;
+  sourceTable?: string;
+  sourceId?: string;
+}
+
+export const recordActCorrection = (
+  campaignId: string,
+  body: ActCorrectionBody,
+): Promise<{ correction: unknown }> =>
+  call(`${base(campaignId)}/home/act/corrections`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

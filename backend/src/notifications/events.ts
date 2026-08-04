@@ -147,6 +147,25 @@ export const BACKER_PREORDER_CONFIRMATION = 'backer_preorder_confirmation' as co
 export const BACKER_CANCELLATION_CONFIRMATION = 'backer_cancellation_confirmation' as const;
 export const BACKER_PRECHARGE_REMINDER = 'backer_precharge_reminder' as const;
 
+/**
+ * Phase 17a's four, sent by `live/notifications.ts`.
+ *
+ * §27.3 — "Idea threshold reached" and "Idea threshold lost" (Founder); §27.6 —
+ * the two internal counterparts. They arrive together because §20's crossing
+ * evaluation is the sender for all four, and each one dedups on the *crossing
+ * row* rather than on the campaign: §20 says a campaign "may cross repeatedly,
+ * and each crossing notifies once". Keying on the campaign would satisfy §27.2
+ * and silently swallow the second crossing — §7's exact failure in another phase.
+ *
+ * There is no `founder_campaign_check_in` key here and there must not be:
+ * §33.6.11 forbids a scheduled generic check-in, and a key with no consequence
+ * behind it is how one gets written (§1.4).
+ */
+export const FOUNDER_IDEA_THRESHOLD_REACHED = 'founder_idea_threshold_reached' as const;
+export const FOUNDER_IDEA_THRESHOLD_LOST = 'founder_idea_threshold_lost' as const;
+export const INTERNAL_THRESHOLD_REACHED = 'internal_threshold_reached' as const;
+export const INTERNAL_THRESHOLD_LOST = 'internal_threshold_lost' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -178,6 +197,10 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   BACKER_PREORDER_CONFIRMATION,
   BACKER_CANCELLATION_CONFIRMATION,
   BACKER_PRECHARGE_REMINDER,
+  FOUNDER_IDEA_THRESHOLD_REACHED,
+  FOUNDER_IDEA_THRESHOLD_LOST,
+  INTERNAL_THRESHOLD_REACHED,
+  INTERNAL_THRESHOLD_LOST,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

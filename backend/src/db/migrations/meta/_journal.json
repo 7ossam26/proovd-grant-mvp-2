@@ -183,6 +183,13 @@
       "when": 1785564000000,
       "tag": "0025_support_and_enforcement",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1785567600000,
+      "tag": "0026_live_campaign_operations",
+      "breakpoints": true
     }
   ]
 }

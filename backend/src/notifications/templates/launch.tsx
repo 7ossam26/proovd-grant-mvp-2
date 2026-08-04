@@ -331,6 +331,86 @@ export async function renderCampaignDiscoveryOpened(v: CampaignDiscoveryOpenedVa
   });
 }
 
+/* ── Threshold reached / lost — Founder (§20, §27.3) ──────────────────────── */
+
+/**
+ * §20's two crossing notices, one per crossing.
+ *
+ * Both state the count, the threshold, and what happens at close, and neither
+ * promises a result: the Idea threshold is fixed at close (§21), so a campaign
+ * that is above it today may not be at close and one below it today may be. A
+ * `reached` message that read as a guarantee would be the §30 failure — and a
+ * `lost` message that read as a warning to go and campaign harder would be the
+ * §33.6.11 one arriving through the other door. Both are factual and neither
+ * carries a countdown.
+ */
+export interface ThresholdCrossingVariables {
+  founderName: string | null;
+  productName: string | null;
+  campaignUrl: string;
+  uniqueActiveBackers: number;
+  threshold: number;
+  closeUtc: string;
+  reference: string;
+  supportEmail: string;
+}
+
+export async function renderThresholdReached(v: ThresholdCrossingVariables) {
+  const product = named(v.productName, '[PRODUCT NAME]');
+  return renderShell({
+    subject: `Your order threshold is met — ${product}`,
+    preview: `${product} has reached its order threshold.`,
+    heading: `${named(v.founderName, '[FOUNDER NAME]')}, ${product} has reached its order threshold.`,
+    sections: [
+      {
+        label: 'Where the campaign stands',
+        lines: [
+          `${v.uniqueActiveBackers} unique Backers currently hold an active pre-order, against your threshold of ${v.threshold}.`,
+          'Nobody has been charged. These Backers selected an offer and agreed to the charge rules, and the cards are saved for later.',
+        ],
+      },
+      {
+        label: 'What this does and does not mean',
+        lines: [
+          `The threshold is measured again when the campaign closes ${v.closeUtc} (UTC). What matters is the count at that moment, not today’s.`,
+          'Backers can still cancel at no cost before close, so this figure can move in either direction. We will tell you if it drops back below.',
+        ],
+      },
+    ],
+    action: { label: 'Open your campaign', url: v.campaignUrl },
+    reference: v.reference,
+    supportEmail: v.supportEmail,
+  });
+}
+
+export async function renderThresholdLost(v: ThresholdCrossingVariables) {
+  const product = named(v.productName, '[PRODUCT NAME]');
+  return renderShell({
+    subject: `Your order threshold is no longer met — ${product}`,
+    preview: `${product} has dropped below its order threshold.`,
+    heading: `${named(v.founderName, '[FOUNDER NAME]')}, ${product} is below its order threshold.`,
+    sections: [
+      {
+        label: 'Where the campaign stands',
+        lines: [
+          `${v.uniqueActiveBackers} unique Backers currently hold an active pre-order, against your threshold of ${v.threshold}.`,
+          'Nobody has been charged, and nothing has been decided.',
+        ],
+      },
+      {
+        label: 'What happens next',
+        lines: [
+          `The threshold is measured when the campaign closes ${v.closeUtc} (UTC). If it is met at that moment, the saved cards are charged under the rules Backers agreed to. If it is not, nobody is charged.`,
+          'We are telling you because it changed, not because you need to do anything right now.',
+        ],
+      },
+    ],
+    action: { label: 'Open your campaign', url: v.campaignUrl },
+    reference: v.reference,
+    supportEmail: v.supportEmail,
+  });
+}
+
 /* ── Styles — the proovd.css values written out by hand, as email requires ── */
 
 const body = { backgroundColor: '#FAFAFA', fontFamily: 'Helvetica, Arial, sans-serif' };

@@ -26,6 +26,19 @@ Phase 16 green — Admin live operations. Phase 14 green — campaigns are live 
 
 ---
 
+## The seam
+
+Eight deliverables against eight named tests is more than one session, the same way Phases 12, 14, 15, and 16 were. There is a real seam in this brief: scope 1–3 and 5 are the **observed campaign** — what the Founder reads, and the counting and event substrate underneath it — while 4 and 6–8 are the **changes people make while it runs**: live edits, a Creator joining, a Backer acting. The acceptance tests fall the same way, which is the usual sign a seam is real rather than convenient.
+
+| Half | Scope | Acceptance |
+|---|---|---|
+| **17a** | Glance, Act, Explore (1–3), and the threshold/campaign event substrate (5): derived new/canceled/net counts, threshold crossings, milestones, and the absence of any scheduled engagement email | **§33.6.6–§33.6.11** |
+| **17b** | Live editing's three tiers (4), the Creator live surface (6), mid-campaign Creator addition (7), and the Backer before close (8) — including the §18 comment thread §33.6.6–13 left for the Backer identity | **§33.6.12, §33.6.13** |
+
+17a builds no write path for campaign content and no roster change. 17b reuses 17a's Act candidate sources rather than adding a second ranking.
+
+---
+
 ## Scope
 
 ### 1. Founder campaign home — Glance

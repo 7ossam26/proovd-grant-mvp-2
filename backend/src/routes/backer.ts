@@ -27,6 +27,8 @@ import { cancelReservation } from '../reservations/cancellation.js';
 import { replaceIdeaReward } from '../reservations/preorder.js';
 import { findCampaignFounderUserId } from '../reservations/context.js';
 import { findAccountForOwner } from '../payments/connected-accounts.js';
+import { evaluateAndNotifyThreshold } from '../live/thresholds.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
 
 export interface BackerRouterDeps {
   db: Database;
@@ -37,6 +39,42 @@ export interface BackerRouterDeps {
   secret: string;
   appBaseUrl: string;
   fromAddress: string;
+  /** §20's threshold notices. Absent in tests that do not assert on them. */
+  notificationContext?: LaunchNotificationContext | undefined;
+}
+
+/**
+ * §20's crossing evaluation after a Backer action changed the active count.
+ *
+ * Never fails the request that triggered it. A cancellation that succeeded must
+ * not be reported as failed because a notice could not be sent — the failure is
+ * recorded and the reconciliation sweep retries it.
+ */
+async function evaluateThreshold(
+  deps: BackerRouterDeps,
+  campaignId: string,
+  actor: string,
+): Promise<void> {
+  try {
+    await evaluateAndNotifyThreshold(
+      deps.db,
+      {
+        audit: deps.audit,
+        notifier: deps.notifier,
+        ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+      },
+      { campaignId, actor },
+    );
+  } catch (error) {
+    await deps.audit({
+      action: 'live.threshold_evaluation_failed',
+      targetType: 'campaign',
+      targetId: campaignId,
+      internalReason: `§20 threshold evaluation failed after ${actor}: ${
+        error instanceof Error ? error.message : String(error)
+      }. The reconciliation sweep will retry it.`,
+    });
+  }
 }
 
 async function connectedAccountFor(
@@ -104,6 +142,13 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
       res.status(409).json({ error: 'not_cancelable', current: outcome.current });
       return;
     }
+    // §20: a cancellation can take an Idea campaign back below its threshold, and
+    // that crossing notifies once. Deduplicated by state transition, so a
+    // duplicate cancel evaluates and emits nothing.
+    if (outcome.status === 'canceled') {
+      await evaluateThreshold(deps, subject.campaignId, 'system:cancellation');
+    }
+
     // `canceled` and `already_canceled` both report success — a duplicate cancel
     // is harmless (§33.7.3).
     res.json({ status: outcome.status, amountCharged: 'US$0' });
@@ -153,6 +198,13 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
       res.status(result.refusal.code === 'setup_failed' ? 402 : 409).json({ error: result.refusal });
       return;
     }
+
+    // A reward replacement cancels one active reservation and creates another,
+    // so the unique-Backer count is usually unchanged — but "usually" is not a
+    // guarantee, and the evaluation is deduplicated by transition, so running it
+    // costs a read and closes the case where it did move.
+    await evaluateThreshold(deps, subject.campaignId, 'system:reward-replacement');
+
     res.status(201).json(result.success);
   });
 

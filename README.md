@@ -23,9 +23,10 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–16 are
-complete**; Phase 17 — live campaign operations, comments, and materiality — is
-next. Money moves in test mode only, and the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–17a are
+complete**; Phase 17b — live editing, mid-campaign Creators, and the Backer
+before close including comments — is next. Money moves in test mode only, and
+the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -57,19 +58,20 @@ next. Money moves in test mode only, and the live-mode gate stays shut.
 | 15b | The campaign-scoped magic link, free cancellation, the practical-deduplication queue, and the pre-charge reminder |
 | 16a | The reservation and charge ledger, the money controls, the risk-control inventory, and the high-impact override machine |
 | 16b | Support cases against the published SLA, the handoff note, campaign suspension and kill, and the composed customer timeline |
+| 17a | The Founder's live campaign home — Glance, one ranked action, Explore — with the delivery receipt behind the last-visit delta, the composed pre-order counts, and the threshold crossings that fire once each |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
 the preparing reveal with its Campaign kit; Phase 09 bundles the optional-item
 workspace and a third-party scheduling integration; Phase 10 bundles the
 payments substrate and the two onboarding surfaces built on it; Phase 12, 14,
-15, and 16 each bundle two or more full deliverables with their own named tests.
-Splitting them was a scheduling decision, not a scope one: each half is built
-against the same brief and lands its own named acceptance tests. Every named
-test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.13, every
-one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one from
-§33.5.1 to §33.5.13, every one from §33.6.1 to §33.6.5, and §33.12.4, §33.9.10,
-and §33.9.11.
+15, 16, and 17 each bundle two or more full deliverables with their own named
+tests. Splitting them was a scheduling decision, not a scope one: each half is
+built against the same brief and lands its own named acceptance tests. Every
+named test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.13,
+every one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one
+from §33.5.1 to §33.5.13, every one from §33.6.1 to §33.6.11, and §33.12.4,
+§33.9.10, and §33.9.11.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
 record went first and is the source of truth — a scheduling provider is a source
@@ -84,6 +86,14 @@ and new customer messages**. The ledger, the money controls, and the risk
 inventory are all reads over what Phases 03 through 15 already wrote; support
 cases, suspension, and the timeline are not. The acceptance tests fall the same
 way, which is usually the sign that a seam is real rather than convenient.
+
+Phase 17 split on the same kind of line: between the campaign as it is
+**observed** — what the Founder reads, and the counting and event substrate under
+it — and the **changes people make while it runs**, which are live edits, a
+Creator joining mid-campaign, and a Backer acting before close. Its brief did not
+name a seam, so that half of the split was written back into the phase file
+rather than left implicit; a plan that is wrong and not corrected is how a plan
+rots.
 
 ## Layout
 
@@ -112,6 +122,9 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/support/    the support topics and owners, the published SLA numbers, the
                   Appendix B.8 acknowledgement, the four handoff facts, the
                   eight suspend/kill reason categories, and the timeline sources
+  src/live/       the five ranked next actions, the exact Glance and caught-up
+                  copy, the eleven Explore sections and their definitions, the
+                  four milestones, and the count and threshold derivations
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -121,6 +134,10 @@ backend/    Express 5 + Drizzle + Postgres 16
                       and the high-impact preview/override machine
   src/reservations/   the Backer pre-order, the atomic cap, reservation-time
                       tax, cancellation, deduplication, and the magic link
+  src/live/           the Founder campaign home: the delivery receipt behind the
+                      last-visit delta, the composed pre-order counts, the ranked
+                      next action and its corrections, Explore, and the threshold
+                      crossings and milestones
   src/invitations/    Founder prospects, the invitation, the retention sweep
   src/vetting/        the §9 answers and their provenance, the §10 account claim
   src/affiliates/     Creator recruitment, verification, the private
@@ -147,8 +164,9 @@ frontend/   React 19 + Vite, styled solely by proovd.css
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
                          preparing Campaign kit
   src/surfaces/founder/  the campaign workspace: five optional items as a flow,
-                         the fee preview, the helper resources, and the listing
-                         payment with its Appendix A.5 consent
+                         the fee preview, the helper resources, the listing
+                         payment with its Appendix A.5 consent, and the live
+                         campaign home — Glance, one action, Explore
   src/surfaces/payouts/  Stripe onboarding for both roles, and where Stripe
                          sends people back to
 docs/       Spec, DNA, tech stack, master plan, phase briefs
@@ -946,6 +964,71 @@ there is no date field, no recurrence, no template, and no job that sends one. A
 second attempt is refused rather than quietly accepted: it is either a mistake or
 the beginning of the thing the rule forbids.
 
+## The Founder's live campaign
+
+Once a campaign is live the Founder gets one page, and it is a chronological
+workspace rather than a dashboard: one large number, one thing to do, and
+everything else a level below. Spec §20 and the DNA's three altitudes stop being
+principles here and become a tested surface.
+
+**The last-visit delta cannot be lost to a failed render.** Spec §20 requires the
+last-seen position to advance only after the rendered state was *successfully
+delivered*, and no server can assert that about its own response — the connection
+can drop after the last byte leaves. So reading the page issues a receipt
+recording exactly what it showed and advances nothing, and the surface
+acknowledges that receipt only once the render has committed. A render that threw
+never acknowledges; the receipt stays open and the same delta is still there next
+time. The position moves to the count the receipt recorded, never to the count at
+the moment of acknowledgement, because otherwise acknowledging a delta you read
+would silently swallow one that arrived while you were reading it.
+
+**Nothing counts pre-orders into a counter.** New, canceled, and net are composed
+on every read from the append-only transition history that the pre-order, the
+cancellation, and the kill already write. A second set of counters could drift
+from the record it summarises, and a Founder would act on the drift. Composing
+them also makes the reconciliation structural: the four numbers partition one
+set, so they agree by construction rather than by discipline. A killed pre-order
+is counted separately from a cancelled one — only one of those is a Backer
+changing their mind.
+
+**A threshold crossing notifies once, every time it happens.** An Idea campaign
+can cross its order threshold, fall back under it, and cross again, and each of
+those is its own event with its own message. That is deduplicated by the
+*transition* rather than by a day or a count: the evaluation compares against the
+last crossing actually recorded, so it runs on every pre-order and every
+cancellation and writes nothing when nothing moved. The database refuses two
+crossings in the same direction and refuses a campaign to lose a threshold it
+never reached. The messages key on the crossing rather than the campaign —
+keying on the campaign would send the first one and quietly swallow every later
+one.
+
+**There is no scheduled check-in email, and no place to add one.** Spec §20 rules
+out generic Day 3/7/10 "check your campaign" mail, so every message this phase
+can produce sits behind a real state transition. The next action a Founder is
+shown works the same way: each of the five ranked actions reads from a record
+that already exists — a suspension, an open review, a support case waiting on
+them, an announced delivery change with no update published yet, a milestone that
+actually happened. None of them is produced by a timer or an absence, and when
+none of them exists the page closes with the caught-up sentence and no button at
+all. That ending is a designed moment, not an empty state to be filled, so there
+is no fallback branch to fill it.
+
+**A ranking can be overridden, and the override has to be documented.** A
+recorded safety decision can move something above its natural rank, but it can
+only promote an action that is genuinely there — it cannot conjure one. Every
+later correction, dismissal, and reclassification stores the prior rank, the
+reason, who did it, and when, insert-only, because those rows are counted as a
+quality metric and a rate computed over an editable table can be improved without
+improving anything.
+
+**Explore is a first-class space, not a bin.** Eleven sections, each carrying the
+definition of what its numbers count, because two people reading "conversion"
+differently is the ordinary failure of a metrics screen. A section whose phase
+has not run says what it is waiting for rather than showing a zero, and a
+conversion rate with no clicks behind it is reported as undefined rather than as
+0%. Freshness is stated as a time and the page says it refreshes when loaded;
+nothing anywhere claims to be live or real time.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -1174,6 +1257,19 @@ The frontend and shared suites need neither Docker nor a database.
 - **An override records before, after, reason, actor, and time, and the before
   is read from the row.** The record is insert-only at the database level, since
   a "before" that can be rewritten afterwards protects nothing (Spec §33.12.4).
+- **A last-seen position advances only on an acknowledged delivery.** Reading a
+  page cannot advance it, because a server cannot know its own response arrived.
+  A failed render leaves the receipt open and the delta intact (Spec §20).
+- **A summary that could drift from its record is not built.** Pre-order counts
+  compose from the append-only transition history and the campaign timeline
+  composes from the tables that own each fact. Neither has a writer.
+- **No message is sent on a timer without a consequence behind it.** Spec §20
+  rules out generic check-in email, so every notification traces to a real state
+  transition, and no table in the live-operations phase carries a schedule,
+  cadence, or next-send column.
+- **An empty next-action list is a designed ending, not a gap.** The caught-up
+  sentence is exact copy and renders with no control beside it; there is no
+  branch that manufactures a call to action (Spec §20, DNA §5.4).
 - **Money is never described as `held`.** Spec §22.3 gives three accurate words —
   `eligible`, `blocked` with the named requirement, and `released`. Proovd holds
   no one's money, so the euphemism would describe an arrangement that does not

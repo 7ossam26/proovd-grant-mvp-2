@@ -39,6 +39,7 @@ import { createAdminReviewRouter } from './routes/admin-review.js';
 import { createAdminLaunchRouter } from './routes/admin-launch.js';
 import { createFounderCreatorPaymentRouter } from './routes/founder-creator-payment.js';
 import { createAdminCreatorReadinessRouter } from './routes/admin-creator-readiness.js';
+import { createFounderHomeRouter } from './routes/founder-home.js';
 import type { StripeGateway } from './payments/stripe-client.js';
 import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
@@ -364,6 +365,12 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     fromAddress: config.invitationContext.fromAddress,
   };
   app.use(createAdminLaunchRouter({ db, auth, audit, notifier, context: launchContext }));
+  // Phase 17a (§20, §33.6.6–8). The Founder's chronological campaign home:
+  // Glance, one ranked Act, and Explore. `GET .../home` advances nothing;
+  // `POST .../home/seen` is the acknowledgement that moves last-seen, which is
+  // §20's "only after the rendered state is successfully delivered". No Stripe
+  // dependency — it reads records every earlier phase already wrote.
+  app.use(createFounderHomeRouter({ db, auth, audit }));
   // Phase 10a (§32.3, §28.3). Two Stripe endpoints with two signing secrets —
   // platform for Proovd's own listing money, Connect for the Founder's campaign
   // money (§24.1). Both mount raw-body parsing themselves, for the reason the
@@ -486,6 +493,10 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         secret: config.authSecret,
         appBaseUrl: config.appBaseUrl,
         fromAddress: config.invitationContext.fromAddress,
+        // Phase 17a: §20's threshold crossing is evaluated on every pre-order,
+        // because each crossing notifies once and a sweep alone would miss a
+        // cross-and-recross between two runs.
+        notificationContext: launchContext,
       }),
     );
     // Phase 15b (§19, §20, §33.7). The Backer magic-link surface: the page data,
@@ -501,6 +512,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         secret: config.authSecret,
         appBaseUrl: config.appBaseUrl,
         fromAddress: config.invitationContext.fromAddress,
+        // Phase 17a: a cancellation can take an Idea campaign back below its
+        // threshold, and §20 makes that its own notified crossing.
+        notificationContext: launchContext,
       }),
     );
   }

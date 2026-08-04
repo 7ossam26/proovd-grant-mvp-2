@@ -21,6 +21,8 @@ import type { AuditWriter } from '../auth/audit.js';
 import type { TokenService } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
 import { createPreorder, quotePreorder, type PreorderRefusalCode } from '../reservations/preorder.js';
+import { evaluateAndNotifyThreshold } from '../live/thresholds.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
 
 export interface BackerPreorderRouterDeps {
   db: Database;
@@ -32,6 +34,8 @@ export interface BackerPreorderRouterDeps {
   secret: string;
   appBaseUrl: string;
   fromAddress: string;
+  /** §20's threshold notices. Absent in tests that do not assert on them. */
+  notificationContext?: LaunchNotificationContext | undefined;
 }
 
 const UUID = /^[0-9a-fA-F-]{36}$/;
@@ -162,6 +166,35 @@ export function createBackerPreorderRouter(deps: BackerPreorderRouterDeps): Rout
       res.status(STATUS_FOR[result.refusal.code] ?? 400).json({ error: result.refusal });
       return;
     }
+
+    // §20: the count changed, so the Idea threshold may have been crossed. The
+    // evaluation is deduplicated by state transition, so calling it on every
+    // pre-order costs one read when nothing moved and is the only way each
+    // crossing notifies — a sweep alone would miss a cross-and-recross between
+    // two runs. It runs after the response is decided and never fails it: a
+    // pre-order that succeeded must not be reported as failed because a notice
+    // could not be sent.
+    try {
+      await evaluateAndNotifyThreshold(
+        deps.db,
+        {
+          audit: deps.audit,
+          notifier: deps.notifier,
+          ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+        },
+        { campaignId, actor: 'system:preorder' },
+      );
+    } catch (error) {
+      await deps.audit({
+        action: 'live.threshold_evaluation_failed',
+        targetType: 'campaign',
+        targetId: campaignId,
+        internalReason: `§20 threshold evaluation failed after a pre-order: ${
+          error instanceof Error ? error.message : String(error)
+        }. The reconciliation sweep will retry it.`,
+      });
+    }
+
     res.status(201).json(result.success);
   });
 
