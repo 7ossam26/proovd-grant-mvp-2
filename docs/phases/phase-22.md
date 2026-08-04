@@ -1,6 +1,6 @@
 # Phase 22 — Notification sweep
 
-**Model:** Opus 4.8 — Roughly 73 events, each with copy that must satisfy §27.2's rules and the naming contract. Volume plus compliance sensitivity rather than algorithmic difficulty.
+**Model:** Opus 5 — Roughly 73 events, each with copy that must satisfy §27.2's rules and the naming contract. Volume plus compliance sensitivity rather than algorithmic difficulty.
 
 **Goal:** every event in §27.3–27.6 exists in the typed registry, sends once, carries the right shape, and is provably covered — with nothing sending that shouldn't.
 

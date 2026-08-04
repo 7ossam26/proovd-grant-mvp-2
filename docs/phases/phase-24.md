@@ -1,6 +1,6 @@
 # Phase 24 — The live-mode gate
 
-**Model:** Opus 4.8 — Little code, maximum consequence. The failure mode is declaring a condition satisfied that isn't, and every condition here is one a motivated person can talk themselves past.
+**Model:** Opus 5 — Little code, maximum consequence. The failure mode is declaring a condition satisfied that isn't, and every condition here is one a motivated person can talk themselves past.
 
 **Goal:** eleven conditions verified, all 131 acceptance tests green, Track A closed, and one named pilot campaign cut over to live with monitoring and rollback owners.
 

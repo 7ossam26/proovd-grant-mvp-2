@@ -1,6 +1,6 @@
 # Phase 21 — Fulfillment, Day 14, and completion
 
-**Model:** Opus 4.8 — Enforcement copy has to name actual evidence and behaviour, and the ghost ban is permanent. A ban applied on an undefined trigger is unrecoverable for the person it hits.
+**Model:** Opus 5 — Enforcement copy has to name actual evidence and behaviour, and the ghost ban is permanent. A ban applied on an undefined trigger is unrecoverable for the person it hits.
 
 **Goal:** the Founder delivers, Admin verifies at Day 14, Creators receive a completion status that gates future collaboration, and a Founder who ghosts is banned once — on a defined trigger, with evidence.
 

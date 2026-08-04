@@ -1,6 +1,6 @@
 # Phase 23 — The P0 pass
 
-**Model:** Opus 4.8 — Cross-surface consistency requires holding seven renderings of the same fact in mind and spotting the one that disagrees. That's exactly the failure a weaker model produces rather than catches.
+**Model:** Opus 5 — Cross-surface consistency requires holding seven renderings of the same fact in mind and spotting the one that disagrees. That's exactly the failure a weaker model produces rather than catches.
 
 **Goal:** every principal flow passes accessibility, every surface agrees with every other surface on the same fact, idempotency holds under adversarial replay, and the measurement baseline is honest.
 
