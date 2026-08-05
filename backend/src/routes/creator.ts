@@ -37,20 +37,46 @@ import type { AuditWriter } from '../auth/audit.js';
 import { readPreparingKit, listCreatorCampaigns } from '../affiliates/kit.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import { submitPost } from '../launch/post-verification.js';
+import { notifyPostVerificationDue } from '../notifications/internal-queue.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { buildCreatorPartnership } from '../affiliates/partnership.js';
 import { readCreatorClose } from '../close/creator-close.js';
 
 export const CREATOR_PATH = '/api/creator';
+
+/**
+ * §27.6's `internal_post_verification_due` is the reason this router gained a
+ * notifier (Phase 22b) — it was the last unsent key whose blocker was a router
+ * signature rather than a missing record. The three new fields are optional and
+ * grouped, so the four positional arguments every existing caller passes still
+ * work: an options object would have been tidier and would have touched every
+ * call site for one message.
+ */
+export interface CreatorRouterExtras {
+  notifier?: Notifier | undefined;
+  context?: LaunchNotificationContext | undefined;
+  /** §27.6's inbox. Absent → the submission is still in the Admin queue. */
+  internalRecipient?: string | undefined;
+}
 
 export function createCreatorRouter(
   db: Database,
   auth: Auth,
   audit: AuditWriter,
   appBaseUrl: string,
+  extras: CreatorRouterExtras = {},
 ): Router {
   const router = Router();
   const creator = requireRole(auth, 'affiliate');
   const json: RequestHandler = express.json({ limit: '8kb' });
+
+  const internalDeps = () => ({
+    db,
+    ...(extras.notifier ? { notifier: extras.notifier } : {}),
+    ...(extras.context ? { context: extras.context } : {}),
+    ...(extras.internalRecipient ? { internalRecipient: extras.internalRecipient } : {}),
+  });
 
   function actorId(req: express.Request): string {
     return req.authUser?.id ?? '';
@@ -148,6 +174,20 @@ export function createCreatorRouter(
     });
 
     if (result.status === 'submitted') {
+      // §27.6: step 5 is Admin's, and nothing told Admin the work had arrived
+      // (Phase 22b). Deduped on the SUBMISSION, so a corrected resubmission is
+      // a new decision and a double-click is not. `alreadyExisted` is not
+      // consulted: the dedup answers it, and a re-post after a correction is
+      // the case where the notice matters most.
+      await notifyPostVerificationDue(internalDeps(), {
+        submissionId: result.submission.id,
+        associationId,
+        campaignId: result.submission.campaignId,
+        postUrl: result.submission.postUrl,
+        channel: result.submission.channel,
+        resubmission: result.alreadyExisted,
+      });
+
       res.json({
         submission: {
           id: result.submission.id,

@@ -181,6 +181,27 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       supportEmail: SUPPORT,
     }),
 
+  founder_roster_update: () =>
+    renderPlainNotice({
+      subject: `A Creator's status changed on ${CAMPAIGN}`,
+      headline: 'Reviewing → Paused',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Was', value: 'Reviewing' },
+        { label: 'Now', value: 'Paused' },
+        {
+          label: 'What you need to do',
+          value: 'Nothing right now. Your roster shows who is where.',
+        },
+      ],
+      paragraphs: [
+        'One Creator on this campaign moved to a new status. Your roster names who.',
+      ],
+      action: { label: 'Open your roster', url: `${APP}/campaigns/c1/roster` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
   founder_creator_proposal_received: () => renderProposalReceived(proposal()),
   founder_creator_proposal_revision: () => renderProposalReceived(proposal()),
   founder_creator_proposal_decision: () =>
@@ -708,6 +729,72 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       supportEmail: SUPPORT,
     }),
 
+  backer_support_followup: () =>
+    renderPlainNotice({
+      subject: 'An update on your support request — PVD-8H2KM-4Q7RT',
+      headline: 'We said we would check in today, so we are.',
+      facts: [
+        { label: 'Your case', value: 'PVD-8H2KM-4Q7RT' },
+        { label: 'What it is about', value: 'Delivery question' },
+        { label: 'Who owns it', value: 'Founder, coordinated by Proovd' },
+        { label: 'Where it stands', value: 'Still open — we have not closed it' },
+        {
+          label: 'What you can do now',
+          value:
+            'Reply to this email with anything new. You do not need to repeat what you already told us.',
+        },
+      ],
+      paragraphs: [
+        'We promised you an update by now and we do not have a resolution yet. Your case is still open and still owned by a person, and nothing you sent has been lost.',
+      ],
+      reference: 'PVD-8H2KM-4Q7RT',
+      supportEmail: SUPPORT,
+    }),
+
+  internal_support_sla_breach: () =>
+    renderInternalNotice({
+      subject: 'Support SLA breached — PVD-8H2KM-4Q7RT (Human response)',
+      headline: 'Human response is past due on PVD-8H2KM-4Q7RT.',
+      facts: [
+        { label: 'Case', value: 'PVD-8H2KM-4Q7RT' },
+        { label: 'Topic', value: 'Delivery question' },
+        { label: 'Owner', value: 'Founder, coordinated by Proovd' },
+        { label: 'Clock', value: 'Human response' },
+        { label: 'Was due', value: '2026-08-06 23:00 UTC' },
+        { label: 'Case status', value: 'open' },
+      ],
+      paragraphs: [
+        '§27.8 publishes this promise, so a breach is a commitment the product has already made and not kept. The queue has the full context.',
+      ],
+      action: { label: 'Open the support queue', url: `${APP}/admin/support` },
+      reference: 'PVD-8H2KM-4Q7RT',
+      supportEmail: SUPPORT,
+    }),
+
+  backer_magic_link_reissue: () =>
+    renderPlainNotice({
+      subject: `Your link to ${CAMPAIGN}`,
+      headline: 'Here is a fresh link to your pre-order.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'What this link does', value: 'Opens your pre-orders on this campaign' },
+        {
+          label: 'How long it lasts',
+          value: 'It works once, and the previous link stops working',
+        },
+        {
+          label: 'If you did not ask for this',
+          value: 'Nothing has changed and nothing has been charged. You can ignore this email.',
+        },
+      ],
+      paragraphs: [
+        'You asked for a new link to your pre-order page. Opening it changes nothing on its own — you can cancel, update your card, or ask for help from there.',
+      ],
+      action: { label: 'Open your pre-order', url: `${APP}/backer/sample-token` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
   backer_delivery: () =>
     renderDeliveryNotice({
       campaignTitle: CAMPAIGN,
@@ -1187,6 +1274,73 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
         },
       ],
       action: { label: 'Open the Day 14 queue', url: `${APP}/admin/fulfillment` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_interview_changed: () =>
+    renderInternalNotice({
+      subject: `Interview rescheduled — ${CAMPAIGN}`,
+      headline: 'A Founder moved their interview.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Change', value: 'Rescheduled' },
+        { label: 'Was', value: '2026-08-11 16:00 UTC' },
+        { label: 'Now', value: '2026-08-13 18:30 UTC' },
+        { label: 'Reason given', value: 'Conflict with a supplier call' },
+        {
+          label: 'Listing fee',
+          value:
+            'Recalculated — the interview credit and the high-effort classification both moved',
+        },
+      ],
+      paragraphs: [
+        'The booking record is ours and has already been updated; this is the notice, not the change.',
+      ],
+      action: { label: 'Open the campaign', url: `${APP}/admin/campaigns/c1` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_proposal_awaiting_response: () =>
+    renderInternalNotice({
+      subject: `Proposal v2 awaiting the Founder — ${CAMPAIGN}`,
+      headline: 'A proposal version is open and waiting on the Founder.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Version', value: 'v2' },
+        { label: 'Proposed by', value: 'Creator' },
+        { label: 'Terms', value: '28% total commission' },
+        { label: 'Waiting on', value: 'the Founder' },
+        { label: 'Response deadline', value: '2026-08-12 09:00 UTC' },
+      ],
+      paragraphs: [
+        'If no Creator and Founder mutually accept before the deadline, §14.6 refunds the listing payment in full and the campaign ends with no Creator.',
+      ],
+      action: { label: 'Open the roster', url: `${APP}/admin/campaigns/c1` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_post_verification_due: () =>
+    renderInternalNotice({
+      subject: `First post awaiting verification — ${CAMPAIGN}`,
+      headline: 'A first post is waiting for verification.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Post', value: 'https://www.instagram.com/p/CxAbCdEfGhI/' },
+        { label: 'Channel', value: 'Instagram' },
+        { label: 'Kind', value: 'First submission' },
+        { label: 'Who owns it', value: 'Proovd Admin' },
+        { label: 'What is due', value: 'The seven §17 checks, against the submitted post' },
+      ],
+      paragraphs: [
+        'Verification releases no money — §17 is explicit that a pass changes only whether later traffic may finalize.',
+      ],
+      action: {
+        label: 'Open the campaign operations queue',
+        url: `${APP}/admin/campaign-operations`,
+      },
       reference: REF,
       supportEmail: SUPPORT,
     }),

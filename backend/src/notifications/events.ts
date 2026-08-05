@@ -320,6 +320,47 @@ export const BACKER_SUPPORT_RECEIVED = 'backer_support_received' as const;
 export const BACKER_SUPPORT_FOUNDER_RESPONSE = 'backer_support_founder_response' as const;
 
 /*
+ * §27.6's support SLA breach and §27.8's promised checkpoint (Phase 22b), sent
+ * by `support/promises.ts`.
+ *
+ * 16b stored all three of §27.8's clocks and 16a's queue showed them; what was
+ * missing was anything that ran. Both dedup on the deadline INSTANT rather than
+ * the case, because a case has three clocks and the promised-update one
+ * legitimately moves forward — keying on the case would report the first breach
+ * and stay silent through every later one, in the surface whose entire purpose
+ * is that an SLA nobody can see breached is one that gets breached.
+ */
+export const INTERNAL_SUPPORT_SLA_BREACH = 'internal_support_sla_breach' as const;
+export const BACKER_SUPPORT_FOLLOWUP = 'backer_support_followup' as const;
+
+/*
+ * §27.6's three queue notices whose services carried no notifier until now
+ * (Phase 22b), sent by `notifications/internal-queue.ts`.
+ *
+ * Each keys on the RECORD rather than its subject, because each of the three
+ * things legitimately happens more than once: a booking is rescheduled, a
+ * proposal is countered, a corrected post is resubmitted. Keying on the
+ * booking, the association, or the campaign would announce the first and
+ * swallow the rest — §7's resend failure, in the three queues where going
+ * quiet looks exactly like having nothing to do.
+ */
+export const INTERNAL_INTERVIEW_CHANGED = 'internal_interview_changed' as const;
+export const INTERNAL_PROPOSAL_AWAITING_RESPONSE = 'internal_proposal_awaiting_response' as const;
+export const INTERNAL_POST_VERIFICATION_DUE = 'internal_post_verification_due' as const;
+
+/*
+ * §27.5's magic-link reissue (Phase 22b), sent by
+ * `reservations/magic-link-reissue.ts`.
+ *
+ * The last of the 44, and the one that needed a capability rather than a
+ * template: every magic-link route sits behind a working magic link, so until
+ * 22b there was no way to ask. Deduped per REQUEST — someone asking twice is
+ * someone whose first link did not arrive — using an HMAC of the delivered URL,
+ * because §28.1 keeps the raw token out of storage and `entity_id` is storage.
+ */
+export const BACKER_MAGIC_LINK_REISSUE = 'backer_magic_link_reissue' as const;
+
+/*
  * Phase 21a — fulfillment and the Day 14 Progress Check (§22.4, §22.5, §27.5,
  * §27.6), sent by `fulfillment/notifications.ts`.
  *
@@ -374,6 +415,23 @@ export const INTERNAL_DAY_14_DUE = 'internal_day_14_due' as const;
  */
 export const FOUNDER_RESPONSE_WINDOW_STARTED = 'founder_response_window_started' as const;
 export const INTERNAL_MISSING_W9 = 'internal_missing_w9' as const;
+
+/*
+ * §27.3 — "roster updates" (Phase 22b).
+ *
+ * Deduped on the `association_status_history` ROW, for two reasons that happen
+ * to agree. A Creator's status legitimately changes more than once, so keying
+ * on the association would announce the first and swallow the rest (§7's
+ * resend failure). And §27.7's digest drops a roster item whose covering key
+ * already delivered, binding on exactly `(this key, target, history row id)` —
+ * so any other entity would silently break the exclusion and start sending
+ * people the same fact twice.
+ *
+ * `rosterUpdateFor` in `affiliates/roster-labels.ts` decides which of the
+ * nineteen states is worth a message: the word on the §14.5 roster card
+ * changed, and no more specific §27.3 key already announces it.
+ */
+export const FOUNDER_ROSTER_UPDATE = 'founder_roster_update' as const;
 
 /*
  * §27.7 — the optional digest, the only opt-out-able message in the product.
@@ -547,6 +605,12 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_PAYMENT_BLOCKED,
   BACKER_SUPPORT_RECEIVED,
   BACKER_SUPPORT_FOUNDER_RESPONSE,
+  INTERNAL_SUPPORT_SLA_BREACH,
+  BACKER_SUPPORT_FOLLOWUP,
+  INTERNAL_INTERVIEW_CHANGED,
+  INTERNAL_PROPOSAL_AWAITING_RESPONSE,
+  INTERNAL_POST_VERIFICATION_DUE,
+  BACKER_MAGIC_LINK_REISSUE,
   BACKER_DELIVERY,
   FOUNDER_DAY_14_REVIEW_RESULT,
   INTERNAL_DAY_14_DUE,
@@ -555,6 +619,7 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   AFFILIATE_TRANSFER_UPDATE,
   FOUNDER_RESPONSE_WINDOW_STARTED,
   INTERNAL_MISSING_W9,
+  FOUNDER_ROSTER_UPDATE,
   FOUNDER_ACTIVITY_DIGEST,
   AFFILIATE_ACTIVITY_DIGEST,
   BACKER_CAMPAIGN_UPDATE_DIGEST,

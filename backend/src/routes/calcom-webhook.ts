@@ -40,6 +40,7 @@ import {
   notifyInterview,
   type InterviewNotificationContext,
 } from '../interviews/notifications.js';
+import { notifyInterviewChanged } from '../notifications/internal-queue.js';
 
 export const CALCOM_WEBHOOK_PATH = '/api/webhooks/calcom';
 
@@ -51,6 +52,15 @@ export interface CalcomWebhookDeps {
   context: InterviewNotificationContext;
   /** Keys the campaign-reference HMAC. `BETTER_AUTH_SECRET`. */
   referenceSecret: string;
+  /**
+   * §27.6's internal notice needs a link and an inbox, and
+   * `InterviewNotificationContext` carries neither — it is the Founder
+   * context, which needs no Admin route. Both optional: without either, the
+   * Founder still hears about their own booking and the change stays visible
+   * in the workspace, which is where §1.4 requires it to be visible anyway.
+   */
+  appBaseUrl?: string | undefined;
+  internalRecipient?: string | undefined;
   /** Raised only by the integration suite, which drives many deliveries. */
   limit?: number;
 }
@@ -62,6 +72,8 @@ export function createCalcomWebhookRouter({
   audit,
   context,
   referenceSecret,
+  appBaseUrl,
+  internalRecipient,
   limit,
 }: CalcomWebhookDeps): Router {
   const router = Router();
@@ -112,6 +124,22 @@ export function createCalcomWebhookRouter({
           bookingId: outcome.bookingId,
           kind: outcome.notify,
         });
+      }
+
+      if (outcome.status === 'applied' && outcome.eventId && appBaseUrl && internalRecipient) {
+        // §27.6's internal counterpart, deduped on the event row (Phase 22b).
+        // A reschedule or cancellation moves a US$2 credit and one third of
+        // the high-effort classification, so Admin is owed the notice even
+        // though the Founder already has theirs.
+        await notifyInterviewChanged(
+          {
+            db,
+            notifier,
+            context: { ...context, appBaseUrl },
+            internalRecipient,
+          },
+          { eventId: outcome.eventId },
+        );
       }
 
       res.status(200).json({ received: true });

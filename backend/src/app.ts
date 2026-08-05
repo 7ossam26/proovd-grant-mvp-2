@@ -406,7 +406,15 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator: their campaigns and
   // the preparing Campaign kit, every read of it logged and revocable. Phase 14a
   // adds the §17 first-post URL submission, scoped by session.
-  app.use(createCreatorRouter(db, auth, audit, config.appBaseUrl));
+  app.use(
+    createCreatorRouter(db, auth, audit, config.appBaseUrl, {
+      // Phase 22b (§27.6): the first-post submission tells Admin the
+      // verification work has arrived. Deduped on the submission row.
+      notifier,
+      context: launchContext,
+      ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
+    }),
+  );
   // Phase 09a (§12, §33.3.1–4). The signed-in Founder's campaign workspace: the
   // five optional items, the evidence that completes them, the interview
   // booking, and the itemised listing fee. First session-bearing Founder
@@ -426,6 +434,10 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       notifier,
       context: interviewContext,
       referenceSecret: config.authSecret,
+      // Phase 22b (§27.6): the internal counterpart to §12's four Founder
+      // messages, which this router has sent since 09b.
+      appBaseUrl: config.appBaseUrl,
+      ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
     }),
   );
   // Phase 09b (§12, tech-stack §12). The booking provider's webhook. Mounts its
@@ -440,6 +452,12 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       audit: (event) => audit({ ...event, targetId: event.targetId }),
       context: interviewContext,
       referenceSecret: config.authSecret,
+      // Phase 22b (§27.6): a provider-driven reschedule or cancellation moves a
+      // US$2 credit and one third of the high-effort classification, and this
+      // is the path nobody is watching — the change came from Cal.com and was
+      // noticed by a webhook rather than by a person.
+      appBaseUrl: config.appBaseUrl,
+      ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
       ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
     }),
   );

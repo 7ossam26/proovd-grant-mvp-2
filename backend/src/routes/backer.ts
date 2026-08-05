@@ -44,6 +44,11 @@ import { findCampaignFounderUserId } from '../reservations/context.js';
 import { findAccountForOwner } from '../payments/connected-accounts.js';
 import { evaluateAndNotifyThreshold } from '../live/thresholds.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
+import rateLimit from 'express-rate-limit';
+import {
+  MAGIC_LINK_REISSUE_ACK,
+  reissueMagicLink,
+} from '../reservations/magic-link-reissue.js';
 
 export interface BackerRouterDeps {
   db: Database;
@@ -121,6 +126,76 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
   router.use(json());
   const base = `${MAGIC_LINK_TOKEN_PATH}/:${TOKEN_PARAM}`;
   const guard = requireMagicLinkToken(deps.tokens);
+
+  /* ── §5.5's ask: "send me my link again" (Phase 22b) ───────────────────── */
+
+  /**
+   * The only route in this file with NO token in front of it, because it is
+   * the route for someone whose token no longer works.
+   *
+   * Every branch answers `MAGIC_LINK_REISSUE_ACK` — hit, miss, nonexistent
+   * campaign, malformed address, and over the limit. See
+   * `reservations/magic-link-reissue.ts` for why the rate-limit case is not an
+   * exception: a 429 on the fifth try tells you the first four were
+   * interesting, which is Phase 04's reasoning about token rejections applied
+   * to the one public route that takes an email address.
+   *
+   * The limiter is deliberately generous per window and low per address-shaped
+   * body — this is a route a locked-out person may legitimately hit twice.
+   */
+  router.post(
+    `${MAGIC_LINK_TOKEN_PATH}/request`,
+    rateLimit({
+      windowMs: 15 * 60_000,
+      limit: 20,
+      standardHeaders: false,
+      legacyHeaders: false,
+      // Not a 429. The same body, the same status, the same everything.
+      handler: (_req, res) => {
+        res.status(202).json(MAGIC_LINK_REISSUE_ACK);
+      },
+    }),
+    async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const email = typeof body['email'] === 'string' ? body['email'] : '';
+      const campaignId = typeof body['campaignId'] === 'string' ? body['campaignId'] : '';
+
+      // Answer FIRST. A hit mints a token and sends an email while a miss
+      // returns immediately, and that difference is measurable even when the
+      // bodies match. The result of this request arrives by email, so
+      // responding before the work is honest rather than a claim of completion.
+      res.status(202).json(MAGIC_LINK_REISSUE_ACK);
+
+      if (!email || !campaignId) return;
+
+      try {
+        await reissueMagicLink(
+          {
+            db: deps.db,
+            tokenService: deps.tokens,
+            notifier: deps.notifier,
+            appBaseUrl: deps.appBaseUrl,
+            fromAddress: deps.fromAddress,
+            supportEmail: deps.notificationContext?.supportEmail ?? deps.fromAddress,
+            secret: deps.secret,
+          },
+          { email, campaignId },
+        );
+      } catch (error) {
+        // The response is already sent, so this can only be recorded. It must
+        // not surface: an error path that behaved differently would be the
+        // oracle the whole route is built to avoid.
+        await deps.audit({
+          action: 'backer.magic_link_reissue_failed',
+          targetType: 'campaign',
+          targetId: campaignId,
+          internalReason: `§27.5 magic-link reissue failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+    },
+  );
 
   router.get(`${base}/page`, guard, async (req, res) => {
     const subject = req.magicLinkSubject!;

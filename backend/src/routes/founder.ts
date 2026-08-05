@@ -41,6 +41,7 @@ import {
   notifyInterview,
   type InterviewNotificationContext,
 } from '../interviews/notifications.js';
+import { notifyInterviewChanged } from '../notifications/internal-queue.js';
 import type { Notifier } from '../notifications/send.js';
 import {
   ensureWorkspace,
@@ -82,6 +83,14 @@ export interface FounderRouterConfig {
    * domain-separated — see `interviews/reference.ts`.
    */
   referenceSecret: string;
+  /**
+   * §27.6's internal interview notice needs an Admin link and an inbox, and
+   * `InterviewNotificationContext` is the Founder's context, which carries
+   * neither (Phase 22b). Both optional: without them the Founder still gets
+   * their own message and the change stays visible in the workspace.
+   */
+  appBaseUrl?: string | undefined;
+  internalRecipient?: string | undefined;
 }
 
 /** §27.1: a refusal says what happened and what to do next. */
@@ -102,6 +111,23 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
   const json = express.json({ limit: '256kb' });
 
   const actorId = (req: express.Request) => `user:${req.authUser?.id ?? ''}`;
+
+  /**
+   * §27.6's internal interview notice, deduped on the event row (Phase 22b).
+   * Sends nothing where §27.6 has no inbox configured.
+   */
+  async function noticeInterviewChange(eventId: string | undefined): Promise<void> {
+    if (!eventId || !config.appBaseUrl || !config.internalRecipient) return;
+    await notifyInterviewChanged(
+      {
+        db,
+        notifier,
+        context: { ...context, appBaseUrl: config.appBaseUrl },
+        internalRecipient: config.internalRecipient,
+      },
+      { eventId },
+    );
+  }
 
   /**
    * Resolves the campaign or answers 404, and guarantees the workspace exists.
@@ -547,6 +573,7 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
         bookingId: result.bookingId,
         kind: 'rescheduled',
       });
+      await noticeInterviewChange(result.eventId);
       await respond(res, campaignId);
     },
   );
@@ -588,6 +615,7 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
         bookingId: result.bookingId,
         kind: 'canceled',
       });
+      await noticeInterviewChange(result.eventId);
       await respond(res, campaignId);
     },
   );

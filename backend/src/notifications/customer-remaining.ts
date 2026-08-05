@@ -57,8 +57,12 @@ export interface CustomerNotifyDeps {
  * different for every new request, and reveals nothing — you cannot reset an
  * account from a digest of a link.
  */
+export function deliveredUrlId(label: string, url: string, secret: string): string {
+  return createHmac('sha256', secret).update(`${label}:${url}`).digest('hex').slice(0, 32);
+}
+
 export function resetRequestId(url: string, secret: string): string {
-  return createHmac('sha256', secret).update(`password-reset:${url}`).digest('hex').slice(0, 32);
+  return deliveredUrlId('password-reset', url, secret);
 }
 
 export async function sendPasswordReset(

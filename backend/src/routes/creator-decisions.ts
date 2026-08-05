@@ -15,6 +15,7 @@ import { Router, type RequestHandler } from 'express';
 import express from 'express';
 import type { Database } from '../db/client.js';
 import { notifyMidCampaignAccepted } from '../affiliates/mid-campaign-notifications.js';
+import { notifyProposalAwaitingResponse } from '../notifications/internal-queue.js';
 import { notifyDisclosureAvailable } from '../notifications/customer-remaining.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
@@ -95,6 +96,8 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
     context,
     ...(deps.internalRecipient ? { internalRecipient: deps.internalRecipient } : {}),
   };
+  /** §27.6's queue notices. Same three fields; same no-op without an inbox. */
+  const internalDeps = () => midNotify;
   const router = Router();
   const creator = requireRole(auth, 'affiliate');
   const json: RequestHandler = express.json({ limit: '32kb' });
@@ -247,6 +250,9 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
         version: result.version,
         isCounter: false,
       });
+      // §27.6, deduped on the VERSION (Phase 22b): a counter is a genuinely new
+      // answer owed, so every negotiation round is announced and none repeats.
+      await notifyProposalAwaitingResponse(internalDeps(), { versionId: result.version.id });
 
       res.json({
         proposal: {
@@ -331,6 +337,7 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
         version: result.newVersion,
         isCounter: true,
       });
+      await notifyProposalAwaitingResponse(internalDeps(), { versionId: result.newVersion.id });
       res.json({
         response: {
           outcome: 'countered',

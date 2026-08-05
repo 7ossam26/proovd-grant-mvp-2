@@ -37,6 +37,7 @@ import type { Database } from '../db/client.js';
 import { founderInterviewBookings } from '../db/schema/workspace.js';
 import { readSettingValue, SettingNotConfigured } from '../settings/service.js';
 import { cancelBooking, confirmBooking } from '../workspace/interview.js';
+import { notifyInterviewChanged } from '../notifications/internal-queue.js';
 import type { Scheduler as SchedulerPort } from './calcom.js';
 import { evaluateWorkspace } from '../workspace/service.js';
 import { interviewBookingEvents } from '../db/schema/workspace.js';
@@ -220,6 +221,12 @@ export async function reconcilePendingBookings(
   scheduler: SchedulerPort,
   notifier: Notifier,
   context: InterviewNotificationContext,
+  /**
+   * §27.6's inbox and the Admin route its notice links to (Phase 22b).
+   * Optional: without it the Founder still hears about their own booking and
+   * the change is still visible in the Admin workspace.
+   */
+  internal?: { recipient: string; appBaseUrl: string } | undefined,
 ): Promise<ReconcileResult> {
   if (!scheduler.configured) {
     return { checked: 0, confirmed: [], canceled: [], unavailable: true };
@@ -293,6 +300,21 @@ export async function reconcilePendingBookings(
           bookingId: booking.id,
           kind: 'canceled',
         });
+        // §27.6's internal counterpart (Phase 22b). This path in particular is
+        // where nobody is watching: the change came from the provider and was
+        // noticed by a sweep, so without a notice the first anyone hears of it
+        // is a fee that has quietly moved.
+        if (internal && canceled.eventId) {
+          await notifyInterviewChanged(
+            {
+              db,
+              notifier,
+              context: { ...context, appBaseUrl: internal.appBaseUrl },
+              internalRecipient: internal.recipient,
+            },
+            { eventId: canceled.eventId },
+          );
+        }
       }
     }
   }

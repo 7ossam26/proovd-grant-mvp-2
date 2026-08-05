@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { ASSOCIATION_STATUSES, type AssociationStatus } from '../states/association.js';
+import {
+  ASSOCIATION_STATUSES,
+  associationMachine,
+  type AssociationStatus,
+} from '../states/association.js';
 import {
   AFFILIATE_SUBTYPES,
   AFFILIATE_SUBTYPE_DEFINITIONS,
@@ -20,6 +24,12 @@ import {
   occupiesActiveSlot,
   slotUsage,
 } from './slots.js';
+import {
+  FOUNDER_ROSTER_STATUS_LABELS,
+  ROSTER_UPDATES_COVERED_ELSEWHERE,
+  rosterUpdateFor,
+} from './decisions.js';
+import { NOTIFICATION_EVENTS } from '../notifications/registry.js';
 
 describe('§5.3 Affiliate subtypes', () => {
   it('defines exactly the seven subtypes §5.3 names, once each', () => {
@@ -225,5 +235,120 @@ describe('§2.2 active-partnership slots', () => {
     // A pre-existing over-allocation must read as "at limit", not as "-1".
     expect(slotUsage(['active', 'active', 'active', 'active']).remaining).toBe(0);
     expect(slotUsage(['active', 'active', 'active', 'active']).atLimit).toBe(true);
+  });
+});
+
+describe('§27.3 roster updates — which of nineteen states earns a message', () => {
+  it('says nothing when the §14.5 word on the roster card did not change', () => {
+    // The two collapses §14.5 makes deliberately. Announcing either would tell
+    // a Founder about a distinction their own roster does not display, which
+    // is a notification with no consequence behind it (Phase 22 scope §6).
+    expect(rosterUpdateFor('formal_decision_open', 'reviewing')).toEqual({
+      announce: false,
+      reason: 'no_change_in_founder_facing_status',
+    });
+    expect(rosterUpdateFor('readiness_blocked', 'ready')).toEqual({
+      announce: false,
+      reason: 'no_change_in_founder_facing_status',
+    });
+    expect(rosterUpdateFor('ready', 'readiness_blocked')).toEqual({
+      announce: false,
+      reason: 'no_change_in_founder_facing_status',
+    });
+    expect(rosterUpdateFor('signup_started', 'signed_up_waiting_for_founder')).toEqual({
+      announce: false,
+      reason: 'no_change_in_founder_facing_status',
+    });
+  });
+
+  it('defers to the more specific §27.3 key rather than sending twice', () => {
+    for (const rule of ROSTER_UPDATES_COVERED_ELSEWHERE) {
+      const from = rule.from === '*' ? 'formal_decision_open' : rule.from;
+      // Only assert where the pair genuinely changes the word — otherwise the
+      // no-change rule answers first and this proves nothing.
+      if (FOUNDER_ROSTER_STATUS_LABELS[from] === FOUNDER_ROSTER_STATUS_LABELS[rule.to]) continue;
+      expect(rosterUpdateFor(from, rule.to)).toEqual({
+        announce: false,
+        reason: 'covered_by',
+        coveredBy: rule.coveredBy,
+      });
+    }
+  });
+
+  it('announces a real change nothing else reports, with both words', () => {
+    // §17's correction pauses a Creator mid-campaign and no other §27.3 key
+    // covers it; the resume is its own event and is owed its own message.
+    expect(rosterUpdateFor('active', 'paused')).toEqual({
+      announce: true,
+      priorLabel: 'Active',
+      newLabel: 'Paused',
+    });
+    expect(rosterUpdateFor('paused', 'active')).toEqual({
+      announce: true,
+      priorLabel: 'Paused',
+      newLabel: 'Active',
+    });
+    expect(rosterUpdateFor('prospect', 'invited')).toEqual({
+      announce: true,
+      priorLabel: 'Recruited',
+      newLabel: 'Invited',
+    });
+    expect(rosterUpdateFor('signed_up_waiting_for_founder', 'preparing')).toEqual({
+      announce: true,
+      priorLabel: 'Signed up',
+      newLabel: 'Preparing',
+    });
+  });
+
+  it('never announces a campaign-wide transition per Creator (§30)', () => {
+    // Launch moves every ready Creator and close ends every active one. One
+    // event multiplied by the size of the roster is the engagement stream.
+    expect(rosterUpdateFor('ready', 'active').announce).toBe(false);
+    expect(rosterUpdateFor('active', 'ended').announce).toBe(false);
+    expect(rosterUpdateFor('paused', 'ended').announce).toBe(false);
+  });
+
+  it('decides every edge the §23.4 machine actually permits', () => {
+    // Over the LEGAL edges, not the cartesian product: two thirds of all
+    // status pairs are transitions the machine refuses, and counting those
+    // would make this assert something about arithmetic rather than about
+    // what a Founder receives.
+    const edges: Array<[AssociationStatus, AssociationStatus]> = [];
+    for (const from of ASSOCIATION_STATUSES) {
+      for (const to of ASSOCIATION_STATUSES) {
+        if (associationMachine.canTransition(from, to)) edges.push([from, to]);
+      }
+    }
+    expect(edges.length).toBeGreaterThan(20);
+
+    const announced = edges.filter(([from, to]) => rosterUpdateFor(from, to).announce);
+    expect(announced.length).toBeGreaterThan(0);
+
+    // Every announced edge is genuinely a different word, and every silent one
+    // has a reason that names itself. That is the whole contract; the count is
+    // whatever §14.5's labels and the covering rules make it.
+    for (const [from, to] of announced) {
+      expect(FOUNDER_ROSTER_STATUS_LABELS[from]).not.toBe(FOUNDER_ROSTER_STATUS_LABELS[to]);
+    }
+    for (const [from, to] of edges) {
+      const decision = rosterUpdateFor(from, to);
+      if (decision.announce) continue;
+      expect(['no_change_in_founder_facing_status', 'covered_by']).toContain(decision.reason);
+    }
+  });
+
+  it('sends nothing for a removal that is only ever a status word away', () => {
+    // `removed` is reachable from almost every state and reads as "Ended".
+    // From `prospect` that is a real change a Founder should hear about; from
+    // `ended` it is the same word and must not fire a second time.
+    expect(rosterUpdateFor('prospect', 'removed').announce).toBe(true);
+    expect(rosterUpdateFor('ended', 'removed').announce).toBe(false);
+    expect(rosterUpdateFor('declined', 'removed').announce).toBe(true);
+  });
+
+  it('never claims a covering key that is not in the §27 register', () => {
+    for (const rule of ROSTER_UPDATES_COVERED_ELSEWHERE) {
+      expect(NOTIFICATION_EVENTS).toHaveProperty(rule.coveredBy);
+    }
   });
 });

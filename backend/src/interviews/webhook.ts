@@ -62,6 +62,13 @@ export type IngestOutcome =
       bookingId: string;
       /** Which §27.3 notification this transition owes, if any. */
       notify: 'confirmed' | 'rescheduled' | 'canceled' | null;
+      /**
+       * The `interview_booking_events` row, when this delivery wrote one.
+       * §27.6's `internal_interview_changed` dedups on it (Phase 22b) — carried
+       * out rather than looked up, because "the latest event for this booking"
+       * is a race the moment two deliveries overlap.
+       */
+      eventId?: string | undefined;
     };
 
 export interface IngestDeps {
@@ -304,7 +311,13 @@ export async function ingestVendorEvent(
       });
 
       return moved.ok
-        ? { status: 'applied', campaignId, bookingId: existing.id, notify: 'rescheduled' }
+        ? {
+            status: 'applied',
+            campaignId,
+            bookingId: existing.id,
+            notify: 'rescheduled',
+            eventId: moved.eventId,
+          }
         : unmatched(audit, event, moved.message);
     }
 
@@ -336,6 +349,7 @@ export async function ingestVendorEvent(
             campaignId,
             bookingId: existing.id,
             notify: wasCanceled ? null : 'canceled',
+            eventId: canceled.eventId,
           }
         : unmatched(audit, event, canceled.message);
     }

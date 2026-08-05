@@ -16,6 +16,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { CampaignPage } from './CampaignPage.js';
+import { MagicLinkRequest } from './MagicLinkRequest.js';
+import { Section, Measure } from '../../../components/index.js';
 import { NotFoundSurface, PageLoading } from '../states.js';
 import { fetchLiveCampaign, type LiveCampaignResponse } from './api.js';
 import type { CampaignView } from './types.js';
@@ -112,5 +114,21 @@ export function LiveCampaignPage() {
   if (state.status === 'loading') return <PageLoading />;
   if (state.status === 'not_found') return <NotFoundSurface />;
   // §19: a real live campaign gets the pre-order checkout. Samples never do.
-  return <CampaignPage campaign={state.view} checkout={{ campaignId }} />;
+  return (
+    <>
+      <CampaignPage campaign={state.view} checkout={{ campaignId }} />
+      {/*
+        §5.5 (Phase 22b). The recovery path for a Backer whose magic link
+        expired — on the campaign page because the campaign is the one thing
+        they can always find again, and because `/link-unavailable` is shared
+        by every token kind and deliberately varies on nothing. Present on an
+        ended campaign too: a Backer whose charge failed needs it most there.
+      */}
+      <Section breathe>
+        <Measure>
+          <MagicLinkRequest campaignId={campaignId} />
+        </Measure>
+      </Section>
+    </>
+  );
 }

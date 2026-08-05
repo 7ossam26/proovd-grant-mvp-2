@@ -128,7 +128,22 @@ export type BookingRefusal =
   | 'incomplete';
 
 export type BookingResult =
-  | { ok: true; bookingId: string; status: InterviewStatus; evaluation: EvaluationResult }
+  | {
+      ok: true;
+      bookingId: string;
+      status: InterviewStatus;
+      evaluation: EvaluationResult;
+      /**
+       * The `interview_booking_events` row this call wrote, when it wrote one.
+       *
+       * §27.6's `internal_interview_changed` deduplicates on it (Phase 22b):
+       * a Founder who cancels and rebooks the same slot produces two real
+       * events, and the obvious `<booking>:<time>` key would collide on them.
+       * Returned rather than looked up afterwards, because "the latest event"
+       * is a race the moment two requests overlap.
+       */
+      eventId?: string;
+    }
   | { ok: false; code: BookingRefusal; message: string; next?: string };
 
 /**
@@ -358,18 +373,21 @@ export async function rescheduleBooking(
       })
       .where(eq(founderInterviewBookings.id, booking.id));
 
-    await tx.insert(interviewBookingEvents).values({
-      bookingId: booking.id,
-      campaignId: input.campaignId,
-      event: 'rescheduled',
-      priorStatus: booking.status,
-      newStatus: booking.status,
-      priorScheduledAt: booking.scheduledAt,
-      newScheduledAt: input.scheduledAt,
-      reason: input.reason ?? null,
-      source: input.source,
-      actor: input.actor,
-    });
+    const [event] = await tx
+      .insert(interviewBookingEvents)
+      .values({
+        bookingId: booking.id,
+        campaignId: input.campaignId,
+        event: 'rescheduled',
+        priorStatus: booking.status,
+        newStatus: booking.status,
+        priorScheduledAt: booking.scheduledAt,
+        newScheduledAt: input.scheduledAt,
+        reason: input.reason ?? null,
+        source: input.source,
+        actor: input.actor,
+      })
+      .returning({ id: interviewBookingEvents.id });
 
     const evaluation = await evaluateWorkspace(tx, {
       campaignId: input.campaignId,
@@ -377,7 +395,13 @@ export async function rescheduleBooking(
       trigger: 'interview_rescheduled',
     });
 
-    return { ok: true as const, bookingId: booking.id, status: booking.status, evaluation };
+    return {
+      ok: true as const,
+      bookingId: booking.id,
+      status: booking.status,
+      evaluation,
+      ...(event ? { eventId: event.id } : {}),
+    };
   });
 }
 
@@ -438,17 +462,20 @@ export async function cancelBooking(
       })
       .where(eq(founderInterviewBookings.id, booking.id));
 
-    await tx.insert(interviewBookingEvents).values({
-      bookingId: booking.id,
-      campaignId: input.campaignId,
-      event: 'canceled',
-      priorStatus: booking.status,
-      newStatus: 'canceled',
-      priorScheduledAt: booking.scheduledAt,
-      reason: input.reason,
-      source: input.source,
-      actor: input.actor,
-    });
+    const [event] = await tx
+      .insert(interviewBookingEvents)
+      .values({
+        bookingId: booking.id,
+        campaignId: input.campaignId,
+        event: 'canceled',
+        priorStatus: booking.status,
+        newStatus: 'canceled',
+        priorScheduledAt: booking.scheduledAt,
+        reason: input.reason,
+        source: input.source,
+        actor: input.actor,
+      })
+      .returning({ id: interviewBookingEvents.id });
 
     const evaluation = await evaluateWorkspace(tx, {
       campaignId: input.campaignId,
@@ -456,7 +483,13 @@ export async function cancelBooking(
       trigger: 'interview_canceled',
     });
 
-    return { ok: true as const, bookingId: booking.id, status: 'canceled' as const, evaluation };
+    return {
+      ok: true as const,
+      bookingId: booking.id,
+      status: 'canceled' as const,
+      evaluation,
+      ...(event ? { eventId: event.id } : {}),
+    };
   });
 }
 

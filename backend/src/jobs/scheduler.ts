@@ -51,6 +51,8 @@ import { sweepTransferRetries } from '../close/earnings.js';
 import { sweepFounderPaymentSchedule } from '../close/founder-payments.js';
 import { sweepDay14Reviews } from '../fulfillment/day14.js';
 import { sweepDigests } from '../notifications/digest.js';
+import { sweepRosterUpdates } from '../affiliates/roster-notifications.js';
+import { sweepSupportPromises } from '../support/promises.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -211,6 +213,25 @@ export const DIGEST_DAILY_CRON = '0 14 * * *';
 export const DIGEST_WEEKLY_CRON = '0 14 * * 1';
 
 /**
+ * Phase 22b's two remaining sweeps.
+ *
+ * `roster-update-notices` announces §27.3's roster changes from the recorded
+ * `association_status_history` rows, and `support-promises` sends §27.6's SLA
+ * breach and §27.8's promised-checkpoint follow-up from the deadlines
+ * `support_cases` already stores. Neither invents a cadence: each reads facts
+ * that exist and sends nothing when there are none, which is the difference
+ * §33.6.11 turns on. Both dedup per record, so running them twice sends once.
+ *
+ * Hourly. Both watch business-day-scale promises (§27.8's is one business day),
+ * so minute-level precision buys nothing and a minutely tick would be sixty
+ * times the churn for the same outcome — the retention sweep's reasoning.
+ */
+export const ROSTER_UPDATE_JOB = 'roster-update-notices';
+export const SUPPORT_PROMISE_JOB = 'support-promises';
+export const ROSTER_UPDATE_CRON = '17 * * * *';
+export const SUPPORT_PROMISE_CRON = '23 * * * *';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -274,6 +295,10 @@ export interface Scheduler {
   runTransferRetriesNow: () => Promise<void>;
   /** Runs the §22.3 Founder payment schedule sweep now. */
   runFounderPaymentScheduleNow: () => Promise<void>;
+  /** Runs the §27.3 roster-update sweep now. Used by tests and by Admin. */
+  runRosterUpdatesNow: () => Promise<void>;
+  /** Runs the §27.6/§27.8 support promise sweep now. */
+  runSupportPromisesNow: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -342,6 +367,12 @@ export async function startScheduler({
       interviews.scheduler,
       interviews.notifier,
       interviews.context,
+      // Phase 22b (§27.6). A cancellation the provider made and a sweep
+      // noticed is the interview change nobody was watching; without a notice
+      // the first anyone hears of it is a listing fee that quietly moved.
+      internalRecipient && launch
+        ? { recipient: internalRecipient, appBaseUrl: launch.context.appBaseUrl }
+        : undefined,
     );
     log('interview reconciliation complete', {
       abandoned: abandoned.abandoned.length,
@@ -635,6 +666,54 @@ export async function startScheduler({
     await boss.schedule(job, cron, undefined, { tz: 'UTC' });
   }
 
+  /* ── Phase 22b's two remaining sweeps (§27.3, §27.6, §27.8) ────────────── */
+
+  await boss.createQueue(ROSTER_UPDATE_JOB);
+  await boss.work(ROSTER_UPDATE_JOB, async () => {
+    if (!launch) {
+      log('roster update sweep skipped: no notifier configured');
+      return;
+    }
+    const result = await sweepRosterUpdates({
+      db,
+      notifier: launch.notifier,
+      context: launch.context,
+    });
+    log('roster update sweep complete', {
+      considered: result.considered,
+      sent: result.sent,
+      // The interesting number. A run where everything was silent means the
+      // §14.5 word did not change or a more specific §27.3 key covered it —
+      // which is the design working, not the job failing to find anything.
+      silent: result.silent,
+      duplicates: result.duplicates,
+    });
+  });
+  await boss.schedule(ROSTER_UPDATE_JOB, ROSTER_UPDATE_CRON, undefined, { tz: 'UTC' });
+
+  await boss.createQueue(SUPPORT_PROMISE_JOB);
+  await boss.work(SUPPORT_PROMISE_JOB, async () => {
+    if (!launch) {
+      log('support promise sweep skipped: no notifier configured');
+      return;
+    }
+    const result = await sweepSupportPromises({
+      db,
+      notifier: launch.notifier,
+      context: launch.context,
+      ...(internalRecipient ? { internalRecipient } : {}),
+    });
+    // §27.8 publishes the promise, so a breach is a commitment already broken.
+    // It is logged every run for the same reason the listing clock is: a quiet
+    // run and a dead job must not look alike when a promise is what is watched.
+    log('support promise sweep complete', {
+      considered: result.considered,
+      breachesNotified: result.breachesNotified,
+      followupsSent: result.followupsSent,
+    });
+  });
+  await boss.schedule(SUPPORT_PROMISE_JOB, SUPPORT_PROMISE_CRON, undefined, { tz: 'UTC' });
+
   return {
     boss,
     runRetentionNow: async () => {
@@ -668,6 +747,12 @@ export async function startScheduler({
     },
     runFounderPaymentScheduleNow: async () => {
       await boss.send(FOUNDER_PAYMENT_SCHEDULE_JOB, {});
+    },
+    runRosterUpdatesNow: async () => {
+      await boss.send(ROSTER_UPDATE_JOB, {});
+    },
+    runSupportPromisesNow: async () => {
+      await boss.send(SUPPORT_PROMISE_JOB, {});
     },
     stop: async () => {
       await boss.stop({ graceful: true });

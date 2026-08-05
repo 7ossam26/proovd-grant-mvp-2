@@ -36,6 +36,49 @@ export const FOUNDER_ROSTER_STATUS_LABELS: Record<string, string> = {
 /** §14.5: the display status when the open version requests a fixed payment. */
 export const FIXED_PAYMENT_REQUESTED_LABEL = 'Fixed payment requested';
 
+/* ── §27.3's roster update, restated (Phase 22b) ──────────────────────────── */
+
+/**
+ * Which transitions a Founder is owed a message about. Restated from
+ * `shared/src/affiliates/decisions.ts` and drift-tested; see that file for why
+ * the rule is "the word on the roster card changed" rather than a chosen list.
+ */
+export const ROSTER_UPDATES_COVERED_ELSEWHERE: ReadonlyArray<{
+  from: string;
+  to: string;
+  coveredBy: string;
+}> = [
+  { from: 'preparing', to: 'formal_decision_open', coveredBy: 'founder_response_window_started' },
+  { from: '*', to: 'proposal_pending', coveredBy: 'founder_creator_proposal_received' },
+  { from: '*', to: 'accepted', coveredBy: 'founder_creator_proposal_decision' },
+  { from: '*', to: 'declined', coveredBy: 'founder_creator_proposal_decision' },
+  { from: 'ready', to: 'active', coveredBy: 'founder_campaign_live' },
+  { from: '*', to: 'ended', coveredBy: 'founder_campaign_ended' },
+];
+
+export type RosterUpdateDecision =
+  | { announce: true; priorLabel: string; newLabel: string }
+  | { announce: false; reason: 'no_change_in_founder_facing_status' }
+  | { announce: false; reason: 'covered_by'; coveredBy: string };
+
+export function rosterUpdateFor(from: string, to: string): RosterUpdateDecision {
+  const priorLabel = FOUNDER_ROSTER_STATUS_LABELS[from];
+  const newLabel = FOUNDER_ROSTER_STATUS_LABELS[to];
+  if (priorLabel === undefined || newLabel === undefined) {
+    // An unknown status is not silently announced: a label we cannot render is
+    // an internal name one step from a Founder's screen (§3.1).
+    return { announce: false, reason: 'no_change_in_founder_facing_status' };
+  }
+  if (priorLabel === newLabel) {
+    return { announce: false, reason: 'no_change_in_founder_facing_status' };
+  }
+  const covered = ROSTER_UPDATES_COVERED_ELSEWHERE.find(
+    (rule) => rule.to === to && (rule.from === '*' || rule.from === from),
+  );
+  if (covered) return { announce: false, reason: 'covered_by', coveredBy: covered.coveredBy };
+  return { announce: true, priorLabel, newLabel };
+}
+
 /**
  * §14.5: "a pending proposal is interest, not acceptance." Restates Phase 11's
  * shared `PENDING_PROPOSAL_NOTE` (`shared/src/checkout/consent.ts`), which the

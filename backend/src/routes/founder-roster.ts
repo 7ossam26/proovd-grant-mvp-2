@@ -16,6 +16,7 @@ import express from 'express';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { notifyMidCampaignAccepted } from '../affiliates/mid-campaign-notifications.js';
+import { notifyProposalAwaitingResponse } from '../notifications/internal-queue.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
 import type { AuditWriter } from '../auth/audit.js';
@@ -283,6 +284,9 @@ export function createFounderRosterRouter(deps: FounderRosterDeps): Router {
       associationId,
       version: result.newVersion,
     });
+    // §27.6, deduped on the VERSION (Phase 22b). A revision is a new answer
+    // owed by the Creator, and §14.6's deadline keeps running through it.
+    await notifyProposalAwaitingResponse(midNotify, { versionId: result.newVersion.id });
     res.json({
       response: {
         outcome: 'revised',
