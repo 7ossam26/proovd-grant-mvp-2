@@ -158,6 +158,11 @@ export function CampaignHome() {
   return (
     <Measure>
       <Section>
+        {/* §33.11.2: every principal surface names itself once, at level one.
+            The Glance number is the hero (DNA §5.1) but a hero is not a title —
+            a Founder arriving from a bookmark, and every screen reader, needs
+            to be told which page this is before the count means anything. */}
+        <h1 className="h2">Your campaign today</h1>
         <GlancePanel view={state.view} />
         <ActPanel act={act} campaignId={campaignId} onChanged={load} />
         <ExplorePanel sections={explore.sections} readAt={explore.readAt} />

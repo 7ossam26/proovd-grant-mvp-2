@@ -316,13 +316,18 @@ export function VettingFlow() {
 
         {screen !== 'review' ? (
           <div className="vetting__nav">
-            <Button
-              tier="tertiary"
-              disabled={index === 0}
-              onClick={() => void advance(SCREENS[index - 1]!)}
-            >
-              Back
-            </Button>
+            {/* §33.11.4: a CTA names the action, so both of these name where
+                they go. `Continue` and `Back` alone are the same two words on
+                every flow in the product, which tells a screen-reader user
+                moving through a form nothing about what happens next. */}
+            {/* Nothing precedes the first step, so there is no control here
+                rather than a permanently disabled one — a dead button is a
+                promise of somewhere to go (§1.4). */}
+            {index > 0 ? (
+              <Button tier="tertiary" onClick={() => void advance(SCREENS[index - 1]!)}>
+                {`Back to ${copyFor(SCREENS[index - 1]!).label}`}
+              </Button>
+            ) : null}
             <Button
               tier="primary"
               disabled={!complete[screen as keyof typeof complete]}
@@ -331,7 +336,9 @@ export function VettingFlow() {
               {/* Not "Review": the overview below already offers a control by
                   that name, and two buttons with one name is ambiguous to a
                   screen reader before it is ambiguous to anyone else. */}
-              {remaining === 1 ? 'Review my answers' : 'Continue'}
+              {remaining === 1
+                ? 'Review my answers'
+                : `Continue to ${copyFor(SCREENS[index + 1]!).label}`}
             </Button>
           </div>
         ) : null}

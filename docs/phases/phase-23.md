@@ -25,6 +25,31 @@ Phases 01–22 green. This phase finds what they missed.
 
 ---
 
+## The seam (added by the session that started this phase, per master-plan §1.3 step 6)
+
+Seventeen done-when items across **two complete acceptance sections** — fourteen
+named tests, more than any phase in the plan, and every one of them a sweep
+across everything built so far rather than a feature with a boundary. The brief
+does not name a seam, so this one was written back into the file, on the line the
+brief's own acceptance draws:
+
+| Half | Scope | Acceptance | State |
+|---|---|---|---|
+| **23a** | Scope 1–3: the accessibility sweep across every principal flow, content QA including the built bundle, and the seven-surface cross-surface consistency contract | **§33.11.1–§33.11.7** | **built** |
+| **23b** | Scope 4–8: the adversarial idempotency sweep, the §32.5 test-card matrix and its §32.6 evidence log, the §32.7 direct-architecture test, the §31.9 measurement baseline, and the time/security confirmations | **§33.12.1–§33.12.7**, plus the three §32 done-when items | pending |
+
+The dependency runs one way and both halves are read-only over the product:
+§33.11 is about what a person **sees** — the rendered surface, the rendered
+message, and whether seven renderings of one reservation agree — while §33.12 is
+about what the system **does** under replay, under a clock, and under a stale
+session. Nothing in 23a asserts an idempotency property and nothing in 23b
+renders a surface; where they touch, 23a's cross-surface register is the
+vocabulary 23b's architecture test reconciles against.
+
+**23a builds no test clock, no evidence log, and no scoreboard.**
+
+---
+
 ## Scope
 
 ### 1. Accessibility sweep

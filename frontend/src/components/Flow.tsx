@@ -49,6 +49,23 @@ interface FlowProps {
   done?: { title: ReactNode; body?: ReactNode };
 }
 
+/**
+ * What a nav control names as its destination.
+ *
+ * `label` is the step's own short name and is what the overview menu already
+ * shows, so a Founder meets the same word in both places (DNA §5.13's one
+ * vocabulary). Without one there is still something specific to say — which
+ * numbered step — and that is better than a bare `Continue`.
+ */
+function stepName(steps: FlowStep[], index: number): string {
+  return steps[index]?.label ?? `step ${index + 1}`;
+}
+
+/** The review stop's name, lowercased mid-sentence unless it is a proper noun. */
+function reviewName(reviewTitle: ReactNode): string {
+  return typeof reviewTitle === 'string' && reviewTitle.trim() ? reviewTitle : 'the review';
+}
+
 export function Flow({
   steps,
   onComplete,
@@ -165,14 +182,19 @@ export function Flow({
 
       <div className="flow__stage">
         <div className="flow__step" ref={stepRef} key={finished ? 'done' : index}>
+          {/* §33.11.2: the step title is the heading of what a person is
+              looking at, so it is a heading. As a `p` the whole flow — four
+              screens of the Founder's own campaign — had no structure between
+              the page title and whatever a step's content rendered, which is
+              also what put an accordion's `h3` directly under the `h1`. */}
           {finished && done ? (
             <>
-              <p className="step-title">{done.title}</p>
+              <h2 className="step-title">{done.title}</h2>
               {done.body ? <p className="lede">{done.body}</p> : null}
             </>
           ) : onReview ? (
             <>
-              <p className="step-title">{reviewTitle}</p>
+              <h2 className="step-title">{reviewTitle}</h2>
               <dl className="flow__summary">
                 {steps.map((s, i) => (
                   <div className="flow__summary-row" key={s.id}>
@@ -186,7 +208,7 @@ export function Flow({
               </dl>
               <div className="flow__nav">
                 <Button tier="tertiary" onClick={back}>
-                  Back
+                  {`Back to ${stepName(steps, total - 1)}`}
                 </Button>
                 <Button tier="primary" onClick={confirm}>
                   {confirmLabel}
@@ -195,22 +217,26 @@ export function Flow({
             </>
           ) : (
             <>
-              <p className="step-title">{current?.title}</p>
+              <h2 className="step-title">{current?.title}</h2>
               {current?.content}
               <div className="flow__nav">
-                <Button
-                  tier="tertiary"
-                  onClick={back}
-                  disabled={index === 0 && !onExit}
-                >
-                  Back
-                </Button>
+                {/* §33.11.4: both controls name where they go. `Back` and
+                    `Continue` are the same two words on every flow in the
+                    product; a person moving by keyboard hears the label and
+                    nothing else, and the destination is the useful half. */}
+                {index > 0 || onExit ? (
+                  <Button tier="tertiary" onClick={back}>
+                    {index > 0 ? `Back to ${stepName(steps, index - 1)}` : 'Back out of this'}
+                  </Button>
+                ) : null}
                 <Button
                   tier="primary"
                   onClick={next}
                   disabled={current?.canAdvance === false}
                 >
-                  Continue
+                  {index + 1 >= total
+                    ? `Continue to ${reviewName(reviewTitle)}`
+                    : `Continue to ${stepName(steps, index + 1)}`}
                 </Button>
               </div>
             </>

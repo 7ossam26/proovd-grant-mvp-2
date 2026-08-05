@@ -175,16 +175,20 @@ export function CampaignPreview() {
       {p.rewards.length > 0 ? (
         <Card>
           <h2>Rewards</h2>
-          {p.rewards.map((r) => (
-            <div className="kv__row" key={r.sku}>
-              <dt>
-                {r.title} — {formatUsd(BigInt(r.priceCents))}
-              </dt>
-              <dd>
-                {r.contents.join(', ')} · Delivery {r.delivery}
-              </dd>
-            </div>
-          ))}
+          {/* §33.11.2: the rows are `dt`/`dd`, so they need the `dl` around
+              them — without it each reward is an orphaned term. */}
+          <dl className="kv">
+            {p.rewards.map((r) => (
+              <div className="kv__row" key={r.sku}>
+                <dt>
+                  {r.title} — {formatUsd(BigInt(r.priceCents))}
+                </dt>
+                <dd>
+                  {r.contents.join(', ')} · Delivery {r.delivery}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </Card>
       ) : null}
 

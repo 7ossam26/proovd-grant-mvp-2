@@ -22,7 +22,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Measure, Section } from '../../components/index.js';
+import { Measure, NO_ACTION, Section, StatePanel } from '../../components/index.js';
+import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
 import { DigestPreference, type DigestFrequency, type DigestPreferenceView } from './DigestPreference.js';
 import { NotificationHistory, type HistoryEntry } from './NotificationHistory.js';
 import {
@@ -81,13 +82,7 @@ export function NotificationSettings({ role }: NotificationSettingsProps) {
   }, [role, cursor]);
 
   if (loading) {
-    return (
-      <Section>
-        <Measure>
-          <p>Loading your notification settings…</p>
-        </Measure>
-      </Section>
-    );
+    return <SurfaceLoading subject="your notification settings" reference="Your account" />;
   }
 
   if (failure || !preference) {
@@ -97,13 +92,19 @@ export function NotificationSettings({ role }: NotificationSettingsProps) {
           <h1 className="h2" id="notification-settings-error">
             We could not load your notification settings
           </h1>
-          <p>{failure ?? 'The server did not return your preference.'}</p>
-          {/* §27.1's sixth question, and the fact that matters most here:
-              a failed read changed nothing about which emails you receive. */}
-          <p>
-            Nothing about your emails has changed. Reload the page, and if it
-            keeps happening, contact support.
-          </p>
+          {/* §33.11.7: all six of §27.1's questions, not just the one that
+              matters most. The fact that matters most is still first: a failed
+              read changed nothing about which emails you receive. */}
+          <StatePanel
+            state="We could not load your notification settings"
+            whatHappened={`${failure ?? 'The server did not return your preference.'} Nothing about your emails has changed.`}
+            next="Reload the page. Every transactional email — money, deadlines, your account — keeps arriving either way."
+            owner="Proovd"
+            nextUpdate="As soon as you reload"
+            action={NO_ACTION}
+            reference="Your notification settings"
+            getHelp={{ href: supportMailto('Notification settings') }}
+          />
         </Measure>
       </Section>
     );

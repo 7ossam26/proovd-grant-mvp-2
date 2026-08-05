@@ -77,15 +77,33 @@ export const NO_WORK_YET =
 
 export function CreatorCampaigns() {
   const [state, setState] = useState<
-    { status: 'loading' } | { status: 'signed_out' } | { status: 'ready'; rows: CreatorCampaign[] }
+    | { status: 'loading' }
+    | { status: 'signed_out' }
+    | { status: 'error'; detail: string }
+    | { status: 'ready'; rows: CreatorCampaign[] }
   >({ status: 'loading' });
 
   const load = useCallback(async () => {
     try {
       const { campaigns } = await fetchCreatorCampaigns();
       setState({ status: 'ready', rows: campaigns });
-    } catch {
-      setState({ status: 'signed_out' });
+    } catch (caught) {
+      // §33.11.7, §1.4: only a refused session is a signed-out session. Showing
+      // the sign-in form when the server is unavailable asks a Creator to
+      // retype a password that will not help, and hides the real state.
+      const status =
+        caught instanceof CreatorRequestError ? caught.detail.status : 0;
+      if (status === 401 || status === 403) {
+        setState({ status: 'signed_out' });
+        return;
+      }
+      setState({
+        status: 'error',
+        detail:
+          caught instanceof CreatorRequestError
+            ? `${caught.detail.whatHappened ?? ''} ${caught.detail.next ?? ''}`.trim()
+            : 'The request did not complete, so nothing about your campaigns has changed.',
+      });
     }
   }, []);
 
@@ -110,6 +128,26 @@ export function CreatorCampaigns() {
   }
 
   if (state.status === 'signed_out') return <CreatorSignIn onSignedIn={load} />;
+
+  if (state.status === 'error') {
+    return (
+      <Measure>
+        <Section>
+          <h1>Your campaigns</h1>
+        </Section>
+        <StatePanel
+          state="We could not load your campaigns"
+          whatHappened={state.detail}
+          next="Reload the page. Nothing about your partnerships has changed — this was a read that did not complete."
+          owner="Proovd"
+          nextUpdate="As soon as you reload"
+          action={NO_ACTION}
+          reference="Your campaigns"
+          getHelp={{ href: supportMailto('Creator campaigns') }}
+        />
+      </Measure>
+    );
+  }
 
   return (
     <Measure>

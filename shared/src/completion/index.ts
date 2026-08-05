@@ -32,7 +32,10 @@ export const COMPLETION_CRITERIA = [
   {
     key: 'readiness_cleared',
     spec: '§22.8.1: Creator cleared readiness before work.',
-    record: 'association_readiness (§16) — the thirteen-item checklist, all-or-nothing',
+    // "every item or none" rather than the crowdfunding phrase §3.2 forbids
+    // everywhere, including in an internal description. This string ships in
+    // the browser bundle, and Phase 23a's bundle scan is what found it.
+    record: 'association_readiness (§16) — the thirteen-item checklist, every item or none',
   },
   {
     key: 'valid_post_verified',

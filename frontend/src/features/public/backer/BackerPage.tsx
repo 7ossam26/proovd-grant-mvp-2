@@ -22,7 +22,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'react-router';
-import { Button, Section, Measure } from '../../../components/index.js';
+import { Button, Section, Measure, StatePanel } from '../../../components/index.js';
+import { SurfaceLoading } from '../states.js';
 import { CommentThread } from './CommentThread.js';
 import {
   DigestPreference,
@@ -75,11 +76,7 @@ export function BackerPage(props: BackerPageProps = {}) {
 
   if (state.status === 'loading') {
     return (
-      <Section>
-        <Measure>
-          <p>Opening your backer page…</p>
-        </Measure>
-      </Section>
+      <SurfaceLoading subject="your pre-orders" reference="Your backer link" />
     );
   }
 
@@ -91,12 +88,24 @@ export function BackerPage(props: BackerPageProps = {}) {
           <h1 className="h2" id="backer-unavailable">
             We couldn&rsquo;t open this link
           </h1>
-          <p>
-            This backer link can&rsquo;t be opened. If you have a newer confirmation or reminder
-            email, use the link there. Otherwise email{' '}
-            <a href="mailto:support@proovd.co">support@proovd.co</a> and we&rsquo;ll help — no
-            payment is affected.
-          </p>
+          {/* §33.11.7's six questions, answered without distinguishing the
+              failures §5.5 requires to be indistinguishable: every one of these
+              sentences is true of an expired link, a revoked one, and a server
+              that is simply unavailable. */}
+          <StatePanel
+            state="This backer link can’t be opened"
+            whatHappened="Nothing is wrong with your card and no payment is affected. Links are single-purpose and time-limited, and we can’t tell from here which reason applies."
+            next="If you have a newer confirmation or reminder email, use the link in it. Otherwise email support@proovd.co and we will send a fresh one."
+            owner="You"
+            nextUpdate="As soon as a new link is sent"
+            action={
+              <a className="btn btn--primary" href="mailto:support@proovd.co">
+                Ask us for a new link
+              </a>
+            }
+            reference="No account details are shown on this page."
+            getHelp={{ href: 'mailto:support@proovd.co' }}
+          />
         </Measure>
       </Section>
     );

@@ -26,7 +26,17 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, Link } from 'react-router';
-import { Button, Field, Input, Section, Tag, Textarea } from '../../components/index.js';
+import {
+  Button,
+  Field,
+  Input,
+  NO_ACTION,
+  Section,
+  StatePanel,
+  Tag,
+  Textarea,
+} from '../../components/index.js';
+import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
 import {
   fetchFulfillment,
   fetchDay14,
@@ -113,10 +123,23 @@ export function Fulfillment() {
   }
 
   if (error && !status) {
+    // §33.11.7: an exception state answers §27.1's six questions. A sentence
+    // and nothing else leaves a Founder who owes their Backers a delivery with
+    // no idea who is fixing it or how to reach anyone.
     return (
       <main className="page">
         <Section title="Fulfillment">
-          <p className="text-body">{error}</p>
+          <h1 className="text-display">Fulfillment</h1>
+          <StatePanel
+            state="We could not open your fulfillment record"
+            whatHappened={error}
+            next="Reload the page. Nothing about your campaign or your Backers has changed."
+            owner="Proovd"
+            nextUpdate="As soon as you reload"
+            action={NO_ACTION}
+            reference={campaignId ?? 'this campaign'}
+            getHelp={{ href: supportMailto(`Fulfillment — ${campaignId ?? 'campaign'}`) }}
+          />
         </Section>
       </main>
     );
@@ -124,9 +147,10 @@ export function Fulfillment() {
   if (!status || !campaignId) {
     return (
       <main className="page">
-        <Section title="Fulfillment">
-          <p className="text-body">Loading your fulfillment record…</p>
-        </Section>
+        <SurfaceLoading
+          subject="your fulfillment record"
+          reference={campaignId ?? 'this campaign'}
+        />
       </main>
     );
   }

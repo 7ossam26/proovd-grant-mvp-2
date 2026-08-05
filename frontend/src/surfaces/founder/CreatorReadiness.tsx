@@ -188,8 +188,10 @@ function CreatorCard({
       </Tag>
       <h2>{creator.publicHandle ?? 'A recruited Creator'}</h2>
 
+      {/* §33.11.2: a `dt`/`dd` pair needs a `dl` above it — a `div` with the
+          same class leaves a screen reader announcing an orphaned term. */}
       {fixedPayment.applicable ? (
-        <div className="kv">
+        <dl className="kv">
           <div className="kv__row">
             <dt>Fixed Creator payment</dt>
             <dd>
@@ -211,7 +213,7 @@ function CreatorCard({
               <dd>{isoDay(fixedPayment.fundedAt)}</dd>
             </div>
           ) : null}
-        </div>
+        </dl>
       ) : null}
 
       {creator.canBeginWork ? (

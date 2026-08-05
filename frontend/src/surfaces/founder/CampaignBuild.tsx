@@ -267,20 +267,27 @@ function ChangesRequired({ review }: { review: LatestReview }) {
         <Row label="Reviewer">{review.reviewer ?? 'Proovd review'}</Row>
         <Row label="Next update">{review.nextUpdateExpectation ?? 'When you resubmit'}</Row>
       </dl>
+      {/* §33.11.2: each feedback item is a `dt`/`dd` pair, so the group needs
+          its `dl` — otherwise a screen reader reaches a term with nothing
+          defining it, on the one surface telling a Founder what to fix. */}
       {review.required.length > 0 ? (
         <>
           <h3>{FEEDBACK_GROUP_LABELS.required}</h3>
-          {review.required.map((f, i) => (
-            <FeedbackItem key={i} item={f} />
-          ))}
+          <dl className="kv">
+            {review.required.map((f, i) => (
+              <FeedbackItem key={i} item={f} />
+            ))}
+          </dl>
         </>
       ) : null}
       {review.optional.length > 0 ? (
         <>
           <h3>{FEEDBACK_GROUP_LABELS.optional}</h3>
-          {review.optional.map((f, i) => (
-            <FeedbackItem key={i} item={f} />
-          ))}
+          <dl className="kv">
+            {review.optional.map((f, i) => (
+              <FeedbackItem key={i} item={f} />
+            ))}
+          </dl>
         </>
       ) : null}
       <p className="field-hint">

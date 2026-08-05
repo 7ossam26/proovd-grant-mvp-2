@@ -195,7 +195,7 @@ describe('the fee preview (§12, §24.6)', () => {
 });
 
 describe('the workspace flow (§12, DNA §5.9)', () => {
-  it('presents one item at a time with progress and Back/Continue', async () => {
+  it('presents one item at a time with progress and a named next step', async () => {
     mount();
     await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
 
@@ -204,8 +204,10 @@ describe('the workspace flow (§12, DNA §5.9)', () => {
     expect(screen.getByText(/photo or video of what you are making/)).toBeInTheDocument();
     expect(screen.queryByText(/Is your campaign story written/)).not.toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+    // Phase 23a (§33.11.4): the nav names its destination, and step 1 offers no
+    // Back — there is nothing behind it (§1.4).
+    expect(screen.getByRole('button', { name: /^Continue to / })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull();
     expect(screen.getByText('5 steps left')).toBeInTheDocument();
   });
 
@@ -214,7 +216,7 @@ describe('the workspace flow (§12, DNA §5.9)', () => {
     mount();
     await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
     expect(screen.getByText(/logo and a written brand direction/)).toBeInTheDocument();
     expect(screen.queryByText(/photo or video of what you are making/)).not.toBeInTheDocument();
@@ -226,7 +228,7 @@ describe('the workspace flow (§12, DNA §5.9)', () => {
     expect(screen.getByText('Complete')).toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     expect(screen.getByText('A logo or wordmark has not been uploaded.')).toBeInTheDocument();
   });
 
@@ -244,8 +246,8 @@ describe('the workspace flow (§12, DNA §5.9)', () => {
     mount();
     await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
     expect(screen.getByText('Booking an interview is not open yet')).toBeInTheDocument();
     expect(

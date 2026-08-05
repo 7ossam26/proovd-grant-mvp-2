@@ -1,9 +1,22 @@
 import '@testing-library/jest-dom/vitest';
 import { expect, afterEach } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { toHaveNoViolations } from 'jest-axe';
 
 expect.extend(toHaveNoViolations);
+
+/**
+ * `waitFor`'s deadline, raised from Testing Library's 1s default (Phase 23a).
+ *
+ * Vitest's `testTimeout` does not govern this one: a `waitFor` gives up on its
+ * own clock, and 1s is a bet on how fast the machine is. `npm test` runs the
+ * jsdom project beside the backend's Postgres suites, and a render that settles
+ * in 40ms alone can take well over a second under that load — which surfaces as
+ * `Unable to find role="alert"` and blames the surface for being wrong when it
+ * was only late. The assertions are unchanged; only how long they are willing
+ * to wait for a render React has not committed yet.
+ */
+configure({ asyncUtilTimeout: 10_000 });
 
 afterEach(() => cleanup());
 

@@ -131,17 +131,17 @@ describe('§33.1.4 the vetting sequence', () => {
     // 1. Campaign path
     await screen.findByRole('heading', { name: /which of these is closer/i });
     await user.click(screen.getByRole('radio', { name: /i have a product/i }));
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
     // 2. Problem
     await screen.findByRole('heading', { name: /what problem does your product solve/i });
     await user.type(screen.getByLabelText(/what problem does your product solve/i), 'A problem.');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
     // 3. Solution
     await screen.findByRole('heading', { name: /what does your product do about it/i });
     await user.type(screen.getByLabelText(/what does your product do about it/i), 'A solution.');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
     // 4. Competition
     await screen.findByRole('heading', { name: /who else is solving this/i });
@@ -156,20 +156,23 @@ describe('§33.1.4 the vetting sequence', () => {
     stubVetting();
     renderVetting();
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    expect(screen.getByRole('button', { name: 'Continue' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: /^Continue to / }).hasAttribute('disabled')).toBe(true);
   });
 
-  it('Back returns to the previous step and is unavailable on the first', async () => {
+  it('Back returns to the previous step and does not exist on the first', async () => {
     const user = userEvent.setup();
     stubVetting({ selectedType: 'pre_launch' });
     renderVetting();
 
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    expect(screen.getByRole('button', { name: 'Back' }).hasAttribute('disabled')).toBe(true);
+    // Phase 23a (§33.11.4, §1.4): nothing precedes step 1, so there is no
+    // control rather than a permanently disabled one — and every nav control
+    // now names where it goes.
+    expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await screen.findByRole('heading', { name: /what problem does your product solve/i });
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: /^Back to / }));
     await screen.findByRole('heading', { name: /which of these is closer/i });
   });
 
@@ -179,11 +182,11 @@ describe('§33.1.4 the vetting sequence', () => {
     renderVetting();
 
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what problem/i), 'A problem.');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what does your product do/i), 'A solution.');
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/who else is solving this/i), 'Spreadsheets.');
 
     // All the way back to step 2, then forward again. Step 4's answer survives.
@@ -202,7 +205,7 @@ describe('§33.1.4 the vetting sequence', () => {
     renderVetting();
 
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what problem/i), 'A problem.');
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Saved /), {
@@ -225,7 +228,7 @@ describe('§33.1.4 the vetting sequence', () => {
     renderVetting();
 
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what problem/i), 'A problem.');
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/retrying/i), {
@@ -249,7 +252,7 @@ describe('§33.1.4 the vetting sequence', () => {
     renderVetting();
 
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     const box = screen.getByLabelText(/what problem/i) as HTMLTextAreaElement;
     await user.type(box, 'Work I do not want to lose.');
 
@@ -274,7 +277,7 @@ describe('§33.1.4 the vetting sequence', () => {
     renderVetting();
 
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what problem/i), 'Refused text.');
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Not saved/i), {
@@ -313,7 +316,7 @@ describe('§33.1.4 the vetting sequence', () => {
     stubVetting({ selectedType: 'pre_launch' });
     renderVetting();
     await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what problem/i), 'U');
 
     await waitFor(() => expect(added).toContain('beforeunload'));

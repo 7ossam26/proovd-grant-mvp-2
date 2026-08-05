@@ -314,7 +314,16 @@ export const UNIVERSALLY_BANNED_TERMS = {
   equity: {
     specRef: '§3.2',
     replacement: 'reward package / founding-member benefit',
-    pattern: /\b(equity|investment|returns on your|ROI)\b/i,
+    // §3.2 forbids *presenting the offer* as an investment. It does not forbid
+    // the word, and Phase 23a's surface sweep is what made the difference
+    // matter: `/safety` lists `investment` among the prohibited business
+    // categories and `/about` says "we are not an investment platform" — both
+    // are the section's own position, stated. So the pattern reads the forms
+    // that make a claim about the reader's money (`your investment`, `invest in
+    // this`, `equity stake`, `ROI`) rather than every occurrence of a word the
+    // honest sentences also need.
+    pattern:
+      /\b(equity (stake|crowdfunding|share)|your (investment|equity)|invest(ing)? in (this|the) (campaign|product|company)|investment (opportunity|return)|returns on your|ROI)\b/i,
   },
   anyone_can_launch: {
     specRef: '§3.2',

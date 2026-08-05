@@ -200,8 +200,10 @@ export function AdminNotificationsPage() {
             onChange={(event) => setEmail(event.target.value)}
             placeholder="Leave empty for every recipient"
           />
+          {/* §33.11.4: the control names what it does. `Apply` names nothing —
+              on a page with a preview form beside it, it could be either. */}
           <button type="submit" className="btn btn--secondary">
-            Apply
+            Filter the history
           </button>
         </form>
         {applied ? <p className="admin-note">Showing messages sent to {applied}.</p> : null}

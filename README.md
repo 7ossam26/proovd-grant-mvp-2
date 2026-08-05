@@ -23,11 +23,11 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–21a are
-complete**, and Phase 22 — the notification sweep — is nearly done: the coverage
-machine, the optional digest, and 29 of its 44 missing messages are built. The
-last 7 are recorded with the dedup entity each needs and what still blocks it.
-Money moves in test mode only, and the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–22 are
+complete** — every lifecycle phase and the whole notification contract — and
+Phase 23, the P0 pass, is under way: **23a** has swept accessibility, content,
+and cross-surface consistency across every principal flow. Money moves in test
+mode only, and the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -68,9 +68,11 @@ Money moves in test mode only, and the live-mode gate stays shut.
 | 20a | The refund cause register, the reservation-refund lifecycle, the Idea exceptions with no voluntary path, and the per-cause earnings treatments |
 | 20b | Disputes and their 24-hour task, the assembled evidence packet, one statement descriptor everywhere, post-capture enforcement, and the §29 records |
 | 21a | Fulfillment and its four Founder obligations, delivery-date changes and their two paths, the Day 14 Progress Check, and the one-strike ghost ban |
+| 21b | Creator completion and the work-again request, Founder next-campaign readiness, the Backer's derived status and satisfaction, and campaign resolution |
 | 22a | The notification coverage machine: every §27 event either sends or is recorded as deliberately unsent, and every message it can send is proved against the transactional contract |
-| 22b | 24 more of the messages the Spec names: the review round, the fixed Creator payment, the mid-campaign Creator, the password reset, and the new-account notice |
+| 22b | All 44 missing messages: the roster update decided by a real state change, the review round, the fixed Creator payment, the mid-campaign Creator, the queue notices, and the magic-link reissue that names nobody |
 | 22c | The optional activity digest — the one email anyone can switch off — with the notification history that stays a record rather than becoming a dashboard |
+| 23a | The P0 accessibility and content sweep: every principal flow rendered and checked, the built bundle grepped, and one pre-order compared across all seven surfaces |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -83,8 +85,9 @@ built against the same brief and lands its own named acceptance tests. Every
 named test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.13,
 every one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one
 from §33.5.1 to §33.5.13, **every one from §33.6.1 to §33.6.13, every one from
-§33.7.1 to §33.7.12, every one from §33.8.1 to §33.8.14, and every one from
-§33.9.1 to §33.9.13**, §33.10.1 to §33.10.4, and §33.12.4.
+§33.7.1 to §33.7.12, every one from §33.8.1 to §33.8.14, every one from §33.9.1
+to §33.9.13, every one from §33.10.1 to §33.10.10, and every one from §33.11.1 to
+§33.11.7**, plus §33.12.4. §33.12's remaining six are Phase 23b's.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
 record went first and is the source of truth — a scheduling provider is a source
@@ -118,6 +121,15 @@ the second writes the missing messages into a suite that already refuses a bad
 one, and the third composes the optional digest and history layer on top. That is
 the same ordering Phase 09 used for the booking record and Phase 10 for the
 payments substrate.
+
+Phase 23 splits on the line its own acceptance draws. §33.11 is about what a
+person **sees** — the rendered surface, the rendered message, and whether seven
+renderings of one pre-order agree — while §33.12 is about what the system
+**does** under replay, under a clock, and under a stale session. 23a is the
+first; 23b is the second, together with the provider test matrix and its
+evidence log. Nothing in either half adds behaviour: §32.1's last step verifies
+what is already built, and what the sweep finds is either a defect it fixes or a
+gap it records with the phase that owns it.
 
 ## Layout
 
@@ -156,6 +168,10 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
                   detectors, the naming contract as a scanner, and the optional
                   digest: its preference vocabulary, the three eligible activity
                   kinds, the window kernels, and what it must never become
+  src/qa/         the P0 pass as registers: every principal flow and the five
+                  §28.5 keyboard paths, the CTA rule, the placeholder patterns,
+                  the six-question detectors, what a bundle scan can decide, and
+                  the seven surfaces and eight facts §33.11.5 compares
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -1343,7 +1359,13 @@ TEST_DATABASE_URL=postgres://postgres:x@127.0.0.1:55432/proovd_test npm test
 pg_ctl -D /tmp/pgdata stop
 ```
 
-The frontend and shared suites need neither Docker nor a database.
+The frontend and shared suites need neither Docker nor a database. The frontend
+suite does build the production bundle once, in `vitest.global-setup.ts`, when
+`frontend/dist` is older than the source: §33.11.3's scan reads what actually
+ships rather than the source, and a stale bundle would pass while the code it
+was built from had the violation. It runs before the worker pool exists —
+building inside a test file starved the jsdom workers and timed out three
+unrelated suites.
 
 ## Conventions that are not negotiable
 

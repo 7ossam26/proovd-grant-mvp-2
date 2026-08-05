@@ -19,7 +19,17 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { Button, Field, Measure, Section, Tag, Textarea } from '../../components/index.js';
+import {
+  Button,
+  Field,
+  Measure,
+  NO_ACTION,
+  Section,
+  StatePanel,
+  Tag,
+  Textarea,
+} from '../../components/index.js';
+import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
 import { formatUsd } from '@proovd/shared';
 import {
   fetchCampaignResults,
@@ -238,22 +248,29 @@ export function CampaignResults() {
 
   if (state.status === 'loading') {
     return (
-      <Section>
-        <Measure>
-          <p>Loading your results…</p>
-        </Measure>
-      </Section>
+      <SurfaceLoading subject="your results" reference={campaignId} />
     );
   }
 
   if (state.status === 'error') {
+    // §33.11.7: the six questions, on the surface a Founder opens to find out
+    // what their campaign earned. A title and a sentence answer two of them.
     return (
       <Section aria-labelledby="results-error">
         <Measure>
           <h1 className="h2" id="results-error">
             {state.title}
           </h1>
-          <p>{state.detail}</p>
+          <StatePanel
+            state={state.title}
+            whatHappened={state.detail}
+            next="Reload the page. Your results are computed from your record when you open it, so nothing was lost."
+            owner="Proovd"
+            nextUpdate="As soon as you reload"
+            action={NO_ACTION}
+            reference={campaignId}
+            getHelp={{ href: supportMailto(`Campaign results — ${campaignId}`) }}
+          />
         </Measure>
       </Section>
     );

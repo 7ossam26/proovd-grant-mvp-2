@@ -141,7 +141,12 @@ export const UNIVERSALLY_BANNED_TERMS = {
   equity: {
     specRef: '§3.2',
     replacement: 'reward package / founding-member benefit',
-    pattern: /\b(equity|investment|returns on your|ROI)\b/i,
+    // Phase 23a narrowed this from every occurrence of the word to the forms
+    // that make a claim about the reader's money — see the shared register for
+    // why `/safety`'s prohibited-category list and `/about`'s denial are §3.2's
+    // own position rather than breaches of it.
+    pattern:
+      /\b(equity (stake|crowdfunding|share)|your (investment|equity)|invest(ing)? in (this|the) (campaign|product|company)|investment (opportunity|return)|returns on your|ROI)\b/i,
   },
   anyone_can_launch: {
     specRef: '§3.2',

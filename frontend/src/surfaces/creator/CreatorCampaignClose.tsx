@@ -12,7 +12,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { formatUsd } from '@proovd/shared';
-import { Section, Measure } from '../../components/index.js';
+import { Section, Measure, StatePanel } from '../../components/index.js';
+import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
 import { fetchCreatorClose, CreatorRequestError, type CreatorCloseView } from './api.js';
 
 type State =
@@ -54,11 +55,7 @@ export function CreatorCampaignClose() {
 
   if (state.status === 'loading') {
     return (
-      <Section>
-        <Measure>
-          <p>Loading your campaign close…</p>
-        </Measure>
-      </Section>
+      <SurfaceLoading subject="your campaign close" reference={associationId} />
     );
   }
 
@@ -69,12 +66,23 @@ export function CreatorCampaignClose() {
           <h1 className="h2" id="creator-close-error">
             {state.title}
           </h1>
-          <p>{state.detail}</p>
-          <p>
-            <Link to={`/creator/campaigns/${associationId}/partnership`}>
-              Back to your campaign dashboard
-            </Link>
-          </p>
+          {/* §33.11.7: this is the surface a Creator opens to see what they
+              earned. A failure here says who owns it and how to reach a person
+              — the amount is not in question, the view is. */}
+          <StatePanel
+            state={state.title}
+            whatHappened={state.detail}
+            next="Reload the page. Your earnings are recorded on Proovd’s side and are not affected by this."
+            owner="Proovd"
+            nextUpdate="As soon as you reload"
+            action={
+              <Link to={`/creator/campaigns/${associationId}/partnership`}>
+                Back to your campaign dashboard
+              </Link>
+            }
+            reference={associationId}
+            getHelp={{ href: supportMailto(`Campaign close — ${associationId}`) }}
+          />
         </Measure>
       </Section>
     );
