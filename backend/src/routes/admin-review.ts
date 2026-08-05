@@ -17,6 +17,9 @@ import type { Auth } from '../auth/auth.js';
 import { requireAdmin, requireFreshSession } from '../auth/guards.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
+import { reviewNotifyDeps } from '../campaign/review-notifications.js';
 import { campaigns } from '../db/schema/domain.js';
 import {
   evaluateRosterReadiness,
@@ -37,6 +40,11 @@ export interface AdminReviewDeps {
   db: Database;
   auth: Auth;
   audit: AuditWriter;
+  /** Phase 22b: §27.3/§27.6's review messages. Unset → the review still runs
+      and the Admin queue still shows it, which is where the work is visible. */
+  notifier?: Notifier | undefined;
+  notificationContext?: LaunchNotificationContext | undefined;
+  internalRecipient?: string | undefined;
 }
 
 export function createAdminReviewRouter(deps: AdminReviewDeps): Router {
@@ -142,7 +150,7 @@ export function createAdminReviewRouter(deps: AdminReviewDeps): Router {
 
   router.post('/api/admin/campaigns/:campaignId/review/approve', admin, fresh, json, async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
-    const result = await approveReview(db, { audit }, {
+    const result = await approveReview(db, { audit, ...reviewNotifyDeps(deps) }, {
       campaignId: req.params['campaignId'] as string,
       reviewer: typeof body['reviewer'] === 'string' ? body['reviewer'] : actor(req),
       actor: actor(req),
@@ -181,7 +189,7 @@ export function createAdminReviewRouter(deps: AdminReviewDeps): Router {
       });
     }
 
-    const result = await requireChanges(db, { audit }, {
+    const result = await requireChanges(db, { audit, ...reviewNotifyDeps(deps) }, {
       campaignId: req.params['campaignId'] as string,
       reviewer: typeof body['reviewer'] === 'string' ? body['reviewer'] : actor(req),
       nextUpdateExpectation:

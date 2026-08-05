@@ -860,6 +860,262 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       supportEmail: SUPPORT,
     }),
 
+  /* §27.6's operational queue notices (Phase 22b). */
+  internal_invitation_claimed: () =>
+    renderInternalNotice({
+      subject: 'New Founder account — c1',
+      headline: 'A Founder claimed their invitation',
+      facts: [
+        { label: 'Who', value: 'Rowan Vale' },
+        { label: 'Role', value: 'Founder' },
+      ],
+      action: { label: 'Open the admin surface', url: `${APP}/admin/founders` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+
+
+
+
+
+
+
+
+  /* The last four customer messages §27 named and nothing sent (Phase 22b). */
+  founder_password_reset: () =>
+    renderPlainNotice({
+      subject: 'Reset your Proovd password',
+      headline: 'Set a new password',
+      facts: [
+        { label: 'Account', value: 'rowan@example.com' },
+        { label: 'Who owns it', value: 'You' },
+        {
+          label: 'If this was not you',
+          value: 'Nothing has changed. You can ignore this and your password stays as it is.',
+        },
+      ],
+      action: { label: 'Set a new password', url: `${APP}/reset/opaque-token` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+
+
+  affiliate_disclosure_tracking_available: () =>
+    renderPlainNotice({
+      subject: `Your link and disclosure for ${CAMPAIGN}`,
+      headline: 'Your tracking link and the disclosure you must use.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Your link', value: `${APP}/c/abc123` },
+        {
+          label: 'Required disclosure',
+          value: 'Paid partnership: I may earn a commission from purchases made through this link. #ad',
+        },
+        { label: 'Status', value: 'Not active yet — it starts earning at launch' },
+      ],
+      paragraphs: ['Clicks before it activates earn nothing.'],
+      action: { label: 'Open your campaign', url: `${APP}/creator/campaigns/a1/partnership` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+
+
+
+
+  /*
+   * §20's mid-campaign addition (Phase 22b). Ten keys, four moments, all on the
+   * addition row. The frozen remaining-time terms are what makes these separate
+   * messages rather than the ordinary invitation and activation copy.
+   */
+  affiliate_mid_campaign_invitation: () =>
+    midCampaign('affiliate', 'invitation'),
+  founder_mid_campaign_creator_proposed: () => midCampaign('founder', 'proposed'),
+  internal_mid_campaign_invite: () => midCampaign('internal', 'invite'),
+  founder_mid_campaign_creator_accepted: () => midCampaign('founder', 'accepted'),
+  internal_mid_campaign_accept: () => midCampaign('internal', 'accept'),
+  affiliate_mid_campaign_readiness: () => midCampaign('affiliate', 'readiness'),
+  internal_mid_campaign_readiness: () => midCampaign('internal', 'readiness'),
+  affiliate_mid_campaign_activation: () => midCampaign('affiliate', 'activation'),
+  founder_mid_campaign_creator_activated: () => midCampaign('founder', 'activated'),
+  internal_mid_campaign_activation: () => midCampaign('internal', 'activation'),
+
+  /*
+   * §16's fixed Creator payment (Phase 22b). §24.7 makes it its own stream:
+   * no percentage, no sales tax, and Proovd is the merchant of record on the
+   * funding charge — which is why the two Founder money messages carry a
+   * seller and a descriptor and the Creator's does not (it is not a charge).
+   */
+  founder_fixed_payment_funding_request: () =>
+    renderPlainNotice({
+      subject: `Fund the Creator payment for ${CAMPAIGN}`,
+      headline: 'One Creator payment is waiting to be funded.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Creator', value: '@rainmaker' },
+        { label: 'Amount', value: 'US$1,500.00' },
+        { label: 'Fund by', value: '2026-09-28 17:00 UTC' },
+        { label: 'Who owns it', value: 'You' },
+      ],
+      paragraphs: [
+        'This is the fixed payment you and this Creator agreed. It is separate from the campaign charges and from any commission — no percentage applies to it, and no sales tax is added.',
+      ],
+      action: { label: 'Fund the Creator payment', url: `${APP}/campaigns/c1/creator-readiness` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_fixed_payment_funding_confirmation: () =>
+    renderPlainNotice({
+      subject: `Creator payment funded — ${CAMPAIGN}`,
+      headline: 'Your Creator payment is funded.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Amount', value: 'US$1,500.00' },
+        { label: 'Seller', value: 'Proovd LLC' },
+        { label: 'Your statement shows', value: 'PROOVD CREATOR PAY' },
+        { label: 'Status', value: 'Completed — received in full' },
+      ],
+      paragraphs: ['It reaches the Creator after their work is verified and the campaign closes.'],
+      action: { label: 'View your Creators', url: `${APP}/campaigns/c1/creator-readiness` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_fixed_payment_funding_failure: () =>
+    renderPlainNotice({
+      subject: `Creator payment not funded — ${CAMPAIGN}`,
+      headline: 'That Creator payment did not go through.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Amount still owed', value: 'US$1,500.00' },
+        { label: 'Status', value: 'Not funded — nothing was taken' },
+        { label: 'Fund by', value: '2026-09-28 17:00 UTC' },
+      ],
+      paragraphs: [
+        'Nothing was taken from your card. The payment has to be made in full and the exact amount.',
+      ],
+      action: { label: 'Try funding again', url: `${APP}/campaigns/c1/creator-readiness` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  affiliate_fixed_funding_complete: () =>
+    renderPlainNotice({
+      subject: `Your fixed payment is funded — ${CAMPAIGN}`,
+      headline: 'The Founder has funded your fixed payment.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Amount', value: 'US$1,500.00' },
+        { label: 'Status', value: 'Funded — not yet paid to you' },
+        {
+          label: 'Your readiness',
+          value: 'Still checked separately — funding does not make you ready.',
+        },
+      ],
+      paragraphs: ['Funded is not paid. The money is with Proovd until your work is verified.'],
+      action: { label: 'Open your campaign', url: `${APP}/creator/campaigns/a1/partnership` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_fixed_funding_received: () =>
+    renderInternalNotice({
+      subject: `Fixed Creator payment funded — ${CAMPAIGN} (US$1,500.00)`,
+      headline: `Fixed Creator payment received — ${CAMPAIGN}`,
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Amount', value: 'US$1,500.00' },
+        { label: 'Allocation state', value: 'funded — NOT paid (§16)' },
+      ],
+      action: { label: 'Open Creator readiness', url: `${APP}/admin/creator-readiness?campaignId=c1` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_fixed_funding_failed: () =>
+    renderInternalNotice({
+      subject: `Fixed Creator payment failed — ${CAMPAIGN} (US$1,500.00)`,
+      headline: `Fixed Creator payment failed — ${CAMPAIGN}`,
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Amount', value: 'US$1,500.00' },
+        { label: 'Recorded reason', value: 'amount_mismatch' },
+        { label: 'Deadline still running', value: '2026-09-28 17:00 UTC' },
+      ],
+      action: { label: 'Open Creator readiness', url: `${APP}/admin/creator-readiness?campaignId=c1` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  /* §15's review round (Phase 22b). All four dedup on the review row. */
+  founder_submission_receipt: () =>
+    renderPlainNotice({
+      subject: `We have your campaign for review — ${CAMPAIGN}`,
+      headline: 'Your campaign is with us.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Review round', value: '1' },
+        { label: 'Who owns it now', value: 'Proovd' },
+        {
+          label: 'When you will hear',
+          value: 'Within one business day, Monday to Friday, excluding U.S. federal holidays.',
+        },
+      ],
+      action: { label: 'View your campaign', url: `${APP}/campaigns/c1/build` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_changes_required: () =>
+    renderPlainNotice({
+      subject: `Changes needed before ${CAMPAIGN} can go live`,
+      headline: 'We read your campaign and there are changes to make.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Who owns it now', value: 'You' },
+        { label: 'Required before resubmitting', value: '2' },
+        { label: 'Optional improvements', value: '1' },
+      ],
+      paragraphs: [
+        'Everything you built is still there — your build, your Creator roster, and the terms they accepted. Nothing was reset.',
+      ],
+      action: { label: 'Open your campaign', url: `${APP}/campaigns/c1/build` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_campaign_approved: () =>
+    renderPlainNotice({
+      subject: `${CAMPAIGN} is approved`,
+      headline: 'Your campaign is approved.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Who owns the next step', value: 'Proovd' },
+        { label: 'What you can do now', value: 'No action needed.' },
+      ],
+      paragraphs: ['Approved is not live yet. We keep an exact copy of what was approved.'],
+      action: { label: 'View your campaign', url: `${APP}/campaigns/c1/build` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_campaign_submitted: () =>
+    renderInternalNotice({
+      subject: `Campaign submitted for review — ${CAMPAIGN} (round 1)`,
+      headline: `A campaign is waiting on Proovd — ${CAMPAIGN}`,
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Round', value: '1' },
+        { label: 'Response promised', value: 'One business day (§27.8).' },
+      ],
+      action: { label: 'Open the review', url: `${APP}/admin/creator-readiness?campaignId=c1` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
   /*
    * §27.7's three digests. The samples carry real activity because an empty
    * digest is never sent (`DIGEST_PROHIBITIONS.no_empty_send`) — rendering one
@@ -1082,6 +1338,49 @@ function enforcement(outcomeWord: string, audience: 'founder' | 'affiliate' | 'b
       audience === 'affiliate'
         ? 'You may appeal in writing within five business days, by 2026-09-25 23:59 UTC.'
         : 'Proovd owns the next step and will contact you with the outcome.',
+    reference: REF,
+    supportEmail: SUPPORT,
+  });
+}
+
+/**
+ * §20's ten mid-campaign messages, as representative renders.
+ *
+ * One builder rather than ten literals: they are the same four facts to three
+ * audiences, and ten near-identical blocks here would be ten places for a
+ * sample to drift from what the sender passes. The senders themselves are ten
+ * distinct functions with distinct copy — this is the contract's fixture, not
+ * a second copy of the templates.
+ */
+function midCampaign(
+  audience: 'founder' | 'affiliate' | 'internal',
+  moment: string,
+): Promise<RenderedMessage> {
+  const facts = [
+    { label: 'Campaign', value: CAMPAIGN },
+    { label: 'Time left when asked', value: '212 hours' },
+    { label: 'Campaign closes', value: '2026-09-29 17:00 UTC' },
+    { label: 'Status', value: moment },
+  ];
+  const action = {
+    label: 'Open the campaign',
+    url:
+      audience === 'internal'
+        ? `${APP}/admin/creators?campaignId=c1`
+        : audience === 'founder'
+          ? `${APP}/campaigns/c1/roster`
+          : `${APP}/creator/campaigns/a1/partnership`,
+  };
+  const render = audience === 'internal' ? renderInternalNotice : renderPlainNotice;
+  return render({
+    subject: `Mid-campaign Creator ${moment} — ${CAMPAIGN}`,
+    headline: `Mid-campaign Creator ${moment} — ${CAMPAIGN}`,
+    facts,
+    paragraphs: [
+      'The terms above were fixed when the Creator was asked and are measured against the time that is left, not a full campaign.',
+      'Clicks count from activation onward. Nothing is credited backwards.',
+    ],
+    action,
     reference: REF,
     supportEmail: SUPPORT,
   });

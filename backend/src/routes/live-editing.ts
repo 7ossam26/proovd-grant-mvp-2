@@ -26,6 +26,8 @@ import { requireRole, requireAdmin, requireFreshSession } from '../auth/guards.j
 import { requireMagicLinkToken } from '../auth/token-middleware.js';
 import { MAGIC_LINK_TOKEN_PATH, TOKEN_PARAM } from '../auth/token-routes.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import { findFounderCampaign } from '../workspace/service.js';
 import {
@@ -269,10 +271,22 @@ export interface AdminLiveOpsDeps {
   db: Database;
   auth: Auth;
   audit: AuditWriter;
+  /** Phase 22b: §20 mid-campaign notices. Unset → the addition still happens
+      and the roster still shows it, which is where it was visible before. */
+  notifier?: Notifier | undefined;
+  notificationContext?: LaunchNotificationContext | undefined;
+  internalRecipient?: string | undefined;
 }
 
 export function createAdminLiveOpsRouter(deps: AdminLiveOpsDeps): Router {
   const { db, auth, audit } = deps;
+
+  /** §20 mid-campaign notices. One shape for both routes. */
+  const midNotify = {
+    ...(deps.notifier ? { notifier: deps.notifier } : {}),
+    ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+    ...(deps.internalRecipient ? { internalRecipient: deps.internalRecipient } : {}),
+  };
   const router = Router();
   const admin = requireAdmin(auth);
   const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
@@ -380,7 +394,7 @@ export function createAdminLiveOpsRouter(deps: AdminLiveOpsDeps): Router {
       const body = req.body as Record<string, unknown>;
       const outcome = await openMidCampaignAddition(
         db,
-        { audit },
+        { audit, ...midNotify },
         {
           associationId: String(req.params['associationId']),
           ...(typeof body['adjustedDeliverables'] === 'string'
@@ -410,7 +424,7 @@ export function createAdminLiveOpsRouter(deps: AdminLiveOpsDeps): Router {
     async (req, res) => {
       const outcome = await activateMidCampaignCreator(
         db,
-        { audit },
+        { audit, ...midNotify },
         { associationId: String(req.params['associationId']), actor: actorId(req) },
       );
       if (!outcome.ok) {

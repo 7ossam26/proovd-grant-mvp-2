@@ -25,9 +25,9 @@ Working rules for contributors and for Claude Code sessions live in
 
 Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–21a are
 complete**, and Phase 22 — the notification sweep — is nearly done: the coverage
-machine and the optional digest are built, and 31 of its 44 missing messages are
-still to be written. Money moves in test mode only, and the live-mode gate stays
-shut.
+machine, the optional digest, and 29 of its 44 missing messages are built. The
+last 7 are recorded with the dedup entity each needs and what still blocks it.
+Money moves in test mode only, and the live-mode gate stays shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -69,6 +69,7 @@ shut.
 | 20b | Disputes and their 24-hour task, the assembled evidence packet, one statement descriptor everywhere, post-capture enforcement, and the §29 records |
 | 21a | Fulfillment and its four Founder obligations, delivery-date changes and their two paths, the Day 14 Progress Check, and the one-strike ghost ban |
 | 22a | The notification coverage machine: every §27 event either sends or is recorded as deliberately unsent, and every message it can send is proved against the transactional contract |
+| 22b | 24 more of the messages the Spec names: the review round, the fixed Creator payment, the mid-campaign Creator, the password reset, and the new-account notice |
 | 22c | The optional activity digest — the one email anyone can switch off — with the notification history that stays a record rather than becoming a dashboard |
 
 Several briefs have been built in halves. Phase 06 bundles four independent

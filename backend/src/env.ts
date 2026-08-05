@@ -73,6 +73,14 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
 
+  // §27.6's staffed inbox — where the internal queue notices go. Deliberately
+  // NOT the §27.8 published support address: an internal notice may name a
+  // decline code or a table, and §3.1/§25.6 keep that out of anything a
+  // customer can reach. Optional, and unset means the §27.6 notices do not
+  // send while the Admin queues stay the place the work is visible (§1.4) —
+  // the same posture every other unconfigured port takes here.
+  INTERNAL_NOTIFICATION_EMAIL: z.string().email().optional(),
+
   // ── Object storage (tech-stack §9, Spec §12) ─────────────────────────────
   // Cloudflare R2. Optional to boot for the same reason Resend is: the app has
   // to start before an Admin can see in the §6 prerequisites panel that it is

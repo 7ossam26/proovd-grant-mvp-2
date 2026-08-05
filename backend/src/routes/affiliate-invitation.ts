@@ -29,6 +29,7 @@
 import { Router, type RequestHandler } from 'express';
 import express from 'express';
 import type { Database } from '../db/client.js';
+import { notifyInvitationClaimed } from '../notifications/operational.js';
 import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
@@ -60,6 +61,8 @@ export interface AffiliateInvitationDeps {
   notifier: Notifier;
   context: { appBaseUrl: string; supportEmail: string; fromAddress: string };
   verifyLimit?: number;
+  /** Phase 22b: §27.6's new-account notice. Unset → it does not send. */
+  internalRecipient?: string | undefined;
 }
 
 export function createAffiliateInvitationRouter({
@@ -69,6 +72,7 @@ export function createAffiliateInvitationRouter({
   notifier,
   context,
   verifyLimit,
+  internalRecipient,
 }: AffiliateInvitationDeps): Router {
   const router = Router();
   const json: RequestHandler = express.json({ limit: '64kb' });
@@ -207,6 +211,24 @@ export function createAffiliateInvitationRouter({
     // message about an account that does not exist is worse than a missing one,
     // and the dedup key makes a retry safe rather than duplicating it.
     await sendSignupConfirmation({ db, notifier, context }, result.associationId);
+
+    // §27.6 (Phase 22b). Admin learns a new Creator account exists; the claim
+    // is idempotent and the delivery dedups on the association, so a retry of
+    // the whole route sends nothing twice.
+    await notifyInvitationClaimed(
+      {
+        db,
+        notifier,
+        context,
+        ...(internalRecipient ? { internalRecipient } : {}),
+      },
+      {
+        role: 'creator',
+        entityType: 'affiliate_association',
+        entityId: result.associationId,
+        displayName: result.associationId,
+      },
+    );
 
     res.status(201).json({
       userId: result.userId,

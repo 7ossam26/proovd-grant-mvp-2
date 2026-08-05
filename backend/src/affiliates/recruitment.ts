@@ -639,7 +639,18 @@ export async function transitionAssociation(
   to: AssociationStatusValue,
   actor: string,
   executor: AssociationExecutor,
-): Promise<boolean> {
+  /**
+   * The `association_status_history` row id when the transition happened, and
+   * null when it matched nothing.
+   *
+   * Phase 22b widened this from `boolean`: §27.3's `founder_roster_update` must
+   * dedup on the history ROW — §27.7's digest excludes a roster item whose
+   * covering key already delivered, and that exclusion binds on this exact id.
+   * A module-scoped "last id" would have been smaller and wrong: two concurrent
+   * requests interleave at every `await`, and the caller reads it after one.
+   * Every existing call site tests truthiness, which reads identically.
+   */
+): Promise<string | null> {
   const moved = await executor
     .update(campaignAffiliateAssociations)
     .set({ status: to, updatedAt: new Date() })
@@ -651,16 +662,19 @@ export async function transitionAssociation(
     )
     .returning({ id: campaignAffiliateAssociations.id });
 
-  if (moved.length !== 1) return false;
+  if (moved.length !== 1) return null;
 
-  await executor.insert(associationStatusHistory).values({
-    associationId,
-    fromStatus: from,
-    toStatus: to,
-    actor,
-  });
+  const [history] = await executor
+    .insert(associationStatusHistory)
+    .values({
+      associationId,
+      fromStatus: from,
+      toStatus: to,
+      actor,
+    })
+    .returning({ id: associationStatusHistory.id });
 
-  return true;
+  return history?.id ?? null;
 }
 
 export { occupiesActiveSlot };

@@ -54,6 +54,71 @@ export const UNSENT_NOTIFICATION_EVENTS = {
     reason:
       '"Spike" needs a threshold and §6 fixes none. Inventing one is §1 rule 6, and the §33.7.12 close-operations queue already shows every failed capture with no threshold in front of it.',
   },
+  internal_risk_flag: {
+    kind: 'never',
+    owner: 'none',
+    reason:
+      '22b looked for the trigger and there is none. §31.7\'s ten signals are computed live on every read of the risk panel — `readRiskPanel` runs ten SELECTs and derives `blockingKeys` at read time — and §31.7 forbids both a score and a threshold, so nothing is stored that a message could key on. Sending would require a sweep on an invented cadence (§33.6.11\'s exact failure) and `tax_not_collecting` would re-fire on every tick, since an unrecorded seller readiness is an instance in its own right and has no event to resolve against. The panel is where the work is visible, and it is honest there. A later phase that gives a signal a durable observation record gives this key its trigger with it.',
+  },
+
+  /* ── Message missing, behaviour recorded — Phase 22b's remainder ───────── */
+  /*
+   * The seven 22b did not reach. Each has a written sender design and a named
+   * dedup entity; what each still needs is either a call site threaded through
+   * a service that has no notifier, or infrastructure that does not exist yet.
+   * They are recorded rather than declared because `events.ts` carries one rule
+   * — a key appears when something SENDS it — and a key with a template and no
+   * caller is the §1.4 failure this register exists to make impossible.
+   */
+
+  founder_roster_update: {
+    kind: 'message',
+    owner: 'phase-22b',
+    reason:
+      '22b widened `transitionAssociation` to return the `association_status_history` row id, which is the hard half — its dedup entity MUST be that row, because §27.7\'s digest excludes a roster item whose covering key already delivered and the exclusion binds on exactly (`founder_roster_update`, target, history row id). What remains is choosing WHICH of the fourteen transitions a Founder is owed a message about; announcing all fourteen would be the engagement stream §30 forbids, and that is a judgement rather than a wiring job.',
+    record: 'association_status_history (id returned by `transitionAssociation`)',
+  },
+  internal_interview_changed: {
+    kind: 'message',
+    owner: 'phase-22b',
+    reason:
+      '§27.6. `workspace/interview.ts` has no notifier and its four Founder-facing messages are sent a frame up by the routes; the internal one needs the same threading through `rescheduleBooking`/`cancelBooking`. Its entity is the `interview_booking_events` ROW, not `<booking>:<time>` — a cancel-then-rebook to the same slot collides under the latter.',
+    record: 'founder_interview_bookings + interview_booking_events',
+  },
+  internal_proposal_awaiting_response: {
+    kind: 'message',
+    owner: 'phase-22b',
+    reason:
+      '§27.6. `insertVersion` is private to `decisions.ts` and has two call sites inside transactions; the entity is the `proposal_versions` row, because a counter is a genuinely new answer owed and keying on the association would announce the first and swallow the rest.',
+    record: 'proposal_versions (open)',
+  },
+  internal_post_verification_due: {
+    kind: 'message',
+    owner: 'phase-22b',
+    reason:
+      '§27.6. `createCreatorRouter` takes positional args and carries no notifier — the only remaining sender that needs a router SIGNATURE change rather than an added dep. Entity: the `creator_post_submissions` row, so a corrected resubmission is a new decision.',
+    record: 'creator_post_submissions',
+  },
+  internal_support_sla_breach: {
+    kind: 'message',
+    owner: 'phase-22b',
+    reason:
+      '§27.6/§27.8. `readSupportQueue` derives all three breaches already, but nothing runs it on a schedule: there is no support job in `scheduler.ts` and no `support` field on `SchedulerDeps`. The sweep is the work. Entity: (case, clock, the deadline instant that lapsed) — a case has three clocks and the promised-update one legitimately moves forward.',
+    record: 'support_cases.response_due_at / next_promised_update_at / founder_followup_due_at',
+  },
+  backer_support_followup: {
+    kind: 'message',
+    owner: 'phase-22b',
+    reason:
+      '§27.8: "Even without resolution, send an update at the promised checkpoint." `next_promised_update_at` is written by `addCaseMessage` and read only by the queue; it needs the same sweep as the breach notice, and the entity is the promise INSTANT so a case that gets a second promise gets a second follow-up.',
+    record: 'support_cases.next_promised_update_at',
+  },
+  backer_magic_link_reissue: {
+    kind: 'capability',
+    owner: 'phase-22b',
+    reason:
+      'Not a missing message — a missing ASK. Every magic-link route sits behind a working magic link, so a Backer whose link expired has no self-serve path and nothing to trigger a reissue. The message needs a public request route first, and that route has to answer identically whether or not an identity matched (§5.5) or it becomes an oracle for who pre-ordered what. That is a §19 surface decision, not a template.',
+  },
 
   /* ── Capability not built — Phase 21b (§22.8–§22.11, §31.8) ────────────── */
 
@@ -87,215 +152,7 @@ export const UNSENT_NOTIFICATION_EVENTS = {
 
   /* ── Message missing, behaviour recorded — Phase 22b ───────────────────── */
 
-  founder_password_reset: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§5.5 reset exists in Better Auth and `sendResetPassword` is wired — to a function that throws, deliberately, because Phase 04 had no transport. Phase 06b built one. The message is the only thing missing.',
-    record: 'better-auth verification tokens',
-  },
-  founder_roster_update: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§14.5\'s roster status is derived and its transitions are recorded; the Founder learns of them only by opening the roster. When 22b builds it, its dedup entity MUST be the `association_status_history` row id: §27.7\'s digest excludes a roster item whose covering key already delivered, and that exclusion binds on (`founder_roster_update`, target, the history row id). Keying on the association instead would make the digest restate a change the Founder was already emailed about (§27.2, §30).',
-    record: 'association_status_history + campaign_readiness',
-  },
-  founder_submission_receipt: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§15 review submission is recorded with its owner and next date; no receipt is sent.',
-    record: 'campaign_reviews',
-  },
-  founder_changes_required: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§15\'s grouped `Required before resubmission` / `Optional improvements` feedback is stored per round with deep link, owner, and due expectation. Nothing delivers it.',
-    record: 'review_feedback_items',
-  },
-  founder_campaign_approved: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§15 approval writes the immutable snapshot and moves the campaign; no message follows.',
-    record: 'approved_campaign_snapshots',
-  },
-  internal_campaign_submitted: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6\'s Admin notice for the same submission. The review round is recorded with its owner and due expectation, and the queue is currently the only thing that says a campaign is waiting on Proovd.',
-    record: 'campaign_reviews',
-  },
-  founder_fixed_payment_funding_request: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§16\'s allocation and its Admin-configured funding deadline exist; the Founder is asked for the money only by the surface.',
-    record: 'creator_payment_allocations',
-  },
-  founder_fixed_payment_funding_confirmation: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§16 funding marks the allocation `funded` on the exact amount and sends nothing.',
-    record: 'creator_payment_funding_attempts',
-  },
-  founder_fixed_payment_funding_failure: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§16 records a `failed` attempt and leaves the allocation `payment_failed`; the Founder learns nothing, and the funding deadline keeps running.',
-    record: 'creator_payment_funding_attempts',
-  },
-  affiliate_fixed_funding_complete: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§16: funding complete, "readiness remains explicit" — the Creator is owed both facts and receives neither.',
-    record: 'creator_payment_allocations',
-  },
-  internal_fixed_funding_received: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6\'s Admin counterpart to the funding confirmation. Funded is not paid (§16): the allocation now waits on a §22.1 completion decision that only an Admin records.',
-    record: 'creator_payment_funding_attempts',
-  },
-  internal_fixed_funding_failed: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6\'s Admin counterpart to the funding failure. The Admin-configured funding deadline keeps running against a failed allocation, and missing it cancels the association.',
-    record: 'creator_payment_funding_attempts',
-  },
-  affiliate_disclosure_tracking_available: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§14.2 mints the tracking link at acceptance with `active=false` and 14d publishes the disclosure requirements; §27.4 makes their availability its own message and there is none.',
-    record: 'tracking_links',
-  },
-  founder_mid_campaign_creator_proposed: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§20\'s mid-campaign addition is recorded with its frozen remaining-time terms.',
-    record: 'mid_campaign_additions',
-  },
-  founder_mid_campaign_creator_accepted: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§20. The acceptance is a recorded association transition.',
-    record: 'mid_campaign_additions + association_status_history',
-  },
-  founder_mid_campaign_creator_activated: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§20. Activation stamps the new link\'s `activated_at`.',
-    record: 'tracking_links.activated_at',
-  },
-  affiliate_mid_campaign_invitation: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§20. The Creator receives Phase 08a\'s general campaign invitation; §27.4 names the mid-campaign one separately because the terms it carries are the frozen remaining-time ones.',
-    record: 'mid_campaign_additions',
-  },
-  affiliate_mid_campaign_readiness: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§16 readiness for a mid-campaign Creator, recorded and unannounced.',
-    record: 'association_readiness',
-  },
-  affiliate_mid_campaign_activation: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§20. The Creator is not told the moment their link starts earning.',
-    record: 'tracking_links.activated_at',
-  },
-  internal_mid_campaign_invite: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6\'s Admin counterpart to the mid-campaign invitation. A Creator recruited after launch joins on frozen remaining-time terms, and nothing announces that one has gone out.',
-    record: 'mid_campaign_additions',
-  },
-  internal_mid_campaign_accept: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6\'s Admin counterpart to the mid-campaign acceptance — the moment the §2.2 slot is committed and the frozen terms become binding.',
-    record: 'mid_campaign_additions',
-  },
-  internal_mid_campaign_readiness: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6\'s Admin counterpart to mid-campaign readiness. Admin schedules the activation, so Admin is who needs to know the thirteen §16 items are finally all met.',
-    record: 'association_readiness',
-  },
-  internal_mid_campaign_activation: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6\'s Admin counterpart to mid-campaign activation — the instant the new link starts earning, which is also when no-retroactive-attribution starts to matter.',
-    record: 'tracking_links.activated_at',
-  },
-  internal_invitation_claimed: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6. Both claim transactions are idempotent and recorded — §10\'s Founder claim and §11\'s Creator signup — and neither tells Admin a new account exists.',
-    record: 'campaign_drafts.claimed_at + affiliate_signup_profiles.claimed_user_id',
-  },
-  internal_interview_changed: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6. The booking record and its reschedule history are the source of truth (tech-stack §12); the four Founder-facing interview messages exist and the Admin one does not.',
-    record: 'founder_interview_bookings + its events',
-  },
-  internal_proposal_awaiting_response: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6. §14.6\'s deadline evaluation runs on the sweep and Admin sees an open proposal only by opening the roster.',
-    record: 'proposal_versions (open) + response_deadline_evaluations',
-  },
-  internal_post_verification_due: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6. A submitted first post waits for an Admin decision whose three outcomes pause a Creator; nothing announces that it is waiting.',
-    record: 'creator_post_submissions',
-  },
-  internal_risk_flag: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6. §31.7\'s ten signals are computed live and three of them are blocking; a blocking signal is a real observed consequence, so the message has a trigger without inventing a score or a threshold (§31.7 forbids both).',
-    record: 'the §31.7 risk panel over reservations, disputes, and tax readiness',
-  },
-  internal_support_sla_breach: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.8. The breach is already derived and badged in the daily queue; §27.6 names the message and §27.8\'s own promise is what makes a silent breach the failure that matters.',
-    record: 'support_cases.response_due_at',
-  },
-  backer_support_followup: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.8: "Even without resolution, send an update at the promised checkpoint." The promised checkpoint is stored; nothing reads it.',
-    record: 'support_cases.next_update_promised_at',
-  },
-  backer_magic_link_reissue: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.5. `mintOrReissueMagicLink` already rotates the token and every campaign message carries the fresh link, so a Backer whose link expired can only wait for the next event to reach them.',
-    record: 'secure_tokens (backer_magic_link scope)',
-  },
+
 } as const satisfies Record<string, UnsentEvent>;
 
 export type UnsentNotificationKey = keyof typeof UNSENT_NOTIFICATION_EVENTS;

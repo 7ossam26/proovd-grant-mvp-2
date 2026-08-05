@@ -58,6 +58,12 @@ import {
   recordFundingFailed,
 } from '../creator-payment/allocations.js';
 import { evaluateCreatorReadiness } from '../creator-payment/readiness.js';
+import { creatorPaymentAllocations } from '../db/schema/creator-payment.js';
+import {
+  notifyFundingSucceeded,
+  notifyFundingFailed,
+  type CreatorPaymentNotifyDeps,
+} from '../creator-payment/notifications.js';
 import type { TokenService } from '../auth/token-service.js';
 import { readProviderObject, recordProviderObject } from './provider-objects.js';
 import { applyCaptureSuccess, applyCaptureFailure } from '../close/capture.js';
@@ -95,6 +101,9 @@ export interface HandlerContext {
    */
   notifier?: Notifier | undefined;
   notificationContext?: ListingNotificationContext | undefined;
+  /** §27.6's staffed inbox (Phase 22b). Unset → the internal funding notices
+      do not send and the Admin readiness queue is where the work is visible. */
+  internalRecipient?: string | undefined;
   /** Phase 18a: mints the Backer magic link for the receipt/recovery messages.
       Absent → the messages still send with the support-route fallback. */
   tokens?: TokenService | undefined;
@@ -635,7 +644,51 @@ async function handleFundingCompleted(
       { audit: context.audit, mode: context.gateway.mode },
       { associationId: outcome.associationId, actor: 'system:stripe-webhook' },
     );
+    // §27.3/§27.4/§27.6 (Phase 22b). Three audiences, one moment, all deduped
+    // on the allocation — a redelivered event sends nothing.
+    await notifyFundingSucceeded(creatorPaymentNotifyDeps(context), {
+      associationId: outcome.associationId,
+      allocationId: outcome.allocationId,
+      amountCents: typeof amountTotal === 'number' ? BigInt(amountTotal) : 0n,
+    });
   }
+
+  if (outcome.status === 'rejected') {
+    // §33.4.3: a partial or wrong amount is rejected outright and the §16
+    // deadline keeps running against it. Silence here is the expensive kind —
+    // the Founder's Creator is removed when it lapses.
+    await notifyFundingFailed(creatorPaymentNotifyDeps(context), {
+      associationId,
+      allocationId,
+      amountCents: typeof amountTotal === 'number' ? BigInt(amountTotal) : 0n,
+      failureCode: outcome.reason,
+      deadlineAt: await fundingDeadlineFor(context.db, allocationId),
+    });
+  }
+}
+
+/** The §16 deadline, for the messages that must name it (§27.1). */
+async function fundingDeadlineFor(db: Database, allocationId: string): Promise<Date | null> {
+  const [row] = await db
+    .select({ deadlineAt: creatorPaymentAllocations.fundingDeadlineAt })
+    .from(creatorPaymentAllocations)
+    .where(eq(creatorPaymentAllocations.id, allocationId))
+    .limit(1);
+  return row?.deadlineAt ?? null;
+}
+
+/**
+ * The webhook's notify half. `HandlerContext` already carries an optional
+ * notifier and a structurally identical context, so nothing new is threaded
+ * through the endpoint — only the internal recipient is new.
+ */
+function creatorPaymentNotifyDeps(context: HandlerContext): CreatorPaymentNotifyDeps {
+  return {
+    db: context.db,
+    ...(context.notifier ? { notifier: context.notifier } : {}),
+    ...(context.notificationContext ? { context: context.notificationContext } : {}),
+    ...(context.internalRecipient ? { internalRecipient: context.internalRecipient } : {}),
+  };
 }
 
 /* ── Phase 18a: the off-session campaign charges (§21, §32.3, §33.7.7) ─────── */
@@ -1010,6 +1063,26 @@ async function handleCheckoutExpired(
         { gateway: context.gateway, audit: context.audit },
         { allocationId, checkoutSessionId: sessionId, providerEventId: event.id },
       );
+      // §27.3/§27.6. A different failure KIND from the amount mismatch, so it
+      // is a different dedup entity and a Founder who hit both hears about both.
+      const [allocation] = await context.db
+        .select({
+          associationId: creatorPaymentAllocations.associationId,
+          amountCents: creatorPaymentAllocations.amountCents,
+          deadlineAt: creatorPaymentAllocations.fundingDeadlineAt,
+        })
+        .from(creatorPaymentAllocations)
+        .where(eq(creatorPaymentAllocations.id, allocationId))
+        .limit(1);
+      if (allocation) {
+        await notifyFundingFailed(creatorPaymentNotifyDeps(context), {
+          associationId: allocation.associationId,
+          allocationId,
+          amountCents: allocation.amountCents,
+          failureCode: 'checkout_expired',
+          deadlineAt: allocation.deadlineAt,
+        });
+      }
     }
     return;
   }

@@ -50,6 +50,7 @@ import {
 import { policyVersions } from '../db/schema/policies.js';
 import { inArray } from 'drizzle-orm';
 import { revealPreparingCampaign, type HandoffDeps } from '../affiliates/handoff.js';
+import { notifyInvitationClaimed } from '../notifications/operational.js';
 
 /**
  * The autosave allowance. Generous for a person typing into a debounced form
@@ -71,9 +72,12 @@ export function createVettingRouter(
      * absent means the reveal is Admin's to trigger, which it is anyway.
      */
     handoff?: HandoffDeps;
+    /** Phase 22b: §27.6's new-account notice. Unset → it does not send. */
+    internalRecipient?: string | undefined;
   } = {},
 ): Router {
   const handoff = options.handoff;
+  const internalRecipient = options.internalRecipient;
   const router = Router();
   const json: RequestHandler = express.json({ limit: '128kb' });
 
@@ -351,6 +355,32 @@ export function createVettingRouter(
     // revealed is skipped by their idempotency key. That is why this is not
     // inside the transaction: holding a row lock across an email provider call
     // would be a much more expensive way to be no safer.
+    // §27.6 (Phase 22b). The same after-the-transaction posture: the claim has
+    // committed, the delivery dedups on the draft, and a failure here is not
+    // allowed to turn a successful claim into an error the Founder sees.
+    if (handoff) {
+      try {
+        await notifyInvitationClaimed(
+          {
+            db,
+            notifier: handoff.notifier,
+            context: handoff.context,
+            ...(internalRecipient ? { internalRecipient } : {}),
+          },
+          {
+            role: 'founder',
+            // The campaign, which is claimed exactly once (the idempotency key
+            // and the conditional draft claim both guarantee it) and is what
+            // the result carries.
+            entityType: 'campaign_draft',
+            entityId: result.campaignId,
+            displayName: result.campaignId,
+          },
+        );
+      } catch {
+        /* An internal queue notice must never break a customer's claim. */
+      }
+    }
     if (handoff) {
       try {
         await revealPreparingCampaign(handoff, result.campaignId);

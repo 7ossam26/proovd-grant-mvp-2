@@ -65,6 +65,7 @@ import { createAuth, type Auth, type SendResetPassword } from './auth/auth.js';
 import { createAuditWriter } from './auth/audit.js';
 import { createTokenService, type TokenService } from './auth/token-service.js';
 import { createNotifier, type EmailTransport, type Notifier } from './notifications/send.js';
+import { sendPasswordReset } from './notifications/customer-remaining.js';
 import { unconfiguredTransport } from './notifications/resend-transport.js';
 import type { PrerequisiteEnvironment } from './admin/prerequisites.js';
 import type { InvitationContext } from './invitations/service.js';
@@ -124,6 +125,15 @@ export interface AppConfig {
   /** §7 / §27.8 addresses and origins the invitation is built from. */
   invitationContext: InvitationContext;
   /**
+   * §27.6's staffed inbox. Deliberately NOT `invitationContext.supportEmail` —
+   * that is the customer-facing address in §27.8's published block, and an
+   * internal queue notice naming `reservation` or a decline code belongs
+   * nowhere near it (§3.1, §25.6). Unset means the §27.6 notices do not send
+   * and the Admin queue stays the place the work is visible, which is the
+   * honest state rather than a silent no-op (§1.4).
+   */
+  internalRecipient?: string | undefined;
+  /**
    * §28.1 draft-token verification limit. Defaults to the production value;
    * the integration suite raises it because it issues far more verifications
    * from one loopback address than any person would.
@@ -145,7 +155,12 @@ export interface AppConfig {
    */
   authRouteLimit?: number;
   /** §5.5 email-link password reset. Injected; the transport arrives later. */
-  sendResetPassword: SendResetPassword;
+  /**
+   * §5.5. Optional since Phase 22b: without one,  sends the reset
+   * through the notifier like every other message. The suite supplies one to
+   * capture the link without a transport.
+   */
+  sendResetPassword?: SendResetPassword | undefined;
   /** Founder-only Google sign-in (§5.2). Omitted when unconfigured. */
   google?: { clientId: string; clientSecret: string };
 }
@@ -164,20 +179,41 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Three account roles through Better Auth; the two account-less surfaces
   // through the token service. Both write to the same immutable audit table.
   const audit = createAuditWriter(db);
-  const auth = createAuth({
-    db,
-    baseUrl: config.appBaseUrl,
-    secret: config.authSecret,
-    adminReauthWindowSeconds: config.adminReauthWindowSeconds,
-    sendResetPassword: config.sendResetPassword,
-    ...(config.google ? { google: config.google } : {}),
-  });
-  const tokens = createTokenService({ db, audit });
+  // The notifier is built BEFORE auth (Phase 22b) because §5.5's reset email is
+  // the one Better Auth message Proovd sends itself, and it needs a notifier to
+  // send through — the dedup, the audit row, and the §27.2 template all live
+  // there. `config.sendResetPassword` still wins where it is supplied, which is
+  // how the suite captures the link without a transport.
   const notifier = createNotifier({
     db,
     transport: config.emailTransport ?? unconfiguredTransport,
     audit: (event) => audit({ ...event, targetId: event.targetId }),
   });
+  const auth = createAuth({
+    db,
+    baseUrl: config.appBaseUrl,
+    secret: config.authSecret,
+    adminReauthWindowSeconds: config.adminReauthWindowSeconds,
+    sendResetPassword:
+      config.sendResetPassword ??
+      (async ({ user, url }) => {
+        await sendPasswordReset(
+          {
+            db,
+            notifier,
+            context: {
+              appBaseUrl: config.appBaseUrl,
+              supportEmail: config.invitationContext.supportEmail,
+              fromAddress: config.invitationContext.fromAddress,
+            },
+            authSecret: config.authSecret,
+          },
+          { email: user.email, name: user.name, url },
+        );
+      }),
+    ...(config.google ? { google: config.google } : {}),
+  });
+  const tokens = createTokenService({ db, audit });
 
   // ── Security headers ───────────────────────────────────────────────────────
   app.use(helmet());
@@ -416,9 +452,16 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // payment, and the Creator's materiality reacceptance; Admin's review,
   // roster finalization, and the general materiality machine. No Stripe
   // dependency, so mounted with the other session routes.
-  app.use(createFounderBuildRouter({ db, auth, audit }));
+  // Phase 22b: §15's review round finally speaks. All four messages dedup on
+  // the review ROW, so a resubmission is owed its own receipt.
+  const reviewNotify = {
+    notifier,
+    notificationContext: launchContext,
+    ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
+  };
+  app.use(createFounderBuildRouter({ db, auth, audit, ...reviewNotify }));
   app.use(createCreatorReacceptanceRouter({ db, auth, audit }));
-  app.use(createAdminReviewRouter({ db, auth, audit }));
+  app.use(createAdminReviewRouter({ db, auth, audit, ...reviewNotify }));
   // Phase 14a (§17, §29.6, §33.4.5–9). The coordinated launch (page → links),
   // Admin first-post verification with its three outcomes, and the required-
   // Creator-failure replacement window. No Stripe dependency for the launch or
@@ -450,7 +493,17 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   app.use(createNotificationsRouter({ db, auth, audit }, 'admin'));
   // Phase 17b (§20, §18, §33.6.13). Admin decides change requests and comment
   // flags, and adds a Creator mid-campaign. Writes take the freshness gate.
-  app.use(createAdminLiveOpsRouter({ db, auth, audit }));
+  app.use(
+    createAdminLiveOpsRouter({
+      db,
+      auth,
+      audit,
+      // Phase 22b: §20's ten mid-campaign notices.
+      notifier,
+      notificationContext: launchContext,
+      ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
+    }),
+  );
   // Phase 21a (§22.4–§22.7). Fulfillment and its four obligations, the two
   // §22.6 delivery-change paths, the Day 14 Progress Check, and the one-strike
   // ghost ban. The Founder and Admin read the SAME §22.4 checklist — one
@@ -496,6 +549,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         audit: (event) => audit({ ...event, targetId: event.targetId }),
         notifier,
         notificationContext: listingContext,
+        // Phase 22b: §27.6's funding notices go to the staffed inbox, never to
+        // the published support address (§3.1).
+        ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
         // Phase 18a: the payment_intent.* handlers mint the Backer magic link
         // for the receipt/recovery messages.
         tokens,
@@ -586,6 +642,10 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         auth,
         gateway: config.stripeGateway,
         audit: (event) => audit({ ...event, targetId: event.targetId }),
+        // Phase 22b: §27.3's funding request, sent when the deadline is set.
+        notifier,
+        notificationContext: launchContext,
+        ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
       }),
     );
     // Phase 15 (§19, §33.5). The public Backer pre-order: a card save that

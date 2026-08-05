@@ -389,6 +389,80 @@ export const INTERNAL_MISSING_W9 = 'internal_missing_w9' as const;
  * Deduped on `<preference id>:<period key>`: one digest per subscriber per
  * period, whatever the job does.
  */
+/*
+ * §15's review round, as four messages around one record (Phase 22b).
+ *
+ * All four dedup on the REVIEW ROW rather than the campaign: §15 makes a
+ * resubmission a new round, and a Founder who fixed the feedback is owed a
+ * second receipt. Keying on the campaign would satisfy §27.2 and swallow every
+ * round after the first.
+ */
+/*
+ * §16's fixed Creator payment, the fourth money stream (Phase 22b).
+ *
+ * The success keys dedup on the ALLOCATION — funding succeeds once — and the
+ * failure keys on the ATTEMPT, because funding can fail repeatedly and each
+ * failure is a real second thing to act on while the §16 deadline keeps
+ * running. One entity for both would announce the first problem and swallow
+ * every one after it.
+ */
+/*
+ * §20's mid-campaign Creator addition (Phase 22b).
+ *
+ * Ten keys, all deduped on the `mid_campaign_additions` row — one Creator, one
+ * join, four moments. §27 names these separately from the ordinary
+ * invitation/acceptance/activation messages because the terms differ: a Creator
+ * joining a live campaign accepts a deliverable measured in the time that is
+ * LEFT, frozen at the ask. Reusing 08a's copy would send them terms nobody
+ * offered.
+ */
+/*
+ * §27.6's operational queue notices, and the three customer messages that had
+ * no trigger until 22b built one (Phase 22b).
+ *
+ * Each keys on the record that genuinely recurs: a claim per draft/association,
+ * an interview change per booking-EVENT row (a cancel-then-rebook to the same
+ * time would collide under `<booking>:<time>`), a proposal per VERSION (a
+ * counter is a new answer owed), a post per SUBMISSION row, an SLA breach per
+ * (case, clock, deadline instant) because a case has three clocks and the
+ * promised-update one moves forward, a Founder roster update per
+ * `association_status_history` ROW — which §27.7's digest exclusion binds on —
+ * and a magic-link reissue per newly issued token.
+ */
+export const INTERNAL_INVITATION_CLAIMED = 'internal_invitation_claimed' as const;
+export const FOUNDER_PASSWORD_RESET = 'founder_password_reset' as const;
+export const AFFILIATE_DISCLOSURE_TRACKING_AVAILABLE =
+  'affiliate_disclosure_tracking_available' as const;
+
+export const FOUNDER_MID_CAMPAIGN_CREATOR_PROPOSED =
+  'founder_mid_campaign_creator_proposed' as const;
+export const FOUNDER_MID_CAMPAIGN_CREATOR_ACCEPTED =
+  'founder_mid_campaign_creator_accepted' as const;
+export const FOUNDER_MID_CAMPAIGN_CREATOR_ACTIVATED =
+  'founder_mid_campaign_creator_activated' as const;
+export const AFFILIATE_MID_CAMPAIGN_INVITATION = 'affiliate_mid_campaign_invitation' as const;
+export const AFFILIATE_MID_CAMPAIGN_READINESS = 'affiliate_mid_campaign_readiness' as const;
+export const AFFILIATE_MID_CAMPAIGN_ACTIVATION = 'affiliate_mid_campaign_activation' as const;
+export const INTERNAL_MID_CAMPAIGN_INVITE = 'internal_mid_campaign_invite' as const;
+export const INTERNAL_MID_CAMPAIGN_ACCEPT = 'internal_mid_campaign_accept' as const;
+export const INTERNAL_MID_CAMPAIGN_READINESS = 'internal_mid_campaign_readiness' as const;
+export const INTERNAL_MID_CAMPAIGN_ACTIVATION = 'internal_mid_campaign_activation' as const;
+
+export const FOUNDER_FIXED_PAYMENT_FUNDING_REQUEST =
+  'founder_fixed_payment_funding_request' as const;
+export const FOUNDER_FIXED_PAYMENT_FUNDING_CONFIRMATION =
+  'founder_fixed_payment_funding_confirmation' as const;
+export const FOUNDER_FIXED_PAYMENT_FUNDING_FAILURE =
+  'founder_fixed_payment_funding_failure' as const;
+export const AFFILIATE_FIXED_FUNDING_COMPLETE = 'affiliate_fixed_funding_complete' as const;
+export const INTERNAL_FIXED_FUNDING_RECEIVED = 'internal_fixed_funding_received' as const;
+export const INTERNAL_FIXED_FUNDING_FAILED = 'internal_fixed_funding_failed' as const;
+
+export const FOUNDER_SUBMISSION_RECEIPT = 'founder_submission_receipt' as const;
+export const FOUNDER_CHANGES_REQUIRED = 'founder_changes_required' as const;
+export const FOUNDER_CAMPAIGN_APPROVED = 'founder_campaign_approved' as const;
+export const INTERNAL_CAMPAIGN_SUBMITTED = 'internal_campaign_submitted' as const;
+
 export const FOUNDER_ACTIVITY_DIGEST = 'founder_activity_digest' as const;
 export const AFFILIATE_ACTIVITY_DIGEST = 'affiliate_activity_digest' as const;
 export const BACKER_CAMPAIGN_UPDATE_DIGEST = 'backer_campaign_update_digest' as const;
@@ -484,6 +558,29 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_ACTIVITY_DIGEST,
   AFFILIATE_ACTIVITY_DIGEST,
   BACKER_CAMPAIGN_UPDATE_DIGEST,
+  FOUNDER_SUBMISSION_RECEIPT,
+  FOUNDER_CHANGES_REQUIRED,
+  FOUNDER_CAMPAIGN_APPROVED,
+  INTERNAL_CAMPAIGN_SUBMITTED,
+  INTERNAL_INVITATION_CLAIMED,
+  FOUNDER_PASSWORD_RESET,
+  AFFILIATE_DISCLOSURE_TRACKING_AVAILABLE,
+  FOUNDER_MID_CAMPAIGN_CREATOR_PROPOSED,
+  FOUNDER_MID_CAMPAIGN_CREATOR_ACCEPTED,
+  FOUNDER_MID_CAMPAIGN_CREATOR_ACTIVATED,
+  AFFILIATE_MID_CAMPAIGN_INVITATION,
+  AFFILIATE_MID_CAMPAIGN_READINESS,
+  AFFILIATE_MID_CAMPAIGN_ACTIVATION,
+  INTERNAL_MID_CAMPAIGN_INVITE,
+  INTERNAL_MID_CAMPAIGN_ACCEPT,
+  INTERNAL_MID_CAMPAIGN_READINESS,
+  INTERNAL_MID_CAMPAIGN_ACTIVATION,
+  FOUNDER_FIXED_PAYMENT_FUNDING_REQUEST,
+  FOUNDER_FIXED_PAYMENT_FUNDING_CONFIRMATION,
+  FOUNDER_FIXED_PAYMENT_FUNDING_FAILURE,
+  AFFILIATE_FIXED_FUNDING_COMPLETE,
+  INTERNAL_FIXED_FUNDING_RECEIVED,
+  INTERNAL_FIXED_FUNDING_FAILED,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

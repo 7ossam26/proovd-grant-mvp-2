@@ -33,6 +33,10 @@
 
 import { and, eq, isNull, isNotNull, lte, ne } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import {
+  notifyFundingRequested,
+  type CreatorPaymentNotifyDeps,
+} from './notifications.js';
 import { campaigns, campaignAffiliateAssociations } from '../db/schema/domain.js';
 import {
   creatorPaymentAllocations,
@@ -552,7 +556,7 @@ export async function recordFundingFailed(
  */
 export async function setFundingDeadline(
   db: Database,
-  deps: { audit: AuditWriter },
+  deps: { audit: AuditWriter } & Omit<CreatorPaymentNotifyDeps, 'db'>,
   input: { associationId: string; deadlineAt: Date; actor: string; gateway: StripeGateway },
 ): Promise<{ ok: true; allocation: CreatorPaymentAllocation } | { ok: false; code: 'not_applicable' | 'canceled' }> {
   const ensured = await ensureAllocation(db, input.gateway, input.associationId);
@@ -578,6 +582,19 @@ export async function setFundingDeadline(
     newValue: { allocationId: ensured.allocation.id, fundingDeadlineAt: input.deadlineAt.toISOString() },
     actorId: input.actor.replace(/^user:/, ''),
   });
+
+  // §27.3. The ask becomes a date here, so this is where the Founder is told.
+  // Deduped on the allocation: an Admin re-setting the deadline is the same
+  // ask, and a second message would read as a second payment.
+  await notifyFundingRequested(
+    { db, ...deps },
+    {
+      associationId: input.associationId,
+      allocationId: ensured.allocation.id,
+      amountCents: ensured.allocation.amountCents,
+      deadlineAt: input.deadlineAt,
+    },
+  );
 
   return { ok: true, allocation: updated! };
 }

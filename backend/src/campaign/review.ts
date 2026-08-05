@@ -35,6 +35,12 @@ import { deriveReviewReady } from './logic.js';
 import type { AuditWriter } from '../auth/audit.js';
 import { readBuild } from './service.js';
 import { evaluateRosterReadiness } from './readiness.js';
+import {
+  notifyReviewSubmitted,
+  notifyChangesRequired,
+  notifyCampaignApproved,
+  type ReviewNotifyDeps,
+} from './review-notifications.js';
 
 type Executor = Pick<Database, 'select' | 'insert' | 'update' | 'execute'>;
 
@@ -71,7 +77,7 @@ export type SubmitOutcome =
 
 export async function submitForReview(
   db: Database,
-  deps: { audit: AuditWriter },
+  deps: { audit: AuditWriter } & Omit<ReviewNotifyDeps, 'db'>,
   input: {
     campaignId: string;
     campaignType: 'pre_build' | 'pre_launch';
@@ -145,6 +151,12 @@ export async function submitForReview(
     actorId: input.actor,
   });
 
+  // After the transaction, on 08c's precedent: the messages dedup on the review
+  // row, so a crash between the two costs a retry rather than correctness, and
+  // holding a row lock across a provider call would be a more expensive way to
+  // be no safer.
+  await notifyReviewSubmitted({ db, ...deps }, { campaignId: input.campaignId, review });
+
   return { ok: true, review };
 }
 
@@ -180,7 +192,7 @@ async function openReview(db: Executor, campaignId: string): Promise<CampaignRev
  */
 export async function approveReview(
   db: Database,
-  deps: { audit: AuditWriter },
+  deps: { audit: AuditWriter } & Omit<ReviewNotifyDeps, 'db'>,
   input: { campaignId: string; reviewer: string; actor: string },
 ): Promise<ReviewDecisionOutcome> {
   const review = await openReview(db, input.campaignId);
@@ -271,6 +283,8 @@ export async function approveReview(
     actorId: input.actor,
   });
 
+  await notifyCampaignApproved({ db, ...deps }, { campaignId: input.campaignId, review: decided });
+
   return { ok: true, outcome: 'approved', review: decided };
 }
 
@@ -280,7 +294,7 @@ export async function approveReview(
  */
 export async function requireChanges(
   db: Database,
-  deps: { audit: AuditWriter },
+  deps: { audit: AuditWriter } & Omit<ReviewNotifyDeps, 'db'>,
   input: {
     campaignId: string;
     reviewer: string;
@@ -348,6 +362,8 @@ export async function requireChanges(
     internalReason: `Admin returned ${input.feedback.length} feedback item(s); all valid work preserved (§15)`,
     actorId: input.actor,
   });
+
+  await notifyChangesRequired({ db, ...deps }, { campaignId: input.campaignId, review: decided });
 
   return { ok: true, outcome: 'changes_required', review: decided };
 }

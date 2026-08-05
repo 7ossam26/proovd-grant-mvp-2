@@ -165,14 +165,16 @@ async function main() {
       // still sends from somewhere real if a key is present without a From.
       fromAddress: env.EMAIL_FROM ?? 'support@proovd.co',
     },
-    // §5.5 password reset for Founder, Affiliate, and Admin. Resend arrives in
-    // a later phase; until it does this refuses loudly rather than pretending
-    // to have sent mail (§1.4: never imply automation that does not exist).
-    sendResetPassword: async () => {
-      throw new Error(
-        'Password-reset delivery is not wired yet: no transactional email provider is configured.',
-      );
-    },
+    // §27.6. Unset → the internal notices do not send and the Admin queues are
+    // where the due work is visible. Before Phase 22b this was never supplied
+    // at all, so `internal_day_14_due` had a sender and no inbox.
+    ...(env.INTERNAL_NOTIFICATION_EMAIL
+      ? { internalRecipient: env.INTERNAL_NOTIFICATION_EMAIL }
+      : {}),
+    // §5.5 password reset for Founder, Affiliate, and Admin. Phase 22b gave it
+    // a real sender: `createApp` sends it through the notifier, so it dedups on
+    // the request, writes its audit row, and satisfies §27.2 like every other
+    // message. An unconfigured transport still refuses loudly (§1.4).
     ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? {
           google: {
@@ -193,6 +195,12 @@ async function main() {
     tokens,
     connectionString: env.DATABASE_URL,
     log: (message, detail) => logger.info(detail ?? {}, message),
+    // §27.6's staffed inbox. Phase 21a's `internal_day_14_due` and 22b's
+    // support-SLA and follow-up sweeps all read it; before this it was declared
+    // on `SchedulerDeps` and never supplied, so those notices silently no-opped.
+    ...(env.INTERNAL_NOTIFICATION_EMAIL
+      ? { internalRecipient: env.INTERNAL_NOTIFICATION_EMAIL }
+      : {}),
     // §12's interview reminder and reconciliation (Phase 09b). Both are no-ops
     // while §6's lead time is unset or the provider is unconfigured, and both
     // say so in the log rather than passing silently (§1.4).

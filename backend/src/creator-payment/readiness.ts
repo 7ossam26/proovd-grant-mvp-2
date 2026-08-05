@@ -26,6 +26,10 @@
 
 import { and, count, desc, eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import {
+  notifyMidCampaignReady,
+  type MidCampaignNotifyDeps,
+} from '../affiliates/mid-campaign-notifications.js';
 import { campaigns, campaignStatusHistory, campaignAffiliateAssociations } from '../db/schema/domain.js';
 import { campaignBuild, campaignRewardPackages, associationReadiness, approvedCampaignSnapshots } from '../db/schema/build.js';
 import {
@@ -211,10 +215,15 @@ export interface CreatorReadinessReport extends CreatorReadinessResult {
  */
 export async function evaluateCreatorReadiness(
   db: Database,
-  deps: { audit: AuditWriter; mode: StripeModeValue },
+  deps: { audit: AuditWriter; mode: StripeModeValue } & Omit<MidCampaignNotifyDeps, 'db'>,
   input: { associationId: string; actor: string },
 ): Promise<CreatorReadinessReport | null> {
-  return db.transaction(async (tx) => {
+  // §20 (Phase 22b): a MID-CAMPAIGN Creator reaching ready is a message; an
+  // ordinary one is not, and `notifyMidCampaignReady` decides which by looking
+  // for the addition row rather than by anything asked of the caller. Recorded
+  // inside the transaction, sent after it commits.
+  let becameReady = false;
+  const report = await db.transaction(async (tx) => {
     const [association] = await tx
       .select({ id: campaignAffiliateAssociations.id, status: campaignAffiliateAssociations.status })
       .from(campaignAffiliateAssociations)
@@ -240,6 +249,7 @@ export async function evaluateCreatorReadiness(
         );
         if (moved) {
           gathered.associationStatus = target;
+          becameReady = target === 'ready';
           await deps.audit({
             action: 'creator_readiness.evaluated',
             targetType: 'campaign_affiliate_association',
@@ -261,6 +271,11 @@ export async function evaluateCreatorReadiness(
       snapshot: gathered.snapshot,
     };
   });
+
+  if (becameReady) {
+    await notifyMidCampaignReady({ db, ...deps }, { associationId: input.associationId });
+  }
+  return report;
 }
 
 /**

@@ -40,6 +40,11 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import {
+  notifyMidCampaignOpened,
+  notifyMidCampaignActivated,
+  type MidCampaignNotifyDeps,
+} from './mid-campaign-notifications.js';
 import { campaigns, campaignAffiliateAssociations } from '../db/schema/domain.js';
 import { campaignBuild } from '../db/schema/build.js';
 import { trackingLinks } from '../db/schema/decisions.js';
@@ -168,7 +173,7 @@ export async function readMidCampaignTerms(
  */
 export async function openMidCampaignAddition(
   db: Database,
-  deps: { audit: AuditWriter },
+  deps: { audit: AuditWriter } & Omit<MidCampaignNotifyDeps, 'db'>,
   input: {
     associationId: string;
     /** Admin may replace the composed deliverable sentence with their own. */
@@ -241,6 +246,10 @@ export async function openMidCampaignAddition(
       actorId: input.actor,
     });
 
+    // §27.3/§27.4/§27.6. The Creator is asked, the Founder is told, and Admin
+    // learns a §2.2 slot is now in play — all deduped on the addition row.
+    await notifyMidCampaignOpened({ db, ...deps }, { associationId: input.associationId });
+
     return { ok: true, addition: addition!, terms };
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -277,7 +286,7 @@ export type ActivateOutcome =
  */
 export async function activateMidCampaignCreator(
   db: Database,
-  deps: { audit: AuditWriter },
+  deps: { audit: AuditWriter } & Omit<MidCampaignNotifyDeps, 'db'>,
   input: { associationId: string; actor: string },
   now: Date = new Date(),
 ): Promise<ActivateOutcome> {
@@ -360,6 +369,9 @@ export async function activateMidCampaignCreator(
     newValue: { activatedAt: now.toISOString() },
     actorId: input.actor,
   });
+
+  // §27.3/§27.4/§27.6. After the transaction, deduped on the addition row.
+  await notifyMidCampaignActivated({ db, ...deps }, { associationId: input.associationId, activatedAt: now });
 
   return { ok: true, activatedAt: now.toISOString() };
 }

@@ -14,6 +14,8 @@
 import { Router, type RequestHandler } from 'express';
 import express from 'express';
 import type { Database } from '../db/client.js';
+import { notifyMidCampaignAccepted } from '../affiliates/mid-campaign-notifications.js';
+import { notifyDisclosureAvailable } from '../notifications/customer-remaining.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
 import type { AuditWriter } from '../auth/audit.js';
@@ -24,6 +26,7 @@ import {
   declineOpportunity,
   submitProposal,
   respondToProposal,
+  CREATOR_DISCLOSURE_TEXT,
   type AcceptanceConfirmations,
   type Refused,
 } from '../affiliates/decisions.js';
@@ -41,6 +44,8 @@ export interface CreatorDecisionDeps {
   audit: AuditWriter;
   notifier: Notifier;
   context: DecisionNotificationContext;
+  /** Phase 22b: §27.6's mid-campaign notice. Unset → it does not send. */
+  internalRecipient?: string | undefined;
 }
 
 const REFUSAL_STATUS: Record<Refused['code'], number> = {
@@ -78,6 +83,18 @@ function confirmationsFrom(body: unknown): AcceptanceConfirmations {
 
 export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
   const { db, auth, audit, notifier, context } = deps;
+
+  /**
+   * §20's mid-campaign notices. `DecisionNotificationContext` is structurally
+   * the same three fields as `LaunchNotificationContext`, and the sender no-ops
+   * for an ordinary Creator — so this adds no branch to the accept path.
+   */
+  const midNotify = {
+    db,
+    notifier,
+    context,
+    ...(deps.internalRecipient ? { internalRecipient: deps.internalRecipient } : {}),
+  };
   const router = Router();
   const creator = requireRole(auth, 'affiliate');
   const json: RequestHandler = express.json({ limit: '32kb' });
@@ -127,6 +144,26 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
         associationId: req.params['associationId'] as string,
         agreement: result.agreement,
       });
+      // §20 (Phase 22b): if this Creator joined MID-campaign, the Founder and
+      // Admin are owed the frozen-terms acceptance notice. No addition row means
+      // an ordinary Creator, and this sends nothing.
+      await notifyMidCampaignAccepted(midNotify, {
+        associationId: req.params['associationId'] as string,
+      });
+      // §27.4 (Phase 22b): the link exists now, inactive, and the disclosure is
+      // required from the first post that carries it. Deduped on the
+      // association — one link, minted once.
+      if (result.trackingLink) {
+        await notifyDisclosureAvailable(
+          { db, notifier, context },
+          {
+            associationId: req.params['associationId'] as string,
+            campaignId: result.agreement.campaignId,
+            trackingUrl: `${context.appBaseUrl}/c/${result.trackingLink.code}`,
+            disclosureText: CREATOR_DISCLOSURE_TEXT,
+          },
+        );
+      }
 
       res.json({
         accepted: {
@@ -275,6 +312,7 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
           associationId,
           agreement: result.agreement,
         });
+        await notifyMidCampaignAccepted(midNotify, { associationId });
         res.json({ response: { outcome: 'locked', totalPercent: result.agreement.totalPercent } });
         return;
       }

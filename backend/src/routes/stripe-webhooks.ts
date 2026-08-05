@@ -56,6 +56,8 @@ export interface StripeWebhookDeps {
   /** §13's effect 7 — Phase 11's payment handler sends through these. */
   notifier?: Notifier;
   notificationContext?: ListingNotificationContext;
+  /** Phase 22b: §27.6's funding notices. Unset → they do not send. */
+  internalRecipient?: string | undefined;
   /** Phase 18a: the Backer receipt/recovery messages carry a magic link. */
   tokens?: TokenService;
   /** Raised only by the integration suite, which drives many deliveries. */
@@ -68,6 +70,7 @@ export function createStripeWebhookRouter({
   audit,
   notifier,
   notificationContext,
+  internalRecipient,
   tokens,
   limit,
 }: StripeWebhookDeps): Router {
@@ -109,7 +112,7 @@ export function createStripeWebhookRouter({
       }
 
       const outcome = await ingestStripeEvent(
-        { db, gateway, audit, notifier, notificationContext, tokens },
+        { db, gateway, audit, notifier, notificationContext, internalRecipient, tokens },
         event,
       );
 

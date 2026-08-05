@@ -17,6 +17,9 @@ import type { Auth } from '../auth/auth.js';
 import { requireAdmin, requireFreshSession } from '../auth/guards.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
+import type { CreatorPaymentNotifyDeps } from '../creator-payment/notifications.js';
 import type { StripeGateway } from '../payments/stripe-client.js';
 import { campaigns } from '../db/schema/domain.js';
 import { setFundingDeadline } from '../creator-payment/allocations.js';
@@ -33,6 +36,11 @@ export interface AdminCreatorReadinessDeps {
   auth: Auth;
   gateway: StripeGateway;
   audit: AuditWriter;
+  /** Phase 22b: the §27.3 funding request. Unset and the ask lives only on
+      the readiness surface, which is where it lived before. */
+  notifier?: Notifier | undefined;
+  notificationContext?: LaunchNotificationContext | undefined;
+  internalRecipient?: string | undefined;
 }
 
 export function createAdminCreatorReadinessRouter(deps: AdminCreatorReadinessDeps): Router {
@@ -44,6 +52,13 @@ export function createAdminCreatorReadinessRouter(deps: AdminCreatorReadinessDep
 
   const actor = (req: express.Request): string => `admin:${req.authUser?.id ?? ''}`;
   const mode = () => gateway.mode;
+
+  /** §27's funding messages. One shape, built once. */
+  const paymentNotify: Omit<CreatorPaymentNotifyDeps, 'db'> = {
+    ...(deps.notifier ? { notifier: deps.notifier } : {}),
+    ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+    ...(deps.internalRecipient ? { internalRecipient: deps.internalRecipient } : {}),
+  };
 
   async function campaignExists(campaignId: string): Promise<boolean> {
     const [row] = await db
@@ -128,7 +143,7 @@ export function createAdminCreatorReadinessRouter(deps: AdminCreatorReadinessDep
         res.status(422).json({ error: 'invalid_deadline', whatHappened: 'A funding deadline needs a valid date/time.' });
         return;
       }
-      const result = await setFundingDeadline(db, { audit }, {
+      const result = await setFundingDeadline(db, { audit, ...paymentNotify }, {
         associationId: req.params['associationId'] as string,
         deadlineAt,
         actor: actor(req),

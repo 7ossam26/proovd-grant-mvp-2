@@ -15,6 +15,7 @@ import { Router, type RequestHandler } from 'express';
 import express from 'express';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { notifyMidCampaignAccepted } from '../affiliates/mid-campaign-notifications.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
 import type { AuditWriter } from '../auth/audit.js';
@@ -48,6 +49,8 @@ export interface FounderRosterDeps {
   audit: AuditWriter;
   notifier: Notifier;
   context: DecisionNotificationContext;
+  /** Phase 22b: §27.6's mid-campaign notice. Unset → it does not send. */
+  internalRecipient?: string | undefined;
 }
 
 const REFUSAL_STATUS: Record<Refused['code'], number> = {
@@ -73,6 +76,14 @@ function sendRefusal(res: express.Response, refused: Refused): void {
 
 export function createFounderRosterRouter(deps: FounderRosterDeps): Router {
   const { db, auth, audit, notifier, context } = deps;
+
+  /** §20's mid-campaign notices. See `creator-decisions.ts` for the shape. */
+  const midNotify = {
+    db,
+    notifier,
+    context,
+    ...(deps.internalRecipient ? { internalRecipient: deps.internalRecipient } : {}),
+  };
   const router = Router();
   const founder = requireRole(auth, 'founder');
   const json: RequestHandler = express.json({ limit: '32kb' });
@@ -250,6 +261,9 @@ export function createFounderRosterRouter(deps: FounderRosterDeps): Router {
         associationId,
         agreement: result.agreement,
       });
+      // §20 (Phase 22b). No addition row means an ordinary Creator, and this
+      // sends nothing — the check lives in the sender, not in the caller.
+      await notifyMidCampaignAccepted(midNotify, { associationId });
       res.json({ response: { outcome: 'locked', totalPercent: result.agreement.totalPercent } });
       return;
     }

@@ -18,6 +18,9 @@ import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
+import { reviewNotifyDeps } from '../campaign/review-notifications.js';
 import { campaigns } from '../db/schema/domain.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
 import { readBuild, saveBuild, upsertRewardPackage, type BuildPatch } from '../campaign/service.js';
@@ -37,6 +40,11 @@ export interface FounderBuildDeps {
   db: Database;
   auth: Auth;
   audit: AuditWriter;
+  /** Phase 22b: §27.3/§27.6's review messages. Unset → the review still runs
+      and the Admin queue still shows it, which is where the work is visible. */
+  notifier?: Notifier | undefined;
+  notificationContext?: LaunchNotificationContext | undefined;
+  internalRecipient?: string | undefined;
 }
 
 interface FounderCampaign {
@@ -164,7 +172,7 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
   router.post('/api/founder/campaigns/:campaignId/submit', founder, async (req, res) => {
     const campaign = await resolve(req.params['campaignId'] as string, userId(req));
     if (!campaign) return notFound(res);
-    const result = await submitForReview(db, { audit }, {
+    const result = await submitForReview(db, { audit, ...reviewNotifyDeps(deps) }, {
       campaignId: campaign.campaignId,
       campaignType: campaign.campaignType,
       campaignStatus: campaign.status,

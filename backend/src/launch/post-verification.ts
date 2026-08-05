@@ -225,12 +225,8 @@ export async function verifyPost(
       linkPaused = paused.length === 1;
 
       // Pause the Creator (active → paused). If already paused, this is a no-op.
-      associationPaused = await transitionAssociation(
-        submission.associationId,
-        'active',
-        'paused',
-        input.actor,
-        tx,
+      associationPaused = Boolean(
+        await transitionAssociation(submission.associationId, 'active', 'paused', input.actor, tx),
       );
     } else {
       // Passed: if this Creator was paused by an earlier correction and has now
@@ -241,12 +237,8 @@ export async function verifyPost(
         .where(eq(trackingLinks.associationId, submission.associationId))
         .returning({ id: trackingLinks.id });
       if (resumed.length === 1) {
-        associationResumed = await transitionAssociation(
-          submission.associationId,
-          'paused',
-          'active',
-          input.actor,
-          tx,
+        associationResumed = Boolean(
+          await transitionAssociation(submission.associationId, 'paused', 'active', input.actor, tx),
         );
       }
     }

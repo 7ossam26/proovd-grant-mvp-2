@@ -800,6 +800,9 @@ describe('§27.7 — notification history', () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const surfaces = join(here, '../../../frontend/src/surfaces/notifications');
     for (const file of readdirSync(surfaces)) {
+      // The suite's own file asserts the absence and therefore contains the
+      // word. Scanning it would make the guard fail because it is enforced.
+      if (file.includes('.test.')) continue;
       const text = stripComments(readFileSync(join(surfaces, file), 'utf8')).toLowerCase();
       expect(text.includes('unread'), file).toBe(false);
     }
