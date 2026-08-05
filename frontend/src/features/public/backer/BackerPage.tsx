@@ -29,7 +29,11 @@ import {
   fetchBackerPage,
   cancelReservation,
   updateCardAndRetry,
+  fetchBackerSupport,
+  openSupportCase,
+  escalateSupportCase,
   type BackerPageData,
+  type BackerSupportView,
   type BackerTransaction,
   type UpdateCardResult,
 } from './api.js';
@@ -119,6 +123,12 @@ export function BackerPage(props: BackerPageProps = {}) {
           </ul>
         )}
 
+        {/* §29.9/§29.10 (Phase 20b): the support path the live copy has
+            promised since Phase 15 — a real form that opens a case carrying
+            this Backer's full context, and the recorded escalation to Proovd
+            when the Founder has not responded or resolved it. */}
+        <SupportSection token={token} transactions={page.transactions} />
+
         {/* §18's general thread. It lives here rather than on the public
             campaign page because §18 lets only a magic-link-authenticated
             Backer post, and this is the only place a Backer is authenticated
@@ -177,6 +187,14 @@ function BackerTransactionRow({
           <dt>Charged</dt>
           <dd>{tx.chargeOccurred ? 'Yes' : 'US$0 — not charged'}</dd>
         </div>
+        {tx.statementDescriptor ? (
+          // §24.12/§33.9.13: the magic link shows the same computed value the
+          // campaign page, checkout, reminder, and receipt show.
+          <div>
+            <dt>{tx.chargeOccurred ? 'Your statement shows' : 'Expected statement'}</dt>
+            <dd>{tx.statementDescriptor}</dd>
+          </div>
+        ) : null}
       </dl>
       {tx.canCancel ? (
         <Button tier="secondary" onClick={cancel} disabled={busy}>
@@ -333,6 +351,164 @@ function RecoveryBlock({
       {outcome && outcome.status !== 'captured' && outcome.status !== 'already_captured' ? (
         <p className="backer__recovery-note" role="status">
           {outcome.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * §29.9/§29.10: get help without losing context (§26.8 — the case is born
+ * carrying the campaign, pre-order, and charge facts, so nobody retypes them).
+ * Opening a case shows the same B.8 acknowledgement the confirmation email
+ * carries; a Founder-first case gains the recorded escalation to Proovd when
+ * §29.10's arms open. The issuer-rights sentence renders verbatim — contacting
+ * anyone first waives nothing.
+ */
+function SupportSection({
+  token,
+  transactions,
+}: {
+  token: string;
+  transactions: BackerTransaction[];
+}) {
+  const [view, setView] = useState<BackerSupportView | null>(null);
+  const [topic, setTopic] = useState('');
+  const [message, setMessage] = useState('');
+  const [reservationId, setReservationId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setView(await fetchBackerSupport(token));
+  }, [token]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!view) return null;
+
+  async function submit() {
+    if (!topic || !message.trim()) return;
+    setBusy(true);
+    const result = await openSupportCase(token, {
+      topic,
+      message,
+      ...(reservationId ? { reservationId } : {}),
+    });
+    if (result.ok) {
+      setNotice(result.acknowledgement);
+      setTopic('');
+      setMessage('');
+      await load();
+    } else {
+      setNotice(result.message);
+    }
+    setBusy(false);
+  }
+
+  async function escalate(caseId: string) {
+    const reason = window.prompt(
+      'Tell Proovd what is still unresolved — a person reads this.',
+    );
+    if (!reason || !reason.trim()) return;
+    setBusy(true);
+    const result = await escalateSupportCase(token, caseId, reason);
+    setNotice(
+      result.ok
+        ? 'Escalated to Proovd. A person will respond within one business day.'
+        : result.message,
+    );
+    await load();
+    setBusy(false);
+  }
+
+  return (
+    <div className="backer__support">
+      <h2 className="h3" id="backer-support">
+        Get help
+      </h2>
+      <p className="field-hint">{view.issuerRights}</p>
+
+      {view.cases.length > 0 ? (
+        <ul className="backer__support-cases">
+          {view.cases.map((c) => (
+            <li key={c.caseId} className="backer__support-case">
+              <p>
+                <strong>{c.reference}</strong> — {c.topic} · {c.status}
+                {c.escalatedAt ? ' · escalated to Proovd' : ''}
+              </p>
+              <p className="field-hint">
+                {c.responded
+                  ? 'You have a response — check your email.'
+                  : `A human response is due by ${c.humanResponseDueAt.slice(0, 10)}.`}
+              </p>
+              {c.canEscalate ? (
+                <Button tier="secondary" onClick={() => escalate(c.caseId)} disabled={busy}>
+                  Escalate to Proovd
+                </Button>
+              ) : c.escalationOpensAt && !c.escalatedAt ? (
+                <p className="field-hint">
+                  If the Founder has not responded by {c.escalationOpensAt.slice(0, 10)}, you can
+                  escalate to Proovd here.
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <label className="field">
+        <span className="field__label">What is this about?</span>
+        <select
+          className="input"
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          aria-label="Support topic"
+        >
+          <option value="">Choose a topic</option>
+          {view.topics.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {transactions.length > 1 ? (
+        <label className="field">
+          <span className="field__label">Which pre-order? (optional)</span>
+          <select
+            className="input"
+            value={reservationId}
+            onChange={(e) => setReservationId(e.target.value)}
+            aria-label="Which pre-order"
+          >
+            <option value="">This campaign in general</option>
+            {transactions.map((t) => (
+              <option key={t.reservationId} value={t.reservationId}>
+                {t.rewardTitle ?? t.reservationId} — {t.statusLabel}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+      <label className="field">
+        <span className="field__label">What happened?</span>
+        <textarea
+          className="input"
+          rows={4}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          aria-label="What happened"
+        />
+      </label>
+      <Button tier="secondary" onClick={submit} disabled={busy || !topic || !message.trim()}>
+        {busy ? 'Sending…' : 'Send to support'}
+      </Button>
+      {notice ? (
+        <p className="backer__recovery-body" role="status">
+          {notice}
         </p>
       ) : null}
     </div>

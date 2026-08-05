@@ -135,6 +135,18 @@ export const PRE_CAPTURE_EFFECTS = [
 ] as const;
 export type PreCaptureEffect = (typeof PRE_CAPTURE_EFFECTS)[number];
 
+/** §26.7's post-capture set (Phase 20b), restated from shared. */
+export const POST_CAPTURE_EFFECTS = [
+  'invoke_refund_reversal_recovery_policy',
+  'restrict_unreleased_funds',
+  'notify_affected_roles',
+  'preserve_page_and_evidence',
+] as const;
+export type PostCaptureEffect = (typeof POST_CAPTURE_EFFECTS)[number];
+
+/** What an enforcement action's `effects_applied` may carry, either phase. */
+export type EnforcementEffect = PreCaptureEffect | PostCaptureEffect;
+
 /**
  * Which §26.7 consequence set applies.
  *

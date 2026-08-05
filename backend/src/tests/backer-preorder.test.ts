@@ -265,7 +265,9 @@ describe('§33.5.2 — the quote shows subtotal+tax=total, $0 today, and the res
     expect(q.chargeRule).toContain('order threshold of 500');
     expect(q.delivery).toBe('December 2026');
     expect(q.founderLegalName).toBe(c.founderLegalName);
-    expect(q.statementDescriptor).toMatch(/^PROOVD /);
+    // §24.12 (Phase 20b): the display value is the provider's own
+    // concatenation shape — prefix, `* `, suffix (§33.9.13).
+    expect(q.statementDescriptor).toMatch(/^PROOVD\* /);
     expect(q.cancellationPath).toMatch(/cancel/i);
     expect(q.sharingDisclosure).toMatch(/shared with the Founder/i);
     // The consent is A.3 (Idea) and says the card is not charged today.

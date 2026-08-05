@@ -33,11 +33,20 @@ export interface CampaignUpdate {
 }
 
 /**
- * §18's ended-state kinds. A real campaign renders one when it is no longer
- * open; a sample or preview never does. The page composes outcome-specific copy
- * from the kind — §18 forbids one generic "Campaign ended" message.
+ * §18/§33.9.9's ended-state kinds (Phase 20b widened them). A real campaign
+ * renders one when it is no longer open; a sample or preview never does. The
+ * page composes outcome-specific copy from the kind — §18 forbids one generic
+ * "Campaign ended" message, and §33.9.9 requires a threshold miss, a natural
+ * close, a pre-charge kill, and a post-charge suspension to be told apart.
  */
-export type EndedKind = 'closed' | 'no_charge' | 'suspended' | 'killed';
+export type EndedKind =
+  | 'closed'
+  | 'threshold_not_met'
+  | 'canceled_before_charge'
+  | 'suspended_before_charge'
+  | 'suspended_after_charge'
+  | 'killed_before_charge'
+  | 'killed_after_charge';
 
 /** §18: "Creator-link arrival shows `You came through [handle]`." */
 export interface AttributionBanner {
@@ -146,6 +155,12 @@ export interface CampaignView {
    * disables the pre-order action and renders outcome-specific ended copy.
    */
   ended?: EndedKind | null;
+  /**
+   * The Admin-recorded §26.7 customer explanation behind a suspension/kill —
+   * the server refused it if it carried a raw provider code (§33.9.11). Null
+   * for non-enforcement outcomes.
+   */
+  endedExplanation?: string | null;
   /** §18's attribution banner, or null when no Creator link is attributed. */
   attribution?: AttributionBanner | null;
   /**

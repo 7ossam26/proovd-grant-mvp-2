@@ -22,6 +22,7 @@ import type { Database } from '../db/client.js';
 import { campaigns } from '../db/schema/domain.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
 import { campaignBuild, campaignRewardPackages, campaignFaqs } from '../db/schema/build.js';
+import { computeCampaignDescriptor } from '../payments/descriptors.js';
 
 type Executor = Pick<Database, 'select'>;
 
@@ -152,9 +153,12 @@ export async function buildCampaignPreview(
     example,
     orderThreshold: build?.orderThreshold ?? null,
     internalTargetCents: build?.internalTargetCents?.toString() ?? null,
-    // §24.12: the validated descriptor. In preview it is the fixed listing-style
-    // placeholder until Phase 14 assigns the live one.
-    statementDescriptor: 'PROOVD',
+    // §24.12: the same kernel the checkout stores on the reservation
+    // (§33.9.13) — the preview shows what a Backer's statement will show.
+    statementDescriptor: computeCampaignDescriptor({
+      legalName: build?.founderDisplayName ?? claim?.legalName ?? 'The Founder',
+      entity,
+    }).display,
     story: build?.publicStory ?? null,
     faq: faqRows.map((f) => ({ question: f.question, answer: f.answer })),
     founderRefundPolicy:

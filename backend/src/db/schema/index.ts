@@ -108,3 +108,12 @@ export * from './founder-payments.js';
 // reservation refund with its requested/submitted/succeeded/failed lifecycle
 // claimed before the provider call, and its append-only events.
 export * from './refunds.js';
+// Phase 20b: §24.11 — the provider dispute with its CHECK-pinned 24-hour Admin
+// task and write-once §24.8 classification (case_kind = 'dispute'), the
+// append-only lifecycle events, and the recorded evidence-packet assembly.
+export * from './disputes.js';
+// Phase 20b: §29 — the affiliate enforcement action with its five REQUIRED
+// customer-statement fields and computed appeal deadline, the write-once
+// appeal decision, the §29.1/§29.2 disclosures, §29.8's published-version
+// reacceptance requirement, and §29.10's one-per-case Backer escalation.
+export * from './enforcement.js';

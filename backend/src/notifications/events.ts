@@ -251,10 +251,10 @@ export const AFFILIATE_PAYOUT_FAILED = 'affiliate_payout_failed' as const;
  * model's first payment day — so the schedule sweep sends both now, once per
  * campaign.
  *
- * `founder_payment_blocked` remains deliberately unsent: every §22.3 block
- * this phase can detect is the W-9 (its own key above) or a checks/risk
- * judgement whose records are Phase 20's cause-based machinery. A key sent on
- * no detectable trigger claims a message the product does not send (§1.4).
+ * `founder_payment_blocked` was deliberately unsent in 19b: every §22.3 block
+ * it could detect was the W-9 (its own key above) or a judgement whose records
+ * were Phase 20's. Phase 20b's post-capture enforcement hold is the first
+ * detectable non-W-9 block, and it is the sender (registered below).
  * `founder_day_14_review_result` is Phase 21's — the review itself is out of
  * scope here (§22.4).
  */
@@ -280,6 +280,44 @@ export const INTERNAL_DELIVERABLE_VERIFICATION_DUE =
 export const BACKER_REFUND_STARTED = 'backer_refund_started' as const;
 export const BACKER_REFUND_COMPLETED = 'backer_refund_completed' as const;
 export const BACKER_REFUND_FAILED = 'backer_refund_failed' as const;
+
+/**
+ * Phase 20b — disputes, enforcement, and the Backer support path.
+ *
+ * §27.6 — `internal_dispute_opened` finally has its sender: the §24.11 ingest,
+ * deduped per DISPUTE row (a redelivery under a fresh event id changes the
+ * status at most; the internal notice announces the 24-hour task once).
+ *
+ * §27.4 — `affiliate_transfer_reversal` from the `transfer.reversed` handler,
+ * deduped per transfer row. `affiliate_warning`/`affiliate_suspension` carry
+ * the §29.4 customer statement (five fields + computed appeal deadline), each
+ * deduped on the enforcement-action row; `affiliate_policy_reacceptance`
+ * announces a §29.8 requirement, deduped per (requirement, association).
+ *
+ * §27.3/§27.5 — the campaign suspension/kill notices, per role, deduped on the
+ * campaign-enforcement action so a replayed enforcement sends nothing and a
+ * later distinct action (suspend, then kill) sends its own. §26.7's "notify
+ * roles" is these three keys plus the affiliate one above.
+ * `founder_payment_blocked` gains its first detectable trigger: a post-capture
+ * enforcement hold on an existing unreleased payment (§26.7 "restrict
+ * unreleased funds"), deduped per (enforcement action, payment row).
+ *
+ * §27.5 — the Backer support path (§29.9/§29.10): the B.8 acknowledgement on
+ * case open (per case), and the Founder-response relay on an outbound
+ * customer-facing message of a Backer's case (per message row).
+ */
+export const INTERNAL_DISPUTE_OPENED = 'internal_dispute_opened' as const;
+export const AFFILIATE_TRANSFER_REVERSAL = 'affiliate_transfer_reversal' as const;
+export const AFFILIATE_WARNING = 'affiliate_warning' as const;
+export const AFFILIATE_SUSPENSION = 'affiliate_suspension' as const;
+export const AFFILIATE_POLICY_REACCEPTANCE = 'affiliate_policy_reacceptance' as const;
+export const FOUNDER_CAMPAIGN_SUSPENDED = 'founder_campaign_suspended' as const;
+export const FOUNDER_CAMPAIGN_KILLED = 'founder_campaign_killed' as const;
+export const BACKER_CAMPAIGN_SUSPENDED = 'backer_campaign_suspended' as const;
+export const BACKER_CAMPAIGN_KILLED = 'backer_campaign_killed' as const;
+export const FOUNDER_PAYMENT_BLOCKED = 'founder_payment_blocked' as const;
+export const BACKER_SUPPORT_RECEIVED = 'backer_support_received' as const;
+export const BACKER_SUPPORT_FOUNDER_RESPONSE = 'backer_support_founder_response' as const;
 
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
@@ -344,6 +382,18 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_EARLY_REMAINING_RESULT,
   INTERNAL_MONEY_DECISIONS_DUE,
   INTERNAL_DELIVERABLE_VERIFICATION_DUE,
+  INTERNAL_DISPUTE_OPENED,
+  AFFILIATE_TRANSFER_REVERSAL,
+  AFFILIATE_WARNING,
+  AFFILIATE_SUSPENSION,
+  AFFILIATE_POLICY_REACCEPTANCE,
+  FOUNDER_CAMPAIGN_SUSPENDED,
+  FOUNDER_CAMPAIGN_KILLED,
+  BACKER_CAMPAIGN_SUSPENDED,
+  BACKER_CAMPAIGN_KILLED,
+  FOUNDER_PAYMENT_BLOCKED,
+  BACKER_SUPPORT_RECEIVED,
+  BACKER_SUPPORT_FOUNDER_RESPONSE,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

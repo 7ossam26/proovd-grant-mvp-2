@@ -13,6 +13,10 @@
  * `POST …/reservations/:id/update-card`  §21's B.5 recovery (Phase 18b): save a
  *                                        new card, retry once under the next
  *                                        stable attempt key (§33.7.9)
+ * `GET  …/support`                       §29.9/§29.10 (Phase 20b): this Backer's
+ *                                        cases with the escalation facts
+ * `POST …/support`                       open a case carrying full context
+ * `POST …/support/:caseId/escalate`      the §29.10 escalation to Proovd
  */
 
 import { Router, json } from 'express';
@@ -29,6 +33,12 @@ import { readBackerPage } from '../reservations/magic-link-read.js';
 import { cancelReservation } from '../reservations/cancellation.js';
 import { replaceIdeaReward } from '../reservations/preorder.js';
 import { updateCardAndRetry } from '../close/retry.js';
+import {
+  escalateBackerCase,
+  openBackerSupportCase,
+  readBackerSupport,
+} from '../support/backer-support.js';
+import type { SupportTopic } from '../support/logic.js';
 import { findCampaignFounderUserId } from '../reservations/context.js';
 import { findAccountForOwner } from '../payments/connected-accounts.js';
 import { evaluateAndNotifyThreshold } from '../live/thresholds.js';
@@ -301,6 +311,77 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
       default:
         res.status(404).json({ error: 'not_found' });
     }
+  });
+
+  /* ── §29.9/§29.10: the Backer support path (Phase 20b) ─────────────────── */
+
+  router.get(`${base}/support`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const view = await readBackerSupport(deps.db, {
+      campaignId: subject.campaignId,
+      backerIdentityId: subject.backerIdentityId,
+    });
+    res.json(view);
+  });
+
+  router.post(`${base}/support`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const outcome = await openBackerSupportCase(
+      {
+        db: deps.db,
+        audit: deps.audit,
+        notifier: deps.notifier,
+        ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+      },
+      {
+        campaignId: subject.campaignId,
+        backerIdentityId: subject.backerIdentityId,
+        topic: (typeof b['topic'] === 'string' ? b['topic'] : '') as SupportTopic,
+        message: typeof b['message'] === 'string' ? b['message'] : '',
+        reservationId: typeof b['reservationId'] === 'string' ? b['reservationId'] : null,
+      },
+    );
+    if (!outcome.ok) {
+      res
+        .status(outcome.code === 'not_found' ? 404 : 422)
+        .json({ error: outcome.code, message: outcome.message });
+      return;
+    }
+    // §27.8's five facts plus the B.8 acknowledgement — the same string the
+    // confirmation email carries (§33.11.5).
+    res.status(201).json({
+      reference: outcome.result.reference,
+      topic: outcome.result.topic,
+      owner: outcome.result.owner,
+      humanResponseDueAt: outcome.result.humanResponseDueAt.toISOString(),
+      founderFollowupDueAt: outcome.result.founderFollowupDueAt?.toISOString() ?? null,
+      acknowledgement: outcome.result.acknowledgement,
+      issuerRights: outcome.issuerRights,
+    });
+  });
+
+  router.post(`${base}/support/:caseId/escalate`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const outcome = await escalateBackerCase(
+      { db: deps.db, audit: deps.audit },
+      {
+        campaignId: subject.campaignId,
+        backerIdentityId: subject.backerIdentityId,
+        caseId: String(req.params.caseId),
+        reason: typeof b['reason'] === 'string' ? b['reason'] : '',
+      },
+    );
+    if (!outcome.ok) {
+      res.status(outcome.code === 'not_found' ? 404 : 422).json({
+        error: outcome.code,
+        message: outcome.message,
+        ...(outcome.opensAt ? { opensAt: outcome.opensAt } : {}),
+      });
+      return;
+    }
+    res.status(201).json(outcome);
   });
 
   return router;

@@ -232,14 +232,31 @@ function EnforcementPanel({
       )}
 
       <Field label="Action" hint="Suspension pauses; a kill ends the campaign.">
-        <Input value={action} onChange={(e) => setAction(e.target.value)} />
+        <select
+          className="input"
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          aria-label="Enforcement action"
+        >
+          <option value="suspend">Suspend</option>
+          <option value="kill">Kill</option>
+        </select>
       </Field>
 
-      <Field
-        label="Reason category"
-        hint={`§26.7's eight: ${Object.keys(ENFORCEMENT_REASON_LABELS).join(', ')}`}
-      >
-        <Input value={category} onChange={(e) => setCategory(e.target.value)} />
+      <Field label="Reason category" hint="§26.7's eight categories — the register decides.">
+        <select
+          className="input"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          aria-label="Reason category"
+        >
+          <option value="">Choose a category…</option>
+          {Object.entries(ENFORCEMENT_REASON_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
       </Field>
 
       <Field
@@ -259,8 +276,10 @@ function EnforcementPanel({
       <p className="field-hint">
         Before capture this closes every active pre-order without charge, blocks any future
         PaymentIntent, detaches cards only where reference-safe, notifies affected roles, and keeps
-        the page up with the banner. After capture it records the decision — refunds, reversals, and
-        recovery are Phase 20.
+        the page up with the banner. After capture it closes any still-uncharged pre-order without
+        charge, holds unreleased Founder payments and Creator Transfers, notifies every role, and
+        preserves evidence — each refund of a charged pre-order is then its own §24.8 cause
+        classification on the Refunds surface, never an automatic clawback.
       </p>
 
       {notice && <p className="field-hint">{notice}</p>}

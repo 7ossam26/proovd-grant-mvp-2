@@ -12,6 +12,7 @@
 
 import { and, asc, eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { computeCampaignDescriptor } from '../payments/descriptors.js';
 import { campaigns } from '../db/schema/domain.js';
 import { campaignBuild, campaignRewardPackages, type CampaignRewardPackage } from '../db/schema/build.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
@@ -62,19 +63,15 @@ export type PreorderContextResult =
   | { ok: false; code: PreorderContextRefusal };
 
 /**
- * §24.12 statement descriptor, computed once here and stored on the reservation.
- * The public page's `displayDescriptor` produces the same shape (its comment
- * says the authoritative one is assigned at checkout); this is that assignment.
+ * §24.12 statement descriptor, computed once here and stored on the
+ * reservation. Phase 20b: the compute moved to the ONE kernel in
+ * `payments/descriptors.ts` (shared-restated, drift-tested) — the public page
+ * renders the same kernel's output, and the capture call derives its provider
+ * SUFFIX from the stored display rather than re-sending the whole string
+ * (§33.9.13).
  */
 export function computeStatementDescriptor(founder: { entity: string; legalName: string }): string {
-  const base =
-    founder.entity && founder.entity !== 'sole proprietor' ? founder.entity : founder.legalName;
-  const cleaned = base
-    .toUpperCase()
-    .replace(/[^A-Z0-9 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return `PROOVD ${cleaned}`.slice(0, 22).trim();
+  return computeCampaignDescriptor(founder).display;
 }
 
 /** Resolves the Founder user id that owns a campaign (§25.5 chain). */

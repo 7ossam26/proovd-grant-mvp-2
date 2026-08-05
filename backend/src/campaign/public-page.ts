@@ -24,19 +24,40 @@
  * "Campaign ended" message.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
-import { campaigns } from '../db/schema/domain.js';
+import { campaigns, reservations } from '../db/schema/domain.js';
+import { campaignCloseBatches } from '../db/schema/close.js';
+import { campaignEnforcementActions } from '../db/schema/support.js';
 import { buildCampaignPreview } from './preview.js';
 
-export type EndedKind = 'closed' | 'no_charge' | 'suspended' | 'killed';
+/**
+ * §33.9.9's outcome-specific kinds (Phase 20b). The old four ('closed',
+ * 'no_charge', 'suspended', 'killed') collapsed a threshold miss into a
+ * pre-charge kill and could not say whether a suspension found charged money —
+ * exactly the distinctions §33.9.9 names. The status alone cannot draw them,
+ * so `resolveEndedState` consults the records that can: the close batch's
+ * threshold decision (§33.7.5), the §31.6 cancellation, and the §26.7
+ * enforcement action with its recorded phase.
+ */
+export type EndedKind =
+  | 'closed'
+  | 'threshold_not_met'
+  | 'canceled_before_charge'
+  | 'suspended_before_charge'
+  | 'suspended_after_charge'
+  | 'killed_before_charge'
+  | 'killed_after_charge';
+
+/** The coarse group the lifecycle status alone can answer. */
+export type EndedGroup = 'closed' | 'no_charge' | 'suspended' | 'killed';
 
 /** How each §23.1 lifecycle status renders publicly. */
 interface Lifecycle {
   /** Is there a public page at all? False for every pre-live status. */
   isPublic: boolean;
-  /** null while live/open; the ended kind once the campaign has ended. */
-  ended: EndedKind | null;
+  /** null while live/open; the coarse ended group once the campaign has ended. */
+  ended: EndedGroup | null;
 }
 
 export function classifyLifecycle(status: string): Lifecycle {
@@ -56,7 +77,8 @@ export function classifyLifecycle(status: string): Lifecycle {
     case 'fulfilled':
     case 'closed_resolved':
       return { isPublic: true, ended: 'closed' };
-    // Threshold miss or a pre-charge kill: closed with no charge created.
+    // Pre-charge termination: threshold miss or §31.6 cancellation. Which one
+    // is a record, not a status — `resolveEndedState` reads it.
     case 'ended_no_charge':
       return { isPublic: true, ended: 'no_charge' };
     case 'suspended':
@@ -69,6 +91,101 @@ export function classifyLifecycle(status: string): Lifecycle {
       // approved — never went public.
       return { isPublic: false, ended: null };
   }
+}
+
+export interface EndedState {
+  kind: EndedKind;
+  /**
+   * The Admin-recorded §26.7 customer explanation for a suspension/kill —
+   * already refused if it carried a raw provider code (§33.9.11). Null for
+   * the non-enforcement outcomes, whose copy the surface composes from facts.
+   */
+  explanation: string | null;
+}
+
+/** Whether any of this campaign's reservations was ever actually charged. */
+async function anyReservationCharged(db: Database, campaignId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: reservations.id })
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.campaignId, campaignId),
+        inArray(sql`${reservations.status}::text`, ['captured', 'disputed', 'refunded', 'reversed']),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+async function latestEnforcement(
+  db: Database,
+  campaignId: string,
+  action?: 'suspend' | 'kill',
+): Promise<{ phase: string; customerExplanation: string } | null> {
+  const [row] = await db
+    .select({
+      phase: campaignEnforcementActions.phase,
+      customerExplanation: campaignEnforcementActions.customerExplanation,
+    })
+    .from(campaignEnforcementActions)
+    .where(
+      action
+        ? and(
+            eq(campaignEnforcementActions.campaignId, campaignId),
+            eq(campaignEnforcementActions.action, action),
+          )
+        : eq(campaignEnforcementActions.campaignId, campaignId),
+    )
+    .orderBy(desc(campaignEnforcementActions.occurredAt))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function resolveEndedState(
+  db: Database,
+  campaignId: string,
+  group: EndedGroup,
+): Promise<EndedState> {
+  if (group === 'closed') return { kind: 'closed', explanation: null };
+
+  if (group === 'no_charge') {
+    // The batch's threshold decision is immutable at close (§33.7.5) — the
+    // authoritative record of a miss.
+    const [batch] = await db
+      .select({ thresholdMet: campaignCloseBatches.thresholdMet })
+      .from(campaignCloseBatches)
+      .where(eq(campaignCloseBatches.campaignId, campaignId))
+      .limit(1);
+    if (batch && batch.thresholdMet === false) {
+      return { kind: 'threshold_not_met', explanation: null };
+    }
+    // A suspension resolved to pre-charge termination keeps its enforcement
+    // record; a §31.6 cancellation keeps its own. Either way nothing was
+    // charged, and the copy says which act ended it.
+    const enforcement = await latestEnforcement(db, campaignId);
+    if (enforcement) {
+      return { kind: 'suspended_before_charge', explanation: enforcement.customerExplanation };
+    }
+    return { kind: 'canceled_before_charge', explanation: null };
+  }
+
+  const action = group === 'suspended' ? 'suspend' : 'kill';
+  const enforcement = await latestEnforcement(db, campaignId, action);
+  // The recorded phase wins; a record-less state (unreachable through the one
+  // enforcement door) falls back to whether money actually moved.
+  const afterCharge = enforcement
+    ? enforcement.phase === 'post_capture'
+    : await anyReservationCharged(db, campaignId);
+  const kind: EndedKind =
+    group === 'suspended'
+      ? afterCharge
+        ? 'suspended_after_charge'
+        : 'suspended_before_charge'
+      : afterCharge
+        ? 'killed_after_charge'
+        : 'killed_before_charge';
+  return { kind, explanation: enforcement?.customerExplanation ?? null };
 }
 
 export interface PublicReward {
@@ -107,22 +224,9 @@ export interface PublicCampaignPayload {
 
 export interface PublicCampaign {
   campaign: PublicCampaignPayload;
-  ended: { kind: EndedKind } | null;
+  ended: EndedState | null;
   /** §18: false through Days 1–7 (known-link-only); true once Day 8 opened it. */
   indexable: boolean;
-}
-
-/** A display statement descriptor for §18 item 14. */
-function displayDescriptor(founder: { entity: string; legalName: string }): string {
-  const base = founder.entity && founder.entity !== 'sole proprietor' ? founder.entity : founder.legalName;
-  const cleaned = base
-    .toUpperCase()
-    .replace(/[^A-Z0-9 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  // The authoritative §24.12 descriptor is assigned and validated at checkout
-  // (Phase 15) and must match this shape; here it is the expected display value.
-  return `PROOVD ${cleaned}`.slice(0, 22).trim();
 }
 
 /** The factual refund summary for the page, restating the disclosed rules (§19/§31). */
@@ -196,7 +300,9 @@ export async function buildPublicCampaign(
     })),
     featuredRewardSku: preview.featuredRewardSku,
     orderThreshold: preview.orderThreshold,
-    statementDescriptor: displayDescriptor(preview.founder),
+    // §24.12/§33.9.13: the preview computes the one kernel's display value —
+    // the same value the checkout stores on every reservation.
+    statementDescriptor: preview.statementDescriptor,
     story: preview.story,
     faq: preview.faq,
     refundSummary: refundSummary(preview.model, Boolean(founderRefundPolicy)),
@@ -206,7 +312,7 @@ export async function buildPublicCampaign(
 
   return {
     campaign: payload,
-    ended: lifecycle.ended ? { kind: lifecycle.ended } : null,
+    ended: lifecycle.ended ? await resolveEndedState(db, row.id, lifecycle.ended) : null,
     indexable: row.discoveryOpenedAt !== null,
   };
 }

@@ -1846,3 +1846,23 @@ html.no-motion [data-splash] { display: none !important; }
 .backer__recovery-body { margin: 0; white-space: pre-line; }
 .backer__recovery-card { min-height: 44px; }
 .backer__recovery-note { margin: 0; color: var(--grey); font-size: 0.9375rem; }
+
+/* ---- Phase 20b: the Backer support path (S29.9/S29.10) and the Admin-recorded
+   ended explanation (S26.7). Customer surfaces keep the public rhythm; every
+   value reads a slot - no hex literal, no arbitrary spacing. */
+.backer__support {
+  margin-top: var(--sp-24);
+  display: flex; flex-direction: column; gap: var(--sp-12);
+}
+.backer__support-cases {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: var(--sp-12);
+}
+.backer__support-case {
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  display: flex; flex-direction: column; gap: var(--sp-8);
+}
+/* The S26.7 customer explanation is the Admin's own sentence; keep its breaks. */
+.ended-banner__explanation { white-space: pre-line; }

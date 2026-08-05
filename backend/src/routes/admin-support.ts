@@ -31,13 +31,22 @@ import {
   resolveCase,
 } from '../support/cases.js';
 import { RESPONSE_TEMPLATES, renderTemplate } from '../support/templates.js';
-import { enforceCampaign, listEnforcementActions } from '../support/enforcement.js';
+import {
+  enforceCampaign,
+  listEnforcementActions,
+  type EnforcementDeps,
+} from '../support/enforcement.js';
 import {
   readTimeline,
   recordRelationshipTouch,
   listRelationshipTouches,
   type TimelineSubject,
 } from '../support/timeline.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
+import { BACKER_SUPPORT_FOUNDER_RESPONSE } from '../notifications/events.js';
+import { eq } from 'drizzle-orm';
+import { supportCases } from '../db/schema/support.js';
 import {
   SUPPORT_TOPICS,
   SUPPORT_OWNERS,
@@ -57,7 +66,12 @@ export interface AdminSupportRouterDeps {
   detachPaymentMethod?:
     | ((input: { paymentMethodId: string; connectedAccountId: string }) => Promise<void>)
     | undefined;
-  notifyRoles?: ((input: { campaignId: string; explanation: string }) => Promise<void>) | undefined;
+  /** Phase 20b: the campaign Founder's seller account, resolved per campaign (§24.1). */
+  resolveConnectedAccount?: ((campaignId: string) => Promise<string | null>) | undefined;
+  notifyRoles?: EnforcementDeps['notifyRoles'];
+  /** Phase 20b: the §27.5 Founder-response relay on a Backer's case. */
+  notifier?: Notifier | undefined;
+  notificationContext?: LaunchNotificationContext | undefined;
 }
 
 function actorOf(req: express.Request): string {
@@ -78,7 +92,10 @@ export function createAdminSupportRouter({
   db,
   auth,
   detachPaymentMethod,
+  resolveConnectedAccount,
   notifyRoles,
+  notifier,
+  notificationContext,
 }: AdminSupportRouterDeps): Router {
   const router = Router();
   const admin = requireAdmin(auth);
@@ -245,6 +262,37 @@ export function createAdminSupportRouter({
         return;
       }
 
+      // §27.5/§29.10 (Phase 20b): an outbound customer-facing reply on a
+      // Backer's case reaches their inbox — the response the 14-day escalation
+      // arm measures is a response the Backer actually received. Deduped per
+      // MESSAGE row (each reply is its own send); a provider refusal is
+      // recorded by the notifier and never unwinds the recorded message.
+      if (customerFacing && body['direction'] !== 'inbound' && notifier && notificationContext) {
+        const [caseRow] = await db
+          .select({
+            requesterKind: supportCases.requesterKind,
+            requesterEmail: supportCases.requesterEmail,
+            reference: supportCases.reference,
+          })
+          .from(supportCases)
+          .where(eq(supportCases.id, req.params['caseId'] as string))
+          .limit(1);
+        if (caseRow && caseRow.requesterKind === 'backer') {
+          const replyBody = typeof body['body'] === 'string' ? body['body'] : '';
+          await notifier.send({
+            eventKey: BACKER_SUPPORT_FOUNDER_RESPONSE,
+            entityType: 'support_case_message',
+            entityId: result.messageId,
+            to: caseRow.requesterEmail,
+            from: notificationContext.fromAddress,
+            replyTo: notificationContext.supportEmail,
+            subject: `Response to your request — ${caseRow.reference}`,
+            html: `<p style="white-space:pre-line">${replyBody}</p><p>Reference: ${caseRow.reference}. Reply from your pre-order page — your context is already there.</p>`,
+            text: `${replyBody}\n\nReference: ${caseRow.reference}. Reply from your pre-order page — your context is already there.`,
+          });
+        }
+      }
+
       res.status(201).json({ messageId: result.messageId });
     },
   );
@@ -348,6 +396,7 @@ export function createAdminSupportRouter({
         {
           db,
           ...(detachPaymentMethod ? { detachPaymentMethod } : {}),
+          ...(resolveConnectedAccount ? { resolveConnectedAccount } : {}),
           ...(notifyRoles ? { notifyRoles } : {}),
         },
         {

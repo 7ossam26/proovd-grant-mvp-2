@@ -385,7 +385,10 @@ export async function addCaseMessage(
     return { ok: false, code: 'invalid', message: 'A message needs a body.' };
   }
 
-  if (input.customerFacing && containsRawProviderCode(input.body)) {
+  // §33.9.11 is about what WE send: an OUTBOUND customer-facing reply may not
+  // carry a provider code. An inbound customer message quoting their own
+  // bank's wording is their evidence, not our copy (Phase 20b's Backer path).
+  if (input.direction === 'outbound' && input.customerFacing && containsRawProviderCode(input.body)) {
     return {
       ok: false,
       code: 'raw_provider_code',

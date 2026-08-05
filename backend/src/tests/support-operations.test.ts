@@ -946,7 +946,7 @@ describe('§26.7 suspend and kill', () => {
     expect(campaign!.status).toBe('killed');
   });
 
-  it('records the decision post-capture and moves no money — Phase 20 owns the consequences', async () => {
+  it('records the decision post-capture and a SUSPENSION moves no money — the §26.7 consequences are 20b’s', async () => {
     const f = await seedLiveCampaignWithReservation('kill-postcapture', {
       status: 'captured_pending_w9',
     });
@@ -965,10 +965,14 @@ describe('§26.7 suspend and kill', () => {
       .expect(201);
 
     expect(res.body.phase).toBe('post_capture');
-    expect(res.body.postCaptureConsequencesDeferred).toBe(true);
-    // A post-capture action closes nothing: those reservations may already have
-    // been charged, and closing them would be the one mistake here that moves
-    // real money the wrong way.
+    // Phase 20b applies the post-capture consequences rather than deferring
+    // them: the funds hold, the §24.8 path, the role notices.
+    expect(res.body.postCaptureConsequencesDeferred).toBe(false);
+    expect(res.body.effectsApplied).toContain('invoke_refund_reversal_recovery_policy');
+    expect(res.body.effectsApplied).toContain('restrict_unreleased_funds');
+    // A post-capture SUSPENSION closes nothing: it is reinstateable (§23.1),
+    // and a reservation may already have been charged — closing it would be
+    // the one mistake here that moves real money the wrong way.
     expect(res.body.reservationsClosed).toBe(0);
     expect(res.body.effectsApplied).not.toContain('close_active_reservations_without_charge');
 

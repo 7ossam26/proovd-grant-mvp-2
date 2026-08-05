@@ -102,9 +102,20 @@ interface EndedCopy {
   next: string;
 }
 
-/** §18's outcome-specific ended copy. Never one generic "Campaign ended". */
+/**
+ * §18/§33.9.9's outcome-specific ended copy. Never one generic "Campaign
+ * ended" — and since Phase 20b never one generic kill/suspension either: a
+ * threshold miss, a natural close, a pre-charge kill, and a post-charge
+ * suspension each state their own why/charged/next.
+ */
 function endedCopy(kind: EndedKind, campaign: CampaignView): EndedCopy {
   const closed = `Pre-orders closed on ${formatUtcInstant(campaign.closesAt)}.`;
+  const noChargeFact =
+    'No card was charged — not yours, not anyone’s. Any saved card has lost future-charge eligibility for this campaign.';
+  const chargedFact =
+    'If you placed a pre-order, your card may have been charged before this decision. ' +
+    'Open your backer page — the magic link is in your confirmation email — for your exact charge and refund status. ' +
+    'Your card issuer’s dispute rights are unaffected.';
   switch (kind) {
     case 'closed':
       return {
@@ -116,34 +127,48 @@ function endedCopy(kind: EndedKind, campaign: CampaignView): EndedCopy {
           'If you never pre-ordered, nothing was charged.',
         next: 'The Founder now fulfills the rewards on the delivery dates shown above.',
       };
-    case 'no_charge':
+    case 'threshold_not_met':
       return {
-        title: 'This campaign closed without any charge',
-        why:
-          campaign.model === 'idea'
-            ? 'This Idea Campaign did not reach its order threshold by the close date.'
-            : 'This campaign was ended before any charge was created.',
-        charge:
-          'No card was charged — not yours, not anyone’s. Any saved card has lost future-charge eligibility for this campaign.',
+        title: 'This campaign closed without reaching its order threshold',
+        why: 'This Idea Campaign did not reach its order threshold by the close date, so no charge was created.',
+        charge: noChargeFact,
         next: 'Nothing further happens, and you were not billed.',
       };
-    case 'suspended':
+    case 'canceled_before_charge':
+      return {
+        title: 'This campaign ended before any charge',
+        why: 'This campaign was ended before any charge was created.',
+        charge: noChargeFact,
+        next: 'Nothing further happens, and you were not billed.',
+      };
+    case 'suspended_before_charge':
       return {
         title: 'This campaign is on hold',
-        why: 'Proovd has paused this campaign while it reviews it. Pre-orders and new comments are closed for now.',
-        charge:
-          'Whether a charge has occurred depends on where the campaign was in its cycle. ' +
-          'Open your backer page, or contact support, to see your exact status.',
-        next: 'Proovd will update Backers as the review concludes.',
+        why: 'Proovd paused this campaign for review before any charge was created. Pre-orders and new comments are closed for now.',
+        charge: noChargeFact,
+        next: 'Proovd will update Backers as the review concludes. No card will be charged while it is on hold.',
       };
-    case 'killed':
+    case 'suspended_after_charge':
+      return {
+        title: 'This campaign is on hold',
+        why: 'Proovd paused this campaign for review after its close. Pre-orders and new comments are closed.',
+        charge: chargedFact,
+        next: 'Charged pre-orders keep their recorded state while Proovd reviews; any refund follows the recorded refund rules.',
+      };
+    case 'killed_before_charge':
       return {
         title: 'This campaign has been stopped',
-        why: 'This campaign was stopped and is no longer running.',
-        charge:
-          'If you were charged, refund handling follows Proovd’s Refund Policy and the recovery path for a stopped campaign. ' +
-          'Open your backer page or contact support to see your exact status.',
-        next: 'Proovd is handling any charged pre-orders under the recovery path.',
+        why: 'Proovd stopped this campaign before any charge was created.',
+        charge: noChargeFact,
+        next: 'Nothing further happens, and you were not billed.',
+      };
+    case 'killed_after_charge':
+      return {
+        title: 'This campaign has been stopped',
+        why: 'Proovd stopped this campaign after charges had occurred.',
+        charge: chargedFact,
+        next:
+          'Proovd is handling charged pre-orders under the recorded refund and recovery rules — your backer page shows your exact status.',
       };
   }
 }
@@ -165,6 +190,9 @@ function EndedBanner({ kind, campaign }: { kind: EndedKind; campaign: CampaignVi
           <h2 className="h2" id="campaign-ended">
             {copy.title}
           </h2>
+          {campaign.endedExplanation ? (
+            <p className="ended-banner__explanation">{campaign.endedExplanation}</p>
+          ) : null}
           <dl className="ended-banner">
             <div className="ended-banner__row">
               <dt>Why it ended</dt>

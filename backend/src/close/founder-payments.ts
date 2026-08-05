@@ -57,6 +57,7 @@ import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { readSettingValue } from '../settings/service.js';
+import { campaignEnforcementHold } from '../support/enforcement-hold.js';
 import { dayAfterClose } from './creator-close.js';
 import {
   canMoveW9State,
@@ -637,6 +638,14 @@ export async function readFounderPaymentStatus(
       : [];
 
   const lines: FounderPaymentLine[] = [];
+  // §26.7 (Phase 20b): while the campaign stands suspended/killed, every
+  // unreleased payment is blocked — with the hold NAMED, because `blocked`
+  // without its reason is the forbidden word respelled (§22.3).
+  const hold = await campaignEnforcementHold(db, input.campaignId);
+  const holdBlocker = hold.restricted
+    ? `Campaign enforcement hold — this campaign is ${hold.campaignStatus ?? 'suspended'} and unreleased payments are restricted while Proovd reviews it (§26.7).`
+    : null;
+
   let firstAmount: bigint | null = null;
   for (const entry of schedule) {
     const day = await readNumberSetting(db, entry.daySettingKey);
@@ -687,16 +696,23 @@ export async function readFounderPaymentStatus(
       if (entry.kind === 'single_payment') {
         blockers.push('Recorded payment and risk checks, and a named Admin approval (§22.3).');
       }
-      if (blockers.length === 0) {
+      if (blockers.length === 0 && !holdBlocker) {
         blockers.push('Proovd records the payment decision — no action needed from you.');
       }
     }
 
-    const status: FounderPaymentLine['status'] = existing
+    let status: FounderPaymentLine['status'] = existing
       ? existing.status === 'released'
         ? 'released'
         : 'eligible'
       : 'blocked';
+    // The hold blocks everything not already released — an existing `eligible`
+    // payment cannot release while it stands, and saying `eligible` would
+    // promise a release the service refuses (§1.4).
+    if (holdBlocker && status !== 'released') {
+      status = 'blocked';
+      blockers.unshift(holdBlocker);
+    }
     lines.push({
       kind: entry.kind,
       label: FOUNDER_PAYMENT_KIND_LABELS[entry.kind],
@@ -798,6 +814,7 @@ export type CreatePaymentOutcome =
   | { status: 'early_release_disabled' }
   | { status: 'before_day_3'; earliestAt: Date }
   | { status: 'evidence_incomplete'; missing: string[] }
+  | { status: 'enforcement_hold'; campaignStatus: string }
   | { status: 'not_found' };
 
 export async function createFounderPayment(
@@ -824,6 +841,13 @@ export async function createFounderPayment(
   if (campaign.status === 'capture_retry_window' || campaign.status === 'closed_pending_capture') {
     // §22.3: every schedule line starts "after retry".
     return { status: 'retry_incomplete', current: campaign.status };
+  }
+  // §26.7 (Phase 20b): a suspended/killed campaign holds unreleased funds.
+  // Named BEFORE the generic state check, because `blocked` without its reason
+  // is the forbidden word respelled (§22.3).
+  const hold = await campaignEnforcementHold(deps.db, input.campaignId);
+  if (hold.restricted) {
+    return { status: 'enforcement_hold', campaignStatus: hold.campaignStatus ?? campaign.status };
   }
   if (!CREATABLE_FROM[input.kind].includes(campaign.status)) {
     return { status: 'not_creatable', current: campaign.status };
@@ -999,6 +1023,7 @@ export type ReleasePaymentOutcome =
   | { status: 'released'; payment: FounderPayment }
   | { status: 'already_released'; payment: FounderPayment }
   | { status: 'not_releasable'; current: string }
+  | { status: 'enforcement_hold'; campaignStatus: string }
   | { status: 'not_found' };
 
 export async function releaseFounderPayment(
@@ -1015,6 +1040,13 @@ export async function releaseFounderPayment(
     .limit(1);
   if (!payment) return { status: 'not_found' };
   if (payment.status === 'released') return { status: 'already_released', payment };
+
+  // §26.7 (Phase 20b): the release is the exact edge "restrict unreleased
+  // funds" restricts. An already-released payment above is history (§29.7).
+  const hold = await campaignEnforcementHold(deps.db, input.campaignId);
+  if (hold.restricted) {
+    return { status: 'enforcement_hold', campaignStatus: hold.campaignStatus ?? 'suspended' };
+  }
 
   const campaign = await loadCampaignMoney(deps.db, input.campaignId);
   if (!campaign) return { status: 'not_found' };

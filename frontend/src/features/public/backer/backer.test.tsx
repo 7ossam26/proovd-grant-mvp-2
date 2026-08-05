@@ -41,17 +41,36 @@ const PAGE = {
       statusLabel: 'Reserved',
       chargeOccurred: false,
       notChargedYet: true,
+      // §24.12/§33.9.13: the stored display value, rendered on this surface.
+      statementDescriptor: 'PROOVD* FOCUS TIMER',
       canCancel: true,
       canChangeReward: false,
     },
   ],
 };
 
+/** The §29.9/§29.10 support view (Phase 20b), empty by default. */
+const EMPTY_SUPPORT = {
+  topics: [
+    { key: 'reward_not_as_described', label: 'Reward not as described' },
+    { key: 'unknown_charge', label: 'Unknown charge' },
+  ],
+  cases: [],
+  issuerRights:
+    'Contacting the Founder or Proovd first does not waive your card issuer’s dispute rights.',
+};
+
 function stubFetch(handler: (url: string, init?: RequestInit) => { status: number; body?: unknown }) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
-      const { status, body } = handler(url, init);
+      // The Phase 20b support view rides beside the page read; a suite that is
+      // not about support answers it empty unless its handler says otherwise.
+      const routed =
+        url.endsWith('/support') && (!init || init.method === undefined)
+          ? { status: 200, body: EMPTY_SUPPORT }
+          : handler(url, init);
+      const { status, body } = routed;
       return {
         ok: status >= 200 && status < 300,
         status,
@@ -330,5 +349,68 @@ describe('§33.9.2 — the B.6 refund state (Phase 20a)', () => {
       screen.getByRole('link', { name: 'View pre-order or get help' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Update card' })).not.toBeInTheDocument();
+  });
+});
+
+/* ── Phase 20b — the descriptor line and the §29.9/§29.10 support path ─────── */
+
+describe('Phase 20b — the magic-link descriptor and the Backer support form', () => {
+  it('shows the stored statement descriptor (§33.9.13) and opens a case with the B.8 acknowledgement', async () => {
+    const acknowledgement = [
+      'We received your request — PVD-AB2CD-EF3GH.',
+      'A person will respond by 2026-08-06 14:00 UTC.',
+    ].join('\n');
+    let openedBody: Record<string, unknown> | null = null;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        let payload: { status: number; body?: unknown };
+        if (url.endsWith('/support') && init?.method === 'POST') {
+          openedBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          payload = {
+            status: 201,
+            body: {
+              reference: 'PVD-AB2CD-EF3GH',
+              topic: 'reward_not_as_described',
+              owner: 'founder_coordinated',
+              humanResponseDueAt: '2026-08-06T14:00:00.000Z',
+              founderFollowupDueAt: null,
+              acknowledgement,
+              issuerRights: EMPTY_SUPPORT.issuerRights,
+            },
+          };
+        } else if (url.endsWith('/support')) {
+          payload = { status: 200, body: EMPTY_SUPPORT };
+        } else {
+          payload = { status: 200, body: PAGE };
+        }
+        return {
+          ok: payload.status >= 200 && payload.status < 300,
+          status: payload.status,
+          json: async () => payload.body,
+        } as Response;
+      }),
+    );
+
+    renderAt('validtoken123');
+
+    // §24.12/§33.9.13: the same computed display value the other surfaces show.
+    expect(await screen.findByText('PROOVD* FOCUS TIMER')).toBeInTheDocument();
+    expect(screen.getByText('Expected statement')).toBeInTheDocument();
+
+    // §29.10: the issuer-rights sentence renders verbatim.
+    expect(screen.getByText(EMPTY_SUPPORT.issuerRights)).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByLabelText('Support topic'), 'reward_not_as_described');
+    await user.type(screen.getByLabelText('What happened'), 'The strap color is wrong.');
+    await user.click(screen.getByRole('button', { name: 'Send to support' }));
+
+    // The B.8 acknowledgement — the same string the email carries — renders.
+    expect(await screen.findByText(/We received your request — PVD-AB2CD-EF3GH/)).toBeInTheDocument();
+    expect(openedBody).toEqual({
+      topic: 'reward_not_as_described',
+      message: 'The strap color is wrong.',
+    });
   });
 });

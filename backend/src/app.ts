@@ -9,6 +9,11 @@ import { createAuthRouter } from './routes/auth.js';
 import { createAdminRouter } from './routes/admin.js';
 import { createAdminOperationsRouter } from './routes/admin-operations.js';
 import { createAdminSupportRouter } from './routes/admin-support.js';
+import { notifyEnforcementRoles } from './support/enforcement-notifications.js';
+import { findCampaignFounderUserId } from './reservations/context.js';
+import { findAccountForOwner } from './payments/connected-accounts.js';
+import { createEnforcementRouter } from './routes/enforcement.js';
+import { policyReacceptanceGate } from './enforcement/reacceptance.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
@@ -31,6 +36,7 @@ import { createBackerPreorderRouter } from './routes/backer-preorder.js';
 import { createBackerRouter } from './routes/backer.js';
 import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createAdminRefundsRouter } from './routes/admin-refunds.js';
+import { createAdminDisputesRouter } from './routes/admin-disputes.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
 import {
@@ -202,6 +208,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     }),
   );
   app.use(createHealthRouter(db));
+  // Phase 20b (§29.8). "Continued use is suspended until accepted": an
+  // authenticated Founder/Creator with an outstanding material policy update
+  // answers 403 on their own API prefix, naming the document and where to
+  // accept it. Unauthenticated requests pass through unanswered — the routers'
+  // own guards fail closed exactly as before — and the acceptance routes live
+  // at /api/account/policy-reacceptance, outside both gated prefixes.
+  app.use('/api/founder', policyReacceptanceGate(db, auth, 'founder'));
+  app.use('/api/creator', policyReacceptanceGate(db, auth, 'affiliate'));
   // Phase 14b (§18, §33.6). Two public, session-less routes: `/c/:code` records
   // a tracking-link click, sets the per-browser attribution cookie, and
   // redirects to the live page; `/api/campaign/:id` returns the Backer-facing
@@ -233,11 +247,21 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   );
   // Phase 16b (§26.7, §26.8, §27.8). Support cases with their business-day
   // response promise and daily due/overdue queue, the four-field handoff note,
-  // suspend/kill with its complete pre-capture behaviour, and the read-only
-  // timeline composed from records that already exist. Kill/suspend and the
+  // suspend/kill with its complete behaviour, and the read-only timeline
+  // composed from records that already exist. Kill/suspend and the
   // relationship-touch log take the freshness gate; the queue and the timeline
   // do not — support is daily work, and a gate on looking teaches an Admin to
   // reauthenticate reflexively.
+  //
+  // Phase 20b closed 16b's two wiring gaps: the detach account is resolved PER
+  // CAMPAIGN (the Founder's own seller account, §24.1 — a static id would
+  // detach one Founder's cards against another's account), and §26.7's
+  // "notify affected roles" finally has a real sender.
+  const launchContext = {
+    appBaseUrl: config.appBaseUrl,
+    supportEmail: config.invitationContext.supportEmail,
+    fromAddress: config.invitationContext.fromAddress,
+  };
   app.use(
     createAdminSupportRouter({
       db,
@@ -245,8 +269,35 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       ...(config.stripeGateway
         ? {
             detachPaymentMethod: (input) => config.stripeGateway!.detachPaymentMethod(input),
+            resolveConnectedAccount: async (campaignId: string) => {
+              const founderUserId = await findCampaignFounderUserId(db, campaignId);
+              if (!founderUserId) return null;
+              const account = await findAccountForOwner(db, {
+                ownerUserId: founderUserId,
+                role: 'founder_seller',
+                mode: config.stripeGateway!.mode,
+              });
+              return account?.stripeAccountId ?? null;
+            },
           }
         : {}),
+      notifyRoles: (input) =>
+        notifyEnforcementRoles({ db, notifier, context: launchContext }, input),
+      notifier,
+      notificationContext: launchContext,
+    }),
+  );
+  // Phase 20b (§29.1–§29.5, §29.8). The affiliate enforcement action with its
+  // five-field customer statement and computed appeal deadline, the write-once
+  // appeal decision, the §29.1/§29.2 disclosures, the Creator's own view and
+  // appeal, and the §29.8 reacceptance requirement + acceptance routes.
+  app.use(
+    createEnforcementRouter({
+      db,
+      auth,
+      audit,
+      notifier,
+      notificationContext: launchContext,
     }),
   );
   app.use(
@@ -366,11 +417,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Creator-failure replacement window. No Stripe dependency for the launch or
   // the verification; the §29.6 miss-path refund runs in the scheduled sweep,
   // which has the gateway. Mounted with the other session routes.
-  const launchContext = {
-    appBaseUrl: config.appBaseUrl,
-    supportEmail: config.invitationContext.supportEmail,
-    fromAddress: config.invitationContext.fromAddress,
-  };
   app.use(createAdminLaunchRouter({ db, auth, audit, notifier, context: launchContext }));
   // Phase 17a (§20, §33.6.6–8). The Founder's chronological campaign home:
   // Glance, one ranked Act, and Explore. `GET .../home` advances nothing;
@@ -572,6 +618,19 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         notifier,
         notificationContext: launchContext,
         tokens,
+      }),
+    );
+    // Phase 20b (§24.11, §33.9.7). Admin's dispute operations: the queue with
+    // its overdue 24-hour tasks first, the assembled evidence packet, the
+    // recorded assembly, and the §24.8 classification through 20a's register.
+    app.use(
+      createAdminDisputesRouter({
+        db,
+        auth,
+        audit,
+        gateway: config.stripeGateway,
+        notifier,
+        notificationContext: launchContext,
       }),
     );
   }

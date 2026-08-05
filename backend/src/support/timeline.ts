@@ -25,7 +25,7 @@
  * a subject it uses the reference the ledger uses.
  */
 
-import { and, eq, sql, desc } from 'drizzle-orm';
+import { and, eq, ne, or, sql, desc } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import {
   campaignStatusHistory,
@@ -48,6 +48,8 @@ import {
   reservationRefunds,
   reservationRefundEvents,
 } from '../db/schema/refunds.js';
+import { paymentDisputes, paymentDisputeEvents } from '../db/schema/disputes.js';
+import { affiliateTransfers } from '../db/schema/earnings.js';
 import { RELATIONSHIP_TOUCH_KINDS, type TimelineKind } from './logic.js';
 
 export type TimelineSubject = 'campaign' | 'reservation' | 'association';
@@ -279,18 +281,50 @@ export async function readTimeline(
     }
   }
 
-  /* ── §27.2 notifications, with delivery state and dedup ──────────────────── */
+  /* ── §27.2 notifications, with delivery state and SUPPRESSION (§33.9.12) ─── */
 
-  if (campaignId) {
+  // The entities whose messages belong on this subject's timeline. A
+  // reservation's messages dedup on the reservation, on its refund rows
+  // (20a's B.6 senders), and on the campaign; an association's on itself and
+  // its campaign. Reading only `campaign` rows was 16b's shape, and it left
+  // every reservation-scoped email invisible on the reservation's own
+  // timeline.
+  const messageRefs: Array<{ type: string; id: string }> = [];
+  if (subject === 'campaign' && campaignId) {
+    messageRefs.push({ type: 'campaign', id: campaignId });
+  } else if (subject === 'reservation') {
+    messageRefs.push({ type: 'reservation', id: subjectId });
+    const refundRows = await db
+      .select({ id: reservationRefunds.id })
+      .from(reservationRefunds)
+      .where(eq(reservationRefunds.reservationId, subjectId));
+    for (const refund of refundRows) {
+      messageRefs.push({ type: 'reservation_refund', id: refund.id });
+    }
+    if (campaignId) messageRefs.push({ type: 'campaign', id: campaignId });
+  } else if (subject === 'association') {
+    messageRefs.push({ type: 'campaign_affiliate_association', id: subjectId });
+    // 19a's Transfer messages and 20b's reversal notice dedup on the transfer.
+    const transferRows = await db
+      .select({ id: affiliateTransfers.id })
+      .from(affiliateTransfers)
+      .where(eq(affiliateTransfers.associationId, subjectId));
+    for (const transfer of transferRows) {
+      messageRefs.push({ type: 'affiliate_transfer', id: transfer.id });
+    }
+  }
+
+  if (messageRefs.length > 0) {
+    const refConditions = messageRefs.map((ref) =>
+      and(
+        eq(notificationDeliveries.entityType, ref.type),
+        eq(notificationDeliveries.entityId, ref.id),
+      ),
+    );
     const rows = await db
       .select()
       .from(notificationDeliveries)
-      .where(
-        and(
-          eq(notificationDeliveries.entityType, 'campaign'),
-          eq(notificationDeliveries.entityId, campaignId),
-        ),
-      );
+      .where(or(...refConditions));
     sourcesRead.push('notification_deliveries');
     for (const row of rows) {
       entries.push({
@@ -304,6 +338,30 @@ export async function readTimeline(
         detail: { target: row.target, confirmed: row.deliveredAt !== null },
       });
     }
+
+    // §33.9.12: a suppressed duplicate inserts no delivery row — the ONE
+    // customer message is the row above — so the suppression is composed from
+    // its audit record and rendered as what it is, not as a generic "Admin
+    // action" (§26.8's register: "Emails, delivery state, and suppression").
+    const suppressionConditions = messageRefs.map((ref) =>
+      and(eq(auditEvents.targetType, ref.type), eq(auditEvents.targetId, ref.id)),
+    );
+    const suppressed = await db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(eq(auditEvents.action, 'notification.duplicate_suppressed'), or(...suppressionConditions)),
+      );
+    for (const row of suppressed) {
+      entries.push({
+        kind: 'notification',
+        occurredAt: row.occurredAt.toISOString(),
+        summary: `Duplicate delivery suppressed — one message kept (${row.internalReason ?? 'already delivered'})`,
+        actor: null,
+        composedFrom: 'audit_events',
+        detail: { suppressed: true },
+      });
+    }
   }
 
   /* ── §25.6 Admin actions and §33.12.4 overrides ──────────────────────────── */
@@ -311,7 +369,14 @@ export async function readTimeline(
   const auditRows = await db
     .select()
     .from(auditEvents)
-    .where(and(eq(auditEvents.targetType, subject), eq(auditEvents.targetId, subjectId)));
+    .where(
+      and(
+        eq(auditEvents.targetType, subject),
+        eq(auditEvents.targetId, subjectId),
+        // Suppressions render as first-class notification entries above.
+        ne(auditEvents.action, 'notification.duplicate_suppressed'),
+      ),
+    );
   sourcesRead.push('audit_events');
   for (const row of auditRows) {
     entries.push({
@@ -398,6 +463,42 @@ export async function readTimeline(
             cause: allocation.cause,
             affiliateTreatment: allocation.affiliateTreatment,
             proovdFeeTreatment: allocation.proovdFeeTreatment,
+          },
+        });
+      }
+    }
+
+    // §24.11 disputes (Phase 20b) compose under the same §24.8 kind — a
+    // dispute is the issuer's act on the same charge, classified through the
+    // same register. The provider's reason code stays in `detail` (Admin
+    // secondary detail, §26.8), never in the summary.
+    const disputeRows = await db
+      .select()
+      .from(paymentDisputes)
+      .where(
+        subject === 'reservation'
+          ? eq(paymentDisputes.reservationId, subjectId)
+          : eq(paymentDisputes.campaignId, campaignId!),
+      );
+    sourcesRead.push('payment_disputes');
+    for (const dispute of disputeRows) {
+      const events = await db
+        .select()
+        .from(paymentDisputeEvents)
+        .where(eq(paymentDisputeEvents.disputeId, dispute.id));
+      for (const event of events) {
+        entries.push({
+          kind: 'refund',
+          occurredAt: event.occurredAt.toISOString(),
+          summary: event.fromStatus
+            ? `Dispute moved ${event.fromStatus} → ${event.toStatus}`
+            : `Dispute opened — §24.11 evidence task due ${dispute.taskDueAt.toISOString()}`,
+          actor: 'system:stripe-webhook',
+          composedFrom: 'payment_disputes',
+          detail: {
+            providerDisputeId: dispute.providerDisputeId,
+            reasonCode: dispute.reasonCode,
+            classified: dispute.allocationId !== null,
           },
         });
       }

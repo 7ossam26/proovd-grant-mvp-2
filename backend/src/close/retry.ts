@@ -42,6 +42,7 @@ import {
 import { campaignCloseBatches, reservationCaptureAttempts } from '../db/schema/close.js';
 import { founderOperationalShares } from '../db/schema/reservations.js';
 import { recordProviderObject } from '../payments/provider-objects.js';
+import { campaignDescriptorSuffix } from '../payments/descriptors.js';
 import { findCampaignFounderUserId } from '../reservations/context.js';
 import { findAccountForOwner } from '../payments/connected-accounts.js';
 import { classifyCaptureFailure, type CaptureFailureKind } from './logic.js';
@@ -290,7 +291,10 @@ async function driveClaimedAttempt(
       paymentMethodId: reservation.paymentMethodId!,
       amountCents: attempt.amountCents,
       idempotencyKey: attempt.idempotencyKey,
-      statementDescriptorSuffix: reservation.statementDescriptor ?? undefined,
+      // §24.12: send the SUFFIX derived from the stored display (§33.9.13).
+      statementDescriptorSuffix: reservation.statementDescriptor
+        ? campaignDescriptorSuffix(reservation.statementDescriptor)
+        : undefined,
       metadata: {
         proovd_reservation_id: reservation.id,
         proovd_campaign_id: reservation.campaignId,

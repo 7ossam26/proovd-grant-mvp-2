@@ -27,9 +27,15 @@ import {
   recordRefundCase,
   previewRefund,
   executeRefund,
+  fetchDisputeQueue,
+  fetchDisputeEvidence,
+  recordDisputeEvidence,
+  classifyDispute,
   AdminRequestError,
   type RefundQueueState,
   type RefundCaseState,
+  type DisputeQueueState,
+  type DisputeEvidencePacketState,
 } from './api.js';
 
 function usd(cents: string | null): string {
@@ -196,6 +202,10 @@ export function RefundsPage() {
           {actionError}
         </p>
       ) : null}
+
+      {/* §24.11 (Phase 20b): disputes lead — their Admin task is due within
+          24 hours of notice, and an overdue task sorts first. */}
+      <DisputesPanel campaignId={campaignId || undefined} />
 
       {queue.unreconciled.length > 0 ? (
         <Card title="Provider refunds awaiting classification">
@@ -380,3 +390,266 @@ export function RefundsPage() {
     </div>
   );
 }
+
+/**
+ * The Â§24.11 dispute queue (Phase 20b). Overdue 24-hour tasks first; the
+ * packet is ASSEMBLED from stored records (never re-derived) and its recorded
+ * assembly refuses while a required item is missing, naming it. Classification
+ * reuses the exact Â§24.8 register the refund-case form reads â€” a dispute is
+ * never a second cause vocabulary. The provider's reason code renders only as
+ * secondary Admin detail (Â§26.8), never as anything a customer reads.
+ */
+function DisputesPanel({ campaignId }: { campaignId?: string | undefined }) {
+  const [state, setState] = useState<
+    | { status: 'loading' }
+    | { status: 'error'; message: string }
+    | { status: 'ready'; queue: DisputeQueueState }
+  >({ status: 'loading' });
+  const [evidence, setEvidence] = useState<DisputeEvidencePacketState | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [classifying, setClassifying] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    cause: '',
+    affiliateTreatment: '',
+    proovdFeeTreatment: 'retained',
+    affiliateInvalidCents: '',
+    founderLiabilityCents: '',
+    evidence: '',
+    recoveryNote: '',
+    mandate: '',
+  });
+
+  const load = useCallback(async () => {
+    try {
+      setState({ status: 'ready', queue: await fetchDisputeQueue(campaignId) });
+    } catch (error) {
+      setState({
+        status: 'error',
+        message:
+          error instanceof AdminRequestError
+            ? (error.detail.whatHappened ?? error.detail.title)
+            : 'The dispute queue could not be read.',
+      });
+    }
+  }, [campaignId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (state.status === 'loading') return <p className="admin-page__note">Reading disputesâ€¦</p>;
+  if (state.status === 'error') {
+    return (
+      <p className="admin-page__note" role="alert">
+        {state.message}
+      </p>
+    );
+  }
+  const queue = state.queue;
+  if (queue.disputes.length === 0) return null;
+
+  const selectedCause = queue.causes.find((c) => c.key === form.cause);
+  const treatments = selectedCause?.permittedAffiliateTreatments ?? [];
+  const invalidNeeded =
+    form.affiliateTreatment === 'cancel_unpaid_invalid' ||
+    form.affiliateTreatment === 'contractual_recovery';
+
+  const showEvidence = async (disputeId: string) => {
+    setNote(null);
+    setEvidence(await fetchDisputeEvidence(disputeId));
+  };
+
+  const recordAssembly = async (disputeId: string) => {
+    setNote(null);
+    try {
+      await recordDisputeEvidence(disputeId);
+      setNote('Evidence packet assembly recorded.');
+      setEvidence(null);
+      await load();
+    } catch (error) {
+      setNote(
+        error instanceof AdminRequestError
+          ? (error.detail.whatHappened ?? error.detail.title)
+          : 'The assembly was not recorded.',
+      );
+    }
+  };
+
+  const submitClassification = async (disputeId: string) => {
+    setNote(null);
+    try {
+      await classifyDispute(disputeId, {
+        cause: form.cause,
+        affiliateTreatment: form.affiliateTreatment,
+        proovdFeeTreatment: form.proovdFeeTreatment,
+        affiliateInvalidCents: form.affiliateInvalidCents.trim() || null,
+        founderLiabilityCents: form.founderLiabilityCents.trim() || '0',
+        evidence: form.evidence,
+        recoveryNote: form.recoveryNote.trim() || null,
+        mandate: form.mandate.trim() || null,
+      });
+      setNote('Dispute classified through the Â§24.8 register.');
+      setClassifying(null);
+      await load();
+    } catch (error) {
+      setNote(
+        error instanceof AdminRequestError
+          ? (error.detail.whatHappened ?? error.detail.title)
+          : 'The classification was not recorded.',
+      );
+    }
+  };
+
+  return (
+    <section aria-labelledby="disputes-heading">
+      <h2 id="disputes-heading">Disputes</h2>
+      <p className="admin-page__note">
+        The evidence packet is due within 24 hours of notice (Â§24.11). {queue.bestEffortRecovery}
+      </p>
+      {note ? (
+        <p className="admin-page__note" role="status">
+          {note}
+        </p>
+      ) : null}
+      <ul className="backer__support-cases">
+        {queue.disputes.map((d) => (
+          <li key={d.disputeId} className="backer__support-case">
+            <p>
+              <code>{d.providerDisputeId}</code> â€” {usd(d.amountCents)} Â· {d.status}{' '}
+              {d.taskOverdue ? <Tag variant="live">Task overdue</Tag> : null}{' '}
+              {d.classified ? (
+                <Tag variant="mint">Classified</Tag>
+              ) : (
+                <Tag>Awaiting classification</Tag>
+              )}
+            </p>
+            <p className="admin-page__note">
+              Task due {d.taskDueAt.slice(0, 16).replace('T', ' ')} UTC
+              {d.evidenceAssembledAt
+                ? ` Â· packet recorded ${d.evidenceAssembledAt.slice(0, 16).replace('T', ' ')} UTC`
+                : ' Â· packet not yet recorded'}
+              {d.reasonCode ? ` Â· provider reason (internal): ${d.reasonCode}` : ''}
+            </p>
+            <div className="ops-check">
+              <Button tier="secondary" onClick={() => showEvidence(d.disputeId)}>
+                View evidence packet
+              </Button>
+              <Button tier="secondary" onClick={() => recordAssembly(d.disputeId)}>
+                Record assembly
+              </Button>
+              {!d.classified ? (
+                <Button
+                  tier="secondary"
+                  onClick={() => setClassifying(classifying === d.disputeId ? null : d.disputeId)}
+                >
+                  Classify (Â§24.8)
+                </Button>
+              ) : null}
+            </div>
+            {evidence && evidence.disputeId === d.disputeId ? (
+              <ul>
+                {evidence.items.map((item) => (
+                  <li key={item.key}>
+                    {item.present ? 'Present' : `Absent (${item.absentReason ?? 'not recorded'})`}
+                    {' â€” '}
+                    {item.label}
+                    {item.required ? '' : ' (conditional)'}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {classifying === d.disputeId ? (
+              <div>
+                <Field label="Cause (Â§24.8)">
+                  <select
+                    className="input"
+                    value={form.cause}
+                    onChange={(e) =>
+                      setForm({ ...form, cause: e.target.value, affiliateTreatment: '' })
+                    }
+                  >
+                    <option value="">Choose the causeâ€¦</option>
+                    {queue.causes.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {selectedCause ? (
+                  <p className="admin-page__note">{selectedCause.allocation}</p>
+                ) : null}
+                <Field label="Affiliate treatment">
+                  <select
+                    className="input"
+                    value={form.affiliateTreatment}
+                    disabled={!selectedCause}
+                    onChange={(e) => setForm({ ...form, affiliateTreatment: e.target.value })}
+                  >
+                    <option value="">Chooseâ€¦</option>
+                    {treatments.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Proovd fee treatment">
+                  <select
+                    className="input"
+                    value={form.proovdFeeTreatment}
+                    onChange={(e) => setForm({ ...form, proovdFeeTreatment: e.target.value })}
+                  >
+                    {queue.proovdFeeTreatments.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                {invalidNeeded ? (
+                  <Field label="Invalid earnings (cents)">
+                    <Input
+                      value={form.affiliateInvalidCents}
+                      onChange={(e) => setForm({ ...form, affiliateInvalidCents: e.target.value })}
+                    />
+                  </Field>
+                ) : null}
+                <Field label="Founder liability (cents)">
+                  <Input
+                    value={form.founderLiabilityCents}
+                    onChange={(e) => setForm({ ...form, founderLiabilityCents: e.target.value })}
+                  />
+                </Field>
+                {selectedCause?.requiresMandate ? (
+                  <Field label="Mandate (who required this outcome)">
+                    <Input
+                      value={form.mandate}
+                      onChange={(e) => setForm({ ...form, mandate: e.target.value })}
+                    />
+                  </Field>
+                ) : null}
+                <Field label="Evidence">
+                  <Input
+                    value={form.evidence}
+                    onChange={(e) => setForm({ ...form, evidence: e.target.value })}
+                  />
+                </Field>
+                <Field label="Recovery note (optional)">
+                  <Input
+                    value={form.recoveryNote}
+                    onChange={(e) => setForm({ ...form, recoveryNote: e.target.value })}
+                  />
+                </Field>
+                <Button tier="secondary" onClick={() => submitClassification(d.disputeId)}>
+                  Record classification
+                </Button>
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+

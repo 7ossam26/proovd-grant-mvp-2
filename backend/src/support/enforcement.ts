@@ -8,12 +8,17 @@
  *   **Post-capture:** invoke refund/reversal/recovery policy, restrict
  *   unreleased funds where possible, notify roles, preserve evidence."
  *
- * The phase brief draws the line: "Post-capture consequences land fully in Phase
- * 20; build the decision, the audit, and the notification here." So a
- * post-capture enforcement records the decision completely and moves the
- * lifecycle — and executes no refund and no reversal, because those are Phase
- * 20's and inventing them here would be a second refund path beside Phase 11's
- * single one.
+ * Phase 20b landed the post-capture consequences on 20a's machinery: a
+ * post-capture KILL closes the still-uncharged reservations without charge
+ * (§29.7 — a kill during the retry window must not charge anyone), and for the
+ * charged ones it invokes the §24.8 refund/reversal/recovery policy — which
+ * means OPENING that path, never executing it: every refund is an
+ * Admin-recorded cause classification through the ONE 20a register, so the
+ * kill itself moves no money and guesses no cause (§1 rule 6, §33.9.8).
+ * "Restrict unreleased funds" is a read-side hold: while the campaign stands
+ * suspended/killed, the Founder-payment create/release edges and the one
+ * Affiliate Transfer refuse `enforcement_hold` by name
+ * (`campaignEnforcementHold` in enforcement-hold.ts is the one reader).
  *
  * ── The phase is derived, never passed in ───────────────────────────────────
  * `enforcementPhaseFor` reads the campaign's own lifecycle. A caller that could
@@ -47,11 +52,12 @@ import {
   ENFORCEMENT_REASON_CATEGORIES,
   ENFORCEMENT_ACTIONS,
   PRE_CAPTURE_EFFECTS,
+  POST_CAPTURE_EFFECTS,
   enforcementPhaseFor,
   type EnforcementActionKind,
   type EnforcementReasonCategory,
+  type EnforcementEffect,
   type EnforcementPhaseKind,
-  type PreCaptureEffect,
 } from './logic.js';
 
 export interface EnforceInput {
@@ -74,12 +80,15 @@ export interface EnforceResult {
   phase: EnforcementPhaseKind;
   priorCampaignStatus: string;
   newCampaignStatus: string;
-  effectsApplied: PreCaptureEffect[];
+  effectsApplied: EnforcementEffect[];
   reservationsClosed: number;
   paymentMethodsDetached: number;
   /** True when a retry found the first decision and changed nothing. */
   replayed: boolean;
-  /** Phase 20 owns the money consequences; named so the surface can say so. */
+  /**
+   * Always false since Phase 20b: the post-capture consequences are applied,
+   * not deferred. Kept so a surface reading it stays truthful either way.
+   */
   postCaptureConsequencesDeferred: boolean;
 }
 
@@ -97,9 +106,25 @@ export interface EnforcementDeps {
   detachPaymentMethod?:
     | ((input: { paymentMethodId: string; connectedAccountId: string }) => Promise<void>)
     | undefined;
+  /**
+   * Resolves the campaign Founder's seller account — where the saved cards
+   * live (§24.1). Per campaign, because a static account id would detach one
+   * Founder's cards against another Founder's account. The static
+   * `connectedAccountId` remains as a test seam and wins when present.
+   */
+  resolveConnectedAccount?: ((campaignId: string) => Promise<string | null>) | undefined;
   connectedAccountId?: string | undefined;
   /** §26.7: notify affected roles. Absent → the effect is not claimed as applied. */
-  notifyRoles?: ((input: { campaignId: string; explanation: string }) => Promise<void>) | undefined;
+  notifyRoles?:
+    | ((input: {
+        campaignId: string;
+        action: EnforcementActionKind;
+        phase: EnforcementPhaseKind;
+        explanation: string;
+        /** Stable per (action, campaign): the notification dedup entity. */
+        dedupeKey: string;
+      }) => Promise<void>)
+    | undefined;
 }
 
 /**
@@ -231,7 +256,7 @@ export async function enforceCampaign(
       actor: input.actor,
     });
 
-    const effects: PreCaptureEffect[] = [];
+    const effects: EnforcementEffect[] = [];
     let reservationsClosed = 0;
 
     if (phase === 'pre_capture') {
@@ -286,6 +311,77 @@ export async function enforceCampaign(
       // endpoint already classifies `killed`/`suspended` — this decision is what
       // gives it the outcome-specific copy to render.
       effects.push('preserve_page_with_banner');
+    } else {
+      // §26.7 post-capture (Phase 20b, §33.9.8).
+      //
+      // A kill during the close/retry window finds reservations money has NOT
+      // yet touched — `pending_capture` locked for the batch, and
+      // `capture_failed_retrying` inside the 48-hour window (`reserved_active`
+      // cannot survive past close, but the same rule would cover it). §29.7:
+      // an uncharged reservation on a killed campaign is never charged, so
+      // those close `killed_no_charge` exactly as the pre-capture path closes
+      // active ones. The CHARGED ones are deliberately untouched: their status
+      // is the money's history, and what happens to that money is a §24.8
+      // cause classification an Admin records through 20a's register —
+      // "invoke the refund/reversal/recovery policy" opens that path, it does
+      // not guess a cause per reservation (§1 rule 6). A suspension closes
+      // nothing: it is reinstateable (§23.1), and closing an uncharged
+      // reservation would decide what the reinstatement is meant to decide.
+      if (input.action === 'kill') {
+        const uncharged = await tx
+          .select({
+            id: reservations.id,
+            status: sql<string>`${reservations.status}::text`,
+            subtotal: reservations.rewardSubtotalCents,
+          })
+          .from(reservations)
+          .where(
+            and(
+              eq(reservations.campaignId, input.campaignId),
+              sql`${reservations.status}::text IN ('reserved_active', 'pending_capture', 'capture_failed_retrying')`,
+            ),
+          );
+
+        for (const row of uncharged) {
+          const moved2 = await tx
+            .update(reservations)
+            .set({ status: 'killed_no_charge', canceledAt: now, updatedAt: now })
+            .where(
+              and(
+                eq(reservations.id, row.id),
+                sql`${reservations.status}::text = ${row.status}`,
+              ),
+            )
+            .returning({ id: reservations.id });
+          if (moved2.length === 0) continue;
+          reservationsClosed += 1;
+          await tx.insert(reservationStatusHistory).values({
+            reservationId: row.id,
+            fromStatus: row.status as never,
+            toStatus: 'killed_no_charge',
+            actor: input.actor,
+          });
+          await releaseCapacity(tx, input.campaignId, row.subtotal);
+          await tx
+            .update(founderOperationalShares)
+            .set({
+              fulfillmentState: 'do_not_fulfill',
+              doNotFulfillAt: now,
+              deliveryStatus: 'do_not_fulfill',
+            })
+            .where(eq(founderOperationalShares.reservationId, row.id));
+        }
+      }
+
+      // Opening the §24.8 path is the invocation; executing any refund is an
+      // Admin's recorded case (20a's preview → execute machine).
+      effects.push('invoke_refund_reversal_recovery_policy');
+      // Live the moment the status flipped: `campaignEnforcementHold` refuses
+      // the Founder-payment create/release edges and the Affiliate Transfer.
+      effects.push('restrict_unreleased_funds');
+      // §26.7/§29.7: the page, the records, and support access all survive —
+      // every table this decision touches is append-only or history-bearing.
+      effects.push('preserve_page_and_evidence');
     }
 
     return { now, effects, reservationsClosed };
@@ -308,11 +404,11 @@ export async function enforceCampaign(
           phase: existing.phase,
           priorCampaignStatus: existing.priorCampaignStatus,
           newCampaignStatus: existing.newCampaignStatus,
-          effectsApplied: existing.effectsApplied as PreCaptureEffect[],
+          effectsApplied: existing.effectsApplied as EnforcementEffect[],
           reservationsClosed: existing.reservationsClosed,
           paymentMethodsDetached: existing.paymentMethodsDetached,
           replayed: true,
-          postCaptureConsequencesDeferred: existing.phase === 'post_capture',
+          postCaptureConsequencesDeferred: false,
         },
       };
     }
@@ -327,12 +423,14 @@ export async function enforceCampaign(
   // refusal is recorded and never rolled back onto the enforcement — the
   // campaign is killed either way, and a card left attached is recoverable.
   let detached = 0;
-  if (deps.detachPaymentMethod && deps.connectedAccountId) {
+  const connectedAccountId =
+    deps.connectedAccountId ?? (await deps.resolveConnectedAccount?.(input.campaignId)) ?? null;
+  if (deps.detachPaymentMethod && connectedAccountId) {
     for (const target of detachable) {
       try {
         await deps.detachPaymentMethod({
           paymentMethodId: target.paymentMethodId,
-          connectedAccountId: deps.connectedAccountId,
+          connectedAccountId,
         });
         detached += 1;
       } catch (error) {
@@ -357,7 +455,10 @@ export async function enforceCampaign(
     try {
       await deps.notifyRoles({
         campaignId: input.campaignId,
+        action: input.action,
+        phase,
         explanation: input.customerExplanation,
+        dedupeKey: idempotencyKey,
       });
       effects.push('notify_affected_roles');
     } catch (error) {
@@ -414,7 +515,10 @@ export async function enforceCampaign(
       paymentMethodsDetached: detached,
       ...(phase === 'post_capture'
         ? {
-            note: 'Post-capture refund, reversal, and recovery are Phase 20. This records the decision only.',
+            note:
+              'Post-capture: uncharged reservations closed without charge; charged reservations route through the §24.8 cause register; unreleased funds hold while the campaign stands ' +
+              newStatus +
+              '.',
           }
         : {}),
     },
@@ -433,7 +537,7 @@ export async function enforceCampaign(
       reservationsClosed: applied.reservationsClosed,
       paymentMethodsDetached: detached,
       replayed: false,
-      postCaptureConsequencesDeferred: phase === 'post_capture',
+      postCaptureConsequencesDeferred: false,
     },
   };
 }
@@ -448,4 +552,4 @@ export async function listEnforcementActions(db: Database, campaignId: string) {
 }
 
 /** Exposed so the suite asserts the register rather than the implementation. */
-export { PRE_CAPTURE_EFFECTS };
+export { PRE_CAPTURE_EFFECTS, POST_CAPTURE_EFFECTS };

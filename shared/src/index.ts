@@ -21,3 +21,6 @@ export * from './support/index.js';
 export * from './live/index.js';
 export * from './close/index.js';
 export * from './refunds/index.js';
+export * from './payments/index.js';
+export * from './disputes/index.js';
+export * from './enforcement/index.js';

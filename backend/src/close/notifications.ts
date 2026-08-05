@@ -52,6 +52,7 @@ import {
   renderCreatorClosed,
 } from '../notifications/templates/close.js';
 import { loadFounder, type LaunchNotificationContext } from '../launch/notifications.js';
+import { DESCRIPTOR_UNKNOWN_LABEL } from '../payments/descriptors.js';
 import { formatCents } from '../reservations/restated.js';
 import { formatUtcInstant } from '../reservations/consent.js';
 import { mintOrReissueMagicLink } from '../reservations/magic-link.js';
@@ -161,7 +162,7 @@ export async function notifyChargeReceipt(
     rewardSubtotal: formatCents(reservation.rewardSubtotalCents),
     salesTax: formatCents(reservation.salesTaxCents),
     totalCaptured: formatCents(reservation.totalCapturedCents),
-    statementDescriptor: reservation.statementDescriptor ?? 'the campaign descriptor',
+    statementDescriptor: reservation.statementDescriptor ?? DESCRIPTOR_UNKNOWN_LABEL,
     delivery: reservation.rewardDelivery ?? 'as stated on the campaign page',
     magicLinkUrl,
     reference: reservation.id,
@@ -311,7 +312,7 @@ export async function notifyRetrySuccess(
     rewardSubtotal: formatCents(reservation.rewardSubtotalCents),
     salesTax: formatCents(reservation.salesTaxCents),
     totalCaptured: formatCents(reservation.totalCapturedCents),
-    statementDescriptor: reservation.statementDescriptor ?? 'the campaign descriptor',
+    statementDescriptor: reservation.statementDescriptor ?? DESCRIPTOR_UNKNOWN_LABEL,
     delivery: reservation.rewardDelivery ?? 'as stated on the campaign page',
     magicLinkUrl,
     reference: reservation.id,

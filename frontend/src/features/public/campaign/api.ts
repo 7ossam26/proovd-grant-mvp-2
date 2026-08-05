@@ -43,7 +43,8 @@ export interface PublicCampaignPayload {
 
 export interface LiveCampaignResponse {
   campaign: PublicCampaignPayload;
-  ended: { kind: EndedKind } | null;
+  /** §33.9.9: the outcome-specific kind plus the Admin-recorded explanation. */
+  ended: { kind: EndedKind; explanation: string | null } | null;
   indexable: boolean;
   attribution: { handle: string | null; status: AttributionStatus } | null;
   updates: CampaignUpdate[];

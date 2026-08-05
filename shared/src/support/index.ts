@@ -251,6 +251,28 @@ export const PRE_CAPTURE_EFFECTS = [
 ] as const;
 export type PreCaptureEffect = (typeof PRE_CAPTURE_EFFECTS)[number];
 
+/**
+ * §26.7's post-capture effects (Phase 20b), the same way: "invoke refund/
+ * reversal/recovery policy, restrict unreleased funds where possible, notify
+ * roles, preserve evidence."
+ *
+ * The first effect creates no refund object by itself — §24.8's after-charge
+ * table makes every refund an Admin-recorded cause classification, so the
+ * invocation OPENS that path (the campaign's captured charges become §24.8
+ * cases in the refund queue) rather than guessing a cause per reservation
+ * (§1 rule 6). The second is a read-side hold: while a campaign stands
+ * suspended/killed, the Founder-payment create/release edges and the one
+ * Affiliate Transfer refuse `enforcement_hold` by name. Charged reservations
+ * are never rewritten to a no-charge state — who was charged is history.
+ */
+export const POST_CAPTURE_EFFECTS = [
+  'invoke_refund_reversal_recovery_policy',
+  'restrict_unreleased_funds',
+  'notify_affected_roles',
+  'preserve_page_and_evidence',
+] as const;
+export type PostCaptureEffect = (typeof POST_CAPTURE_EFFECTS)[number];
+
 /* ── §26.8 chronological timeline ──────────────────────────────────────────── */
 
 /**
@@ -381,9 +403,9 @@ export const TIMELINE_SOURCES: readonly TimelineSource[] = [
   },
   {
     kind: 'refund',
-    label: 'Refunds and cause allocation',
-    specRef: '§24.8',
-    composedFrom: 'reservation_refunds, refund_cause_allocations',
+    label: 'Refunds, disputes, and cause allocation',
+    specRef: '§24.8, §24.11',
+    composedFrom: 'reservation_refunds, refund_cause_allocations, payment_disputes',
   },
 ] as const;
 

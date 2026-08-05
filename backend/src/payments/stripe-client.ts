@@ -32,6 +32,11 @@
  */
 
 import Stripe from 'stripe';
+import {
+  CREATOR_PAYMENT_DESCRIPTOR,
+  DESCRIPTOR_PREFIX,
+  LISTING_DESCRIPTOR,
+} from './descriptors.js';
 
 export type StripeModeValue = 'test' | 'live';
 export type WebhookEndpoint = 'platform' | 'connect';
@@ -615,7 +620,7 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
               : []),
           ],
           payment_intent_data: {
-            statement_descriptor: 'PROOVD LISTING',
+            statement_descriptor: LISTING_DESCRIPTOR,
             metadata: input.metadata,
           },
           metadata: input.metadata,
@@ -651,7 +656,7 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
             },
           ],
           payment_intent_data: {
-            statement_descriptor: 'PROOVD CREATOR PAY',
+            statement_descriptor: CREATOR_PAYMENT_DESCRIPTOR,
             metadata: input.metadata,
           },
           metadata: input.metadata,
@@ -719,6 +724,17 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
           input.role === 'founder_seller'
             ? { card_payments: { requested: true }, transfers: { requested: true } }
             : { transfers: { requested: true } },
+        // §24.12: "Prefix: PROOVD" — set in the Founder/account context so the
+        // provider's own concatenation (prefix + `* ` + per-charge suffix) is
+        // the display value every §33.9.13 surface renders. A recipient
+        // account never takes a card charge and needs no prefix.
+        ...(input.role === 'founder_seller'
+          ? {
+              settings: {
+                card_payments: { statement_descriptor_prefix: DESCRIPTOR_PREFIX },
+              },
+            }
+          : {}),
       });
       return account.id;
     },
@@ -842,6 +858,8 @@ export interface MemoryStripeGateway extends StripeGateway {
     paymentMethodId: string;
     amountCents: bigint;
     idempotencyKey: string;
+    /** What was actually sent as the per-charge suffix (§24.12, §33.9.13). */
+    statementDescriptorSuffix: string | null;
     status: 'succeeded' | 'requires_action' | 'failed';
   }>;
   /** Pins the outcome of a capture on this PaymentMethod (default succeeded). */
@@ -1060,6 +1078,7 @@ export function createMemoryStripeGateway(config: {
         paymentMethodId: input.paymentMethodId,
         amountCents: input.amountCents,
         idempotencyKey: input.idempotencyKey,
+        statementDescriptorSuffix: input.statementDescriptorSuffix ?? null,
         status,
       });
 

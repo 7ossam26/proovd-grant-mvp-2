@@ -29,6 +29,7 @@ import { sendPrechargeReminder } from '../notifications/backer.js';
 import { mintOrReissueMagicLink } from './magic-link.js';
 import { formatCents } from './restated.js';
 import { formatUtcInstant } from './consent.js';
+import { DESCRIPTOR_UNKNOWN_LABEL } from '../payments/descriptors.js';
 
 /** §20: "approximately 24 hours before the trigger." Stated by the Spec, not §6. */
 export const PRECHARGE_REMINDER_LEAD_HOURS = 24;
@@ -134,7 +135,7 @@ export async function sweepPrechargeReminders(
         totalAuthorized: formatCents(row.totalAuthorizedCents ?? 0n),
         whenUtc: formatUtcInstant(row.closeAt),
         condition,
-        statementDescriptor: row.statementDescriptor ?? 'PROOVD',
+        statementDescriptor: row.statementDescriptor ?? DESCRIPTOR_UNKNOWN_LABEL,
         magicLinkUrl,
       },
     ).then(() => true).catch(() => false);

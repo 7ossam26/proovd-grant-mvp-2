@@ -18,6 +18,8 @@ export interface BackerTransaction {
   statusLabel: string;
   chargeOccurred: boolean;
   notChargedYet: boolean;
+  /** §24.12/§33.9.13: what this card's statement shows (or will show). */
+  statementDescriptor: string | null;
   canCancel: boolean;
   canChangeReward: boolean;
   /**
@@ -192,4 +194,91 @@ export async function flagComment(
   if (!res.ok) return { ok: false };
   const body = (await res.json().catch(() => null)) as { next?: string } | null;
   return { ok: true, ...(body?.next ? { next: body.next } : {}) };
+}
+
+/* ── The §29.9/§29.10 support path (Phase 20b) ─────────────────────────────── */
+
+export interface BackerSupportCase {
+  caseId: string;
+  reference: string;
+  topic: string;
+  status: string;
+  owner: string;
+  openedAt: string;
+  humanResponseDueAt: string;
+  responded: boolean;
+  escalatedAt: string | null;
+  canEscalate: boolean;
+  escalationOpensAt: string | null;
+}
+
+export interface BackerSupportView {
+  topics: Array<{ key: string; label: string }>;
+  cases: BackerSupportCase[];
+  issuerRights: string;
+}
+
+export async function fetchBackerSupport(token: string): Promise<BackerSupportView | null> {
+  const res = await fetch(`/api/link/${encodeURIComponent(token)}/support`, {
+    credentials: 'include',
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as BackerSupportView;
+}
+
+export type OpenSupportResult =
+  | { ok: true; reference: string; acknowledgement: string; issuerRights: string }
+  | { ok: false; message: string };
+
+export async function openSupportCase(
+  token: string,
+  input: { topic: string; message: string; reservationId?: string },
+): Promise<OpenSupportResult> {
+  const res = await fetch(`/api/link/${encodeURIComponent(token)}/support`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const body = (await res.json().catch(() => null)) as
+    | { reference?: string; acknowledgement?: string; issuerRights?: string; message?: string }
+    | null;
+  if (res.ok && body?.reference && body.acknowledgement) {
+    return {
+      ok: true,
+      reference: body.reference,
+      acknowledgement: body.acknowledgement,
+      issuerRights: body.issuerRights ?? '',
+    };
+  }
+  return { ok: false, message: body?.message ?? 'That request was not sent. Nothing was lost.' };
+}
+
+export type EscalateResult =
+  | { ok: true }
+  | { ok: false; message: string; opensAt?: string };
+
+export async function escalateSupportCase(
+  token: string,
+  caseId: string,
+  reason: string,
+): Promise<EscalateResult> {
+  const res = await fetch(
+    `/api/link/${encodeURIComponent(token)}/support/${encodeURIComponent(caseId)}/escalate`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    },
+  );
+  if (res.ok) return { ok: true };
+  const body = (await res.json().catch(() => null)) as
+    | { message?: string; opensAt?: string }
+    | null;
+  return {
+    ok: false,
+    message: body?.message ?? 'That escalation was not recorded.',
+    ...(body?.opensAt ? { opensAt: body.opensAt } : {}),
+  };
 }

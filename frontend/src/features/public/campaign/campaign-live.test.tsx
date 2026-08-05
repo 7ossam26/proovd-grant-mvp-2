@@ -163,22 +163,53 @@ describe('the live campaign page — ended state is outcome-specific (§18)', ()
         model: 'idea',
         orderThreshold: 250,
         founderRefundPolicy: null,
-        ended: 'no_charge',
+        ended: 'threshold_not_met',
       }),
     );
     const text = textOf(container);
-    expect(text).toContain('closed without any charge');
+    expect(text).toContain('closed without reaching its order threshold');
     expect(text).toContain('No card was charged');
     expect(text).toContain('did not reach its order threshold');
     expect(text).not.toContain('Campaign ended');
   });
 
-  it('a suspended campaign and a killed campaign give distinct copy', () => {
-    const suspended = textOf(renderView(baseView({ ended: 'suspended' })).container);
-    expect(suspended).toContain('on hold');
-    const killed = textOf(renderView(baseView({ ended: 'killed' })).container);
-    expect(killed).toContain('has been stopped');
-    expect(suspended).not.toBe(killed);
+  // §33.9.9: threshold miss, natural close, pre-charge kill, and post-charge
+  // suspension are four different pages — one generic message is prohibited.
+  it('the four §33.9.9 outcomes are pairwise distinct, and pre/post-charge kills differ', () => {
+    const thresholdMiss = textOf(
+      renderView(baseView({ model: 'idea', ended: 'threshold_not_met' })).container,
+    );
+    const closed = textOf(renderView(baseView({ ended: 'closed' })).container);
+    const preChargeKill = textOf(renderView(baseView({ ended: 'killed_before_charge' })).container);
+    const postChargeSuspension = textOf(
+      renderView(baseView({ ended: 'suspended_after_charge' })).container,
+    );
+    const four = [thresholdMiss, closed, preChargeKill, postChargeSuspension];
+    for (let i = 0; i < four.length; i += 1) {
+      for (let j = i + 1; j < four.length; j += 1) {
+        expect(four[i]).not.toBe(four[j]);
+      }
+    }
+    // The pre-charge kill states the no-charge fact; the post-charge kill
+    // points at the charge/refund status instead of claiming no charge.
+    expect(preChargeKill).toContain('No card was charged');
+    const postChargeKill = textOf(renderView(baseView({ ended: 'killed_after_charge' })).container);
+    expect(postChargeKill).not.toContain('No card was charged — not yours');
+    expect(postChargeKill).toContain('refund');
+    expect(preChargeKill).not.toBe(postChargeKill);
+  });
+
+  it('a suspension renders the Admin-recorded explanation when one exists', () => {
+    const text = textOf(
+      renderView(
+        baseView({
+          ended: 'suspended_after_charge',
+          endedExplanation:
+            'We paused this campaign while we verify a delivery claim with the Founder.',
+        }),
+      ).container,
+    );
+    expect(text).toContain('while we verify a delivery claim');
   });
 });
 

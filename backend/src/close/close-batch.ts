@@ -40,6 +40,7 @@ import { campaignCloseBatches, reservationCaptureAttempts, type CampaignCloseBat
 import { deduplicationCases, founderOperationalShares } from '../db/schema/reservations.js';
 import { releaseCapacity } from '../reservations/capacity.js';
 import { recordProviderObject } from '../payments/provider-objects.js';
+import { campaignDescriptorSuffix } from '../payments/descriptors.js';
 import type { StripeGateway } from '../payments/stripe-client.js';
 import type { AuditWriter } from '../auth/audit.js';
 import type { TokenService } from '../auth/token-service.js';
@@ -888,7 +889,12 @@ async function captureOne(
       paymentMethodId: reservation.paymentMethodId!,
       amountCents,
       idempotencyKey: attempt.idempotencyKey,
-      statementDescriptorSuffix: reservation.statementDescriptor ?? undefined,
+      // §24.12: the provider joins the account prefix to this SUFFIX with
+      // `* `, so what is sent is the suffix derived from the stored display —
+      // sending the whole display would render `PROOVD* PROOVD …` (§33.9.13).
+      statementDescriptorSuffix: reservation.statementDescriptor
+        ? campaignDescriptorSuffix(reservation.statementDescriptor)
+        : undefined,
       metadata: {
         proovd_reservation_id: reservation.id,
         proovd_campaign_id: reservation.campaignId,

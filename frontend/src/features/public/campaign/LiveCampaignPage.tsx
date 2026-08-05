@@ -75,6 +75,7 @@ function toCampaignView(res: LiveCampaignResponse): CampaignView | null {
     commentsEnabled: p.commentsEnabled,
     isSample: false,
     ended: res.ended?.kind ?? null,
+    endedExplanation: res.ended?.explanation ?? null,
     attribution: res.attribution,
     indexable: res.indexable,
     updates: res.updates,

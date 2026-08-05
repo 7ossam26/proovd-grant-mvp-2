@@ -322,22 +322,37 @@ describe('§32.3 — two endpoints, two handler maps', () => {
     // reads as "handled", and this build does not handle these.
     //
     // `checkout.session.*` left this list in Phase 11, `payment_intent.*` in
-    // Phase 18a, and `charge.refunded` in Phase 20a — each the phase whose
-    // objects those are. The rest still belong to objects later phases create
-    // (disputes and Transfer reversals are Phase 20b's).
-    for (const type of ['setup_intent.succeeded', 'transfer.created', 'charge.dispute.created']) {
+    // Phase 18a, `charge.refunded` in Phase 20a, and `charge.dispute.*` /
+    // `transfer.reversed` in Phase 20b — each the phase whose objects those
+    // are. `transfer.created`/`transfer.updated` stay recorded-and-ignored:
+    // the Transfer is Proovd's own synchronous call, stored at creation.
+    for (const type of ['setup_intent.succeeded', 'transfer.created', 'transfer.updated']) {
       expect(PLATFORM_HANDLERS[type]).toBeUndefined();
       expect(CONNECT_HANDLERS[type]).toBeUndefined();
     }
   });
 
-  it('registers Phase 20a’s charge.refunded on both endpoints', () => {
-    // §32.3 lists it on both: the platform delivery reconciles the listing
-    // stream (Phase 11 confirms its refund synchronously) and the Connect
-    // delivery confirms or routes a campaign-charge refund (§24.1: direct
+  it('registers Phase 20a’s charge.refunded and Phase 20b’s charge.dispute.* on both endpoints', () => {
+    // §32.3 lists them on both: the platform delivery belongs to the listing
+    // stream (recorded and routed to Admin — no reservation to bind) and the
+    // Connect delivery is the campaign-charge machinery (§24.1: direct
     // charges live on the Founder's account).
-    expect(PLATFORM_HANDLERS['charge.refunded']).toBeDefined();
-    expect(CONNECT_HANDLERS['charge.refunded']).toBeDefined();
+    for (const type of [
+      'charge.refunded',
+      'charge.dispute.created',
+      'charge.dispute.updated',
+      'charge.dispute.closed',
+    ]) {
+      expect(PLATFORM_HANDLERS[type]).toBeDefined();
+      expect(CONNECT_HANDLERS[type]).toBeDefined();
+    }
+  });
+
+  it('registers Phase 20b’s transfer.reversed on Connect only', () => {
+    // A Transfer reversal is connected-account money (§32.3's list); the
+    // platform endpoint has no transfer to reconcile it against.
+    expect(CONNECT_HANDLERS['transfer.reversed']).toBeDefined();
+    expect(PLATFORM_HANDLERS['transfer.reversed']).toBeUndefined();
   });
 
   it('registers Phase 18a’s payment_intent events on Connect and not on platform', () => {

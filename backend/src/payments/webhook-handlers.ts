@@ -73,6 +73,12 @@ import {
   applyPlatformChargeRefunded,
   type RefundDeps,
 } from '../refunds/service.js';
+import {
+  applyConnectDisputeEvent,
+  applyPlatformDisputeEvent,
+  applyTransferReversed,
+  type DisputeDeps,
+} from '../disputes/service.js';
 
 export const STRIPE_PROVIDER = 'stripe';
 
@@ -105,17 +111,24 @@ export type EventHandler = (
  * recorded-and-ignored until a sender exists:
  *
  *   Phase 18 — payment_intent.succeeded, payment_intent.payment_failed
- *   Phase 20b — charge.dispute.created/updated/closed
  *
  * Phase 20a registered `charge.refunded`: on the platform endpoint it belongs
  * to the listing stream, whose refund Phase 11 confirms synchronously — so the
  * handler reconciles rather than applies, and an unknown refund is recorded
  * and routed to Admin (§1 rule 6).
+ *
+ * Phase 20b registered `charge.dispute.*`: a platform-side dispute belongs to
+ * the listing stream too — no reservation to bind, no §24.11 campaign packet —
+ * so it is recorded under §32.4 and routed to Admin (§1.3), never guessed into
+ * campaign machinery.
  */
 export const PLATFORM_HANDLERS: Record<string, EventHandler> = {
   'checkout.session.completed': handleCheckoutCompleted,
   'checkout.session.expired': handleCheckoutExpired,
   'charge.refunded': handlePlatformChargeRefunded,
+  'charge.dispute.created': handlePlatformDispute,
+  'charge.dispute.updated': handlePlatformDispute,
+  'charge.dispute.closed': handlePlatformDispute,
 };
 
 /**
@@ -126,15 +139,18 @@ export const PLATFORM_HANDLERS: Record<string, EventHandler> = {
  *
  *   Phase 15 — setup_intent.*, payment_method.detached
  *   Phase 18 — payment_intent.*
- *   Phase 20b — charge.dispute.*, transfer.reversed
  *
  * Phase 19a registered `payout.paid`/`payout.failed` — Appendix B.7's tail.
  * `transfer.created`/`transfer.updated` stay recorded-and-ignored: the §22.1
  * Transfer is created by Proovd's own synchronous API call and stored under
- * §32.4 at creation, a creation failure is a synchronous error with NO
- * `transfer.failed` webhook (§32.3), and the reversal is Phase 20b's — it
- * pairs with the dispute/enforcement recovery operations, and 20a's
- * contractual recovery RECORD needs no provider leg (§24.9: best-effort).
+ * §32.4 at creation, and a creation failure is a synchronous error with NO
+ * `transfer.failed` webhook (§32.3).
+ *
+ * Phase 20b registered `charge.dispute.*` (the §24.11 ingest: bind by the
+ * reservation's own stored charge/intent, open the 24-hour task, move
+ * `captured → disputed`, touch NO earnings — §33.9.6) and
+ * `transfer.reversed` (confirm a reversal a §24.8 recovery record expects, or
+ * record and route an unexpected one — never a state move of its own).
  *
  * Phase 20a registered `charge.refunded` — §24.1's direct charges mean a
  * campaign refund lives on the Founder's account, so its confirmations arrive
@@ -164,6 +180,10 @@ export const CONNECT_HANDLERS: Record<string, EventHandler> = {
   'payout.paid': handlePayoutPaid,
   'payout.failed': handlePayoutFailed,
   'charge.refunded': handleConnectChargeRefunded,
+  'charge.dispute.created': handleConnectDispute,
+  'charge.dispute.updated': handleConnectDispute,
+  'charge.dispute.closed': handleConnectDispute,
+  'transfer.reversed': handleTransferReversed,
 };
 
 export function handlersFor(endpoint: WebhookEndpoint): Record<string, EventHandler> {
@@ -875,6 +895,52 @@ async function handlePlatformChargeRefunded(
   await applyPlatformChargeRefunded(refundDeps(context), {
     id: event.id,
     object: event.object,
+  });
+}
+
+/* ── Phase 20b: disputes and Transfer reversals (§24.11, §32.3) ────────────── */
+
+function disputeDeps(context: HandlerContext): DisputeDeps {
+  return {
+    db: context.db,
+    gateway: context.gateway,
+    audit: context.audit,
+    notifier: context.notifier,
+    context: context.notificationContext,
+  };
+}
+
+async function handleConnectDispute(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyConnectDisputeEvent(disputeDeps(context), {
+    id: event.id,
+    type: event.type,
+    object: event.object,
+    account: event.account ?? null,
+  });
+}
+
+async function handlePlatformDispute(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyPlatformDisputeEvent(disputeDeps(context), {
+    id: event.id,
+    type: event.type,
+    object: event.object,
+  });
+}
+
+async function handleTransferReversed(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyTransferReversed(disputeDeps(context), {
+    id: event.id,
+    object: event.object,
+    account: event.account ?? null,
   });
 }
 

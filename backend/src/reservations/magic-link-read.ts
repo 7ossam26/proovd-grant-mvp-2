@@ -87,6 +87,12 @@ export interface BackerTransaction {
   notChargedYet: boolean;
   reservedAt: string | null;
   canceledAt: string | null;
+  /**
+   * §24.12/§33.9.13: the stored display descriptor — what this Backer's card
+   * statement shows (or will show). The magic link is one of the seven
+   * surfaces that must render the same computed value.
+   */
+  statementDescriptor: string | null;
   /** Whether this transaction may still be canceled from the backer page (§20). */
   canCancel: boolean;
   /** Idea only: whether the reward may still be changed before close (§19). */
@@ -237,6 +243,7 @@ export async function readBackerPage(
         notChargedYet: status.notChargedYet,
         reservedAt: r.reservedAt?.toISOString() ?? null,
         canceledAt: r.canceledAt?.toISOString() ?? null,
+        statementDescriptor: r.statementDescriptor,
         canCancel: isActive && open,
         canChangeReward: isActive && open && model === 'idea',
         recovery,

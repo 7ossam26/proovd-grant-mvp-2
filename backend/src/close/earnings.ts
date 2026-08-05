@@ -61,6 +61,7 @@ import type { Notifier } from '../notifications/send.js';
 import type { StripeGateway } from '../payments/stripe-client.js';
 import { readTransferGate } from '../payments/tax-accountability.js';
 import { recordProviderObject } from '../payments/provider-objects.js';
+import { campaignEnforcementHold } from '../support/enforcement-hold.js';
 import { readSettingValue } from '../settings/service.js';
 import { creatorPaymentKeys } from '../creator-payment/allocations.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
@@ -991,6 +992,7 @@ export type CreateTransferOutcome =
   | { status: 'tax_gate_blocked'; reason: string }
   | { status: 'recipient_account_not_ready' }
   | { status: 'not_approved'; current: string }
+  | { status: 'enforcement_hold'; campaignStatus: string }
   | { status: 'not_found' };
 
 export async function createAffiliateTransfer(
@@ -1018,6 +1020,15 @@ export async function createAffiliateTransfer(
   }
   if (earnings.state !== 'approved_for_transfer') {
     return { status: 'not_approved', current: earnings.state };
+  }
+
+  // §26.7 (Phase 20b): while the campaign stands suspended/killed, unreleased
+  // funds hold — the Transfer is the one Creator-money edge Proovd operates.
+  // An already-created Transfer is never rewritten (§29.7); this refuses only
+  // a NEW movement of money.
+  const hold = await campaignEnforcementHold(deps.db, context.campaignId);
+  if (hold.restricted) {
+    return { status: 'enforcement_hold', campaignStatus: hold.campaignStatus ?? 'suspended' };
   }
 
   // §22.1: "on or after Day 3", anchored on campaign_close_at (§21's anchor).

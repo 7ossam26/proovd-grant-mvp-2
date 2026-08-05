@@ -1661,3 +1661,83 @@ export const executeRefund = (
     method: 'POST',
     body: JSON.stringify({ previewId }),
   });
+
+/* ── Phase 20b (§24.11): the dispute queue, evidence packet, classification ── */
+
+export interface DisputeQueueEntry {
+  disputeId: string;
+  providerDisputeId: string;
+  campaignId: string;
+  reservationId: string;
+  status: string;
+  amountCents: string;
+  reasonCode: string | null;
+  openedAt: string;
+  taskDueAt: string;
+  taskOverdue: boolean;
+  providerEvidenceDueBy: string | null;
+  classified: boolean;
+  allocationId: string | null;
+  evidenceAssembledAt: string | null;
+  closedAt: string | null;
+}
+
+export interface DisputeQueueState {
+  disputes: DisputeQueueEntry[];
+  causes: RefundQueueState['causes'];
+  proovdFeeTreatments: string[];
+  evidenceItems: Array<{ key: string; label: string; required: boolean }>;
+  bestEffortRecovery: string;
+}
+
+export const fetchDisputeQueue = (campaignId?: string): Promise<DisputeQueueState> =>
+  call<DisputeQueueState>(
+    `/api/admin/disputes${campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : ''}`,
+  );
+
+export interface DisputeEvidencePacketState {
+  disputeId: string;
+  providerDisputeId: string;
+  items: Array<{
+    key: string;
+    label: string;
+    required: boolean;
+    present: boolean;
+    absentReason?: string;
+  }>;
+  complete: boolean;
+  missing: string[];
+}
+
+export const fetchDisputeEvidence = (disputeId: string): Promise<DisputeEvidencePacketState> =>
+  call<DisputeEvidencePacketState>(
+    `/api/admin/disputes/${encodeURIComponent(disputeId)}/evidence`,
+  );
+
+export const recordDisputeEvidence = (
+  disputeId: string,
+): Promise<{ status: string; evidenceId?: string }> =>
+  call(`/api/admin/disputes/${encodeURIComponent(disputeId)}/evidence`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export interface ClassifyDisputeBody {
+  cause: string;
+  affiliateTreatment: string;
+  proovdFeeTreatment: string;
+  affiliateInvalidCents?: string | null;
+  founderLiabilityCents: string;
+  evidence: string;
+  recoveryNote?: string | null;
+  mandate?: string | null;
+}
+
+export const classifyDispute = (
+  disputeId: string,
+  body: ClassifyDisputeBody,
+): Promise<{ status: string; allocationId?: string }> =>
+  call(`/api/admin/disputes/${encodeURIComponent(disputeId)}/classify`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
