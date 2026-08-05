@@ -58,6 +58,7 @@ import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { readSettingValue } from '../settings/service.js';
 import { campaignEnforcementHold } from '../support/enforcement-hold.js';
+import { day14PaymentBlock } from '../fulfillment/payment-block.js';
 import { dayAfterClose } from './creator-close.js';
 import {
   canMoveW9State,
@@ -645,6 +646,11 @@ export async function readFounderPaymentStatus(
   const holdBlocker = hold.restricted
     ? `Campaign enforcement hold — this campaign is ${hold.campaignStatus ?? 'suspended'} and unreleased payments are restricted while Proovd reviews it (§26.7).`
     : null;
+  // §22.4 (Phase 21a): a failed Day 14 Progress Check blocks the unreleased
+  // REMAINING payment on a Product campaign. Derived from the recorded review,
+  // and named here so the Founder reads the same requirement the service
+  // refuses with (19b's one-source rule).
+  const day14 = await day14PaymentBlock(db, input.campaignId);
 
   let firstAmount: bigint | null = null;
   for (const entry of schedule) {
@@ -712,6 +718,14 @@ export async function readFounderPaymentStatus(
     if (holdBlocker && status !== 'released') {
       status = 'blocked';
       blockers.unshift(holdBlocker);
+    }
+    // §22.4's Product failure consequence. Applies only to the kinds the block
+    // names — a first payment already released is not "unreleased", and
+    // recovering it is §22.4's separate best-effort line, which is an
+    // Admin-recorded §24.8 case (Phase 20a), never an automatic reversal.
+    if (day14.blocked && day14.kinds.includes(entry.kind) && status !== 'released') {
+      status = 'blocked';
+      blockers.unshift(day14.blocker!);
     }
     lines.push({
       kind: entry.kind,
@@ -815,6 +829,7 @@ export type CreatePaymentOutcome =
   | { status: 'before_day_3'; earliestAt: Date }
   | { status: 'evidence_incomplete'; missing: string[] }
   | { status: 'enforcement_hold'; campaignStatus: string }
+  | { status: 'day_14_failed'; reasons: readonly string[] }
   | { status: 'not_found' };
 
 export async function createFounderPayment(
@@ -848,6 +863,12 @@ export async function createFounderPayment(
   const hold = await campaignEnforcementHold(deps.db, input.campaignId);
   if (hold.restricted) {
     return { status: 'enforcement_hold', campaignStatus: hold.campaignStatus ?? campaign.status };
+  }
+  // §22.4 (Phase 21a): a failed Day 14 blocks the unreleased remaining payment.
+  // Refused by name, with the §22.4 findings — never a bare "blocked" (§22.3).
+  const day14 = await day14PaymentBlock(deps.db, input.campaignId);
+  if (day14.blocked && day14.kinds.includes(input.kind)) {
+    return { status: 'day_14_failed', reasons: day14.reasons };
   }
   if (!CREATABLE_FROM[input.kind].includes(campaign.status)) {
     return { status: 'not_creatable', current: campaign.status };
@@ -1024,6 +1045,7 @@ export type ReleasePaymentOutcome =
   | { status: 'already_released'; payment: FounderPayment }
   | { status: 'not_releasable'; current: string }
   | { status: 'enforcement_hold'; campaignStatus: string }
+  | { status: 'day_14_failed'; reasons: readonly string[] }
   | { status: 'not_found' };
 
 export async function releaseFounderPayment(
@@ -1046,6 +1068,12 @@ export async function releaseFounderPayment(
   const hold = await campaignEnforcementHold(deps.db, input.campaignId);
   if (hold.restricted) {
     return { status: 'enforcement_hold', campaignStatus: hold.campaignStatus ?? 'suspended' };
+  }
+  // §22.4: the same block, at the release edge. A payment created before the
+  // review failed still cannot be released while the failure stands.
+  const day14 = await day14PaymentBlock(deps.db, input.campaignId);
+  if (day14.blocked && day14.kinds.includes(input.kind)) {
+    return { status: 'day_14_failed', reasons: day14.reasons };
   }
 
   const campaign = await loadCampaignMoney(deps.db, input.campaignId);

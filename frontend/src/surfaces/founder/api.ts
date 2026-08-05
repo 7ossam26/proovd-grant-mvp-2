@@ -939,3 +939,143 @@ export const requestEarlyRemainingRelease = (
     method: 'POST',
     body: JSON.stringify({ message }),
   });
+
+/* ── Phase 21a (§22.4–§22.6) — fulfillment, delivery changes, Day 14 ───────── */
+
+export interface ObligationStatusView {
+  key: string;
+  label: string;
+  evidence: string;
+  state: 'met' | 'due' | 'overdue' | 'not_applicable';
+  dueAt: string | null;
+  detail: string;
+}
+
+export interface DeliveryCommitmentView {
+  sequence: number;
+  deliveryMonth: string;
+  deliveryDate: string | null;
+  commitmentText: string;
+  reason: string | null;
+  path: string | null;
+  notifiedBackersAt: string | null;
+  isOriginal: boolean;
+}
+
+export interface FulfillmentStatusView {
+  campaignId: string;
+  campaignType: 'pre_build' | 'pre_launch';
+  mechanism: string | null;
+  mechanismLabel: string | null;
+  accessInstructions: string | null;
+  deliveredAt: string | null;
+  deliveryNotifiedAt: string | null;
+  fulfilledAt: string | null;
+  closeAt: string | null;
+  chargedAt: string | null;
+  obligations: ObligationStatusView[];
+  cadence: {
+    state: 'met' | 'due' | 'overdue' | 'not_applicable';
+    nextDueAt: string | null;
+    daysSinceLastCommunication: number | null;
+    silentDays: number;
+  };
+  commitments: DeliveryCommitmentView[];
+  changePath: 'admin_preapproval' | 'notice_before_original_month';
+  pendingChangeRequest: {
+    id: string;
+    reviewDueAt: string;
+    proposedDeliveryMonth: string;
+  } | null;
+  mechanisms: { key: string; label: string }[];
+  materialUpdateFields: { key: string; label: string }[];
+  disclosedCommitmentSuggestion: string | null;
+}
+
+export interface Day14ChecklistView {
+  campaignId: string;
+  campaignType: 'pre_build' | 'pre_launch';
+  items: { key: string; label: string; example: string; required: boolean }[];
+  reviewOpen: boolean;
+  outcome: string;
+  decisionDueAt: string | null;
+  blocksAPayment: boolean;
+  enforcementOnly: boolean;
+  submissions: {
+    id: string;
+    reference: string;
+    submittedAt: string;
+    submittedBy: string;
+    decisionDueAt: string;
+    items: { itemKey: string; label: string; detail: string; url: string | null }[];
+  }[];
+  clarifications: {
+    id: string;
+    question: string;
+    requestedAt: string;
+    dueAt: string;
+    respondedAt: string | null;
+    responseNote: string | null;
+    overdue: boolean;
+  }[];
+}
+
+export const fetchFulfillment = (
+  campaignId: string,
+): Promise<FulfillmentStatusView> => call(`${base(campaignId)}/fulfillment`);
+
+export const recordOriginalCommitment = (
+  campaignId: string,
+  body: { deliveryMonth: string; deliveryDate?: string | null; commitmentText: string },
+): Promise<{ status: string }> =>
+  call(`${base(campaignId)}/fulfillment/commitment`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const setDeliveryMechanism = (
+  campaignId: string,
+  body: { mechanism: string; accessInstructions: string },
+): Promise<{ status: string }> =>
+  call(`${base(campaignId)}/fulfillment/mechanism`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const recordDelivery = (
+  campaignId: string,
+): Promise<{ status: string; notified: number }> =>
+  call(`${base(campaignId)}/fulfillment/deliver`, { method: 'POST', body: JSON.stringify({}) });
+
+export interface DeliveryChangeBody {
+  proposedDeliveryMonth: string;
+  proposedDeliveryDate?: string | null;
+  reason: string;
+  unchangedObligations: string;
+  nextUpdateDate: string;
+  supportRefundRoute: string;
+}
+
+export const requestDeliveryChange = (
+  campaignId: string,
+  body: DeliveryChangeBody,
+): Promise<{ status: string; requestId?: string; reviewDueAt?: string }> =>
+  call(`${base(campaignId)}/delivery-change`, { method: 'POST', body: JSON.stringify(body) });
+
+export const applyDeliveryRevision = (
+  campaignId: string,
+  body: DeliveryChangeBody & { commitmentText: string; changeRequestId?: string | null },
+): Promise<{ status: string; commitmentId?: string }> =>
+  call(`${base(campaignId)}/delivery-revision`, { method: 'POST', body: JSON.stringify(body) });
+
+export const fetchDay14 = (campaignId: string): Promise<Day14ChecklistView> =>
+  call(`${base(campaignId)}/day-14`);
+
+export const submitDay14Evidence = (
+  campaignId: string,
+  items: { itemKey: string; detail: string; url?: string | null }[],
+): Promise<{ status: string; reference?: string; decisionDueAt?: string }> =>
+  call(`${base(campaignId)}/day-14/evidence`, {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  });

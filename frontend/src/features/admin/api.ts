@@ -1741,3 +1741,90 @@ export const classifyDispute = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── Phase 21a (§22.4, §22.7) — Day 14 and the one-strike ghost ban ────────── */
+
+export interface Day14QueueRowView {
+  campaignId: string;
+  campaignTitle: string | null;
+  campaignType: 'pre_build' | 'pre_launch';
+  reviewId: string;
+  dueAt: string;
+  overdue: boolean;
+  outcome: string;
+  submissionCount: number;
+  latestSubmissionAt: string | null;
+  openClarifications: number;
+  overdueClarifications: number;
+  daysSinceLastUpdate: number | null;
+  noSubstantiveUpdateInSevenDays: boolean;
+  blocksAPayment: boolean;
+}
+
+export interface Day14QueueState {
+  queue: Day14QueueRowView[];
+  failureReasons: { key: string; label: string }[];
+}
+
+export interface GhostBanCandidateView {
+  campaignId: string;
+  campaignTitle: string | null;
+  founderUserId: string | null;
+  triggersMet: string[];
+  labels: string[];
+  alreadyBanned: boolean;
+}
+
+export interface GhostBanQueueState {
+  candidates: GhostBanCandidateView[];
+  triggers: { key: string; label: string }[];
+  requiredFields: { key: string; label: string }[];
+  permanentSentence: string;
+}
+
+export const fetchDay14Queue = (): Promise<Day14QueueState> =>
+  call('/api/admin/fulfillment/day-14');
+
+export const fetchGhostBanCandidates = (): Promise<GhostBanQueueState> =>
+  call('/api/admin/fulfillment/ghost-ban/candidates');
+
+export const decideDay14 = (
+  campaignId: string,
+  body: {
+    outcome: 'pass' | 'fail';
+    adequateProgressEvidence: boolean;
+    requiredCommunication: boolean;
+    failureReasons?: string[];
+    internalReason: string;
+    customerExplanation: string;
+  },
+): Promise<{ status: string; consequences?: { key: string; label: string }[] }> =>
+  call(`/api/admin/fulfillment/campaigns/${encodeURIComponent(campaignId)}/day-14/decide`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const requestDay14Clarification = (
+  campaignId: string,
+  question: string,
+): Promise<{ status: string; dueAt?: string }> =>
+  call(`/api/admin/fulfillment/campaigns/${encodeURIComponent(campaignId)}/day-14/clarification`, {
+    method: 'POST',
+    body: JSON.stringify({ question }),
+  });
+
+export const recordGhostBan = (
+  campaignId: string,
+  body: {
+    trigger: string;
+    evidence: string;
+    notice: string;
+    paymentRecoveryStatus: string;
+    enforcementDecision: string;
+    internalReason: string;
+  },
+): Promise<{ status: string; banId?: string; permanentSentence?: string; met?: string[] }> =>
+  call(`/api/admin/fulfillment/campaigns/${encodeURIComponent(campaignId)}/ghost-ban`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });

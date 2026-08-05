@@ -398,8 +398,12 @@ describe('Phase 20b — the magic-link descriptor and the Backer support form', 
     expect(await screen.findByText('PROOVD* FOCUS TIMER')).toBeInTheDocument();
     expect(screen.getByText('Expected statement')).toBeInTheDocument();
 
-    // §29.10: the issuer-rights sentence renders verbatim.
-    expect(screen.getByText(EMPTY_SUPPORT.issuerRights)).toBeInTheDocument();
+    // §29.10: the issuer-rights sentence renders verbatim. Awaited, because the
+    // support panel arrives from its own `/support` request — a synchronous
+    // assertion here passes only while that second fetch happens to have
+    // settled, which is a race the suite loses under load rather than a
+    // property of the page.
+    expect(await screen.findByText(EMPTY_SUPPORT.issuerRights)).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.selectOptions(screen.getByLabelText('Support topic'), 'reward_not_as_described');

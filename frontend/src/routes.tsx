@@ -27,6 +27,7 @@ import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
 import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { CampaignHome } from './surfaces/founder/CampaignHome.js';
 import { CampaignResults } from './surfaces/founder/CampaignResults.js';
+import { Fulfillment } from './surfaces/founder/Fulfillment.js';
 import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { LedgerPage } from './features/admin/Ledger.js';
 import { MoneyControlsPage } from './features/admin/MoneyControls.js';
@@ -35,6 +36,7 @@ import { SupportQueuePage } from './features/admin/SupportQueue.js';
 import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
 import { CloseOperationsPage } from './features/admin/CloseOperations.js';
 import { RefundsPage } from './features/admin/Refunds.js';
+import { AdminFulfillmentPage } from './features/admin/Fulfillment.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -161,6 +163,10 @@ const rootChildren: RouteObject[] = [
       // the Founder-issued provider refunds awaiting classification, and the
       // preview-then-execute machine — campaign-scoped by query string.
       { path: 'refunds', element: <RefundsPage /> },
+      // Phase 21a (§22.4, §22.7). The Day 14 Progress Check queue — overdue
+      // first — and the campaigns whose stored records already meet a §22.7 ban
+      // trigger. Every decision here takes the freshness gate on the server.
+      { path: 'fulfillment', element: <AdminFulfillmentPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
@@ -298,6 +304,15 @@ const rootChildren: RouteObject[] = [
     // Admin-reviewed "what this does and does not prove" section.
     path: 'campaigns/:campaignId/results',
     element: <CampaignResults />,
+  },
+  {
+    // Phase 21a (§22.4–§22.6). The Founder's fulfillment surface — the four
+    // §22.5 obligations with their real state, the delivery-commitment history
+    // with the original preserved first, the §22.6 change path that applies,
+    // and the Day 14 checklist. Beside the other campaign surfaces, outside
+    // both shells.
+    path: 'campaigns/:campaignId/fulfillment',
+    element: <Fulfillment />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

@@ -319,6 +319,33 @@ export const FOUNDER_PAYMENT_BLOCKED = 'founder_payment_blocked' as const;
 export const BACKER_SUPPORT_RECEIVED = 'backer_support_received' as const;
 export const BACKER_SUPPORT_FOUNDER_RESPONSE = 'backer_support_founder_response' as const;
 
+/*
+ * Phase 21a — fulfillment and the Day 14 Progress Check (§22.4, §22.5, §27.5,
+ * §27.6), sent by `fulfillment/notifications.ts`.
+ *
+ * `backer_delivery` carries §22.5's five repeated items (§33.10.1) and dedups
+ * per RESERVATION: a Backer with two pre-orders on one campaign is told about
+ * each, and a re-run of `recordDelivery` tells nobody twice.
+ * `founder_day_14_review_result` is the review outcome, deduped per review row
+ * — 19b left this key deliberately unsent because the review itself was out of
+ * scope there, and this is its sender. `internal_day_14_due` fires once per
+ * campaign when the Day 14 anchor arrives and the review is still open.
+ *
+ * §22.5's sixth item — the satisfaction response — is deliberately NOT folded
+ * into `backer_delivery`. §27.5 names "Delivery and satisfaction survey" as two
+ * events, `backer_satisfaction_survey` is its own registry key, and §31.8's
+ * one-click control is Phase 21b's; linking to a control that does not exist
+ * yet would be the §1.4 failure.
+ *
+ * There is deliberately NO ghost-ban key. §27 names none, §22.7's "notice" is a
+ * recorded field on the ban rather than a new message class, and the campaign's
+ * §27.3 suspension/kill notices are what a Founder receives when enforcement
+ * also stops their campaign. Inventing a key would be §1 rule 6.
+ */
+export const BACKER_DELIVERY = 'backer_delivery' as const;
+export const FOUNDER_DAY_14_REVIEW_RESULT = 'founder_day_14_review_result' as const;
+export const INTERNAL_DAY_14_DUE = 'internal_day_14_due' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -394,6 +421,9 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_PAYMENT_BLOCKED,
   BACKER_SUPPORT_RECEIVED,
   BACKER_SUPPORT_FOUNDER_RESPONSE,
+  BACKER_DELIVERY,
+  FOUNDER_DAY_14_REVIEW_RESULT,
+  INTERNAL_DAY_14_DUE,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

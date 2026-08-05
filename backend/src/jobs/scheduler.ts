@@ -49,6 +49,7 @@ import { sweepCampaignCloses } from '../close/close-batch.js';
 import { sweepRetryWindowEnds } from '../close/retry.js';
 import { sweepTransferRetries } from '../close/earnings.js';
 import { sweepFounderPaymentSchedule } from '../close/founder-payments.js';
+import { sweepDay14Reviews } from '../fulfillment/day14.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -174,6 +175,21 @@ export const FOUNDER_PAYMENT_SCHEDULE_JOB = 'founder-payment-schedule';
 export const FOUNDER_PAYMENT_SCHEDULE_CRON = '*/15 * * * *';
 
 /**
+ * Phase 21a's §22.4 sweep.
+ *
+ * Opens the Day 14 review for every campaign whose anchor has arrived and
+ * something captured, and sends §27.6's `internal_day_14_due` once per
+ * campaign. The review row is unique per campaign and the notice dedups, so
+ * running it twice changes nothing.
+ *
+ * Hourly, not minutely: Day 14 is a calendar-day anchor, so an hour of
+ * precision on a fourteen-day deadline is ample and a minutely tick would buy
+ * nothing for sixty times the churn (the retention sweep's reasoning).
+ */
+export const DAY_14_REVIEW_JOB = 'day-14-review';
+export const DAY_14_REVIEW_CRON = '7 * * * *';
+
+/**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
  * has to be accurate to well inside an hour; a minutely job would buy nothing
  * and quadruple the churn. The reconciliation runs on the same tick because a
@@ -210,6 +226,9 @@ export interface SchedulerDeps {
     fromAddress: string;
     appBaseUrl: string;
   };
+  /** Phase 21a. §27.6's internal Day 14 notice; unset → the review still opens
+      and the Admin queue still shows it, which is where the work is visible. */
+  internalRecipient?: string | undefined;
 }
 
 export interface Scheduler {
@@ -246,6 +265,7 @@ export async function startScheduler({
   listing,
   launch,
   backer,
+  internalRecipient,
 }: SchedulerDeps): Promise<Scheduler> {
   const boss = new PgBoss({ connectionString, schema: 'pgboss' });
 
@@ -535,6 +555,26 @@ export async function startScheduler({
   await boss.schedule(FOUNDER_PAYMENT_SCHEDULE_JOB, FOUNDER_PAYMENT_SCHEDULE_CRON, undefined, {
     tz: 'UTC',
   });
+
+  /* ── Phase 21a's §22.4 Day 14 Progress Check ───────────────────────────── */
+
+  await boss.createQueue(DAY_14_REVIEW_JOB);
+  await boss.work(DAY_14_REVIEW_JOB, async () => {
+    const result = await sweepDay14Reviews({
+      db,
+      audit,
+      ...(launch ? { notifier: launch.notifier, context: launch.context } : {}),
+      // §27.6's internal notice only sends where an internal recipient is
+      // configured; without one the review still opens and the queue still
+      // shows it, which is where the due work is visible (19a's reasoning).
+      ...(internalRecipient ? { internalRecipient } : {}),
+    });
+    log('day 14 review sweep complete', {
+      opened: result.opened,
+      noticed: result.noticed,
+    });
+  });
+  await boss.schedule(DAY_14_REVIEW_JOB, DAY_14_REVIEW_CRON, undefined, { tz: 'UTC' });
 
   return {
     boss,

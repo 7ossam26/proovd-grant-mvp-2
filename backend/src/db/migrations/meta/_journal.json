@@ -239,6 +239,13 @@
       "when": 1785592800000,
       "tag": "0033_disputes_and_enforcement",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785596400000,
+      "tag": "0034_fulfillment_day14_ghost_ban",
+      "breakpoints": true
     }
   ]
 }

@@ -47,6 +47,8 @@ const NAV = [
   { to: '/admin/close', label: 'Close operations' },
   // Phase 20a (§24.8, §24.9).
   { to: '/admin/refunds', label: 'Refunds' },
+  // Phase 21a (§22.4, §22.7). The Day 14 Progress Check and the ghost ban.
+  { to: '/admin/fulfillment', label: 'Fulfillment' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];

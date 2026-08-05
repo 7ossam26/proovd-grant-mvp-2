@@ -117,3 +117,9 @@ export * from './disputes.js';
 // appeal decision, the §29.1/§29.2 disclosures, §29.8's published-version
 // reacceptance requirement, and §29.10's one-per-case Backer escalation.
 export * from './enforcement.js';
+// Phase 21a: §22.4–§22.7 — the campaign fulfillment record with its three
+// obligation timestamps, the insert-only delivery-commitment sequence whose
+// first row is the original promise, the §22.6 Admin-approval request with its
+// five-business-day deadline, the write-once Day 14 review with its durable
+// insert-only receipt, and the one-per-Founder permanent ghost ban.
+export * from './fulfillment.js';

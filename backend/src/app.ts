@@ -36,6 +36,12 @@ import { createBackerPreorderRouter } from './routes/backer-preorder.js';
 import { createBackerRouter } from './routes/backer.js';
 import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createAdminRefundsRouter } from './routes/admin-refunds.js';
+import {
+  createFounderFulfillmentRouter,
+  createAdminFulfillmentRouter,
+  FOUNDER_FULFILLMENT_BASE_PATH,
+  ADMIN_FULFILLMENT_BASE_PATH,
+} from './routes/fulfillment.js';
 import { createAdminDisputesRouter } from './routes/admin-disputes.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
@@ -434,6 +440,32 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Phase 17b (§20, §18, §33.6.13). Admin decides change requests and comment
   // flags, and adds a Creator mid-campaign. Writes take the freshness gate.
   app.use(createAdminLiveOpsRouter({ db, auth, audit }));
+  // Phase 21a (§22.4–§22.7). Fulfillment and its four obligations, the two
+  // §22.6 delivery-change paths, the Day 14 Progress Check, and the one-strike
+  // ghost ban. The Founder and Admin read the SAME §22.4 checklist — one
+  // function, two routes — and every Admin decision takes the freshness gate.
+  app.use(
+    FOUNDER_FULFILLMENT_BASE_PATH,
+    createFounderFulfillmentRouter({
+      db,
+      auth,
+      audit,
+      notifier,
+      notificationContext: launchContext,
+      tokens,
+    }),
+  );
+  app.use(
+    ADMIN_FULFILLMENT_BASE_PATH,
+    createAdminFulfillmentRouter({
+      db,
+      auth,
+      audit,
+      notifier,
+      notificationContext: launchContext,
+      tokens,
+    }),
+  );
   // Phase 10a (§32.3, §28.3). Two Stripe endpoints with two signing secrets —
   // platform for Proovd's own listing money, Connect for the Founder's campaign
   // money (§24.1). Both mount raw-body parsing themselves, for the reason the
