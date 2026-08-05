@@ -24,8 +24,9 @@ Working rules for contributors and for Claude Code sessions live in
 ## Status
 
 Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–21a are
-complete**, and Phase 22 — the notification sweep — is under way: its first
-third is built. Money moves in test mode only, and the live-mode gate stays
+complete**, and Phase 22 — the notification sweep — is nearly done: the coverage
+machine and the optional digest are built, and 31 of its 44 missing messages are
+still to be written. Money moves in test mode only, and the live-mode gate stays
 shut.
 
 | Phase | Delivered |
@@ -68,6 +69,7 @@ shut.
 | 20b | Disputes and their 24-hour task, the assembled evidence packet, one statement descriptor everywhere, post-capture enforcement, and the §29 records |
 | 21a | Fulfillment and its four Founder obligations, delivery-date changes and their two paths, the Day 14 Progress Check, and the one-strike ghost ban |
 | 22a | The notification coverage machine: every §27 event either sends or is recorded as deliberately unsent, and every message it can send is proved against the transactional contract |
+| 22c | The optional activity digest — the one email anyone can switch off — with the notification history that stays a record rather than becoming a dashboard |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -150,7 +152,9 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
                   Creator earnings states with Appendix B.7
   src/notifications/ the ~120 transactional events, the transactional-email
                   rules, the money facts as four message classes with their
-                  detectors, and the naming contract as a scanner
+                  detectors, the naming contract as a scanner, and the optional
+                  digest: its preference vocabulary, the three eligible activity
+                  kinds, the window kernels, and what it must never become
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -183,8 +187,10 @@ backend/    Express 5 + Drizzle + Postgres 16
                       full refund, Founder cancellation, and the two clocks
   src/notifications/  the deduplicating sender, Resend, the email templates, the
                       register of events that deliberately do not send, the
-                      render catalog behind the coverage test, and the preview
-                      with its transactional-contract report
+                      render catalog behind the coverage test, the preview with
+                      its transactional-contract report, and the optional
+                      digest: the preference, the composer that reads activity
+                      rather than deliveries, and the history read
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
@@ -199,6 +205,8 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          the fee preview, the helper resources, the listing
                          payment with its Appendix A.5 consent, and the live
                          campaign home — Glance, one action, Explore
+  src/surfaces/notifications/ the digest preference and notification history,
+                         one page for both roles and the Backer control
   src/surfaces/payouts/  Stripe onboarding for both roles, and where Stripe
                          sends people back to
 docs/       Spec, DNA, tech stack, master plan, phase briefs
@@ -1202,6 +1210,41 @@ so.** No key matches a check-in, nudge, streak, or drip shape; no sender, job, o
 template mentions a re-engagement sequence; no message manufactures urgency or
 scarcity or claims to be real time. Absence is asserted as deliberately as
 presence.
+
+**Exactly one email can be switched off, and it is the only one that carries a
+way to do it.** Every transactional message is unstoppable by design — you cannot
+unsubscribe from a receipt for a charge on your card. The optional activity
+digest is the single exception, so the two rules have to stay apart: the digest
+is composed from *activity* — campaign updates, comments, roster changes — and
+never from the record of what was emailed. Build it the obvious way, as "here is
+everything we sent you since last time", and someone who turned it off has
+unsubscribed from something they cannot, while someone who turned it on gets
+every receipt twice. The contract check knows which rule applies to which
+message: a transactional email with an unsubscribe link fails, and so does a
+digest without one.
+
+Nothing sets a frequency on anyone's behalf. There is no default, no backfill,
+and no code path that creates a preference as a side effect of anything else —
+so a person who never chooses simply never receives one, which is the correct
+outcome rather than a gap. Choosing "no summary emails" is a recorded answer and
+is kept distinct from never having been asked, because only the second should be
+asked again. Every choice and every change is written by a database trigger, not
+by the code that saves it.
+
+**A summary of nothing is not sent.** A digest with no activity in its window
+would be a scheduled generic email with a subject line on it, which is the exact
+thing the rest of this section exists to refuse — so the job composes first and
+sends only if there is something to say. A quiet week is silence.
+
+**Notification history is a record, not a dashboard.** Founders, Creators, and
+Admin can see what was sent to them, when, and whether the provider confirmed it
+— a message we recorded but never got confirmation for says exactly that rather
+than showing as delivered. It has its own page, deliberately not the campaign
+home, and it carries no unread count and no badge: there is no column that could
+hold one, nothing that marks anything read, and nothing on it that competes with
+the single next action the campaign home ranks. The message bodies are not
+stored; you already have those in your inbox, and a second copy would be personal
+data with nothing to gain from it.
 
 ## Retention
 

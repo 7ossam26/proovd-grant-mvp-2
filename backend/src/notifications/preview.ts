@@ -28,6 +28,7 @@ import {
   actionUrlsIn,
   audienceOf,
   carriesDeadline,
+  isTransactionalMessage,
   missingMoneyFacts,
   moneyClassFor,
   namingViolations,
@@ -47,8 +48,14 @@ export interface ContractReport {
   hasSupportRoute: boolean;
   /** §27.2: a stable campaign, reservation, or case reference. */
   hasStableReference: boolean;
-  /** §27.2: transactional email is never opt-out-able. */
-  hasNoOptOut: boolean;
+  /**
+   * §27.2 vs §27.7. Transactional email is never opt-out-able; the digest is
+   * the one message that is, and therefore the one that owes a route to its own
+   * preference. `optOutRule` says which way the rule runs for this key.
+   */
+  optOutRule: 'forbidden' | 'required';
+  hasOptOutPath: boolean;
+  optOutRuleSatisfied: boolean;
   /** §27.2/§3.3, by money class. Empty when the message is not about money. */
   moneyFactsMissing: MoneyFactKey[];
   /** §27.1: a deadline email spells out its timezone. */
@@ -65,7 +72,14 @@ export interface NotificationPreview extends RenderedMessage {
   report: ContractReport;
 }
 
-const OPT_OUT = /unsubscribe|opt[- ]out|manage (your )?(email )?preferences|stop receiving/i;
+/**
+ * A family of honest phrasings rather than one pinned sentence — 22a's rule for
+ * every detector here. `change how often` earns its place because that is what
+ * the digest's own control says, and a detector that knew only `unsubscribe`
+ * would report the digest as carrying no way out while it carried one.
+ */
+const OPT_OUT =
+  /unsubscribe|opt[- ]out|manage\s+(your\s+)?(email\s+)?preferences|stop\s+receiving|change\s+how\s+often|turn\s+(this|these)\s+off/i;
 const SUPPORT_ROUTE = /support@|questions:|contact|reply to/i;
 const REFERENCE = /Reference:\s*\S+/;
 
@@ -87,12 +101,17 @@ export function checkTransactionalContract(
     ...namingViolations(message.text, audience),
   ];
 
+  const optOutRule = isTransactionalMessage(eventKey) ? 'forbidden' : 'required';
+  const hasOptOutPath = OPT_OUT.test(message.html) || OPT_OUT.test(message.text);
+
   const report: ContractReport = {
     actionUrls,
     oneActionAtMost: actionUrls.length <= 1,
     hasSupportRoute: SUPPORT_ROUTE.test(message.text),
     hasStableReference: REFERENCE.test(message.text),
-    hasNoOptOut: !OPT_OUT.test(message.html) && !OPT_OUT.test(message.text),
+    optOutRule,
+    hasOptOutPath,
+    optOutRuleSatisfied: optOutRule === 'forbidden' ? !hasOptOutPath : hasOptOutPath,
     moneyFactsMissing,
     deadlineNamesTimezone,
     namingViolations: violations,
@@ -103,7 +122,7 @@ export function checkTransactionalContract(
     report.oneActionAtMost &&
     report.hasSupportRoute &&
     report.hasStableReference &&
-    report.hasNoOptOut &&
+    report.optOutRuleSatisfied &&
     moneyFactsMissing.length === 0 &&
     deadlineNamesTimezone !== false &&
     violations.length === 0;

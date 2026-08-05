@@ -37,7 +37,7 @@ name a seam, so this one was written back into the file:
 |---|---|---|---|
 | **22a** | The coverage machine and the contract: the deliberate-absence register, the render catalog, the coverage test, §27.2's shape rules and §3.3's money facts proved over every message, §27.1's timezone rule, the §3 copy pass, the absence tests, and the high-impact preview | **§33.6.11 reconfirmed**, §33.9.10 and §33.9.12 re-proved through the catalog | **built** |
 | **22b** | The 44 missing senders and their templates — every §27.3–27.6 bullet whose *capability* already exists gains its message and its tested send path | the coverage register empties to the genuinely deferred | pending |
-| **22c** | §27.7 — the optional daily/weekly digest for all three roles, and the authenticated notification history that must not become a dashboard | the §27.7 done-when | pending |
+| **22c** | §27.7 — the optional daily/weekly digest for all three roles, and the authenticated notification history that must not become a dashboard | the §27.7 done-when | **built** |
 
 **The order is the point, and it is Phase 09's and 10's order rerun.** The audit
 has to exist before anyone can know what to fill, and the contract test has to

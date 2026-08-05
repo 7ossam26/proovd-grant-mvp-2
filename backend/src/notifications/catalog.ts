@@ -85,6 +85,7 @@ import {
 import { renderEnforcementNotice } from './templates/enforcement.js';
 import { renderDeliveryNotice, renderDay14Result } from './templates/fulfillment.js';
 import { renderInternalNotice, renderPlainNotice } from './templates/plain.js';
+import { renderDigest } from './templates/digest.js';
 
 export interface RenderedMessage {
   subject: string;
@@ -857,6 +858,65 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       action: { label: 'Open the close queue', url: `${APP}/admin/close` },
       reference: REF,
       supportEmail: SUPPORT,
+    }),
+
+  /*
+   * §27.7's three digests. The samples carry real activity because an empty
+   * digest is never sent (`DIGEST_PROHIBITIONS.no_empty_send`) — rendering one
+   * with no items would assert the contract against a message the product
+   * cannot produce.
+   */
+  founder_activity_digest: () =>
+    renderDigest({
+      audience: 'founder',
+      frequency: 'daily',
+      items: [
+        {
+          campaignTitle: CAMPAIGN,
+          headline: 'Backer 014 commented',
+          occurredAt: new Date('2026-09-20T14:05:00Z'),
+        },
+        {
+          campaignTitle: CAMPAIGN,
+          headline: 'A Creator’s status changed',
+          occurredAt: new Date('2026-09-20T09:40:00Z'),
+        },
+      ],
+      preferencesUrl: `${APP}/settings/notifications`,
+      supportEmail: SUPPORT,
+      reference: REF,
+    }),
+
+  affiliate_activity_digest: () =>
+    renderDigest({
+      audience: 'affiliate',
+      frequency: 'weekly',
+      items: [
+        {
+          campaignTitle: CAMPAIGN,
+          headline: 'Tooling is finished and the first run is scheduled',
+          occurredAt: new Date('2026-09-18T11:20:00Z'),
+        },
+      ],
+      preferencesUrl: `${APP}/creator/settings/notifications`,
+      supportEmail: SUPPORT,
+      reference: REF,
+    }),
+
+  backer_campaign_update_digest: () =>
+    renderDigest({
+      audience: 'backer',
+      frequency: 'weekly',
+      items: [
+        {
+          campaignTitle: CAMPAIGN,
+          headline: 'Tooling is finished and the first run is scheduled',
+          occurredAt: new Date('2026-09-18T11:20:00Z'),
+        },
+      ],
+      preferencesUrl: `${APP}/backer`,
+      supportEmail: SUPPORT,
+      reference: REF,
     }),
 
   internal_day_14_due: () =>

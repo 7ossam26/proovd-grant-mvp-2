@@ -7,6 +7,11 @@
  * detail about what was wrong.
  */
 
+import type {
+  DigestFrequency,
+  DigestPreferenceView,
+} from '../../../surfaces/notifications/DigestPreference.js';
+
 export interface BackerTransaction {
   reservationId: string;
   rewardTitle: string | null;
@@ -281,4 +286,40 @@ export async function escalateSupportCase(
     message: body?.message ?? 'That escalation was not recorded.',
     ...(body?.opensAt ? { opensAt: body.opensAt } : {}),
   };
+}
+
+/* ── §27.7's digest preference (Phase 22c) ─────────────────────────────────── */
+
+/**
+ * A read failure returns null and the control simply does not render. The
+ * preference is the least consequential thing on this page and a Backer who
+ * came to check a charge should not meet an error about a summary email —
+ * `fetchBackerSupport` takes the same position for the same reason.
+ */
+export async function fetchBackerDigestPreference(
+  token: string,
+): Promise<DigestPreferenceView | null> {
+  const res = await fetch(`/api/link/${encodeURIComponent(token)}/digest-preference`, {
+    credentials: 'include',
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { preference: DigestPreferenceView };
+  return body.preference;
+}
+
+export async function saveBackerDigestPreference(
+  token: string,
+  frequency: DigestFrequency,
+): Promise<DigestPreferenceView> {
+  const res = await fetch(`/api/link/${encodeURIComponent(token)}/digest-preference`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ frequency }),
+  });
+  if (!res.ok) {
+    throw new Error('We could not save that. Nothing changed — try again.');
+  }
+  const body = (await res.json()) as { preference: DigestPreferenceView };
+  return body.preference;
 }

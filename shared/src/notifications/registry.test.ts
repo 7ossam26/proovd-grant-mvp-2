@@ -21,7 +21,13 @@ describe('notification event registry (§27.3–27.6)', () => {
       expect(key).toMatch(/^(founder|affiliate|backer|internal)_[a-z0-9_]+$/);
       const def = NOTIFICATION_EVENTS[key];
       expect(key.startsWith(`${def.audience}_`)).toBe(true);
-      expect(def.specRef).toMatch(/^§27\.[3-6]$/);
+      // §27.3–27.6 are the four transactional inventories. §27.7 is admitted
+      // for exactly one reason: it states a message the inventories do not
+      // list, because that message is not transactional — the optional digest.
+      // A key claiming §27.7 is claiming to be opt-out-able, which is why
+      // `NON_TRANSACTIONAL_KEYS` names the whole set rather than leaving it to
+      // whatever a `specRef` happens to say.
+      expect(def.specRef).toMatch(/^§27\.[3-7]$/);
       expect(def.description.length).toBeGreaterThan(0);
     }
   });

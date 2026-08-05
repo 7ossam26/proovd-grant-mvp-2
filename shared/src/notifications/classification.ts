@@ -101,6 +101,34 @@ export const DEADLINE_MESSAGE_KEYS: readonly NotificationEventKey[] = [
   // to invent a deadline §22.1 does not state.
 ];
 
+/**
+ * The messages §27.2's first rule does NOT bind, and where the rule inverts.
+ *
+ * §27.2: transactional email is "not opt-out-able". §27.7: the digest is
+ * "optional". Both are true, and they are only compatible because the digest is
+ * not transactional — it is the one message a person chose to receive and may
+ * therefore stop.
+ *
+ * Naming the exception is what keeps it honest. A digest that happened to avoid
+ * the words a scanner looks for would satisfy the transactional rule by
+ * accident while being the one message that owes the reader a way out; naming
+ * it means the check inverts deliberately and the digest is *required* to carry
+ * a route to its own preference.
+ *
+ * This is the whole set, and it should stay that way: a second entry here would
+ * be a second message somebody may switch off, which is a decision about what
+ * the product promises rather than about copy.
+ */
+export const NON_TRANSACTIONAL_KEYS: readonly NotificationEventKey[] = [
+  'founder_activity_digest',
+  'affiliate_activity_digest',
+  'backer_campaign_update_digest',
+];
+
+export function isTransactionalMessage(key: NotificationEventKey): boolean {
+  return !NON_TRANSACTIONAL_KEYS.includes(key);
+}
+
 export function moneyClassFor(key: NotificationEventKey): MoneyMessageClass | undefined {
   return MONEY_MESSAGE_CLASS[key];
 }

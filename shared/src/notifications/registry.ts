@@ -247,6 +247,19 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.3',
     description: 'Work-again response',
   },
+  /**
+   * §27.7, not §27.3 — and the `specRef` says so rather than borrowing the
+   * inventory's. §27.3 lists no digest because §27.3 is the *transactional*
+   * inventory and this is the one message that is not; §27.7 states the
+   * capability instead ("Founder/Affiliate in settings"). A preference that
+   * could never cause a send would be a control that does nothing (§1.4), so
+   * the key exists where the Spec puts the capability.
+   */
+  founder_activity_digest: {
+    audience: 'founder',
+    specRef: '§27.7',
+    description: 'Optional activity digest, if selected',
+  },
 
   /* ── §27.4 Affiliate transactional events ───────────────────────────── */
   affiliate_campaign_invitation: {
@@ -413,6 +426,12 @@ export const NOTIFICATION_EVENTS = {
     audience: 'affiliate',
     specRef: '§27.4',
     description: 'Work-again request',
+  },
+  /** §27.7's other half of the same capability. See `founder_activity_digest`. */
+  affiliate_activity_digest: {
+    audience: 'affiliate',
+    specRef: '§27.7',
+    description: 'Optional activity digest, if selected',
   },
 
   /* ── §27.5 Backer transactional events ──────────────────────────────── */

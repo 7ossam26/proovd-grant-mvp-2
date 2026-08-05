@@ -1313,7 +1313,24 @@ describe('§33.6.11 — no scheduled generic Day 3/7/10 check email exists', () 
     // Every scheduled job name in the file, and none of them is a check-in.
     const jobNames = [...scheduler.matchAll(/_JOB = '([a-z-]+)'/g)].map((m) => m[1]!);
     expect(jobNames.length).toBeGreaterThan(0);
+
+    /*
+     * §27.7's digest is the one scheduled job that sends customer mail, and it
+     * is not what §33.6.11 forbids — the two are separable by a property rather
+     * than by a name, so the exemption is by exact name and the guard for
+     * everything else is unchanged.
+     *
+     * What makes it not a check-in: it sends ONLY when real recorded activity
+     * exists in the window, and an empty digest is not sent at all. That is not
+     * a claim here — `notification-digest.test.ts` runs the sweep against a
+     * subscriber with no activity and asserts zero sends and zero delivery
+     * rows. A generic Day 3/7/10 email is precisely a message with no such
+     * record behind it, which is why the name-shaped guard stays for every
+     * other job the file may ever gain.
+     */
+    const DIGEST_JOBS = ['notification-digest-daily', 'notification-digest-weekly'];
     for (const name of jobNames) {
+      if (DIGEST_JOBS.includes(name)) continue;
       expect(name).not.toMatch(/check|nudge|digest|engagement|day-?(3|7|10)/i);
     }
   });

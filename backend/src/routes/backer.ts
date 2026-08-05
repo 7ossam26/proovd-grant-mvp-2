@@ -30,6 +30,7 @@ import { MAGIC_LINK_TOKEN_PATH, TOKEN_PARAM } from '../auth/token-routes.js';
 import { requireMagicLinkToken } from '../auth/token-middleware.js';
 import { campaignBuild } from '../db/schema/build.js';
 import { readBackerPage } from '../reservations/magic-link-read.js';
+import { readDigestPreference, setDigestPreference } from '../notifications/preferences.js';
 import { cancelReservation } from '../reservations/cancellation.js';
 import { replaceIdeaReward } from '../reservations/preorder.js';
 import { updateCardAndRetry } from '../close/retry.js';
@@ -128,6 +129,60 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
       backerIdentityId: subject.backerIdentityId,
     });
     res.json(page);
+  });
+
+  /*
+   * §27.7's digest preference, "at first magic-link visit".
+   *
+   * There is no first-visit marker anywhere in the product to hang this on —
+   * `secure_tokens.last_used_at` is a *last*-seen and rotation destroys it —
+   * so "first visit" is the absence of a preference row, and the page renders
+   * the question while `chosen` is false. See `notifications/preferences.ts`.
+   *
+   * The subject comes from the verified token, never from the body: a Backer
+   * has no account, so the token IS the identity, and a route that took an
+   * identity id would let anyone holding one link set anyone else's preference.
+   */
+  router.get(`${base}/digest-preference`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const preference = await readDigestPreference(deps.db, {
+      audience: 'backer',
+      backerIdentityId: subject.backerIdentityId,
+    });
+    res.json({ preference });
+  });
+
+  router.put(`${base}/digest-preference`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const frequency = String((req.body as { frequency?: unknown } | undefined)?.frequency ?? '');
+    const result = await setDigestPreference(
+      deps.db,
+      { audience: 'backer', backerIdentityId: subject.backerIdentityId },
+      frequency,
+    );
+    if (result.status === 'invalid_frequency') {
+      res.status(400).json({
+        error: 'invalid_frequency',
+        title: 'That is not one of the choices',
+        whatHappened: `A summary preference must be one of: ${result.permitted.join(', ')}.`,
+        next: 'Pick one of the options shown and try again.',
+        support: '/support',
+        permitted: result.permitted,
+      });
+      return;
+    }
+    await deps.audit({
+      action: 'notification.digest_preference_set',
+      targetType: 'digest_preference',
+      targetId: subject.backerIdentityId,
+      internalReason: `backer chose digest frequency ${result.frequency}`,
+      newValue: { frequency: result.frequency },
+    });
+    const preference = await readDigestPreference(deps.db, {
+      audience: 'backer',
+      backerIdentityId: subject.backerIdentityId,
+    });
+    res.json({ preference });
   });
 
   router.post(`${base}/reservations/:reservationId/cancel`, guard, async (req, res) => {

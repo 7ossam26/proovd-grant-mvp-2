@@ -42,6 +42,7 @@ import {
   UNSENT_NOTIFICATION_KEYS,
 } from '../notifications/unsent.js';
 import { NOTIFICATION_CATALOG, CATALOG_KEYS } from '../notifications/catalog.js';
+import { NON_TRANSACTIONAL_KEYS } from '../notifications/contract-logic.js';
 import { previewNotification, checkTransactionalContract } from '../notifications/preview.js';
 
 const SENT = BACKEND_NOTIFICATION_EVENTS as readonly string[];
@@ -315,7 +316,31 @@ describe('§27.2 — high-impact messages can be previewed before manual send', 
     expect(report.oneActionAtMost).toBe(false);
     expect(report.actionUrls).toEqual(['https://a.example', 'https://b.example']);
     expect(report.hasStableReference).toBe(false);
-    expect(report.hasNoOptOut).toBe(false);
+    // A transactional key: §27.2 forbids the opt-out, so finding one is a fail.
+    expect(report.optOutRule).toBe('forbidden');
+    expect(report.hasOptOutPath).toBe(true);
+    expect(report.optOutRuleSatisfied).toBe(false);
+  });
+
+  it('the opt-out rule inverts for the digest, and the digest satisfies it (§27.7)', async () => {
+    // §27.2 says transactional email is not opt-out-able; §27.7 makes the digest
+    // optional. The two are compatible only because the digest is not
+    // transactional — so the rule inverts rather than being waived, and a digest
+    // with no route to its own preference FAILS.
+    for (const key of NON_TRANSACTIONAL_KEYS) {
+      const report = checkTransactionalContract(key, await NOTIFICATION_CATALOG[key]());
+      expect(report.optOutRule, key).toBe('required');
+      expect(report.hasOptOutPath, key).toBe(true);
+      expect(report.optOutRuleSatisfied, key).toBe(true);
+    }
+
+    const withoutRoute = checkTransactionalContract('backer_campaign_update_digest', {
+      subject: 'This week',
+      html: '<html><p>Two things happened.</p></html>',
+      text: 'Two things happened.\n\nQuestions: support@proovd.co\n\nReference: X-1',
+    });
+    expect(withoutRoute.optOutRuleSatisfied).toBe(false);
+    expect(withoutRoute.satisfiesContract).toBe(false);
   });
 });
 

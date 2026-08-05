@@ -230,6 +230,21 @@ export const DEADLINE_MESSAGE_KEYS: readonly string[] = [
   'internal_dispute_opened',
 ];
 
+/**
+ * §27.2's "not opt-out-able" does not bind these, and inverts for them: the
+ * digest is §27.7's optional message and owes the reader a way to stop it. See
+ * the shared register for why the exception is named rather than implicit.
+ */
+export const NON_TRANSACTIONAL_KEYS: readonly string[] = [
+  'founder_activity_digest',
+  'affiliate_activity_digest',
+  'backer_campaign_update_digest',
+];
+
+export function isTransactionalMessage(key: string): boolean {
+  return !NON_TRANSACTIONAL_KEYS.includes(key);
+}
+
 export function moneyClassFor(key: string): MoneyMessageClass | undefined {
   return MONEY_MESSAGE_CLASS[key];
 }

@@ -49,6 +49,8 @@ const NAV = [
   { to: '/admin/refunds', label: 'Refunds' },
   // Phase 21a (§22.4, §22.7). The Day 14 Progress Check and the ghost ban.
   { to: '/admin/fulfillment', label: 'Fulfillment' },
+  // Phase 22c (§27.7, §27.2). Delivery history and the message preview.
+  { to: '/admin/notifications', label: 'Notifications' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];

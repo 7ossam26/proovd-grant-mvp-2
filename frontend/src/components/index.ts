@@ -22,6 +22,7 @@ export { Button, type ButtonTier } from './Button.js';
 export { Input, Textarea, Field } from './Input.js';
 export { Toggle } from './Toggle.js';
 export { Option } from './Option.js';
+export { Choice, type ChoiceEntry } from './Choice.js';
 export { Stepper } from './Stepper.js';
 export { Tag, type TagVariant } from './Tag.js';
 export { Card } from './Card.js';

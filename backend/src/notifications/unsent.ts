@@ -85,15 +85,6 @@ export const UNSENT_NOTIFICATION_EVENTS = {
       '§31.8\'s satisfaction step and its one-click control are 21b\'s. 21a deliberately kept it out of `backer_delivery`: §27.5 names "Delivery and satisfaction survey" as two events, and linking to a control that does not exist would be the §1.4 failure.',
   },
 
-  /* ── Capability not built — Phase 22c (§27.7) ──────────────────────────── */
-
-  backer_campaign_update_digest: {
-    kind: 'capability',
-    owner: 'phase-22c',
-    reason:
-      '§27.7\'s digest is opt-in and there is no preference to opt into yet. Sending a digest nobody chose would breach §27.7\'s "optional" and §30\'s ban on engagement sequences in one message.',
-  },
-
   /* ── Message missing, behaviour recorded — Phase 22b ───────────────────── */
 
   founder_password_reset: {
@@ -107,7 +98,7 @@ export const UNSENT_NOTIFICATION_EVENTS = {
     kind: 'message',
     owner: 'phase-22b',
     reason:
-      '§14.5\'s roster status is derived and its transitions are recorded; the Founder learns of them only by opening the roster.',
+      '§14.5\'s roster status is derived and its transitions are recorded; the Founder learns of them only by opening the roster. When 22b builds it, its dedup entity MUST be the `association_status_history` row id: §27.7\'s digest excludes a roster item whose covering key already delivered, and that exclusion binds on (`founder_roster_update`, target, the history row id). Keying on the association instead would make the digest restate a change the Founder was already emailed about (§27.2, §30).',
     record: 'association_status_history + campaign_readiness',
   },
   founder_submission_receipt: {

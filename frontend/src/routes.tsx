@@ -28,6 +28,10 @@ import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { CampaignHome } from './surfaces/founder/CampaignHome.js';
 import { CampaignResults } from './surfaces/founder/CampaignResults.js';
 import { Fulfillment } from './surfaces/founder/Fulfillment.js';
+import {
+  CreatorNotificationSettings,
+  FounderNotificationSettings,
+} from './surfaces/notifications/NotificationSettings.js';
 import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { LedgerPage } from './features/admin/Ledger.js';
 import { MoneyControlsPage } from './features/admin/MoneyControls.js';
@@ -37,6 +41,7 @@ import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
 import { CloseOperationsPage } from './features/admin/CloseOperations.js';
 import { RefundsPage } from './features/admin/Refunds.js';
 import { AdminFulfillmentPage } from './features/admin/Fulfillment.js';
+import { AdminNotificationsPage } from './features/admin/Notifications.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -167,6 +172,11 @@ const rootChildren: RouteObject[] = [
       // first — and the campaigns whose stored records already meet a §22.7 ban
       // trigger. Every decision here takes the freshness gate on the server.
       { path: 'fulfillment', element: <AdminFulfillmentPage /> },
+      // Phase 22c (§27.7, §27.2). The delivery history for any address — "did
+      // they get the email" is the first question of half the support cases —
+      // and the message preview, which reports the §27.2 contract and sends
+      // nothing to anyone.
+      { path: 'notifications', element: <AdminNotificationsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
@@ -313,6 +323,23 @@ const rootChildren: RouteObject[] = [
     // both shells.
     path: 'campaigns/:campaignId/fulfillment',
     element: <Fulfillment />,
+  },
+  {
+    // Phase 22c (§27.7). The first ACCOUNT-level address either role has had —
+    // every other authenticated route in the product is scoped to a campaign
+    // or an association, because until now everything a Founder or Creator did
+    // belonged to one campaign. The digest preference belongs to the person.
+    //
+    // Deliberately NOT on the campaign home: §27.7 says notification history
+    // must not turn the Founder home into a widget dashboard or override the
+    // one ranked Act item, and its own address is what makes that structural.
+    path: 'settings/notifications',
+    element: <FounderNotificationSettings />,
+  },
+  {
+    // The Creator's half of the same page, beside their campaign list.
+    path: 'creator/settings/notifications',
+    element: <CreatorNotificationSettings />,
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

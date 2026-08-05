@@ -50,6 +50,7 @@ import { sweepRetryWindowEnds } from '../close/retry.js';
 import { sweepTransferRetries } from '../close/earnings.js';
 import { sweepFounderPaymentSchedule } from '../close/founder-payments.js';
 import { sweepDay14Reviews } from '../fulfillment/day14.js';
+import { sweepDigests } from '../notifications/digest.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
 import type { Notifier } from '../notifications/send.js';
 import type { InterviewNotificationContext } from '../interviews/notifications.js';
@@ -188,6 +189,26 @@ export const FOUNDER_PAYMENT_SCHEDULE_CRON = '*/15 * * * *';
  */
 export const DAY_14_REVIEW_JOB = 'day-14-review';
 export const DAY_14_REVIEW_CRON = '7 * * * *';
+
+/**
+ * §27.7's optional digest, one job per cadence (Phase 22c).
+ *
+ * The hour is an operational schedule, not a deadline, and the distinction
+ * matters: §6 fixes no digest send time, so a value here would be inventing a
+ * commercial rule if anything relied on it (§1 rule 6). Nothing does — no
+ * message names a delivery time, no surface promises one, and the period key
+ * is derived from the UTC day number rather than from this cron, so moving it
+ * changes when a digest arrives and never whether one is owed. 14:00 UTC is
+ * morning across the US, which is the audience.
+ *
+ * Two jobs rather than one because the cadences are two different questions,
+ * and a single job filtering by frequency would send the weekly digest on the
+ * daily tick or vice versa the first time the filter was edited.
+ */
+export const DIGEST_DAILY_JOB = 'notification-digest-daily';
+export const DIGEST_WEEKLY_JOB = 'notification-digest-weekly';
+export const DIGEST_DAILY_CRON = '0 14 * * *';
+export const DIGEST_WEEKLY_CRON = '0 14 * * 1';
 
 /**
  * Every fifteen minutes. §6 states the lead time in hours, so the reminder only
@@ -575,6 +596,44 @@ export async function startScheduler({
     });
   });
   await boss.schedule(DAY_14_REVIEW_JOB, DAY_14_REVIEW_CRON, undefined, { tz: 'UTC' });
+
+  /* ── Phase 22c's §27.7 optional digest ─────────────────────────────────── */
+
+  /*
+   * The only job here that sends to people who chose to hear from it, and the
+   * only one whose absence costs nobody anything: with no notifier configured
+   * it sends nothing, and with no subscribers it sends nothing either. An empty
+   * digest is never produced (§33.6.11), so a quiet period is silence rather
+   * than a subject line.
+   */
+  for (const [job, cron, frequency] of [
+    [DIGEST_DAILY_JOB, DIGEST_DAILY_CRON, 'daily'],
+    [DIGEST_WEEKLY_JOB, DIGEST_WEEKLY_CRON, 'weekly'],
+  ] as const) {
+    await boss.createQueue(job);
+    await boss.work(job, async () => {
+      if (!launch) {
+        log(`${frequency} digest skipped: no notifier configured`);
+        return;
+      }
+      const result = await sweepDigests(
+        {
+          db,
+          notifier: launch.notifier,
+          fromAddress: launch.context.fromAddress,
+          supportEmail: launch.context.supportEmail,
+          appBaseUrl: launch.context.appBaseUrl,
+        },
+        { frequency },
+      );
+      log(`${frequency} digest sweep complete`, {
+        considered: result.considered,
+        sent: result.sent,
+        skippedEmpty: result.skippedEmpty,
+      });
+    });
+    await boss.schedule(job, cron, undefined, { tz: 'UTC' });
+  }
 
   return {
     boss,

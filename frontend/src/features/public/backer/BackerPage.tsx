@@ -24,6 +24,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams } from 'react-router';
 import { Button, Section, Measure } from '../../../components/index.js';
 import { CommentThread } from './CommentThread.js';
+import {
+  DigestPreference,
+  type DigestPreferenceView,
+} from '../../../surfaces/notifications/DigestPreference.js';
 import { mountCardElement, stripeConfigured, type StripeCard } from '../checkout/stripe.js';
 import {
   fetchBackerPage,
@@ -32,6 +36,8 @@ import {
   fetchBackerSupport,
   openSupportCase,
   escalateSupportCase,
+  fetchBackerDigestPreference,
+  saveBackerDigestPreference,
   type BackerPageData,
   type BackerSupportView,
   type BackerTransaction,
@@ -128,6 +134,14 @@ export function BackerPage(props: BackerPageProps = {}) {
             this Backer's full context, and the recorded escalation to Proovd
             when the Founder has not responded or resolved it. */}
         <SupportSection token={token} transactions={page.transactions} />
+
+        {/* §27.7 (Phase 22c): "Backer selects preference at first magic-link
+            visit." There is no first-visit marker anywhere in the product —
+            `secure_tokens.last_used_at` is a LAST-seen and rotation destroys
+            it — so first visit is the absence of a recorded choice, and the
+            control renders the question until one exists. Nothing is
+            preselected (§30), and turning it off never stops a receipt. */}
+        <BackerDigestPreference token={token} />
 
         {/* §18's general thread. It lives here rather than on the public
             campaign page because §18 lets only a magic-link-authenticated
@@ -512,5 +526,41 @@ function SupportSection({
         </p>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * §27.7's digest preference, on the one surface where a Backer is
+ * authenticated at all.
+ *
+ * A read failure renders nothing rather than an error: the preference is the
+ * least important thing on this page, and a Backer here to check a charge
+ * should not meet a red box about a summary email. Nothing is lost — the
+ * control reappears on the next visit, which is exactly the state it was in.
+ */
+function BackerDigestPreference({ token }: { token: string }) {
+  const [preference, setPreference] = useState<DigestPreferenceView | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const view = await fetchBackerDigestPreference(token);
+      if (live && view) setPreference(view);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [token]);
+
+  if (!preference) return null;
+
+  return (
+    <DigestPreference
+      preference={preference}
+      compact
+      onSave={async (frequency) => {
+        setPreference(await saveBackerDigestPreference(token, frequency));
+      }}
+    />
   );
 }

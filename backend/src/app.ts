@@ -54,6 +54,7 @@ import { createAdminLaunchRouter } from './routes/admin-launch.js';
 import { createFounderCreatorPaymentRouter } from './routes/founder-creator-payment.js';
 import { createAdminCreatorReadinessRouter } from './routes/admin-creator-readiness.js';
 import { createFounderHomeRouter } from './routes/founder-home.js';
+import { createNotificationsRouter } from './routes/notifications.js';
 import {
   createFounderLiveEditRouter,
   createBackerCommentRouter,
@@ -437,6 +438,16 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Admin as a change request, or refused outright. A route per tier would let a
   // caller pick which rules apply by picking a URL.
   app.use(createFounderLiveEditRouter({ db, auth, audit }));
+  // Phase 22c (§27.7). The digest preference and the notification history, one
+  // router mounted three times with the audience bound at construction — an
+  // `?audience=` parameter would let a Creator ask for the Founder view. The
+  // Admin mount additionally carries §27.2's preview, which reports rather than
+  // refuses (see `notifications/preview.ts`). None of them writes a read-state:
+  // §27.7 forbids the history becoming a dashboard, and a read receipt is the
+  // first thing an unread badge would be computed from.
+  app.use(createNotificationsRouter({ db, auth, audit }, 'founder'));
+  app.use(createNotificationsRouter({ db, auth, audit }, 'affiliate'));
+  app.use(createNotificationsRouter({ db, auth, audit }, 'admin'));
   // Phase 17b (§20, §18, §33.6.13). Admin decides change requests and comment
   // flags, and adds a Creator mid-campaign. Writes take the freshness gate.
   app.use(createAdminLiveOpsRouter({ db, auth, audit }));

@@ -375,6 +375,24 @@ export const INTERNAL_DAY_14_DUE = 'internal_day_14_due' as const;
 export const FOUNDER_RESPONSE_WINDOW_STARTED = 'founder_response_window_started' as const;
 export const INTERNAL_MISSING_W9 = 'internal_missing_w9' as const;
 
+/*
+ * §27.7 — the optional digest, the only opt-out-able message in the product.
+ *
+ * Three keys because the dedup constraint is (event, target, entity) and the
+ * three audiences see different activity; one shared key would make a Founder's
+ * digest and a Creator's digest for the same period collide the moment one
+ * person held both roles. The Backer key is §27.5's own bullet; the Founder and
+ * Creator keys are §27.7's ("Founder/Affiliate in settings"), which is why
+ * their `specRef` says §27.7 rather than borrowing the transactional inventory
+ * they are deliberately not part of.
+ *
+ * Deduped on `<preference id>:<period key>`: one digest per subscriber per
+ * period, whatever the job does.
+ */
+export const FOUNDER_ACTIVITY_DIGEST = 'founder_activity_digest' as const;
+export const AFFILIATE_ACTIVITY_DIGEST = 'affiliate_activity_digest' as const;
+export const BACKER_CAMPAIGN_UPDATE_DIGEST = 'backer_campaign_update_digest' as const;
+
 export const FOUNDER_CONNECTED_ACCOUNT_STATUS = 'founder_connected_account_status' as const;
 export const AFFILIATE_CONNECTED_ACCOUNT_INFO_REQUIRED =
   'affiliate_connected_account_info_required' as const;
@@ -463,6 +481,9 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   AFFILIATE_TRANSFER_UPDATE,
   FOUNDER_RESPONSE_WINDOW_STARTED,
   INTERNAL_MISSING_W9,
+  FOUNDER_ACTIVITY_DIGEST,
+  AFFILIATE_ACTIVITY_DIGEST,
+  BACKER_CAMPAIGN_UPDATE_DIGEST,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

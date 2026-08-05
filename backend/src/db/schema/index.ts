@@ -123,3 +123,8 @@ export * from './enforcement.js';
 // five-business-day deadline, the write-once Day 14 review with its durable
 // insert-only receipt, and the one-per-Founder permanent ghost ban.
 export * from './fulfillment.js';
+// Phase 22c: §27.7 — the optional digest preference, one per person, existing
+// only because someone chose it, with its trigger-written insert-only history.
+// No digest-content table and no unread counter: the digest composes from
+// records that already exist, and a badge is the pressure DNA §5.5 replaces.
+export * from './digest.js';
