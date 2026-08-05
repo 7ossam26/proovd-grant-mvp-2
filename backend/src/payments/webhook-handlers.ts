@@ -51,6 +51,7 @@ import {
   notifyListingPayment,
   type ListingNotificationContext,
 } from './listing-notifications.js';
+import { notifyAccountStateChange } from './account-notifications.js';
 import {
   FUNDING_PURPOSE,
   applyAllocationFunding,
@@ -77,6 +78,7 @@ import {
   applyConnectDisputeEvent,
   applyPlatformDisputeEvent,
   applyTransferReversed,
+  applyTransferUpdated,
   type DisputeDeps,
 } from '../disputes/service.js';
 
@@ -184,6 +186,7 @@ export const CONNECT_HANDLERS: Record<string, EventHandler> = {
   'charge.dispute.updated': handleConnectDispute,
   'charge.dispute.closed': handleConnectDispute,
   'transfer.reversed': handleTransferReversed,
+  'transfer.updated': handleTransferUpdated,
 };
 
 export function handlersFor(endpoint: WebhookEndpoint): Record<string, EventHandler> {
@@ -354,6 +357,26 @@ async function handleAccountUpdated(
       priorValue: { state: result.priorState },
       newValue: { state: result.state, disabledReason: facts.disabledReason },
     });
+
+    // §27.3/§27.4 (Phase 22b). The state moved and it has a consequence — a
+    // Founder who cannot sell, a Creator who cannot be paid — so the person
+    // who owns the next step hears it here rather than at the wall (§27.1).
+    // Past-due requirements first: §13 wants the exact missing one.
+    await notifyAccountStateChange(
+      {
+        db: context.db,
+        notifier: context.notifier,
+        context: context.notificationContext,
+      },
+      {
+        stripeAccountId,
+        role: known.role as 'founder_seller' | 'affiliate_recipient',
+        ownerUserId: known.ownerUserId,
+        priorState: result.priorState,
+        state: result.state,
+        missingRequirements: [...facts.pastDue, ...facts.currentlyDue],
+      },
+    );
   }
 }
 
@@ -938,6 +961,25 @@ async function handleTransferReversed(
   event: VerifiedStripeEvent,
 ): Promise<void> {
   await applyTransferReversed(disputeDeps(context), {
+    id: event.id,
+    object: event.object,
+    account: event.account ?? null,
+  });
+}
+
+/**
+ * `transfer.updated` — §32.3's Connect set, registered in Phase 22b.
+ *
+ * Most deliveries are Proovd's own metadata edits and carry nothing a Creator
+ * needs; the applier records every one under §32.4 and messages only when the
+ * provider's amount disagrees with the recorded total (§27: no notification
+ * without a consequence behind it).
+ */
+async function handleTransferUpdated(
+  context: HandlerContext,
+  event: VerifiedStripeEvent,
+): Promise<void> {
+  await applyTransferUpdated(disputeDeps(context), {
     id: event.id,
     object: event.object,
     account: event.account ?? null,

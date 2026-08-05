@@ -346,6 +346,40 @@ export const BACKER_DELIVERY = 'backer_delivery' as const;
 export const FOUNDER_DAY_14_REVIEW_RESULT = 'founder_day_14_review_result' as const;
 export const INTERNAL_DAY_14_DUE = 'internal_day_14_due' as const;
 
+/*
+ * Phase 22b — the §27 sweep's senders. Each closes a gap `unsent.ts` had
+ * recorded as `kind: 'message'`: the behaviour was already built and recorded,
+ * and only the message was missing. A key moves out of that register and into
+ * this list in the same change that gives it a sender, which is what keeps the
+ * two lists a partition of the §27 register (`notification-coverage.test.ts`).
+ *
+ * §27.3/§27.4 — the connected-account status. §13's four derived states have
+ * moved on their own from `account.updated` since Phase 10a and nobody was
+ * told. Deduped on `<account>:<state>`: the change is the event, so a slip and
+ * a later recovery are two messages and a provider touch that changed nothing
+ * is none.
+ *
+ * §27.4 — "Transfer … update". §32.3 lists `transfer.updated` on the Connect
+ * endpoint and the handler map never registered it; the Transfer record has
+ * existed since 19a. Deduped per transfer row.
+ */
+/*
+ * §27.3 — "Formal response window start". §13's effect 5 stores the 72-hour
+ * deadline at payment and the receipt carried it as one line among a dozen;
+ * §27.3 names the window start as its own bullet and it is the only clock a
+ * Founder owes Creators an answer against. Deduped on the payment.
+ *
+ * §27.6 — "Missing W-9". `founder_w9_block` tells the Founder; the Admin
+ * counterpart rides the same schedule-sweep detection, once per campaign.
+ */
+export const FOUNDER_RESPONSE_WINDOW_STARTED = 'founder_response_window_started' as const;
+export const INTERNAL_MISSING_W9 = 'internal_missing_w9' as const;
+
+export const FOUNDER_CONNECTED_ACCOUNT_STATUS = 'founder_connected_account_status' as const;
+export const AFFILIATE_CONNECTED_ACCOUNT_INFO_REQUIRED =
+  'affiliate_connected_account_info_required' as const;
+export const AFFILIATE_TRANSFER_UPDATE = 'affiliate_transfer_update' as const;
+
 export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_INVITATION,
   AFFILIATE_CAMPAIGN_INVITATION,
@@ -424,6 +458,11 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   BACKER_DELIVERY,
   FOUNDER_DAY_14_REVIEW_RESULT,
   INTERNAL_DAY_14_DUE,
+  FOUNDER_CONNECTED_ACCOUNT_STATUS,
+  AFFILIATE_CONNECTED_ACCOUNT_INFO_REQUIRED,
+  AFFILIATE_TRANSFER_UPDATE,
+  FOUNDER_RESPONSE_WINDOW_STARTED,
+  INTERNAL_MISSING_W9,
 ] as const;
 
 export type NotificationEventKey = (typeof BACKEND_NOTIFICATION_EVENTS)[number];

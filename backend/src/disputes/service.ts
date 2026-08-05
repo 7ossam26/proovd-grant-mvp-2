@@ -70,7 +70,7 @@ import {
   PAYMENT_DISPUTE_STATUSES,
 } from './logic.js';
 import { deriveEarningsPhase } from '../refunds/service.js';
-import { notifyDisputeOpened, notifyTransferReversal } from './notifications.js';
+import { notifyDisputeOpened, notifyTransferReversal, notifyTransferUpdate } from './notifications.js';
 
 export interface DisputeDeps {
   db: Database;
@@ -526,6 +526,105 @@ export async function applyTransferReversed(
   await notifyTransferReversal(deps, {
     transfer,
     amountReversedCents: amountReversed,
+  });
+}
+
+/**
+ * `transfer.updated` — §32.3's Connect set, registered in Phase 22b.
+ *
+ * ── Most of these deliveries are ours, and carry nothing a Creator needs ────
+ * Stripe fires `transfer.updated` for any change to the Transfer object,
+ * including a metadata or description edit Proovd itself made. §27's own rule
+ * — no notification without a real action or consequence behind it — means the
+ * default here is to record and say nothing.
+ *
+ * The exception is a change to the money: an amount or a reversed amount that
+ * disagrees with what Proovd recorded is a fact the Creator is owed, because it
+ * changes what they are being paid. So the message is gated on that comparison
+ * rather than on the delivery arriving, and the audit row is written either way
+ * — an unreconciled amount is routed to Admin, never guessed into place
+ * (§1 rule 6).
+ */
+export async function applyTransferUpdated(
+  deps: DisputeDeps,
+  event: { id: string; object: Record<string, unknown>; account: string | null },
+): Promise<void> {
+  const transferId = typeof event.object['id'] === 'string' ? event.object['id'] : null;
+  if (!transferId) {
+    await deps.audit({
+      action: 'transfer.update_unbindable',
+      targetType: 'provider_event',
+      targetId: event.id,
+      internalReason: 'transfer.updated delivery carried no transfer id; nothing was applied',
+    });
+    return;
+  }
+
+  const amount =
+    typeof event.object['amount'] === 'number'
+      ? BigInt(Math.trunc(event.object['amount']))
+      : null;
+  const amountReversed =
+    typeof event.object['amount_reversed'] === 'number'
+      ? BigInt(Math.trunc(event.object['amount_reversed']))
+      : null;
+
+  const [transfer] = await deps.db
+    .select()
+    .from(affiliateTransfers)
+    .where(eq(affiliateTransfers.providerTransferId, transferId))
+    .limit(1);
+
+  await recordProviderObject(deps.db, {
+    mode: deps.gateway.mode,
+    objectType: 'transfer',
+    providerObjectId: transferId,
+    accountContext: event.account ? 'connected' : 'platform',
+    ...(event.account ? { stripeAccountId: event.account } : {}),
+    campaignId: transfer?.campaignId ?? null,
+    associationId: transfer?.associationId ?? null,
+    ...(amount !== null ? { amountCents: amount } : {}),
+    status: 'updated',
+  });
+
+  if (!transfer) {
+    await deps.audit({
+      action: 'transfer.update_unreconciled',
+      targetType: 'provider_event',
+      targetId: event.id,
+      internalReason: `transfer.updated for ${transferId} matches no affiliate_transfers row; recorded under §32.4 and routed to Admin (§1 rule 6)`,
+    });
+    return;
+  }
+
+  // The comparison that decides whether anyone is told. `total_cents` is
+  // CHECK-pinned to commission + bonus + fixed and a `created` row is
+  // trigger-immutable, so a provider amount that disagrees with it is a real
+  // discrepancy rather than a rounding artefact.
+  const amountMoved = amount !== null && amount !== transfer.totalCents;
+  const reversalMoved = amountReversed !== null && amountReversed > 0n;
+
+  await deps.audit({
+    action: amountMoved ? 'transfer.update_amount_discrepancy' : 'transfer.update_recorded',
+    targetType: 'campaign_affiliate_association',
+    targetId: transfer.associationId,
+    internalReason: amountMoved
+      ? `transfer.updated for ${transferId} reports ${amount} against a recorded total of ${transfer.totalCents}; routed to Admin`
+      : `transfer.updated for ${transferId} changed nothing about the amount`,
+    newValue: {
+      transferId: transfer.id,
+      providerAmountCents: amount?.toString() ?? null,
+      amountReversedCents: amountReversed?.toString() ?? null,
+    },
+  });
+
+  // A reversal has its own §27.4 message and its own handler; announcing it
+  // again from here would be two messages for one fact.
+  if (!amountMoved || reversalMoved) return;
+
+  await notifyTransferUpdate(deps, {
+    transfer,
+    providerAmountCents: amount,
   });
 }
 

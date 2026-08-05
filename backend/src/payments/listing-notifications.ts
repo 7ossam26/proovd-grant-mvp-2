@@ -23,6 +23,7 @@ import { affiliateProspects } from '../db/schema/affiliates.js';
 import { listingFeeRefunds } from '../db/schema/listing.js';
 import type { Notifier } from '../notifications/send.js';
 import {
+  FOUNDER_RESPONSE_WINDOW_STARTED,
   FOUNDER_LISTING_FEE_RECEIPT,
   FOUNDER_LISTING_FEE_REFUND,
   AFFILIATE_FORMAL_OPPORTUNITY_AVAILABLE,
@@ -35,7 +36,7 @@ import {
   type ListingFeeLine,
 } from '../notifications/templates/listing-fee.js';
 import { renderFormalOpportunity } from '../notifications/templates/affiliate-formal-opportunity.js';
-import { renderInternalNotice } from '../notifications/templates/plain.js';
+import { renderInternalNotice, renderPlainNotice } from '../notifications/templates/plain.js';
 import { findListingPayment } from './listing-checkout.js';
 
 export interface ListingNotificationContext {
@@ -91,6 +92,8 @@ async function founderIdentity(db: Database, campaignId: string) {
 
 export interface PaymentNotifyResult {
   receipt: string;
+  /** §27.3's "Formal response window start" (Phase 22b). */
+  responseWindow: string;
   opportunities: Array<{ associationId: string; outcome: string }>;
   internal: string;
 }
@@ -200,6 +203,55 @@ export async function notifyListingPayment(
     }
   }
 
+  /*
+   * §27.3's "Formal response window start" (Phase 22b).
+   *
+   * §13's effect 5 stores this deadline at payment and the receipt carries it
+   * as one line among a dozen. §27.3 names the window start as its own bullet,
+   * and it deserves one: it is the only 72-hour clock a Founder owes Creators
+   * an answer against, and a deadline buried inside a receipt is a deadline
+   * read once. Deduped on the PAYMENT — the window starts once per payment, and
+   * a §31.6 cancellation-and-repay would be a new payment and a new window.
+   */
+  let windowOutcome = 'skipped: no Founder address';
+  if (founder?.email) {
+    const opportunities = input.openedAssociationIds.length;
+    const windowNotice = await renderPlainNotice({
+      subject: `Creators have until ${deadlineUtc} UTC to respond — ${founder.productName ?? 'your campaign'}`,
+      headline: 'The Creator response window has started.',
+      facts: [
+        // §27.1: a deadline names its zone.
+        { label: 'Creators must respond by', value: `${deadlineUtc} UTC` },
+        {
+          label: 'Creators who can respond',
+          value: `${opportunities} ${opportunities === 1 ? 'Creator' : 'Creators'}`,
+        },
+        { label: 'Who owns it', value: 'The Creators — and you, once one proposes terms' },
+        { label: 'What you can do now', value: 'Build your campaign; both tracks run in parallel' },
+      ],
+      paragraphs: [
+        'If no Creator and you mutually accept the same terms before that deadline, Proovd refunds your listing payment in full, including its sales tax, automatically.',
+      ],
+      action: {
+        label: 'Open your campaign roster',
+        url: `${context.appBaseUrl}/campaigns/${input.campaignId}/roster`,
+      },
+      reference: input.campaignId,
+      supportEmail: context.supportEmail,
+    });
+
+    const outcome = await notifier.send({
+      eventKey: FOUNDER_RESPONSE_WINDOW_STARTED,
+      entityType: 'listing_fee_payment',
+      entityId: input.paymentId,
+      to: founder.email,
+      from: context.fromAddress,
+      replyTo: context.supportEmail,
+      ...windowNotice,
+    });
+    windowOutcome = outcome.status;
+  }
+
   /* §27.6: "Listing paid / deadline started" — to the staffed inbox. */
   const opened = input.openedAssociationIds.length;
   const internalNotice = await renderInternalNotice({
@@ -232,7 +284,12 @@ export async function notifyListingPayment(
     ...internalNotice,
   });
 
-  return { receipt: receiptOutcome, opportunities, internal: internal.status };
+  return {
+    receipt: receiptOutcome,
+    responseWindow: windowOutcome,
+    opportunities,
+    internal: internal.status,
+  };
 }
 
 /* ── The refund confirmation (§13, §27.3) ─────────────────────────────────── */

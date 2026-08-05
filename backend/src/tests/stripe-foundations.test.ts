@@ -322,14 +322,25 @@ describe('§32.3 — two endpoints, two handler maps', () => {
     // reads as "handled", and this build does not handle these.
     //
     // `checkout.session.*` left this list in Phase 11, `payment_intent.*` in
-    // Phase 18a, `charge.refunded` in Phase 20a, and `charge.dispute.*` /
-    // `transfer.reversed` in Phase 20b — each the phase whose objects those
-    // are. `transfer.created`/`transfer.updated` stay recorded-and-ignored:
-    // the Transfer is Proovd's own synchronous call, stored at creation.
-    for (const type of ['setup_intent.succeeded', 'transfer.created', 'transfer.updated']) {
+    // Phase 18a, `charge.refunded` in Phase 20a, `charge.dispute.*` /
+    // `transfer.reversed` in Phase 20b, and `transfer.updated` in Phase 22b —
+    // each the phase whose objects those are.
+    //
+    // `transfer.created` stays recorded-and-ignored, and the reason is worth
+    // keeping: the §22.1 Transfer is Proovd's own synchronous API call and is
+    // stored under §32.4 at creation, so the webhook confirms a fact already
+    // recorded and there is nothing for a handler to apply.
+    for (const type of ['setup_intent.succeeded', 'transfer.created']) {
       expect(PLATFORM_HANDLERS[type]).toBeUndefined();
       expect(CONNECT_HANDLERS[type]).toBeUndefined();
     }
+
+    // §32.3 lists `transfer.updated` on the Connect endpoint and Phase 22b
+    // registered it — the applier records every delivery under §32.4 and
+    // messages only when the provider's amount disagrees with the recorded
+    // total (§27: no notification without a consequence behind it).
+    expect(CONNECT_HANDLERS['transfer.updated']).toBeDefined();
+    expect(PLATFORM_HANDLERS['transfer.updated']).toBeUndefined();
   });
 
   it('registers Phase 20a’s charge.refunded and Phase 20b’s charge.dispute.* on both endpoints', () => {

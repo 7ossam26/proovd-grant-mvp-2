@@ -82,6 +82,9 @@ export const DEADLINE_MESSAGE_KEYS: readonly NotificationEventKey[] = [
   'backer_precharge_reminder',
   // Appendix B.5's retry-window deadline, after which the pre-order is canceled.
   'backer_charge_failed_update_card',
+  // §14.6's 72-hour Creator response window — the deadline a Founder's
+  // listing refund turns on.
+  'founder_response_window_started',
   // §29.4's five-business-day appeal deadline.
   'affiliate_warning',
   'affiliate_suspension',

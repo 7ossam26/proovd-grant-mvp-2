@@ -162,6 +162,24 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       supportEmail: SUPPORT,
     }),
 
+  founder_response_window_started: () =>
+    renderPlainNotice({
+      subject: `Creators have until 2026-08-12 09:00 UTC to respond — ${CAMPAIGN}`,
+      headline: 'The Creator response window has started.',
+      facts: [
+        { label: 'Creators must respond by', value: '2026-08-12 09:00 UTC' },
+        { label: 'Creators who can respond', value: '4 Creators' },
+        { label: 'Who owns it', value: 'The Creators — and you, once one proposes terms' },
+        { label: 'What you can do now', value: 'Build your campaign; both tracks run in parallel' },
+      ],
+      paragraphs: [
+        'If no Creator and you mutually accept the same terms before that deadline, Proovd refunds your listing payment in full, including its sales tax, automatically.',
+      ],
+      action: { label: 'Open your campaign roster', url: `${APP}/campaigns/c1/roster` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
   founder_creator_proposal_received: () => renderProposalReceived(proposal()),
   founder_creator_proposal_revision: () => renderProposalReceived(proposal()),
   founder_creator_proposal_decision: () =>
@@ -281,6 +299,8 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       reference: REF,
       supportEmail: SUPPORT,
     }),
+
+  founder_connected_account_status: () => accountStatus('founder'),
 
   founder_day_14_review_result: () =>
     renderDay14Result({
@@ -495,6 +515,28 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
 
   affiliate_warning: () => enforcement('warned', 'affiliate'),
   affiliate_suspension: () => enforcement('suspended', 'affiliate'),
+
+  affiliate_connected_account_info_required: () => accountStatus('affiliate'),
+
+  affiliate_transfer_update: () =>
+    renderPlainNotice({
+      subject: `Transfer amount under review — ${CAMPAIGN}`,
+      headline: 'A transfer for this campaign is being checked.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Amount Proovd recorded', value: 'US$954.00' },
+        { label: 'Amount the payment provider reports', value: 'US$940.00' },
+        { label: 'Status', value: 'Pending — a person is reconciling the two' },
+        { label: 'Who owns it', value: 'Proovd' },
+      ],
+      paragraphs: [
+        'Your finalized earnings have not changed. We are checking why the two figures differ before anything else happens, and we will tell you the outcome.',
+        'No action is needed from you.',
+      ],
+      action: { label: 'View your earnings', url: `${APP}/creator/campaigns/a1/close` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
 
   affiliate_policy_reacceptance: () =>
     renderPlainNotice({
@@ -798,6 +840,25 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       supportEmail: SUPPORT,
     }),
 
+  internal_missing_w9: () =>
+    renderInternalNotice({
+      subject: 'W-9 missing — campaign c1',
+      headline: 'A verified W-9 is missing — campaign c1',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Amount blocked', value: 'US$3,204.90' },
+        {
+          label: 'Why',
+          value:
+            'Charges settled and the payment schedule has started; no Founder payment can exist without a verified W-9 (§22.3).',
+        },
+        { label: 'Next', value: 'Record receipt and the verification decision from the close queue.' },
+      ],
+      action: { label: 'Open the close queue', url: `${APP}/admin/close` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
   internal_day_14_due: () =>
     renderInternalNotice({
       subject: `Day 14 Progress Check due — ${CAMPAIGN}`,
@@ -890,6 +951,28 @@ function released(kindLabel: string) {
       'Sales tax collected from Backers is not part of your share and is remitted separately.',
     paymentsUrl: `${APP}/campaigns/c1/results`,
     reference: REF,
+    supportEmail: SUPPORT,
+  });
+}
+
+function accountStatus(role: 'founder' | 'affiliate') {
+  return renderPlainNotice({
+    subject: 'Action on your Proovd payout account — more information required',
+    headline: 'Stripe needs more information before you can be paid.',
+    facts: [
+      { label: 'Status', value: 'More information required' },
+      { label: 'Who owns it', value: 'You — Stripe collects it directly, and Proovd never sees it' },
+      {
+        label: 'What Stripe still needs',
+        value: role === 'founder' ? 'company.tax_id, representative.dob' : 'individual.id_number',
+      },
+    ],
+    paragraphs: [
+      'Open your payout setup and supply what is listed below. It usually takes a few minutes.',
+      'Stripe collects and holds the identity, tax, and bank details for this account. Proovd never asks for them and never stores them.',
+    ],
+    action: { label: 'Open payout setup', url: `${APP}/payouts` },
+    reference: 'acct_1PxSampleAccount',
     supportEmail: SUPPORT,
   });
 }

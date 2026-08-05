@@ -80,6 +80,7 @@ import {
 import {
   notifyW9Prompt,
   notifyW9Block,
+  notifyMissingW9Internal,
   notifyFounderPaymentReleased,
   notifyEarlyRequestReceived,
   notifyEarlyRequestResult,
@@ -1536,6 +1537,12 @@ export async function sweepFounderPaymentSchedule(
             { campaignId: campaign.id, view },
           );
           if (sent) result.w9Blocked += 1;
+          // §27.6's Admin counterpart, from the SAME detection (Phase 22b) —
+          // two senders reading one state cannot disagree about it.
+          await notifyMissingW9Internal(
+            { db: deps.db, notifier: deps.notifier, context: deps.context },
+            { campaignId: campaign.id, view },
+          );
         }
       }
     }

@@ -379,9 +379,13 @@ describe('§33.3.5 — the session lines and the receipt', () => {
     const { res } = await completeSession(checkout.sessionId);
     expect(res.status).toBe(200);
 
-    const receipts = emailsTo(j.founder.email);
-    expect(receipts).toHaveLength(1);
-    const receipt = receipts[0]!;
+    // Two Founder messages now: the receipt, and §27.3's separate "Formal
+    // response window start" (Phase 22b). §27.3 names them as two bullets, and
+    // a 72-hour clock buried inside a dozen-line receipt is a clock read once.
+    const founderMail = emailsTo(j.founder.email);
+    expect(founderMail).toHaveLength(2);
+    const receipt = founderMail.find((m) => m.subject.startsWith('Your Proovd listing'))
+      ?? founderMail.find((m) => !m.subject.includes('respond'))!;
 
     expect(receipt.subject).toContain('Product a');
     for (const part of [receipt.text, receipt.html]) {
@@ -577,8 +581,13 @@ describe('successful payment — seven effects, one transaction', () => {
   });
 
   it('sends the receipt and one formal-opportunity message with one action', async () => {
-    const receipts = emailsTo(j.founder.email);
-    expect(receipts).toHaveLength(1);
+    // The receipt and the §27.3 response-window notice (Phase 22b).
+    const founderMail = emailsTo(j.founder.email);
+    expect(founderMail).toHaveLength(2);
+    const window = founderMail.find((m) => m.subject.includes('respond'));
+    expect(window, 'the response window has its own message').toBeDefined();
+    // §27.1: the deadline names its zone, in words.
+    expect(window!.text).toContain('UTC');
 
     const opportunities = emailsTo(j.creatorEmail);
     expect(opportunities).toHaveLength(1);

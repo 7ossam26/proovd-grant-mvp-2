@@ -31,6 +31,7 @@ import {
   FOUNDER_EARLY_REMAINING_RESULT,
   INTERNAL_MONEY_DECISIONS_DUE,
   INTERNAL_DELIVERABLE_VERIFICATION_DUE,
+  INTERNAL_MISSING_W9,
 } from '../notifications/events.js';
 import {
   renderW9Prompt,
@@ -265,6 +266,57 @@ export async function notifyEarlyRequestResult(
     replyTo: deps.context.supportEmail,
     ...rendered,
   });
+}
+
+/**
+ * §27.6's "Missing W-9" (Phase 22b).
+ *
+ * `founder_w9_block` tells the Founder their payment is blocked; §27.6 names
+ * the Admin notice separately, and the schedule sweep already computes the
+ * state that sends both. It rides the same detection rather than a second one,
+ * so the two can never disagree about whether a campaign is blocked.
+ *
+ * Once per campaign: the campaign enters `captured_pending_w9` once, and a
+ * nightly repeat of the same fact is the drumbeat §27.1 is not asking for.
+ */
+export async function notifyMissingW9Internal(
+  deps: FounderPaymentNotificationDeps,
+  input: { campaignId: string; view: FounderPaymentStatusView },
+): Promise<boolean> {
+  const affected = input.view.payments
+    .filter((p) => p.status !== 'released')
+    .reduce((sum, p) => sum + BigInt(p.amountCents), 0n);
+
+  const notice = await renderInternalNotice({
+    subject: `W-9 missing — campaign ${input.campaignId}`,
+    headline: `A verified W-9 is missing — campaign ${input.campaignId}`,
+    facts: [
+      { label: 'Campaign', value: await campaignTitle(deps.db, input.campaignId) },
+      { label: 'Amount blocked', value: `US$${formatCents(affected)}` },
+      {
+        label: 'Why',
+        value:
+          'Charges settled and the payment schedule has started; no Founder payment can exist without a verified W-9 (§22.3).',
+      },
+      {
+        label: 'Next',
+        value: 'Record receipt and the verification decision from the close queue.',
+      },
+    ],
+    action: { label: 'Open the close queue', url: `${deps.context.appBaseUrl}/admin/close` },
+    reference: input.campaignId,
+    supportEmail: deps.context.supportEmail,
+  });
+
+  const outcome = await deps.notifier.send({
+    eventKey: INTERNAL_MISSING_W9,
+    entityType: 'campaign',
+    entityId: input.campaignId,
+    to: deps.context.supportEmail,
+    from: deps.context.fromAddress,
+    ...notice,
+  });
+  return outcome.status === 'sent';
 }
 
 /* ── §27.6: the two internal notices, to the staffed inbox ──────────────────── */

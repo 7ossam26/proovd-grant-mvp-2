@@ -221,6 +221,7 @@ export const MONEY_MESSAGE_CLASS: Record<string, MoneyMessageClass> = {
 export const DEADLINE_MESSAGE_KEYS: readonly string[] = [
   'backer_precharge_reminder',
   'backer_charge_failed_update_card',
+  'founder_response_window_started',
   'affiliate_warning',
   'affiliate_suspension',
   'affiliate_policy_reacceptance',

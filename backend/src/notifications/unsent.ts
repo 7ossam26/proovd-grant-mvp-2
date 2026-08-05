@@ -103,32 +103,6 @@ export const UNSENT_NOTIFICATION_EVENTS = {
       '§5.5 reset exists in Better Auth and `sendResetPassword` is wired — to a function that throws, deliberately, because Phase 04 had no transport. Phase 06b built one. The message is the only thing missing.',
     record: 'better-auth verification tokens',
   },
-  founder_connected_account_status: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§13\'s four derived states already move on `account.updated`; nothing tells the Founder.',
-    record: 'stripe_connected_accounts + stripe_account_events',
-  },
-  affiliate_connected_account_info_required: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason: '§13\'s requirement names are already stored per account; the Creator is never told.',
-    record: 'stripe_connected_accounts.requirements',
-  },
-  affiliate_transfer_update: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§32.3 lists `transfer.updated` on the Connect endpoint and the handler map does not register it. The Transfer record exists; the event is unhandled and the message unsent.',
-    record: 'affiliate_transfers',
-  },
-  founder_response_window_started: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§13\'s effect 5 stores the 72-hour deadline at listing payment and the receipt carries it as one line. §27.3 names the window start as its own bullet, and a Founder who owes Creators an answer deserves a message about the answer rather than a sentence inside a receipt.',
-    record: 'listing_fee_payments.response_deadline_at',
-  },
   founder_roster_update: {
     kind: 'message',
     owner: 'phase-22b',
@@ -302,13 +276,6 @@ export const UNSENT_NOTIFICATION_EVENTS = {
     reason:
       '§27.6. A submitted first post waits for an Admin decision whose three outcomes pause a Creator; nothing announces that it is waiting.',
     record: 'creator_post_submissions',
-  },
-  internal_missing_w9: {
-    kind: 'message',
-    owner: 'phase-22b',
-    reason:
-      '§27.6. `founder_w9_block` tells the Founder; §27.6 names the Admin notice separately and the schedule sweep already computes the state that would send it.',
-    record: 'founder_w9_records',
   },
   internal_risk_flag: {
     kind: 'message',

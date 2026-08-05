@@ -14,6 +14,7 @@ import type { PaymentDispute } from '../db/schema/disputes.js';
 import type { AffiliateTransfer } from '../db/schema/earnings.js';
 import {
   AFFILIATE_TRANSFER_REVERSAL,
+  AFFILIATE_TRANSFER_UPDATE,
   INTERNAL_DISPUTE_OPENED,
 } from '../notifications/events.js';
 import { formatCents } from '../reservations/restated.js';
@@ -108,6 +109,63 @@ export async function notifyTransferReversal(
     eventKey: AFFILIATE_TRANSFER_REVERSAL,
     entityType: 'affiliate_transfer',
     // One reversal notice per Transfer — a redelivered webhook sends nothing.
+    entityId: input.transfer.id,
+    to: profile.email,
+    from: deps.context.fromAddress,
+    replyTo: deps.context.supportEmail,
+    ...notice,
+  });
+}
+
+/**
+ * §27.4 "Transfer … update" (Phase 22b).
+ *
+ * Sent only when the provider's amount disagrees with the recorded total —
+ * `applyTransferUpdated` makes that comparison, and everything else is recorded
+ * without a message, because §27 forbids a notification with no consequence
+ * behind it. The Creator is told the discrepancy exists and that a person is
+ * looking at it; the resolution is an Admin's recorded decision, never one this
+ * message predicts (§1 rule 6).
+ */
+export async function notifyTransferUpdate(
+  deps: DisputeDeps,
+  input: { transfer: AffiliateTransfer; providerAmountCents: bigint },
+): Promise<void> {
+  if (!deps.notifier || !deps.context) return;
+  const [profile] = await deps.db
+    .select({ email: affiliateSignupProfiles.email })
+    .from(affiliateSignupProfiles)
+    .where(eq(affiliateSignupProfiles.associationId, input.transfer.associationId))
+    .limit(1);
+  if (!profile?.email) return;
+
+  const title = await campaignTitle(deps, input.transfer.campaignId);
+  const notice = await renderPlainNotice({
+    subject: `Transfer amount under review — ${title}`,
+    headline: 'A transfer for this campaign is being checked.',
+    facts: [
+      { label: 'Campaign', value: title },
+      { label: 'Amount Proovd recorded', value: `US$${formatCents(input.transfer.totalCents)}` },
+      { label: 'Amount the payment provider reports', value: `US$${formatCents(input.providerAmountCents)}` },
+      { label: 'Status', value: 'Pending — a person is reconciling the two' },
+      { label: 'Who owns it', value: 'Proovd' },
+    ],
+    paragraphs: [
+      'Your finalized earnings have not changed. We are checking why the two figures differ before anything else happens, and we will tell you the outcome.',
+      'No action is needed from you.',
+    ],
+    action: {
+      label: 'View your earnings',
+      url: `${deps.context.appBaseUrl}/creator/campaigns/${input.transfer.associationId}/close`,
+    },
+    reference: input.transfer.id,
+    supportEmail: deps.context.supportEmail,
+  });
+
+  await deps.notifier.send({
+    eventKey: AFFILIATE_TRANSFER_UPDATE,
+    entityType: 'affiliate_transfer',
+    // Per transfer row: a redelivery of the same discrepancy is the same fact.
     entityId: input.transfer.id,
     to: profile.email,
     from: deps.context.fromAddress,
