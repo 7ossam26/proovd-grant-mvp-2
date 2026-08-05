@@ -43,6 +43,11 @@ import {
   ADMIN_FULFILLMENT_BASE_PATH,
 } from './routes/fulfillment.js';
 import { createAdminDisputesRouter } from './routes/admin-disputes.js';
+import {
+  createAdminCompletionRouter,
+  createFounderCompletionRouter,
+  createCreatorCompletionRouter,
+} from './routes/completion.js';
 import { createFounderRosterRouter } from './routes/founder-roster.js';
 import { createAdminDecisionRouter } from './routes/admin-decisions.js';
 import {
@@ -548,6 +553,25 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       tokens,
     }),
   );
+  // Phase 21b (§22.8–§22.11, §31.8, §33.10.5–10). The last of the lifecycle:
+  // the Creator's completion status against its five criteria, the work-again
+  // request that creates nothing, the Founder's two independent next-campaign
+  // gates, and §22.11 resolution — which stays distinct from `fulfilled`.
+  {
+    const completionDeps = {
+      db,
+      auth,
+      audit,
+      notify: {
+        notifier,
+        context: launchContext,
+        ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
+      },
+    };
+    app.use(createAdminCompletionRouter(completionDeps));
+    app.use(createFounderCompletionRouter(completionDeps));
+    app.use(createCreatorCompletionRouter(completionDeps));
+  }
   // Phase 10a (§32.3, §28.3). Two Stripe endpoints with two signing secrets —
   // platform for Proovd's own listing money, Connect for the Founder's campaign
   // money (§24.1). Both mount raw-body parsing themselves, for the reason the

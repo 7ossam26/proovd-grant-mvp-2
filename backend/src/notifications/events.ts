@@ -361,6 +361,27 @@ export const INTERNAL_POST_VERIFICATION_DUE = 'internal_post_verification_due' a
 export const BACKER_MAGIC_LINK_REISSUE = 'backer_magic_link_reissue' as const;
 
 /*
+ * Phase 21b's five (§22.9, §22.10, §31.8), sent by `completion/notifications.ts`.
+ *
+ * These sat in `unsent.ts` as `capability` absences from Phase 22a: the
+ * behaviour did not exist, so neither did the message. Phase 22's brief
+ * assigned them to the phase that owns the behaviour, and this is it.
+ *
+ * The three work-again keys dedup on the `work_again_requests` ROW, because a
+ * Founder may ask again on a later campaign and a Creator may hear from more
+ * than one — keying on the association would announce the first and swallow
+ * the rest. `founder_ready_next_campaign` keys on the DECISION, since a
+ * `not_ready` that later becomes `ready` is a second thing to hear.
+ * `backer_satisfaction_survey` keys on the RESERVATION, because §31.8 permits
+ * one response and therefore one ask (§30's "no second ask").
+ */
+export const AFFILIATE_WORK_AGAIN_REQUEST = 'affiliate_work_again_request' as const;
+export const FOUNDER_WORK_AGAIN_RESPONSE = 'founder_work_again_response' as const;
+export const INTERNAL_WORK_AGAIN_REQUEST = 'internal_work_again_request' as const;
+export const FOUNDER_READY_NEXT_CAMPAIGN = 'founder_ready_next_campaign' as const;
+export const BACKER_SATISFACTION_SURVEY = 'backer_satisfaction_survey' as const;
+
+/*
  * Phase 21a — fulfillment and the Day 14 Progress Check (§22.4, §22.5, §27.5,
  * §27.6), sent by `fulfillment/notifications.ts`.
  *
@@ -611,6 +632,11 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   INTERNAL_PROPOSAL_AWAITING_RESPONSE,
   INTERNAL_POST_VERIFICATION_DUE,
   BACKER_MAGIC_LINK_REISSUE,
+  AFFILIATE_WORK_AGAIN_REQUEST,
+  FOUNDER_WORK_AGAIN_RESPONSE,
+  INTERNAL_WORK_AGAIN_REQUEST,
+  FOUNDER_READY_NEXT_CAMPAIGN,
+  BACKER_SATISFACTION_SURVEY,
   BACKER_DELIVERY,
   FOUNDER_DAY_14_REVIEW_RESULT,
   INTERNAL_DAY_14_DUE,

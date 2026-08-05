@@ -686,15 +686,19 @@ describe('§5.5 magic-link reissue', () => {
 
 describe('the deliberate-absence register after 22b', () => {
   it('owes nothing to Phase 22b any more', () => {
-    expect(unsentOwnedBy('none' as never)).toHaveLength(3);
+    expect(unsentOwnedBy('none')).toHaveLength(3);
     // The whole point of the phase: `message` — behaviour recorded, message
-    // missing — is now empty. Everything left is a decision or Phase 21b's.
+    // missing — is empty. Phase 21b then closed the `capability` five, so what
+    // is left is only what the Spec itself rules out.
     const kinds = Object.values(UNSENT_NOTIFICATION_EVENTS).map((e) => e.kind);
     expect(kinds).not.toContain('message');
+    expect(kinds).not.toContain('capability');
   });
 
-  it('leaves exactly the three §1 rule 6 decisions and Phase 21bs five', () => {
-    expect(unsentOwnedBy('phase-21b')).toHaveLength(5);
-    expect(Object.keys(UNSENT_NOTIFICATION_EVENTS)).toHaveLength(8);
+  it('leaves exactly the three §1 rule 6 decisions', () => {
+    expect(Object.keys(UNSENT_NOTIFICATION_EVENTS)).toHaveLength(3);
+    // No phase owns a message any more. The owner field existed so a gap could
+    // be handed to whoever owned the behaviour, and every one was.
+    expect(Object.values(UNSENT_NOTIFICATION_EVENTS).every((e) => e.owner === 'none')).toBe(true);
   });
 });

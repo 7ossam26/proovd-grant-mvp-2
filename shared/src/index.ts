@@ -25,3 +25,4 @@ export * from './payments/index.js';
 export * from './disputes/index.js';
 export * from './enforcement/index.js';
 export * from './fulfillment/index.js';
+export * from './completion/index.js';

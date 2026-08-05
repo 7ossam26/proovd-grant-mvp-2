@@ -37,7 +37,7 @@ Ten named tests across nine deliverables — level with Phase 12 and above Phase
 | **21a** | Fulfillment and the four Founder obligations (§22.5), delivery-date changes and their two approval paths (§22.6), the Day 14 Progress Check with its checklist, receipt, and per-type consequences (§22.4), and the one-strike ghost ban (§22.7) | **§33.10.1–§33.10.4**, plus the update-cadence done-when |
 | **21b** | Creator `successfully_completed` (§22.8), the work-again request (§22.9), Founder next-campaign readiness (§22.10), Backer status progression and satisfaction (§31.8), and campaign resolution (§22.11) | **§33.10.5–§33.10.10**, plus the `closed_resolved`/`fulfilled` done-when |
 
-**21a is built and its four tests pass.** 21b is the remaining half.
+**Both halves are built and all ten tests pass.**
 
 The dependency runs one way. §22.8's fourth criterion ("no unresolved fraud, invalid-proof, material-breach, or compliance case") reads 21a's Day-14 failure and ban records; §31.8's satisfaction step only exists after 21a records a delivery; §22.11's reconciliation compares against 21a's fulfillment state. **21a writes no Creator completion status, no work-again record, and no satisfaction response** — and 21b adds no second delivery record and no second ban trigger.
 

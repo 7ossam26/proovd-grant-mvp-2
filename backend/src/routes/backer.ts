@@ -20,7 +20,8 @@
  */
 
 import { Router, json } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { reservations } from '../db/schema/domain.js';
 import type { Database } from '../db/client.js';
 import type { StripeGateway } from '../payments/stripe-client.js';
 import type { AuditWriter } from '../auth/audit.js';
@@ -49,6 +50,13 @@ import {
   MAGIC_LINK_REISSUE_ACK,
   reissueMagicLink,
 } from '../reservations/magic-link-reissue.js';
+import {
+  addSatisfactionReason,
+  backerProgression,
+  recordSatisfaction,
+  satisfactionState,
+} from '../completion/satisfaction.js';
+import { SATISFACTION_PROHIBITIONS } from '../completion/logic.js';
 
 export interface BackerRouterDeps {
   db: Database;
@@ -196,6 +204,120 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
       }
     },
   );
+
+  /* ── §31.8 satisfaction (Phase 21b) ────────────────────────────────────── */
+
+  /*
+   * The subject comes from the verified token, never from the body — a Backer
+   * has no account (§5.4), so the token IS the identity, and a route that took
+   * a reservation id would let anyone holding one link answer for someone
+   * else's pre-order.
+   *
+   * One POST records the answer. There is no preceding call to make, nothing
+   * to consent to, and no second question — §31.8's "under 30 seconds" is the
+   * absence of steps rather than a timer.
+   */
+  router.get(`${base}/satisfaction`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const rows = await deps.db
+      .select({ id: reservations.id })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.campaignId, subject.campaignId),
+          eq(reservations.backerIdentityId, subject.backerIdentityId),
+        ),
+      );
+
+    const items = [];
+    for (const row of rows) {
+      items.push({
+        reservationId: row.id,
+        progression: await backerProgression(deps.db, row.id),
+        ...(await satisfactionState(deps.db, row.id)),
+      });
+    }
+    res.json({ reservations: items, prohibitions: SATISFACTION_PROHIBITIONS });
+  });
+
+  router.post(`${base}/satisfaction/:reservationId`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const reservationId = String(req.params['reservationId']);
+
+    const [own] = await deps.db
+      .select({ id: reservations.id })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.id, reservationId),
+          eq(reservations.campaignId, subject.campaignId),
+          eq(reservations.backerIdentityId, subject.backerIdentityId),
+        ),
+      )
+      .limit(1);
+    if (!own) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const scale = body['scale'] === 'rating_1_5' ? 'rating_1_5' : 'binary';
+    const result = await recordSatisfaction(
+      { db: deps.db, audit: deps.audit },
+      {
+        reservationId,
+        scale,
+        satisfied: typeof body['satisfied'] === 'boolean' ? body['satisfied'] : undefined,
+        rating: typeof body['rating'] === 'number' ? body['rating'] : undefined,
+        actor: `backer:${subject.backerIdentityId}`,
+      },
+    );
+    if (!result.ok) {
+      res.status(result.code === 'not_found' ? 404 : 409).json({
+        error: result.code,
+        whatHappened: result.message,
+      });
+      return;
+    }
+    res.json({
+      recorded: true,
+      // The Backer is told what happens next, and it is honest: a person picks
+      // up a negative answer, and nothing happens on a positive one (§27.1).
+      followUp: result.negative
+        ? 'Someone at Proovd will follow this up with you.'
+        : 'Thank you — that is all we needed.',
+    });
+  });
+
+  /** §31.8: "then optional reason." Separate, and never a precondition. */
+  router.post(`${base}/satisfaction/:reservationId/reason`, guard, async (req, res) => {
+    const subject = req.magicLinkSubject!;
+    const reservationId = String(req.params['reservationId']);
+    const [own] = await deps.db
+      .select({ id: reservations.id })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.id, reservationId),
+          eq(reservations.backerIdentityId, subject.backerIdentityId),
+        ),
+      )
+      .limit(1);
+    if (!own) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const result = await addSatisfactionReason(
+      { db: deps.db, audit: deps.audit },
+      {
+        reservationId,
+        reason: typeof body['reason'] === 'string' ? body['reason'] : '',
+        actor: `backer:${subject.backerIdentityId}`,
+      },
+    );
+    res.json({ recorded: result.ok });
+  });
 
   router.get(`${base}/page`, guard, async (req, res) => {
     const subject = req.magicLinkSubject!;

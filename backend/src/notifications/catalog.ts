@@ -85,6 +85,11 @@ import {
 import { renderEnforcementNotice } from './templates/enforcement.js';
 import { renderDeliveryNotice, renderDay14Result } from './templates/fulfillment.js';
 import { renderInternalNotice, renderPlainNotice } from './templates/plain.js';
+import {
+  WORK_AGAIN_NO_PENALTY,
+  WORK_AGAIN_ACCEPTANCE_GRANTS_NOTHING,
+  PREPARE_WITHOUT_OPENING,
+} from '../completion/logic.js';
 import { renderDigest } from './templates/digest.js';
 
 export interface RenderedMessage {
@@ -1318,6 +1323,115 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
         'If no Creator and Founder mutually accept before the deadline, §14.6 refunds the listing payment in full and the campaign ends with no Creator.',
       ],
       action: { label: 'Open the roster', url: `${APP}/admin/campaigns/c1` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  /* ── Phase 21b (§22.9, §22.10, §31.8) ────────────────────────────────── */
+
+  affiliate_work_again_request: () =>
+    renderPlainNotice({
+      subject: `A Founder would like to work with you again — ${CAMPAIGN}`,
+      headline: 'You have a request to work together again.',
+      facts: [
+        { label: 'Campaign you completed', value: CAMPAIGN },
+        { label: 'From', value: 'Ada' },
+        { label: 'What they said', value: 'We are building a travel version and would love you on it.' },
+        { label: 'Who owns it', value: 'You — there is no deadline on your answer' },
+        { label: 'If you decline', value: WORK_AGAIN_NO_PENALTY },
+      ],
+      paragraphs: [
+        'This is a request to talk about working together on something new. Accepting it does not commit you to terms — nothing has been agreed and no campaign exists yet.',
+      ],
+      action: { label: 'Open the request', url: `${APP}/creator/campaigns/a1/close` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_work_again_response: () =>
+    renderPlainNotice({
+      subject: '@kettlehead is open to working again',
+      headline: 'They are open to talking about something new.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Creator', value: '@kettlehead' },
+        { label: 'Answer', value: 'Open to working again' },
+        { label: 'What this changes', value: WORK_AGAIN_ACCEPTANCE_GRANTS_NOTHING.join(' ') },
+      ],
+      paragraphs: [
+        'Your next campaign still goes through the same route as this one: the cooldown, and then an Admin readiness decision. This answer does not move either.',
+      ],
+      action: { label: 'Open your campaign', url: `${APP}/campaigns/c1/results` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_work_again_request: () =>
+    renderInternalNotice({
+      subject: `Work-again request — ${CAMPAIGN}`,
+      headline: 'A Founder asked a completed Creator to work again.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Creator', value: '@kettlehead' },
+        { label: 'Status', value: 'requested' },
+        { label: 'Message', value: 'We are building a travel version and would love you on it.' },
+        {
+          label: 'What it can do',
+          value: 'Nothing on its own — no campaign, no cooldown change, no readiness approval.',
+        },
+      ],
+      paragraphs: [
+        '§22.9 routes this through Proovd rather than giving the two parties a channel. Nothing is owed here unless the request needs mediation.',
+      ],
+      action: { label: 'Open campaign operations', url: `${APP}/admin/campaign-operations` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_ready_next_campaign: () =>
+    renderPlainNotice({
+      subject: 'You are ready for your next campaign',
+      headline: 'Proovd has approved you for a next campaign.',
+      facts: [
+        { label: 'Previous campaign', value: CAMPAIGN },
+        { label: 'Readiness decision', value: 'Ready' },
+        {
+          label: 'Why',
+          value:
+            'You delivered on time, answered the Day 14 check with evidence, and every Backer question was resolved.',
+        },
+        {
+          label: 'The other gate',
+          value: 'The three-month cooldown is separate. Your campaign page shows the exact date.',
+        },
+      ],
+      paragraphs: [PREPARE_WITHOUT_OPENING],
+      action: { label: 'Open your campaign', url: `${APP}/campaigns/c1/results` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  backer_satisfaction_survey: () =>
+    renderPlainNotice({
+      subject: `How did ${CAMPAIGN} go?`,
+      headline: 'One question, one click.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'What we are asking', value: 'Whether what you received was what you expected' },
+        {
+          label: 'How long it takes',
+          value: 'One click. A reason is optional and you can skip it.',
+        },
+        {
+          label: 'What it changes',
+          value:
+            'If something went wrong, a person at Proovd picks it up. Nothing about your order changes because you answered.',
+        },
+      ],
+      paragraphs: [
+        'You pre-ordered this and it has been delivered. We would like to know how it went — one click is a complete answer, and you can add a reason if you want to.',
+      ],
+      action: { label: 'Answer in one click', url: `${APP}/backer/sample-token` },
       reference: REF,
       supportEmail: SUPPORT,
     }),

@@ -253,6 +253,13 @@
       "when": 1785600000000,
       "tag": "0035_digest_and_history",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1785686400000,
+      "tag": "0036_completion_and_resolution",
+      "breakpoints": true
     }
   ]
 }

@@ -128,3 +128,11 @@ export * from './fulfillment.js';
 // No digest-content table and no unread counter: the digest composes from
 // records that already exist, and a badge is the pressure DNA §5.5 replaces.
 export * from './digest.js';
+
+// Phase 21b: §22.8's Creator completion status with its five stored findings,
+// §22.9's work-again request (which carries nothing a campaign could be built
+// from), §22.10's Admin readiness decision (the cooldown is derived, never
+// stored), §31.8's one-per-reservation satisfaction answer (with no consent
+// column to coerce), and §22.11's resolution record — which stores whether
+// fulfillment was still active, so the two states cannot be collapsed.
+export * from './completion.js';
