@@ -1153,7 +1153,12 @@ export async function createAffiliateTransfer(
     if (deps.notifier && deps.context) {
       await notifyTransferFailure(
         { db: deps.db, notifier: deps.notifier, context: deps.context },
-        { transferId: claimed.id, associationId: input.associationId, campaignId: context.campaignId },
+        {
+          transferId: claimed.id,
+          associationId: input.associationId,
+          campaignId: context.campaignId,
+          totalCents: claimed.totalCents,
+        },
       );
     }
     return { status: 'transfer_failed', message };

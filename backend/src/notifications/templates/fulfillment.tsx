@@ -34,6 +34,8 @@ export interface DeliveryNoticeVariables {
   /** The five §22.5 items, resolved and labelled. */
   items: readonly { key: string; label: string; value: string }[];
   actionUrl: string;
+  /** §27.2: a stable reservation reference the Backer can quote. */
+  reference: string;
   supportEmail: string;
 }
 
@@ -71,6 +73,7 @@ function DeliveryNoticeEmail({ v }: { v: DeliveryNoticeVariables }) {
               {v.supportEmail} — we respond within one business day, Monday to Friday, excluding
               U.S. federal holidays.
             </Text>
+            <Text style={quiet}>Reference: {v.reference}</Text>
           </Section>
         </Container>
       </Body>
@@ -99,6 +102,8 @@ export interface Day14ResultVariables {
   /** The Admin's customer-facing explanation (§25.6, §29.4). */
   explanation: string;
   actionUrl: string;
+  /** §27.2: a stable campaign reference the Founder can quote. */
+  reference: string;
   supportEmail: string;
 }
 
@@ -161,6 +166,7 @@ function Day14ResultEmail({ v }: { v: Day14ResultVariables }) {
               Campaign: {v.campaignTitle}. Questions: {v.supportEmail} — we respond within one
               business day, Monday to Friday, excluding U.S. federal holidays.
             </Text>
+            <Text style={quiet}>Reference: {v.reference}</Text>
           </Section>
         </Container>
       </Body>

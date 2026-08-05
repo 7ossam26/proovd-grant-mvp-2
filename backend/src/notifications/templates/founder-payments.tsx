@@ -355,6 +355,13 @@ export async function renderEarlyRequestAck(
 export interface EarlyResultVariables {
   campaignTitle: string;
   approved: boolean;
+  /**
+   * The remaining payment this decision is about (§27.2: a money email names
+   * its amount). An approved request releases it now; a declined one leaves it
+   * on the default schedule — and either way the Founder is owed the number,
+   * not just the verdict.
+   */
+  amount: string;
   reason: string;
   /** On approval: the §33.8.12 sentence travels with the good news. */
   neverSkipsLine: string | null;
@@ -377,6 +384,12 @@ function EarlyResultEmail({ v }: { v: EarlyResultVariables }) {
           <Heading style={heading}>{lead}</Heading>
           <Section style={section}>
             <Text style={text}>Campaign: {v.campaignTitle}</Text>
+            <Text style={text}>Remaining payment: {v.amount}</Text>
+            <Text style={text}>
+              {v.approved
+                ? 'Status: released — the remaining payment has been released to you.'
+                : 'Status: eligible, on the default schedule — nothing has been released early.'}
+            </Text>
             <Text style={text}>Reason: {v.reason}</Text>
             {v.neverSkipsLine ? <Text style={text}>{v.neverSkipsLine}</Text> : null}
             {!v.approved ? (
@@ -412,6 +425,10 @@ export async function renderEarlyResult(v: EarlyResultVariables): Promise<Render
       lead,
       '',
       `Campaign: ${v.campaignTitle}`,
+      `Remaining payment: ${v.amount}`,
+      v.approved
+        ? 'Status: released — the remaining payment has been released to you.'
+        : 'Status: eligible, on the default schedule — nothing has been released early.',
       `Reason: ${v.reason}`,
       ...(v.neverSkipsLine ? [v.neverSkipsLine] : []),
       ...(v.approved

@@ -35,6 +35,7 @@ import {
   type ListingFeeLine,
 } from '../notifications/templates/listing-fee.js';
 import { renderFormalOpportunity } from '../notifications/templates/affiliate-formal-opportunity.js';
+import { renderInternalNotice } from '../notifications/templates/plain.js';
 import { findListingPayment } from './listing-checkout.js';
 
 export interface ListingNotificationContext {
@@ -200,15 +201,35 @@ export async function notifyListingPayment(
   }
 
   /* §27.6: "Listing paid / deadline started" — to the staffed inbox. */
+  const opened = input.openedAssociationIds.length;
+  const internalNotice = await renderInternalNotice({
+    subject: `Listing paid — response deadline ${deadlineUtc} UTC — campaign ${input.campaignId}`,
+    headline: `Listing fee paid — campaign ${input.campaignId}`,
+    facts: [
+      { label: 'Response window ends', value: `${deadlineUtc} UTC` },
+      {
+        label: 'Formal opportunities opened',
+        value: `${opened} ${opened === 1 ? 'Creator' : 'Creators'}`,
+      },
+    ],
+    paragraphs: [
+      'The deadline was stored at payment with the window length in force at that moment; a later settings change moves future deadlines and never this one.',
+    ],
+    action: {
+      label: 'Open the campaign roster',
+      url: `${context.appBaseUrl}/admin/campaigns/${input.campaignId}`,
+    },
+    reference: input.campaignId,
+    supportEmail: context.supportEmail,
+  });
+
   const internal = await notifier.send({
     eventKey: INTERNAL_LISTING_PAID_DEADLINE_STARTED,
     entityType: 'listing_fee_payment',
     entityId: input.paymentId,
     to: context.supportEmail,
     from: context.fromAddress,
-    subject: `Listing paid — response deadline ${deadlineUtc} UTC — campaign ${input.campaignId}`,
-    html: `<p>Campaign ${input.campaignId} paid its listing fee. The 72-hour response window ends ${deadlineUtc} UTC. ${input.openedAssociationIds.length} formal opportunit${input.openedAssociationIds.length === 1 ? 'y' : 'ies'} opened.</p>`,
-    text: `Campaign ${input.campaignId} paid its listing fee. The response window ends ${deadlineUtc} UTC. ${input.openedAssociationIds.length} formal opportunity/opportunities opened.`,
+    ...internalNotice,
   });
 
   return { receipt: receiptOutcome, opportunities, internal: internal.status };

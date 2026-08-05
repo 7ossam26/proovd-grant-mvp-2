@@ -51,6 +51,7 @@ import {
   renderResultsReady,
   renderCreatorClosed,
 } from '../notifications/templates/close.js';
+import { renderInternalNotice } from '../notifications/templates/plain.js';
 import { loadFounder, type LaunchNotificationContext } from '../launch/notifications.js';
 import { DESCRIPTOR_UNKNOWN_LABEL } from '../payments/descriptors.js';
 import { formatCents } from '../reservations/restated.js';
@@ -491,11 +492,22 @@ export async function notifyRetryReconciliationComplete(
     captured: number;
   },
 ): Promise<void> {
-  const summary =
-    `The 48-hour retry window for campaign ${input.campaignId} has ended: ` +
-    `${input.recovered} recovered, ${input.dropped} dropped, ${input.captured} captured in total. ` +
-    'Dropped reservations count as no revenue, no Creator commission, and no Founder share (§21). ' +
-    'Reconciliation can begin.';
+  const notice = await renderInternalNotice({
+    subject: `Retry window ended — campaign ${input.campaignId}`,
+    headline: `The 48-hour retry window has ended — campaign ${input.campaignId}`,
+    facts: [
+      { label: 'Recovered', value: String(input.recovered) },
+      { label: 'Dropped', value: String(input.dropped) },
+      { label: 'Captured in total', value: String(input.captured) },
+    ],
+    paragraphs: [
+      'Dropped reservations count as no revenue, no Creator commission, and no Founder share (§21) — the ledger was only ever written at capture, so nothing needs unwinding.',
+      'Reconciliation can begin.',
+    ],
+    action: { label: 'Open the close queue', url: `${deps.context.appBaseUrl}/admin/close` },
+    reference: input.campaignId,
+    supportEmail: deps.context.supportEmail,
+  });
 
   await deps.notifier.send({
     eventKey: INTERNAL_RETRY_RECONCILIATION_COMPLETE,
@@ -504,9 +516,7 @@ export async function notifyRetryReconciliationComplete(
     entityId: input.campaignId,
     to: deps.context.supportEmail,
     from: deps.context.fromAddress,
-    subject: `Retry window ended — campaign ${input.campaignId}`,
-    html: `<p>${summary}</p>`,
-    text: summary,
+    ...notice,
   });
 }
 
@@ -528,17 +538,38 @@ export async function notifyBatchResult(
     .where(eq(campaigns.id, batch.campaignId))
     .limit(1);
 
-  const summary =
-    `Close batch complete for campaign ${batch.campaignId} (${batch.campaignType === 'pre_build' ? 'Idea' : 'Product'}): ` +
-    `${input.captured} captured, ${input.failed} in the retry window, ${input.dropped} dropped, ` +
-    `${input.noCharge} closed without charge. ` +
-    (batch.thresholdDecidedAt
-      ? `Threshold ${batch.thresholdMet ? 'met' : 'missed'} at ${batch.uniqueActiveBackers}/${batch.thresholdRequired} unique active Backers. `
-      : '') +
-    (batch.retryDeadlineAt
-      ? `The one 48-hour retry window closes ${batch.retryDeadlineAt.toISOString()}. `
-      : '') +
-    `Campaign is now ${campaign?.status ?? 'unknown'}.`;
+  const notice = await renderInternalNotice({
+    subject: `Charge batch result — campaign ${batch.campaignId}`,
+    headline: `Close batch complete — campaign ${batch.campaignId}`,
+    facts: [
+      { label: 'Campaign model', value: batch.campaignType === 'pre_build' ? 'Idea' : 'Product' },
+      { label: 'Captured', value: String(input.captured) },
+      { label: 'In the retry window', value: String(input.failed) },
+      { label: 'Dropped', value: String(input.dropped) },
+      { label: 'Closed without charge', value: String(input.noCharge) },
+      ...(batch.thresholdDecidedAt
+        ? [
+            {
+              label: 'Order threshold',
+              value: `${batch.thresholdMet ? 'Met' : 'Missed'} at ${batch.uniqueActiveBackers}/${batch.thresholdRequired} unique active Backers`,
+            },
+          ]
+        : []),
+      ...(batch.retryDeadlineAt
+        ? [
+            {
+              label: 'Retry window closes',
+              // §27.1: a deadline names its zone.
+              value: `${batch.retryDeadlineAt.toISOString().replace('Z', '')} UTC`,
+            },
+          ]
+        : []),
+      { label: 'Campaign status', value: campaign?.status ?? 'unknown' },
+    ],
+    action: { label: 'Open the close queue', url: `${deps.context.appBaseUrl}/admin/close` },
+    reference: batch.campaignId,
+    supportEmail: deps.context.supportEmail,
+  });
 
   await deps.notifier.send({
     eventKey: INTERNAL_CHARGE_BATCH_RESULT,
@@ -547,8 +578,6 @@ export async function notifyBatchResult(
     entityId: batch.id,
     to: deps.context.supportEmail,
     from: deps.context.fromAddress,
-    subject: `Charge batch result — campaign ${batch.campaignId}`,
-    html: `<p>${summary}</p>`,
-    text: summary,
+    ...notice,
   });
 }

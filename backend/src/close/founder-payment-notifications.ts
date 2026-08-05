@@ -39,6 +39,7 @@ import {
   renderEarlyRequestAck,
   renderEarlyResult,
 } from '../notifications/templates/founder-payments.js';
+import { renderInternalNotice } from '../notifications/templates/plain.js';
 import { loadFounder, type LaunchNotificationContext } from '../launch/notifications.js';
 import { formatCents } from '../reservations/restated.js';
 import { founderW9Records } from '../db/schema/founder-payments.js';
@@ -48,7 +49,7 @@ import {
   EARLY_RELEASE_NEVER_SKIPS_DAY_14,
   type FounderPaymentKind,
 } from './founder-payments-logic.js';
-import type { FounderPaymentStatusView } from './founder-payments.js';
+import { readFounderPaymentStatus, type FounderPaymentStatusView } from './founder-payments.js';
 
 export interface FounderPaymentNotificationDeps {
   db: Database;
@@ -232,9 +233,21 @@ export async function notifyEarlyRequestResult(
   if (!founder.email) return;
 
   const approved = input.request.status === 'approved';
+
+  // §27.2: a money email names its amount, and §33.8.13 says it comes from the
+  // ONE §22.3 resolver rather than being recomputed for this message. The
+  // request is about the remaining payment specifically, so that is the row
+  // read — never the eligible share, which is what it is a percentage of.
+  const view = await readFounderPaymentStatus(deps.db, {
+    campaignId: input.request.campaignId,
+    now: new Date(),
+  });
+  const remaining = view?.payments.find((p) => p.kind === 'remaining_payment');
+
   const rendered = await renderEarlyResult({
     campaignTitle: await campaignTitle(deps.db, input.request.campaignId),
     approved,
+    amount: remaining ? `US$${formatCents(BigInt(remaining.amountCents))}` : 'not yet determined',
     reason: input.request.decisionReason ?? '',
     neverSkipsLine: approved ? EARLY_RELEASE_NEVER_SKIPS_DAY_14 : null,
     paymentsUrl: paymentsUrl(deps.context, input.request.campaignId),
@@ -260,10 +273,21 @@ export async function notifyMoneyDecisionsDue(
   deps: FounderPaymentNotificationDeps,
   input: { campaignId: string; day: number; dueAt: Date },
 ): Promise<boolean> {
-  const summary =
-    `Day ${input.day} money decisions are due for campaign ${input.campaignId} ` +
-    `(due ${input.dueAt.toISOString()}): Founder payment eligibility under the §22.3 schedule, ` +
-    'and any remaining Creator earnings approvals and Transfers (§22.1). The Admin close queue has the work.';
+  const notice = await renderInternalNotice({
+    subject: `Money decisions due — campaign ${input.campaignId}`,
+    headline: `Day ${input.day} money decisions are due — campaign ${input.campaignId}`,
+    facts: [
+      // §27.1: a deadline names its zone.
+      { label: 'Due', value: `${input.dueAt.toISOString().replace('Z', '')} UTC` },
+      { label: 'Schedule day', value: `Day ${input.day} from campaign close` },
+    ],
+    paragraphs: [
+      'Founder payment eligibility under the §22.3 schedule, and any remaining Creator earnings approvals and Transfers (§22.1).',
+    ],
+    action: { label: 'Open the close queue', url: `${deps.context.appBaseUrl}/admin/close` },
+    reference: input.campaignId,
+    supportEmail: deps.context.supportEmail,
+  });
 
   const outcome = await deps.notifier.send({
     eventKey: INTERNAL_MONEY_DECISIONS_DUE,
@@ -272,9 +296,7 @@ export async function notifyMoneyDecisionsDue(
     entityId: input.campaignId,
     to: deps.context.supportEmail,
     from: deps.context.fromAddress,
-    subject: `Money decisions due — campaign ${input.campaignId}`,
-    html: `<p>${summary}</p>`,
-    text: summary,
+    ...notice,
   });
   return outcome.status === 'sent';
 }
@@ -283,10 +305,20 @@ export async function notifyDeliverableVerificationDue(
   deps: FounderPaymentNotificationDeps,
   input: { campaignId: string; missingCount: number },
 ): Promise<boolean> {
-  const summary =
-    `Deliverable verification is due for campaign ${input.campaignId}: ` +
-    `${input.missingCount} Creator association(s) have no recorded §22.1 completion decision, ` +
-    'and the money schedule has reached its first payment day. The Admin close queue has the work.';
+  const notice = await renderInternalNotice({
+    subject: `Deliverable verification due — campaign ${input.campaignId}`,
+    headline: `Deliverable verification is due — campaign ${input.campaignId}`,
+    facts: [
+      {
+        label: 'Awaiting a §22.1 completion decision',
+        value: `${input.missingCount} Creator association${input.missingCount === 1 ? '' : 's'}`,
+      },
+      { label: 'Why now', value: 'The money schedule has reached its first payment day' },
+    ],
+    action: { label: 'Open the close queue', url: `${deps.context.appBaseUrl}/admin/close` },
+    reference: input.campaignId,
+    supportEmail: deps.context.supportEmail,
+  });
 
   const outcome = await deps.notifier.send({
     eventKey: INTERNAL_DELIVERABLE_VERIFICATION_DUE,
@@ -294,9 +326,7 @@ export async function notifyDeliverableVerificationDue(
     entityId: input.campaignId,
     to: deps.context.supportEmail,
     from: deps.context.fromAddress,
-    subject: `Deliverable verification due — campaign ${input.campaignId}`,
-    html: `<p>${summary}</p>`,
-    text: summary,
+    ...notice,
   });
   return outcome.status === 'sent';
 }

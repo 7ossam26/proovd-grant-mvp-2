@@ -33,6 +33,7 @@ import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { BACKER_SUPPORT_RECEIVED } from '../notifications/events.js';
 import { ESCALATION_WAIT_DAYS, ISSUER_RIGHTS_SENTENCE } from '../enforcement/logic.js';
+import { renderPlainNotice } from '../notifications/templates/plain.js';
 import { openSupportCase, type OpenCaseResult } from './cases.js';
 import { SUPPORT_TOPICS, SUPPORT_TOPIC_LABELS, type SupportTopic } from './logic.js';
 
@@ -132,7 +133,18 @@ export async function openBackerSupportCase(
   // §27.5 "Support received": the SAME B.8 acknowledgement the screen shows —
   // one string, two renderers (§33.11.5). Deduped per case: opening is once.
   if (deps.notifier && deps.context) {
+    // The acknowledgement is Appendix B.8's exact text and travels as ONE
+    // paragraph — restructuring it into labelled facts would make the inbox
+    // copy a different string from the one on screen (§33.11.5).
     const ack = opened.result.acknowledgement;
+    const notice = await renderPlainNotice({
+      subject: `We received your request — ${opened.result.reference}`,
+      headline: 'We received your request.',
+      facts: [],
+      paragraphs: [ack, ISSUER_RIGHTS_SENTENCE],
+      reference: opened.result.reference,
+      supportEmail: deps.context.supportEmail,
+    });
     await deps.notifier.send({
       eventKey: BACKER_SUPPORT_RECEIVED,
       entityType: 'support_case',
@@ -140,9 +152,7 @@ export async function openBackerSupportCase(
       to: identity.email,
       from: deps.context.fromAddress,
       replyTo: deps.context.supportEmail,
-      subject: `We received your request — ${opened.result.reference}`,
-      html: `<p style="white-space:pre-line">${ack}</p><p>${ISSUER_RIGHTS_SENTENCE}</p>`,
-      text: `${ack}\n\n${ISSUER_RIGHTS_SENTENCE}`,
+      ...notice,
     });
   }
 

@@ -31,6 +31,7 @@ import {
   INTERNAL_DAY_14_DUE,
 } from '../notifications/events.js';
 import { renderDeliveryNotice, renderDay14Result } from '../notifications/templates/fulfillment.js';
+import { renderInternalNotice } from '../notifications/templates/plain.js';
 import { mintOrReissueMagicLink } from '../reservations/magic-link.js';
 import {
   DAY_14_FAILURE_LABELS,
@@ -137,6 +138,8 @@ export async function notifyDelivery(
       campaignTitle,
       rewardTitle: row.rewardTitle ?? 'your pre-order',
       items: notice.items,
+      // §27.2: the reservation is the Backer's own stable reference.
+      reference: row.reservationId,
       actionUrl,
       supportEmail: deps.context.supportEmail,
     });
@@ -190,6 +193,7 @@ export async function notifyDay14Result(
     consequences,
     explanation: input.review.customerExplanation ?? '',
     actionUrl: `${deps.context.appBaseUrl}/campaigns/${input.review.campaignId}/results`,
+    reference: input.review.campaignId,
     supportEmail: deps.context.supportEmail,
   });
 
@@ -220,14 +224,28 @@ export async function notifyDay14Due(
     .limit(1);
 
   const title = campaign?.title ?? input.campaignId;
-  const body = [
-    `Day 14 Progress Check is due for ${title}.`,
-    `Due: ${input.dueAt.toISOString()}`,
-    campaign?.type === 'pre_build'
-      ? 'Idea Campaign — the review is enforcement-only; there is no unreleased payment to block.'
-      : 'Product Campaign — a failure blocks the unreleased remaining payment.',
-    `Queue: ${deps.context.appBaseUrl}/admin/fulfillment`,
-  ].join('\n');
+  const notice = await renderInternalNotice({
+    subject: `Day 14 Progress Check due — ${title}`,
+    headline: `Day 14 Progress Check is due — ${title}`,
+    facts: [
+      // §27.1: a deadline names its zone. `toISOString` ends in `Z`, which is
+      // canonical UTC and spells nothing out.
+      { label: 'Due', value: `${input.dueAt.toISOString().replace('Z', '')} UTC` },
+      {
+        label: 'Consequence of failure',
+        value:
+          campaign?.type === 'pre_build'
+            ? 'Idea Campaign — enforcement only; there is no unreleased payment to block'
+            : 'Product Campaign — blocks the unreleased remaining payment',
+      },
+    ],
+    action: {
+      label: 'Open the Day 14 queue',
+      url: `${deps.context.appBaseUrl}/admin/fulfillment`,
+    },
+    reference: input.campaignId,
+    supportEmail: deps.context.supportEmail,
+  });
 
   await deps.notifier.send({
     eventKey: INTERNAL_DAY_14_DUE,
@@ -235,8 +253,6 @@ export async function notifyDay14Due(
     entityId: input.campaignId,
     to: input.internalRecipient,
     from: deps.context.fromAddress,
-    subject: `Day 14 Progress Check due — ${title}`,
-    html: `<pre>${body}</pre>`,
-    text: body,
+    ...notice,
   });
 }

@@ -26,6 +26,32 @@ Phases 06–21 green. Most events already exist; this phase audits, completes, a
 
 ---
 
+## The seam (added by the session that started this phase, per master-plan §1.3 step 6)
+
+The registry holds **121 keys** and **44 of them have no sender**. Closing all of
+them, proving the §27.2 contract over ~110 rendered messages, and building
+§27.7's digest and history layer is more than one session. The brief does not
+name a seam, so this one was written back into the file:
+
+| Third | Scope | Acceptance | State |
+|---|---|---|---|
+| **22a** | The coverage machine and the contract: the deliberate-absence register, the render catalog, the coverage test, §27.2's shape rules and §3.3's money facts proved over every message, §27.1's timezone rule, the §3 copy pass, the absence tests, and the high-impact preview | **§33.6.11 reconfirmed**, §33.9.10 and §33.9.12 re-proved through the catalog | **built** |
+| **22b** | The 44 missing senders and their templates — every §27.3–27.6 bullet whose *capability* already exists gains its message and its tested send path | the coverage register empties to the genuinely deferred | pending |
+| **22c** | §27.7 — the optional daily/weekly digest for all three roles, and the authenticated notification history that must not become a dashboard | the §27.7 done-when | pending |
+
+**The order is the point, and it is Phase 09's and 10's order rerun.** The audit
+has to exist before anyone can know what to fill, and the contract test has to
+exist before 40-odd new templates are written *against* it — a contract applied
+afterwards is a retrofit, and a retrofit is how the one message that violates it
+survives. So 22a builds the machine and records every gap with the phase that
+owns it; 22b writes messages into a suite that already refuses a bad one; 22c
+composes the optional layer from deliveries the registry has by then completed.
+
+**22a adds no new sender and no new template for an unsent key.** Its output is
+the guarantee, not the content.
+
+---
+
 ## Scope
 
 ### 1. Coverage audit

@@ -45,6 +45,7 @@ import {
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { BACKER_SUPPORT_FOUNDER_RESPONSE } from '../notifications/events.js';
+import { renderPlainNotice } from '../notifications/templates/plain.js';
 import { eq } from 'drizzle-orm';
 import { supportCases } from '../db/schema/support.js';
 import {
@@ -279,6 +280,19 @@ export function createAdminSupportRouter({
           .limit(1);
         if (caseRow && caseRow.requesterKind === 'backer') {
           const replyBody = typeof body['body'] === 'string' ? body['body'] : '';
+          const notice = await renderPlainNotice({
+            subject: `Response to your request — ${caseRow.reference}`,
+            headline: 'There is a response to your request.',
+            facts: [],
+            // The Admin's own words, unedited and first — this is the reply,
+            // not a summary of it.
+            paragraphs: [
+              replyBody,
+              'Reply from your pre-order page — your context is already there.',
+            ],
+            reference: caseRow.reference,
+            supportEmail: notificationContext.supportEmail,
+          });
           await notifier.send({
             eventKey: BACKER_SUPPORT_FOUNDER_RESPONSE,
             entityType: 'support_case_message',
@@ -286,9 +300,7 @@ export function createAdminSupportRouter({
             to: caseRow.requesterEmail,
             from: notificationContext.fromAddress,
             replyTo: notificationContext.supportEmail,
-            subject: `Response to your request — ${caseRow.reference}`,
-            html: `<p style="white-space:pre-line">${replyBody}</p><p>Reference: ${caseRow.reference}. Reply from your pre-order page — your context is already there.</p>`,
-            text: `${replyBody}\n\nReference: ${caseRow.reference}. Reply from your pre-order page — your context is already there.`,
+            ...notice,
           });
         }
       }

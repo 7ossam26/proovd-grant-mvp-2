@@ -23,6 +23,8 @@ export interface EnforcementNoticeVariables {
   moneyFact: string;
   /** What happens next for this reader. */
   nextStep: string;
+  /** §27.2: a stable campaign reference the reader can quote. */
+  reference: string;
   supportEmail: string;
 }
 
@@ -54,6 +56,7 @@ function EnforcementNoticeEmail({ v }: { v: EnforcementNoticeVariables }) {
               Questions: {v.supportEmail} — we respond within one business day, Monday to Friday,
               excluding U.S. federal holidays. A person answers.
             </Text>
+            <Text style={quiet}>Reference: {v.reference}</Text>
           </Section>
         </Container>
       </Body>
@@ -73,6 +76,8 @@ function plainText(v: EnforcementNoticeVariables): string {
     '---',
     `Questions: ${v.supportEmail} — we respond within one business day, Monday to Friday,`,
     'excluding U.S. federal holidays. A person answers.',
+    '',
+    `Reference: ${v.reference}`,
   ].join('\n');
 }
 

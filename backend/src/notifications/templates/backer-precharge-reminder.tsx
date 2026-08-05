@@ -18,6 +18,17 @@ import { render } from '@react-email/render';
 
 export const PRECHARGE_LEAD = 'Your Proovd pre-order is scheduled for its charge decision tomorrow.';
 
+/**
+ * §30 forbids anything that "confuses a saved card with a charge", and §3.2
+ * replaces `US$0 charge` with `card saved; not charged today`. A message that
+ * names an amount, a seller, and a descriptor and never says the money has not
+ * moved is exactly that confusion — the reader has every fact of a receipt.
+ * So the not-yet-charged statement is pinned, and it sits above the amounts
+ * rather than under them.
+ */
+export const PRECHARGE_NOT_CHARGED =
+  'Your card is saved and has not been charged. Nothing has moved yet.';
+
 export interface PrechargeReminderVariables {
   campaignTitle: string;
   founderLegalName: string;
@@ -45,6 +56,9 @@ function PrechargeReminderEmail({ v }: { v: PrechargeReminderVariables }) {
         <Container style={container}>
           <Text style={eyebrow}>Proovd</Text>
           <Heading style={heading}>{PRECHARGE_LEAD}</Heading>
+          <Section style={section}>
+            <Text style={text}>{PRECHARGE_NOT_CHARGED}</Text>
+          </Section>
           <Section style={section}>
             <Text style={text}>Campaign: {v.campaignTitle}</Text>
             <Text style={text}>Seller: {v.founderLegalName}</Text>
@@ -78,6 +92,8 @@ function PrechargeReminderEmail({ v }: { v: PrechargeReminderVariables }) {
 function plainText(v: PrechargeReminderVariables): string {
   return [
     PRECHARGE_LEAD,
+    '',
+    PRECHARGE_NOT_CHARGED,
     '',
     `Campaign: ${v.campaignTitle}`,
     `Seller: ${v.founderLegalName}`,

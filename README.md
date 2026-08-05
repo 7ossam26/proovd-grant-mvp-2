@@ -23,10 +23,10 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–17 are
-complete**; Phase 18 — the campaign close, the charge batch, failed-payment
-recovery, and results — is next, and the plan calls it the critical phase. Money
-moves in test mode only, and the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–21a are
+complete**, and Phase 22 — the notification sweep — is under way: its first
+third is built. Money moves in test mode only, and the live-mode gate stays
+shut.
 
 | Phase | Delivered |
 | --- | --- |
@@ -60,6 +60,14 @@ moves in test mode only, and the live-mode gate stays shut.
 | 16b | Support cases against the published SLA, the handoff note, campaign suspension and kill, and the composed customer timeline |
 | 17a | The Founder's live campaign home — Glance, one ranked action, Explore — with the delivery receipt behind the last-visit delta, the composed pre-order counts, and the threshold crossings that fire once each |
 | 17b | Live editing's three tiers and the FAQ loophole, the Backer comment thread, mid-campaign Creators with no retroactive credit, and the Creator's named earnings states |
+| 18a | The close batch, the threshold decided once from the state at exactly close, tax-usability validation, off-session capture, and the one 48-hour recovery window |
+| 18b | The window's end, the update-card recovery, results with their Admin-reviewed narrative, and Admin reconciliation |
+| 19a | Creator completion decisions, earnings finalization and the provisional/earned reconciliation, the one idempotent Transfer, and the thank-you that computes nothing |
+| 19b | The Founder W-9 block, the Idea single payment and the Product 40%/60% schedule, and evidence-gated early release that never skips Day 14 |
+| 20a | The refund cause register, the reservation-refund lifecycle, the Idea exceptions with no voluntary path, and the per-cause earnings treatments |
+| 20b | Disputes and their 24-hour task, the assembled evidence packet, one statement descriptor everywhere, post-capture enforcement, and the §29 records |
+| 21a | Fulfillment and its four Founder obligations, delivery-date changes and their two paths, the Day 14 Progress Check, and the one-strike ghost ban |
+| 22a | The notification coverage machine: every §27 event either sends or is recorded as deliberately unsent, and every message it can send is proved against the transactional contract |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -71,8 +79,9 @@ tests. Splitting them was a scheduling decision, not a scope one: each half is
 built against the same brief and lands its own named acceptance tests. Every
 named test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.13,
 every one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one
-from §33.5.1 to §33.5.13, **every one from §33.6.1 to §33.6.13**, and §33.12.4,
-§33.9.10, and §33.9.11.
+from §33.5.1 to §33.5.13, **every one from §33.6.1 to §33.6.13, every one from
+§33.7.1 to §33.7.12, every one from §33.8.1 to §33.8.14, and every one from
+§33.9.1 to §33.9.13**, §33.10.1 to §33.10.4, and §33.12.4.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
 record went first and is the source of truth — a scheduling provider is a source
@@ -95,6 +104,17 @@ Creator joining mid-campaign, and a Backer acting before close. Its brief did no
 name a seam, so that half of the split was written back into the phase file
 rather than left implicit; a plan that is wrong and not corrected is how a plan
 rots.
+
+Phase 22 split into thirds, and the *order* is the point. The registry holds 121
+notification events and 44 of them had no sender. The audit has to exist before
+anyone can know what to fill, and the contract test has to exist before forty-odd
+new templates are written against it — a contract applied afterwards is a
+retrofit, and a retrofit is how the one message that violates it survives. So the
+first third builds the machine and records every gap with the phase that owns it,
+the second writes the missing messages into a suite that already refuses a bad
+one, and the third composes the optional digest and history layer on top. That is
+the same ordering Phase 09 used for the booking record and Phase 10 for the
+payments substrate.
 
 ## Layout
 
@@ -128,6 +148,9 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
                   four milestones, the count and threshold derivations, the
                   three live-editing tiers, the comment rules, and the seven
                   Creator earnings states with Appendix B.7
+  src/notifications/ the ~120 transactional events, the transactional-email
+                  rules, the money facts as four message classes with their
+                  detectors, and the naming contract as a scanner
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -158,7 +181,10 @@ backend/    Express 5 + Drizzle + Postgres 16
                       provider-object ledger, the tax-accountability gate, the
                       listing Checkout and its seven atomic effects, the single
                       full refund, Founder cancellation, and the two clocks
-  src/notifications/  the deduplicating sender, Resend, the email templates
+  src/notifications/  the deduplicating sender, Resend, the email templates, the
+                      register of events that deliberately do not send, the
+                      render catalog behind the coverage test, and the preview
+                      with its transactional-contract report
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
@@ -1115,6 +1141,68 @@ The three-active-partnership cap is checked before the Creator is asked to
 accept anything, because telling someone they cannot start after they have
 agreed is asking them to agree to something they could not do.
 
+## What the product will and will not email you
+
+Spec §27 names about 120 transactional messages across four audiences, and by
+this point in the build most of them existed and nobody could say which. The
+notification sweep makes that answerable.
+
+**Every event either sends or is written down as deliberately not sending.** The
+registry is 121 keys; 77 have a sender and 44 are recorded with a reason, an
+owner, and — where the claim is that only the *message* is missing — the table
+that already holds the fact it would carry. A test asserts the two lists
+partition the register exactly: none in both, none in neither. Adding an event
+without either building it or recording why it is absent fails the suite.
+
+**The three kinds of absence are different things and are labelled as such.**
+Some are decisions: the Spec asks for public-route email verification "if later
+enabled" and there is no public signup to verify, and it asks for a
+failed-payment *spike* alert while fixing no threshold anywhere — inventing one
+is exactly what the Spec forbids. Those own nothing and belong to nobody's
+backlog. Others are messages waiting on behaviour that has not been built yet,
+and they name the phase that owns the behaviour. The rest are messages whose
+behaviour already exists and is recorded, which is the only kind that is really
+a gap.
+
+**The rules are checked against the rendered message, not the sender's
+intention.** At most one primary action, a plain-text support route, a stable
+reference to quote, no unsubscribe anywhere, and — for money — the amount, who
+sold it, what the statement will show, and where the money stands. Each is
+decided by rendering the actual email and reading it, the same way the invitation
+preview has always scanned the rendered message rather than the record behind it.
+
+**Money messages come in four kinds, because one would be wrong.** Read flatly,
+the money rule would demand a card-statement descriptor on a cancellation — on
+the one message where it matters most not to imply money moved — and on a
+Founder payment that appears on nobody's statement at all. So a message is about
+money leaving a card now, money leaving that card later, money moving toward
+someone, or money that did not move and will not. The middle two carry an
+explicit not-charged sentence; only the first two carry a seller and a
+descriptor.
+
+The sweep found five real defects and they were fixed rather than reclassified.
+The pre-charge reminder named an amount, a seller, and a descriptor and never
+said the card had not been charged. The listing receipt named no merchant of
+record, on the single charge in the product where that is Proovd rather than the
+Founder. A failed Creator transfer told someone something had gone wrong with an
+unnamed sum. Three notices carried no reference to quote back to support. And
+fourteen senders were emitting a bare paragraph of text with no support route,
+no reference, and not even a complete document — each locally reasonable, and
+collectively the largest hole in the contract.
+
+**A deadline names its timezone, and `Z` does not count.** Several internal
+notices rendered a raw ISO instant, which is canonical UTC and spells nothing out
+to someone reading it at ten at night in Denver. The suite refuses a bare ISO
+instant anywhere, and the register names which messages carry a deadline at all —
+one that says work is due *now* is deliberately excluded, because demanding a
+timezone from it would push it to invent a deadline the Spec never states.
+
+**There is still no scheduled check-in email, and now there is a test that says
+so.** No key matches a check-in, nudge, streak, or drip shape; no sender, job, or
+template mentions a re-engagement sequence; no message manufactures urgency or
+scarcity or claims to be real time. Absence is asserted as deliberately as
+presence.
+
 ## Retention
 
 Unclaimed draft content is irreversibly anonymised 30 calendar days after the
@@ -1353,6 +1441,16 @@ The frontend and shared suites need neither Docker nor a database.
   rules out generic check-in email, so every notification traces to a real state
   transition, and no table in the live-operations phase carries a schedule,
   cadence, or next-send column.
+- **Every notification event either sends or is recorded as deliberately not
+  sending.** The two lists partition the register exactly, and a recorded
+  absence names its reason, its owner, and — where only the message is missing —
+  the table that already holds the fact. A new event with neither fails the
+  suite.
+- **Transactional email is never opt-out-able, and the check is on the rendered
+  message.** At most one primary action, a plain-text support route, a stable
+  reference, and for money the amount, the seller and merchant of record, the
+  expected statement descriptor, and where the money stands. A deadline names
+  its timezone in words; a bare ISO instant is refused.
 - **An empty next-action list is a designed ending, not a gap.** The caught-up
   sentence is exact copy and renders with no control beside it; there is no
   branch that manufactures a call to action (Spec §20, DNA §5.4).

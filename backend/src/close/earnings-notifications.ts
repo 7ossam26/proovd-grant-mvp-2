@@ -227,12 +227,19 @@ export async function notifyTransferCreated(
 
 export async function notifyTransferFailure(
   deps: EarningsNotificationDeps,
-  input: { transferId: string; associationId: string; campaignId: string },
+  input: {
+    transferId: string;
+    associationId: string;
+    campaignId: string;
+    /** §27.2: a money message names its amount. */
+    totalCents: bigint;
+  },
 ): Promise<void> {
   const recipient = await creatorRecipient(deps.db, input.associationId);
   if (!recipient?.email) return;
 
   const rendered = await renderTransferFailure({
+    amount: `US$${formatCents(input.totalCents)}`,
     campaignTitle: recipient.campaignTitle,
     partnershipUrl: closeViewUrl(deps.context, input.associationId),
     reference: input.transferId,

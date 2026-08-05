@@ -44,6 +44,14 @@ import { render } from '@react-email/render';
  * to. Restated here because the backend cannot import `@proovd/shared` at
  * runtime; the acceptance suite drift-tests it against the shared register.
  */
+/**
+ * §27.2 asks every money email to name its seller and merchant of record, and
+ * this is the only charge in the product where that is Proovd rather than the
+ * Founder (§24.6, §13). Naming it here is what keeps the two streams legible
+ * to the person paying: everything else they ever see is sold by them.
+ */
+export const LISTING_MERCHANT_OF_RECORD = 'Proovd LLC';
+
 export const LISTING_REFUND_PROMISE = `Proovd will refund the entire amount charged at this Checkout — the
 listing-fee subtotal plus the associated sales-tax reversal or
 correction — if no eligible campaign-specific Creator is recruited,
@@ -151,6 +159,9 @@ function ReceiptEmail({ v }: { v: ListingReceiptVariables }) {
               </Text>
             ))}
             <Text style={{ ...text, fontWeight: 700 }}>Total charged: {v.total}</Text>
+            <Text style={text}>
+              Seller and merchant of record: {LISTING_MERCHANT_OF_RECORD}
+            </Text>
             <Text style={quiet}>Your card statement will show “{v.descriptor}”.</Text>
             {v.receiptUrl ? (
               <Text style={quiet}>Your card receipt: {v.receiptUrl}</Text>
@@ -216,6 +227,7 @@ function receiptText(v: ListingReceiptVariables): string {
     'WHAT YOU PAID',
     ...v.lines.map((line) => `${line.label}: ${line.amount}`),
     `Total charged: ${v.total}`,
+    `Seller and merchant of record: ${LISTING_MERCHANT_OF_RECORD}`,
     `Your card statement will show "${v.descriptor}".`,
     v.receiptUrl
       ? `Your card receipt: ${v.receiptUrl}`

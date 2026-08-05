@@ -34,6 +34,7 @@ import {
   FOUNDER_PAYMENT_BLOCKED,
 } from '../notifications/events.js';
 import { renderEnforcementNotice } from '../notifications/templates/enforcement.js';
+import { renderPlainNotice } from '../notifications/templates/plain.js';
 import { loadFounder, type LaunchNotificationContext } from '../launch/notifications.js';
 import { formatCents } from '../reservations/restated.js';
 import type { EnforcementActionKind, EnforcementPhaseKind } from './logic.js';
@@ -92,6 +93,7 @@ export async function notifyEnforcementRoles(
         input.action === 'kill'
           ? 'The campaign page stays accessible in its ended state. Proovd will contact you about anything that needs your action.'
           : 'The campaign is on hold while Proovd reviews it. Proovd will contact you with the outcome.',
+      reference: input.campaignId,
       supportEmail: context.supportEmail,
     });
     await notifier.send({
@@ -140,6 +142,7 @@ export async function notifyEnforcementRoles(
           ? 'Finalized earnings keep their recorded state; anything not yet transferred is restricted while this stands, and any change follows the recorded cause rules — never an automatic clawback.'
           : 'No Backer was charged, so no commission exists on this campaign. Your standing with Proovd is unaffected by this decision about the campaign.',
       nextStep: 'Your money status view shows the current state of every amount.',
+      reference: input.campaignId,
       supportEmail: context.supportEmail,
     });
     await notifier.send({
@@ -190,6 +193,10 @@ export async function notifyEnforcementRoles(
       nextStep: wasCharged
         ? 'Open your pre-order page from your confirmation email for the current state and to get help without repeating anything.'
         : 'Nothing further happens, and you were not billed.',
+      // §27.2's "stable campaign, reservation, or case reference" — the
+      // Backer's own pre-order, so a support reply starts from their record
+      // rather than from the campaign's.
+      reference: row.id,
       supportEmail: context.supportEmail,
     });
     await notifier.send({
@@ -216,10 +223,26 @@ export async function notifyEnforcementRoles(
       );
     for (const payment of heldPayments) {
       const amount = formatCents(payment.amountCents);
-      const text =
-        `A campaign payment of US$${amount} is on hold: the campaign has been ${word} and ` +
-        'unreleased payments are restricted while that stands (§26.7). No action is needed from you; ' +
-        `Proovd will contact you with the outcome. Questions: ${context.supportEmail}.`;
+      const notice = await renderPlainNotice({
+        subject: `Campaign payment on hold — ${title}`,
+        headline: 'A campaign payment is on hold.',
+        facts: [
+          { label: 'Campaign', value: title },
+          { label: 'Amount affected', value: `US$${amount}` },
+          { label: 'Status', value: `Blocked — the campaign has been ${word}` },
+          { label: 'Who owns it', value: 'Proovd' },
+          { label: 'What you can do now', value: 'No action is needed from you' },
+        ],
+        paragraphs: [
+          'Unreleased payments are restricted while that stands (§26.7). Proovd will contact you with the outcome.',
+        ],
+        action: {
+          label: 'View your payment status',
+          url: `${context.appBaseUrl}/campaigns/${input.campaignId}/results`,
+        },
+        reference: input.campaignId,
+        supportEmail: context.supportEmail,
+      });
       await notifier.send({
         eventKey: FOUNDER_PAYMENT_BLOCKED,
         entityType: 'campaign_enforcement',
@@ -227,9 +250,7 @@ export async function notifyEnforcementRoles(
         to: founder.email,
         from: context.fromAddress,
         replyTo: context.supportEmail,
-        subject: `Campaign payment on hold — ${title}`,
-        html: `<p>${text}</p>`,
-        text,
+        ...notice,
       });
     }
   }

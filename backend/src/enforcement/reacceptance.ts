@@ -34,6 +34,7 @@ import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
+import { renderPlainNotice } from '../notifications/templates/plain.js';
 import { AFFILIATE_POLICY_REACCEPTANCE } from '../notifications/events.js';
 import { REACCEPTANCE_AUDIENCES, type ReacceptanceAudienceValue } from './logic.js';
 
@@ -130,10 +131,24 @@ export async function requirePolicyReacceptance(
       .where(isNotNull(affiliateSignupProfiles.claimedUserId));
     for (const profile of profiles) {
       if (!profile.email) continue;
-      const text =
-        `Proovd's ${version.title ?? input.slug} has a material update (version ${input.version}). ` +
-        'Continued use of your Creator account is paused until you review and accept it — ' +
-        `sign in, open the updated document, and accept. Questions: ${deps.context.supportEmail}.`;
+      const notice = await renderPlainNotice({
+        subject: `Action needed — an updated policy needs your acceptance`,
+        headline: 'An updated policy needs your acceptance.',
+        facts: [
+          { label: 'Document', value: version.title ?? input.slug },
+          { label: 'Version', value: input.version },
+          { label: 'Who owns it', value: 'You — nothing moves until you accept' },
+        ],
+        paragraphs: [
+          'Continued use of your Creator account is paused until you review and accept it. Sign in, open the updated document, and accept.',
+        ],
+        action: {
+          label: 'Review and accept',
+          url: `${deps.context.appBaseUrl}/legal/${input.slug}`,
+        },
+        reference: inserted[0]!.id,
+        supportEmail: deps.context.supportEmail,
+      });
       await deps.notifier.send({
         eventKey: AFFILIATE_POLICY_REACCEPTANCE,
         entityType: 'policy_reacceptance',
@@ -141,9 +156,7 @@ export async function requirePolicyReacceptance(
         to: profile.email,
         from: deps.context.fromAddress,
         replyTo: deps.context.supportEmail,
-        subject: `Action needed — an updated policy needs your acceptance`,
-        html: `<p>${text}</p>`,
-        text,
+        ...notice,
       });
     }
   }

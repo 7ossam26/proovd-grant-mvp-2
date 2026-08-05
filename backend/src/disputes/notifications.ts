@@ -17,6 +17,10 @@ import {
   INTERNAL_DISPUTE_OPENED,
 } from '../notifications/events.js';
 import { formatCents } from '../reservations/restated.js';
+import {
+  renderInternalNotice,
+  renderPlainNotice,
+} from '../notifications/templates/plain.js';
 import type { DisputeDeps } from './service.js';
 
 async function campaignTitle(deps: DisputeDeps, campaignId: string): Promise<string> {
@@ -35,11 +39,25 @@ export async function notifyDisputeOpened(
 ): Promise<void> {
   if (!deps.notifier || !deps.context) return;
   const d = input.dispute;
-  const summary =
-    `A payment dispute (${d.providerDisputeId}) opened on reservation ${d.reservationId} ` +
-    `for US$${formatCents(d.amountCents)} (provider reason: ${d.reasonCode ?? 'none'}). ` +
-    `The §24.11 evidence packet is due by ${d.taskDueAt.toISOString()} — within 24 hours of notice. ` +
-    'Classify the case through the §24.8 cause register; nothing about the Creator’s earnings moves until an Admin records that classification.';
+  const notice = await renderInternalNotice({
+    subject: `Dispute opened — evidence due in 24 hours (${d.providerDisputeId})`,
+    headline: `Payment dispute opened — evidence due within 24 hours`,
+    facts: [
+      { label: 'Provider dispute', value: d.providerDisputeId },
+      { label: 'Reservation', value: d.reservationId },
+      { label: 'Amount', value: `US$${formatCents(d.amountCents)}` },
+      { label: 'Provider reason', value: d.reasonCode ?? 'none supplied' },
+      // §27.1: a deadline names its zone. `toISOString` ends in `Z`, which is
+      // canonical UTC and spells nothing out.
+      { label: 'Evidence due', value: `${d.taskDueAt.toISOString().replace('Z', '')} UTC` },
+    ],
+    paragraphs: [
+      'Classify the case through the §24.8 cause register. Nothing about the Creator’s earnings moves until an Admin records that classification.',
+    ],
+    action: { label: 'Open the dispute queue', url: `${deps.context.appBaseUrl}/admin/refunds` },
+    reference: d.id,
+    supportEmail: deps.context.supportEmail,
+  });
 
   await deps.notifier.send({
     eventKey: INTERNAL_DISPUTE_OPENED,
@@ -47,9 +65,7 @@ export async function notifyDisputeOpened(
     entityId: d.id,
     to: deps.context.supportEmail,
     from: deps.context.fromAddress,
-    subject: `Dispute opened — evidence due in 24 hours (${d.providerDisputeId})`,
-    html: `<p>${summary}</p>`,
-    text: summary,
+    ...notice,
   });
 }
 
@@ -68,10 +84,25 @@ export async function notifyTransferReversal(
 
   const title = await campaignTitle(deps, input.transfer.campaignId);
   const amount = formatCents(input.amountReversedCents ?? input.transfer.totalCents);
-  const text =
-    `A transfer of US$${amount} for ${title} was reversed as part of a recorded recovery decision. ` +
-    'Your money status view shows the current state, the amounts involved, and the reason on record. ' +
-    `Questions or a dispute of this decision: reply to ${deps.context.supportEmail} and a person will answer.`;
+  const notice = await renderPlainNotice({
+    subject: `Transfer reversal recorded — ${title}`,
+    headline: 'A transfer for this campaign was reversed.',
+    facts: [
+      { label: 'Campaign', value: title },
+      { label: 'Amount reversed', value: `US$${amount}` },
+      { label: 'Status', value: 'Reversed — recorded recovery decision' },
+    ],
+    paragraphs: [
+      'Your money status view shows the current state, the amounts involved, and the reason on record.',
+      `Questions, or to dispute this decision: reply to ${deps.context.supportEmail} and a person will answer.`,
+    ],
+    action: {
+      label: 'View your earnings',
+      url: `${deps.context.appBaseUrl}/creator/campaigns/${input.transfer.associationId}/close`,
+    },
+    reference: input.transfer.id,
+    supportEmail: deps.context.supportEmail,
+  });
 
   await deps.notifier.send({
     eventKey: AFFILIATE_TRANSFER_REVERSAL,
@@ -81,8 +112,6 @@ export async function notifyTransferReversal(
     to: profile.email,
     from: deps.context.fromAddress,
     replyTo: deps.context.supportEmail,
-    subject: `Transfer reversal recorded — ${title}`,
-    html: `<p>${text}</p>`,
-    text,
+    ...notice,
   });
 }

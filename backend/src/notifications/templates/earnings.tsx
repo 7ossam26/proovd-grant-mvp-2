@@ -284,6 +284,12 @@ export const TRANSFER_FAILURE_LEAD = 'Your campaign Transfer needs another attem
 
 export interface TransferFailureVariables {
   campaignTitle: string;
+  /**
+   * §27.2: a money message states its amount. Without it the Creator is told
+   * something went wrong with an unnamed sum, which is the shape of message
+   * that generates a support case rather than answering one.
+   */
+  amount: string;
   partnershipUrl: string;
   reference: string;
   supportEmail: string;
@@ -300,6 +306,8 @@ function TransferFailureEmail({ v }: { v: TransferFailureVariables }) {
           <Heading style={heading}>{TRANSFER_FAILURE_LEAD}</Heading>
           <Section style={section}>
             <Text style={text}>Campaign: {v.campaignTitle}</Text>
+            <Text style={text}>Amount: {v.amount}</Text>
+            <Text style={text}>Status: pending — retrying</Text>
             <Text style={text}>
               We could not complete the Transfer of your finalized earnings on the first attempt.
               Your amount is unchanged and approved; Proovd is retrying automatically.
@@ -329,6 +337,8 @@ export async function renderTransferFailure(
       TRANSFER_FAILURE_LEAD,
       '',
       `Campaign: ${v.campaignTitle}`,
+      `Amount: ${v.amount}`,
+      'Status: pending — retrying',
       'We could not complete the Transfer of your finalized earnings on the first attempt.',
       'Your amount is unchanged and approved; Proovd is retrying automatically.',
       'No action needed — we will confirm as soon as it completes.',

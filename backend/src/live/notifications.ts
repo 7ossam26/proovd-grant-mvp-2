@@ -35,6 +35,7 @@ import {
   renderThresholdReached,
   renderThresholdLost,
 } from '../notifications/templates/launch.js';
+import { renderInternalNotice } from '../notifications/templates/plain.js';
 import { loadFounder, type LaunchNotificationContext } from '../launch/notifications.js';
 
 function utcMinute(instant: Date | null): string {
@@ -95,10 +96,21 @@ export async function notifyThresholdCrossing(
   }
 
   /* §27.6's internal counterpart, to the staffed inbox. */
-  const summary =
-    `Campaign ${crossing.campaignId} threshold ${crossing.direction}: ` +
-    `${crossing.uniqueActiveBackers} unique active Backers against a threshold of ${crossing.threshold}. ` +
-    `The threshold is measured again at close (${closeUtc} UTC).`;
+  const internalNotice = await renderInternalNotice({
+    subject: `Threshold ${crossing.direction} — campaign ${crossing.campaignId}`,
+    headline: `Order threshold ${crossing.direction} — campaign ${crossing.campaignId}`,
+    facts: [
+      { label: 'Unique active Backers', value: String(crossing.uniqueActiveBackers) },
+      { label: 'Order threshold', value: String(crossing.threshold) },
+      { label: 'Measured again at close', value: `${closeUtc} UTC` },
+    ],
+    paragraphs: [
+      'A campaign may cross repeatedly; each crossing is its own recorded event and notifies once. Nothing about the charge decision changes until close, when the threshold is decided from the state at exactly that instant.',
+    ],
+    action: { label: 'Open campaign operations', url: `${context.appBaseUrl}/admin/campaign-operations` },
+    reference: crossing.campaignId,
+    supportEmail: context.supportEmail,
+  });
 
   const internal = await notifier.send({
     eventKey: reached ? INTERNAL_THRESHOLD_REACHED : INTERNAL_THRESHOLD_LOST,
@@ -106,9 +118,7 @@ export async function notifyThresholdCrossing(
     entityId: crossing.id,
     to: context.supportEmail,
     from: context.fromAddress,
-    subject: `Threshold ${crossing.direction} — campaign ${crossing.campaignId}`,
-    html: `<p>${summary}</p>`,
-    text: summary,
+    ...internalNotice,
   });
 
   // §7's "recorded, not confirmed delivered" state, made visible: the crossing
