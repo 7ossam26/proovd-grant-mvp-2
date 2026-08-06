@@ -459,6 +459,13 @@ export async function executeRefund(
   // A replay after success changes nothing and needs no fresh preview (§28.3).
   if (refund.status === 'succeeded') return { status: 'already_succeeded' };
 
+  // No live-mode guard here, and that is the decision rather than an omission.
+  // §34's blocked list is six things that create exposure and a refund is not
+  // among them; a refund is only reachable from a charge that already
+  // happened, which is the state a rollback leaves behind. Refusing here would
+  // mean a closed gate stranding the Backer who is owed money back — see the
+  // partition in `shared/src/live-mode`.
+
   // §26.6: the consequences the Admin read must be THIS execution's, read
   // before it runs, consumed exactly once — 16a's machine, same table.
   if (!input.previewId) return { status: 'refused', reason: 'preview_required' };

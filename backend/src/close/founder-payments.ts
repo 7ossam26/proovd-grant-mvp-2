@@ -34,6 +34,7 @@
 
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { checkLiveMoneyPermitted, configuredStripeMode } from '../live-mode/guard.js';
 import {
   campaigns,
   campaignAffiliateAssociations,
@@ -826,6 +827,8 @@ export type CreatePaymentOutcome =
   | { status: 'approval_missing' }
   | { status: 'first_payment_not_released' }
   | { status: 'no_approved_early_request' }
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | { status: 'live_mode_blocked'; message: string }
   | { status: 'early_release_disabled' }
   | { status: 'before_day_3'; earliestAt: Date }
   | { status: 'evidence_incomplete'; missing: string[] }
@@ -845,6 +848,15 @@ export async function createFounderPayment(
   },
 ): Promise<CreatePaymentOutcome> {
   const now = input.now ?? new Date();
+
+  // §34, §6. No gateway call happens here — under the direct-charge
+  // configuration the money already sits on the Founder's account — but §34's
+  // blocked list ends with "any payout promise", and creating the payment
+  // object IS that promise. The mode comes from the boot configuration because
+  // this contract has no gateway to ask.
+  const live = await checkLiveMoneyPermitted(deps.db, configuredStripeMode(), input.campaignId);
+  if (!live.permitted) return { status: 'live_mode_blocked', message: live.message };
+
   const campaign = await loadCampaignMoney(deps.db, input.campaignId);
   if (!campaign || !campaign.type || !campaign.closeAt) return { status: 'not_found' };
   const model: 'idea' | 'product' = campaign.type === 'pre_build' ? 'idea' : 'product';
@@ -1047,6 +1059,8 @@ export type ReleasePaymentOutcome =
   | { status: 'not_releasable'; current: string }
   | { status: 'enforcement_hold'; campaignStatus: string }
   | { status: 'day_14_failed'; reasons: readonly string[] }
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | { status: 'live_mode_blocked'; message: string }
   | { status: 'not_found' };
 
 export async function releaseFounderPayment(
@@ -1062,6 +1076,18 @@ export async function releaseFounderPayment(
     )
     .limit(1);
   if (!payment) return { status: 'not_found' };
+
+  // §34, §6 — the release is the promise being kept, so it is gated with the
+  // creation. Read after the payment lookup so a refusal cannot be used to
+  // probe which campaign is the pilot.
+  const liveRelease = await checkLiveMoneyPermitted(
+    deps.db,
+    configuredStripeMode(),
+    input.campaignId,
+  );
+  if (!liveRelease.permitted) {
+    return { status: 'live_mode_blocked', message: liveRelease.message };
+  }
   if (payment.status === 'released') return { status: 'already_released', payment };
 
   // §26.7 (Phase 20b): the release is the exact edge "restrict unreleased

@@ -30,3 +30,4 @@ export * from './qa/index.js';
 export * from './qa/system.js';
 export * from './qa/test-cards.js';
 export * from './measurement/index.js';
+export * from './live-mode/index.js';

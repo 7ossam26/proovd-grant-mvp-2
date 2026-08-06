@@ -325,23 +325,34 @@ export function prerequisiteFacts(env: Env): {
   stripeKeysMatchMode: boolean;
   platformWebhookSecretPresent: boolean;
   connectWebhookSecretPresent: boolean;
+  webhookSecretsDiffer: boolean;
   transactionalEmailConfigured: boolean;
 } {
   const expectedSecret = env.STRIPE_MODE === 'test' ? 'sk_test_' : 'sk_live_';
   const expectedPublishable = env.STRIPE_MODE === 'test' ? 'pk_test_' : 'pk_live_';
+
+  // §34 condition 5 is "test/live key separation and webhook signatures pass".
+  // Separation is only real if the two endpoints hold different secrets —
+  // `checkWebhookSecrets` refuses to boot otherwise, and this records that it
+  // held rather than assuming it.
+  //
+  // Reported as its own fact as well as folded into `stripeKeysMatchMode`,
+  // because Phase 24's gate names the specific failure and "at least one key
+  // has the wrong prefix" and "both endpoints share a secret" are two
+  // different things to go and fix. The §6 prerequisites panel keeps reading
+  // the combined answer it has read since Phase 06a.
+  const webhookSecretsDiffer =
+    env.STRIPE_WEBHOOK_SECRET_PLATFORM !== env.STRIPE_WEBHOOK_SECRET_CONNECT;
 
   return {
     stripeMode: env.STRIPE_MODE,
     stripeKeysMatchMode:
       env.STRIPE_PLATFORM_SECRET_KEY.startsWith(expectedSecret) &&
       env.STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith(expectedPublishable) &&
-      // §34 condition 5 is "test/live key separation and webhook signatures
-      // pass". Separation is only real if the two endpoints hold different
-      // secrets — `checkWebhookSecrets` refuses otherwise, and this records
-      // that it held rather than assuming it.
-      env.STRIPE_WEBHOOK_SECRET_PLATFORM !== env.STRIPE_WEBHOOK_SECRET_CONNECT,
+      webhookSecretsDiffer,
     platformWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_PLATFORM),
     connectWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_CONNECT),
+    webhookSecretsDiffer,
     transactionalEmailConfigured: Boolean(env.RESEND_API_KEY && env.EMAIL_FROM),
   };
 }

@@ -23,13 +23,18 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–23 are
-complete** — every lifecycle phase, the whole notification contract, and the P0
-pass: **23a** swept accessibility, content, and cross-surface consistency across
-every principal flow, and **23b** proved what the system does under replay, a
-clock, and a stale session. **All 131 named acceptance tests have been written
-and passed.** Money moves in test mode only, and the live-mode gate stays shut —
-it is released by closing Track A, not by writing more code.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–24 are
+complete** — every lifecycle phase, the whole notification contract, the P0
+pass, and the live-mode gate itself. **All 131 named acceptance tests pass in a
+single run.**
+
+Money moves in test mode only. **The Spec §34 gate is now code rather than a
+checklist**, and it is shut: ten of its eleven conditions are unsatisfied, and
+eight of those wait on Track A — Stripe underwriting, legal review of the eight
+policy documents, tax registration, accounts and assets, the contrast sign-off,
+and two named pilot owners. None of that is a coding task. The gate is released
+by satisfying it, and there is no override on any surface and nowhere to add
+one.
 
 | Phase | Delivered |
 | --- | --- |
@@ -76,6 +81,7 @@ it is released by closing Track A, not by writing more code.
 | 22c | The optional activity digest — the one email anyone can switch off — with the notification history that stays a record rather than becoming a dashboard |
 | 23a | The P0 accessibility and content sweep: every principal flow rendered and checked, the built bundle grepped, and one pre-order compared across all seven surfaces |
 | 23b | The system contract: the three anchors and every deadline they drive, the adversarial idempotency sweep, the provider test matrix with its retained evidence log, the direct-architecture proof, and the first-cohort scoreboard whose baseline is `not measured` |
+| 24 | The live-mode gate as code: §34's eleven conditions with their filed evidence, the fail-closed refusal at the one gateway every money path shares, the single named pilot campaign, and the rollback that is one statement |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -149,6 +155,15 @@ test results to internal ledgers still needs a run against a real test-mode
 account with the CLI forwarding webhooks. `docs/evidence/stripe-test-matrix.md`
 records that as an unresolved item rather than leaving it to be inferred.
 
+Phase 24 builds almost nothing, and that is the phase. Its out-of-scope section
+is one word — "Everything. If something needs building, the gate stays closed."
+What it adds is the gate: a register the money path reads and refuses on, at the
+one point every service in the product shares. The eleven conditions are Spec
+§34's own, in §34's order, and most of them are judgements about the world
+outside the process — what Stripe approved, whether the tax registrations exist,
+whether two people know they are on the hook. Those are recorded with a named
+verifier and evidence, and no code path can satisfy one by inference.
+
 ## Layout
 
 npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
@@ -197,6 +212,11 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/measurement/ the four first-cohort metrics, the gate that keeps them
                   `not measured` until ten Founders, the three facts no metric
                   may exclude, and the tables an analytics warehouse arrives as
+  src/live-mode/  the §34 gate: the eleven conditions with how each is decided
+                  and the Track A item behind it, §34's two lists as a partition
+                  over every gateway operation, the money entry points and which
+                  are deliberately ungated, Appendix C's four statements as
+                  walks, and the five facts a rollback plan must state
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -206,6 +226,10 @@ backend/    Express 5 + Drizzle + Postgres 16
                       and the high-impact preview/override machine
   src/measurement/    the first-cohort scoreboard — a read across seven existing
                       tables that owns none of them and writes nothing
+  src/live-mode/      the §34 gate read (fail-closed four ways, never cached),
+                      the filed condition answers, the one named pilot
+                      enablement and its rollback, and the decorator that
+                      refuses live money at the single Stripe chokepoint
   src/reservations/   the Backer pre-order, the atomic cap, reservation-time
                       tax, cancellation, deduplication, and the magic link
   src/live/           the Founder campaign home: the delivery receipt behind the
@@ -360,6 +384,84 @@ exist (Spec §1.4).
 **Incomplete prerequisites block, they do not warn.** There is no override on
 that page, no "proceed anyway", and no place to add one. Spec §34 is released by
 satisfying its conditions.
+
+## The live-mode gate
+
+The last thing built, and the smallest. Spec §34 lists eleven conditions that
+must all hold before a real person's card can be charged, and the phase that
+implements it has a one-word scope for everything else: if something needs
+building, the gate stays closed.
+
+**The gate is code.** A page of eleven ticks beside an enabled button is a
+checklist, and a checklist is something a motivated person walks past at the end
+of a long week. So the conditions are a register the money path reads, and the
+refusal happens at the one Stripe gateway object every service in the product
+receives — which means a service written in a later phase inherits it without
+knowing the gate exists.
+
+**A gateway operation with no decided disposition stops the app from booting.**
+The decorator is built by walking the register rather than by listing method
+names, and it throws at startup if the gateway carries a callable member nobody
+has classified. Adding a money method and forgetting to decide whether it may
+run through a closed gate is therefore a deployment that does not start, rather
+than an ungated path that looks exactly like a gated one.
+
+**Refunds and card detachment deliberately keep working.** §34 blocks six
+things, all of which create exposure: real card data, a live SetupIntent or
+PaymentIntent, a live application fee, live fixed funding, an Affiliate
+Transfer, a payout promise. A refund is not among them, and adding it would mean
+a gate closing — because a condition lapsed, or because the rollback owner
+flipped it at 2am — while simultaneously stranding every Backer who is owed
+money back or has a live card with no path to remove it. §34 asks what happens
+to reservations already saved; that is the answer.
+
+**Nothing is satisfied by inference.** Two conditions the app genuinely decides
+on every read: whether the eight canonical documents are published, and whether
+the environment separates test keys from live ones. Three are decided by the
+acceptance suite, and a running server cannot watch its own test run — so those
+are filed, naming what was run and where the output is. The remaining six are
+human judgements about Stripe's underwriting, the tax registrations, a deployed
+origin, a reconciliation somebody performed, and two people who know they are on
+call for a pilot. Each carries a written reason for why the process cannot
+answer it, so a later session adding a heuristic that "usually" gets it right is
+a visible edit rather than a quiet one.
+
+**An unanswered condition is unsatisfied, and a gate that cannot read itself is
+shut.** There is no path through the code that returns "open" because something
+could not be determined, no cached answer, and no request body that opens live
+mode — the enablement reads the gate itself rather than taking it from whoever
+is calling.
+
+**One named pilot campaign, enforced by the database.** Spec §6 limits the first
+live enablement to one pilot with a named monitoring owner and a named rollback
+owner. A unique index over a constant means a second enablement cannot exist
+anywhere in the system; the two owners are rows with a name, a way to reach
+them, and a record of who confirmed they know they hold it. A team alias and
+"whoever's on call" are both refused by name, because Spec §34 says so twice.
+
+**The rollback plan is a column, not an intention.** All five facts — what
+triggers it, who decides and how they are reached, how live mode is disabled,
+what happens to reservations already saved, and what each party is told and by
+whom — are `NOT NULL` on the enablement. "Written before cutover, not after a
+problem" has exactly one enforceable form: the row cannot exist without it.
+Rolling back is one statement and takes effect on the next money call, because
+nothing caches the gate. Re-enabling afterwards is a new record with its own
+gate snapshot; there is no un-rollback, because why live money stopped is not a
+fact to erase. The plan itself is at [docs/rollback-plan.md](docs/rollback-plan.md),
+with its owner fields deliberately blank and marked as Track A6.
+
+**Appendix C is walked, not read.** The Spec's completion definition is that the
+app runs the whole lifecycle "without undocumented operator knowledge", so the
+record is of a person going to a surface and getting through it. The column that
+matters is the one for knowledge that is written down nowhere: naming it and
+marking the step passed is refused by the service and unrepresentable in the
+database, because a walk that only succeeded because the walker knew a trick is
+a failed walk with a passing feeling.
+
+**Today the gate is shut and says why.** Ten of eleven conditions are
+unsatisfied. Every policy document is a draft, no condition has been filed, and
+eight of them wait on Track A. That is the correct state, and the phase that
+releases it does so by closing Track A rather than by writing more code.
 
 ## The Founder invitation
 
@@ -1562,6 +1664,15 @@ unrelated suites.
   `eligible`, `blocked` with the named requirement, and `released`. Proovd holds
   no one's money, so the euphemism would describe an arrangement that does not
   exist, and Spec §3.2 already bans the rest of that vocabulary everywhere.
+- **No live money moves through a closed §34 gate, and the refusal is at the
+  gateway rather than at each caller.** A gateway operation with no recorded
+  disposition stops the application from booting. The operations that unwind
+  exposure — a refund, a card detachment — are deliberately not blocked, because
+  a closed gate must never strand somebody who is owed money back.
+- **The gate is never cached, and there is no override anywhere.** A cached gate
+  is a rollback that does not take effect. No route sets `open`, no request body
+  opens live mode, and an unanswered condition is unsatisfied rather than
+  unknown.
 - Secrets live in the deployment environment, never in the repo, the frontend
   bundle, email, or documentation. `.env.example` documents variable *names*
   and non-secret shape only.

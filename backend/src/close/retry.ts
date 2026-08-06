@@ -32,6 +32,7 @@
 
 import { and, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { checkLiveMoneyPermitted } from '../live-mode/guard.js';
 import {
   campaigns,
   campaignStatusHistory,
@@ -74,6 +75,8 @@ export type UpdateCardOutcome =
   | { status: 'retry_window_closed'; deadline: Date }
   | { status: 'setup_failed' }
   | { status: 'provider_error' }
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | { status: 'live_mode_blocked'; message: string }
   | { status: 'not_found' };
 
 export async function updateCardAndRetry(
@@ -104,6 +107,11 @@ export async function updateCardAndRetry(
     )
     .limit(1);
   if (!reservation) return { status: 'not_found' };
+
+  // §34, §6 — read from the reservation's own campaign, after the ownership
+  // check, so the refusal cannot be used to probe which campaign is the pilot.
+  const live = await checkLiveMoneyPermitted(db, deps.gateway.mode, reservation.campaignId);
+  if (!live.permitted) return { status: 'live_mode_blocked', message: live.message };
 
   // A duplicate submission after success is a person double-clicking, not an
   // error — the stale failure is already cleared (§33.7.9).

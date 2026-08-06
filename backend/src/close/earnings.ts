@@ -32,6 +32,7 @@
 
 import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { checkLiveMoneyPermitted } from '../live-mode/guard.js';
 import {
   campaigns,
   campaignAffiliateAssociations,
@@ -993,6 +994,8 @@ export type CreateTransferOutcome =
   | { status: 'recipient_account_not_ready' }
   | { status: 'not_approved'; current: string }
   | { status: 'enforcement_hold'; campaignStatus: string }
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | { status: 'live_mode_blocked'; message: string }
   | { status: 'not_found' };
 
 export async function createAffiliateTransfer(
@@ -1003,6 +1006,12 @@ export async function createAffiliateTransfer(
 
   const context = await loadAssociationContext(deps.db, input.associationId);
   if (!context) return { status: 'not_found' };
+
+  // §34, §6 — an Affiliate Transfer is named in §34's blocked list, and this
+  // is its campaign scope. The gateway decorator refuses a closed gate; this
+  // refuses a campaign that is not the pilot.
+  const live = await checkLiveMoneyPermitted(deps.db, deps.gateway.mode, context.campaignId);
+  if (!live.permitted) return { status: 'live_mode_blocked', message: live.message };
 
   const [earnings] = await deps.db
     .select()
@@ -1472,6 +1481,8 @@ export type ThankYouOutcome =
   | { status: 'recipient_account_not_ready' }
   | { status: 'approval_missing' }
   | { status: 'eligibility_not_confirmed' }
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | { status: 'live_mode_blocked'; message: string }
   | { status: 'not_found' };
 
 /**
@@ -1506,6 +1517,16 @@ export async function recordThankYou(
 
   const context = await loadAssociationContext(deps.db, input.associationId);
   if (!context) return { status: 'not_found' };
+
+  // §34, §6 — the PAYMENT branch only. A §22.2 thank-you payment uses the same
+  // Transfer §34 blocks by name, so it is gated with it; a recorded
+  // recognition creates no provider object, carries no amount by CHECK, and is
+  // §22.2's own answer to a Creator who cannot be paid. Blocking that would
+  // remove the one thing an Admin can still do while the gate is shut.
+  if (input.kind !== 'recognition') {
+    const live = await checkLiveMoneyPermitted(deps.db, deps.gateway.mode, context.campaignId);
+    if (!live.permitted) return { status: 'live_mode_blocked', message: live.message };
+  }
 
   if (input.kind === 'recognition') {
     const [record] = await deps.db

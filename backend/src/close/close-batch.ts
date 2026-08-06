@@ -27,6 +27,7 @@
 
 import { and, eq, lte, or, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { checkLiveMoneyPermitted } from '../live-mode/guard.js';
 import {
   campaigns,
   campaignStatusHistory,
@@ -139,6 +140,13 @@ export async function runCloseBatch(
   const { db, audit } = deps;
   const now = input.now ?? new Date();
   const { campaignId } = input;
+
+  // §34, §6 — before anything is locked or excluded. `blocked` rather than a
+  // new status: the batch genuinely is blocked, the reason rides the summary,
+  // and the sweep will pick it up again once live mode is enabled — which is
+  // the right behaviour, because the close is still owed.
+  const live = await checkLiveMoneyPermitted(db, deps.gateway.mode, campaignId);
+  if (!live.permitted) return summary('blocked', campaignId, { reason: live.message });
 
   const [campaign] = await db
     .select({

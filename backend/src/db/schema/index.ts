@@ -136,3 +136,10 @@ export * from './digest.js';
 // column to coerce), and §22.11's resolution record — which stores whether
 // fulfillment was still active, so the two states cannot be collapsed.
 export * from './completion.js';
+
+// Phase 24: §34's live-mode gate — the insert-only verification of each of the
+// eleven conditions, the one live pilot enablement (a partial unique index over
+// a constant, so §6's "one named pilot campaign" is the database's answer) with
+// its five NOT NULL rollback-plan columns and its two named owners as rows, the
+// three pre-first-reservation confirmations, and the recorded Appendix C walks.
+export * from './live-mode.js';

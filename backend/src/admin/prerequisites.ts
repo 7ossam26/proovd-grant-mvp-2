@@ -182,6 +182,14 @@ export interface PrerequisiteEnvironment {
   stripeKeysMatchMode: boolean;
   platformWebhookSecretPresent: boolean;
   connectWebhookSecretPresent: boolean;
+  /**
+   * The two endpoints carry different signing secrets. Folded into
+   * `stripeKeysMatchMode` as well, which is what this panel has read since
+   * Phase 06a; carried separately because Phase 24's §34 gate names the
+   * specific failure, and "a key has the wrong prefix" and "both endpoints
+   * share a secret" are two different things to go and fix.
+   */
+  webhookSecretsDiffer: boolean;
   /** A sending provider and a From address are both configured. */
   transactionalEmailConfigured: boolean;
 }

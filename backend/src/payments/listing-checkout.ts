@@ -36,6 +36,7 @@
 
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { checkLiveMoneyPermitted } from '../live-mode/guard.js';
 import {
   campaigns,
   campaignStatusHistory,
@@ -127,6 +128,8 @@ export async function advanceCampaignToListingFeePending(
 /* ── Beginning Checkout ───────────────────────────────────────────────────── */
 
 export type BeginCheckoutRefusal =
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | 'live_mode_blocked'
   | 'already_paid'
   | 'onboarding_incomplete'
   | 'restricted'
@@ -182,6 +185,15 @@ export async function beginListingCheckout(
 
   if (!campaign) {
     return refuse('provider_error', 'That campaign could not be found.', 'Contact support.');
+  }
+
+  // §34, §6: live money moves for one named pilot campaign and no other. The
+  // gateway decorator already refuses a closed gate; this is the campaign
+  // scope, which the gateway cannot know without trusting a value somebody
+  // chose. In test mode it is always permitted.
+  const live = await checkLiveMoneyPermitted(db, gateway.mode, input.campaignId);
+  if (!live.permitted) {
+    return refuse('live_mode_blocked', live.message, 'Contact Proovd.');
   }
 
   if (campaign.listingPaidAt) {

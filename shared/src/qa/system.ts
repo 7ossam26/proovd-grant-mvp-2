@@ -543,6 +543,12 @@ export const UNGATED_ADMIN_WRITES = [
     reason:
       'Same. The consequence — an own-link reservation’s attribution moving to blocked — follows from the recorded fact rather than from an Admin’s discretion.',
   },
+  {
+    route: 'POST /api/admin/live-mode/appendix-c',
+    specRef: '§34, Appendix C',
+    reason:
+      'Records that a person walked one Appendix C step and what they found. It changes no standing, moves no money, and cannot satisfy a §34 condition — the three writes that CAN (filing an answer, enabling the pilot, rolling it back) all take the gate. Requiring reauthentication to write down "I walked the Founder build and it worked" is the reflexive gating that stops a prompt meaning anything.',
+  },
 ] as const;
 
 export type UngatedAdminWrite = (typeof UNGATED_ADMIN_WRITES)[number];

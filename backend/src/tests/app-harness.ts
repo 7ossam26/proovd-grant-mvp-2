@@ -46,6 +46,9 @@ export const TEST_PREREQUISITE_ENVIRONMENT: PrerequisiteEnvironment = {
   stripeKeysMatchMode: true,
   platformWebhookSecretPresent: false,
   connectWebhookSecretPresent: false,
+  // Two absent secrets are not the same secret, and the §34 gate reports the
+  // absence rather than a false sharing.
+  webhookSecretsDiffer: true,
   transactionalEmailConfigured: false,
 };
 

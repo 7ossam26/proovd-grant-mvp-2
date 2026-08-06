@@ -19,6 +19,7 @@
 import { createHash } from 'node:crypto';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { checkLiveMoneyPermitted } from '../live-mode/guard.js';
 import { reservations, reservationStatusHistory, type Reservation } from '../db/schema/domain.js';
 import { founderOperationalShares, backerIdentities } from '../db/schema/reservations.js';
 import { recordProviderObject } from '../payments/provider-objects.js';
@@ -86,6 +87,8 @@ export interface PreorderDeps {
 }
 
 export type PreorderRefusalCode =
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | 'live_mode_blocked'
   | 'not_found'
   | 'not_live'
   | 'no_build'
@@ -185,6 +188,13 @@ export async function createPreorder(
   input: CreatePreorderInput,
 ): Promise<PreorderResult> {
   const { db, gateway } = deps;
+
+  // 0 — §34, §6. Live money moves for one named pilot campaign and no other.
+  // The gateway decorator already refuses a closed gate; this is the campaign
+  // scope, which the gateway cannot know without trusting a value somebody
+  // chose (09b's Cal.com reasoning). Always permitted in test mode.
+  const live = await checkLiveMoneyPermitted(db, gateway.mode, input.campaignId);
+  if (!live.permitted) return refuse('live_mode_blocked', live.message);
 
   // 1 — the campaign, reward, Founder, seller account.
   const ctxResult = await loadPreorderContext(db, gateway, input.campaignId);
@@ -742,6 +752,11 @@ export async function replaceIdeaReward(
   input: ReplaceIdeaRewardInput,
 ): Promise<PreorderResult> {
   const { db, gateway } = deps;
+
+  // §34, §6 — a replacement saves a card again, so it is the same live-money
+  // question the original pre-order answered.
+  const live = await checkLiveMoneyPermitted(db, gateway.mode, input.campaignId);
+  if (!live.permitted) return failReplace('live_mode_blocked', live.message);
 
   const ctxResult = await loadPreorderContext(db, gateway, input.campaignId);
   if (!ctxResult.ok) {

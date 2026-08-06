@@ -844,6 +844,23 @@ export type MemoryCaptureOutcome =
   | 'processing_error';
 
 export interface MemoryStripeGateway extends StripeGateway {
+  /**
+   * The methods on this double that are test scaffolding rather than provider
+   * operations — Phase 24, §34.
+   *
+   * `assertPartitionCoversGateway` walks the object it is handed and refuses
+   * any callable member with no recorded §34 disposition, so that a phase
+   * adding a money method without deciding whether it may run through a closed
+   * gate cannot boot the application. This double carries controls the real
+   * port does not (`setTaxRate`, `failNextTransfer`, …), and they reach no
+   * provider and move no money.
+   *
+   * Declared as a list rather than detected by a naming convention, so adding
+   * a control is a deliberate act: a new method that is NOT named here is
+   * treated as a provider operation and fails the partition, which is the safe
+   * direction for a marker whose whole job is to exempt things.
+   */
+  readonly __testControls: readonly string[];
   /** Sets what `retrieveAccount` will answer, and what a webhook would carry. */
   setAccount(accountId: string, account: Record<string, unknown>): void;
   /** Every account-link request, so a test can assert one was issued. */
@@ -982,6 +999,20 @@ export function createMemoryStripeGateway(config: {
     platformAccountId: config.platformAccountId ?? 'acct_platformtestaccount',
     taxEnabled: config.taxEnabled ?? true,
     client: null,
+    // §34: scaffolding, not provider operations. See the declaration on
+    // `MemoryStripeGateway` — a control added here and not listed fails the
+    // live-mode partition, which is the safe direction.
+    __testControls: [
+      'setAccount',
+      'setTaxRate',
+      'setCaptureOutcome',
+      'setNextSetupOutcome',
+      'setCardFingerprint',
+      'failNextPaymentIntent',
+      'failNextRefund',
+      'failNextTransfer',
+      'failNextSetup',
+    ],
     links,
     created,
     sessions,

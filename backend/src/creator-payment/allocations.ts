@@ -48,6 +48,7 @@ import { idempotencyKeys } from '../db/schema/integrity.js';
 import type { AuditWriter } from '../auth/audit.js';
 import type { StripeGateway } from '../payments/stripe-client.js';
 import { recordProviderObject } from '../payments/provider-objects.js';
+import { checkLiveMoneyPermitted } from '../live-mode/guard.js';
 
 type Executor = Pick<Database, 'select' | 'insert' | 'update' | 'execute'>;
 
@@ -168,6 +169,8 @@ export function allocationFunded(allocation: CreatorPaymentAllocation | null): b
 /* ── Beginning funding (§16 step 2) ────────────────────────────────────────── */
 
 export type BeginFundingRefusal =
+  /** §34: the live-mode gate is closed, or this is not the named pilot. */
+  | 'live_mode_blocked'
   | 'not_applicable'
   | 'already_funded'
   | 'canceled'
@@ -206,6 +209,13 @@ export async function beginAllocationFunding(
     };
   }
   const allocation = ensured.allocation;
+
+  // §34, §6 — checked against the allocation's own campaign rather than a
+  // caller-supplied id, so the scope cannot be widened by asking differently.
+  const live = await checkLiveMoneyPermitted(db, gateway.mode, allocation.campaignId);
+  if (!live.permitted) {
+    return { ok: false, code: 'live_mode_blocked', message: live.message, next: 'Contact Proovd.' };
+  }
 
   if (allocation.canceledAt) {
     return {

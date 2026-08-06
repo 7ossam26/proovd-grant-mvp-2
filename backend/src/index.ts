@@ -125,7 +125,7 @@ async function main() {
   // keys and fails closed on any mode mismatch, so this always constructs — the
   // separation §34 condition 5 asks about was already proven at boot.
   const { createStripeGateway } = await import('./payments/stripe-client.js');
-  const stripeGateway = createStripeGateway({
+  const rawStripeGateway = createStripeGateway({
     mode: env.STRIPE_MODE,
     apiVersion: env.STRIPE_API_VERSION,
     secretKey: env.STRIPE_PLATFORM_SECRET_KEY,
@@ -135,6 +135,18 @@ async function main() {
     // §12 puts Stripe Tax on the listing Checkout; while this is false the
     // payment surface refuses loudly rather than charging an untaxed total.
     taxEnabled: env.STRIPE_TAX_ENABLED,
+  });
+
+  // §34's gate, as code. In test mode this returns the gateway unchanged —
+  // §34's own first list permits test-mode engineering, and every condition is
+  // verified by a product that runs. In live mode it refuses every money-or-
+  // card operation while any of the eleven conditions is unsatisfied, and it
+  // throws HERE, before the server listens, if the gateway carries an
+  // operation whose disposition nobody has decided.
+  const { guardLiveMoneyGateway } = await import('./live-mode/guard.js');
+  const stripeGateway = guardLiveMoneyGateway(rawStripeGateway, {
+    db,
+    environment: prerequisiteFacts(env),
   });
 
   const publicDir = path.join(__dirname, '..', 'public');

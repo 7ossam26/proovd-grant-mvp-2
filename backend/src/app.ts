@@ -36,6 +36,7 @@ import { createBackerPreorderRouter } from './routes/backer-preorder.js';
 import { createBackerRouter } from './routes/backer.js';
 import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createAdminRefundsRouter } from './routes/admin-refunds.js';
+import { createAdminLiveModeRouter } from './routes/admin-live-mode.js';
 import {
   createFounderFulfillmentRouter,
   createAdminFulfillmentRouter,
@@ -280,6 +281,19 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // registered TOTP factor, and every write additionally requires a recent
   // sign-in.
   app.use(createAdminRouter({ db, auth, environment: config.prerequisiteEnvironment }));
+  // Phase 24 (§34, Appendix C). The live-mode gate: the eleven conditions with
+  // their filed evidence, the one named pilot enablement and its rollback, the
+  // three pre-first-reservation confirmations, and the recorded Appendix C
+  // walks. There is no override on it and nowhere to add one — `enablePilot`
+  // reads the gate itself, so no request body opens live mode.
+  app.use(
+    createAdminLiveModeRouter({
+      db,
+      auth,
+      audit,
+      environment: config.prerequisiteEnvironment,
+    }),
+  );
   // Phase 16a (§26.5, §26.6, §31.7, §33.12.4). The reservation and charge
   // ledger with §25.7's permitted export, the money controls read against the
   // Phase 03 ledger columns, the ten §31.7 risk signals, and the general

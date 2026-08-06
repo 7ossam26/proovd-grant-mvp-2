@@ -42,6 +42,10 @@ const UUID = /^[0-9a-fA-F-]{36}$/;
 
 /** Refusals that are the caller's fault (400) vs a state/availability (409/404). */
 const STATUS_FOR: Record<PreorderRefusalCode, number> = {
+  // §34: live pre-orders are not open. 503 beside `tax_unavailable` for the
+  // same reason — the request is well-formed and the campaign is real; the
+  // capability is not available, and it may be later.
+  live_mode_blocked: 503,
   not_found: 404,
   not_live: 409,
   no_build: 409,
