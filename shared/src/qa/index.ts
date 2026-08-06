@@ -201,6 +201,7 @@ export const PRINCIPAL_FLOWS = [
       '/admin/refunds',
       '/admin/fulfillment',
       '/admin/notifications',
+      '/admin/measurement',
     ],
     keyboardPathRequired: true,
   },

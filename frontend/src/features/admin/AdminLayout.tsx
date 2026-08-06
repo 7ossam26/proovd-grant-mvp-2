@@ -51,6 +51,8 @@ const NAV = [
   { to: '/admin/fulfillment', label: 'Fulfillment' },
   // Phase 22c (§27.7, §27.2). Delivery history and the message preview.
   { to: '/admin/notifications', label: 'Notifications' },
+  // Phase 23b (§31.9, §33.12.6). The first-cohort scoreboard.
+  { to: '/admin/measurement', label: 'Measurement' },
   { to: '/admin/settings', label: 'Global configuration' },
   { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];

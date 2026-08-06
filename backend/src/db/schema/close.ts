@@ -179,6 +179,17 @@ export const campaignResults = pgTable(
     /** §1.3: the named Admin whose review makes the narrative valid. */
     reviewedBy: text('reviewed_by').notNull(),
     preparedAt: timestamp('prepared_at', { withTimezone: true }).notNull().defaultNow(),
+
+    /**
+     * The first time the Founder opened their results (§31.9, Phase 23b).
+     *
+     * `prepared_at` is when `Results ready` became true; §31.9's "return after
+     * closure" measures the Founder opening it within seven days, which the
+     * prepared stamp cannot tell you. The only column on this insert-only table
+     * the app may write, granted by name in 0037, and write-once by trigger.
+     */
+    firstViewedAt: timestamp('first_viewed_at', { withTimezone: true }),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

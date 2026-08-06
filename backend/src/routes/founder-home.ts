@@ -123,7 +123,7 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
     const campaignId = await resolve(req, res);
     if (!campaignId) return;
 
-    const results = await readFounderResults(db, { campaignId });
+    const results = await readFounderResults(db, { campaignId, stampViewed: true });
     if (!results) {
       notFound(res);
       return;

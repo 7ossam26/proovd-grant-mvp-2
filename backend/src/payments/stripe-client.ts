@@ -215,6 +215,12 @@ export interface SetupIntentResult {
   last4: string | null;
   /** For a `requires_action` result the client must complete. */
   clientSecret: string | null;
+  /**
+   * The provider decline code on a failed setup — `incorrect_cvc`,
+   * `card_declined` (§32.5). Internal only: §33.9.11 keeps a raw provider code
+   * off every customer surface, and nothing renders this.
+   */
+  declineCode?: string | null;
 }
 
 export interface DetachPaymentMethodInput {
@@ -529,6 +535,10 @@ export function createStripeGateway(config: StripeGatewayConfig): StripeGateway 
         brand,
         last4,
         clientSecret: intent.client_secret ?? null,
+        // Internal only (§25.6, §33.9.11). The pre-order surface reports the
+        // failure without it; this exists so the ledger and the §32.5 matrix
+        // can name which provider outcome occurred.
+        declineCode: intent.last_setup_error?.decline_code ?? intent.last_setup_error?.code ?? null,
       };
     },
 
@@ -820,6 +830,19 @@ function verifyWithSecret(
 
 /* ── An in-memory gateway, for tests ──────────────────────────────────────── */
 
+/**
+ * The capture outcomes the suite can pin, one per §32.5 scenario that reaches a
+ * charge. Test infrastructure — never rendered, never shipped.
+ */
+export type MemoryCaptureOutcome =
+  | 'succeeded'
+  | 'card_declined'
+  | 'insufficient_funds'
+  | 'requires_action'
+  | 'expired_card'
+  | 'incorrect_cvc'
+  | 'processing_error';
+
 export interface MemoryStripeGateway extends StripeGateway {
   /** Sets what `retrieveAccount` will answer, and what a webhook would carry. */
   setAccount(accountId: string, account: Record<string, unknown>): void;
@@ -862,11 +885,17 @@ export interface MemoryStripeGateway extends StripeGateway {
     statementDescriptorSuffix: string | null;
     status: 'succeeded' | 'requires_action' | 'failed';
   }>;
-  /** Pins the outcome of a capture on this PaymentMethod (default succeeded). */
-  setCaptureOutcome(
-    paymentMethodId: string,
-    outcome: 'succeeded' | 'card_declined' | 'insufficient_funds' | 'requires_action',
-  ): void;
+  /**
+   * Pins the outcome of a capture on this PaymentMethod (default succeeded).
+   *
+   * The list is §32.5's required outcomes, not a general failure taxonomy. Each
+   * name is the provider decline code the scenario produces, because that is
+   * what the ledger records and what §33.9.11 forbids reaching a customer —
+   * `classifyCaptureFailure` collapses all of the declines onto `card_declined`
+   * on purpose, since the recovery is identical and finer customer-facing
+   * categories would put provider vocabulary in front of a person.
+   */
+  setCaptureOutcome(paymentMethodId: string, outcome: MemoryCaptureOutcome): void;
   /** Makes the next `createOffSessionPaymentIntent` throw once — the crash test. */
   failNextPaymentIntent(message: string): void;
 
@@ -893,8 +922,11 @@ export interface MemoryStripeGateway extends StripeGateway {
     status: SetupIntentResult['status'];
   }>;
   readonly detachedPaymentMethods: Array<{ paymentMethodId: string; connectedAccountId: string }>;
-  /** Forces the next `confirmSetupIntent` to return this status (default succeeded). */
-  setNextSetupOutcome(status: SetupIntentResult['status']): void;
+  /**
+   * Forces the next `confirmSetupIntent` to return this status, and optionally
+   * the provider decline code that produced it (default succeeded, no code).
+   */
+  setNextSetupOutcome(status: SetupIntentResult['status'], declineCode?: string): void;
   /** Makes the next `confirmSetupIntent` throw once — the provider-error path. */
   failNextSetup(message: string): void;
   /** Pins a payment method's card fingerprint, for §4.1 dedup tests. */
@@ -933,10 +965,7 @@ export function createMemoryStripeGateway(config: {
   const cardFingerprints = new Map<string, string>();
   const paymentIntents: MemoryStripeGateway['paymentIntents'] = [];
   const paymentIntentsByKey = new Map<string, OffSessionPaymentIntentResult>();
-  const captureOutcomes = new Map<
-    string,
-    'succeeded' | 'card_declined' | 'insufficient_funds' | 'requires_action'
-  >();
+  const captureOutcomes = new Map<string, MemoryCaptureOutcome>();
   let nextPaymentIntentFailure: string | null = null;
   let counter = 0;
   // A flat 8% unless a test says otherwise. Test infrastructure only — the
@@ -944,6 +973,7 @@ export function createMemoryStripeGateway(config: {
   let taxRate = 0.08;
   let nextRefundFailure: string | null = null;
   let nextSetupOutcome: SetupIntentResult['status'] = 'succeeded';
+  let nextSetupDeclineCode: string | null = null;
   let nextSetupFailure: string | null = null;
 
   return {
@@ -982,8 +1012,9 @@ export function createMemoryStripeGateway(config: {
       nextTransferFailure = message;
     },
 
-    setNextSetupOutcome(status) {
+    setNextSetupOutcome(status, declineCode) {
       nextSetupOutcome = status;
+      nextSetupDeclineCode = declineCode ?? null;
     },
 
     failNextSetup(message) {
@@ -1016,7 +1047,9 @@ export function createMemoryStripeGateway(config: {
       if (cached) return cached;
 
       const status = nextSetupOutcome;
+      const declineCode = nextSetupDeclineCode;
       nextSetupOutcome = 'succeeded';
+      nextSetupDeclineCode = null;
       counter += 1;
       const id = `seti_memory${String(counter).padStart(10, '0')}`;
       setupIntents.push({
@@ -1036,6 +1069,7 @@ export function createMemoryStripeGateway(config: {
         brand: status === 'succeeded' ? 'visa' : null,
         last4: status === 'succeeded' ? '4242' : null,
         clientSecret: status === 'succeeded' ? null : `${id}_secret`,
+        declineCode: status === 'succeeded' ? null : declineCode,
       };
       setupIntentsByKey.set(input.idempotencyKey, result);
       return result;
@@ -1089,18 +1123,27 @@ export function createMemoryStripeGateway(config: {
           ? BigInt(Math.round(Number(input.amountCents) * 0.029)) + 30n
           : null;
 
+      // §32.5's outcomes, each carrying the provider code it is named for.
+      // `card_declined` maps to `generic_decline` because that is the code
+      // Stripe returns for the generic-decline scenario, and the two words are
+      // deliberately not the same one: the first is the failure type, the
+      // second is the decline reason, and §33.7.8 reads them separately.
+      const declineCodes: Record<string, string | null> = {
+        card_declined: 'generic_decline',
+        insufficient_funds: 'insufficient_funds',
+        expired_card: 'expired_card',
+        incorrect_cvc: 'incorrect_cvc',
+        processing_error: 'processing_error',
+        requires_action: 'authentication_required',
+      };
+
       const result: OffSessionPaymentIntentResult = {
         id,
         status,
         chargeId: status === 'succeeded' ? `ch_capture${String(counter).padStart(10, '0')}` : null,
         stripeFeeCents: fee,
-        failureCode: status === 'failed' ? 'card_declined' : null,
-        declineCode:
-          outcome === 'insufficient_funds'
-            ? 'insufficient_funds'
-            : outcome === 'card_declined'
-              ? 'generic_decline'
-              : null,
+        failureCode: status === 'failed' ? 'card_error' : null,
+        declineCode: declineCodes[outcome] ?? null,
         failureMessage: status === 'failed' ? 'Your card was declined.' : null,
         clientSecret: status === 'requires_action' ? `${id}_secret` : null,
       };

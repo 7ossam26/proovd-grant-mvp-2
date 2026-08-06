@@ -36,7 +36,7 @@ brief's own acceptance draws:
 | Half | Scope | Acceptance | State |
 |---|---|---|---|
 | **23a** | Scope 1–3: the accessibility sweep across every principal flow, content QA including the built bundle, and the seven-surface cross-surface consistency contract | **§33.11.1–§33.11.7** | **built** |
-| **23b** | Scope 4–8: the adversarial idempotency sweep, the §32.5 test-card matrix and its §32.6 evidence log, the §32.7 direct-architecture test, the §31.9 measurement baseline, and the time/security confirmations | **§33.12.1–§33.12.7**, plus the three §32 done-when items | pending |
+| **23b** | Scope 4–8: the adversarial idempotency sweep, the §32.5 test-card matrix and its §32.6 evidence log, the §32.7 direct-architecture test, the §31.9 measurement baseline, and the time/security confirmations | **§33.12.1–§33.12.7**, plus the three §32 done-when items | **built** |
 
 The dependency runs one way and both halves are read-only over the product:
 §33.11 is about what a person **sees** — the rendered surface, the rendered
@@ -47,6 +47,23 @@ renders a surface; where they touch, 23a's cross-surface register is the
 vocabulary 23b's architecture test reconciles against.
 
 **23a builds no test clock, no evidence log, and no scoreboard.**
+
+**What 23b found, and did not route around.** Two of §33.12's claims were held by
+nothing. `campaign_payment_flags` was granted `UPDATE` and `DELETE` at the start
+and no service ever used them — a trail the application role can rewrite is not
+"independently auditable" (§33.12.3), so 0037 revokes the grant. And thirteen
+Admin write routes ran without the freshness gate; the first draft of the sweep
+required all of them to refuse, which was the wrong answer — `admin.ts` has
+recorded since Phase 06a that reauthenticating for ordinary work teaches people
+to do it reflexively — so the suite became a partition instead: gated, or
+recorded in `UNGATED_ADMIN_WRITES` with the property it lacks.
+
+One register entry was wrong in the other direction and the product was right.
+§33.12.3 read flatly says a payment flag may not be a lifecycle state, and the
+first draft enforced "no payment word in `campaigns.status`" — which would have
+meant renaming five of §23.1's own committed states (`captured_pending_w9`,
+`single_payment_released`, and three more) to satisfy a rule the Spec does not
+state. §1 rule 6 cuts both ways: the register was corrected, not the enum.
 
 ---
 
@@ -137,22 +154,22 @@ New features. If this phase finds missing behaviour rather than a defect, record
 
 ## Done when
 
-- [ ] All principal flows pass at 320px, desktop, keyboard, and screen reader — **§33.11.1**
-- [ ] Labels, errors, focus, and amounts, dates, actions are intact — **§33.11.2**
-- [ ] No banned vocabulary or undefined acronym reaches a Founder or Backer — **§33.11.3**
-- [ ] Every CTA names the actual action — **§33.11.4**
-- [ ] All seven surfaces agree on all eight facts — **§33.11.5**
-- [ ] No unresolved variable, broken link, old name, or placeholder policy — **§33.11.6**
-- [ ] Every state uses the six-question pattern — **§33.11.7**
-- [ ] The three anchors independently drive every deadline — **§33.12.1**
-- [ ] The replacement deadline is exact, versioned, and non-resettable — **§33.12.2**
-- [ ] Lifecycle and payment flags stay separate and auditable — **§33.12.3**
-- [ ] Admin auto-population works; every override records before, after, reason, actor, time — **§33.12.4**
-- [ ] MFA is enforced; stale reauthentication fails safely — **§33.12.5**
-- [ ] The scoreboard baseline is explicitly `not measured`, with no invented figure — **§33.12.6**
-- [ ] Cohort metrics come from defined events without hiding cancellations, support, or failures — **§33.12.7**
-- [ ] Every §32.5 test-card outcome is exercised and logged
-- [ ] The §32.6 evidence log is complete
-- [ ] The §32.7 direct architecture test passes; no code path can run both models
+- [x] All principal flows pass at 320px, desktop, keyboard, and screen reader — **§33.11.1**
+- [x] Labels, errors, focus, and amounts, dates, actions are intact — **§33.11.2**
+- [x] No banned vocabulary or undefined acronym reaches a Founder or Backer — **§33.11.3**
+- [x] Every CTA names the actual action — **§33.11.4**
+- [x] All seven surfaces agree on all eight facts — **§33.11.5**
+- [x] No unresolved variable, broken link, old name, or placeholder policy — **§33.11.6**
+- [x] Every state uses the six-question pattern — **§33.11.7**
+- [x] The three anchors independently drive every deadline — **§33.12.1**
+- [x] The replacement deadline is exact, versioned, and non-resettable — **§33.12.2**
+- [x] Lifecycle and payment flags stay separate and auditable — **§33.12.3**
+- [x] Admin auto-population works; every override records before, after, reason, actor, time — **§33.12.4**
+- [x] MFA is enforced; stale reauthentication fails safely — **§33.12.5**
+- [x] The scoreboard baseline is explicitly `not measured`, with no invented figure — **§33.12.6**
+- [x] Cohort metrics come from defined events without hiding cancellations, support, or failures — **§33.12.7**
+- [x] Every §32.5 test-card outcome is exercised and logged
+- [x] The §32.6 evidence log is complete
+- [x] The §32.7 direct architecture test passes; no code path can run both models
 
 **Acceptance:** §33.11 complete (7) and §33.12 complete (7). With these, all 131 tests have been written and passed at least once.

@@ -151,6 +151,17 @@ export const secureTokens = pgTable(
 
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
 
+    /**
+     * The FIRST successful verification (§31.9, Phase 23b).
+     *
+     * `last_used_at` above is overwritten every time, which makes it the wrong
+     * tense for §31.9's "time to first magic" — a Founder who opened their
+     * invitation in March and again yesterday has no March left in it. Set once
+     * by `verify` and refused a later move by trigger: a first that a later
+     * visit can shift is a last with a misleading name.
+     */
+    firstUsedAt: timestamp('first_used_at', { withTimezone: true }),
+
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     revokedReason: tokenRevocationReason('revoked_reason'),
 

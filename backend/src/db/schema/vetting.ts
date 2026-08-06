@@ -359,6 +359,16 @@ export const possibleCreatorResults = pgTable(
 
     recordedBy: text('recorded_by').notNull(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+
+    /**
+     * The first time the Founder was actually shown this result (§31.9).
+     *
+     * `recorded_at` is when an Admin recorded the §10 assessment; §31.9 asks
+     * for "possible-creator rendering", and the gap between the two is the wait
+     * the metric exists to measure. The only column on this insert-only table
+     * the app may write, granted by name in 0037, and write-once by trigger.
+     */
+    firstRenderedAt: timestamp('first_rendered_at', { withTimezone: true }),
   },
   (t) => ({
     campaignIdx: index('possible_creator_results_campaign_idx').on(t.campaignId, t.recordedAt),

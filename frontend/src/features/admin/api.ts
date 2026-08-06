@@ -1828,3 +1828,32 @@ export const recordGhostBan = (
     method: 'POST',
     body: JSON.stringify(body),
   });
+
+/* ── §31.9 first-cohort measurement (Phase 23b) ────────────────────────────── */
+
+export type MetricValue =
+  | {
+      state: 'not_measured';
+      reason: 'cohort_incomplete' | 'no_observations' | 'input_not_recorded';
+      invitedFounders: number;
+      cohortSize: number;
+      missingInput?: string;
+    }
+  | { state: 'measured'; unit: 'median_hours'; value: number; observations: number }
+  | { state: 'measured'; unit: 'rate'; numerator: number; denominator: number; value: number };
+
+export interface Scoreboard {
+  notMeasuredLabel: string;
+  cohortSize: number;
+  invitedFounders: number;
+  baselineEstablished: boolean;
+  metrics: Array<{ key: string; value: MetricValue }>;
+  secondary: Array<{ key: string; label: string; count: number | null; absentBecause?: string }>;
+}
+
+/**
+ * A read, and there is deliberately no writer beside it. §33.12.6 forbids an
+ * invented baseline, and the surest way to have none is to leave nowhere on the
+ * client to send one.
+ */
+export const fetchScoreboard = (): Promise<Scoreboard> => call<Scoreboard>('/api/admin/measurement');

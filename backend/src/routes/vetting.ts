@@ -212,7 +212,7 @@ export function createVettingRouter(
       return;
     }
 
-    const view = viewCreatorSignal(await readPossibleCreatorSignal(db, state.campaignId));
+    const view = viewCreatorSignal(await readPossibleCreatorSignal(db, state.campaignId, { stampRendered: true }));
 
     // The count and nothing else. Never the basis, never who recorded it, never
     // a Creator — §10: "It names no Creator." The basis is Proovd's internal

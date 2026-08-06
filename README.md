@@ -23,11 +23,13 @@ Working rules for contributors and for Claude Code sessions live in
 
 ## Status
 
-Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–22 are
-complete** — every lifecycle phase and the whole notification contract — and
-Phase 23, the P0 pass, is under way: **23a** has swept accessibility, content,
-and cross-surface consistency across every principal flow. Money moves in test
-mode only, and the live-mode gate stays shut.
+Built one phase at a time against `docs/master-plan.md` §6. **Phases 00–23 are
+complete** — every lifecycle phase, the whole notification contract, and the P0
+pass: **23a** swept accessibility, content, and cross-surface consistency across
+every principal flow, and **23b** proved what the system does under replay, a
+clock, and a stale session. **All 131 named acceptance tests have been written
+and passed.** Money moves in test mode only, and the live-mode gate stays shut —
+it is released by closing Track A, not by writing more code.
 
 | Phase | Delivered |
 | --- | --- |
@@ -73,6 +75,7 @@ mode only, and the live-mode gate stays shut.
 | 22b | All 44 missing messages: the roster update decided by a real state change, the review round, the fixed Creator payment, the mid-campaign Creator, the queue notices, and the magic-link reissue that names nobody |
 | 22c | The optional activity digest — the one email anyone can switch off — with the notification history that stays a record rather than becoming a dashboard |
 | 23a | The P0 accessibility and content sweep: every principal flow rendered and checked, the built bundle grepped, and one pre-order compared across all seven surfaces |
+| 23b | The system contract: the three anchors and every deadline they drive, the adversarial idempotency sweep, the provider test matrix with its retained evidence log, the direct-architecture proof, and the first-cohort scoreboard whose baseline is `not measured` |
 
 Several briefs have been built in halves. Phase 06 bundles four independent
 deliverables; Phase 08 bundles three — recruitment, the Creator's signup, and
@@ -86,8 +89,8 @@ named test from §33.1.1 to §33.1.9 passes, every one from §33.2.1 to §33.2.1
 every one from §33.3.1 to §33.3.11, every one from §33.4.1 to §33.4.9, every one
 from §33.5.1 to §33.5.13, **every one from §33.6.1 to §33.6.13, every one from
 §33.7.1 to §33.7.12, every one from §33.8.1 to §33.8.14, every one from §33.9.1
-to §33.9.13, every one from §33.10.1 to §33.10.10, and every one from §33.11.1 to
-§33.11.7**, plus §33.12.4. §33.12's remaining six are Phase 23b's.
+to §33.9.13, every one from §33.10.1 to §33.10.10, every one from §33.11.1 to
+§33.11.7, and every one from §33.12.1 to §33.12.7**. That is all 131.
 
 Phase 09 split along the line between a domain record and a vendor. The booking
 record went first and is the source of truth — a scheduling provider is a source
@@ -131,6 +134,21 @@ evidence log. Nothing in either half adds behaviour: §32.1's last step verifies
 what is already built, and what the sweep finds is either a defect it fixes or a
 gap it records with the phase that owns it.
 
+Between them the two halves found four things. Three were defects and were fixed:
+copy shipped in every browser that no source grep of `frontend/` could see, six
+failure states that answered two of §27.1's six questions, and a payment-flag
+trail the application role could rewrite. The fourth was a register that was
+wrong about the product rather than the other way round — it would have required
+renaming five of the Spec's own campaign states — and the register was corrected.
+Deciding which of the two is happening is most of what this phase is for.
+
+One item stays open and says so in its own artifact. The provider test matrix
+runs against the in-memory gateway, which verifies real webhook signatures but
+creates nothing at Stripe, so §34's requirement that a human reconcile provider
+test results to internal ledgers still needs a run against a real test-mode
+account with the CLI forwarding webhooks. `docs/evidence/stripe-test-matrix.md`
+records that as an unresolved item rather than leaving it to be inferred.
+
 ## Layout
 
 npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
@@ -170,8 +188,15 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
                   kinds, the window kernels, and what it must never become
   src/qa/         the P0 pass as registers: every principal flow and the five
                   §28.5 keyboard paths, the CTA rule, the placeholder patterns,
-                  the six-question detectors, what a bundle scan can decide, and
-                  the seven surfaces and eight facts §33.11.5 compares
+                  the six-question detectors, what a bundle scan can decide, the
+                  seven surfaces and eight facts §33.11.5 compares — and, for the
+                  system half, every deadline with the instant it is anchored on,
+                  the lifecycle/payment-flag separation, what makes an Admin
+                  action sensitive, the state-changing paths with their
+                  mechanisms, and the provider test outcomes and evidence fields
+  src/measurement/ the four first-cohort metrics, the gate that keeps them
+                  `not measured` until ten Founders, the three facts no metric
+                  may exclude, and the tables an analytics warehouse arrives as
 backend/    Express 5 + Drizzle + Postgres 16
   src/auth/           Better Auth config, guards, token service, seeding
   src/policies/       the §34 policy gate
@@ -179,6 +204,8 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/admin/          the production-prerequisites panel, the reservation and
                       charge ledger, the money controls, the risk inventory,
                       and the high-impact preview/override machine
+  src/measurement/    the first-cohort scoreboard — a read across seven existing
+                      tables that owns none of them and writes nothing
   src/reservations/   the Backer pre-order, the atomic cap, reservation-time
                       tax, cancellation, deduplication, and the magic link
   src/live/           the Founder campaign home: the delivery receipt behind the

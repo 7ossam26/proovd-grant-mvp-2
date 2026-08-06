@@ -32,7 +32,7 @@
  * claiming the campaign entered `vetting_submitted` twice.
  */
 
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { campaigns, campaignStatusHistory } from '../db/schema/domain.js';
 import { campaignDrafts, founderProspects } from '../db/schema/invitations.js';
@@ -570,6 +570,17 @@ export interface PossibleCreatorSignal {
 export async function readPossibleCreatorSignal(
   db: Database,
   campaignId: string,
+  /**
+   * §31.9's "possible-creator rendering", stamped once (Phase 23b).
+   *
+   * Off by default and passed only by the two Founder-facing reads, because an
+   * Admin opening the record is not the Founder being shown it — and "time to
+   * first magic" measured from an Admin's own click would be measuring
+   * ourselves. `coalesce` in SQL rather than a read-then-write, so two
+   * concurrent loads cannot both see null; the 0037 trigger refuses a move
+   * regardless.
+   */
+  options: { stampRendered?: boolean } = {},
 ): Promise<PossibleCreatorSignal | null> {
   const [row] = await db
     .select()
@@ -579,6 +590,16 @@ export async function readPossibleCreatorSignal(
     .limit(1);
 
   if (!row) return null;
+
+  if (options.stampRendered && !row.firstRenderedAt) {
+    await db
+      .update(possibleCreatorResults)
+      .set({
+        firstRenderedAt: sql`coalesce(${possibleCreatorResults.firstRenderedAt}, now())`,
+      })
+      .where(eq(possibleCreatorResults.id, row.id));
+  }
+
   return {
     count: row.count,
     basis: row.basis,

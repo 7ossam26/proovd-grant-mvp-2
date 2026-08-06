@@ -328,9 +328,17 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
       return reject('attempt limit exceeded', row.id);
     }
 
+    // `first_used_at` is set only while it is still null (§31.9, Phase 23b) —
+    // the SQL CASE rather than a read-then-write, so two concurrent
+    // verifications cannot both see null and both write. The trigger would
+    // refuse the second anyway; this keeps it from being an error path.
     await db
       .update(secureTokens)
-      .set({ lastUsedAt: now(), failedAttempts: 0 })
+      .set({
+        lastUsedAt: now(),
+        firstUsedAt: sql`coalesce(${secureTokens.firstUsedAt}, ${now()})`,
+        failedAttempts: 0,
+      })
       .where(eq(secureTokens.id, row.id));
 
     const subject: TokenSubject =

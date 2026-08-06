@@ -36,6 +36,7 @@ import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
 import { LedgerPage } from './features/admin/Ledger.js';
 import { MoneyControlsPage } from './features/admin/MoneyControls.js';
 import { RiskPanelPage } from './features/admin/RiskPanel.js';
+import { MeasurementPage } from './features/admin/Measurement.js';
 import { SupportQueuePage } from './features/admin/SupportQueue.js';
 import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
 import { CloseOperationsPage } from './features/admin/CloseOperations.js';
@@ -154,6 +155,9 @@ const rootChildren: RouteObject[] = [
       { path: 'ledger', element: <LedgerPage /> },
       { path: 'money', element: <MoneyControlsPage /> },
       { path: 'risk', element: <RiskPanelPage /> },
+      // Phase 23b (§31.9, §33.12.6). Account-wide rather than campaign-scoped:
+      // a cohort is the first ten Founders, not one campaign's.
+      { path: 'measurement', element: <MeasurementPage /> },
       // Phase 16b (§26.7, §26.8, §27.8). The support queue sweeps every case and
       // opens one by query string; campaign operations — timeline, enforcement,
       // and relationship touches — is campaign-scoped like the panels above.

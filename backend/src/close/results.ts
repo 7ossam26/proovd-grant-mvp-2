@@ -164,7 +164,18 @@ function rate(numerator: number, denominator: number): string | null {
 
 export async function readFounderResults(
   db: Database,
-  input: { campaignId: string },
+  input: {
+    campaignId: string;
+    /**
+     * §31.9's "opening Results ready", stamped once (Phase 23b).
+     *
+     * Passed only by the Founder's own route. `prepared_at` records when the
+     * results became ready, which is a different question from whether anyone
+     * came back to read them — and "return after closure" is the second one.
+     * An Admin opening the queue is not the Founder returning.
+     */
+    stampViewed?: boolean;
+  },
 ): Promise<FounderResults | null> {
   const { campaignId } = input;
   const [campaign] = await db
@@ -314,6 +325,16 @@ export async function readFounderResults(
     .from(campaignResults)
     .where(eq(campaignResults.campaignId, campaignId))
     .limit(1);
+
+  if (input.stampViewed && recorded && !recorded.firstViewedAt) {
+    // `coalesce` in SQL, not a read-then-write: two tabs opening the results
+    // at once must not race to be the first. The 0037 trigger refuses a move
+    // regardless — this keeps it off the error path.
+    await db
+      .update(campaignResults)
+      .set({ firstViewedAt: sql`coalesce(${campaignResults.firstViewedAt}, now())` })
+      .where(eq(campaignResults.id, recorded.id));
+  }
 
   const placed = Number(statusCounts?.placed ?? 0);
   const canceled = Number(statusCounts?.canceled ?? 0);

@@ -13,6 +13,7 @@
  * response shape that changes fails typecheck here before it reaches a test.
  */
 
+import type { Scoreboard } from '../admin/api.js';
 import type { DraftLanding, PrerequisitePanel, FounderRow, AdminIdentity, SettingState, AffiliateRegistry, LedgerPageState, MoneyPanelState, RiskPanelState, SupportQueueState, CloseOperationsState, RefundQueueState, Day14QueueState, GhostBanQueueState, DisputeQueueState } from '../admin/api.js';
 import type { ClaimView, CreatorSignal, VettingState } from '../../surfaces/draft/api.js';
 import type {
@@ -1401,6 +1402,48 @@ const ghostBanQueue: GhostBanQueueState = {
  * Order matters where one path is a prefix of another — `/api/founder/campaigns`
  * would otherwise answer `/api/founder/campaigns/:id/build`.
  */
+/* ── §31.9 the first-cohort scoreboard (Phase 23b) ─────────────────────────── */
+
+/**
+ * Deliberately a cohort-incomplete board.
+ *
+ * §33.12.6's state is the one a fresh deployment is actually in, and it is the
+ * one worth sweeping: it renders the `not measured` label, the reason, and no
+ * number at all. A fixture with four measured values would sweep a screen the
+ * product cannot currently produce.
+ */
+const scoreboard: Scoreboard = {
+  notMeasuredLabel: 'not measured',
+  cohortSize: 10,
+  invitedFounders: 3,
+  baselineEstablished: false,
+  metrics: [
+    'time_to_first_magic',
+    'founder_completion',
+    'return_after_closure',
+    'next_action_correction_rate',
+  ].map((key) => ({
+    key,
+    value: {
+      state: 'not_measured' as const,
+      reason: 'cohort_incomplete' as const,
+      invitedFounders: 3,
+      cohortSize: 10,
+    },
+  })),
+  secondary: [
+    {
+      key: 'autosave_failures',
+      label: 'Autosave failures',
+      count: null,
+      absentBecause:
+        'Autosave reports its own outcome to the Founder and retries; a client-side beacon to count failures is the analytics warehouse §31.9 forbids.',
+    },
+    { key: 'proposal_outcomes', label: 'Proposal outcomes', count: 0 },
+    { key: 'support_sla_misses', label: 'Support SLA misses', count: 0 },
+  ],
+};
+
 export const QA_ROUTES: StubRoute[] = [
   /* Draft (§7, §9, §10) */
   { match: /\/api\/draft\/[^/]+\/vetting$/, body: vetting },
@@ -1467,4 +1510,5 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/admin\/fulfillment\/ghost-ban\/candidates$/, body: ghostBanQueue },
   { match: /\/api\/admin\/notifications\/catalog$/, body: { keys: [], deliberateAbsences: [] } },
   { match: /\/api\/admin\/notifications\/history/, body: { history: notificationHistory } },
+  { match: /\/api\/admin\/measurement$/, body: scoreboard },
 ];

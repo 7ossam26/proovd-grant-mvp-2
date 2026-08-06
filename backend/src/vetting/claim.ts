@@ -479,7 +479,7 @@ export async function completeClaim(
   // zero routes to Admin "before the Founder proceeds". The surface already
   // enforces the order; this enforces it again on the server, because §1.1
   // requires server-side authorization and a hidden button is not one.
-  const signal = viewCreatorSignal(await readPossibleCreatorSignal(db, profile.campaignId));
+  const signal = viewCreatorSignal(await readPossibleCreatorSignal(db, profile.campaignId, { stampRendered: true }));
   if (signal.status !== 'available') {
     return {
       ok: false,

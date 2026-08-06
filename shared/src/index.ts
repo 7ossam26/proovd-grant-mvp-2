@@ -27,3 +27,6 @@ export * from './enforcement/index.js';
 export * from './fulfillment/index.js';
 export * from './completion/index.js';
 export * from './qa/index.js';
+export * from './qa/system.js';
+export * from './qa/test-cards.js';
+export * from './measurement/index.js';

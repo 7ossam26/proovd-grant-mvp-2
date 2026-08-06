@@ -33,6 +33,7 @@ import {
 } from '../admin/ledger.js';
 import { readMoneyControls } from '../admin/money-controls.js';
 import { readRiskPanel, readSellerTaxReadiness, recordSellerTaxReadiness } from '../admin/risk.js';
+import { readScoreboard } from '../measurement/service.js';
 import {
   previewHighImpactAction,
   recordOverride,
@@ -192,6 +193,19 @@ export function createAdminOperationsRouter({
       return;
     }
     res.json(panel);
+  });
+
+  /* ── §31.9 first-cohort measurement (Phase 23b) ────────────────────────── */
+
+  /**
+   * A read, so `admin` only — the same reasoning the ledger and the risk panel
+   * record. There is deliberately no write route here at all: §33.12.6 forbids
+   * an invented baseline, and the surest way to have none is to leave nowhere
+   * to record one. Every number is computed on the request from records other
+   * phases already keep.
+   */
+  router.get(`${ADMIN_OPS_BASE_PATH}/measurement`, admin, async (_req, res) => {
+    res.json(await readScoreboard(db));
   });
 
   /* ── §31.7 risk-control inventory ──────────────────────────────────────── */
