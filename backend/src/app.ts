@@ -13,6 +13,7 @@ import { notifyEnforcementRoles } from './support/enforcement-notifications.js';
 import { findCampaignFounderUserId } from './reservations/context.js';
 import { findAccountForOwner } from './payments/connected-accounts.js';
 import { createEnforcementRouter } from './routes/enforcement.js';
+import { createAccountRouter } from './routes/account.js';
 import { policyReacceptanceGate } from './enforcement/reacceptance.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
@@ -271,6 +272,12 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // at /api/account/policy-reacceptance, outside both gated prefixes.
   app.use('/api/founder', policyReacceptanceGate(db, auth, 'founder'));
   app.use('/api/creator', policyReacceptanceGate(db, auth, 'affiliate'));
+  // §5, §1.1. "Who is this session?" — the one read that lets a sign-in form
+  // send somebody somewhere without asking them which role they hold. Mounted
+  // beside the reacceptance routes and outside both gated prefixes above, for
+  // the reason `routes/account.ts` records: a person who owes an acceptance
+  // must still be able to reach the surface that takes it.
+  app.use(createAccountRouter(auth));
   // Phase 14b (§18, §33.6). Two public, session-less routes: `/c/:code` records
   // a tracking-link click, sets the per-browser attribution cookie, and
   // redirects to the live page; `/api/campaign/:id` returns the Backer-facing

@@ -6,6 +6,17 @@
  * weight shift, never colour alone. The full inventory lives in the footer
  * sitemap, so the header stays at four destinations and still wraps cleanly at
  * 320px without a hamburger that hides the way to anywhere behind a state.
+ *
+ * ── Sign in is separated from the nav, and that is deliberate ──────────────
+ * The four links are wayfinding around the public site; `Sign in` is the way
+ * into the product, and a returning Founder or Creator should not have to read
+ * a marketing nav to find it (DNA §5.12: the way to anywhere is one gesture
+ * from everywhere). It sits outside `<nav aria-label="Main">` in its own group
+ * so a screen reader browsing by landmark meets the site's sections and the
+ * account door as two different things.
+ *
+ * It is not `.btn`: a brand-filled button here would compete with the hero's
+ * one primary action on every page it renders on (DNA §5.6, §5.8).
  */
 
 import { NavLink } from 'react-router';
@@ -44,6 +55,16 @@ export function SiteHeader() {
             See a sample campaign
           </NavLink>
         </nav>
+        <div className="site-header__account">
+          <NavLink
+            to="/signin"
+            className={({ isActive }) =>
+              isActive ? 'site-header__signin is-current' : 'site-header__signin'
+            }
+          >
+            Sign in
+          </NavLink>
+        </div>
       </div>
     </header>
   );

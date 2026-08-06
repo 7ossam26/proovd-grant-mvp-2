@@ -26,6 +26,8 @@ import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
 import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { CampaignHome } from './surfaces/founder/CampaignHome.js';
+import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
+import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
 import { CampaignResults } from './surfaces/founder/CampaignResults.js';
 import { Fulfillment } from './surfaces/founder/Fulfillment.js';
 import {
@@ -122,6 +124,14 @@ const rootChildren: RouteObject[] = [
         path: 'campaign/:campaignId',
         element: <LiveCampaignPage />,
       },
+      // §5.1, §5.2, §5.3, §5.5. The one sign-in address, and the reset that
+      // §5.5 grants all three account roles. Inside the public shell — unlike
+      // the token surfaces, these are browsable addresses reached from the
+      // header, so the site's header, footer, and staffed-hours chat belong
+      // around them. They are deliberately NOT in §18's fourteen-route
+      // inventory; see `ACCOUNT_ROUTES` in `features/public/site.ts`.
+      { path: 'signin', element: <SignIn /> },
+      { path: 'reset-password', element: <ResetPassword /> },
       { path: '*', element: <NotFoundSurface /> },
     ],
   },
@@ -264,6 +274,14 @@ const rootChildren: RouteObject[] = [
     // next review date, and a factual thank-you — no ranking anywhere (§30).
     path: 'creator/campaigns/:associationId/close',
     element: <CreatorCampaignClose />,
+  },
+  {
+    // §1.1, §5.2. Where a Founder lands after signing in. Every other Founder
+    // route is `/campaigns/:campaignId/…`, so without this a valid session was
+    // only useful to somebody who already had a campaign id in their history.
+    // Outside both shells, for the reasons the campaign routes below document.
+    path: 'campaigns',
+    element: <FounderCampaigns />,
   },
   {
     // Phase 09a (§12, DNA §5.9). The signed-in Founder's campaign workspace.
