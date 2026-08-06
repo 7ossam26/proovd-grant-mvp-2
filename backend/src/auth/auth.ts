@@ -54,6 +54,14 @@ export interface AuthConfig {
   sendResetPassword: SendResetPassword;
   /** Founder-only Google sign-in (§5.2). Omitted entirely when unconfigured. */
   google?: { clientId: string; clientSecret: string };
+  /**
+   * Origins Better Auth accepts on a cookie-bearing or Origin-header-carrying
+   * request (its own CSRF check, independent of Express's CORS middleware).
+   * Defaults to `[baseUrl]` — Better Auth's own default — when omitted. `app.ts`
+   * passes the same list it built for CORS, so the two never disagree about
+   * which origins the app trusts in a given environment.
+   */
+  trustedOrigins?: string[];
 }
 
 export function createAuth(config: AuthConfig) {
@@ -78,6 +86,7 @@ export function createAuth(config: AuthConfig) {
     appName: 'Proovd',
     baseURL: config.baseUrl,
     secret: config.secret,
+    ...(config.trustedOrigins ? { trustedOrigins: config.trustedOrigins } : {}),
 
     database: drizzleAdapter(config.db, {
       provider: 'pg',

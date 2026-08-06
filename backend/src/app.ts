@@ -195,11 +195,22 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     transport: config.emailTransport ?? unconfiguredTransport,
     audit: (event) => audit({ ...event, targetId: event.targetId }),
   });
+  // Computed here (rather than beside the CORS middleware below) because
+  // Better Auth's own origin/CSRF check — independent of Express's CORS
+  // middleware — needs the identical list. `http://localhost:5173` is the Vite
+  // dev server's origin (vite.config.ts proxies /api to this server), added
+  // only outside production for the same reason CORS already special-cases it.
+  const corsOrigins: string[] =
+    config.nodeEnv === 'development'
+      ? [config.appBaseUrl, 'http://localhost:5173']
+      : [config.appBaseUrl];
+
   const auth = createAuth({
     db,
     baseUrl: config.appBaseUrl,
     secret: config.authSecret,
     adminReauthWindowSeconds: config.adminReauthWindowSeconds,
+    trustedOrigins: corsOrigins,
     sendResetPassword:
       config.sendResetPassword ??
       (async ({ user, url }) => {
@@ -235,11 +246,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   );
 
   // ── CORS ───────────────────────────────────────────────────────────────────
-  const corsOrigins: string[] =
-    config.nodeEnv === 'development'
-      ? [config.appBaseUrl, 'http://localhost:5173']
-      : [config.appBaseUrl];
-
   app.use(cors({ origin: corsOrigins, credentials: true }));
 
   // ── Routes (per-router body parsing — no global express.json()) ────────────
