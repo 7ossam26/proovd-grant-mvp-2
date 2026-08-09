@@ -7,20 +7,48 @@ const schema = z.object({
   APP_BASE_URL: z.string().url('APP_BASE_URL must be a valid URL'),
 
   // ── Stripe (§6 / §32.2) — all required; mode-mismatch exits non-zero ──────
+  /**
+   * A declaration, not a credential. Stays required: it costs nothing to
+   * state, and `prerequisiteFacts` has to report which mode a deployment
+   * believes it is in even when no keys are configured.
+   */
   STRIPE_MODE: z.enum(['test', 'live']),
-  STRIPE_PLATFORM_SECRET_KEY: z.string().min(1),
-  STRIPE_PLATFORM_PUBLISHABLE_KEY: z.string().min(1),
 
   /**
-   * §32.2: "Locked API version." Required, and deliberately not defaulted to
-   * the SDK's own pinned version — an SDK upgrade would then silently change
-   * the shape of every provider object the ledger reads. The operator states
-   * the version; `payments/stripe-client.ts` passes it to every call.
+   * ── The four platform credentials, and why they are optional to boot ──────
+   *
+   * §32.2 requires all four before any money moves, and `checkStripeMode`
+   * still refuses a set that disagrees with the declared mode. What they no
+   * longer do is stop the process from starting — the reason `RESEND_API_KEY`
+   * and the R2 block already give: the app has to run before an Admin can open
+   * the §6 prerequisites panel and read that Stripe is missing. A deployment
+   * that cannot boot reports nothing at all.
+   *
+   * All four or none (`checkStripeCredentials`). A partial set would build a
+   * half-configured client and fail at the first provider call instead of
+   * here, which is the failure shape `checkGoogleOAuth` exists to prevent.
+   *
+   * Unset, `unconfiguredStripeGateway` refuses every operation by name, the
+   * prerequisites panel reports the item unsatisfied, and §34 condition 5
+   * stays unproven — `stripeKeysMatchMode` is false when there are no keys to
+   * match. Nothing records a separation that was never demonstrated.
+   *
+   * In LIVE mode they are required, because a live deployment with no gateway
+   * is not a configuration anyone meant.
    */
-  STRIPE_API_VERSION: z.string().min(1, 'STRIPE_API_VERSION is required and must be locked'),
+  STRIPE_PLATFORM_SECRET_KEY: z.string().optional(),
+  STRIPE_PLATFORM_PUBLISHABLE_KEY: z.string().optional(),
+
+  /**
+   * §32.2: "Locked API version." Deliberately not defaulted to the SDK's own
+   * pinned version — an SDK upgrade would then silently change the shape of
+   * every provider object the ledger reads. The operator states the version;
+   * `payments/stripe-client.ts` passes it to every call.
+   */
+  STRIPE_API_VERSION: z.string().optional(),
 
   /** §32.2: "Platform account ID." The account the listing fee is charged on. */
-  STRIPE_PLATFORM_ACCOUNT_ID: z.string().min(1),
+  STRIPE_PLATFORM_ACCOUNT_ID: z.string().optional(),
 
   // Required for webhook verification (Phases 10+), optional to boot
   STRIPE_WEBHOOK_SECRET_PLATFORM: z.string().optional(),
@@ -129,27 +157,32 @@ export type Env = z.infer<typeof schema>;
 function checkStripeMode(data: Env): void {
   const { STRIPE_MODE, STRIPE_PLATFORM_SECRET_KEY, STRIPE_PLATFORM_PUBLISHABLE_KEY } = data;
 
-  if (STRIPE_MODE === 'test') {
-    if (!STRIPE_PLATFORM_SECRET_KEY.startsWith('sk_test_')) {
-      throw new Error(
-        `STRIPE_MODE=test but STRIPE_PLATFORM_SECRET_KEY does not start with sk_test_ (got ${STRIPE_PLATFORM_SECRET_KEY.slice(0, 8)}...)`,
-      );
-    }
-    if (!STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith('pk_test_')) {
-      throw new Error(
-        `STRIPE_MODE=test but STRIPE_PLATFORM_PUBLISHABLE_KEY does not start with pk_test_ (got ${STRIPE_PLATFORM_PUBLISHABLE_KEY.slice(0, 8)}...)`,
-      );
-    }
-  } else {
-    if (!STRIPE_PLATFORM_SECRET_KEY.startsWith('sk_live_')) {
-      throw new Error(
-        `STRIPE_MODE=live but STRIPE_PLATFORM_SECRET_KEY does not start with sk_live_ (got ${STRIPE_PLATFORM_SECRET_KEY.slice(0, 8)}...)`,
-      );
-    }
-    if (!STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith('pk_live_')) {
-      throw new Error(
-        `STRIPE_MODE=live but STRIPE_PLATFORM_PUBLISHABLE_KEY does not start with pk_live_ (got ${STRIPE_PLATFORM_PUBLISHABLE_KEY.slice(0, 8)}...)`,
-      );
+  // Absent credentials are `checkStripeCredentials`' business (all four or
+  // none) and the prerequisites panel's to report. What this decides is
+  // whether the values that ARE present agree with the declared mode.
+  if (STRIPE_PLATFORM_SECRET_KEY && STRIPE_PLATFORM_PUBLISHABLE_KEY) {
+    if (STRIPE_MODE === 'test') {
+      if (!STRIPE_PLATFORM_SECRET_KEY.startsWith('sk_test_')) {
+        throw new Error(
+          `STRIPE_MODE=test but STRIPE_PLATFORM_SECRET_KEY does not start with sk_test_ (got ${STRIPE_PLATFORM_SECRET_KEY.slice(0, 8)}...)`,
+        );
+      }
+      if (!STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith('pk_test_')) {
+        throw new Error(
+          `STRIPE_MODE=test but STRIPE_PLATFORM_PUBLISHABLE_KEY does not start with pk_test_ (got ${STRIPE_PLATFORM_PUBLISHABLE_KEY.slice(0, 8)}...)`,
+        );
+      }
+    } else {
+      if (!STRIPE_PLATFORM_SECRET_KEY.startsWith('sk_live_')) {
+        throw new Error(
+          `STRIPE_MODE=live but STRIPE_PLATFORM_SECRET_KEY does not start with sk_live_ (got ${STRIPE_PLATFORM_SECRET_KEY.slice(0, 8)}...)`,
+        );
+      }
+      if (!STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith('pk_live_')) {
+        throw new Error(
+          `STRIPE_MODE=live but STRIPE_PLATFORM_PUBLISHABLE_KEY does not start with pk_live_ (got ${STRIPE_PLATFORM_PUBLISHABLE_KEY.slice(0, 8)}...)`,
+        );
+      }
     }
   }
 
@@ -186,11 +219,62 @@ function checkStripeMode(data: Env): void {
 
   // §32.2 asks for a locked API version. Stripe's are dated, and a value that is
   // not one is a typo that would be sent on every request.
-  if (!/^\d{4}-\d{2}-\d{2}(\.[a-z]+)?$/.test(data.STRIPE_API_VERSION)) {
+  if (
+    data.STRIPE_API_VERSION &&
+    !/^\d{4}-\d{2}-\d{2}(\.[a-z]+)?$/.test(data.STRIPE_API_VERSION)
+  ) {
     throw new Error(
       `STRIPE_API_VERSION must be a locked Stripe API version such as 2026-07-29.dahlia (got ${data.STRIPE_API_VERSION})`,
     );
   }
+}
+
+/**
+ * The Stripe platform credentials are configured or they are not (§32.2).
+ *
+ * Three of the four build a client that authenticates and then charges on the
+ * wrong account, or one that cannot verify a webhook it has already accepted —
+ * failures that surface at the first provider call rather than at boot. Same
+ * reasoning as `checkGoogleOAuth`, `checkObjectStorage`, and `checkScheduler`.
+ *
+ * In live mode the set is mandatory: §34's gate governs whether live money may
+ * MOVE, and a live deployment with no gateway at all is not a state anyone
+ * chose. Refusing here keeps that from being discovered by a Backer.
+ */
+function checkStripeCredentials(data: Env): void {
+  const parts = [
+    data.STRIPE_PLATFORM_SECRET_KEY,
+    data.STRIPE_PLATFORM_PUBLISHABLE_KEY,
+    data.STRIPE_PLATFORM_ACCOUNT_ID,
+    data.STRIPE_API_VERSION,
+  ];
+  const present = parts.filter(Boolean).length;
+
+  if (present !== 0 && present !== parts.length) {
+    throw new Error(
+      'Stripe is half-configured: set STRIPE_PLATFORM_SECRET_KEY, ' +
+        'STRIPE_PLATFORM_PUBLISHABLE_KEY, STRIPE_PLATFORM_ACCOUNT_ID, and ' +
+        'STRIPE_API_VERSION, or none of them.',
+    );
+  }
+
+  if (present === 0 && data.STRIPE_MODE === 'live') {
+    throw new Error(
+      'STRIPE_MODE=live with no Stripe credentials configured. Live mode ' +
+        'requires the full platform credential set; use STRIPE_MODE=test ' +
+        'while Stripe is not yet set up.',
+    );
+  }
+}
+
+/** True only when all four platform credentials are present. Read by `createApp`. */
+export function stripeConfigured(env: Env): boolean {
+  return Boolean(
+    env.STRIPE_PLATFORM_SECRET_KEY &&
+      env.STRIPE_PLATFORM_PUBLISHABLE_KEY &&
+      env.STRIPE_PLATFORM_ACCOUNT_ID &&
+      env.STRIPE_API_VERSION,
+  );
 }
 
 /**
@@ -322,6 +406,13 @@ export function objectStorageConfigured(env: Env): boolean {
  */
 export function prerequisiteFacts(env: Env): {
   stripeMode: 'test' | 'live';
+  /**
+   * False when no credentials are configured at all. Kept separate from
+   * `stripeKeysMatchMode` because "Stripe is not set up" and "the keys
+   * contradict the mode" are two different things to go and fix — the §26
+   * distinction between an unpopulated fact and a failing one (§1.4).
+   */
+  stripeConfigured: boolean;
   stripeKeysMatchMode: boolean;
   platformWebhookSecretPresent: boolean;
   connectWebhookSecretPresent: boolean;
@@ -344,11 +435,19 @@ export function prerequisiteFacts(env: Env): {
   const webhookSecretsDiffer =
     env.STRIPE_WEBHOOK_SECRET_PLATFORM !== env.STRIPE_WEBHOOK_SECRET_CONNECT;
 
+  const configured = stripeConfigured(env);
+
   return {
     stripeMode: env.STRIPE_MODE,
+    stripeConfigured: configured,
+    // With nothing configured this is false, and that is the honest answer:
+    // §34 condition 5 asks that test/live separation be demonstrated, and
+    // there is no separation to demonstrate between two absent keys. An
+    // unconfigured deployment must never record the condition as met.
     stripeKeysMatchMode:
-      env.STRIPE_PLATFORM_SECRET_KEY.startsWith(expectedSecret) &&
-      env.STRIPE_PLATFORM_PUBLISHABLE_KEY.startsWith(expectedPublishable) &&
+      configured &&
+      env.STRIPE_PLATFORM_SECRET_KEY!.startsWith(expectedSecret) &&
+      env.STRIPE_PLATFORM_PUBLISHABLE_KEY!.startsWith(expectedPublishable) &&
       webhookSecretsDiffer,
     platformWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_PLATFORM),
     connectWebhookSecretPresent: Boolean(env.STRIPE_WEBHOOK_SECRET_CONNECT),
@@ -368,6 +467,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
     const messages = result.error.errors.map((e) => `  ${e.path.join('.')}: ${e.message}`);
     throw new Error(`Environment validation failed:\n${messages.join('\n')}`);
   }
+  checkStripeCredentials(result.data);
   checkStripeMode(result.data);
   checkGoogleOAuth(result.data);
   checkWebhookSecrets(result.data);

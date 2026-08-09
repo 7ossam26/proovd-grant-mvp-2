@@ -1392,3 +1392,68 @@ export function toVerifiedEvent(
     endpoint,
   };
 }
+
+/**
+ * ── The gateway a deployment gets when Stripe is not configured ─────────────
+ *
+ * The `unconfiguredTransport` / `unconfiguredStorage` / `unconfiguredScheduler`
+ * decision, applied to the fourth port. It refuses loudly rather than
+ * pretending: every operation that would touch money or a card throws, naming
+ * itself and the variables that are missing, so a failure reads as "Stripe is
+ * not set up" instead of as a provider outage.
+ *
+ * Two members deliberately answer instead of throwing:
+ *
+ *  - `hasSecretFor` returns false. It is a question ABOUT configuration, and
+ *    the webhook routes call it to decide whether to accept anything at all.
+ *    Throwing would turn a correctly-refused delivery into a 500.
+ *  - `verifyEvent` returns null, which the interface already documents as the
+ *    single answer to every verification failure. An unsigned or unverifiable
+ *    delivery is rejected on the path that already exists.
+ *
+ * `client` is null. §32.4's store and the §21 close batch read it before
+ * creating provider objects, and null is what "there is no client" means.
+ *
+ * This does not weaken §34. The gate governs whether LIVE money may move; this
+ * governs whether there is a provider at all, and `checkStripeCredentials`
+ * refuses an unconfigured live deployment outright.
+ */
+export function createUnconfiguredStripeGateway(mode: StripeModeValue): StripeGateway {
+  const refuse = (operation: string): never => {
+    throw new Error(
+      `Stripe is not configured, so ${operation} cannot run. Set ` +
+        'STRIPE_PLATFORM_SECRET_KEY, STRIPE_PLATFORM_PUBLISHABLE_KEY, ' +
+        'STRIPE_PLATFORM_ACCOUNT_ID, and STRIPE_API_VERSION.',
+    );
+  };
+
+  return {
+    mode,
+    apiVersion: 'not-configured',
+    platformAccountId: '',
+    taxEnabled: false,
+    client: null,
+
+    hasSecretFor() {
+      return false;
+    },
+
+    verifyEvent() {
+      return null;
+    },
+
+    createConnectedAccount: () => refuse('creating a connected account'),
+    createAccountLink: () => refuse('creating an onboarding link'),
+    retrieveAccount: () => refuse('reading a connected account'),
+    createTaxCalculation: () => refuse('calculating sales tax'),
+    createCustomer: () => refuse('creating a customer'),
+    confirmSetupIntent: () => refuse('saving a card'),
+    detachPaymentMethod: () => refuse('detaching a card'),
+    createOffSessionPaymentIntent: () => refuse('capturing a pre-order'),
+    createListingCheckoutSession: () => refuse('opening the listing-fee Checkout'),
+    createFundingCheckoutSession: () => refuse('opening the Creator-payment Checkout'),
+    retrieveCheckoutSession: () => refuse('reading a Checkout session'),
+    createRefund: () => refuse('issuing a refund'),
+    createTransfer: () => refuse('creating a Transfer'),
+  };
+}

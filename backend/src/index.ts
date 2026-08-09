@@ -121,21 +121,30 @@ async function main() {
       })
     : unconfiguredScheduler;
 
-  // §32.2's Stripe client, with the locked API version. `env.ts` requires the
-  // keys and fails closed on any mode mismatch, so this always constructs — the
-  // separation §34 condition 5 asks about was already proven at boot.
-  const { createStripeGateway } = await import('./payments/stripe-client.js');
-  const rawStripeGateway = createStripeGateway({
-    mode: env.STRIPE_MODE,
-    apiVersion: env.STRIPE_API_VERSION,
-    secretKey: env.STRIPE_PLATFORM_SECRET_KEY,
-    platformAccountId: env.STRIPE_PLATFORM_ACCOUNT_ID,
-    platformWebhookSecret: env.STRIPE_WEBHOOK_SECRET_PLATFORM,
-    connectWebhookSecret: env.STRIPE_WEBHOOK_SECRET_CONNECT,
-    // §12 puts Stripe Tax on the listing Checkout; while this is false the
-    // payment surface refuses loudly rather than charging an untaxed total.
-    taxEnabled: env.STRIPE_TAX_ENABLED,
-  });
+  // §32.2's Stripe client, with the locked API version. `env.ts` fails closed
+  // on any mode mismatch, so when the credentials are present the separation
+  // §34 condition 5 asks about was already proven at boot. When they are
+  // absent the refusing gateway takes their place — the same shape the email
+  // transport, object storage, and the scheduler above already have, and
+  // `prerequisiteFacts` reports the prerequisite unsatisfied rather than
+  // recording a separation nothing demonstrated.
+  const { stripeConfigured } = await import('./env.js');
+  const { createStripeGateway, createUnconfiguredStripeGateway } = await import(
+    './payments/stripe-client.js'
+  );
+  const rawStripeGateway = stripeConfigured(env)
+    ? createStripeGateway({
+        mode: env.STRIPE_MODE,
+        apiVersion: env.STRIPE_API_VERSION!,
+        secretKey: env.STRIPE_PLATFORM_SECRET_KEY!,
+        platformAccountId: env.STRIPE_PLATFORM_ACCOUNT_ID!,
+        platformWebhookSecret: env.STRIPE_WEBHOOK_SECRET_PLATFORM,
+        connectWebhookSecret: env.STRIPE_WEBHOOK_SECRET_CONNECT,
+        // §12 puts Stripe Tax on the listing Checkout; while this is false the
+        // payment surface refuses loudly rather than charging an untaxed total.
+        taxEnabled: env.STRIPE_TAX_ENABLED,
+      })
+    : createUnconfiguredStripeGateway(env.STRIPE_MODE);
 
   // §34's gate, as code. In test mode this returns the gateway unchanged —
   // §34's own first list permits test-mode engineering, and every condition is
