@@ -189,6 +189,16 @@ export function Home() {
             </Button>
           </Card>
         </div>
+        {/* Both cards above are for people who do not have an account yet.
+            Everyone who already does arrives here too, and §5 gives them no
+            other way in — the header link is the shortcut, this is the one
+            that reads in the flow of the page. */}
+        <Measure>
+          <p>
+            Already have a Proovd account?{' '}
+            <RouterLink to="/signin">Sign in to your account</RouterLink>.
+          </p>
+        </Measure>
       </Section>
 
       <Mode kind="light">

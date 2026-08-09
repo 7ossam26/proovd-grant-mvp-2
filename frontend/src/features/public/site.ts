@@ -78,6 +78,42 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
 
 export const PUBLIC_ROUTE_PATHS: readonly string[] = PUBLIC_ROUTES.map((r) => r.path);
 
+/**
+ * The account doors — §5.1, §5.2, §5.3, §5.5.
+ *
+ * Deliberately NOT in `PUBLIC_ROUTES`. That list is §18's own inventory of the
+ * public *site*, its length is fixed at fourteen, and the acceptance suite
+ * sweeps every entry for banned vocabulary, heading structure, landmarks, and
+ * axe violations as a public marketing page. A sign-in form is none of those
+ * things: it has no §18 content requirement, and adding it would change a
+ * count the Spec fixes.
+ *
+ * It still has to be *linkable*, which is what `LINKABLE_ROUTE_PATHS` below is
+ * for — §33.11.6 asks that every rendered link resolve to a route that exists,
+ * and §18's inventory only stood in for "every route that exists" while the
+ * site was the whole app.
+ *
+ * `/campaigns` and `/creator/campaigns` are not here: they are session-scoped
+ * destinations reached by signing in, never linked from a public page.
+ */
+export const ACCOUNT_ROUTES: readonly PublicRoute[] = [
+  { path: '/signin', label: 'Sign in', kind: 'site' },
+  { path: '/reset-password', label: 'Reset your password', kind: 'site' },
+] as const;
+
+export const ACCOUNT_ROUTE_PATHS: readonly string[] = ACCOUNT_ROUTES.map((r) => r.path);
+
+/**
+ * Every in-app path a rendered link may legitimately point at. The §33.11.6
+ * broken-link scan reads this rather than `PUBLIC_ROUTE_PATHS`, so a link to a
+ * real route is not reported as broken and a link to a route that does not
+ * exist still is.
+ */
+export const LINKABLE_ROUTE_PATHS: readonly string[] = [
+  ...PUBLIC_ROUTE_PATHS,
+  ...ACCOUNT_ROUTE_PATHS,
+];
+
 /** The primary wayfinding row in the header — the rest lives in the footer. */
 export const HEADER_ROUTES: readonly PublicRoute[] = PUBLIC_ROUTES.filter((r) =>
   ['/how-payments-work', '/safety', '/about'].includes(r.path),

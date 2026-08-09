@@ -13,6 +13,7 @@ import { POLICY_DOCUMENTS, findPolicyDocument } from '@proovd/shared';
 import { renderRoute, normalize, anchors } from './test-harness.js';
 import { PageLoading } from './states.js';
 import {
+  LINKABLE_ROUTE_PATHS,
   PUBLIC_ROUTE_PATHS,
   REQUIRED_FOOTER_LINKS,
   SERVICE_SLA_BLOCK,
@@ -274,9 +275,14 @@ describe('§33.11.6 — no unresolved variables, broken links, or placeholders',
       // Pure fragments (the skip link) are checked by the in-page test below.
       if (href.startsWith('#')) continue;
       const [pathname] = href.split('#') as [string, ...string[]];
+      // §33.11.6 asks that a rendered link resolve to a route that exists.
+      // §18's fourteen stood in for that while the public site WAS the whole
+      // app; the account doors (§5) are real routes on the same shell, so the
+      // check reads the linkable set. A link to something that is in neither
+      // list still fails.
       expect(
-        PUBLIC_ROUTE_PATHS.includes(pathname),
-        `${path} links to ${href}, which is not in the §18 inventory`,
+        LINKABLE_ROUTE_PATHS.includes(pathname),
+        `${path} links to ${href}, which is not a route this app serves`,
       ).toBe(true);
     }
   });

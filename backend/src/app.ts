@@ -13,6 +13,7 @@ import { notifyEnforcementRoles } from './support/enforcement-notifications.js';
 import { findCampaignFounderUserId } from './reservations/context.js';
 import { findAccountForOwner } from './payments/connected-accounts.js';
 import { createEnforcementRouter } from './routes/enforcement.js';
+import { createAccountRouter } from './routes/account.js';
 import { policyReacceptanceGate } from './enforcement/reacceptance.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
@@ -195,11 +196,22 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     transport: config.emailTransport ?? unconfiguredTransport,
     audit: (event) => audit({ ...event, targetId: event.targetId }),
   });
+  // Computed here (rather than beside the CORS middleware below) because
+  // Better Auth's own origin/CSRF check — independent of Express's CORS
+  // middleware — needs the identical list. `http://localhost:5173` is the Vite
+  // dev server's origin (vite.config.ts proxies /api to this server), added
+  // only outside production for the same reason CORS already special-cases it.
+  const corsOrigins: string[] =
+    config.nodeEnv === 'development'
+      ? [config.appBaseUrl, 'http://localhost:5173']
+      : [config.appBaseUrl];
+
   const auth = createAuth({
     db,
     baseUrl: config.appBaseUrl,
     secret: config.authSecret,
     adminReauthWindowSeconds: config.adminReauthWindowSeconds,
+    trustedOrigins: corsOrigins,
     sendResetPassword:
       config.sendResetPassword ??
       (async ({ user, url }) => {
@@ -235,11 +247,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   );
 
   // ── CORS ───────────────────────────────────────────────────────────────────
-  const corsOrigins: string[] =
-    config.nodeEnv === 'development'
-      ? [config.appBaseUrl, 'http://localhost:5173']
-      : [config.appBaseUrl];
-
   app.use(cors({ origin: corsOrigins, credentials: true }));
 
   // ── Routes (per-router body parsing — no global express.json()) ────────────
@@ -265,6 +272,12 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // at /api/account/policy-reacceptance, outside both gated prefixes.
   app.use('/api/founder', policyReacceptanceGate(db, auth, 'founder'));
   app.use('/api/creator', policyReacceptanceGate(db, auth, 'affiliate'));
+  // §5, §1.1. "Who is this session?" — the one read that lets a sign-in form
+  // send somebody somewhere without asking them which role they hold. Mounted
+  // beside the reacceptance routes and outside both gated prefixes above, for
+  // the reason `routes/account.ts` records: a person who owes an acceptance
+  // must still be able to reach the surface that takes it.
+  app.use(createAccountRouter(auth));
   // Phase 14b (§18, §33.6). Two public, session-less routes: `/c/:code` records
   // a tracking-link click, sets the per-browser attribution cookie, and
   // redirects to the live page; `/api/campaign/:id` returns the Backer-facing

@@ -1912,3 +1912,76 @@ html.no-motion [data-splash] { display: none !important; }
   display: flex; flex-direction: column; gap: var(--sp-4);
 }
 .notification-history__when { color: var(--grey); font-size: 0.9375rem; }
+
+/* ---- The account door: sign-in, password reset, and the Founder's campaign
+   list. Added with the sign-in surfaces (S5.1, S5.2, S5.3, S5.5, S1.1).
+
+   The product had no front door until now: sign-in existed only as a fallback
+   inside /admin and /creator/campaigns, so it had no styles of its own and
+   borrowed .admin-form. These are customer surfaces on the public shell, so
+   they get their own block rather than wearing the Admin panel's - S26
+   licenses dashboard density in Admin and nowhere else, and a shared class is
+   how that leaks.
+
+   Every value reads a slot: no hex literal, no arbitrary spacing, px only for
+   the 44px touch minimum inherited via --touch. */
+
+/* Sign in sits outside <nav> and is pushed to the end of the header row. When
+   the row wraps at a narrow width it simply takes its own line - no hamburger,
+   because DNA S5.12 refuses to hide the way to anywhere behind a state. */
+.site-header__account { margin-inline-start: auto; display: flex; }
+/* Reads the button slots rather than picking a colour, so it stays correct in
+   every section mode. Outlined at rest - it must not compete with the one
+   primary action on the page it renders over (DNA S5.6, S5.8) - and filled
+   when it IS the current page, which is weight AND fill, never colour alone. */
+.site-header__signin {
+  min-height: var(--touch); display: inline-flex; align-items: center;
+  padding-inline: var(--sp-16);
+  font-weight: 900; text-decoration: none;
+  background: var(--brand-0);
+  color: var(--btn2-text);
+  outline: var(--bw-btn) solid var(--btn2-border);
+  outline-offset: 0;
+  border-radius: var(--radius);
+}
+.site-header__signin.is-current {
+  background: var(--btn1-bg);
+  color: var(--btn1-text);
+  outline-color: var(--btn1-border);
+}
+
+/* One question per moment (DNA S5.1): the shell is narrow on purpose, so a
+   sign-in form never reads as a page with several things to do on it. */
+.auth {
+  width: min(30rem, 100%); margin-inline: auto;
+  display: grid; gap: var(--sp-24);
+}
+.auth__head { display: grid; gap: var(--sp-12); }
+.auth__lede { margin: 0; color: var(--mode-body); }
+.auth__form { display: grid; gap: var(--sp-16); justify-items: start; }
+.auth__form > .field { width: 100%; }
+.auth__aside { display: grid; gap: var(--sp-12); justify-items: start; }
+.auth__aside p { margin: 0; }
+.auth__note { color: var(--grey); }
+
+/* The Founder's campaign list is the same shell one measure wider: it holds
+   rows rather than one form, and a 30rem column would wrap every destination
+   label onto its own line. */
+.auth-shell {
+  width: min(var(--measure), 100%); margin-inline: auto;
+  display: grid; gap: var(--sp-32);
+}
+.auth-shell__head { display: grid; gap: var(--sp-12); }
+
+/* Not a dashboard (S26): rows, not tiles. No count, no meter, no badge. */
+.campaign-list {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--sp-16);
+}
+.campaign-list__row {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: var(--sp-16);
+}
+.campaign-list__what { display: grid; gap: var(--sp-4); }
+.campaign-list__what h2 { margin: 0; }
+.campaign-list__ref { margin: 0; color: var(--grey); font-size: 0.9375rem; }
