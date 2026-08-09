@@ -11,6 +11,11 @@ RUN npm ci --workspace=@proovd/frontend --workspace=@proovd/shared
 COPY shared/ ./shared/
 COPY frontend/ ./frontend/
 
+# Every workspace tsconfig extends this. Without it tsc reports TS5083 and then
+# silently falls back to compiler defaults (target ES3, no skipLibCheck), which
+# surfaces as ~120 bogus errors about BigInt literals and downlevelIteration.
+COPY tsconfig.base.json ./
+
 RUN npm run build --workspace=@proovd/frontend
 
 # ── Stage 2: Build backend ────────────────────────────────────────────────────
@@ -24,6 +29,7 @@ RUN npm ci --workspace=@proovd/backend --workspace=@proovd/shared
 
 COPY shared/ ./shared/
 COPY backend/ ./backend/
+COPY tsconfig.base.json ./
 
 RUN npm run build --workspace=@proovd/backend
 
