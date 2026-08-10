@@ -50,9 +50,30 @@ beforeEach(() => {
       const result = handler(url, init);
       if (result) return respond(result.status, result.body);
     }
+    // Both of these addresses sit behind a role guard now, so every render
+    // begins by asking who is signed in. Answered here rather than in each
+    // case: the subject of this file is the digest control, and a session stub
+    // repeated in twenty tests is twenty places to forget it. A test that wants
+    // a different session registers its own handler, which is matched first.
+    if (url.endsWith('/api/account/me')) {
+      return respond(200, {
+        account: { role: sessionRole(), email: 'someone@example.com', name: 'Someone' },
+      });
+    }
     return respond(404, { error: 'not_found', title: 'No stub' });
   });
 });
+
+/**
+ * Which role the guard should see, derived from the address under test.
+ *
+ * `/creator/settings/notifications` is the Creator's half of the same page, so
+ * the session that reaches it has to be a Creator's — deriving it from the path
+ * means adding a route here cannot silently render against the wrong role.
+ */
+let renderedPath = '/settings/notifications';
+const sessionRole = (): 'founder' | 'affiliate' =>
+  renderedPath.startsWith('/creator') ? 'affiliate' : 'founder';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -110,6 +131,7 @@ function stubServer(pref = preference()) {
 }
 
 function renderAt(path: string) {
+  renderedPath = path;
   const router = createMemoryRouter(appRoutes, { initialEntries: [path] });
   return render(<RouterProvider router={router} />);
 }
@@ -219,6 +241,19 @@ describe('the Creator gets the same page at its own address', () => {
     renderAt('/creator/settings/notifications');
 
     await screen.findByRole('radiogroup');
-    expect(requests.every((r) => r.url.startsWith('/api/creator/'))).toBe(true);
+
+    // The guarantee is that the Creator's page never reads the FOUNDER routes —
+    // one component serves both roles, and the audience is bound at the mount
+    // rather than passed as a parameter a caller could change.
+    expect(requests.some((r) => r.url.startsWith('/api/creator/'))).toBe(true);
+    expect(requests.filter((r) => r.url.startsWith('/api/founder/'))).toEqual([]);
+
+    // `/api/account/me` is the role guard asking who is signed in. It is
+    // account-level and belongs to neither audience, which is exactly why it is
+    // the one address allowed to appear here.
+    const foreign = requests.filter(
+      (r) => !r.url.startsWith('/api/creator/') && !r.url.endsWith('/api/account/me'),
+    );
+    expect(foreign).toEqual([]);
   });
 });

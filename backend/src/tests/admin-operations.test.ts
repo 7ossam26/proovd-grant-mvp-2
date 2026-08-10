@@ -472,7 +472,7 @@ describe('§33.12.4 user and provider data auto-populates; every override is ful
 
     // §25.6: internal reason and customer explanation stay separate columns.
     expect(row!.customerExplanation).not.toBe(row!.internalReason);
-    expect(row!.mfaContext).toBe('totp_factor_registered');
+    expect(row!.mfaContext).toBe('password_session_admin_role_verified');
     expect(row!.reauthContext).toContain('session_established_at=');
 
     // The domain actually moved.

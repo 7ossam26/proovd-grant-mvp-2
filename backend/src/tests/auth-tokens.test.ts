@@ -5,7 +5,12 @@
  * Four actors, two mechanisms. Everything below is about proving the seam
  * between them holds: that a token grants exactly one scope and nothing else,
  * that every way of failing looks the same from outside, and that an Admin
- * cannot reach a sensitive action on a stale session or an unenrolled factor.
+ * cannot reach a sensitive action on a stale session.
+ *
+ * The second factor these tests used to drive was removed on 2026-08-10 (see
+ * `src/auth/auth.ts`), so the Admin half now proves the boundary that decides
+ * access in its absence: the role, checked server-side, and the freshness
+ * window — which is the only remaining control on a high-impact action.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -16,8 +21,6 @@ import { eq, and, desc } from 'drizzle-orm';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createOTP } from '@better-auth/utils/otp';
-import { base32 } from '@better-auth/utils/base32';
 
 import { startHarness, type Harness, TEST_REAUTH_WINDOW_SECONDS } from './app-harness.js';
 import { secureTokens } from '../db/schema/tokens.js';
@@ -579,7 +582,7 @@ describe('§33.2.1 no public signup route exists', () => {
 
 /* ── §33.12.5 — MFA enforced, stale reauthentication fails safely ──────────── */
 
-describe('§33.12.5 MFA is enforced and a sensitive action without recent reauthentication fails safely', () => {
+describe('§33.12.5 the Admin boundary holds and a sensitive action without recent reauthentication fails safely', () => {
   const audit = () => createAuditWriter(h.db);
   const PASSWORD = 'a-perfectly-good-password';
 
@@ -598,63 +601,14 @@ describe('§33.12.5 MFA is enforced and a sensitive action without recent reauth
     return cookiesOf(res);
   }
 
-  /**
-   * The `secret` in a provisioning URI is base32 — that is what an
-   * authenticator app scans. Better Auth verifies against the raw secret it
-   * base32-encoded to build the URI, so a code generated straight from the URI
-   * parameter is computed over the wrong input and is always rejected.
+  /*
+   * The TOTP helpers that used to live here — `secretFromTotpUri`,
+   * `totpCode`, `enrolTotp`, `signInWithTotp` — are gone with the factor they
+   * drove (2026-08-10, see `src/auth/auth.ts`). `/api/auth/two-factor/*` no
+   * longer exists, so a session is now established the same way for all three
+   * account roles: one password, one cookie. `signInPlain` above is the whole
+   * of it.
    */
-  function secretFromTotpUri(uri: string): string {
-    const encoded = new URL(uri).searchParams.get('secret');
-    expect(encoded).toBeTruthy();
-    return new TextDecoder().decode(base32.decode(encoded!));
-  }
-
-  const totpCode = (secret: string): Promise<string> => createOTP(secret).totp();
-
-  /**
-   * Registers a real TOTP factor the way an Admin does: enable, read the
-   * provisioning URI, then prove possession with a generated code. Setting
-   * `two_factor_enabled` in the database instead would test nothing — it is
-   * precisely the step an unenrolled Admin cannot perform.
-   */
-  async function enrolTotp(email: string): Promise<{ secret: string; cookie: string }> {
-    const cookie = await signInPlain(email);
-
-    const enabled = await request(h.app)
-      .post('/api/auth/two-factor/enable')
-      .set('cookie', cookie)
-      .send({ password: PASSWORD })
-      .expect(200);
-
-    const secret = secretFromTotpUri(enabled.body.totpURI);
-    const verified = await request(h.app)
-      .post('/api/auth/two-factor/verify-totp')
-      .set('cookie', [cookie, cookiesOf(enabled)].filter(Boolean).join('; '))
-      .send({ code: await totpCode(secret) })
-      .expect(200);
-
-    return { secret, cookie: cookiesOf(verified) || cookie };
-  }
-
-  /** Full sign-in for an enrolled Admin — password, then the second factor. */
-  async function signInWithTotp(email: string, secret: string): Promise<string> {
-    const first = await request(h.app)
-      .post('/api/auth/sign-in/email')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-
-    // §5.1/§28.2: the password alone does not produce a session.
-    expect(first.body.twoFactorRedirect).toBe(true);
-
-    const second = await request(h.app)
-      .post('/api/auth/two-factor/verify-totp')
-      .set('cookie', cookiesOf(first))
-      .send({ code: await totpCode(secret) })
-      .expect(200);
-
-    return cookiesOf(second);
-  }
 
   async function seedAdmin(label: string): Promise<{ id: string; email: string }> {
     const email = `${label}-${randomUUID()}@example.com`;
@@ -667,50 +621,59 @@ describe('§33.12.5 MFA is enforced and a sensitive action without recent reauth
     return { id: seeded.id, email };
   }
 
-  it('refuses an Admin with no registered TOTP factor every operational surface', async () => {
-    const { email } = await seedAdmin('admin-unenrolled');
+  /**
+   * The two-factor endpoints are gone, not merely unused.
+   *
+   * This is the assertion that keeps the removal honest: an enrolment route
+   * left mounted would still create `two_factor` rows nothing verifies, which
+   * is a credential store with no reader. It also proves there is no second
+   * authentication path for an attacker to prefer over the one the guards
+   * watch.
+   */
+  it('exposes no two-factor endpoint at all', async () => {
+    for (const path of [
+      '/api/auth/two-factor/enable',
+      '/api/auth/two-factor/verify-totp',
+      '/api/auth/two-factor/disable',
+      '/api/auth/two-factor/send-otp',
+      '/api/auth/two-factor/generate-backup-codes',
+    ]) {
+      const res = await request(h.app).post(path).send({});
+      expect(res.status, path).toBeGreaterThanOrEqual(400);
+      expect(res.status, path).not.toBe(403);
+    }
+  });
+
+  /**
+   * The password IS the whole credential now, so the thing worth proving is
+   * that it still produces a real session and that the session still carries a
+   * role the server decided.
+   */
+  it('admits an Admin on the password alone and reports the role from the session', async () => {
+    const { email } = await seedAdmin('admin-password');
     const cookie = await signInPlain(email);
 
-    const res = await request(probe).get('/probe/admin').set('cookie', cookie);
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('mfa_enrollment_required');
-  });
-
-  it('will not issue a session on the password alone once a factor is registered', async () => {
-    const { email } = await seedAdmin('admin-password-only');
-    await enrolTotp(email);
-
-    const res = await request(h.app)
-      .post('/api/auth/sign-in/email')
-      .send({ email, password: PASSWORD })
-      .expect(200);
-
-    expect(res.body.twoFactorRedirect).toBe(true);
-    expect(res.body.token).toBeFalsy();
-
-    // Whatever cookie that response did set is not a session: it cannot reach
-    // an operational surface.
-    const res2 = await request(probe).get('/probe/admin').set('cookie', cookiesOf(res));
-    expect(res2.status).toBe(401);
-  });
-
-  it('admits an Admin once the factor is registered and verified', async () => {
-    const { id, email } = await seedAdmin('admin-enrolled');
-    const { secret } = await enrolTotp(email);
-
-    const [row] = await h.db.select().from(userTable).where(eq(userTable.id, id));
-    expect(row!.twoFactorEnabled).toBe(true);
-
-    const cookie = await signInWithTotp(email, secret);
     const res = await request(probe).get('/probe/admin').set('cookie', cookie);
     expect(res.status).toBe(200);
     expect(res.body.role).toBe('admin');
   });
 
+  it('refuses a wrong password, so removing the factor did not remove the credential', async () => {
+    const { email } = await seedAdmin('admin-wrong-password');
+
+    const res = await request(h.app)
+      .post('/api/auth/sign-in/email')
+      .send({ email, password: 'not-the-password' });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    // Nothing it set can reach an operational surface.
+    const res2 = await request(probe).get('/probe/admin').set('cookie', cookiesOf(res));
+    expect(res2.status).toBe(401);
+  });
+
   it('blocks a sensitive action on a stale session and does not proceed', async () => {
     const { id, email } = await seedAdmin('admin-stale');
-    const { secret } = await enrolTotp(email);
-    const cookie = await signInWithTotp(email, secret);
+    const cookie = await signInPlain(email);
 
     // Fresh: allowed.
     await request(probe).post('/probe/sensitive').set('cookie', cookie).expect(200);
@@ -732,8 +695,7 @@ describe('§33.12.5 MFA is enforced and a sensitive action without recent reauth
 
   it('lets a reauthenticated Admin through again — the gate prompts, it does not lock out', async () => {
     const { id, email } = await seedAdmin('admin-reauth');
-    const { secret } = await enrolTotp(email);
-    const stale = await signInWithTotp(email, secret);
+    const stale = await signInPlain(email);
 
     await h.pool.query(
       `UPDATE "session" SET created_at = now() - ($1 || ' seconds')::interval WHERE user_id = $2`,
@@ -741,8 +703,10 @@ describe('§33.12.5 MFA is enforced and a sensitive action without recent reauth
     );
     await request(probe).post('/probe/sensitive').set('cookie', stale).expect(403);
 
-    // A fresh sign-in — password *and* second factor — restores the action.
-    const fresh = await signInWithTotp(email, secret);
+    // A fresh sign-in restores the action. With the second factor removed this
+    // gate is the ONLY thing standing between a long-lived stolen session and
+    // a money-moving action, which is why it is tested in both directions.
+    const fresh = await signInPlain(email);
     await request(probe).post('/probe/sensitive').set('cookie', fresh).expect(200);
   });
 
@@ -842,8 +806,10 @@ describe('§33.1.8 no SMS OTP path exists', () => {
   });
 
   it('does not register a second factor that could deliver a code by phone', async () => {
-    // The two-factor plugin is configured with TOTP only; the OTP sender that
-    // would be needed for an SMS or email code is deliberately absent.
+    // §33.1.8. There is no second factor of ANY kind since 2026-08-10, so
+    // there is certainly no phone-delivered one — but the assertion stays,
+    // because the failure it guards against is a later phase adding MFA back
+    // and reaching for SMS as the easiest delivery.
     const res = await request(h.app).post('/api/auth/two-factor/send-otp').send({});
     expect(res.status).toBeGreaterThanOrEqual(400);
   });

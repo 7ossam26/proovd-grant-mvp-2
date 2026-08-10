@@ -105,6 +105,9 @@ export async function startHarness(
     publicDir: path.resolve(__dirname, '../../public'),
     authSecret: TEST_AUTH_SECRET,
     adminReauthWindowSeconds: TEST_REAUTH_WINDOW_SECONDS,
+    // Nothing is in front of supertest, so the socket address is the real one
+    // — the same value production uses when it sits on the network directly.
+    trustProxyHops: 0,
     liveModeEnvironment: TEST_PREREQUISITE_ENVIRONMENT,
     invitationContext: {
       appBaseUrl: 'http://localhost:3000',

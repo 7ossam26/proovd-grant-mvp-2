@@ -33,7 +33,8 @@ import {
 } from '@proovd/shared';
 import { appRoutes } from '../../routes.js';
 import { TRUST_STRIP_PARAGRAPHS } from '../public/trust-strip.js';
-import { installQaServer, unmatchedRequests } from './server.js';
+import { installQaServer, setQaSessionRoleForPath, unmatchedRequests } from './server.js';
+import { invalidateSession } from '../../lib/session.js';
 import { QA, QA_ROUTES } from './fixtures.js';
 
 /* ── Rendering one flow ────────────────────────────────────────────────────── */
@@ -48,6 +49,17 @@ function concreteRoute(pattern: string): string {
 }
 
 async function renderFlowRoute(path: string): Promise<RenderResult> {
+  // The session fixture answers with the role this address belongs to. A
+  // Creator surface rendered against a Founder session renders a refusal, which
+  // would pass axe with nothing on the page.
+  //
+  // The cache has to be cleared with it: `lib/session.ts` remembers the answer
+  // for the lifetime of a page load, and each flow here IS a separate page
+  // load. Without this, the first flow's role would be the role every later
+  // flow was rendered against — the exact drift the per-path role exists to
+  // prevent, reintroduced one layer up.
+  invalidateSession();
+  setQaSessionRoleForPath(path);
   const router = createMemoryRouter(appRoutes, { initialEntries: [path] });
   const result = render(<RouterProvider router={router} />);
   // Every surface here loads asynchronously, and each one names its own loading

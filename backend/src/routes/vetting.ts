@@ -26,6 +26,7 @@
 
 import { Router, type RequestHandler } from 'express';
 import express from 'express';
+import { fromNodeHeaders } from 'better-auth/node';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
@@ -323,13 +324,40 @@ export function createVettingRouter(
       ? (body['acceptedPolicySlugs'] as unknown[]).filter((v): v is string => typeof v === 'string')
       : [];
 
+    /**
+     * The Google identity comes from the SESSION, never from the body.
+     *
+     * This route used to read `body.googleUserId` and pass it straight to
+     * `completeClaim`, which then bound the draft — and the campaign — to
+     * whatever user id it was handed. A caller holding a draft link could
+     * therefore attach that campaign to somebody else's Founder account by
+     * typing their id into the request: the server took a user id as PROOF of
+     * an identity, which is the one thing a request body can never be.
+     *
+     * Nothing shipped used it. No Proovd surface renders a Google button and
+     * no test exercised the branch, so it was reachable only by calling the
+     * API directly — which is exactly the case that has to hold.
+     *
+     * Now the caller proves it: they must be carrying a real Better Auth
+     * session, and the id used is the one on that session. `getSession` fails
+     * closed — an unreadable session yields no id, and the claim then falls
+     * through to the password path and refuses if no password was supplied.
+     */
+    let sessionUserId: string | null = null;
+    if (body['useGoogle'] === true || typeof body['googleUserId'] === 'string') {
+      try {
+        const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+        sessionUserId = session?.user?.id ?? null;
+      } catch {
+        sessionUserId = null;
+      }
+    }
+
     const result = await completeClaim(db, auth, tokens, {
       draftId,
       tokenId,
       ...(typeof body['password'] === 'string' ? { password: body['password'] } : {}),
-      ...(typeof body['googleUserId'] === 'string'
-        ? { googleUserId: body['googleUserId'] }
-        : {}),
+      ...(sessionUserId ? { googleUserId: sessionUserId } : {}),
       acceptedPolicySlugs: accepted,
       actor: actorOf(draftId),
     });

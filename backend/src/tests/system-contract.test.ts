@@ -472,14 +472,26 @@ describe('§33.12.3 — lifecycle and payment flags stay separate and independen
   });
 });
 
-/* ── §33.12.5 MFA and the freshness gate ───────────────────────────────────── */
+/* ── §33.12.5 role authorization and the freshness gate ───────────────────── */
 
-describe('§33.12.5 — MFA is enforced and a stale session fails safely', () => {
-  it('refuses an Admin with no registered second factor', async () => {
-    const unenrolled = await seedUser(h, 'admin', 'system-contract-unenrolled');
-    const cookie = await signInPlain(h, unenrolled.email);
-    const res = await request(h.app).get('/api/admin/settings').set('cookie', cookie);
-    expect(res.status).toBe(403);
+describe('§33.12.5 — the Admin boundary holds and a stale session fails safely', () => {
+  /*
+   * This block used to open by refusing an Admin with no registered second
+   * factor. The factor was removed on 2026-08-10 (see `src/auth/auth.ts`), so
+   * what remains to prove is the boundary that actually decides access now:
+   * an authenticated non-Admin is refused an Admin route on the server, and a
+   * stale Admin session is refused a sensitive one.
+   */
+  it('refuses an authenticated non-Admin every Admin surface', async () => {
+    for (const role of ['founder', 'affiliate'] as const) {
+      const other = await seedUser(h, role, `system-contract-${role}`);
+      const cookie = await signInPlain(h, other.email);
+      const res = await request(h.app).get('/api/admin/settings').set('cookie', cookie);
+      expect(res.status, role).toBe(403);
+      // Refused for what the session IS, never answered as "no session" —
+      // §27.1: a person who is signed in must not be told to sign in.
+      expect(res.body.error, role).toBe('forbidden');
+    }
   });
 
   it('partitions every admin write into gated and deliberately-ungated, with nothing left over', async () => {

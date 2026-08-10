@@ -13,6 +13,9 @@ import { NotFoundSurface, PageLoading } from './features/public/states.js';
 import { CampaignPage } from './features/public/campaign/CampaignPage.js';
 import { LiveCampaignPage } from './features/public/campaign/LiveCampaignPage.js';
 import { AdminLayout } from './features/admin/AdminLayout.js';
+import { AdminSignIn } from './features/admin/AdminSignIn.js';
+import { RequireRole, RedirectIfAuthenticated } from './lib/routeGuards.js';
+import { roleHome } from './lib/session.js';
 import { FoundersList } from './features/admin/founders/FoundersList.js';
 import { FounderWorkspace } from './features/admin/founders/FounderWorkspace.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
@@ -115,19 +118,75 @@ const rootChildren: RouteObject[] = [
       // header, so the site's header, footer, and staffed-hours chat belong
       // around them. They are deliberately NOT in §18's fourteen-route
       // inventory; see `ACCOUNT_ROUTES` in `features/public/site.ts`.
-      { path: 'signin', element: <SignIn /> },
+      // Already-signed-in visitors never see this form: `RedirectIfAuthenticated`
+      // sends them to their own home (or to `?next=` when it is a same-site
+      // path). Asking somebody to re-enter a password they have already proved
+      // is a question with no consequence, and it teaches people to type
+      // credentials at any form that asks.
+      {
+        path: 'signin',
+        element: (
+          <RedirectIfAuthenticated>
+            <SignIn />
+          </RedirectIfAuthenticated>
+        ),
+      },
+      // `/reset-password` is deliberately NOT wrapped. Somebody who is signed
+      // in on one device and has forgotten the password on another still needs
+      // this page, and the token in the emailed link is what authorises the
+      // change — not the session.
       { path: 'reset-password', element: <ResetPassword /> },
       { path: '*', element: <NotFoundSurface /> },
     ],
   },
   {
+    // §5.1. The Admin door, and the reason it has its own address.
+    //
+    // It used to be the signed-out branch INSIDE `AdminLayout`, which rendered
+    // the Admin wordmark, the section tabs, the Explore control, and the
+    // environment chip to anybody who typed `/admin`. Nothing secret leaked —
+    // every request behind that chrome 401s — but an operations shell shown to
+    // a stranger tells them what exists, and the URL claimed to be the panel
+    // while what was on screen was a login form.
+    //
+    // Outside the `admin` route below, so it is impossible for the protected
+    // layout to wrap it. That structural separation is the fix; a conditional
+    // inside one component is what created the bug.
+    path: 'admin/signin',
+    element: (
+      <RedirectIfAuthenticated
+        // An authenticated non-Admin goes to their OWN home, never to `next` —
+        // `next` points into `/admin`, and bouncing them there just produces a
+        // refusal one navigation later.
+        destinationFor={(role, next) =>
+          role === 'admin' ? (next ?? '/admin/founders') : roleHome[role]
+        }
+      >
+        <AdminSignIn />
+      </RedirectIfAuthenticated>
+    ),
+  },
+  {
     // Phase 06 (§6, §26). The Admin panel stands outside the public shell: it
     // is the only dashboard-density surface in the MVP (§26), and sharing the
     // site header, footer sitemap, and live-chat gate is how that density
-    // leaks into a Founder surface. Access is decided by the server on every
-    // request — the layout's session check only decides what to render.
+    // leaks into a Founder surface.
+    //
+    // `RequireRole` decides BEFORE `AdminLayout` renders, so no Admin chrome
+    // reaches a visitor who is not a signed-in Admin — an anonymous one is sent
+    // to `/admin/signin` carrying where they were going, and an authenticated
+    // Founder or Creator is told plainly that this area is not theirs rather
+    // than being shown a sign-in form for an identity they have already proved.
+    //
+    // None of this is the security boundary: `/api/admin/*` is decided by
+    // `requireAdmin` on the server for every request, and stays decided there
+    // if this guard is bypassed. What it removes is the protected-shell flash.
     path: 'admin',
-    element: <AdminLayout />,
+    element: (
+      <RequireRole allow={['admin']} signInPath="/admin/signin">
+        <AdminLayout />
+      </RequireRole>
+    ),
     children: [
       { index: true, element: <Navigate to="/admin/founders" replace /> },
       // §26.1. Two addresses: everybody, and one person. The workspace is keyed
@@ -190,6 +249,27 @@ const rootChildren: RouteObject[] = [
     element: <CreatorSignup />,
   },
   {
+    /*
+     * Every session-scoped CREATOR address, behind one guard.
+     *
+     * A pathless layout route rather than a wrapper per route: a guard that has
+     * to be remembered on each new entry is one that eventually is not. Adding
+     * a Creator surface inside this group inherits the check; adding one
+     * outside it is a visible choice somebody made.
+     *
+     * `creator-invitation/:token` is deliberately NOT in here — it is reached
+     * with an invitation token and no account, which is the whole of §11.
+     *
+     * The server decides access regardless: every /api/creator route is behind
+     * requireRole(auth, 'affiliate') on every request. This decides rendering.
+     */
+    element: (
+      <RequireRole allow={['affiliate']} signInPath="/signin">
+        <Outlet />
+      </RequireRole>
+    ),
+    children: [
+      {
     // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator. Outside both
     // shells: §26 licenses dashboard density in Admin only, and this is not a
     // public page — it is reached by signing in, and everything on it is
@@ -223,7 +303,22 @@ const rootChildren: RouteObject[] = [
     path: 'creator/campaigns/:associationId/close',
     element: <CreatorCampaignClose />,
   },
+    ],
+  },
   {
+    /*
+     * Every session-scoped FOUNDER address, behind one guard. Same reasoning as
+     * the Creator group above. On the server every /api/founder route is behind
+     * requireRole(auth, 'founder'), the §29.8 reacceptance gate, and the
+     * §26.7/§22.7 standing gate, on every request.
+     */
+    element: (
+      <RequireRole allow={['founder']} signInPath="/signin">
+        <Outlet />
+      </RequireRole>
+    ),
+    children: [
+      {
     // §1.1, §5.2. Where a Founder lands after signing in. Every other Founder
     // route is `/campaigns/:campaignId/…`, so without this a valid session was
     // only useful to somebody who already had a campaign id in their history.
@@ -306,10 +401,23 @@ const rootChildren: RouteObject[] = [
     path: 'settings/notifications',
     element: <FounderNotificationSettings />,
   },
+    ],
+  },
   {
-    // The Creator's half of the same page, beside their campaign list.
-    path: 'creator/settings/notifications',
-    element: <CreatorNotificationSettings />,
+    // The Creator's half of the same page. Its own one-route guard group rather
+    // than being moved up into the Creator block, so the Creator routes stay in
+    // one contiguous run in the order they were built.
+    element: (
+      <RequireRole allow={['affiliate']} signInPath="/signin">
+        <Outlet />
+      </RequireRole>
+    ),
+    children: [
+      {
+        path: 'creator/settings/notifications',
+        element: <CreatorNotificationSettings />,
+      },
+    ],
   },
   {
     // Phase 10b (§32.2, §13). Where Stripe sends someone back to. Two landing

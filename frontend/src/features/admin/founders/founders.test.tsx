@@ -122,7 +122,21 @@ let requests: RecordedRequest[] = [];
  * the server" test, and is not observable from the DOM.
  */
 function serve(routes: StubRoute[]): void {
-  installQaServer(routes);
+  // `/admin/*` is behind a role guard now, so every render begins by asking who
+  // is signed in — before any Admin request is made. Prepended here rather than
+  // added to each test's route list: this file has dozens, and a session stub
+  // that has to be remembered per test is one that is eventually forgotten,
+  // which surfaces as a ten-second timeout blaming the surface.
+  //
+  // A test that wants a different session puts its own `/api/account/me` route
+  // in `routes` — first match wins, and `routes` is searched first.
+  installQaServer([
+    ...routes,
+    {
+      match: /\/api\/account\/me$/,
+      body: { account: { role: 'admin', email: 'admin@proovd.example', name: 'An Admin' } },
+    },
+  ]);
   const stubbed = globalThis.fetch;
   requests = [];
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {

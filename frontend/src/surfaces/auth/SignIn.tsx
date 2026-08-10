@@ -22,19 +22,23 @@
  * A wrong password and an address with no account produce the identical
  * sentence. That is `AdminSignIn`'s rule, and it is not Admin's alone — the
  * Founder and Creator rosters are exactly as enumerable and exactly as
- * private.
+ * private. The decision lives in `refusal.ts` and is imported by both doors,
+ * because two copies of it is how one of them acquires a helpful branch.
  *
- * The second factor is the documented exception, for `AdminSignIn`'s reason:
- * past the password a person has proved who they are, so a wrong code says so
- * plainly rather than making them retype a correct one until they lock
- * themselves out.
+ * ── One step, since 2026-08-10 ─────────────────────────────────────────────
+ * There was a second step: for an account with a registered factor, Better
+ * Auth answered the password with `twoFactorRedirect` and this surface asked
+ * for a code. The Admin second factor was removed by product direction (see
+ * `backend/src/auth/auth.ts`), no role has one, and the branch went with it.
+ * The role still decides the DESTINATION, and the server still decides the
+ * role — signing in here makes nobody an Admin.
  *
- * ── Two steps, never two questions at once (DNA §5.1) ──────────────────────
- * §5.1 makes MFA mandatory for Admin, so Better Auth answers the password with
- * `twoFactorRedirect` rather than a session. This surface does not decide who
- * needs a factor — it renders the step the server asked for. §5.2 and §5.3
- * give the other two roles no second factor, so in practice they never see it;
- * that is a fact about their accounts, not a branch in this file.
+ * ── Already signed in ──────────────────────────────────────────────────────
+ * This surface is wrapped in `RedirectIfAuthenticated` (see `routes.tsx`), so
+ * somebody who already has a session never reaches the form. Asking a person
+ * to re-enter a password they have already proved is not a security control;
+ * it is a question with no consequence, and it trains people to type
+ * credentials at any form that asks.
  *
  * ── What is deliberately absent ────────────────────────────────────────────
  * No "create an account" link, anywhere. §5.1 seeds Admins, §5.2 admits
@@ -50,7 +54,7 @@
  */
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router';
 import {
   Button,
   Card,
@@ -69,46 +73,15 @@ import {
   resetPassword,
   roleHome,
   signInWithPassword,
-  verifyTotp,
 } from './api.js';
+import { CREDENTIAL_REFUSAL, refusalFor } from './refusal.js';
+import { returnTo } from '../../lib/routeGuards.js';
+import { invalidateSession } from '../../lib/session.js';
 
-/**
- * One refusal for every credential failure. Never varies by cause, and is not
- * assembled from parts — a template with a slot is a template somebody later
- * fills with the reason.
- */
-const CREDENTIAL_REFUSAL =
-  'That email address and password combination was not accepted. Nothing about the account is confirmed or denied by this message.';
-
-const CODE_REFUSAL =
-  'That code was not accepted. Codes expire quickly — wait for your authenticator app to show the next one and enter that.';
-
-/**
- * Which failures are a credential decision and which are a transport problem.
- *
- * The distinction is the STATUS, deliberately, and not the error body. Better
- * Auth answers a bad credential with 401 and a body of its own shape — no
- * `title`, no `whatHappened` — so a client that decides by inspecting the body
- * classifies every real wrong password as "the server answered 401 with no
- * explanation". That is not a leak, but it is untrue (§1.4): the server
- * explained perfectly well, and the person is left thinking Proovd is broken
- * rather than that they mistyped.
- *
- * 401 and 403 are the only two answers this endpoint gives to a credential it
- * refuses; everything else — a dead connection, a 5xx, an HTML error page — is
- * a request that did not get a decision, and saying so is what stops somebody
- * retyping a correct password against a server that is down.
- */
-function refusalFor(caught: unknown): string {
-  if (!(caught instanceof AccountRequestError)) return CREDENTIAL_REFUSAL;
-  const { status } = caught.detail;
-  if (status === 401 || status === 403) return CREDENTIAL_REFUSAL;
-  return caught.detail.whatHappened ?? caught.detail.title;
-}
+export { CREDENTIAL_REFUSAL };
 
 type Step =
   | { kind: 'credentials' }
-  | { kind: 'second_factor' }
   /** A session exists; `/api/account/me` decides where it belongs. */
   | { kind: 'resolving' }
   /** Signed in, but the destination could not be read. Never a dead end. */
@@ -116,10 +89,10 @@ type Step =
 
 export function SignIn() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState<Step>({ kind: 'credentials' });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -130,9 +103,17 @@ export function SignIn() {
   const land = useCallback(async () => {
     setStep({ kind: 'resolving' });
     try {
+      // The cached identity predates this sign-in. Clearing it first is what
+      // stops the destination rendering against a stale "anonymous".
+      invalidateSession();
       const account = await fetchAccount();
       // §3.1: the role is read to choose a route and is never rendered.
-      navigate(roleHome[account.role], { replace: true });
+      //
+      // `next` wins when it is a same-site path — that is how a guard bounce
+      // returns somebody to where they were going. It is NOT trusted to be
+      // reachable: if it belongs to another role, that route's own guard
+      // refuses, which is the correct place for the decision.
+      navigate(returnTo(location.search, roleHome[account.role]), { replace: true });
     } catch (caught) {
       const detail = caught instanceof AccountRequestError ? caught.detail : null;
       setStep({
@@ -146,41 +127,23 @@ export function SignIn() {
           'Reload this page. Your session is still valid, so you will not be asked for your password again.',
       });
     }
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   async function submitCredentials(event: FormEvent) {
     event.preventDefault();
+    // No duplicate submit while one is in flight. The button is disabled too;
+    // this is the half that survives a keyboard repeat.
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await signInWithPassword(email.trim(), password);
-      // The password is right and the session is not issued yet. Drop it here
-      // rather than holding a correct credential in state through a second
-      // network round trip.
+      await signInWithPassword(email.trim(), password);
+      // Drop the credential as soon as it has been sent rather than holding it
+      // in component state through the next round trip.
       setPassword('');
-      if (result.twoFactorRedirect) {
-        setStep({ kind: 'second_factor' });
-        return;
-      }
       await land();
     } catch (caught) {
       setError(refusalFor(caught));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submitCode(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await verifyTotp(code.trim());
-      setCode('');
-      await land();
-    } catch {
-      setError(CODE_REFUSAL);
-      setCode('');
     } finally {
       setBusy(false);
     }
@@ -231,7 +194,7 @@ export function SignIn() {
   return (
     <Section>
       <div className="auth">
-        {step.kind === 'credentials' ? (
+        {
           <>
             <div className="auth__head">
               <h1>Sign in to Proovd</h1>
@@ -287,55 +250,7 @@ export function SignIn() {
               </p>
             </div>
           </>
-        ) : (
-          <>
-            <div className="auth__head">
-              <h1>Enter your authenticator code</h1>
-              <p className="auth__lede">
-                This account has an authenticator app registered to it. Your password
-                was accepted; the code finishes signing you in.
-              </p>
-            </div>
-
-            <Card>
-              <form className="auth__form" onSubmit={submitCode} noValidate>
-                <Field
-                  label="Authenticator code"
-                  hint="Six digits from the authenticator app registered to this account."
-                  {...(error ? { error } : {})}
-                >
-                  <Input
-                    type="text"
-                    name="code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="[0-9]*"
-                    required
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                  />
-                </Field>
-
-                <Button type="submit" disabled={busy || !code}>
-                  {busy ? 'Checking the code…' : 'Finish signing in'}
-                </Button>
-              </form>
-            </Card>
-
-            <div className="auth__aside">
-              <Button
-                tier="tertiary"
-                onClick={() => {
-                  setStep({ kind: 'credentials' });
-                  setCode('');
-                  setError(null);
-                }}
-              >
-                Start again with your email address
-              </Button>
-            </div>
-          </>
-        )}
+        }
       </div>
     </Section>
   );

@@ -480,7 +480,7 @@ describe('§33.10.5 — successfully_completed requires all five criteria', () =
           priorAssociationStatus: 'active',
           newAssociationStatus: 'paused',
           actor: 'admin:test',
-          mfaContext: 'totp',
+          mfaContext: 'password_session_admin_role_verified',
           reauthContext: 'fresh',
         });
       }

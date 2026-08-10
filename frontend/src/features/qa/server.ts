@@ -21,7 +21,17 @@ export interface StubRoute {
   match: RegExp;
   method?: string;
   status?: number;
-  body: unknown;
+  /**
+   * The response, or a function returning it.
+   *
+   * A function exists for exactly one fixture: the session read. Every Founder
+   * and Creator address is behind a role guard, so the answer to "who is signed
+   * in?" has to match the flow being rendered — a Creator surface rendered
+   * against a Founder session renders a refusal and would then pass axe with
+   * nothing on the page, which is the §33.11.1 trap this harness exists to
+   * avoid.
+   */
+  body: unknown | (() => unknown);
 }
 
 let routes: StubRoute[] = [];
@@ -29,6 +39,26 @@ let unmatched: string[] = [];
 
 export function unmatchedRequests(): string[] {
   return [...unmatched];
+}
+
+/**
+ * Which role the session fixture reports. Set from the address being rendered
+ * rather than fixed per file, so adding a flow cannot silently render it
+ * against the wrong role.
+ */
+export type QaSessionRole = 'founder' | 'affiliate' | 'admin';
+let sessionRole: QaSessionRole = 'founder';
+
+export function setQaSessionRoleForPath(path: string): void {
+  sessionRole = path.startsWith('/admin')
+    ? 'admin'
+    : path.startsWith('/creator')
+      ? 'affiliate'
+      : 'founder';
+}
+
+export function qaSessionRole(): QaSessionRole {
+  return sessionRole;
 }
 
 function respond(status: number, body: unknown): Response {
@@ -54,7 +84,10 @@ export function installQaServer(stubs: StubRoute[]): void {
     for (const route of routes) {
       if (!route.match.test(url)) continue;
       if (route.method && route.method.toUpperCase() !== method) continue;
-      return respond(route.status ?? 200, route.body);
+      return respond(
+        route.status ?? 200,
+        typeof route.body === 'function' ? (route.body as () => unknown)() : route.body,
+      );
     }
     unmatched.push(`${method} ${url}`);
     return respond(404, {

@@ -23,7 +23,6 @@ import {
   pgEnum,
   text,
   boolean,
-  integer,
   timestamp,
   index,
   uniqueIndex,
@@ -66,8 +65,14 @@ export const user = pgTable(
     phone: text('phone'),
     phoneVerified: boolean('phone_verified').notNull().default(false),
 
-    /** Set by the two-factor plugin. Mandatory for Admin (§5.1, §28.2). */
-    twoFactorEnabled: boolean('two_factor_enabled').notNull().default(false),
+    /*
+     * There is deliberately no `two_factor_enabled` column and no `two_factor`
+     * table. Both were dropped in migration 0041 when the Admin second factor
+     * was removed by product direction (see `auth/auth.ts`). The absence is the
+     * point: a boolean nobody sets is a boolean somebody later reads as
+     * meaningful, and a `two_factor` row surviving its plugin is an
+     * unencrypted-secret store with no reader.
+     */
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -159,40 +164,21 @@ export const verification = pgTable(
   }),
 );
 
-/**
- * TOTP factors. §5.1 and §28.2 make MFA mandatory for Admin; `requireAdmin`
- * refuses to admit an Admin whose `twoFactorEnabled` is false, so a row here is
- * the precondition for any Admin operational surface.
- *
- * TOTP only. There is no SMS/OTP-by-phone provider configured anywhere
- * (§5.2, §33.1.8).
+/*
+ * A `twoFactor` table used to be declared here. It is gone with the plugin that
+ * owned it (2026-08-10, migration 0041) and must not come back on its own: the
+ * table stored a symmetrically-encrypted TOTP secret and a backup-code blob per
+ * Admin, and keeping that at rest for a factor nothing verifies is strictly
+ * worse than not having it. Reinstating the factor means reinstating the
+ * plugin, the table, and the enrolment path together, under the same
+ * instruction that removed them.
  */
-export const twoFactor = pgTable(
-  'two_factor',
-  {
-    id: text('id').primaryKey(),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-    secret: text('secret').notNull(),
-    backupCodes: text('backup_codes').notNull(),
-    verified: boolean('verified').notNull().default(true),
-    failedVerificationCount: integer('failed_verification_count').notNull().default(0),
-    lockedUntil: timestamp('locked_until', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => ({
-    userIdx: index('two_factor_user_idx').on(t.userId),
-    secretIdx: index('two_factor_secret_idx').on(t.secret),
-  }),
-);
 
 /**
  * The object Better Auth's drizzle adapter indexes by model name. The keys are
  * Better Auth's model names and must stay exactly as written.
  */
-export const betterAuthSchema = { user, session, account, verification, twoFactor };
+export const betterAuthSchema = { user, session, account, verification };
 
 export type UserRow = typeof user.$inferSelect;
 export type SessionRow = typeof session.$inferSelect;

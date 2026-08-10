@@ -36,16 +36,41 @@ function renderAt(path: string) {
 
 type Reply = { status: number; body?: unknown };
 
+/**
+ * `afterSignIn` models what the server does, rather than counting calls.
+ *
+ * A test that signs in needs `/api/account/me` to answer 401 before and 200
+ * after — the form only renders for an anonymous visitor now, and the
+ * destination is only chosen once a session exists.
+ *
+ * The obvious fixture is "401 on the first call, 200 on the second", and it is
+ * wrong: the number of session reads is an implementation detail of the guards
+ * and React's render scheduling, so under load an extra read shifts the
+ * sequence and the test fails for a reason that has nothing to do with the
+ * product. Keying on whether the sign-in POST has actually happened is what the
+ * server does, and it holds however many times anything asks.
+ */
+type Reply2 = Reply & { afterSignIn?: Reply };
+
 /** Replies per URL; anything unmatched fails loudly rather than 404ing quietly. */
-function stub(replies: Record<string, Reply>) {
+function stub(replies: Record<string, Reply2>) {
   const seen: string[] = [];
+  // Every guarded surface asks who is signed in before it renders. An anonymous
+  // visitor is the default, so the session read is answered 401 unless a case
+  // overrides it — a test that had to remember to stub it would fail as
+  // 'unstubbed request' and blame the wrong thing.
+  const table: Record<string, Reply2> = { '/api/account/me': { status: 401 }, ...replies };
+  let signedIn = false;
+
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : String(input);
       seen.push(url);
-      const reply = replies[url];
-      if (!reply) throw new Error(`unstubbed request: ${url}`);
+      const entry = table[url];
+      if (!entry) throw new Error(`unstubbed request: ${url}`);
+      if (url === '/api/auth/sign-in/email' && entry.status < 400) signedIn = true;
+      const reply = signedIn && entry.afterSignIn ? entry.afterSignIn : entry;
       return {
         ok: reply.status >= 200 && reply.status < 300,
         status: reply.status,
@@ -54,6 +79,17 @@ function stub(replies: Record<string, Reply>) {
     }),
   );
   return seen;
+}
+
+/** The session read: 401 while nobody has signed in, this account afterwards. */
+function signsInAs(role: 'founder' | 'affiliate' | 'admin'): Reply2 {
+  return {
+    status: 401,
+    afterSignIn: {
+      status: 200,
+      body: { account: { role, email: 'someone@example.com', name: 'Someone' } },
+    },
+  };
 }
 
 beforeEach(() => {
@@ -86,27 +122,56 @@ describe('the root address offers a way into the product (§1.1, §5)', () => {
     }
   });
 
-  it('renders the sign-in form at /signin', () => {
+  it('renders the sign-in form at /signin', async () => {
+    // Async now: the page asks whether somebody is already signed in before it
+    // decides to show a credential form at all.
+    stub({});
     renderAt('/signin');
     expect(
-      screen.getByRole('heading', { level: 1, name: /sign in to proovd/i }),
+      await screen.findByRole('heading', { level: 1, name: /sign in to proovd/i }),
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: /^sign in$/i })).toBeTruthy();
   });
 
-  it('names both account roles, so a founder and a creator both know it is theirs', () => {
+  it('names both account roles, so a founder and a creator both know it is theirs', async () => {
+    stub({});
     const { container } = renderAt('/signin');
+    await screen.findByRole('heading', { level: 1, name: /sign in to proovd/i });
     const text = (container.textContent ?? '').toLowerCase();
     expect(text).toContain('founder');
     expect(text).toContain('creator');
+  });
+
+  /**
+   * §5, §1.4. An already-authenticated person is not asked to prove an identity
+   * they have already proved. Before this the form rendered for everybody, so a
+   * signed-in Founder who clicked "Sign in" in the header was shown a password
+   * box whose only possible outcome was the session they already had.
+   */
+  it('never shows the credential form to somebody who is already signed in', async () => {
+    stub({
+      '/api/account/me': {
+        status: 200,
+        body: { account: { role: 'founder', email: 'f@example.com', name: 'F' } },
+      },
+      '/api/founder/campaigns': { status: 200, body: { campaigns: [] } },
+    });
+
+    const { router } = renderAt('/signin');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/campaigns');
+    });
+    expect(screen.queryByLabelText(/^password$/i)).toBeNull();
   });
 });
 
 /* ══════════════════════════════════════════════ §5: no signup, for any role */
 
 describe('§5 — the door offers no way to create an account', () => {
-  it('has no signup control and no link to one (§33.2.1)', () => {
+  it('has no signup control and no link to one (§33.2.1)', async () => {
+    stub({});
     const { container } = renderAt('/signin');
+    await screen.findByRole('heading', { level: 1, name: /sign in to proovd/i });
     const labels = [
       ...container.querySelectorAll('button'),
       ...container.querySelectorAll('a'),
@@ -119,8 +184,10 @@ describe('§5 — the door offers no way to create an account', () => {
     expect(hrefs.some((h) => h?.includes('signup') || h?.includes('sign-up'))).toBe(false);
   });
 
-  it('says where an account comes from instead (§1.4)', () => {
+  it('says where an account comes from instead (§1.4)', async () => {
+    stub({});
     const { container } = renderAt('/signin');
+    await screen.findByRole('heading', { level: 1, name: /sign in to proovd/i });
     expect((container.textContent ?? '').toLowerCase()).toContain('invitation');
   });
 });
@@ -134,7 +201,7 @@ describe('§5.5 — the refusal is identical whatever the cause', () => {
     const { container, unmount } = renderAt('/signin');
     const view = within(container);
 
-    await user.type(view.getByLabelText(/email address/i), 'someone@example.com');
+    await user.type(await view.findByLabelText(/email address/i), 'someone@example.com');
     await user.type(view.getByLabelText(/^password$/i), 'whatever-it-was');
     await user.click(view.getByRole('button', { name: /^sign in$/i }));
 
@@ -193,20 +260,32 @@ describe('§5.1–§5.3 — the role decides where you land, and is never render
 
     stub({
       '/api/auth/sign-in/email': { status: 200, body: {} },
-      '/api/account/me': {
-        status: 200,
-        body: { account: { role, email: 'someone@example.com', name: 'Someone' } },
-      },
-      // Whatever the destination then loads is not this test's subject.
+      // Anonymous until the sign-in POST, then this account — which is what
+      // makes the form render at all now.
+      '/api/account/me': signsInAs(role),
+      // Whatever the destination then loads is not this test's subject — but
+      // it has to succeed, because a destination that refuses is a different
+      // assertion (see the Admin session-ended case, which is terminal by
+      // design so the two surfaces cannot bounce each other).
       '/api/founder/campaigns': { status: 200, body: { campaigns: [] } },
-      '/api/creator/campaigns': { status: 401, body: {} },
-      '/api/admin/me': { status: 401, body: {} },
+      '/api/creator/campaigns': { status: 200, body: { campaigns: [] } },
+      '/api/admin/me': {
+        status: 200,
+        body: {
+          id: 'a1',
+          name: 'An Admin',
+          email: 'admin@example.com',
+          sessionEstablishedAt: '2026-08-10T10:00:00.000Z',
+          prerequisiteKeys: [],
+        },
+      },
+      '/api/admin/founders': { status: 200, body: { founders: [] } },
     });
 
     const user = userEvent.setup();
     const { router } = renderAt('/signin');
 
-    await user.type(screen.getByLabelText(/email address/i), 'someone@example.com');
+    await user.type(await screen.findByLabelText(/email address/i), 'someone@example.com');
     await user.type(screen.getByLabelText(/^password$/i), 'a-real-password');
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
@@ -218,17 +297,14 @@ describe('§5.1–§5.3 — the role decides where you land, and is never render
   it('never prints the internal role name (§3.1)', async () => {
     stub({
       '/api/auth/sign-in/email': { status: 200, body: {} },
-      '/api/account/me': {
-        status: 200,
-        body: { account: { role: 'affiliate', email: 'c@example.com', name: 'C' } },
-      },
+      '/api/account/me': signsInAs('affiliate'),
       '/api/creator/campaigns': { status: 401, body: {} },
     });
 
     const user = userEvent.setup();
     const { container } = renderAt('/signin');
 
-    await user.type(screen.getByLabelText(/email address/i), 'c@example.com');
+    await user.type(await screen.findByLabelText(/email address/i), 'c@example.com');
     await user.type(screen.getByLabelText(/^password$/i), 'a-real-password');
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
@@ -237,19 +313,45 @@ describe('§5.1–§5.3 — the role decides where you land, and is never render
     });
   });
 
-  it('asks for the second factor only when the server asks for it (§5.1, DNA §5.1)', async () => {
-    stub({ '/api/auth/sign-in/email': { status: 200, body: { twoFactorRedirect: true } } });
+  /**
+   * The second factor is gone (2026-08-10, product direction — see
+   * `backend/src/auth/auth.ts`), and this asserts its ABSENCE rather than
+   * deleting the case.
+   *
+   * Deleting it would leave nothing to notice a half-restored factor: a
+   * `twoFactorRedirect` in a response that the surface silently ignores would
+   * mean the server thinks it withheld the session and the browser thinks it
+   * got one, which is the worst of both.
+   */
+  it('has no second-factor step, and does not invent one from a stray flag', async () => {
+    stub({
+      '/api/auth/sign-in/email': { status: 200, body: { twoFactorRedirect: true } },
+      '/api/account/me': signsInAs('admin'),
+      '/api/admin/me': {
+        status: 200,
+        body: {
+          id: 'a1',
+          name: 'An Admin',
+          email: 'admin@example.com',
+          sessionEstablishedAt: '2026-08-10T10:00:00.000Z',
+          prerequisiteKeys: [],
+        },
+      },
+      '/api/admin/founders': { status: 200, body: { founders: [] } },
+    });
 
     const user = userEvent.setup();
-    renderAt('/signin');
+    const { router } = renderAt('/signin');
 
-    await user.type(screen.getByLabelText(/email address/i), 'admin@example.com');
+    await user.type(await screen.findByLabelText(/email address/i), 'admin@example.com');
     await user.type(screen.getByLabelText(/^password$/i), 'a-real-password');
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
-    // One question per moment: the password fields are gone, not merely below.
-    await screen.findByRole('heading', { level: 1, name: /authenticator code/i });
-    expect(screen.queryByLabelText(/^password$/i)).toBeNull();
+    // The session decides, not the flag: it lands, and never asks for a code.
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/admin');
+    });
+    expect(screen.queryByLabelText(/authenticator|one-time|verification code/i)).toBeNull();
   });
 });
 
@@ -262,7 +364,7 @@ describe('§5.5 — the reset acknowledgement is frozen', () => {
       const user = userEvent.setup();
       const { unmount } = renderAt('/reset-password');
 
-      await user.type(screen.getByLabelText(/email address/i), 'someone@example.com');
+      await user.type(await screen.findByLabelText(/email address/i), 'someone@example.com');
       await user.click(screen.getByRole('button', { name: /send me a reset link/i }));
 
       const panel = await screen.findByText(RESET_ACKNOWLEDGEMENT);
@@ -280,8 +382,14 @@ describe('§5.5 — the reset acknowledgement is frozen', () => {
 /* ══════════════════════════════════════ §1.1: the Founder landing is not a dead end */
 
 describe('§1.1 — a signed-in Founder has somewhere to be', () => {
+  const SIGNED_IN_FOUNDER: Reply = {
+    status: 200,
+    body: { account: { role: 'founder', email: 'f@example.com', name: 'F' } },
+  };
+
   it('lists their campaigns with one destination each (§33.11.4)', async () => {
     stub({
+      '/api/account/me': SIGNED_IN_FOUNDER,
       '/api/founder/campaigns': {
         status: 200,
         body: {
@@ -313,7 +421,10 @@ describe('§1.1 — a signed-in Founder has somewhere to be', () => {
   });
 
   it('answers an empty account with a named state, not a blank page (§27.1)', async () => {
-    stub({ '/api/founder/campaigns': { status: 200, body: { campaigns: [] } } });
+    stub({
+      '/api/account/me': SIGNED_IN_FOUNDER,
+      '/api/founder/campaigns': { status: 200, body: { campaigns: [] } },
+    });
 
     renderAt('/campaigns');
     await screen.findByText(/no campaign is open on your account yet/i);
@@ -321,23 +432,50 @@ describe('§1.1 — a signed-in Founder has somewhere to be', () => {
     expect(screen.getByText(/^next$/i)).toBeTruthy();
   });
 
-  it('offers the way back in when the session has ended, and never when the server is merely down', async () => {
-    stub({ '/api/founder/campaigns': { status: 401, body: {} } });
-    renderAt('/campaigns');
-    expect(await screen.findByRole('button', { name: /sign in to proovd/i })).toBeTruthy();
+  /**
+   * The signed-out case is now decided by the route guard, before the surface
+   * renders at all — which is the improvement, not a regression. A person with
+   * no session is sent to the door carrying where they were going, instead of
+   * being shown a Founder page containing a sign-in button.
+   */
+  it('sends a visitor with no session to the door, carrying where they were going', async () => {
+    stub({ '/api/account/me': { status: 401 } });
+    const { router } = renderAt('/campaigns');
 
-    vi.unstubAllGlobals();
-    stub({ '/api/founder/campaigns': { status: 503, body: {} } });
-    const second = renderAt('/campaigns');
-    // A server that is down must not ask for a password that cannot help
-    // (§1.4) — it offers a retry.
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/signin');
+    });
+    expect(router.state.location.search).toContain('next=%2Fcampaigns');
+  });
+
+  it('does not ask for a password when the server is merely down (§1.4)', async () => {
+    // The session IS valid; the data read failed. Nothing about a password can
+    // fix that, so the surface offers a retry and no sign-in control.
+    stub({
+      '/api/account/me': SIGNED_IN_FOUNDER,
+      '/api/founder/campaigns': { status: 503, body: {} },
+    });
+    const view = renderAt('/campaigns');
+
     expect(
-      await within(second.container).findByRole('button', {
+      await within(view.container).findByRole('button', {
         name: /try loading your campaigns again/i,
       }),
     ).toBeTruthy();
     expect(
-      within(second.container).queryByRole('button', { name: /sign in to proovd/i }),
+      within(view.container).queryByRole('button', { name: /sign in to proovd/i }),
     ).toBeNull();
+  });
+
+  it('does not ask for a password when the session itself cannot be read either', async () => {
+    // §1.4 again, one layer up: a 503 on the session read is not "you are
+    // signed out", so the guard must not send anybody to the sign-in page.
+    stub({ '/api/account/me': { status: 503 } });
+    const { router, container } = renderAt('/campaigns');
+
+    expect(
+      await within(container).findByRole('button', { name: /try again/i }),
+    ).toBeTruthy();
+    expect(router.state.location.pathname).toBe('/campaigns');
   });
 });

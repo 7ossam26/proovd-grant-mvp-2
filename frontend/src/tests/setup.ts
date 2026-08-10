@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { expect, afterEach } from 'vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { toHaveNoViolations } from 'jest-axe';
+import { invalidateSession } from '../lib/session.js';
 
 expect.extend(toHaveNoViolations);
 
@@ -19,6 +20,22 @@ expect.extend(toHaveNoViolations);
 configure({ asyncUtilTimeout: 10_000 });
 
 afterEach(() => cleanup());
+
+/**
+ * The session cache is module-scoped, which is right for a page load and wrong
+ * for a test file.
+ *
+ * `lib/session.ts` caches the resolved answer to "who is signed in?" so a
+ * layout and the route inside it do not each ask. Nothing in a browser outlives
+ * a navigation to a different identity — signing out clears it explicitly. In
+ * jsdom the module is loaded once for the whole file, so without this a test
+ * that signs in as a Founder leaves every later test in the file believing a
+ * Founder is signed in, and route guards then redirect instead of rendering.
+ *
+ * Clearing it here rather than in each suite means a new test file cannot
+ * inherit the hazard by forgetting.
+ */
+afterEach(() => invalidateSession());
 
 // jsdom is missing browser APIs that Radix and the components touch. None of
 // these carry behavior we assert — they exist so a render doesn't throw.

@@ -1,173 +1,138 @@
 /**
- * Admin sign-in — Spec §5.1, §28.2.
+ * Admin sign-in — Spec §5.1, §28.2, §5.5.
  *
- * Two steps, because §5.1 makes them two facts: "Email/password authentication
- * and MFA are mandatory." The password alone never produces a session for an
- * enrolled Admin — Better Auth answers the first request with
- * `twoFactorRedirect` — so this surface asks for the code as a separate moment
- * rather than pretending one form does both (DNA §5.1: one question per
- * moment).
+ * ── Its own address, and its own shell ──────────────────────────────────────
+ * This used to render INSIDE `AdminFrame`, as the signed-out branch of
+ * `AdminLayout`. That put the Admin wordmark, the four section tabs, the
+ * Explore control, and the environment chip on the screen of anybody who typed
+ * `/admin` — signed in or not. No data leaked (every request behind it 401s),
+ * but an operations chrome shown to a stranger is still telling them what
+ * exists, and it made the URL lie about what was being looked at.
+ *
+ * So it lives at `/admin/signin` now, outside the protected layout, and renders
+ * the authentication experience and nothing else. `AdminLayout` no longer has a
+ * signed-out branch at all — the absence is what keeps the shell from coming
+ * back.
+ *
+ * ── One step, since 2026-08-10 ──────────────────────────────────────────────
+ * There was a second step here: password, then a TOTP code. The second factor
+ * was removed by product direction (see `backend/src/auth/auth.ts`), so this is
+ * one form. Nothing about the authorization changed — `requireAdmin` still
+ * decides on the server whether this session may reach anything under
+ * `/api/admin`, and signing in here does not make anybody an Admin.
  *
  * ── The failure message says nothing about the account ──────────────────────
  * A wrong password and an address with no account produce the same refusal.
  * That is §5.5's non-enumeration rule applied at the surface: a sign-in page
- * that distinguishes them is an account-existence oracle, and no amount of
- * helpfulness is worth publishing the Admin roster.
+ * that distinguishes them is an account-existence oracle, and this one would
+ * publish the Admin roster.
  *
- * This is *not* the token surface's silence, though. Once past the password,
- * an Admin has proved who they are, so a wrong TOTP code says so plainly —
- * hiding it would just make them retype a correct code until they locked
- * themselves out.
+ * The refusal logic is imported from the account door rather than restated —
+ * two copies of "which failures are a credential decision" is how one of them
+ * comes to leak.
  */
 
 import { useState, type FormEvent } from 'react';
-import { Button, Field, Input } from '../../components/index.js';
-import { signInWithPassword, verifyTotp, AdminRequestError } from './api.js';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router';
+import { Button, Card, Field, Input } from '../../components/index.js';
+import { CREDENTIAL_REFUSAL, refusalFor } from '../../surfaces/auth/refusal.js';
+import { returnTo } from '../../lib/routeGuards.js';
+import { invalidateSession } from '../../lib/session.js';
+import { fetchAccount, signInWithPassword } from '../../surfaces/auth/api.js';
 
-/** One refusal for every credential failure. Never varies by cause. */
-const CREDENTIAL_REFUSAL =
-  'That email address and password combination was not accepted. Nothing about the account is confirmed or denied by this message.';
-
-type Step = 'credentials' | 'second_factor';
-
-interface AdminSignInProps {
-  /** Called once a full session exists. The shell re-checks with the server. */
-  onSignedIn: () => void;
-}
-
-export function AdminSignIn({ onSignedIn }: AdminSignInProps) {
-  const [step, setStep] = useState<Step>('credentials');
+export function AdminSignIn() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submitCredentials(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return; // No duplicate submit while one is in flight.
     setBusy(true);
     setError(null);
     try {
-      const result = await signInWithPassword(email.trim(), password);
-      if (result.twoFactorRedirect) {
-        setStep('second_factor');
-        setPassword('');
+      await signInWithPassword(email.trim(), password);
+      setPassword('');
+
+      // The cached identity is from before this sign-in. Clearing it first is
+      // what stops the destination rendering against a stale "anonymous".
+      invalidateSession();
+      const account = await fetchAccount();
+
+      if (account.role !== 'admin') {
+        // A real session for somebody who is not an Admin. Refused here as a
+        // rendering decision only — the server has been refusing them all
+        // along — and refused without naming what is behind this door.
+        setError(
+          'That account cannot open the Proovd Admin panel. If you have a Proovd account, sign in at the main sign-in page instead.',
+        );
         return;
       }
-      // A session without a second factor belongs to an account that has not
-      // enrolled one. The shell's next `/api/admin/me` is what refuses it —
-      // this surface does not decide access.
-      onSignedIn();
-    } catch (caught) {
-      setError(
-        caught instanceof AdminRequestError && caught.detail.error === 'unreachable'
-          ? (caught.detail.whatHappened ?? caught.detail.title)
-          : CREDENTIAL_REFUSAL,
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
 
-  async function submitCode(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await verifyTotp(code.trim());
-      onSignedIn();
-    } catch {
-      setError(
-        'That code was not accepted. Codes expire quickly — wait for your authenticator app to show the next one and enter that.',
-      );
-      setCode('');
+      navigate(returnTo(location.search, '/admin/founders'), { replace: true });
+    } catch (caught) {
+      setError(refusalFor(caught));
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <section className="admin-signin" aria-labelledby="admin-signin-heading">
-      <h1 id="admin-signin-heading">Sign in to Proovd Admin</h1>
+    <main className="admin-auth" id="admin-main">
+      <section className="admin-signin" aria-labelledby="admin-signin-heading">
+        {/* The wordmark, and deliberately nothing else. No section tabs, no
+            Explore control, no environment chip — those belong to the
+            authenticated shell and are what this page used to leak. */}
+        <span className="wordmark">
+          proovd<span className="adm">Admin</span>
+        </span>
 
-      {step === 'credentials' ? (
-        <form className="admin-form" onSubmit={submitCredentials} noValidate>
-          <Field label="Email address">
-            <Input
-              type="email"
-              name="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-          <Field label="Password">
-            <Input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </Field>
+        <h1 id="admin-signin-heading">Sign in to Proovd Admin</h1>
 
-          {error ? (
-            <p className="field-error" role="alert">
-              {error}
-            </p>
-          ) : null}
+        <Card>
+          <form className="admin-form" onSubmit={submit} noValidate>
+            <Field label="Email address">
+              <Input
+                type="email"
+                name="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field label="Password">
+              <Input
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
 
-          <p className="admin-form__note">
-            Admin accounts require an authenticator app. After your password, Proovd asks
-            for a code.
-          </p>
+            {error ? (
+              <p className="field-error" role="alert">
+                {error}
+              </p>
+            ) : null}
 
-          <Button type="submit" disabled={busy}>
-            {busy ? 'Checking…' : 'Continue'}
-          </Button>
-        </form>
-      ) : (
-        <form className="admin-form" onSubmit={submitCode} noValidate>
-          <Field
-            label="Authenticator code"
-            hint="Six digits from the authenticator app registered to this account."
-          >
-            <Input
-              type="text"
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]*"
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </Field>
+            <Button type="submit" disabled={busy || !email || !password}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </form>
+        </Card>
 
-          {error ? (
-            <p className="field-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <Button type="submit" disabled={busy}>
-            {busy ? 'Checking…' : 'Sign in'}
-          </Button>
-          <Button
-            tier="tertiary"
-            type="button"
-            onClick={() => {
-              setStep('credentials');
-              setCode('');
-              setError(null);
-            }}
-          >
-            Start again
-          </Button>
-        </form>
-      )}
-    </section>
+        <p className="admin-form__note">
+          <RouterLink to="/reset-password">Reset your password</RouterLink>
+        </p>
+      </section>
+    </main>
   );
 }
+
+export { CREDENTIAL_REFUSAL };

@@ -170,6 +170,7 @@ async function main() {
     publicDir,
     authSecret: env.BETTER_AUTH_SECRET,
     adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
+    trustProxyHops: env.TRUST_PROXY_HOPS,
     liveModeEnvironment: prerequisiteFacts(env),
     emailTransport,
     objectStorage,

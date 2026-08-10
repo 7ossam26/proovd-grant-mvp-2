@@ -523,7 +523,7 @@ describe('§11 — the tax-accountability gate', () => {
       .from(auditEvents)
       .where(eq(auditEvents.action, 'tax_accountability.recorded'));
     expect(audits.length).toBeGreaterThan(0);
-    expect(audits[0]!.mfaContext).toBe('totp');
+    expect(audits[0]!.mfaContext).toBe('password_session_admin_role_verified');
   });
 
   it('supersedes rather than edits, and refuses to change a superseded row', async () => {

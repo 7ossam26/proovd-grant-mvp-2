@@ -44,6 +44,16 @@ beforeEach(() => {
       const result = handler(url, init);
       if (result) return respond(result.status, result.body);
     }
+    // Every Founder address sits behind a role guard now, so a render begins by
+    // asking who is signed in. Answered here rather than in each case: the
+    // subject of this file is §12's workspace, and a session stub repeated in
+    // every test is a place to forget it. A case that wants a different session
+    // registers its own handler, which is matched first.
+    if (url.endsWith('/api/account/me')) {
+      return respond(200, {
+        account: { role: 'founder', email: 'founder@example.com', name: 'A Founder' },
+      });
+    }
     return respond(404, { error: 'not_found', title: 'No stub' });
   });
 });

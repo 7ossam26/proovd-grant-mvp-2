@@ -527,16 +527,18 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
   },
 
   /* ── Admin security ─────────────────────────────────────────────────────── */
-  {
-    key: 'admin_mfa_required',
-    label: 'Admin MFA required',
-    group: 'admin_security',
-    kind: 'boolean',
-    provenance: 'specified',
-    specRef: '§6 · Admin MFA and reauthentication window',
-    defaultValue: 'true',
-    help: '§5.1 makes MFA mandatory for Admin. The guard refuses an Admin without a registered factor regardless of this value; the setting exists so the requirement is recorded and auditable, not so it can be turned off.',
-  },
+  /*
+   * `admin_mfa_required` used to sit here, seeded 'true'. The Admin second
+   * factor was removed by product direction on 2026-08-10, and migration 0041
+   * deletes the row — a setting whose value asserts a control that no longer
+   * exists is a false statement in the one surface an operator consults to
+   * learn what is in force (§1.4).
+   *
+   * It was deleted rather than flipped to 'false': flipping it would record a
+   * decision to DISABLE MFA that nobody took. The requirement was not turned
+   * off; the mechanism was removed. Reinstating the factor means reinstating
+   * the plugin, the table, the enrolment path, and this entry together.
+   */
   {
     key: 'admin_reauth_window_seconds',
     label: 'Admin reauthentication window',
@@ -545,7 +547,7 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     provenance: 'operator',
     specRef: '§6 · Admin MFA and reauthentication window',
     defaultValue: null,
-    help: 'How recently an Admin must have signed in before a money-moving or campaign-killing action is allowed. §6 names the setting and fixes no number. On first boot this is seeded from ADMIN_REAUTH_WINDOW_SECONDS; after that the setting is authoritative and takes effect on the next request.',
+    help: 'How recently an Admin must have signed in before a money-moving or campaign-killing action is allowed. §6 names the setting and fixes no number. On first boot this is seeded from ADMIN_REAUTH_WINDOW_SECONDS; after that the setting is authoritative and takes effect on the next request. With the Admin second factor removed this is the only freshness control on a high-impact action, so raising it widens the window a stolen session stays useful in.',
     minimum: 1,
   },
 ] as const;
