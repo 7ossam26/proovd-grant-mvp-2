@@ -6,30 +6,24 @@
  * across processes.
  */
 
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createDb as createDbFor, type Database } from '../db/client.js';
+import { type Database } from '../db/client.js';
+import { runMigrations } from '../db/migrate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const MIGRATIONS_FOLDER = path.resolve(__dirname, '..', 'db', 'migrations');
 
-const MIGRATION_LOCK_KEY = 720_301;
-
-export async function migrateSerialized(db: Database, pool: Pool): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK_KEY]);
-    try {
-      await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    } finally {
-      await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_KEY]);
-    }
-  } finally {
-    client.release();
-  }
+/**
+ * Production and the harness now share ONE migration runner — per-file
+ * transactions, drizzle-kit's semantics (see `db/migrate.ts` for why the
+ * built-in one-transaction migrator fails a fresh database at 0009). The
+ * runner takes the advisory lock itself, same key as always.
+ */
+export async function migrateSerialized(_db: Database, pool: Pool): Promise<void> {
+  await runMigrations(pool, MIGRATIONS_FOLDER);
 }
 
 /**
@@ -80,7 +74,7 @@ export async function provisionIsolatedDatabase(
 
     const owned = new Pool({ connectionString });
     try {
-      await migrate(createDbFor(owned), { migrationsFolder: MIGRATIONS_FOLDER });
+      await runMigrations(owned, MIGRATIONS_FOLDER);
     } finally {
       await owned.end();
     }

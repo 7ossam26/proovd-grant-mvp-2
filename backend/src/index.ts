@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { runMigrations } from './db/migrate.js';
 
 // Sentry must be initialised before any other import that might throw.
 // We import it first so its auto-instrumentation wraps the Express setup.
@@ -59,11 +59,16 @@ async function main() {
   // Run migrations before the server accepts requests.
   // The migrations folder is at dist/db/migrations/ in production (copied
   // by the Dockerfile) and src/db/migrations/ in development.
+  //
+  // NOT drizzle-orm's own `migrate()`: that wraps every pending file in one
+  // transaction, and a fresh database then fails at 0009 with 55P04 because
+  // 0008's enum value cannot be used in the transaction that added it.
+  // `runMigrations` is drizzle-kit's per-file semantics — see db/migrate.ts.
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const migrationsFolder = path.join(__dirname, 'db', 'migrations');
 
   logger.info({ migrationsFolder }, 'Running database migrations');
-  await migrate(db, { migrationsFolder });
+  await runMigrations(pool, migrationsFolder);
   logger.info('Migrations complete');
 
   // ── First-boot settings seed (§6) ──────────────────────────────────────────
