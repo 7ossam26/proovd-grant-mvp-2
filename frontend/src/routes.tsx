@@ -13,11 +13,8 @@ import { NotFoundSurface, PageLoading } from './features/public/states.js';
 import { CampaignPage } from './features/public/campaign/CampaignPage.js';
 import { LiveCampaignPage } from './features/public/campaign/LiveCampaignPage.js';
 import { AdminLayout } from './features/admin/AdminLayout.js';
-import { SettingsPage } from './features/admin/SettingsPage.js';
-import { FoundersPage } from './features/admin/FoundersPage.js';
-import { FounderDetail } from './features/admin/FounderDetail.js';
-import { CampaignCreators } from './features/admin/CampaignCreators.js';
-import { CampaignWorkspacePanel } from './features/admin/CampaignWorkspace.js';
+import { FoundersList } from './features/admin/founders/FoundersList.js';
+import { FounderWorkspace } from './features/admin/founders/FounderWorkspace.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
@@ -33,10 +30,6 @@ import {
   CreatorNotificationSettings,
   FounderNotificationSettings,
 } from './surfaces/notifications/NotificationSettings.js';
-import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
-import { SupportQueuePage } from './features/admin/SupportQueue.js';
-import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
-import { AdminNotificationsPage } from './features/admin/Notifications.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import {
@@ -137,30 +130,17 @@ const rootChildren: RouteObject[] = [
     element: <AdminLayout />,
     children: [
       { index: true, element: <Navigate to="/admin/founders" replace /> },
-      { path: 'founders', element: <FoundersPage /> },
-      { path: 'founders/:draftId', element: <FounderDetail /> },
-      // Phase 08a (§8, §5.3, §25.4). Scoped to one campaign by query string,
-      // because §8's recruitment is always for one campaign and §11 keeps the
-      // Creator tied to it.
-      { path: 'creators', element: <CampaignCreators /> },
-      // Phase 09a (§12 Admin, §26.2). Scoped to one campaign by query string,
-      // like the Creators panel and for the same reason: §12's optional items
-      // are always one campaign's.
-      { path: 'optional-items', element: <CampaignWorkspacePanel /> },
-      // Phase 13 (§16). Scoped to one campaign by query string, like the
-      // Creators and optional-items panels: readiness is always one campaign's.
-      { path: 'creator-readiness', element: <CreatorReadinessPanel /> },
-      // Phase 16b (§26.7, §26.8, §27.8). The support queue sweeps every case and
-      // opens one by query string; campaign operations — timeline, enforcement,
-      // and relationship touches — is campaign-scoped like the panels above.
-      { path: 'support', element: <SupportQueuePage /> },
-      { path: 'campaign-operations', element: <CampaignOperationsPage /> },
-      // Phase 22c (§27.7, §27.2). The delivery history for any address — "did
-      // they get the email" is the first question of half the support cases —
-      // and the message preview, which reports the §27.2 contract and sends
-      // nothing to anyone.
-      { path: 'notifications', element: <AdminNotificationsPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      // §26.1. Two addresses: everybody, and one person. The workspace is keyed
+      // on the PROSPECT rather than on a draft or a campaign, because a Founder
+      // whose campaign was archived-and-restarted (§9's wrong-type path) has
+      // more than one of each and is still one person.
+      //
+      // The Admin panel's other sections — Today, Campaigns, Creators — are
+      // parked in the shell rather than routed here. A route with no surface is
+      // a claim that a surface exists (§1.4); the shell's parked control says
+      // what the destination is instead.
+      { path: 'founders', element: <FoundersList /> },
+      { path: 'founders/:prospectId', element: <FounderWorkspace /> },
     ],
   },
   {

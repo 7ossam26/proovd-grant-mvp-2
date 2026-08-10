@@ -1985,3 +1985,713 @@ html.no-motion [data-splash] { display: none !important; }
 .campaign-list__what { display: grid; gap: var(--sp-4); }
 .campaign-list__what h2 { margin: 0; }
 .campaign-list__ref { margin: 0; color: var(--grey); font-size: 0.9375rem; }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   PHASE 25 — the Founder Admin workspace (Spec §26.1), added 2026-08-10.
+
+   The Admin shell (top bar, view stack, tabs, tables, timeline) and the Founder
+   workspace that lives inside it: the Founder list, and the detail surface with
+   its persistent header and five panes — Overview · Details · Campaigns · Money
+   · History.
+
+   §26 licenses dashboard density in Admin and nowhere else, so this section
+   packs rows the way PHASE 06's does. DNA §5.14 is not repealed by it: a Founder
+   row still reads Glance (name, product, state) → Act (open, edit, decide) →
+   Explore (the expandables and the audit detail behind them).
+
+   Three conventions this section commits to, because two other tracks build
+   against it:
+
+   1. THE VIEW STACK. `.views` holds every `.view`; a view is hidden until it
+      carries `.is-active`. Both views stay mounted so the horizontal transition
+      has something to slide, which is also why `.views` clips its X axis.
+   2. SCOPED OVERRIDES. Where proovd.css already owns a selector — `.helper`,
+      `.accordion__head`, `.modal`, `.btn--tertiary` — this section never
+      redefines it. It qualifies it by element (`p.helper`), scopes it to the
+      Admin view (`.view .accordion__head`), or adds a modifier
+      (`.modal--form`). A phase section that re-declares a base component is how
+      a Backer surface silently inherits an Admin decision.
+   3. RESPONSIVE IS A CORRECTION, NOT A COAT OF PAINT. The reference prototype
+      has real overflow problems at narrow widths — an eight-column roster, a
+      three-column detail header, a fixed nav row. Each fix below says which one
+      it is answering. The rule everywhere: wide content scrolls inside its own
+      container; the page body never scrolls sideways (§33.11.1).
+
+   Same discipline as every section above — read a mode slot or a token, never a
+   raw value; px only for hairlines, radii, and the 44px touch minimum, which is
+   reached through --touch.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+
+/* ─────────────────────────────────────────────────────────── §26.1 SHELL */
+
+/* The bar wraps rather than compressing: at a narrow width the nav takes its own
+   line and the brand keeps its position, which is DNA §5.12's rule applied to
+   chrome. A hamburger would hide the way to somewhere behind a state. */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-16) var(--sp-32);
+  width: var(--wrap);
+  margin-inline: auto;
+  padding-block: var(--sp-16);
+  padding-inline: var(--gutter);
+}
+.wordmark {
+  font-weight: 900;
+  font-size: 1.375rem;
+  color: var(--darker);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.wordmark .adm {
+  color: var(--grey);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  margin-left: var(--sp-4);
+}
+
+/* RESPONSIVE CORRECTION — the prototype's nav is a plain flex row, so a fifth
+   section or a narrow phone pushes the brand off screen. It scrolls inside the
+   bar instead. The padding/negative-margin pair is not decoration: `overflow-x:
+   auto` makes the Y axis compute to `auto` as well, which would shave the
+   2px :focus-visible ring and its 2px offset off a focused nav item. */
+.topnav {
+  display: flex;
+  gap: var(--sp-24);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-block: var(--sp-4);
+  margin-block: calc(var(--sp-4) * -1);
+}
+.navlink {
+  background: none;
+  border: none;
+  padding: var(--sp-8) 0;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--grey);
+  white-space: nowrap;
+  flex: none;
+  position: relative;
+}
+/* Current location by weight AND ink AND the rule below it — never colour
+   alone, which is the same commitment `.admin-nav__link.is-current` makes. */
+.navlink.is-active { color: var(--darker); font-weight: 900; }
+.navlink::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--brand);
+  transform: scaleX(var(--u, 0));
+  transform-origin: var(--uo, left center);
+}
+/* Pure CSS, so the active marker is correct before GSAP loads and after it
+   fails — `--u` is only ever tweened for hover. */
+.navlink.is-active::after { --u: 1; }
+
+/* A parked destination stays visible and focusable so it can announce why it is
+   parked. `disabled` would remove it from the tab order and say nothing. */
+.navlink[aria-disabled="true"],
+.btn[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+
+.topbar__right {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8) var(--sp-16);
+}
+.envchip {
+  background: var(--accent-yellow);
+  color: var(--darker);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: var(--sp-4) var(--sp-12);
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+/* CORRECTION — the prototype hides this below 900px. It carries webhook health
+   and the deployed version, which is exactly what an Admin wants when something
+   looks wrong on a phone, so it wraps onto its own line instead of vanishing. */
+.envmeta { color: var(--grey); font-size: 0.8125rem; font-weight: 500; }
+
+
+/* ─────────────────────────────────────────────────────────── §26.1 VIEWS */
+
+/* `overflow-x: clip` clips without becoming a scroll container, so the sliding
+   view transition never spawns a page-level horizontal scrollbar and the Y axis
+   stays `visible` — a dropdown opening from the header is not shaved. `hidden`
+   would force overflow-y to `auto` and give the whole shell a scrollbar. */
+.views {
+  position: relative;
+  width: var(--wrap);
+  margin-inline: auto;
+  min-height: 72vh;
+  overflow-x: clip;
+}
+.view { display: none; padding: var(--sp-32) var(--gutter) var(--sp-120); }
+.view.is-active { display: block; }
+
+.crumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-16);
+  margin-bottom: var(--sp-24);
+}
+
+
+/* ──────────────────────────────────────────────────────────── §26.1 TABS */
+
+/* RESPONSIVE CORRECTION — five pane names do not fit at 320px. They scroll
+   rather than wrap or clip: wrapping would move the underline onto a second row
+   and clipping would make a pane unreachable. Same focus-ring padding as the
+   nav, for the same reason. */
+.tabs {
+  position: relative;
+  display: flex;
+  gap: var(--sp-24);
+  margin-bottom: var(--sp-48);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-block: var(--sp-4);
+}
+.tabbtn {
+  background: none;
+  border: none;
+  padding: var(--sp-8) 0;
+  font-weight: 700;
+  color: var(--grey);
+  white-space: nowrap;
+  flex: none;
+}
+/* Weight as well as ink, so the current pane survives the underline being
+   absent — see the no-motion fallback at the end of this section. */
+.tabbtn.is-active { color: var(--darker); font-weight: 900; }
+.tabline {
+  position: absolute;
+  bottom: 0; left: 0;
+  height: 2px;
+  width: 2rem;
+  background: var(--brand);
+  border-radius: var(--radius);
+}
+.tabpane { display: none; }
+.tabpane.is-active { display: block; }
+
+
+/* ────────────────────────────────────────────── §26.1 TABLES AND FILTERS */
+
+.filters {
+  display: flex;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-24);
+}
+.filter-tag {
+  background: none;
+  border: none;
+  padding: var(--sp-4) var(--sp-12);
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--grey);
+}
+.filter-tag.is-active {
+  background: var(--brand-5);
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+  color: var(--darker);
+  font-weight: 900;
+}
+
+/* The one place a table is the right answer: parallel states across a roster of
+   people. It scrolls inside its own container so the page body never scrolls
+   sideways — the same arrangement `.admin-table-scroll` already uses. */
+.tablewrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  max-width: 100%;
+}
+.table { width: 100%; border-collapse: collapse; }
+.table th {
+  text-align: left;
+  color: var(--grey);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: var(--sp-8) var(--sp-12) var(--sp-8) 0;
+}
+.table td {
+  padding: var(--sp-12) var(--sp-12) var(--sp-12) 0;
+  color: var(--darker);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  vertical-align: middle;
+}
+.table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table .mono {
+  display: block;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--grey);
+}
+
+
+/* ──────────────────────────────────────── §26.1 TIMELINE AND SHARED BITS */
+
+.tl { margin-top: var(--sp-16); max-width: 46rem; }
+.tl-row {
+  display: grid;
+  grid-template-columns: minmax(0, 9.5rem) minmax(0, 1fr);
+  gap: var(--sp-24);
+  padding-block: var(--sp-12);
+}
+.tl-row time { color: var(--grey); font-size: 0.875rem; font-weight: 700; }
+.tl-row p { margin: 0; color: var(--darker); font-weight: 500; max-width: var(--measure); }
+.tl-row p b { font-weight: 900; }
+/* The stamp sits above its entry rather than being squeezed into a 9.5rem
+   column that no longer exists. */
+@media (max-width: 600px) {
+  .tl-row { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+}
+
+.case-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-16);
+  margin-top: var(--sp-24);
+}
+.case-reason { margin-top: var(--sp-24); max-width: min(34rem, 100%); }
+
+.people-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--sp-24);
+  margin-bottom: var(--sp-32);
+  flex-wrap: wrap;
+}
+.people-head .btn--primary { flex: none; }
+
+/* The setup checklist's mark. Kept from the campaign phase spine — the spine
+   itself is not built, but a done/now/next mark is the same fact wherever it
+   appears, and a second one would drift. */
+.phase__mark {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: var(--radius);
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.phase__mark--done { background: var(--dark); }
+.phase__mark--done svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  fill: none;
+  stroke: var(--mint);
+  stroke-width: 3;
+}
+.phase__mark--now {
+  background: var(--brand-5);
+  outline: var(--bw) solid var(--brand);
+  outline-offset: 0;
+}
+.phase__mark--next { background: var(--grey-light); }
+
+/* Money lines. Amounts are tabular so a column of figures reads as a column. */
+.money-rows { margin: var(--sp-48) 0 0; max-width: min(44rem, 100%); }
+.money-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-16);
+  padding-block: var(--sp-8);
+}
+.money-row dt { color: var(--dark); font-weight: 500; }
+.money-row dd {
+  margin: 0;
+  color: var(--darker);
+  font-weight: 900;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.money-row--sub dt, .money-row--sub dd { color: var(--grey); font-weight: 500; font-size: 0.9375rem; }
+
+.stack-8  > * + * { margin-top: var(--sp-8); }
+.stack-16 > * + * { margin-top: var(--sp-16); }
+.stack-24 > * + * { margin-top: var(--sp-24); }
+.grey  { color: var(--grey); }
+.right { text-align: right; }
+
+
+/* ══════════════════════════════════════════ THE FOUNDER WORKSPACE (§26.1) */
+
+/* ---- The list. Eight columns of parallel state: who, how to reach them, where
+   their setup stands, their account, their payment setup, their campaign, its
+   status, and whether anything needs a person. */
+
+.fdr-table td { vertical-align: top; overflow-wrap: anywhere; }
+/* RESPONSIVE CORRECTION — eight columns crushed into 53rem is unreadable, so
+   below roughly 1100px the table scrolls inside `.tablewrap` instead of
+   compressing. The page body still never scrolls sideways. */
+.fdr-table { min-width: 56rem; }
+.fdr-row { cursor: pointer; }
+
+.fdr-name { position: relative; color: var(--darker); }
+.fdr-name b { font-size: 1.0625rem; font-weight: 900; }
+.fdr-name::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -0.15em;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(var(--u, 0));
+  transform-origin: var(--uo, left center);
+}
+.fdr-sub { display: block; color: var(--grey); font-size: 0.8125rem; font-weight: 500; }
+
+/* The attention chip is the accent treatment, and it is reserved for a real
+   issue — a row with nothing wrong says so in words instead (§1.4: a quiet
+   state is a state, not an absence). */
+.att-chip {
+  display: inline-block;
+  background: var(--accent-yellow);
+  color: var(--darker);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: var(--sp-4) var(--sp-8);
+  border-radius: var(--radius);
+}
+.att-note { max-width: min(16rem, 100%); margin-top: var(--sp-4); }
+
+/* Styled so it can BE a <button> — the campaign it opens is a destination, and
+   a span with a click handler is not reachable from a keyboard. */
+.camp-link {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: var(--darker);
+  font-weight: 700;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.camp-link::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -0.15em;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(var(--u, 0));
+  transform-origin: var(--uo, left center);
+}
+
+/* ---- The detail header. Identity, the five states, and the one thing that
+   needs a person — side by side while there is room, stacked when there is not.
+   RESPONSIVE CORRECTION — the prototype's `1fr 1fr` lets a long legal name blow
+   the track out; `minmax(0, …)` is what actually lets the column shrink. */
+.fhead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 1fr);
+  gap: var(--sp-48);
+  align-items: start;
+  margin-bottom: var(--sp-48);
+}
+@media (max-width: 1100px) {
+  .fhead { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-32); }
+  .fhead__side { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .fhead { grid-template-columns: minmax(0, 1fr); gap: var(--sp-24); }
+}
+
+.fhead__id { display: flex; flex-wrap: wrap; gap: var(--sp-24); align-items: flex-start; }
+.fhead__id > * { min-width: 0; }
+/* The sticker size lives here rather than in an inline style, so the phone
+   override below can actually reach it — 4.5rem beside a 320px column leaves
+   nothing for the name. */
+.fhead__id .sticker { --sk-size: 4.5rem; }
+@media (max-width: 600px) { .fhead__id .sticker { --sk-size: 3rem; } }
+
+/* Emails, phone numbers and URLs share these lines; they break rather than
+   push the header wider than the screen. */
+.fhead__line {
+  margin: var(--sp-4) 0 0;
+  font-size: 0.9375rem;
+  color: var(--dark);
+  max-width: var(--measure);
+  overflow-wrap: anywhere;
+}
+.fhead__line b { color: var(--darker); }
+
+.fstatus { margin: 0; }
+/* `baseline` rather than a nudge: it aligns the small uppercase label with the
+   first line of its value at any font size, which a fixed padding does not. */
+.fstatus > div {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, auto);
+  gap: var(--sp-12);
+  align-items: baseline;
+  padding-block: var(--sp-4);
+}
+.fstatus dt {
+  color: var(--grey);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.fstatus dd { margin: 0; color: var(--darker); font-weight: 700; font-size: 0.9375rem; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .fstatus > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+}
+
+.fhead__side { display: flex; flex-direction: column; gap: var(--sp-16); align-items: flex-start; }
+.fhead__actions { position: relative; margin-top: 0; }
+.fhead__actions .menu { top: calc(100% + var(--sp-4)); right: 0; }
+
+/* ---- The attention box. Accent-yellow, and only for something a person must
+   act on: if it appears on every Founder it stops meaning anything. */
+.att-box {
+  background: var(--accent-yellow);
+  border-radius: var(--radius);
+  padding: var(--sp-16);
+  max-width: min(26rem, 100%);
+}
+.att-box p { margin: var(--sp-8) 0; color: var(--darker); font-size: 0.9375rem; max-width: none; }
+.att-box p.helper { color: var(--ink-50); }
+.att-box .btn { margin-top: var(--sp-4); }
+/* On the accent fill the brand outline all but disappears, so the secondary
+   button borrows the accent's own ink instead. */
+.att-box .btn--secondary { outline-color: var(--darker); color: var(--darker); }
+
+/* ---- Section titles and field groups. */
+.fsec__title {
+  font-size: 1.0625rem;
+  font-weight: 900;
+  color: var(--darker);
+  margin: var(--sp-64) 0 var(--sp-16);
+}
+.tabpane .fsec__title:first-child { margin-top: 0; }
+
+.fgroup { margin: 0; }
+.frow {
+  display: grid;
+  grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  gap: var(--sp-16);
+  align-items: baseline;
+  padding-block: var(--sp-8);
+}
+/* RESPONSIVE CORRECTION — a 13rem label column leaves 3rem for the answer at
+   320px. Below 700px the label sits above its value. */
+@media (max-width: 700px) {
+  .frow { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+}
+.frow dt { color: var(--grey); font-weight: 700; font-size: 0.875rem; }
+.frow dd { margin: 0; color: var(--darker); font-weight: 500; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.frow dd b { font-weight: 700; }
+.frow .fval { color: var(--darker); }
+.fanswer p:first-child { color: var(--darker); }
+
+/* NOT a redefinition of PHASE 09's `.helper`, which is a grid container for the
+   §12 resource block and is only ever a <div>. This is the caption that sits
+   under a value and explains where it came from. Element-qualifying keeps both
+   true at once; `display: block` is required because the unqualified `.helper`
+   still matches this element and would otherwise make a paragraph a grid. */
+p.helper {
+  display: block;
+  margin: var(--sp-4) 0 0;
+  color: var(--grey);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  max-width: var(--measure);
+}
+
+/* ---- Invitation status. The value first, then what it means — a state nobody
+   can interpret is not a state (§27.1). */
+.inv-status { margin-bottom: var(--sp-16); }
+.inv-status__v { margin: 0; font-size: 1.125rem; color: var(--darker); }
+
+/* ---- Expandable sections (Explore, DNA §5.14). `.xp-body` is height-animated,
+   so it clips; the inner wrapper carries the padding, because padding on a
+   height-tweened box makes the collapsed state 1.5rem tall. */
+.xp-body { overflow: hidden; }
+.xp-inner { padding: var(--sp-8) 0 var(--sp-24); }
+/* Scoped to the Admin view rather than redefining the base accordion header:
+   these sit inside dense panes and read as a control on a row, not as a section
+   heading. */
+.view .accordion__head { font-size: 1rem; max-width: min(46rem, 100%); }
+.view .accordion__head.xp--sm { font-size: 0.875rem; padding: var(--sp-8) 0; color: var(--grey); }
+
+/* ---- Founder setup checklist. */
+.checklist { margin-bottom: var(--sp-16); }
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding-block: var(--sp-4);
+  font-weight: 700;
+  color: var(--darker);
+}
+
+/* ---- Possible Creator matches. One number, with every limit on what it means
+   beside it — never staged behind a control (§10). */
+.match-line { margin: 0; color: var(--darker); font-weight: 700; }
+.match-n { font-size: 2rem; font-weight: 900; margin-right: var(--sp-4); }
+
+/* ---- Campaign and payment blocks. Separated by a hairline rather than boxed:
+   proximity groups them, and a card would make each one look like a decision. */
+.camp-block { padding-block: var(--sp-16); max-width: min(46rem, 100%); }
+.camp-block + .camp-block { border-top: var(--bw) solid var(--grey-light); }
+.camp-block__name {
+  margin: 0;
+  font-size: 1.0625rem;
+  color: var(--darker);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  flex-wrap: wrap;
+}
+
+/* ---- The invitation preview. Exactly what the Founder receives, on the
+   visual-section background so it reads as a rendering and not as this page. */
+.inv-preview {
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+  padding: var(--sp-24);
+  margin-block: var(--sp-16);
+}
+.inv-preview p { max-width: none; font-size: 0.9375rem; color: var(--dark); }
+.inv-preview__hero { font-size: 1.25rem; color: var(--darker); line-height: 1.3; }
+
+/* ---- The per-field Edit control. A modifier of `.btn`, never a second button:
+   it sits on a value line, so it is compact and baseline-aligned with the text
+   beside it. It regains the full touch target on a coarse pointer below. */
+.btn--edit {
+  padding: var(--sp-4) var(--sp-12);
+  min-height: 0;
+  font-size: 0.8125rem;
+  margin-left: var(--sp-8);
+  vertical-align: baseline;
+}
+
+/* Element-qualified modifiers of `.input` — the frame, the focus ring and the
+   touch minimum all still come from `.input` itself. */
+select.input { height: auto; }
+textarea.input { resize: vertical; min-height: calc(var(--touch) * 2); }
+
+/* ---- Reauthentication inside a high-impact confirm (§26.6). Set apart on the
+   visual background so it reads as a gate rather than as another field. */
+.reauth-box {
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+  padding: var(--sp-16);
+  margin-top: var(--sp-16);
+}
+.reauth-box .btn { margin-top: var(--sp-8); }
+
+/* A provider account id is quotable but not readable; it truncates rather than
+   wrapping across three lines. `min()` is the correction — a flat 16rem is
+   wider than the whole column at 320px. */
+.mono-ellip {
+  display: inline-block;
+  max-width: min(16rem, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  color: var(--darker);
+  font-weight: 700;
+}
+.plain-list { margin: var(--sp-8) 0 0; padding-left: var(--sp-24); color: var(--dark); }
+.plain-list li { padding-block: var(--sp-4); }
+
+
+/* ────────────────────────────────────── MODALS AND THE TERTIARY UNDERLINE */
+
+/* A modifier rather than a redefinition of `.modal`. The workspace's confirms
+   carry real forms — `Add founder` alone is twelve fields — so they need a
+   wider column and, more importantly, their own scroll: a base `.modal` with no
+   max-height clips its primary action off the bottom of a short viewport, which
+   is a confirm dialog you cannot confirm. Apply `.modal--form` to those. */
+.modal--form {
+  width: min(92vw, 36rem);
+  max-height: 86vh;
+  overflow-y: auto;
+}
+.modal--form .kicker { display: block; margin-bottom: var(--sp-16); }
+.modal--form h3 { margin-bottom: var(--sp-4); }
+/* The field wrapper is the confirm's own full width here — it is not a note
+   beside something. */
+.modal--form .case-reason { max-width: none; }
+
+/* Inside the Admin views and modals a tertiary button is often the only way out
+   of a decision, sitting beside a primary one. `.btn--tertiary` is plain bold
+   text by design, which reads as a label rather than an action when it is not
+   the only thing on the row — so it keeps a persistent underline here. Scoped:
+   Founder and Backer surfaces keep the quieter base treatment. */
+.view .btn--tertiary .btn__label,
+.modal .btn--tertiary .btn__label {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+
+/* ──────────────────────────────────────────────── TOUCH TARGETS (§33.11)
+   The workspace is a desktop surface, but §28.5 and the 44px minimum are not
+   conditional on that. Applied on a coarse pointer only, so mouse density —
+   which §26 licenses — is unchanged. */
+
+@media (pointer: coarse) {
+  .navlink, .tabbtn, .filter-tag, .btn--edit { min-height: var(--touch); }
+  .camp-link { display: inline-flex; align-items: center; min-height: var(--touch); }
+  /* A table row cannot take `min-height`; on a <tr> `height` is treated as a
+     minimum, and the cell padding is what actually delivers it. */
+  .fdr-row { height: var(--touch); }
+  .fdr-table td { padding-block: var(--sp-16); }
+  .check-line { min-height: var(--touch); }
+}
+
+
+/* ─────────────────────────────────────── MOTION-OFF SAFETY (DNA §6.6, §33.11)
+   Motion is GSAP-only. When GSAP is absent proovd-motion.js sets
+   html.no-motion; every state below stays reachable and legible without it. */
+
+/* A view is revealed by the transition, so with no transition it must simply
+   be there — the same shape the sheet already uses for `.accordion__body`. */
+html.no-motion .view.is-active { opacity: 1 !important; transform: none !important; }
+html.no-motion .xp-body { height: auto !important; }
+
+/* The tab underline is positioned by GSAP from the active tab's offset. With no
+   GSAP it would sit as a 2rem bar under the first tab and point at the wrong
+   pane, which is worse than no marker at all — `.tabbtn.is-active` already
+   carries the state in weight and ink. */
+html.no-motion .tabline { display: none; }
+
+/* Underline draws are hover tweens on `--u`; without GSAP the affordance is
+   restored on :hover so a row and a campaign name still read as destinations. */
+html.no-motion .fdr-row:hover .fdr-name::after,
+html.no-motion .fdr-name:hover::after,
+html.no-motion .camp-link:hover::after { transform: scaleX(1); }
+
+/* Someone who asked for less motion still gets every state; the runtime
+   jump-cuts its own tweens, and these two are the ones a stylesheet owns. */
+@media (prefers-reduced-motion: reduce) {
+  .view.is-active { opacity: 1; transform: none; }
+  .fdr-row:hover .fdr-name::after,
+  .fdr-name:hover::after,
+  .camp-link:hover::after { transform: scaleX(1); }
+}

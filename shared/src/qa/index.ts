@@ -190,14 +190,11 @@ export const PRINCIPAL_FLOWS = [
     label: 'The Admin panel',
     specRef: '§26',
     audience: 'admin',
-    routes: [
-      '/admin/settings',
-      '/admin/founders',
-      '/admin/creators',
-      '/admin/support',
-      '/admin/campaign-operations',
-      '/admin/notifications',
-    ],
+    // §26.1's two addresses: every Founder, and one Founder's workspace. The
+    // panel's other sections are parked in the shell and have no route, so
+    // listing them here would sweep a surface that does not exist — and the
+    // register is what "every principal flow" is counted from.
+    routes: ['/admin/founders', '/admin/founders/:prospectId'],
     keyboardPathRequired: true,
   },
 ] as const satisfies readonly PrincipalFlow[];

@@ -13,7 +13,18 @@
  * response shape that changes fails typecheck here before it reaches a test.
  */
 
-import type { DraftLanding, FounderRow, AdminIdentity, SettingState, AffiliateRegistry, SupportQueueState, DisputeQueueState } from '../admin/api.js';
+import {
+  CREATOR_MATCH_CAVEAT,
+  IDENTITY_CHECK_HELPER,
+  SUMMARY_IS_NOT_ADMIN_WRITABLE,
+  SUMMARY_NOT_CHOSEN_LABEL,
+} from '@proovd/shared';
+import type {
+  AdminIdentity,
+  DraftLanding,
+  FounderListRow,
+  FounderWorkspaceDetail,
+} from '../admin/api.js';
 import type { ClaimView, CreatorSignal, VettingState } from '../../surfaces/draft/api.js';
 import type {
   BuildState,
@@ -50,6 +61,8 @@ export const QA = {
   associationId: 'assoc-qa-1',
   reservationId: 'res-qa-1',
   draftId: 'draft-qa-1',
+  /** The PERSON — what the Admin Founder workspace is keyed on (§26.1, §9). */
+  prospectId: 'prospect-qa-1',
   token: 'qa-token-value',
   title: 'The Bench Lamp',
   founderLegalName: 'Harlow Instruments LLC',
@@ -1101,113 +1114,328 @@ const adminIdentity: AdminIdentity = {
   email: 'sam@proovd.co',
   sessionEstablishedAt: '2026-08-26T15:00:00.000Z',
   prerequisiteKeys: [],
-};
-
-const settings: { settings: SettingState[] } = {
-  settings: [
-    {
-      key: 'affiliate_response_window_hours',
-      value: '72',
-      kind: 'hours',
-      provenance: 'specified',
-      minimum: 1,
-      maximum: 336,
-      specRef: '§6',
-      version: 1,
-      editable: true,
-      updatedBy: 'seed',
-      updateReason: 'Initial value from §6.',
-      updatedAt: '2026-07-01T00:00:00.000Z',
-    },
-    {
-      key: 'interview_reminder_lead_hours',
-      value: null,
-      kind: 'hours',
-      provenance: 'operator',
-      minimum: 1,
-      maximum: 168,
-      specRef: '§6',
-      version: 1,
-      editable: true,
-      updatedBy: 'seed',
-      updateReason: '§6 names the setting and fixes no value.',
-      updatedAt: '2026-07-01T00:00:00.000Z',
-    },
-  ],
-};
-
-const founders: { founders: FounderRow[] } = {
-  founders: [
-    {
-      prospectId: 'prospect-1',
-      draftId: QA.draftId,
-      campaignId: QA.campaignId,
-      legalName: 'Rae Harlow',
-      email: 'rae@harlow.example',
-      productName: QA.title,
-      status: 'claimed',
-      invitationSource: 'Sam Okafor',
-      internalOwner: 'Sam Okafor',
-      lastSentAt: '2026-08-01T09:00:00.000Z',
-      retentionDueAt: '2026-09-30T09:00:00.000Z',
-      claimedAt: '2026-08-02T12:10:00.000Z',
-      anonymisedAt: null,
-      createdAt: '2026-07-30T09:00:00.000Z',
-    },
-  ],
-};
-
-const affiliateRegistry: AffiliateRegistry = {
-  subtypes: ['youtube_channel', 'newsletter'],
-  requiredEvidence: { youtube_channel: ['channel_url', 'subscriber_count'] },
-  verificationStatuses: ['unverified', 'verified'],
-  fixedCopy: {
-    preparingNotice: 'The opportunity may still be being prepared.',
-    declineNotice: 'Declining later does not harm your standing with Proovd.',
-    neverAsksNotice: 'Proovd never asks for your bank details by email.',
+  // §34: the shell renders the mode chip only from what the server reports, so
+  // the sweep needs it present to exercise the branch that renders anything.
+  environment: {
+    stripeMode: 'test',
+    stripeApiVersion: '2026-06-30',
+    webhooksLastEventAt: '2026-08-26T13:58:00.000Z',
   },
 };
 
-const supportQueue: SupportQueueState = {
-  entries: [
-    {
-      caseId: 'case-1',
-      reference: 'PVD-QA500-QA600',
-      topic: 'delivery',
-      owner: 'Founder',
-      status: 'open',
-      humanResponseDueAt: '2026-09-21T10:00:00.000Z',
-      nextPromisedUpdateAt: null,
-      founderFollowupDueAt: '2026-09-22T10:00:00.000Z',
-      responseOverdue: true,
-      promiseOverdue: false,
-      founderFollowupOverdue: false,
-      requesterEmail: 'backer@example.com',
-      campaignId: QA.campaignId,
-    },
-  ],
-  dueCount: 1,
-  overdueCount: 1,
+/**
+ * The same Founder as everywhere else in this file — Rae Harlow, running the
+ * one campaign — seen through §26.1's two Admin addresses.
+ *
+ * Every value the surfaces render arrives resolved, because the payload
+ * resolves it: the setup stage, the account standing, the payment-setup phrase,
+ * and the attention line are the words the table shows. Nothing here is a code
+ * the browser is expected to map, which is the contract `backend/src/founders/
+ * types.ts` documents and the reason the fixtures can be this plain.
+ */
+const founderRow: FounderListRow = {
+  prospectId: QA.prospectId,
+  legalName: 'Rae Harlow',
+  preferredName: 'Rae',
+  email: 'rae@harlow.example',
+  productName: QA.title,
+  setup: { stage: 'Setup complete', detail: null },
+  account: 'Active',
+  paymentSetup: 'Complete',
+  currentCampaign: { campaignId: QA.campaignId, name: QA.title, status: 'Live' },
+  attention: {
+    needed: true,
+    text: 'Payment setup is complete, but the W-9 has not been requested for this campaign yet.',
+    action: { label: 'Open the money record', act: 'jump-money' },
+  },
 };
 
-const disputeQueue: DisputeQueueState = {
-  disputes: [],
-  causes: [
+const founderWorkspace: FounderWorkspaceDetail = {
+  header: {
+    prospectId: QA.prospectId,
+    legalName: 'Rae Harlow',
+    preferredName: 'Rae',
+    businessName: QA.founderLegalName,
+    website: 'https://example.com/harlow',
+    email: 'rae@harlow.example',
+    phone: '+1 555 0100',
+    phoneVerified: false,
+    state: 'NY',
+    country: 'US',
+    sticker: 7,
+    account: 'Active',
+    setup: { stage: 'Setup complete', detail: null },
+    paymentSetup: 'Complete',
+    currentCampaign: { campaignId: QA.campaignId, name: QA.title, status: 'Live' },
+    attention: founderRow.attention,
+    availableActions: ['edit', 'newinvite', 'cancelinvite', 'suspend', 'ban'],
+  },
+  overview: {
+    invitation: {
+      state: 'Invite accepted',
+      stateAt: 'Accepted Aug 2, 2026 · 12:10 PM',
+      meaning: 'Rae used the invitation and completed the account-claim step.',
+      invitedBy: 'Sam Okafor',
+      source: 'Proovd research',
+      owner: 'Sam Okafor',
+      overrides: [
+        {
+          key: 'recipientName',
+          label: 'Recipient name',
+          value: 'Rae Harlow',
+          profileValue: 'Rae Harlow',
+          overridden: false,
+          helper: 'Automatically filled from Rae’s Founder profile.',
+        },
+        {
+          key: 'recipientEmail',
+          label: 'Recipient email',
+          value: 'rae@harlow.example',
+          profileValue: 'rae@harlow.example',
+          overridden: false,
+          helper: 'Automatically filled from Rae’s Founder profile.',
+        },
+        {
+          key: 'product',
+          label: 'Product',
+          value: QA.title,
+          profileValue: QA.title,
+          overridden: false,
+          helper: 'Automatically filled from Rae’s Founder profile.',
+        },
+      ],
+      content: [
+        {
+          key: 'invKnow',
+          label: 'What we know so far',
+          value: 'A machined desk lamp for people who solder at their kitchen table.',
+          helper: null,
+        },
+        {
+          key: 'invFit',
+          label: 'Why we think they could be a fit',
+          value: 'They already sell direct and answer their own support email.',
+          helper: null,
+        },
+        {
+          key: 'invTime',
+          label: 'Estimated time to get started',
+          value: 'About 20 minutes',
+          helper: 'This must reflect the actual expected effort.',
+        },
+      ],
+      fixedContent: [
+        {
+          key: 'invNext',
+          label: 'What happens next',
+          value:
+            'You answer four questions, a person at Proovd reads them, and we tell you either way.',
+        },
+        {
+          key: 'invSupport',
+          label: 'Support contact',
+          value: 'support@proovd.co',
+        },
+      ],
+      unresolvedMarkers: [],
+      missingBeforeSend: [],
+      canSend: false,
+      history: [
+        {
+          at: 'Aug 1, 2026 · 9:00 AM',
+          title: 'Invitation sent',
+          body: 'Sent to rae@harlow.example by Sam Okafor.',
+        },
+      ],
+      technical:
+        'Token version 1 · expires Aug 15, 2026. The link value itself is never stored and cannot be shown again.',
+    },
+    vetting: {
+      progress: [
+        { label: 'Campaign path chosen', done: true },
+        { label: 'Problem', done: true },
+        { label: 'Solution', done: true },
+        { label: 'Competition', done: true },
+      ],
+      progressStatus: '4 of 4 setup questions completed',
+      campaignType: 'Product Campaign',
+      campaignTypeAt: 'Aug 1, 2026 · 10:00 AM',
+      answers: [
+        {
+          key: 'problem',
+          label: 'Problem',
+          text: 'Hobby electronics benches are lit by ceiling lights that cast a shadow over the board.',
+          provenance: 'Originally prepared by Proovd · Last edited by Rae',
+        },
+        {
+          key: 'solution',
+          label: 'Solution',
+          text: 'A clamp lamp with a 96 CRI head and a magnetic arm that holds its position.',
+          provenance: 'Written by Rae',
+        },
+        {
+          key: 'competition',
+          label: 'Competition',
+          text: 'Two incumbents sell at US$300 and neither publishes a colour-rendering figure.',
+          provenance: 'Written by Rae',
+        },
+      ],
+      lastSaved: 'Aug 1, 2026 · 9:42 AM',
+      creatorMatches: { count: 12, recordedAt: 'Aug 2, 2026 · 12:00 PM' },
+    },
+    accountCreatedAt: 'Aug 2, 2026 · 12:10 PM',
+    signInMethod: 'Email and password',
+  },
+  details: {
+    personal: [
+      { key: 'preferred', label: 'Preferred name', value: 'Rae', helper: null, editable: true },
+      { key: 'legal', label: 'Legal name', value: 'Rae Harlow', helper: null, editable: true },
+      { key: 'email', label: 'Email', value: 'rae@harlow.example', helper: null, editable: true },
+      {
+        key: 'phone',
+        label: 'Phone',
+        value: '+1 555 0100',
+        helper: 'Phone number has not been verified, and the MVP has no way to verify one.',
+        editable: true,
+      },
+      { key: 'state', label: 'State', value: 'NY', helper: null, editable: true },
+    ],
+    business: [
+      {
+        key: 'bizLegal',
+        label: 'Legal business name',
+        value: QA.founderLegalName,
+        helper:
+          'Auto-fills invitations and campaigns. Sent and accepted records keep the wording they used.',
+        editable: true,
+      },
+      { key: 'bizType', label: 'Business type', value: 'LLC', helper: null, editable: true },
+      { key: 'product', label: 'Product / startup name', value: QA.title, helper: null, editable: true },
+      {
+        key: 'website',
+        label: 'Website',
+        value: 'https://example.com/harlow',
+        helper: null,
+        editable: true,
+      },
+    ],
+    preferences: [
+      {
+        key: 'summary',
+        label: 'Activity summary',
+        value: SUMMARY_NOT_CHOSEN_LABEL,
+        helper: SUMMARY_IS_NOT_ADMIN_WRITABLE,
+        editable: false,
+      },
+    ],
+    standing: {
+      value: 'Active',
+      detail: 'No enforcement action has ever been recorded against this Founder.',
+      owner: null,
+      startedAt: null,
+      nextReviewAt: null,
+    },
+    ban: null,
+    deletionRequest: null,
+  },
+  campaigns: {
+    current: {
+      campaignId: QA.campaignId,
+      name: QA.title,
+      type: 'Product Campaign',
+      status: 'Live',
+      rawStatus: 'live',
+      buildStatus: 'Complete',
+      rosterReadiness: 'Ready to launch',
+      review: { outcome: 'Approved', why: null },
+      listing: 'Listing fee paid Aug 5, 2026',
+      opensAt: 'Aug 20, 2026 · 3:00 PM',
+      closesAt: 'Sep 12, 2026 · 5:00 PM',
+      issue: null,
+    },
+    previous: [],
+    next: null,
+  },
+  money: {
+    setup: {
+      value: 'Complete',
+      body: 'Stripe has everything it needs to charge Backers on Rae’s account and to pay Rae.',
+      action: null,
+    },
+    identity: { value: 'Verified by Stripe', helper: IDENTITY_CHECK_HELPER },
+    stripe: {
+      accountId: 'acct_qa_founder',
+      requirements: 'Nothing outstanding',
+      lastUpdated: 'Aug 10, 2026 · 10:00 AM',
+      capability: 'Charges and payouts enabled',
+    },
+    listings: [
+      {
+        campaignId: QA.campaignId,
+        campaignName: QA.title,
+        lines: [
+          { label: 'Base listing fee', amount: 'US$35.00', sub: false },
+          { label: 'Optional item discount', amount: '−US$4.00', sub: true },
+          { label: 'Sales tax', amount: 'US$2.56', sub: true },
+          { label: 'Charged', amount: 'US$33.56', sub: false },
+        ],
+        status: 'Paid Aug 5, 2026',
+      },
+    ],
+    w9: {
+      value: 'Not requested yet',
+      line: 'A W-9 is requested once the campaign closes and something has actually been captured.',
+      action: null,
+    },
+    payments: {
+      populated: false,
+      waitingOn: 'The campaign has not closed, so no Founder payment exists to show.',
+      value: null,
+    },
+    blockers: [],
+    pricing: null,
+  },
+  history: [
     {
-      key: 'founder_caused',
-      label: 'Founder-caused',
-      allocation: 'founder',
-      permittedAffiliateTreatments: ['earnings_remain'],
-      requiresMandate: false,
+      category: 'invite',
+      at: 'Aug 1, 2026 · 9:00 AM',
+      occurredAt: '2026-08-01T09:00:00.000Z',
+      title: 'Invitation sent',
+      body: 'Sent to rae@harlow.example by Sam Okafor.',
+      reason: null,
+      audit: null,
+      source: 'campaign_invitation_sends',
+    },
+    {
+      category: 'account',
+      at: 'Aug 2, 2026 · 12:10 PM',
+      occurredAt: '2026-08-02T12:10:00.000Z',
+      title: 'Founder account created',
+      body: 'Rae accepted the Terms, the Founder Acceptable Use Policy, and the Privacy Policy.',
+      reason: null,
+      audit: null,
+      source: 'policy_consents',
+    },
+    {
+      category: 'admin',
+      at: 'Aug 2, 2026 · 12:00 PM',
+      occurredAt: '2026-08-02T12:00:00.000Z',
+      title: 'Creator relevance signal recorded',
+      body: CREATOR_MATCH_CAVEAT,
+      reason: 'Recorded after reviewing twelve channels in this niche.',
+      audit: {
+        by: 'Sam Okafor',
+        field: 'possible_creator_results.count',
+        priorValue: 'Not recorded',
+        newValue: '12',
+        reason: 'Recorded after reviewing twelve channels in this niche.',
+        evidence: 'Research notes filed with the prospect record.',
+        at: '2026-08-02T12:00:00.000Z',
+      },
+      source: 'possible_creator_results',
     },
   ],
-  proovdFeeTreatments: ['fee_returned', 'fee_retained'],
-  evidenceItems: [
-    { key: 'consent_text', label: 'The exact consent the Backer agreed to', required: true },
-    { key: 'refund_policy_snapshot', label: 'The refund policy as it stood', required: true },
-  ],
-  bestEffortRecovery:
-    'Recovery beyond the available balance is best effort and is never promised as certain.',
+  historyCounts: { invite: 1, account: 1, campaign: 0, money: 0, support: 0, admin: 1, enforcement: 0 },
 };
 
 /* ── The stub table ────────────────────────────────────────────────────────── */
@@ -1267,14 +1495,8 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/link\/[^/]+\/support$/, body: backerSupport },
   { match: /\/api\/link\/[^/]+\/digest-preference$/, body: { preference: digestPreference } },
 
-  /* Admin (§26) */
+  /* Admin (§26.1) — the session, every Founder, and one Founder's workspace */
   { match: /\/api\/admin\/me$/, body: adminIdentity },
-  { match: /\/api\/admin\/settings$/, body: settings },
-  { match: /\/api\/admin\/founders$/, body: founders },
-  { match: /\/api\/admin\/affiliates\/registry$/, body: affiliateRegistry },
-  { match: /\/api\/admin\/affiliates(\?.*)?$/, body: { creators: [], slots: { used: 0, cap: 4 } } },
-  { match: /\/api\/admin\/support\/queue$/, body: supportQueue },
-  { match: /\/api\/admin\/disputes(\?.*)?$/, body: disputeQueue },
-  { match: /\/api\/admin\/notifications\/catalog$/, body: { keys: [], deliberateAbsences: [] } },
-  { match: /\/api\/admin\/notifications\/history/, body: { history: notificationHistory } },
+  { match: /\/api\/admin\/founders\/[^/?]+(\?.*)?$/, body: founderWorkspace },
+  { match: /\/api\/admin\/founders(\?.*)?$/, body: { founders: [founderRow] } },
 ];

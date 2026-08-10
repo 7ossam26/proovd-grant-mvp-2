@@ -165,6 +165,27 @@ export const campaignDrafts = pgTable(
     /** "Expected setup time stated honestly." */
     expectedSetupTime: text('expected_setup_time'),
 
+    /* ── Per-invitation overrides of the profile (§7, §26.2). ──────────────
+     * The Founder profile on `founder_prospects` is the source every
+     * invitation auto-fills from. These five say "for THIS invitation only,
+     * use something else" — NULL meaning no override, never an empty value.
+     *
+     * They live on the draft rather than on the prospect on purpose: editing
+     * the prospect to fix one message would silently rewrite the Founder's own
+     * record and change every other surface that fills from it. A 0040 CHECK
+     * refuses a blank-but-present value, because an Admin who cleared the box
+     * meant "go back to the profile", and a whitespace override would sail
+     * through §7's preview gate as a resolved variable.
+     *
+     * Already-sent invitations are unaffected by a later change:
+     * `campaign_invitation_sends` snapshots what was actually delivered.
+     */
+    overrideRecipientName: text('override_recipient_name'),
+    overrideRecipientEmail: text('override_recipient_email'),
+    overrideRecipientPhone: text('override_recipient_phone'),
+    overrideProduct: text('override_product'),
+    overrideWebsite: text('override_website'),
+
     status: invitationStatus('status').notNull().default('draft'),
 
     /** Set by the retention sweep, in the same transaction as the revocation. */

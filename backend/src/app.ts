@@ -364,13 +364,33 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       notificationContext: launchContext,
     }),
   );
+  // The Founder Admin workspace (§26.1, §26.2) and §7's invitation. The
+  // workspace is keyed on the PERSON, so a Founder whose campaign was
+  // archived-and-restarted appears once; the §7 invitation routes stay keyed on
+  // the draft, because one invitation is a different subject from the person
+  // who received it.
+  //
+  // The Stripe onboarding context is passed only when this deployment has a
+  // client. Without it the money pane says Stripe is not configured rather than
+  // making a claim about the Founder's payment setup (§1.4, §32.2).
   app.use(
     createAdminFoundersRouter({
       db,
       auth,
+      audit,
       tokens,
       notifier,
       context: config.invitationContext,
+      ...(config.stripeGateway
+        ? {
+            onboarding: {
+              db,
+              gateway: config.stripeGateway,
+              audit,
+              ...(config.stripeConnectUrls ?? {}),
+            },
+          }
+        : {}),
     }),
   );
   // Phase 08a (§8, §5.3, §25.4, §33.2.1). Campaign-specific Creator

@@ -485,11 +485,42 @@ export async function previewInvitation(
 
   const missingFields = missingInvitationFields(record);
 
+  // The address Admin approves in the preview is the RESOLVED one, overrides
+  // included — otherwise the gate approves one recipient and the send reaches
+  // another, which is the failure the gate exists to prevent.
+  const recipient = resolvedRecipient(record);
+
   return {
     ...rendered,
-    recipientEmail: record.prospect.email,
+    recipientEmail: recipient.email,
     missingFields,
-    blocked: rendered.unresolved.length > 0 || !record.prospect.email || missingFields.length > 0,
+    blocked: rendered.unresolved.length > 0 || !recipient.email || missingFields.length > 0,
+  };
+}
+
+/**
+ * Who this invitation is actually addressed to, after the §7 overrides.
+ *
+ * ONE resolver, because four places need the answer and they must not disagree:
+ * the preview gate (what Admin approves), the send row (what §7 records as
+ * delivered), the transport (where it goes), and the rendered body (who it
+ * greets). A surface computing its own would let Admin preview one address and
+ * the message reach another — the exact failure the preview gate exists to
+ * prevent.
+ *
+ * A NULL override is no override. `??` rather than `||`, because a blank is
+ * refused at the database (0040) and an empty string is therefore not a value
+ * an override column can hold.
+ */
+function resolvedRecipient(record: DraftRecord): {
+  email: string | null;
+  name: string;
+} {
+  return {
+    email: record.draft.overrideRecipientEmail ?? record.prospect.email,
+    name:
+      record.draft.overrideRecipientName ??
+      (record.prospect.preferredName || record.prospect.legalName || ''),
   };
 }
 
@@ -498,10 +529,32 @@ function variablesFor(
   draftUrl: string,
   supportEmail: string,
 ): InvitationVariables {
+  /*
+   * The profile is the source; this invitation may override it.
+   *
+   * §7 has Admin compose a message to a specific person and §26.2 has user data
+   * auto-populate, so both hold at once: `founder_prospects` is what fills the
+   * message, and the five `campaign_drafts.override_*` columns say "for THIS
+   * invitation, use something else" (0040). A NULL override is no override —
+   * never an empty value, which is why `??` is correct here and `||` is not.
+   *
+   * This resolution is the whole point of storing an override at all. Reading
+   * the profile directly would let the workspace label a value "Custom value
+   * for this invitation" while the message that actually went out ignored it,
+   * which is worse than not offering the control.
+   *
+   * The recipient NAME override replaces the preferred/legal pair outright: an
+   * Admin who typed a name for this message meant that name, not a fallback
+   * chain through the profile they were deliberately departing from.
+   */
+  const recipientName =
+    record.draft.overrideRecipientName ??
+    (record.prospect.preferredName || record.prospect.legalName);
+
   return {
-    recipientName: record.prospect.preferredName || record.prospect.legalName,
-    productName: record.prospect.productName,
-    productUrl: record.prospect.productUrl,
+    recipientName,
+    productName: record.draft.overrideProduct ?? record.prospect.productName,
+    productUrl: record.draft.overrideWebsite ?? record.prospect.productUrl,
     whatWeUnderstood: record.draft.whatWeUnderstood,
     whyInvited: record.draft.whyInvited,
     senderName: record.draft.senderName,
@@ -548,7 +601,8 @@ export async function sendInvitation(
   if (record.draft.status === 'claimed') {
     return { ok: false, message: 'This invitation has already been claimed.' };
   }
-  if (!record.prospect.email) {
+  const recipient = resolvedRecipient(record);
+  if (!recipient.email) {
     return { ok: false, message: 'This prospect has no email address to send to.' };
   }
 
@@ -638,8 +692,11 @@ export async function sendInvitation(
   await db.insert(campaignInvitationSends).values({
     id: sendId,
     draftId: input.draftId,
-    recipientEmail: record.prospect.email,
-    recipientName: record.prospect.preferredName || record.prospect.legalName,
+    // §7 records what was DELIVERED, so the send row snapshots the resolved
+    // recipient. A later profile edit or a changed override cannot rewrite it —
+    // this row is the historical answer to "who did we actually write to".
+    recipientEmail: recipient.email,
+    recipientName: recipient.name,
     senderName: record.draft.senderName!,
     senderEmail: record.draft.senderEmail!,
     invitationSource: record.prospect.invitationSource,
@@ -655,7 +712,7 @@ export async function sendInvitation(
     eventKey: FOUNDER_INVITATION,
     entityType: 'campaign_invitation_send',
     entityId: sendId,
-    to: record.prospect.email,
+    to: recipient.email,
     from: input.context.fromAddress,
     replyTo: record.draft.senderEmail ?? undefined,
     subject: message.subject,

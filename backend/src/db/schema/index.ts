@@ -143,3 +143,10 @@ export * from './completion.js';
 // its five NOT NULL rollback-plan columns and its two named owners as rows, the
 // three pre-first-reservation confirmations, and the recorded Appendix C walks.
 export * from './live-mode.js';
+
+// The Founder Admin workspace: per-invitation profile overrides live on
+// `campaign_drafts` (see invitations.ts), and these two records give the
+// workspace what no table held — person-level access decisions (§26.7, distinct
+// from the campaign-scoped enforcement action) and the §25.8 account-deletion
+// ask, which records a request and deletes nothing.
+export * from './founder-workspace.js';

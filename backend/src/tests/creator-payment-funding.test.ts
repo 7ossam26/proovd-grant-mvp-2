@@ -875,7 +875,10 @@ describe('The banned words appear nowhere in Phase 13 code, schema, or copy', ()
       'backend/src/routes/admin-creator-readiness.ts',
       'shared/src/creator-payment/index.ts',
       'frontend/src/surfaces/founder/CreatorReadiness.tsx',
-      'frontend/src/features/admin/CreatorReadiness.tsx',
+      // The Admin-side §16 verification panel was removed with the rest of the
+      // old Admin Dashboard; its workspace will be supplied with the Creators
+      // section. The §24.7 vocabulary rule is unchanged — this list names the
+      // files that exist, and the Founder-facing surface still carries it.
     ];
     const banned = [/\bescrow\b/i, /\bcustody\b/i, /\btrust\b/i, /upfront payout/i, /first half/i, /final half/i];
     for (const file of phase13Files) {

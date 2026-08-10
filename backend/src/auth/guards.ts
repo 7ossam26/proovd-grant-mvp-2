@@ -216,8 +216,15 @@ export function requireFreshSession(auth: Auth, window: FreshnessWindow): Reques
         whatHappened:
           'The Admin reauthentication window has no value, so Proovd cannot tell whether your ' +
           'sign-in is recent enough for an action of this kind.',
-        next: 'Set the reauthentication window in Admin settings, then try again.',
-        action: '/admin/settings',
+        // No `action` link: the §6 global-configuration SURFACE is not built in
+        // this phase, though `PUT /api/admin/settings/:key` still is. Naming a
+        // page that does not exist is the §1.4 failure this guard is otherwise
+        // careful to avoid — an Admin following a dead link learns nothing and
+        // loses the context they were in. Restore the link when the
+        // configuration workspace ships.
+        next:
+          'The Admin reauthentication window must be given a value in global configuration ' +
+          'before actions of this kind can be taken.',
         support: '/support',
       });
       return;

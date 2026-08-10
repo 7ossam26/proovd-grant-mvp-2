@@ -7,7 +7,44 @@
  * friendlier message over a server one — the server already answers §27.1's six
  * questions in `whatHappened` / `next` / `action`, and paraphrasing it in the
  * browser is how the two start disagreeing.
+ *
+ * ── What this file carries, and what it deliberately does not ───────────────
+ * Three groups: the session, the Founder workspace, and the one un-authenticated
+ * read (`/api/draft/:token`) whose consumer happens to live outside `features/
+ * admin` and has always borrowed this module's fetch helper.
+ *
+ * Everything else that used to live here — settings, Creator recruitment, the
+ * §12 optional items, Creator readiness, the support queue, campaign operations,
+ * disputes, and the high-impact override machine — went out with the surfaces
+ * that consumed it. Those workspaces are supplied separately; a client function
+ * with no caller is a claim that a surface exists (§1.4), and this module is
+ * where that claim would be least visible.
+ *
+ * ── The workspace is keyed on the PERSON ────────────────────────────────────
+ * Every workspace path below is `/api/admin/founders/:prospectId`, never
+ * `:draftId`. A Founder whose campaign was archived-and-restarted (§9's
+ * wrong-type path) has more than one draft and more than one campaign;
+ * `founder_prospects` is the record that survives a restart, so it is the
+ * record the workspace addresses.
+ *
+ * `updateProspect` is the one exception and it is not an inconsistency: §7's
+ * invitation-creation fields belong to the *draft* that will carry them, and a
+ * person with two drafts has two sets of them. It is addressed by the draft the
+ * create call just returned, which is the only moment anything in this app
+ * needs a draft id.
  */
+
+import type {
+  AttentionAction,
+  CampaignStatus,
+  FounderAccessAction,
+  FounderAccountState,
+  FounderEditableFieldKey,
+  FounderHistoryCategory,
+  FounderSetupStage,
+  InvitationState,
+  ProfileOverrideKey,
+} from '@proovd/shared';
 
 /** The failure shape every guarded route returns (`guards.ts`, `admin.ts`). */
 export interface AdminError {
@@ -82,12 +119,29 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 /* ── Session ──────────────────────────────────────────────────────────────── */
 
+/**
+ * The environment facts the shell's chip reports.
+ *
+ * Optional, and rendered only when it arrives. §34 forbids claiming a mode
+ * nobody checked, and a chip hardcoded to `TEST MODE` says the one thing that
+ * must never be said by a page that did not ask — so the absence of this key
+ * renders no chip at all rather than a reassuring default.
+ */
+export interface AdminEnvironment {
+  stripeMode: 'test' | 'live';
+  /** The pinned §32.2 API version, so a mismatch is visible without a deploy log. */
+  stripeApiVersion: string;
+  /** The last signed webhook this deployment accepted, or null if none yet. */
+  webhooksLastEventAt: string | null;
+}
+
 export interface AdminIdentity {
   id: string;
   name: string;
   email: string;
   sessionEstablishedAt: string;
   prerequisiteKeys: string[];
+  environment?: AdminEnvironment;
 }
 
 export const fetchAdminIdentity = (): Promise<AdminIdentity> =>
@@ -116,123 +170,393 @@ export const verifyTotp = (code: string): Promise<unknown> =>
 export const signOut = (): Promise<unknown> =>
   call('/api/auth/sign-out', { method: 'POST', body: JSON.stringify({}) });
 
-/* ── Settings (§6) ────────────────────────────────────────────────────────── */
+/* ── The Founder workspace payload (§26.1, §26.2, §27.1) ──────────────────── */
+
+/*
+ * These interfaces mirror `backend/src/founders/types.ts` name for name. They
+ * are restated rather than imported because the frontend and the backend are
+ * separate packages with separate build roots — the same arrangement every
+ * other api module in this app uses — and a shape that drifts fails
+ * `npm run typecheck` here the moment a fixture is typed against it.
+ *
+ * The vocabulary types themselves (`CampaignStatus`, `FounderAccountState`,
+ * `InvitationState`, …) come from `@proovd/shared`, which the browser bundle
+ * imports directly. There is one register; nothing here restates it.
+ */
+
+/** One row of the Founders table. Everything it shows, already resolved. */
+export interface FounderListRow {
+  /** `founder_prospects.id` — the person, stable across archive-and-restart. */
+  prospectId: string;
+  legalName: string;
+  preferredName: string;
+  email: string;
+  productName: string;
+
+  setup: { stage: FounderSetupStage; detail: string | null };
+  account: FounderAccountState;
+  paymentSetup: string;
+
+  /** The campaign the Admin would open. Null when none is running. */
+  currentCampaign: { campaignId: string; name: string; status: string } | null;
+
+  attention: FounderAttention;
+}
 
 /**
- * The stored state of one setting.
+ * The one thing that needs doing, or nothing.
  *
- * Its label, help text, and group are NOT here — those come from
- * `@proovd/shared`'s register, which this app imports directly. One register,
- * rendered once; a copy travelling over the wire is a second version of the
- * same sentence waiting to disagree with the first.
+ * `needed: false` is a first-class answer, not an empty object — DNA §5.4's
+ * done-moment, and the reason the row renders "No action needed" rather than a
+ * blank cell that reads as missing data.
  */
-export interface SettingState {
-  key: string;
-  value: string | null;
-  kind: string;
-  provenance: 'specified' | 'operator' | 'derived';
-  minimum: number | null;
-  maximum: number | null;
-  specRef: string;
-  version: number;
-  editable: boolean;
-  updatedBy: string;
-  updateReason: string;
-  updatedAt: string;
-}
+export type FounderAttention =
+  | { needed: false }
+  | {
+      needed: true;
+      text: string;
+      action: { label: string; act: AttentionAction } | null;
+    };
 
-export const fetchSettings = (): Promise<{ settings: SettingState[] }> =>
-  call('/api/admin/settings');
-
-export const saveSetting = (
-  key: string,
-  value: string,
-  reason: string,
-): Promise<SettingState & { changed: boolean }> =>
-  call(`/api/admin/settings/${encodeURIComponent(key)}`, {
-    method: 'PUT',
-    body: JSON.stringify({ value, reason }),
-  });
-
-export interface SettingHistoryEntry {
-  version: number;
-  priorValue: string | null;
-  newValue: string | null;
-  changedBy: string;
-  reason: string;
-  occurredAt: string;
-}
-
-export const fetchSettingHistory = (
-  key: string,
-): Promise<{ history: SettingHistoryEntry[] }> =>
-  call(`/api/admin/settings/${encodeURIComponent(key)}/history`);
-
-/* ── Founders and invitations (§7, §26.1, §26.2) ──────────────────────────── */
-
-export interface FounderRow {
+export interface FounderHeader {
   prospectId: string;
-  draftId: string;
-  campaignId: string;
-  legalName: string | null;
-  email: string | null;
-  productName: string | null;
-  status: 'draft' | 'sent' | 'revoked' | 'claimed' | 'expired';
-  invitationSource: string | null;
-  internalOwner: string | null;
-  lastSentAt: string | null;
-  retentionDueAt: string | null;
-  claimedAt: string | null;
-  anonymisedAt: string | null;
-  createdAt: string;
+  legalName: string;
+  preferredName: string;
+  businessName: string | null;
+  website: string | null;
+  email: string;
+  phone: string | null;
+  /** §33.1.8: pinned false at the database. Rendered as a stated fact. */
+  phoneVerified: false;
+  state: string | null;
+  country: string | null;
+  /** Deterministic 1–14 sticker index, derived from the id so it never moves. */
+  sticker: number;
+
+  account: FounderAccountState;
+  setup: { stage: FounderSetupStage; detail: string | null };
+  paymentSetup: string;
+  currentCampaign: { campaignId: string; name: string; status: string } | null;
+
+  attention: FounderAttention;
+
+  /** Which menu actions this record's state actually permits. */
+  availableActions: FounderMenuAction[];
 }
 
-export const fetchFounders = (): Promise<{ founders: FounderRow[] }> =>
+export type FounderMenuAction =
+  | 'edit'
+  | 'sendinvite'
+  | 'newinvite'
+  | 'cancelinvite'
+  | 'suspend'
+  | 'restore'
+  | 'ban'
+  | 'deletion';
+
+/** A profile value an invitation may override, resolved for rendering. */
+export interface OverrideField {
+  key: ProfileOverrideKey;
+  label: string;
+  /** What this invitation will actually use. */
+  value: string;
+  /** What the Founder profile says, whether or not it is overridden. */
+  profileValue: string;
+  overridden: boolean;
+  helper: string;
+}
+
+export interface InvitationView {
+  state: InvitationState;
+  /** "Sent Aug 8, 2026 · 3:15 PM" — already formatted, or null. */
+  stateAt: string | null;
+  meaning: string;
+  invitedBy: string | null;
+  source: string | null;
+  owner: string | null;
+
+  overrides: OverrideField[];
+
+  /** Admin-editable invitation content, by `FOUNDER_EDITABLE_FIELDS` key. */
+  content: { key: string; label: string; value: string | null; helper: string | null }[];
+  /** §7's two fixed promises and the support address. Never editable. */
+  fixedContent: { key: string; label: string; value: string }[];
+
+  /** What §7's preview gate currently refuses, if anything. */
+  unresolvedMarkers: string[];
+  missingBeforeSend: string[];
+  canSend: boolean;
+
+  history: { at: string; title: string; body: string }[];
+  /** Token facts only — never a value (§28.1). */
+  technical: string;
+}
+
+export interface VettingView {
+  /** The checklist, in order, with what is done. */
+  progress: { label: string; done: boolean }[];
+  progressStatus: string;
+  campaignType: string | null;
+  campaignTypeAt: string | null;
+  answers: {
+    key: 'problem' | 'solution' | 'competition';
+    label: string;
+    text: string | null;
+    /** "Originally prepared by Proovd · Last edited by Ahmed", or null. */
+    provenance: string | null;
+  }[];
+  lastSaved: string | null;
+  /** §10's recorded Admin assessment. `null` = never recorded, which is not 0. */
+  creatorMatches: { count: number; recordedAt: string | null } | null;
+}
+
+export interface OverviewPane {
+  invitation: InvitationView;
+  vetting: VettingView;
+  accountCreatedAt: string | null;
+  signInMethod: string | null;
+}
+
+/** One rendered field: its value, and whether Admin may change it here. */
+export interface DetailField {
+  key: string;
+  label: string;
+  value: string | null;
+  helper: string | null;
+  editable: boolean;
+}
+
+export interface StandingView {
+  value: string;
+  detail: string | null;
+  owner: string | null;
+  startedAt: string | null;
+  nextReviewAt: string | null;
+}
+
+export interface DetailsPane {
+  personal: DetailField[];
+  business: DetailField[];
+  preferences: DetailField[];
+  standing: StandingView;
+  /** §22.7's record, when one exists. Permanent — there is no lift. */
+  ban: { trigger: string; decidedAt: string; notice: string } | null;
+  deletionRequest: {
+    id: string;
+    detail: string;
+    requestedAt: string;
+    receivedVia: string;
+    reviews: { note: string; actor: string; at: string }[];
+  } | null;
+}
+
+export interface CampaignSummary {
+  campaignId: string;
+  name: string;
+  /** §3.1 label. The raw value rides alongside for Technical details. */
+  type: string;
+  status: string;
+  rawStatus: CampaignStatus;
+  buildStatus: string | null;
+  rosterReadiness: string | null;
+  review: { outcome: string; why: string | null } | null;
+  listing: string | null;
+  opensAt: string | null;
+  closesAt: string | null;
+  issue: string | null;
+}
+
+export interface PreviousCampaign {
+  campaignId: string;
+  name: string;
+  type: string;
+  status: string;
+  /** Already-formatted result lines. Empty when the phase has not run. */
+  lines: string[];
+}
+
+export interface CampaignsPane {
+  current: CampaignSummary | null;
+  previous: PreviousCampaign[];
+  /** §22.10. Null when there is no closed campaign to measure from. */
+  next: {
+    earliest: string | null;
+    wait: string | null;
+    readiness: string;
+    readinessNote: string | null;
+    canApprove: boolean;
+    canRemoveApproval: boolean;
+  } | null;
+}
+
+/**
+ * A money section that may have no data yet.
+ *
+ * `populated: false` carries what it is waiting for, so the surface can say so
+ * rather than rendering US$0.00 — §16a's rule, which matters most here.
+ */
+export interface MoneySection<T> {
+  populated: boolean;
+  waitingOn: string | null;
+  value: T | null;
+}
+
+export interface MoneyPane {
+  setup: { value: string; body: string; action: string | null };
+  identity: { value: string; helper: string };
+  stripe: {
+    accountId: string;
+    requirements: string;
+    lastUpdated: string | null;
+    capability: string;
+  } | null;
+  listings: {
+    campaignId: string;
+    campaignName: string;
+    lines: { label: string; amount: string; sub: boolean }[];
+    status: string;
+  }[];
+  w9: { value: string; line: string; action: string | null };
+  payments: MoneySection<
+    { campaignName: string; label: string; amount: string; status: string; line: string }[]
+  >;
+  blockers: {
+    amount: string | null;
+    state: string;
+    reason: string;
+    owner: string;
+    action: string;
+    nextReview: string | null;
+  }[];
+  pricing: { value: string; reasons: string[] | null; note: string | null } | null;
+}
+
+export interface FounderHistoryEntry {
+  category: FounderHistoryCategory;
+  at: string;
+  /** Sortable instant, so the client never re-parses a rendered date. */
+  occurredAt: string;
+  title: string;
+  body: string;
+  reason: string | null;
+  /** The §25.6 record behind a sensitive event, when there is one. */
+  audit: {
+    by: string;
+    field: string;
+    priorValue: string;
+    newValue: string;
+    reason: string;
+    evidence: string;
+    at: string;
+  } | null;
+  /** The table this came from, so the claim is checkable from the response. */
+  source: string;
+}
+
+export interface FounderWorkspaceDetail {
+  header: FounderHeader;
+  overview: OverviewPane;
+  details: DetailsPane;
+  campaigns: CampaignsPane;
+  money: MoneyPane;
+  history: FounderHistoryEntry[];
+  /** Counts per chip, so a zero-count filter can be hidden without a scan. */
+  historyCounts: Record<string, number>;
+}
+
+/**
+ * §7's preview gate, rendered.
+ *
+ * `unresolved` are bracketed markers still in the message; `missingBeforeSend`
+ * are the §7 list items that never appear in it — the invitation source and the
+ * internal campaign owner — which the marker scan therefore cannot see. Send is
+ * refused server-side on either, whatever this payload says.
+ */
+export interface InvitationPreview {
+  subject: string;
+  html: string;
+  text: string;
+  recipientEmail: string | null;
+  unresolved: string[];
+  missingBeforeSend: string[];
+  blocked: boolean;
+}
+
+/* ── The Founder workspace client ─────────────────────────────────────────── */
+
+const founderBase = (prospectId: string) =>
+  `/api/admin/founders/${encodeURIComponent(prospectId)}`;
+
+export const fetchFounders = (): Promise<{ founders: FounderListRow[] }> =>
   call('/api/admin/founders');
 
+export const fetchFounderWorkspace = (
+  prospectId: string,
+): Promise<FounderWorkspaceDetail> => call(founderBase(prospectId));
+
 /**
- * §7's first act: writing down somebody met off-platform. Only the two facts
- * that identify them are required; the rest of §7's invitation-creation list is
- * filled in on the draft surface through {@link updateProspect}, and Send stays
- * closed until it is there.
+ * §7's first act: writing down somebody met off-platform.
+ *
+ * Only the two facts that identify them are required. The rest of §7's
+ * invitation-creation list is filled in on the workspace beside the message it
+ * feeds, and Send stays closed until it is there — demanding all of it here
+ * makes an Admin type something into a box to get past a form, which is a worse
+ * record than an honestly incomplete one.
+ *
+ * There is deliberately no `competition` key (§9 Step 4, §33.1.5) and no
+ * campaign-story key (§12): what Admin learned about either belongs in
+ * `adminNotes`, which the Founder never sees.
+ *
+ * `problem` and `solution` are here because §9 calls them "human-prefilled by
+ * Proovd from discovery" and this intake IS the discovery record. They are
+ * written through the vetting prefill after the prospect commits, so the
+ * provenance survives and a later Founder edit is never overwritten.
  */
 export interface CreateProspectBody {
   legalName: string;
   email: string;
+  preferredName?: string;
+  phone?: string;
+  productName?: string;
+  /** §7's "product/company URL". The field is `productUrl` on the record. */
+  productUrl?: string;
+  /** §7 requires it on the send row, so it is asked for at intake if known. */
+  invitationSource?: string;
+  /** The Proovd team member responsible for this Founder's onboarding. */
+  internalOwner?: string;
   /** `YYYY-MM-DD` from a date input. A record of a conversation, not a plan. */
   lastContactAt?: string;
-  productName?: string;
-  /**
-   * §9's two prefillable vetting answers, drafted by Proovd from discovery and
-   * editable by the Founder. There is deliberately no `competition` key —
-   * §33.1.5, and the route that receives this has nowhere to put one.
-   */
   problem?: string;
   solution?: string;
-  /**
-   * Internal discovery notes. This is where what Admin learned about the
-   * competition and about why the Founder is building it belongs — §9 Step 4
-   * keeps the Competition *answer* always blank and the Founder's, and §12
-   * keeps the campaign Story theirs to write and approve.
-   */
   adminNotes?: string;
 }
 
-export const createProspect = (
-  body: CreateProspectBody,
-): Promise<{ draftId: string; campaignId: string; prospectId: string }> =>
+/**
+ * All three ids, because the caller needs each for a different reason: the
+ * prospect is the workspace address, the draft is what §7's invitation content
+ * hangs off, and the campaign is the container §23.1 has just entered.
+ */
+export interface CreatedProspect {
+  prospectId: string;
+  campaignId: string;
+  draftId: string;
+}
+
+export const createProspect = (body: CreateProspectBody): Promise<CreatedProspect> =>
   call('/api/admin/founders', { method: 'POST', body: JSON.stringify(body) });
 
 /**
- * The rest of §7's invitation-creation surface, saved against the draft.
+ * The rest of §7's invitation-creation list, against the draft that carries it.
  *
- * A key left out writes nothing (§9's autosave rule), so saving one panel can
- * never blank a field recorded on another visit.
+ * A key absent from the body writes nothing (§9's autosave rule, enforced on
+ * the server), so saving a phone number can never blank an invitation source
+ * recorded on a different visit. Send `null` to clear a value deliberately —
+ * omitting it and clearing it are two different intentions and the route keeps
+ * them apart.
  */
 export interface UpdateProspectBody {
   preferredName?: string | null;
   phone?: string | null;
-  lastContactAt?: string | null;
   productName?: string | null;
   productUrl?: string | null;
   launchFrame?: string | null;
@@ -244,234 +568,187 @@ export interface UpdateProspectBody {
   discoveryEvidence?: string[] | null;
   invitationSource?: string | null;
   internalOwner?: string | null;
+  lastContactAt?: string | null;
 }
 
-export const updateProspect = (draftId: string, body: UpdateProspectBody): Promise<{ ok: true }> =>
-  call(`/api/admin/founders/${draftId}/prospect`, {
+export const updateProspect = (
+  draftId: string,
+  body: UpdateProspectBody,
+): Promise<{ ok: true }> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/prospect`, {
     method: 'PUT',
     body: JSON.stringify(body),
   });
-
-export interface FounderDetail {
-  draft: {
-    id: string;
-    campaignId: string;
-    prospectId: string;
-    status: FounderRow['status'];
-    whatWeUnderstood: string | null;
-    whyInvited: string | null;
-    senderName: string | null;
-    senderEmail: string | null;
-    expectedSetupTime: string | null;
-    anonymisedAt: string | null;
-    createdAt: string;
-  };
-  prospect: Record<string, unknown> & {
-    legalName: string | null;
-    preferredName: string | null;
-    email: string | null;
-    productName: string | null;
-    productUrl: string | null;
-    invitationSource: string | null;
-    internalOwner: string | null;
-    claimedAt: string | null;
-    anonymisedAt: string | null;
-  };
-  campaign: {
-    id: string;
-    type: string | null;
-    typeLockedAt: string | null;
-    status: string;
-    affiliateRosterStatus: string;
-    campaignBuildStatus: string;
-    listingPaidAt: string | null;
-    campaignLiveAt: string | null;
-    campaignCloseAt: string | null;
-    createdAt: string;
-  } | null;
-  sends: Array<{
-    id: string;
-    sentAt: string;
-    recipientEmail: string | null;
-    senderName: string;
-    notificationId: string | null;
-    tokenVersion: number;
-    tokenExpiresAt: string | null;
-    sentBy: string;
-  }>;
-  lastSentAt: string | null;
-  retentionDueAt: string | null;
-  hasLiveToken: boolean;
-
-  /* ── §9 / §10, added Phase 07. All read — Admin does not re-enter Founder
-     data (§9). The one exception is the Problem/Solution prefill, which §9
-     asks for by name and which has its own route. ─────────────────────────*/
-  vetting: AdminVettingState | null;
-  vettingEdits: VettingFieldEdit[];
-  claimProfile: AdminClaimProfile | null;
-  creatorSignal: PossibleCreatorSignal | null;
-  signupComplete: { campaignId: string; founderUserId: string; occurredAt: string } | null;
-}
-
-export interface AdminFieldProvenance {
-  supplier: 'proovd' | 'founder' | null;
-  /** Absent on Competition — §9 gives it no prefill and §33.1.5 tests it. */
-  prefilledText?: string | null;
-  prefilledAt?: string | null;
-  firstEditedAt: string | null;
-  lastEditedAt: string | null;
-}
-
-export interface AdminVettingState {
-  draftId: string;
-  campaignId: string;
-  selectedType: 'pre_build' | 'pre_launch' | null;
-  problem: string | null;
-  solution: string | null;
-  competition: string | null;
-  provenance: {
-    problem: AdminFieldProvenance;
-    solution: AdminFieldProvenance;
-    competition: AdminFieldProvenance;
-  };
-  lastSavedAt: string | null;
-  resumeStep: string | null;
-  submittedAt: string | null;
-  completeness: Record<'campaign_path' | 'problem' | 'solution' | 'competition', boolean>;
-  campaignStatus: string;
-  lockedType: 'pre_build' | 'pre_launch' | null;
-  typeLockedAt: string | null;
-}
-
-export interface VettingFieldEdit {
-  record: string;
-  field: string;
-  priorValue: string | null;
-  newValue: string | null;
-  supplier: 'proovd' | 'founder';
-  editedBy: string;
-  occurredAt: string;
-}
-
-export interface AdminClaimProfile {
-  draftId: string;
-  campaignId: string;
-  fields: Record<
-    string,
-    { value: string | null; supplier: 'proovd' | 'founder' | null; prefilled: string | null; editedAt: string | null }
-  >;
-  soleProprietor: boolean | null;
-  emailOwnership: string | null;
-  phoneVerified: false;
-  representations: { usPerson: boolean; age18Plus: boolean; sanctions: boolean };
-  lastSavedAt: string | null;
-  claimedAt: string | null;
-}
-
-export interface PossibleCreatorSignal {
-  count: number;
-  basis: string;
-  recordedBy: string;
-  recordedAt: string;
-}
-
-export const fetchFounderDetail = (draftId: string): Promise<FounderDetail> =>
-  call(`/api/admin/founders/${encodeURIComponent(draftId)}`);
 
 /**
- * §9: Problem and Solution are prefilled by Proovd from discovery.
+ * One field of the record, changed.
  *
- * There is no `competition` key in this body and no route that accepts one.
- * §9 states the rule twice and §33.1.5 tests it.
+ * `reason` is required where §25.6 requires it — the server decides that from
+ * the record (`editReasonRequired`), never from the caller — and the prior value
+ * is read from the row rather than supplied, so the audit pair cannot be
+ * flattering (§33.12.4).
+ *
+ * `evidence` rides with it because §25.6 names evidence links as their own
+ * audit column and the edit dialog collects one wherever a reason is required.
+ * Collecting it and then dropping it in the client would be the worst of both:
+ * the Admin believes it was filed and the record does not have it.
  */
-export const prefillVetting = (
-  draftId: string,
-  body: { problem?: string; solution?: string },
-): Promise<AdminVettingState> =>
-  call(`/api/admin/founders/${encodeURIComponent(draftId)}/vetting-prefill`, {
+export const updateFounderField = (
+  prospectId: string,
+  key: FounderEditableFieldKey,
+  body: { value: string; reason?: string; evidence?: string },
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/fields/${encodeURIComponent(key)}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   });
 
-export const recordCreatorSignal = (
-  campaignId: string,
-  count: number,
-  basis: string,
-): Promise<PossibleCreatorSignal> =>
-  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/creator-signal`, {
-    method: 'POST',
-    body: JSON.stringify({ count, basis }),
-  });
-
-export const archiveAndRestart = (
-  campaignId: string,
-  reason: string,
-): Promise<{ archivedCampaignId: string; campaignId: string; draftId: string }> =>
-  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/archive-and-restart`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  });
-
-export interface ComposeBody {
-  whatWeUnderstood: string;
-  whyInvited: string;
-  senderName: string;
-  senderEmail: string;
-  expectedSetupTime: string;
-}
-
-export const composeInvitation = (
-  draftId: string,
-  body: ComposeBody,
-): Promise<{ ok: true }> =>
-  call(`/api/admin/founders/${encodeURIComponent(draftId)}/invitation`, {
+/** A value used for THIS invitation only. The Founder profile is not touched. */
+export const setInvitationOverride = (
+  prospectId: string,
+  key: ProfileOverrideKey,
+  value: string,
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/invitation/overrides/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ value }),
   });
 
-export interface InvitationPreview {
-  subject: string;
-  html: string;
-  text: string;
-  recipientEmail: string | null;
-  /** Bracketed markers still in the rendered message. §7's gate. */
-  unresolved: string[];
-  /**
-   * §7 list items that never appear in the message, so the marker gate above
-   * cannot see them: the invitation source and the internal campaign owner.
-   */
-  missingFields: string[];
-  blocked: boolean;
+export const clearInvitationOverride = (
+  prospectId: string,
+  key: ProfileOverrideKey,
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/invitation/overrides/${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+  });
+
+export const fetchInvitationPreview = (prospectId: string): Promise<InvitationPreview> =>
+  call(`${founderBase(prospectId)}/invitation/preview`);
+
+export interface InvitationSendResult {
+  sendId: string;
+  tokenVersion: number;
+  resent: boolean;
 }
 
-export const fetchInvitationPreview = (draftId: string): Promise<InvitationPreview> =>
-  call(`/api/admin/founders/${encodeURIComponent(draftId)}/preview`);
-
-export const sendInvitation = (
-  draftId: string,
-): Promise<{ sendId: string; tokenVersion: number; resent: boolean }> =>
-  call(`/api/admin/founders/${encodeURIComponent(draftId)}/send`, {
+export const sendInvite = (prospectId: string): Promise<InvitationSendResult> =>
+  call(`${founderBase(prospectId)}/invitation/send`, {
     method: 'POST',
     body: JSON.stringify({}),
   });
 
-export const revokeInvitation = (
-  draftId: string,
+/**
+ * A second invitation, which retires the first link.
+ *
+ * Its own route rather than a flag on `sendInvite`: §7 requires resend to work
+ * and the previous link to stop working, and those are two different things to
+ * tell a Founder who writes in holding the old one.
+ */
+export const sendNewInvite = (prospectId: string): Promise<InvitationSendResult> =>
+  call(`${founderBase(prospectId)}/invitation/new`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const cancelInvite = (
+  prospectId: string,
   reason: string,
-): Promise<{ ok: true; tokensRevoked: number }> =>
-  call(`/api/admin/founders/${encodeURIComponent(draftId)}/revoke`, {
+): Promise<{ tokensRevoked: number }> =>
+  call(`${founderBase(prospectId)}/invitation/cancel`, {
     method: 'POST',
     body: JSON.stringify({ reason }),
   });
 
-export interface InvitationCopy {
-  processSummary: string[];
-  noGuarantee: string;
-  retentionDays: number;
-}
+/**
+ * §26.7 standing: suspend this person's Founder access, or restore it.
+ *
+ * `reviewOwner` and `nextReviewAt` are §27.1's two promises to somebody who is
+ * waiting, and the server refuses them on a restore — a closed review that
+ * still names a next date is a promise nothing will honour (§1.4).
+ */
+export const recordAccessAction = (
+  prospectId: string,
+  body: {
+    action: FounderAccessAction;
+    reason: string;
+    evidence?: string;
+    reviewOwner?: string;
+    nextReviewAt?: string;
+  },
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/access`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 
-export const fetchInvitationCopy = (): Promise<InvitationCopy> =>
-  call('/api/admin/founders/invitation-copy');
+/**
+ * §22.7's one strike. Permanent, and there is no lift anywhere in the product.
+ *
+ * `trigger` must be one the record already meets; the server refuses every
+ * other value by name, so there is no discretionary path through this call.
+ */
+export const banFounder = (
+  prospectId: string,
+  // §22.7's five recorded facts, all of them. None is optional and none is
+  // defaulted: a permanent sanction justified by a blank the product filled in
+  // is not the record §22.7 asks for.
+  body: {
+    trigger: string;
+    notice: string;
+    reason: string;
+    evidence: string;
+    paymentRecoveryStatus: string;
+    enforcementDecision: string;
+  },
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/ban`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+/**
+ * §25.8: the Founder asked to close their account, and we wrote it down.
+ *
+ * Recording the ASK. Nothing is deleted here, and there is no route that
+ * deletes — campaign, payment, tax, support, and audit records outlive the
+ * account regardless of what anyone requests.
+ */
+export const recordDeletionRequest = (
+  prospectId: string,
+  body: { detail: string; receivedVia: string; requestedAt: string },
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/deletion-request`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const recordDeletionReview = (
+  prospectId: string,
+  requestId: string,
+  note: string,
+): Promise<FounderWorkspaceDetail> =>
+  call(
+    `${founderBase(prospectId)}/deletion-request/${encodeURIComponent(requestId)}/reviews`,
+    { method: 'POST', body: JSON.stringify({ note }) },
+  );
+
+/**
+ * §22.10: whether Proovd has approved this Founder to run another campaign.
+ *
+ * The cooldown is not part of this — it is derived from the closed campaign's
+ * own instant on every read and there is nothing here that could move it.
+ */
+export const setNextCampaignReadiness = (
+  prospectId: string,
+  // Two statements, because §25.6 wants the criteria that were applied and
+  // §29.4 wants what the Founder is actually told — and the second must name
+  // the real position rather than paraphrase an internal note.
+  body: { approved: boolean; criteriaNote: string; customerExplanation: string },
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/next-campaign-readiness`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 
 /* ── The draft landing state (§7) — no account, no session ────────────────── */
 
@@ -488,744 +765,3 @@ export interface DraftLanding {
 
 export const fetchDraftLanding = (token: string): Promise<DraftLanding> =>
   call(`/api/draft/${encodeURIComponent(token)}`);
-
-/* ── Campaign Creators (§8, §5.3, §25.4) — added Phase 08a ────────────────── */
-
-/**
- * The §5.3 register the server validates against, and §8's fixed copy.
- *
- * Labels, help text, and every `basis` string are NOT here: the Admin bundle
- * imports `@proovd/shared`'s register directly through Vite, and copy that
- * travels over the wire is a second version of the same sentence waiting to
- * disagree with the first. What comes back is only what the server enforces.
- */
-export interface AffiliateRegistry {
-  subtypes: string[];
-  requiredEvidence: Record<string, string[]>;
-  verificationStatuses: string[];
-  /** §8's two promises and the never-asks line. Read-only; no route edits them. */
-  fixedCopy: {
-    preparingNotice: string;
-    declineNotice: string;
-    neverAsksNotice: string;
-  };
-}
-
-export const fetchAffiliateRegistry = (): Promise<AffiliateRegistry> =>
-  call('/api/admin/affiliates/registry');
-
-export interface AffiliateRosterRow {
-  associationId: string;
-  prospectId: string;
-  campaignId: string;
-  legalName: string | null;
-  publicHandle: string | null;
-  email: string | null;
-  subtype: string | null;
-  status: string;
-  invitationStatus: 'draft' | 'sent' | 'revoked' | 'claimed' | 'expired';
-  rosterMembership: 'initial_roster' | 'mid_campaign';
-  verificationStatus: 'unverified' | 'in_review' | 'verified' | 'rejected';
-  recruitingAdmin: string | null;
-  lastSentAt: string | null;
-  claimedAt: string | null;
-  createdAt: string;
-}
-
-export const fetchCampaignAffiliates = (
-  campaignId: string,
-): Promise<{ affiliates: AffiliateRosterRow[] }> =>
-  call(`/api/admin/affiliates?campaignId=${encodeURIComponent(campaignId)}`);
-
-export interface RecruitBody {
-  legalName: string;
-  publicHandle: string;
-  email: string;
-  phone?: string;
-  subtype: string;
-  channelReference: string;
-  audienceNiche: string;
-  campaignFit: string;
-  audienceSize?: string;
-  engagementEvidence?: Record<string, string>;
-  audienceDemographics?: string;
-  permissionBasis: string;
-  priorSponsoredContent?: string;
-  adminBio: string;
-  /** §8: assessment data only. A bare number or percentage is refused. */
-  qualityTier?: string;
-  conflictNotes?: string;
-  sanctionsNotes?: string;
-  internalComments?: string;
-  recruitmentSource: string;
-  recruitingAdmin: string;
-  campaignId: string;
-  rosterIntent: 'initial_roster' | 'mid_campaign';
-}
-
-export const recruitAffiliate = (
-  body: RecruitBody,
-): Promise<{ prospectId: string; associationId: string }> =>
-  call('/api/admin/affiliates', { method: 'POST', body: JSON.stringify(body) });
-
-export interface AffiliateDetail {
-  association: {
-    id: string;
-    campaignId: string;
-    status: string;
-    rosterMembership: 'initial_roster' | 'mid_campaign';
-    invitationStatus: AffiliateRosterRow['invitationStatus'];
-    recruitmentSource: string | null;
-    recruitingAdmin: string | null;
-    recruitedAt: string | null;
-  };
-  prospect: Record<string, unknown> & {
-    id: string;
-    legalName: string | null;
-    publicHandle: string | null;
-    email: string | null;
-    phone: string | null;
-    subtype: string | null;
-    channelReference: string | null;
-    audienceNiche: string | null;
-    campaignFit: string | null;
-    audienceSize: string | null;
-    engagementEvidence: Record<string, string> | null;
-    audienceDemographics: string | null;
-    permissionBasis: string | null;
-    priorSponsoredContent: string | null;
-    adminBio: string | null;
-    qualityTier: string | null;
-    verificationStatus: AffiliateRosterRow['verificationStatus'];
-    verificationEvidence: Record<string, string> | null;
-    verifiedBy: string | null;
-    verifiedAt: string | null;
-    conflictNotes: string | null;
-    sanctionsNotes: string | null;
-    internalComments: string | null;
-    claimedAt: string | null;
-  };
-  /** §5.3 evidence still missing for this subtype. Reported, not enforced. */
-  missingEvidence: string[];
-  /** §2.2, across every campaign. Phase 08 can never make this non-zero. */
-  slots: { used: number; limit: number; remaining: number; atLimit: boolean };
-  invitation: {
-    whyRecruited: string | null;
-    reviewedPresence: string | null;
-    senderName: string | null;
-    senderEmail: string | null;
-    founderName: string | null;
-    productName: string | null;
-    hasLiveToken: boolean;
-    lastSentAt: string | null;
-    sends: Array<{
-      id: string;
-      sentAt: string;
-      recipientEmail: string | null;
-      senderName: string;
-      notificationId: string | null;
-      tokenVersion: number;
-      tokenExpiresAt: string | null;
-      sentBy: string;
-      /** §1.4: false means "recorded, not confirmed delivered". */
-      deliveryConfirmed: boolean;
-    }>;
-  } | null;
-}
-
-export const fetchAffiliateDetail = (associationId: string): Promise<AffiliateDetail> =>
-  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}`);
-
-export const updateAffiliateProspect = (
-  associationId: string,
-  body: Partial<Omit<RecruitBody, 'campaignId' | 'rosterIntent' | 'subtype'>>,
-): Promise<{ ok: true }> =>
-  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/prospect`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
-
-export const recordAffiliateVerification = (
-  associationId: string,
-  body: { status: string; verifiedBy: string; evidence?: Record<string, string> },
-): Promise<{ ok: true }> =>
-  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/verification`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export interface AffiliateComposeBody {
-  whyRecruited: string;
-  reviewedPresence: string;
-  senderName: string;
-  senderEmail: string;
-}
-
-export const composeAffiliateInvitation = (
-  associationId: string,
-  body: AffiliateComposeBody,
-): Promise<{ ok: true }> =>
-  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/invitation`, {
-    method: 'PATCH',
-    body: JSON.stringify(body),
-  });
-
-export interface AffiliateInvitationPreview {
-  subject: string;
-  html: string;
-  text: string;
-  recipientEmail: string | null;
-  /** Bracketed markers still in the rendered message. §8's gate. */
-  unresolved: string[];
-  blocked: boolean;
-  /** The route shape only — §28.1 makes the real link unrecoverable. */
-  claimUrlShape: string;
-}
-
-export const fetchAffiliateInvitationPreview = (
-  associationId: string,
-): Promise<AffiliateInvitationPreview> =>
-  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/preview`);
-
-export const sendAffiliateInvitation = (
-  associationId: string,
-): Promise<{ sendId: string; tokenVersion: number; resent: boolean }> =>
-  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/send`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-export const revokeAffiliateInvitation = (
-  associationId: string,
-  reason: string,
-): Promise<{ ok: true; revoked: number }> =>
-  call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/revoke`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  });
-
-/* ── Phase 09a: the §12 optional items, evidence, and the fee ─────────────── */
-
-export type AdminOptionalItemKey = 'visuals' | 'branding' | 'interview' | 'story' | 'socials';
-
-/**
- * §12 Admin: "every item, evidence, status, discount line, high-effort inputs,
- * fee preview, interview state, invalidation history, and override."
- *
- * `evidence` and `invalidatedReason` are the two fields the Founder never sees:
- * the snapshot each decision rested on, and §25.6's internal reason, which is
- * kept in its own column precisely so it can stay internal.
- */
-export interface AdminOptionalItem {
-  item: AdminOptionalItemKey;
-  complete: boolean;
-  completedAt: string | null;
-  decisionSource: string | null;
-  rejections: string[];
-  locked: boolean;
-  invalidated: { at: string | null; explanation: string | null };
-  evidence: unknown;
-  invalidatedReason: string | null;
-  invalidatedBy: string | null;
-  evaluatedAt: string | null;
-}
-
-export interface AdminWorkspace {
-  campaignId: string;
-  items: AdminOptionalItem[];
-  fee: {
-    baseCents: string;
-    itemDiscountCents: string;
-    completedItems: number;
-    discountLines: Array<{ item: AdminOptionalItemKey; discountCents: string }>;
-    discountCents: string;
-    subtotalCents: string;
-    minSubtotalCents: string;
-    calculatedAt: string | null;
-    locked: boolean;
-    separateStreamNote: string;
-  } | null;
-  highEffort: {
-    visualsCompleted: boolean;
-    brandingCompleted: boolean;
-    interviewScheduledOrConfirmed: boolean;
-    highEffort: boolean;
-    calculatedAt: string | null;
-  } | null;
-  assets: Array<{
-    id: string;
-    purpose: string;
-    state: string;
-    rejection: string | null;
-    approved: boolean;
-    removed: boolean;
-    filename: string | null;
-    contentType: string;
-    byteSize: string | null;
-    width: number | null;
-    height: number | null;
-    storageKey: string;
-    createdBy: string;
-    createdAt: string;
-  }>;
-  socials: Array<{
-    id: string;
-    url: string;
-    accessible: boolean | null;
-    httpStatus: number | null;
-    rejection: string | null;
-    controlsConfirmedByFounder: boolean;
-    removed: boolean;
-    checkedAt: string | null;
-  }>;
-  interview: {
-    configuration: {
-      bookable: boolean;
-      missingSettings: string[];
-      providers: string[];
-      interviewers: string[];
-      availability: string | null;
-      reminderLeadHours: number | null;
-    };
-    booking: Record<string, unknown> | null;
-    history: Array<Record<string, unknown>>;
-  };
-  itemHistory: Array<{
-    id: string;
-    item: AdminOptionalItemKey;
-    event: string;
-    priorComplete: boolean | null;
-    newComplete: boolean | null;
-    reason: string | null;
-    customerExplanation: string | null;
-    actor: string;
-    occurredAt: string;
-  }>;
-}
-
-export interface AdminWorkspaceResponse {
-  workspace: AdminWorkspace | null;
-  whatHappened?: string;
-}
-
-const workspaceBase = (campaignId: string) =>
-  `/api/admin/campaigns/${encodeURIComponent(campaignId)}/workspace`;
-
-export const fetchAdminWorkspace = (campaignId: string): Promise<AdminWorkspaceResponse> =>
-  call(workspaceBase(campaignId));
-
-export const recheckWorkspace = (campaignId: string): Promise<AdminWorkspaceResponse> =>
-  call(`${workspaceBase(campaignId)}/recheck`, { method: 'POST', body: JSON.stringify({}) });
-
-export const invalidateOptionalItem = (
-  campaignId: string,
-  item: AdminOptionalItemKey,
-  body: { reason: string; explanation: string },
-): Promise<AdminWorkspaceResponse> =>
-  call(`${workspaceBase(campaignId)}/items/${item}/invalidate`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const reinstateOptionalItem = (
-  campaignId: string,
-  item: AdminOptionalItemKey,
-  reason: string,
-): Promise<AdminWorkspaceResponse> =>
-  call(`${workspaceBase(campaignId)}/items/${item}/reinstate`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  });
-
-/** §12: an override requires reason, explanation, and the evidence it rests on. */
-export const overrideOptionalItem = (
-  campaignId: string,
-  item: AdminOptionalItemKey,
-  body: { complete: boolean; reason: string; explanation: string; evidence: string },
-): Promise<AdminWorkspaceResponse> =>
-  call(`${workspaceBase(campaignId)}/items/${item}/override`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-/* ── Creator readiness and fixed-payment funding (§16) — Phase 13 ───────────── */
-
-export interface AdminReadinessItem {
-  key: string;
-  label: string;
-  owner: string;
-  specRef: string;
-  complete: boolean;
-  applicable: boolean;
-}
-
-export interface AdminReadinessFixedPayment {
-  applicable: boolean;
-  status?: string;
-  label?: string;
-  amountCents?: string;
-  fundingDeadlineAt?: string | null;
-  fundedAt?: string | null;
-  canceledAt?: string | null;
-  proposalVersionId?: string | null;
-}
-
-export interface AdminReadinessCreator {
-  associationId: string;
-  publicHandle: string | null;
-  legalName: string | null;
-  status: string;
-  canBeginWork: boolean;
-  items: AdminReadinessItem[];
-  fixedPayment: AdminReadinessFixedPayment;
-}
-
-export interface AdminReadiness {
-  campaignId: string;
-  campaignStatus: string;
-  campaignLiveAt: string | null;
-  scheduleBlockers: string[];
-  canScheduleLive: boolean;
-  creators: AdminReadinessCreator[];
-}
-
-const readinessBase = (campaignId: string) =>
-  `/api/admin/campaigns/${encodeURIComponent(campaignId)}`;
-
-export const fetchAdminCreatorReadiness = (
-  campaignId: string,
-): Promise<{ readiness: AdminReadiness }> =>
-  call(`${readinessBase(campaignId)}/creator-readiness`);
-
-export const confirmCreatorDeliverables = (
-  campaignId: string,
-  associationId: string,
-  confirmed: boolean,
-): Promise<unknown> =>
-  call(`${readinessBase(campaignId)}/creators/${encodeURIComponent(associationId)}/confirm-deliverables`, {
-    method: 'POST',
-    body: JSON.stringify({ confirmed }),
-  });
-
-export const setFundingDeadline = (
-  campaignId: string,
-  associationId: string,
-  deadlineAt: string,
-): Promise<unknown> =>
-  call(`${readinessBase(campaignId)}/creators/${encodeURIComponent(associationId)}/funding-deadline`, {
-    method: 'POST',
-    body: JSON.stringify({ deadlineAt }),
-  });
-
-export const cancelFundingLapse = (
-  campaignId: string,
-  associationId: string,
-  reason: string,
-): Promise<unknown> =>
-  call(`${readinessBase(campaignId)}/creators/${encodeURIComponent(associationId)}/cancel-funding-lapse`, {
-    method: 'POST',
-    body: JSON.stringify({ reason }),
-  });
-
-export const scheduleCampaignLive = (
-  campaignId: string,
-  liveAt: string,
-): Promise<{ campaign: { campaignLiveAt: string } }> =>
-  call(`${readinessBase(campaignId)}/schedule-live`, {
-    method: 'POST',
-    body: JSON.stringify({ liveAt }),
-  });
-
-/* ── Phase 16a: the §26.6 high-impact/override machine (§33.12.4) ─────────── */
-
-export interface OverridePreviewState {
-  previewId: string;
-  consequences: Array<{ audience: string; text: string }>;
-  expiresAt: string;
-}
-
-export const previewOverride = (
-  fieldKey: string,
-  targetId: string,
-  newValue: unknown,
-): Promise<OverridePreviewState> =>
-  call('/api/admin/overrides/preview', {
-    method: 'POST',
-    body: JSON.stringify({ fieldKey, targetId, newValue }),
-  });
-
-export const executeOverride = (body: {
-  fieldKey: string;
-  targetId: string;
-  newValue: unknown;
-  internalReason: string;
-  customerExplanation: string;
-  previewId: string;
-}): Promise<{ overrideId: string; priorValue: unknown; newValue: unknown; replayed: boolean }> =>
-  call('/api/admin/overrides', { method: 'POST', body: JSON.stringify(body) });
-
-/* ── Phase 16b: §26.7/§27.8 support, §26.7 enforcement, §26.8 timeline ────── */
-
-export interface QueueEntryState {
-  caseId: string;
-  reference: string;
-  topic: string;
-  owner: string;
-  status: string;
-  humanResponseDueAt: string;
-  nextPromisedUpdateAt: string | null;
-  founderFollowupDueAt: string | null;
-  responseOverdue: boolean;
-  promiseOverdue: boolean;
-  founderFollowupOverdue: boolean;
-  requesterEmail: string;
-  campaignId: string | null;
-}
-
-export interface SupportQueueState {
-  entries: QueueEntryState[];
-  dueCount: number;
-  overdueCount: number;
-}
-
-export const fetchSupportQueue = (): Promise<SupportQueueState> =>
-  call<SupportQueueState>('/api/admin/support/queue');
-
-export interface CaseDetailState {
-  reference: string;
-  topic: string;
-  owner: string;
-  status: string;
-  humanResponseDueAt: string;
-  nextPromisedUpdateAt: string | null;
-  founderFollowupDueAt: string | null;
-  requesterEmail: string;
-  campaign: { id: string; title: string | null; status: string } | null;
-  reservation: {
-    id: string;
-    status: string;
-    rewardTitle: string | null;
-    subtotalCents: string;
-    taxCents: string;
-    totalAuthorizedCents: string | null;
-    statementDescriptor: string | null;
-    reservedAt: string | null;
-  } | null;
-  messages: Array<{
-    id: string;
-    direction: string;
-    customerFacing: boolean;
-    body: string;
-    author: string;
-    occurredAt: string;
-  }>;
-  handoffs: Array<{
-    id: string;
-    verifiedFacts: string;
-    currentOwner: string;
-    nextCustomerPromise: string;
-    statementsToKeepConsistent: string;
-    occurredAt: string;
-  }>;
-  templates: Array<{ key: string; label: string; specRef: string; useWhen: string }>;
-}
-
-export const fetchCase = (caseId: string): Promise<CaseDetailState> =>
-  call<CaseDetailState>(`/api/admin/support/cases/${encodeURIComponent(caseId)}`);
-
-export const fetchTemplateDraft = (
-  caseId: string,
-  templateKey: string,
-): Promise<{ key: string; label: string; draft: string; preservedFacts: Record<string, string>; note: string }> =>
-  call(
-    `/api/admin/support/cases/${encodeURIComponent(caseId)}/templates/${encodeURIComponent(templateKey)}`,
-  );
-
-export const addCaseMessage = (
-  caseId: string,
-  body: { direction: 'inbound' | 'outbound'; customerFacing: boolean; body: string; templateKey?: string },
-): Promise<{ messageId: string }> =>
-  call(`/api/admin/support/cases/${encodeURIComponent(caseId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const transferCase = (
-  caseId: string,
-  body: {
-    toOwner: string;
-    verifiedFacts: string;
-    currentOwner: string;
-    nextCustomerPromise: string;
-    statementsToKeepConsistent: string;
-  },
-): Promise<{ handoffId: string }> =>
-  call(`/api/admin/support/cases/${encodeURIComponent(caseId)}/transfer`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export interface TimelineState {
-  subject: string;
-  subjectId: string;
-  entries: Array<{
-    kind: string;
-    occurredAt: string;
-    summary: string;
-    actor: string | null;
-    composedFrom: string;
-    detail?: Record<string, unknown>;
-  }>;
-  sourcesRead: string[];
-}
-
-export const fetchTimeline = (subject: string, subjectId: string): Promise<TimelineState> =>
-  call<TimelineState>(
-    `/api/admin/timeline/${encodeURIComponent(subject)}/${encodeURIComponent(subjectId)}`,
-  );
-
-export interface EnforcementState {
-  actions: Array<{
-    id: string;
-    action: string;
-    phase: string;
-    reasonCategory: string;
-    reasonDetail: string;
-    customerExplanation: string;
-    priorCampaignStatus: string;
-    newCampaignStatus: string;
-    effectsApplied: string[];
-    reservationsClosed: number;
-    paymentMethodsDetached: number;
-    actor: string;
-    occurredAt: string;
-  }>;
-  reasonCategories: string[];
-}
-
-export const fetchEnforcement = (campaignId: string): Promise<EnforcementState> =>
-  call<EnforcementState>(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/enforcement`);
-
-export const enforceCampaign = (
-  campaignId: string,
-  body: {
-    action: string;
-    reasonCategory: string;
-    reasonDetail: string;
-    customerExplanation: string;
-  },
-): Promise<{ phase: string; reservationsClosed: number; effectsApplied: string[] }> =>
-  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/enforcement`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const fetchRelationshipTouches = (
-  campaignId: string,
-): Promise<{
-  touches: Array<{ id: string; kind: string; note: string; recordedBy: string; occurredAt: string }>;
-  kinds: string[];
-  note: string;
-}> => call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/relationship-touches`);
-
-export const recordRelationshipTouch = (
-  campaignId: string,
-  body: { kind: string; note: string },
-): Promise<{ touchId: string }> =>
-  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/relationship-touches`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-
-/* ── Phase 20b (§24.11): the dispute queue, evidence packet, classification ── */
-
-export interface DisputeQueueEntry {
-  disputeId: string;
-  providerDisputeId: string;
-  campaignId: string;
-  reservationId: string;
-  status: string;
-  amountCents: string;
-  reasonCode: string | null;
-  openedAt: string;
-  taskDueAt: string;
-  taskOverdue: boolean;
-  providerEvidenceDueBy: string | null;
-  classified: boolean;
-  allocationId: string | null;
-  evidenceAssembledAt: string | null;
-  closedAt: string | null;
-}
-
-export interface DisputeQueueState {
-  disputes: DisputeQueueEntry[];
-  /**
-   * The §24.8 cause register a dispute is classified through — the same rows
-   * the refund case form used to constrain, carried here because a dispute
-   * reuses 20a's register rather than a second one.
-   */
-  causes: Array<{
-    key: string;
-    label: string;
-    allocation: string;
-    permittedAffiliateTreatments: string[];
-    requiresMandate: boolean;
-  }>;
-  proovdFeeTreatments: string[];
-  evidenceItems: Array<{ key: string; label: string; required: boolean }>;
-  bestEffortRecovery: string;
-}
-
-export const fetchDisputeQueue = (campaignId?: string): Promise<DisputeQueueState> =>
-  call<DisputeQueueState>(
-    `/api/admin/disputes${campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : ''}`,
-  );
-
-export interface DisputeEvidencePacketState {
-  disputeId: string;
-  providerDisputeId: string;
-  items: Array<{
-    key: string;
-    label: string;
-    required: boolean;
-    present: boolean;
-    absentReason?: string;
-  }>;
-  complete: boolean;
-  missing: string[];
-}
-
-export const fetchDisputeEvidence = (disputeId: string): Promise<DisputeEvidencePacketState> =>
-  call<DisputeEvidencePacketState>(
-    `/api/admin/disputes/${encodeURIComponent(disputeId)}/evidence`,
-  );
-
-export const recordDisputeEvidence = (
-  disputeId: string,
-): Promise<{ status: string; evidenceId?: string }> =>
-  call(`/api/admin/disputes/${encodeURIComponent(disputeId)}/evidence`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-export interface ClassifyDisputeBody {
-  cause: string;
-  affiliateTreatment: string;
-  proovdFeeTreatment: string;
-  affiliateInvalidCents?: string | null;
-  founderLiabilityCents: string;
-  evidence: string;
-  recoveryNote?: string | null;
-  mandate?: string | null;
-}
-
-export const classifyDispute = (
-  disputeId: string,
-  body: ClassifyDisputeBody,
-): Promise<{ status: string; allocationId?: string }> =>
-  call(`/api/admin/disputes/${encodeURIComponent(disputeId)}/classify`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-

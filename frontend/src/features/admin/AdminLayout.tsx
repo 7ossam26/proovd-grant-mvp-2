@@ -7,14 +7,26 @@
  * licence does not repeal DNA §5.14 — complexity is staged into Glance / Act /
  * Explore, never amputated and never dumped in a wall.
  *
- * Concretely, in this shell: the header is Glance (who you are, whether the
- * live-mode gate is blocking), the nav is Act (the surfaces you work in), and
- * everything below is the surface's own Explore.
+ * Concretely, in this shell: the wordmark and the environment chip are Glance,
+ * the four sections are Act, and everything below is the surface's own Explore.
  *
  * ── The shell stands outside the public site chrome ─────────────────────────
  * No `PublicLayout`, no site header, no footer sitemap, no live-chat gate.
  * Phase 06's trap: "the Admin panel is a dashboard; nothing else is" — sharing
  * chrome is how its density leaks into a Founder surface.
+ *
+ * ── Three of the four sections are parked, and they are still shown ─────────
+ * Today, Campaigns, and Creators have no workspace yet. Hiding them would make
+ * the shell describe a one-section product; showing them enabled would claim a
+ * capability that does not exist (§1.4). So they are `aria-disabled`, still
+ * reachable by keyboard, and each one names what it is when pressed. Founders
+ * is the only real destination, so it is the only real link — a control that
+ * navigates is an anchor, and a control that explains itself is a button.
+ *
+ * ── The environment chip never claims a mode it did not check ───────────────
+ * `TEST MODE` is the single most consequential sentence this page could say,
+ * and a hardcoded chip says it whether or not anybody asked. So it renders only
+ * from `identity.environment`, and its absence renders nothing at all.
  *
  * ── The session gate is a rendering convenience, not a security control ─────
  * `/api/admin/me` decides whether an Admin is signed in, and every other route
@@ -23,26 +35,17 @@
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router';
-import { Button, Mode, StatePanel, Tag } from '../../components/index.js';
+import { NavLink, Outlet } from 'react-router';
+import { Button, StatePanel } from '../../components/index.js';
 import {
   fetchAdminIdentity,
   signOut,
   AdminRequestError,
+  type AdminEnvironment,
   type AdminIdentity,
 } from './api.js';
 import { AdminSignIn } from './AdminSignIn.js';
-
-const NAV = [
-  { to: '/admin/founders', label: 'Founders' },
-  { to: '/admin/creators', label: 'Creators' },
-  // Phase 16b (§26.7, §26.8, §27.8).
-  { to: '/admin/support', label: 'Support queue' },
-  { to: '/admin/campaign-operations', label: 'Campaign operations' },
-  // Phase 22c (§27.7, §27.2). Delivery history and the message preview.
-  { to: '/admin/notifications', label: 'Notifications' },
-  { to: '/admin/settings', label: 'Global configuration' },
-];
+import { useParkedControl } from './founders/parked.js';
 
 type SessionState =
   | { status: 'loading' }
@@ -53,7 +56,6 @@ type SessionState =
 
 export function AdminLayout() {
   const [session, setSession] = useState<SessionState>({ status: 'loading' });
-  const location = useLocation();
 
   const load = useCallback(async () => {
     try {
@@ -128,11 +130,7 @@ export function AdminLayout() {
   }
 
   return (
-    <AdminFrame
-      identity={session.identity}
-      onSignOut={() => void signOut().then(load)}
-      currentPath={location.pathname}
-    >
+    <AdminFrame identity={session.identity} onSignOut={() => void signOut().then(load)}>
       <Outlet />
     </AdminFrame>
   );
@@ -142,56 +140,94 @@ interface AdminFrameProps {
   children: ReactNode;
   identity?: AdminIdentity;
   onSignOut?: () => void;
-  currentPath?: string;
 }
 
 function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
+  const parked = useParkedControl();
+
   return (
-    <div className="admin">
+    <>
       <a className="skip-link" href="#admin-main">
         Skip to content
       </a>
 
-      <Mode kind="dark">
-        <header className="admin-bar">
-          <div className="admin-bar__inner">
-            <p className="admin-bar__brand">
-              Proovd <Tag variant="mint">Admin</Tag>
-            </p>
-            {identity ? (
-              <div className="admin-bar__who">
-                <span className="admin-bar__name">{identity.name || identity.email}</span>
-                <Button tier="tertiary" small onClick={onSignOut}>
-                  Sign out
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        </header>
-      </Mode>
+      <header className="topbar">
+        <span className="wordmark">
+          proovd<span className="adm">Admin</span>
+        </span>
 
-      {identity ? (
-        <nav className="admin-nav" aria-label="Admin sections">
-          <ul className="admin-nav__list">
-            {NAV.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  className={({ isActive }) =>
-                    isActive ? 'admin-nav__link is-current' : 'admin-nav__link'
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
+        <nav className="topnav" aria-label="Admin sections">
+          <button type="button" className="navlink" {...parked('tabs')}>
+            Today
+          </button>
+          {/* The one section that exists, and therefore the one real link. */}
+          <NavLink
+            to="/admin/founders"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
+            Founders
+          </NavLink>
+          <button type="button" className="navlink" {...parked('tabs')}>
+            Campaigns
+          </button>
+          <button type="button" className="navlink" {...parked('tabs')}>
+            Creators
+          </button>
         </nav>
-      ) : null}
 
-      <main className="admin-main" id="admin-main" tabIndex={-1}>
-        {children}
+        <div className="topbar__right">
+          <EnvironmentChip environment={identity?.environment} />
+          {/* Parked: the §26.5 ledger, money controls, and risk panels are
+              their own workspaces and are supplied separately. */}
+          <Button tier="secondary" small {...parked('tabs')}>
+            Explore
+          </Button>
+          {identity ? (
+            <>
+              <span className="envmeta">{identity.name || identity.email}</span>
+              <Button tier="tertiary" small onClick={onSignOut}>
+                Sign out
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </header>
+
+      <main className="views" id="admin-main" tabIndex={-1}>
+        {/* One rendered route rather than the prototype's swapped views: React
+            Router owns the swap, so `is-active` is a constant here. */}
+        <section className="view is-active">{children}</section>
       </main>
-    </div>
+    </>
+  );
+}
+
+/**
+ * The mode chip and the two facts beside it.
+ *
+ * All three come from the server or none of them render. §34 gates live money
+ * on somebody having verified that test and live are separated, and a chip that
+ * asserts `TEST MODE` from a string literal is the reassurance that check
+ * exists to replace.
+ */
+function EnvironmentChip({ environment }: { environment: AdminEnvironment | undefined }) {
+  if (!environment) return null;
+
+  const lastWebhook = environment.webhooksLastEventAt
+    ? `last webhook ${new Date(environment.webhooksLastEventAt).toLocaleTimeString(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+      })}`
+    : 'no webhook received yet';
+
+  return (
+    <>
+      <span className="envchip">
+        {environment.stripeMode === 'live' ? 'LIVE MODE' : 'TEST MODE'}
+      </span>
+      <span className="envmeta">
+        {environment.stripeApiVersion} · {lastWebhook}
+      </span>
+    </>
   );
 }

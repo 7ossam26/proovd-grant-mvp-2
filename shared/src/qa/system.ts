@@ -493,6 +493,24 @@ export const UNGATED_ADMIN_WRITES = [
       'Records the rest of §7’s invitation-creation list — the product, the invitation source, the campaign owner, notes, evidence — against an unsent draft. Same act as composing the message, and gated the same way: it reaches nobody, and Send re-decides server-side, refusing while the source or the owner is blank.',
   },
   {
+    route: 'PUT /api/admin/founders/:prospectId/invitation/overrides/:key',
+    specRef: '§7, §26.2',
+    reason:
+      'Says “for THIS invitation, use something else”. The only table it writes is campaign_drafts — the Founder profile is untouched and the workspace renders both values side by side — and the message it composes has reached nobody. Sending is the separate act, and that one takes the gate.',
+  },
+  {
+    route: 'DELETE /api/admin/founders/:prospectId/invitation/overrides/:key',
+    specRef: '§7, §26.2',
+    reason:
+      'Removes that per-invitation value so the field follows the Founder profile again. Restores an auto-populated value rather than replacing one, and still writes nothing outside campaign_drafts.',
+  },
+  {
+    route: 'POST /api/admin/founders/:prospectId/deletion-request',
+    specRef: '§25.8',
+    reason:
+      'Records that the Founder ASKED to close their account, and its provenance. Phase 20b’s decision for the §29.1 disclosures, applied here: writing down what somebody told us decides nothing, and the retention obligations §25.8 names are unaffected by it. The review that follows decides an outcome and takes the gate.',
+  },
+  {
     route: 'POST /api/admin/affiliates',
     specRef: '§8',
     reason: 'Creates a Creator prospect and its association. No money, no standing, no configuration.',
