@@ -51,9 +51,19 @@ export interface FieldEditRequest {
  * from what opened it (DNA §6.5), and a panel that appeared from nowhere is the
  * one motion this design system refuses.
  */
+/** A §9 setup answer an Admin may still prefill (Problem or Solution). */
+export interface AnswerEditRequest {
+  draftId: string;
+  key: 'problem' | 'solution';
+  label: string;
+  text: string | null;
+}
+
 export interface WorkspaceActions {
   confirm: (key: ConfirmKey, trigger: HTMLElement | null) => void;
   editField: (target: FieldEditRequest, trigger: HTMLElement | null) => void;
+  /** §9's prefill: only offered while the server said the answer is editable. */
+  editAnswer: (target: AnswerEditRequest, trigger: HTMLElement | null) => void;
   previewInvitation: (trigger: HTMLElement | null) => void;
   setOverride: (key: string, value: string) => Promise<void>;
   clearOverride: (key: string) => Promise<void>;

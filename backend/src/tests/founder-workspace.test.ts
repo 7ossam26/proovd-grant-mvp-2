@@ -804,14 +804,38 @@ describe('§25.6 editing a Founder’s own record takes a reason and is recorded
     expect(await auditRows(FOUNDER_FIELD_UPDATED, founder.prospectId)).toHaveLength(0);
   });
 
-  it('refuses an account-only field before there is an account to put it on', async () => {
-    const founder = await createFounder('account-only');
+  it('saves an identity field before the claim onto the prospect, where the workspace reads it', async () => {
+    const founder = await createFounder('preclaim-identity');
     const res = await request(h.app)
       .put(`/api/admin/founders/${founder.prospectId}/fields/dob`)
       .set('cookie', admin.cookie)
       .send({ value: '1990-01-01' })
-      .expect(422);
-    expect(res.body.whatHappened).toContain('nowhere to store it yet');
+      .expect(200);
+
+    // Migration 0043's pre-claim home. The claim profile wins later, wherever
+    // it holds a value.
+    const [row] = await h.db
+      .select()
+      .from(founderProspects)
+      .where(eq(founderProspects.id, founder.prospectId));
+    expect(row!.dateOfBirth).toBe('1990-01-01');
+
+    const detail = res.body as {
+      details: { personal: { key: string; value: string | null; editable: boolean }[] };
+    };
+    const dob = detail.details.personal.find((f) => f.key === 'dob');
+    expect(dob).toMatchObject({ value: '1990-01-01', editable: true });
+  });
+
+  it('refuses a date of birth the date column could not hold, by shape', async () => {
+    const founder = await createFounder('preclaim-bad-dob');
+    const res = await request(h.app)
+      .put(`/api/admin/founders/${founder.prospectId}/fields/dob`)
+      .set('cookie', admin.cookie)
+      .send({ value: 'April 1990' })
+      .expect(400);
+    expect(res.body.whatHappened).toContain('YYYY-MM-DD');
+    expect(await auditRows(FOUNDER_FIELD_UPDATED, founder.prospectId)).toHaveLength(0);
   });
 
   it('has no key, under any spelling, that writes the three §9 answers', async () => {

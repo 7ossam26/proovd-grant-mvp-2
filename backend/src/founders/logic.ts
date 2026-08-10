@@ -250,8 +250,14 @@ export const FOUNDER_EDITABLE_FIELDS: readonly FounderEditableField[] = [
     group: 'profile',
     helper: 'Phone number has not been verified, and the MVP has no way to verify one.',
   },
-  { key: 'dob', label: 'Date of birth', group: 'profile' },
+  {
+    key: 'dob',
+    label: 'Date of birth',
+    group: 'profile',
+    helper: 'Entered as YYYY-MM-DD, e.g. 1990-04-23.',
+  },
   { key: 'state', label: 'State', group: 'profile' },
+  { key: 'country', label: 'Country', group: 'profile' },
   {
     key: 'bizType',
     label: 'Business type',

@@ -377,10 +377,10 @@ export async function loadFounderContext(
       claim?.preferredName ?? prospect.preferredName ?? claim?.legalName ?? prospect.legalName ?? '',
     email: claim?.email ?? prospect.email ?? '',
     phone: claim?.phone ?? prospect.phone ?? null,
-    businessName: claim?.businessName ?? null,
+    businessName: claim?.businessName ?? prospect.businessName ?? null,
     website: prospect.productUrl ?? null,
-    state: claim?.stateRegion ?? null,
-    country: claim?.country ?? null,
+    state: claim?.stateRegion ?? prospect.stateRegion ?? null,
+    country: claim?.country ?? prospect.country ?? null,
   };
 
   return {
@@ -1227,6 +1227,17 @@ async function composeVetting(db: Database, ctx: FounderContext): Promise<Vettin
       label: VETTING_ANSWER_LABELS[answer.key],
       text: answer.text,
       provenance: provenanceOf(answer.key, row, ctx.identity.preferredName),
+      // Problem and Solution take §9's Admin prefill until submission locks
+      // the record — and only while the Founder has not taken the field over,
+      // because after that the prefill route deliberately leaves their words
+      // alone and a control that visibly changes nothing is a defect report
+      // waiting to be filed. Views is the Founder's own choice with no prefill
+      // path, and Competition is §33.1.5's absence: neither is ever editable.
+      editable:
+        (answer.key === 'problem' || answer.key === 'solution') &&
+        draft !== null &&
+        !row?.submittedAt &&
+        !(answer.key === 'problem' ? row?.problemFirstEditedAt : row?.solutionFirstEditedAt),
     })),
     lastSaved: prefixed('Last successful save:', row?.lastSavedAt ?? null),
     // §10: `null` means never recorded, which is NOT zero — and Admin is the
@@ -1284,23 +1295,19 @@ function provenanceOf(
 /* ── Details (§25.5, §25.6, §26.7, §25.8) ─────────────────────────────────── */
 
 async function composeDetails(db: Database, ctx: FounderContext): Promise<DetailsPane> {
-  const claimed = ctx.accountUserId !== null;
-
-  // Fields whose only home is the account record. Before a claim there is
-  // nowhere to put them, and saying so is more useful than an empty box that
-  // silently refuses (§1.4).
-  const accountOnly = claimed
-    ? null
-    : 'Recorded when the Founder creates their account.';
-
-  const field = (key: string, value: string | null, helperOverride?: string | null): DetailField => {
+  const field = (key: string, value: string | null): DetailField => {
     const registered = FOUNDER_EDITABLE_FIELDS.find((f) => f.key === key);
     return {
       key,
       label: registered?.label ?? key,
       value,
-      helper: helperOverride !== undefined ? helperOverride : (registered?.helper ?? null),
-      editable: registered !== undefined && (claimed || !ACCOUNT_ONLY_FIELDS.has(key)),
+      helper: registered?.helper ?? null,
+      // Every registered field is editable at every stage: migration 0043 gave
+      // the identity/business fields a pre-claim home on the prospect, and the
+      // claim profile wins wherever it holds a value. The gate difference is
+      // the reason and freshness §25.6 demands once the account is claimed —
+      // decided by `editReasonRequired`, not by hiding the control.
+      editable: registered !== undefined,
     };
   };
 
@@ -1309,29 +1316,27 @@ async function composeDetails(db: Database, ctx: FounderContext): Promise<Detail
     field('legal', ctx.identity.legalName || null),
     field('email', ctx.identity.email || null),
     field('phone', ctx.identity.phone),
-    field('dob', formatDay(ctx.claim?.dateOfBirth ? new Date(ctx.claim.dateOfBirth) : null), accountOnly),
-    field('state', ctx.identity.state, accountOnly),
-    {
-      key: 'country',
-      label: 'Country',
-      value: ctx.identity.country,
-      helper: null,
-      // §5.2/§10: recorded by the Founder at claim, alongside the §28.4
-      // representations. Not an Admin field.
-      editable: false,
-    },
+    // The raw YYYY-MM-DD rather than a formatted day, because the edit dialog
+    // prefills from this value and the save path only accepts the ISO shape —
+    // a value that cannot round-trip through its own Edit control is a trap.
+    field('dob', ctx.claim?.dateOfBirth ?? ctx.prospect.dateOfBirth ?? null),
+    field('state', ctx.identity.state),
+    field('country', ctx.identity.country),
     {
       key: 'age',
       label: 'Age',
       value: ctx.claim?.representationAge18Plus ? 'Confirmed 18 or older' : 'Not confirmed yet',
       helper: 'The Founder’s own §28.4 representation, recorded at account creation.',
+      // Not an Admin field, and never one: this records what the FOUNDER
+      // stated, and an Admin writing it would manufacture a representation
+      // nobody made (§28.4).
       editable: false,
     },
   ];
 
   const business: DetailField[] = [
-    field('bizType', ctx.claim?.businessEntityType ?? null, accountOnly),
-    field('bizLegal', ctx.claim?.businessName ?? null, accountOnly),
+    field('bizType', ctx.claim?.businessEntityType ?? ctx.prospect.businessEntityType ?? null),
+    field('bizLegal', ctx.identity.businessName),
     field('product', ctx.prospect.productName),
     field('website', ctx.prospect.productUrl),
   ];
@@ -1412,9 +1417,6 @@ async function composeDetails(db: Database, ctx: FounderContext): Promise<Detail
       : null,
   };
 }
-
-/** The register keys that have no column until the Founder claims an account. */
-const ACCOUNT_ONLY_FIELDS = new Set(['dob', 'state', 'bizType', 'bizLegal']);
 
 const DIGEST_LABELS: Record<string, string> = {
   off: 'No activity summary',

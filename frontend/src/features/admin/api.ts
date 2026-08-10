@@ -306,6 +306,12 @@ export interface VettingView {
     text: string | null;
     /** "Originally prepared by Proovd · Last edited by Ahmed", or null. */
     provenance: string | null;
+    /**
+     * Whether §9's Admin prefill can still move this answer: Problem and
+     * Solution only, before submission, and only while the Founder has not
+     * taken the field over. Views and Competition are never editable.
+     */
+    editable: boolean;
   }[];
   lastSaved: string | null;
   /** §10's recorded Admin assessment. `null` = never recorded, which is not 0. */
@@ -585,6 +591,24 @@ export const setFounderCampaignPath = (
   call(`/api/admin/founders/${encodeURIComponent(draftId)}/campaign-path`, {
     method: 'PUT',
     body: JSON.stringify({ campaignPath }),
+  });
+
+/**
+ * §9's Admin prefill for Problem and Solution, on the draft.
+ *
+ * The server owns the semantics: it refuses after submission, and once the
+ * Founder has edited a field their words stay — the prefill snapshot updates
+ * without touching what renders. The workspace only offers the control while
+ * the server said the answer is still `editable`.
+ */
+export const prefillVettingAnswer = (
+  draftId: string,
+  key: 'problem' | 'solution',
+  value: string | null,
+): Promise<unknown> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/vetting-prefill`, {
+    method: 'PUT',
+    body: JSON.stringify({ [key]: value }),
   });
 
 export const updateProspect = (

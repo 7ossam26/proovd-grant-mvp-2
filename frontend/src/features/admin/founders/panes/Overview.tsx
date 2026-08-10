@@ -6,14 +6,16 @@
  * order the Founder lived it, so an Admin opening it during a support call
  * lands on the same story the Founder is telling them.
  *
- * ── The three setup answers carry no Edit control ───────────────────────────
- * §9 makes Problem, Solution, and Competition the Founder's own words, and
- * Competition may never even be prefilled — the vetting record has no
- * `competition_prefilled_*` column, a CHECK pins its supplier to the Founder,
- * and §33.1.5 tests all of it. So they render with their provenance and no way
- * to change them. An Admin correcting a Founder's answer is a support case,
- * not a field edit, which is why `FOUNDER_EDITABLE_FIELDS` has no entry for
- * any of them and this pane has nothing to offer.
+ * ── Which setup answers carry an Edit control, and when ─────────────────────
+ * Problem and Solution take §9's Admin prefill — the same write the intake
+ * form makes — so they carry an Edit control exactly while that prefill can
+ * still move them: before submission, and before the Founder takes the field
+ * over. The server decides `editable`; this pane only renders the answer.
+ * Views is the Founder's own choice with no prefill path, and Competition may
+ * never even be prefilled — the vetting record has no `competition_prefilled_*`
+ * column, a CHECK pins its supplier to the Founder, and §33.1.5 tests all of
+ * it. Once the Founder owns an answer, correcting it is a support case, not a
+ * field edit.
  *
  * ── Zero matches and no matches are different states ────────────────────────
  * §10 records the possible-Creator count as an Admin's assessment, so `null`
@@ -311,6 +313,32 @@ export function Overview({ detail, actions }: OverviewProps) {
               <p className="grey">{unansweredText(answer.key)}</p>
             )}
             {answer.provenance ? <p className="helper">{answer.provenance}</p> : null}
+            {/* §9's prefill, while it can still move the answer: before
+                submission, and before the Founder takes the field over. The
+                server decides `editable`; Views and Competition never carry
+                it, because neither has a prefill path (§33.1.5). */}
+            {answer.editable &&
+            vetting.draftId &&
+            (answer.key === 'problem' || answer.key === 'solution') ? (
+              <Button
+                tier="tertiary"
+                small
+                aria-label={`Edit ${answer.label}`}
+                onClick={(event) =>
+                  actions.editAnswer(
+                    {
+                      draftId: vetting.draftId!,
+                      key: answer.key as 'problem' | 'solution',
+                      label: answer.label,
+                      text: answer.text,
+                    },
+                    event.currentTarget,
+                  )
+                }
+              >
+                Edit
+              </Button>
+            ) : null}
           </Row>
         ))}
       </Group>

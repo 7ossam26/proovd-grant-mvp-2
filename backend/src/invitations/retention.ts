@@ -225,6 +225,14 @@ export async function anonymiseDraft(
           preferredName: null,
           email: null,
           phone: null,
+          // The pre-claim identity and business home (migration 0043). A date
+          // of birth is the most personal fact this table holds, so §25.8's
+          // "irreversibly anonymized" covers all five like everything else.
+          dateOfBirth: null,
+          stateRegion: null,
+          country: null,
+          businessEntityType: null,
+          businessName: null,
           productName: null,
           productUrl: null,
           launchFrame: null,

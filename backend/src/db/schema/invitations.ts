@@ -44,6 +44,7 @@ import {
   uuid,
   text,
   integer,
+  date,
   timestamp,
   jsonb,
   index,
@@ -84,6 +85,20 @@ export const founderProspects = pgTable(
      * exists so support can call someone, not so a code can be sent to them.
      */
     phone: text('phone'),
+
+    /**
+     * ── Pre-claim identity and business fields (§7, §10, migration 0043) ──
+     * The Admin workspace's registered fields need a home before the Founder
+     * claims an account; `founder_claim_profiles` only exists afterwards.
+     * Once a claim profile holds a value for one of these, it wins — the same
+     * prospect-then-claim precedence the name, email, and phone have always
+     * had. All nullable: all anonymisable.
+     */
+    dateOfBirth: date('date_of_birth'),
+    stateRegion: text('state_region'),
+    country: text('country'),
+    businessEntityType: text('business_entity_type'),
+    businessName: text('business_name'),
 
     /* ── The product (§7) ──────────────────────────────────────────────────*/
     productName: text('product_name'),

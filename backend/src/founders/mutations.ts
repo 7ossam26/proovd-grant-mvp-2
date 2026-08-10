@@ -198,16 +198,6 @@ export async function addFounder(
 
 /* ── One registered field of the record (§25.6, §26.2, §33.12.4) ───────────── */
 
-/**
- * The register keys whose value has no home until the Founder claims an
- * account.
- *
- * They are columns on `founder_claim_profiles`, which does not exist before the
- * claim. Refusing by name beats writing them somewhere temporary and then
- * having two answers to reconcile at claim time (§1.4).
- */
-const ACCOUNT_ONLY_KEYS = new Set(['dob', 'state', 'bizType', 'bizLegal']);
-
 /** The register keys that are one invitation's content rather than the person's. */
 const DRAFT_KEYS = new Set(['invKnow', 'invFit', 'invTime']);
 
@@ -232,14 +222,19 @@ function readStoredValue(ctx: FounderContext, key: string): string | null {
       return (claimed ? claim.email : ctx.prospect.email) ?? null;
     case 'phone':
       return (claimed ? claim.phone : ctx.prospect.phone) ?? null;
+    // The claim profile wins where it holds a value; the prospect is the
+    // pre-claim home (migration 0043). The same precedence the workspace
+    // renders, so the recorded "before" is the value the Admin was looking at.
     case 'dob':
-      return claim?.dateOfBirth ?? null;
+      return claim?.dateOfBirth ?? ctx.prospect.dateOfBirth ?? null;
     case 'state':
-      return claim?.stateRegion ?? null;
+      return claim?.stateRegion ?? ctx.prospect.stateRegion ?? null;
+    case 'country':
+      return claim?.country ?? ctx.prospect.country ?? null;
     case 'bizType':
-      return claim?.businessEntityType ?? null;
+      return claim?.businessEntityType ?? ctx.prospect.businessEntityType ?? null;
     case 'bizLegal':
-      return claim?.businessName ?? null;
+      return claim?.businessName ?? ctx.prospect.businessName ?? null;
     case 'product':
       return ctx.prospect.productName;
     case 'website':
@@ -279,6 +274,16 @@ function prospectPatch(
       return { email: value?.toLowerCase() ?? null };
     case 'phone':
       return { phone: value };
+    case 'dob':
+      return { dateOfBirth: value };
+    case 'state':
+      return { stateRegion: value };
+    case 'country':
+      return { country: value };
+    case 'bizType':
+      return { businessEntityType: value };
+    case 'bizLegal':
+      return { businessName: value };
     case 'product':
       return { productName: value };
     case 'website':
@@ -310,6 +315,8 @@ function claimPatch(
       return { dateOfBirth: value };
     case 'state':
       return { stateRegion: value };
+    case 'country':
+      return { country: value };
     case 'bizType':
       return { businessEntityType: value };
     case 'bizLegal':
@@ -398,12 +405,6 @@ export async function updateFounderField(
     );
   }
 
-  if (ACCOUNT_ONLY_KEYS.has(field.key) && ctx.claim === null) {
-    return refused(
-      `${field.label} is recorded when the Founder creates their account. There is nowhere to store it yet.`,
-    );
-  }
-
   const draft = ctx.currentDraft;
   if (DRAFT_KEYS.has(field.key)) {
     if (!draft) return refused('This Founder has no invitation to edit.');
@@ -415,6 +416,16 @@ export async function updateFounderField(
   }
 
   const value = trimmedOrNull(input.value);
+
+  // Both `date_of_birth` columns are Postgres `date`s, so a value the database
+  // cannot read would surface as a 500 after the Admin pressed Save. Refusing
+  // here names the shape instead (§27.1); clearing with an empty value is fine.
+  if (field.key === 'dob' && value !== null && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return invalid(
+      'A date of birth is entered as YYYY-MM-DD, e.g. 1990-04-23. Nothing has changed.',
+    );
+  }
+
   const priorValue = readStoredValue(ctx, field.key);
 
   const auditPrior: FieldEditAuditValue = {

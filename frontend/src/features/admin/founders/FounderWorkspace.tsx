@@ -87,6 +87,7 @@ import {
   cancelInvite,
   clearInvitationOverride,
   fetchFounderWorkspace,
+  prefillVettingAnswer,
   recordAccessAction,
   recordDeletionReview,
   sendInvite,
@@ -116,6 +117,7 @@ import {
   NOT_PROVIDED,
   ParkedButton,
   useParkedToast,
+  type AnswerEditRequest,
   type FieldEditRequest,
   type WorkspaceActions,
 } from './shared.js';
@@ -233,6 +235,7 @@ function isOverrideKey(key: string): key is ProfileOverrideKey {
 type OpenDialog =
   | { kind: 'confirm'; key: ConfirmKey; trigger: HTMLElement | null }
   | { kind: 'field'; target: FieldEditRequest; trigger: HTMLElement | null }
+  | { kind: 'answer'; target: AnswerEditRequest; trigger: HTMLElement | null }
   | { kind: 'preview'; trigger: HTMLElement | null };
 
 /* ── The surface ────────────────────────────────────────────────────────────*/
@@ -449,6 +452,7 @@ export function FounderWorkspace() {
   const actions: WorkspaceActions = {
     confirm: (key, trigger) => setDialog({ kind: 'confirm', key, trigger }),
     editField: (target, trigger) => setDialog({ kind: 'field', target, trigger }),
+    editAnswer: (target, trigger) => setDialog({ kind: 'answer', target, trigger }),
     previewInvitation: (trigger) => setDialog({ kind: 'preview', trigger }),
     setOverride: async (key, value) => {
       if (!isOverrideKey(key)) {
@@ -585,6 +589,13 @@ export function FounderWorkspace() {
       ...(reason ? { reason } : {}),
       ...(evidence ? { evidence } : {}),
     });
+    await refresh();
+    toast('Saved', { sub: `${target.label} updated.` });
+  };
+
+  /** §9's prefill: the same write the intake form makes, from the workspace. */
+  const runAnswerEdit = async (target: AnswerEditRequest, values: DialogValues) => {
+    await prefillVettingAnswer(target.draftId, target.key, values[FIELD_EDIT_VALUE] ?? '');
     await refresh();
     toast('Saved', { sub: `${target.label} updated.` });
   };
@@ -821,6 +832,35 @@ export function FounderWorkspace() {
           })}
           trigger={dialog.trigger}
           onSubmit={(values) => runFieldEdit(dialog.target, values)}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+
+      {dialog?.kind === 'answer' ? (
+        <ConfirmDialog
+          spec={{
+            kicker,
+            title: `Edit — ${dialog.target.label}`,
+            body: (
+              <p>
+                Prepared by Proovd from discovery (§9). It stops moving the moment{' '}
+                {header.preferredName} edits the answer themselves, and it locks when
+                they submit.
+              </p>
+            ),
+            fields: [
+              {
+                id: FIELD_EDIT_VALUE,
+                label: 'New value',
+                required: true,
+                textarea: true,
+                value: dialog.target.text ?? '',
+              },
+            ],
+            primary: 'Save change',
+          }}
+          trigger={dialog.trigger}
+          onSubmit={(values) => runAnswerEdit(dialog.target, values)}
           onClose={() => setDialog(null)}
         />
       ) : null}
