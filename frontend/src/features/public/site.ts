@@ -98,6 +98,17 @@ export const PUBLIC_ROUTE_PATHS: readonly string[] = PUBLIC_ROUTES.map((r) => r.
  */
 export const ACCOUNT_ROUTES: readonly PublicRoute[] = [
   { path: '/signin', label: 'Sign in', kind: 'site' },
+  /**
+   * Public Founder signup — an operator decision. It sits here rather than in
+   * `PUBLIC_ROUTES` for the reason stated above: §18 fixes that inventory at
+   * fourteen and sweeps each entry as a marketing page, which a form is not.
+   *
+   * Founder-only by construction. §5.1 seeds Admins with a mandatory TOTP
+   * factor and §5.3 admits Creators only through a private campaign-scoped
+   * invitation, so there is one signup address and it names what it creates
+   * (§33.11.4).
+   */
+  { path: '/signup', label: 'Create a founder account', kind: 'site' },
   { path: '/reset-password', label: 'Reset your password', kind: 'site' },
 ] as const;
 

@@ -102,10 +102,38 @@ describe('the root address offers a way into the product (§1.1, §5)', () => {
   });
 });
 
-/* ══════════════════════════════════════════════ §5: no signup, for any role */
+/* ═════════════════════════════════════════ §5: the signup door is Founder-only
 
-describe('§5 — the door offers no way to create an account', () => {
-  it('has no signup control and no link to one (§33.2.1)', () => {
+   This block used to assert that no signup link existed at all, because no
+   public signup existed for any role. That is an OPERATOR DECISION and it has
+   been reversed for FOUNDERS — so these tests now guard the part of §5 that did
+   not change, which is the part that was always doing the work:
+
+     §5.1 seeds Admins and makes a TOTP factor mandatory.
+     §5.3 admits Creators only through a private, campaign-scoped invitation,
+          which is what §33.2.1 is named for and still enforces server-side.
+
+   A link reading "create an account" would offer all three and deliver one,
+   which is §1.4's failure with a cursor in it. So the assertion is no longer
+   "there is no link" but "the link says which of the three it opens".         */
+
+describe('§5 — the signup link offers a Founder account and only that', () => {
+  it('links to /signup and names the role it creates (§33.11.4)', () => {
+    const { container } = renderAt('/signin');
+    const signupLinks = [...container.querySelectorAll('a')].filter((a) =>
+      a.getAttribute('href')?.includes('signup'),
+    );
+
+    expect(signupLinks.length).toBeGreaterThan(0);
+    // §33.11.4: a control names its destination. "Create an account" is the
+    // objectless label this exists to refuse — it would promise a Creator and
+    // an Admin something the server will not give them.
+    for (const link of signupLinks) {
+      expect((link.textContent ?? '').toLowerCase()).toContain('founder');
+    }
+  });
+
+  it('never offers a Creator or Admin account (§5.1, §5.3)', () => {
     const { container } = renderAt('/signin');
     const labels = [
       ...container.querySelectorAll('button'),
@@ -113,15 +141,16 @@ describe('§5 — the door offers no way to create an account', () => {
     ].map((el) => (el.textContent ?? '').toLowerCase());
 
     for (const label of labels) {
-      expect(label).not.toMatch(/sign up|create an account|register|get started free/);
+      expect(label).not.toMatch(/creator account|admin account|register|get started free/);
     }
-    const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
-    expect(hrefs.some((h) => h?.includes('signup') || h?.includes('sign-up'))).toBe(false);
   });
 
-  it('says where an account comes from instead (§1.4)', () => {
+  it('still says where a Creator account comes from (§1.4)', () => {
     const { container } = renderAt('/signin');
-    expect((container.textContent ?? '').toLowerCase()).toContain('invitation');
+    const text = (container.textContent ?? '').toLowerCase();
+    // The page must not go quiet about the role its signup link does NOT open.
+    expect(text).toContain('invited');
+    expect(text).toContain('creator');
   });
 });
 

@@ -160,3 +160,40 @@ export const resetPassword = (token: string, newPassword: string): Promise<unkno
     method: 'POST',
     body: JSON.stringify({ token, newPassword }),
   });
+
+/* ── Public Founder signup ────────────────────────────────────────────────── */
+
+/**
+ * §10's three documents, in §10's order. Restated here rather than imported
+ * from the backend for the reason every shared fact in this repo is restated
+ * across that boundary — the backend compiles under its own `rootDir` and
+ * ships only `dist`. The labels come from the shared policy register, so the
+ * text a person accepts is the same text the footer links to.
+ */
+export const SIGNUP_POLICY_SLUGS = ['terms', 'aup', 'privacy'] as const;
+export type SignupPolicySlug = (typeof SIGNUP_POLICY_SLUGS)[number];
+
+export type SignupAvailability =
+  | { open: true }
+  | { open: false; reason: 'policies_unpublished' | 'unavailable'; missing?: string[] };
+
+export const fetchSignupAvailability = (): Promise<SignupAvailability> =>
+  call<SignupAvailability>('/api/account/signup');
+
+export interface SignupInput {
+  email: string;
+  password: string;
+  name: string;
+  acceptedPolicySlugs: readonly string[];
+}
+
+/**
+ * Creates the account and nothing else — deliberately no session. The surface
+ * signs in afterwards through `signInWithPassword`, so there is exactly one
+ * path in the product that issues a session.
+ */
+export const createAccount = (input: SignupInput): Promise<{ ok: true; email: string }> =>
+  call('/api/account/signup', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });

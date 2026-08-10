@@ -36,17 +36,20 @@
  * give the other two roles no second factor, so in practice they never see it;
  * that is a fact about their accounts, not a branch in this file.
  *
- * ── What is deliberately absent ────────────────────────────────────────────
- * No "create an account" link, anywhere. §5.1 seeds Admins, §5.2 admits
- * Founders by private invitation, and §5.3 is explicit that Creators have no
- * open public signup — `disableSignUp: true` closes the HTTP route, and a link
- * offering what the server refuses is §1.4's failure with a cursor in it.
+ * ── The signup link, and what it does not offer ────────────────────────────
+ * There is now a public FOUNDER signup, by operator decision, and this page
+ * links to it. It is deliberately described as a founder account rather than
+ * as "create an account": §5.1 still seeds Admins with a mandatory TOTP factor
+ * and §5.3 still admits Creators only through a private campaign-scoped
+ * invitation, so a generic link would offer two of the three roles something
+ * the server refuses — §1.4's failure with a cursor in it.
  *
- * No "Continue with Google" either, although §5.2 grants Founders Google
- * sign-in. The button is safe only once social sign-up is provably closed the
- * way `disableSignUp` closes the email one; without that, one click by an
- * uninvited visitor mints a Founder account, which is precisely what §33.2.1
- * exists to prevent. It is a real gap, recorded rather than papered over.
+ * No "Continue with Google" still, although §5.2 grants Founders Google
+ * sign-in. Better Auth's `disableSignUp` closes the EMAIL route; the social
+ * route is a separate switch, and until social sign-up is provably confined to
+ * the founder role the way `auth/public-signup.ts` confines this one, one click
+ * by a visitor could mint an account whose role nothing in this repo decided.
+ * It is a real gap, recorded rather than papered over.
  */
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
@@ -274,12 +277,16 @@ export function SignIn() {
               <p>
                 <RouterLink to="/reset-password">Reset your password</RouterLink>
               </p>
-              {/* §5: there is no public signup for any role, so this says where
-                  an account comes from instead of offering one. */}
+              <p>
+                Want to run a campaign?{' '}
+                <RouterLink to="/signup">Create a founder account</RouterLink>
+              </p>
+              {/* §5.3 keeps Creator accounts invitation-only, so this names the
+                  one role the signup link actually opens and says where the
+                  other comes from — rather than implying both are available. */}
               <p className="auth__note">
-                Proovd accounts are issued by invitation — founders are invited to
-                run a campaign, creators are invited to promote a specific one. If
-                you were invited and cannot find your link,{' '}
+                Creators are invited to promote one specific campaign and receive a
+                private link. If you were invited and cannot find yours,{' '}
                 <Link href={supportMailto('I cannot find my Proovd invitation link')}>
                   email support
                 </Link>{' '}
