@@ -135,8 +135,16 @@ export interface ProovdAPI {
   /**
    * Button → progress → done morph for any submit that takes real time.
    * Resolves when the morph completes. Re-entrant calls are ignored while busy.
+   *
+   * `work` is the in-flight PROMISE, a number of seconds, or nothing (1.2s) —
+   * never the callback that starts the work. The runtime decides with
+   * `typeof work.then === 'function'` and silently substitutes the timer for
+   * anything else, so a callback passed here plays the whole morph and never
+   * runs. This signature said `() => Promise<unknown>` until 2026-08-10 and
+   * `useButtonProgress` was written against it; every submit behind that hook
+   * animated to a tick and sent nothing.
    */
-  buttonProgress(btn: HTMLElement, work: () => Promise<unknown>): Promise<void>;
+  buttonProgress(btn: HTMLElement, work?: Promise<unknown> | number): Promise<void>;
   /** Plays once per session. Resolves when the splash has exited. */
   splash(el?: Element): Promise<void>;
   /**

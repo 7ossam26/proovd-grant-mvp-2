@@ -2717,3 +2717,139 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 }
 .admin-auth .wordmark { justify-self: center; }
 .admin-auth .admin-signin { justify-items: stretch; }
+
+
+/* ══════════════════════════════ 2026-08-10 · the invited-draft landing (§7)
+   Rebuilt to the reference composition: the elapsed-time line, the greeting,
+   and one supporting sentence on the left; the invite card on the right; Help
+   pinned to the corner. Slots only — the headline reads the mode title ink,
+   the card reads the brand, and nothing here picks a color the palette does
+   not already own. */
+
+.invite-landing {
+  min-height: 100vh;
+  padding: var(--sp-24) var(--gutter) var(--sp-96);
+  display: grid;
+  align-content: start;
+}
+
+.invite-landing__grid {
+  width: var(--wrap);
+  margin-inline: auto;
+  /* The reference sits the composition in the upper middle of the viewport —
+     not at the top edge, not vertically centered. */
+  padding-top: clamp(var(--sp-64), 22vh, 15rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  column-gap: clamp(var(--sp-48), 7vw, var(--sp-160));
+  row-gap: var(--sp-64);
+  align-items: start;
+}
+
+.invite-landing__time {
+  margin: 0 0 var(--sp-48);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--mode-title);
+}
+
+.invite-landing__headline {
+  margin: 0 0 var(--sp-32);
+  font-size: clamp(2.25rem, 4.2vw, 4rem);
+  line-height: 1.12;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--mode-title);
+  max-width: 14em;
+}
+
+.invite-landing__lede {
+  margin: 0;
+  font-size: clamp(1.125rem, 1.6vw, 1.375rem);
+  line-height: 1.45;
+  color: var(--mode-body);
+  max-width: 26em;
+}
+
+/* The invite card: brand outline, the pure-white component fill, the envelope
+   mark astride the top border, and the CTA as the card's own bottom edge. */
+.invite-landing__aside {
+  justify-self: end;
+  width: 100%;
+  max-width: 30rem;
+  margin-top: var(--sp-16);
+}
+
+.invite-card {
+  position: relative;
+  display: grid;
+  background: var(--surface);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+}
+
+.invite-card__icon {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  padding-inline: var(--sp-12);
+  background: var(--surface);
+  color: var(--brand);
+  line-height: 0;
+}
+
+.invite-card__email {
+  margin: 0;
+  padding: clamp(var(--sp-64), 6vw, var(--sp-96)) var(--sp-24)
+    clamp(var(--sp-48), 5vw, var(--sp-80));
+  text-align: center;
+  font-size: clamp(1.375rem, 2vw, 1.75rem);
+  font-weight: 500;
+  color: var(--brand);
+  overflow-wrap: anywhere;
+}
+
+.invite-card__cta.btn {
+  width: 100%;
+  min-height: 3.5rem;
+  border-radius: 0;
+}
+
+.invite-card__terms {
+  margin: var(--sp-12) 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--grey);
+}
+.invite-card__terms a { color: inherit; text-decoration: underline; }
+
+/* Fixed to the corner on every viewport; the page reserves bottom room so the
+   stacked mobile layout can scroll its last content clear of it. The secondary
+   tier is transparent at rest, so it re-reads its rest background from the
+   component fill to stay legible over anything it floats above. */
+.invite-landing__help {
+  position: fixed;
+  right: var(--sp-32);
+  bottom: var(--sp-32);
+  --r-bg: var(--surface);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 900px) {
+  .invite-landing { padding-bottom: var(--sp-120); }
+  .invite-landing__grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: var(--sp-64);
+  }
+  .invite-landing__aside {
+    justify-self: stretch;
+    max-width: 28rem;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .invite-landing__help { right: var(--sp-16); bottom: var(--sp-16); }
+}

@@ -628,11 +628,17 @@ describe('§33.1.1 a personalized draft opens without an account and grants no o
       if (secret === 'Ada Admin') continue; // §7 requires the sender to be named
       expect(serialised).not.toContain(secret);
     }
+    // `recipientEmail` and `lastContactAt` are the Founder's OWN facts — the
+    // address this link arrived at, and when we last spoke to them — not
+    // operational data. The operational set (source, owner, notes, evidence)
+    // stays out, and the loop above proves it by value.
     expect(Object.keys(res.body).sort()).toEqual([
       'expectedSetupTime',
+      'lastContactAt',
       'noGuarantee',
       'processSummary',
       'productName',
+      'recipientEmail',
       'recipientName',
       'reference',
       'senderName',

@@ -748,10 +748,14 @@ export const setNextCampaignReadiness = (
 
 export interface DraftLanding {
   recipientName: string;
+  /** The address the invitation reached — the Founder's own (§26.2). */
+  recipientEmail: string | null;
   productName: string;
   whatWeUnderstood: string | null;
   senderName: string | null;
   expectedSetupTime: string | null;
+  /** §7's "when we last spoke", as an ISO instant. Null when unrecorded. */
+  lastContactAt: string | null;
   reference: string;
   processSummary: string[];
   noGuarantee: string;

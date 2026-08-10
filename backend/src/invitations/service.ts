@@ -844,10 +844,22 @@ export async function revokeInvitation(
  */
 export interface DraftLanding {
   recipientName: string;
+  /**
+   * The address the invitation was actually sent to. It is the Founder's own —
+   * the token that unlocks this read arrived AT that address — so showing it
+   * back to them reveals nothing they do not already hold (§26.2).
+   */
+  recipientEmail: string | null;
   productName: string;
   whatWeUnderstood: string | null;
   senderName: string | null;
   expectedSetupTime: string | null;
+  /**
+   * §7's "when we last spoke" — the discovery-call record the landing greets
+   * them with ("~3 mins" since the meeting). The instant, never a rendering:
+   * the surface formats it against ITS clock, not the server's.
+   */
+  lastContactAt: Date | null;
   reference: string;
 }
 
@@ -859,7 +871,12 @@ export async function readDraftLanding(
     .select({
       legalName: founderProspects.legalName,
       preferredName: founderProspects.preferredName,
+      email: founderProspects.email,
+      lastContactAt: founderProspects.lastContactAt,
       productName: founderProspects.productName,
+      overrideRecipientName: campaignDrafts.overrideRecipientName,
+      overrideRecipientEmail: campaignDrafts.overrideRecipientEmail,
+      overrideProduct: campaignDrafts.overrideProduct,
       whatWeUnderstood: campaignDrafts.whatWeUnderstood,
       senderName: campaignDrafts.senderName,
       expectedSetupTime: campaignDrafts.expectedSetupTime,
@@ -874,12 +891,18 @@ export async function readDraftLanding(
 
   if (!row || row.anonymisedAt) return null;
 
+  // The same resolution `resolvedRecipient`/`variablesFor` apply: the message
+  // that went out greeted the override where one exists, and the page the link
+  // opens must greet the same person by the same name — anything else has the
+  // email and the landing telling two stories (§27.1).
   return {
-    recipientName: row.preferredName || row.legalName || '',
-    productName: row.productName || '',
+    recipientName: row.overrideRecipientName ?? (row.preferredName || row.legalName || ''),
+    recipientEmail: row.overrideRecipientEmail ?? row.email,
+    productName: (row.overrideProduct ?? row.productName) || '',
     whatWeUnderstood: row.whatWeUnderstood,
     senderName: row.senderName,
     expectedSetupTime: row.expectedSetupTime,
+    lastContactAt: row.lastContactAt,
     reference: row.campaignId,
   };
 }

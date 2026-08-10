@@ -251,15 +251,38 @@ export function useButtonProgress() {
       ref: RefObject<HTMLElement | null>,
       work: () => Promise<unknown>,
     ): Promise<void> => {
-      const btn = ref.current;
+      const btn = ref.current as ProgressButton | null;
       if (!runtime || !btn) {
         await work();
         return;
       }
-      await runtime.buttonProgress(btn, work);
+      /*
+       * The runtime takes the PROMISE, not the callback.
+       *
+       * `buttonProgress` decides what to wait on with `typeof work.then ===
+       * 'function'` and substitutes a 1.2-second timer for anything that is
+       * not thenable — so handing it the function played the entire morph,
+       * finished on a tick, and never called the work. Every submit behind
+       * this hook looked like it had succeeded and sent nothing.
+       *
+       * The jsdom suites cannot see it: `window.Proovd` is never defined
+       * there, so the tests take the fallback above, which does call it.
+       */
+      if (btn.__pvBusy) return;
+      await runtime.buttonProgress(btn, work());
     },
     [runtime],
   );
+}
+
+/**
+ * The runtime marks the element while a morph is in flight and drops a second
+ * `buttonProgress` call until it clears. That guard is read before the work
+ * starts, above: a request whose result the morph would throw away is worse
+ * than no request.
+ */
+interface ProgressButton extends HTMLElement {
+  __pvBusy?: boolean;
 }
 
 /**

@@ -85,10 +85,14 @@ export const QA_CHARGE_RULE =
 
 const draftLanding: DraftLanding = {
   recipientName: 'Rae Harlow',
+  recipientEmail: 'rae@harlow-instruments.example',
   productName: QA.title,
   whatWeUnderstood: 'A machined desk lamp for people who solder at their kitchen table.',
   senderName: 'Sam at Proovd',
   expectedSetupTime: 'About 20 minutes',
+  // A recent discovery call, minted relative to the sweep's own run so the
+  // landing renders the elapsed-time line rather than hiding it.
+  lastContactAt: new Date(Date.now() - 3 * 60_000).toISOString(),
   reference: 'PVD-QA100-QA200',
   processSummary: [
     'You answer four questions about the problem, your solution, and the competition.',
