@@ -35,6 +35,15 @@ beforeEach(() => {
       const result = handler(url, init);
       if (result) return respond(result.status, result.body);
     }
+    // Every Creator address sits behind a role guard now, so a render begins by
+    // asking who is signed in. Answered here rather than in each case; a case
+    // that wants a different session — a signed-out one, say — registers its
+    // own handler, which is matched first.
+    if (url.endsWith('/api/account/me')) {
+      return respond(200, {
+        account: { role: 'affiliate', email: 'creator@example.com', name: 'A Creator' },
+      });
+    }
     return respond(404, { error: 'not_found', title: 'No stub' });
   });
 });

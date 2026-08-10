@@ -15,28 +15,40 @@
  * Phase 06's trap: "the Admin panel is a dashboard; nothing else is" — sharing
  * chrome is how its density leaks into a Founder surface.
  *
+ * ── This component is now PROTECTED-ONLY, and that is the fix ───────────────
+ * It used to carry three branches: loading, signed-out, and signed-in — and the
+ * signed-out one rendered `AdminSignIn` INSIDE the frame. So the wordmark, the
+ * section tabs, the Explore control, and the environment chip were on screen
+ * for anybody who typed `/admin`. No data leaked; every request behind them
+ * 401s. But an operations chrome shown to a stranger tells them what exists,
+ * and the URL said `/admin` while what you were looking at was a login form.
+ *
+ * There is no signed-out branch any more. `RequireRole` in `routes.tsx` decides
+ * before this component renders at all, and sends an unauthenticated visitor to
+ * `/admin/signin` — its own address, its own minimal shell. The absence of the
+ * branch is what keeps the leak from coming back: there is nowhere to put it.
+ *
  * ── Three of the four sections are parked, and they are still shown ─────────
  * Today, Campaigns, and Creators have no workspace yet. Hiding them would make
  * the shell describe a one-section product; showing them enabled would claim a
  * capability that does not exist (§1.4). So they are `aria-disabled`, still
- * reachable by keyboard, and each one names what it is when pressed. Founders
- * is the only real destination, so it is the only real link — a control that
- * navigates is an anchor, and a control that explains itself is a button.
+ * reachable by keyboard, and each one names what it is when pressed.
  *
  * ── The environment chip never claims a mode it did not check ───────────────
  * `TEST MODE` is the single most consequential sentence this page could say,
  * and a hardcoded chip says it whether or not anybody asked. So it renders only
  * from `identity.environment`, and its absence renders nothing at all.
  *
- * ── The session gate is a rendering convenience, not a security control ─────
- * `/api/admin/me` decides whether an Admin is signed in, and every other route
- * re-checks independently on the server. This component would be pointless to
- * bypass: doing so would render empty surfaces whose data requests all 401.
+ * ── None of this is the security boundary ───────────────────────────────────
+ * `/api/admin/*` is decided by `requireAdmin` on the server for every request.
+ * This component decides what is drawn.
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { NavLink, Outlet } from 'react-router';
-import { Button, StatePanel } from '../../components/index.js';
+import { NavLink, Outlet, useNavigate } from 'react-router';
+import { Button, Measure, Section, StatePanel } from '../../components/index.js';
+import { supportMailto } from '../../features/public/states.js';
+import { invalidateSession } from '../../lib/session.js';
 import {
   fetchAdminIdentity,
   signOut,
@@ -44,36 +56,48 @@ import {
   type AdminEnvironment,
   type AdminIdentity,
 } from './api.js';
-import { AdminSignIn } from './AdminSignIn.js';
 import { useParkedControl } from './founders/parked.js';
 
-type SessionState =
+type IdentityState =
   | { status: 'loading' }
+  | { status: 'ready'; identity: AdminIdentity }
+  /**
+   * `RequireRole` said this session is an Admin and `/api/admin/me` then
+   * refused it. In practice that means the session ended in the moment between
+   * the two reads.
+   *
+   * It is rendered as a terminal state with a LINK, deliberately, rather than
+   * an automatic redirect to `/admin/signin`. An automatic one is a redirect
+   * loop waiting for the two reads to disagree persistently: the door would see
+   * a valid Admin session, send them to the panel, the panel would be refused
+   * again, and the two would bounce forever with nothing on screen. A link ends
+   * the loop by requiring a person, and it says what happened on the way.
+   */
   | { status: 'signed_out' }
-  /** Signed in, but without a registered TOTP factor — §5.1 admits nobody. */
-  | { status: 'mfa_required'; title: string; whatHappened?: string | undefined; next?: string | undefined }
-  | { status: 'signed_in'; identity: AdminIdentity };
+  | { status: 'unavailable'; title: string; whatHappened: string; next: string };
 
 export function AdminLayout() {
-  const [session, setSession] = useState<SessionState>({ status: 'loading' });
+  const navigate = useNavigate();
+  const [state, setState] = useState<IdentityState>({ status: 'loading' });
 
   const load = useCallback(async () => {
     try {
       const identity = await fetchAdminIdentity();
-      setSession({ status: 'signed_in', identity });
+      setState({ status: 'ready', identity });
     } catch (error) {
-      if (error instanceof AdminRequestError) {
-        if (error.detail.error === 'mfa_enrollment_required') {
-          setSession({
-            status: 'mfa_required',
-            title: error.detail.title,
-            whatHappened: error.detail.whatHappened,
-            next: error.detail.next,
-          });
-          return;
-        }
+      const detail = error instanceof AdminRequestError ? error.detail : null;
+      if (detail && (detail.status === 401 || detail.status === 403)) {
+        setState({ status: 'signed_out' });
+        return;
       }
-      setSession({ status: 'signed_out' });
+      setState({
+        status: 'unavailable',
+        title: detail?.title ?? 'Proovd could not be reached',
+        whatHappened:
+          detail?.whatHappened ??
+          'The request that loads the Admin panel did not come back. Nothing has been changed.',
+        next: detail?.next ?? 'Reload this page. If it keeps happening, contact support.',
+      });
     }
   }, []);
 
@@ -81,56 +105,98 @@ export function AdminLayout() {
     void load();
   }, [load]);
 
-  if (session.status === 'loading') {
+  // The cached identity is cleared as soon as the two reads disagree, so the
+  // next thing the person does re-asks the server rather than acting on an
+  // answer that has already been contradicted. The navigation is NOT automatic
+  // — see the note on `signed_out` above.
+  useEffect(() => {
+    if (state.status === 'signed_out') invalidateSession();
+  }, [state.status]);
+
+  const onSignOut = useCallback(async () => {
+    try {
+      await signOut();
+    } finally {
+      // Cleared whether or not the call succeeded. A cached identity that
+      // outlives the cookie is the client/server disagreement this whole
+      // module exists to end — and if sign-out failed, the next server request
+      // will refuse anyway, which is the truthful outcome.
+      invalidateSession();
+      navigate('/admin/signin', { replace: true });
+    }
+  }, [navigate]);
+
+  // Both of the states below render OUTSIDE `AdminFrame`, deliberately. A
+  // person who is not — or is no longer — an authorized Admin never sees the
+  // shell, including for the fraction of a second the identity read takes.
+  if (state.status === 'loading') {
     return (
-      <AdminFrame>
-        <StatePanel
-          state="Checking your session"
-          whatHappened="Proovd is confirming who you are before showing anything."
-          next="The panel appears as soon as that comes back."
-          owner="Proovd"
-          nextUpdate="Within a few seconds"
-          action="No action needed"
-          reference="Admin panel"
-        />
-      </AdminFrame>
+      <Section>
+        <Measure>
+          <StatePanel
+            state="Opening the Admin panel"
+            whatHappened="Proovd is confirming your account before showing anything."
+            next="The panel appears as soon as that comes back."
+            owner="Proovd"
+            nextUpdate="Within a few seconds"
+            action="No action needed"
+            reference="Admin panel"
+          />
+        </Measure>
+      </Section>
     );
   }
 
-  if (session.status === 'signed_out') {
+  if (state.status === 'signed_out') {
     return (
-      <AdminFrame>
-        <AdminSignIn onSignedIn={load} />
-      </AdminFrame>
+      <Section>
+        <Measure>
+          <StatePanel
+            state="Your session has ended"
+            whatHappened="Proovd checked your account and the Admin panel would not open for it. That usually means the session expired while this page was loading."
+            next="Sign in again and you will come straight back here. Nothing has been changed."
+            owner="You"
+            nextUpdate="When you sign in"
+            action={
+              <Button tier="primary" onClick={() => navigate('/admin/signin', { replace: true })}>
+                Sign in to Proovd Admin
+              </Button>
+            }
+            reference="Admin panel"
+            getHelp={{ href: supportMailto('My Admin session keeps ending') }}
+            ring
+          />
+        </Measure>
+      </Section>
     );
   }
 
-  if (session.status === 'mfa_required') {
+  if (state.status === 'unavailable') {
     return (
-      <AdminFrame>
-        <StatePanel
-          state={session.title}
-          whatHappened={
-            session.whatHappened ??
-            'Admin accounts require an authenticator app. This one does not have it yet.'
-          }
-          next={session.next ?? 'Register an authenticator app, then sign in again.'}
-          owner="You"
-          nextUpdate="When you finish enrolling"
-          action={
-            <Button tier="tertiary" onClick={() => void signOut().then(load)}>
-              Sign out
-            </Button>
-          }
-          reference="Admin account security"
-          ring
-        />
-      </AdminFrame>
+      <Section>
+        <Measure>
+          <StatePanel
+            state={state.title}
+            whatHappened={state.whatHappened}
+            next={state.next}
+            owner="Proovd"
+            nextUpdate="When you reload"
+            action={
+              <Button tier="primary" onClick={() => void load()}>
+                Try again
+              </Button>
+            }
+            reference="Admin panel"
+            getHelp={{ href: supportMailto('The Admin panel will not load') }}
+            ring
+          />
+        </Measure>
+      </Section>
     );
   }
 
   return (
-    <AdminFrame identity={session.identity} onSignOut={() => void signOut().then(load)}>
+    <AdminFrame identity={state.identity} onSignOut={() => void onSignOut()}>
       <Outlet />
     </AdminFrame>
   );
@@ -138,8 +204,14 @@ export function AdminLayout() {
 
 interface AdminFrameProps {
   children: ReactNode;
-  identity?: AdminIdentity;
-  onSignOut?: () => void;
+  /**
+   * Required, not optional. The frame used to accept `undefined` so it could
+   * wrap the signed-out sign-in form; making it required is what makes it
+   * impossible to render this chrome without an authenticated identity behind
+   * it.
+   */
+  identity: AdminIdentity;
+  onSignOut: () => void;
 }
 
 function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
@@ -176,20 +248,16 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
         </nav>
 
         <div className="topbar__right">
-          <EnvironmentChip environment={identity?.environment} />
+          <EnvironmentChip environment={identity.environment} />
           {/* Parked: the §26.5 ledger, money controls, and risk panels are
               their own workspaces and are supplied separately. */}
           <Button tier="secondary" small {...parked('tabs')}>
             Explore
           </Button>
-          {identity ? (
-            <>
-              <span className="envmeta">{identity.name || identity.email}</span>
-              <Button tier="tertiary" small onClick={onSignOut}>
-                Sign out
-              </Button>
-            </>
-          ) : null}
+          <span className="envmeta">{identity.name || identity.email}</span>
+          <Button tier="tertiary" small onClick={onSignOut}>
+            Sign out
+          </Button>
         </div>
       </header>
 

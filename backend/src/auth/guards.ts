@@ -2,11 +2,18 @@
  * Route guards for the three account roles (§5.1, §5.2, §5.3, §28.2).
  *
  * Every guard here **fails closed**. No session, an unreadable session, a
- * database error, a missing role, an Admin without a registered factor, a
- * session older than the reauthentication window — each of these blocks the
- * request. None of them logs a warning and proceeds. §33.12.5 tests precisely
- * that: "MFA is enforced and sensitive action without recent reauthentication
- * fails safely."
+ * database error, a missing or unrecognised role, a role that is not permitted
+ * here, a session older than the reauthentication window — each of these blocks
+ * the request. None of them logs a warning and proceeds. §33.12.5 tests
+ * precisely that: a sensitive action without recent reauthentication fails
+ * safely.
+ *
+ * ── These guards are the security boundary. The browser is not ──────────────
+ * The frontend is a static SPA: it ships one `index.html` to everybody, and
+ * every route guard in it decides what to RENDER, never what may be read or
+ * written. Assume any client-side check has been bypassed — the answer to
+ * "may this request happen?" is decided here and in each handler's own
+ * ownership scoping, and nowhere else.
  *
  * These errors are not the token surface and must not copy its silence. A
  * signed-in Admin who needs to reauthenticate has already proved who they are;
@@ -23,8 +30,12 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   name: string;
+  /**
+   * The authoritative role, read from the session's own user row on every
+   * request. Never from a request body, a header, a query parameter, or
+   * anything the caller can write.
+   */
   role: ProovdRole;
-  twoFactorEnabled: boolean;
 }
 
 export interface AuthenticatedSession {
@@ -73,7 +84,6 @@ async function loadSession(
       email: result.user.email,
       name: result.user.name,
       role: raw['role'],
-      twoFactorEnabled: raw['twoFactorEnabled'] === true,
     },
     session: {
       id: result.session.id,
@@ -138,31 +148,19 @@ export function requireRole(auth: Auth, ...allowed: ProovdRole[]): RequestHandle
 }
 
 /**
- * Admin, with a registered TOTP factor. §5.1: "Email/password authentication
- * and MFA are mandatory." §28.2: "MFA required."
+ * Admin. The one gate every `/api/admin` route is mounted behind — 45 call
+ * sites, and no route anywhere reaches an Admin capability through a looser
+ * check (nothing calls `requireRole(auth, 'admin')` directly, deliberately, so
+ * that this stays the single place the Admin boundary is decided).
  *
- * Mandatory means an Admin without a factor cannot reach any operational
- * surface — not a nag banner, not a reminder on next login. The plugin makes
- * enrolment possible; this refusal is what makes it required.
+ * Until 2026-08-10 this additionally demanded a registered TOTP factor, which
+ * was removed by product direction (see `auth.ts`). It is still a real
+ * authorization decision and not a formality: an authenticated Founder or
+ * Creator reaching any Admin route is refused here, on the server, whatever the
+ * browser rendered.
  */
 export function requireAdmin(auth: Auth): RequestHandler {
-  const roleGuard = requireRole(auth, 'admin');
-  return async function adminGuard(req: Request, res: Response, next: NextFunction) {
-    roleGuard(req, res, () => {
-      if (!req.authUser?.twoFactorEnabled) {
-        res.status(403).json({
-          error: 'mfa_enrollment_required',
-          title: 'Set up two-factor authentication to continue',
-          whatHappened:
-            'Admin accounts require an authenticator app. This one does not have it yet.',
-          next: 'Register an authenticator app, then sign in again.',
-          action: '/admin/security/two-factor',
-        });
-        return;
-      }
-      next();
-    });
-  };
+  return requireRole(auth, 'admin');
 }
 
 /**
@@ -242,7 +240,10 @@ export function requireFreshSession(auth: Auth, window: FreshnessWindow): Reques
           'This action moves money or changes a live campaign, so it needs a recent sign-in. ' +
           'Yours is older than the window Proovd allows.',
         next: 'Sign in again and we will bring you straight back here. Nothing has been changed.',
-        action: '/sign-in',
+        // `/signin`, not `/sign-in`: the route table declares `path: 'signin'`
+        // and a guard that hands somebody a 404 is §1.4's failure in the one
+        // place a person is already stuck.
+        action: '/signin',
         support: '/support',
       });
       return;

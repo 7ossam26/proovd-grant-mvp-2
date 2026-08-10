@@ -13,11 +13,17 @@
  * "No public signup" — stops being true.
  *
  * ── What it does not do ─────────────────────────────────────────────────────
- * It does not enrol a TOTP factor. It cannot: enrolment needs the person and
- * their authenticator app. A seeded Admin therefore lands with
- * `twoFactorEnabled: false` and `requireAdmin` refuses them every operational
- * surface until they enrol — which is exactly what §5.1's "MFA is mandatory"
- * means when read as a requirement rather than a recommendation.
+ * It does not create a session, and it never has. Seeding an account is not
+ * signing in: the seeded person still has to present the password at
+ * `/api/auth/sign-in/email` like anybody else, which is what keeps this from
+ * being a bootstrap that doubles as a back door.
+ *
+ * It also takes the role as a required parameter with no default, so every
+ * caller states which kind of account it is creating. There are exactly two
+ * non-test callers in the product — the Founder claim and the Creator claim —
+ * and both hardcode their own role from the verified invitation token rather
+ * than reading one out of a request (see `vetting/claim.ts` and
+ * `affiliates/signup.ts`). No HTTP path anywhere lets a caller choose.
  */
 
 import type { Auth } from './auth.js';

@@ -257,7 +257,7 @@ export function createPayoutRouter({
         // were never confused.
         mode: gateway.mode,
         actor: `user:${req.authUser?.id ?? 'unknown'}`,
-        mfaContext: req.authUser?.twoFactorEnabled ? 'totp' : null,
+        mfaContext: req.authUser ? 'password_session_admin_role_verified' : null,
         reauthContext: `session:${req.authSession?.id ?? 'unknown'}`,
       });
 

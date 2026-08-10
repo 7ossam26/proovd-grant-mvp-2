@@ -494,7 +494,7 @@ describe('§33.7.4 — threshold miss and pre-charge kill create no PaymentInten
         reasonDetail: 'test kill before capture',
         customerExplanation: 'This campaign was ended by Proovd before any charge occurred.',
         actor: 'admin:test',
-        mfaContext: 'totp:verified',
+        mfaContext: 'password_session_admin_role_verified',
         reauthContext: 'fresh',
       },
     );

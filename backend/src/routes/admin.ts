@@ -4,8 +4,11 @@
  * This is the first product surface any guard is mounted on. Phase 04 built
  * `requireSession` / `requireRole` / `requireAdmin` / `requireFreshSession` and
  * mounted them on nothing, because Phase 05 was entirely public. Everything
- * below `/api/admin` now goes through `requireAdmin`, which means: a session,
- * the `admin` role, and a registered TOTP factor. All three, or 401/403.
+ * below `/api/admin` now goes through `requireAdmin`, which means: a valid
+ * session and the `admin` role. Both, or 401/403. (The registered TOTP factor
+ * this line used to name as a third condition was removed on 2026-08-10 —
+ * see `auth/auth.ts`. The role check is unchanged and is still decided here,
+ * on the server, whatever the browser rendered.)
  *
  * ── Which routes additionally demand recent reauthentication ────────────────
  * §5.1 names the category — "money movement, refund, connected-account,
@@ -52,9 +55,13 @@ function actorOf(req: express.Request): string {
 
 /**
  * §25.6 wants the MFA and reauthentication context on high-impact events.
- * `requireAdmin` has already refused anyone without a registered factor, and
- * `requireFreshSession` has already refused a session older than the window, so
- * what is recorded here is what those guards actually established.
+ *
+ * The column stays; the VALUE tells the truth. What the guards actually
+ * established is a password-backed session carrying the `admin` role
+ * (`requireAdmin`) that is newer than the §6 window (`requireFreshSession`).
+ * It no longer says `totp`, because since 2026-08-10 there is no second factor
+ * to assert — and an audit row claiming one would be a false record in the one
+ * table §25.6 exists to make trustworthy.
  */
 function securityContext(req: express.Request): {
   mfaContext: string;
@@ -62,7 +69,7 @@ function securityContext(req: express.Request): {
 } {
   const session = req.authSession;
   return {
-    mfaContext: 'totp_factor_registered',
+    mfaContext: 'password_session_admin_role_verified',
     reauthContext: session
       ? `session_established_at=${session.createdAt.toISOString()}`
       : 'session_unavailable',

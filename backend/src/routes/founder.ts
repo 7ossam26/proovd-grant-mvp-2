@@ -14,12 +14,20 @@
  * server-side authorization on every surface and a read of another Founder's
  * unreleased product information is the same breach as a write.
  *
- * ── No TOTP ────────────────────────────────────────────────────────────────
- * §5.1 makes a second factor Admin's rule. §5.2 gives the Founder "email +
- * password or Google sign-in". Requiring a factor the Spec does not ask for
- * would lock out every Founder who claimed an account in Phase 07, and
- * inventing an authentication policy is as much a §1 rule 6 violation as
- * inventing a commercial one.
+ * ── No second factor ───────────────────────────────────────────────────────
+ * §5.2 gives the Founder "email + password or Google sign-in". Requiring a
+ * factor the Spec does not ask for would lock out every Founder who claimed an
+ * account in Phase 07, and inventing an authentication policy is as much a §1
+ * rule 6 violation as inventing a commercial one.
+ *
+ * §5.1 used to make one Admin's rule; that layer was removed on 2026-08-10 by
+ * product direction (see `auth/auth.ts`). Nothing here changes — this route
+ * never had one.
+ *
+ * What this prefix DOES carry, mounted in `app.ts` ahead of every route below:
+ * the §29.8 policy-reacceptance gate and the §26.7/§22.7 standing gate, both
+ * decided per request so a suspension or a ban reaches a session that already
+ * exists rather than waiting for it to expire.
  *
  * ── What is deliberately absent ────────────────────────────────────────────
  * There is no route that sets an item complete, no route that sets the fee, and

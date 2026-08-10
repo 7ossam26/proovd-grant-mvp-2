@@ -52,7 +52,7 @@ import type { LiveCampaignResponse } from '../public/campaign/api.js';
 import type { Quote, PreorderSuccess } from '../public/checkout/api.js';
 import type { DigestPreferenceView } from '../../surfaces/notifications/DigestPreference.js';
 import type { HistoryEntry } from '../../surfaces/notifications/NotificationHistory.js';
-import type { StubRoute } from './server.js';
+import { qaSessionRole, type StubRoute } from './server.js';
 
 /* ── The one campaign every surface is rendering ───────────────────────────── */
 
@@ -1448,6 +1448,31 @@ const founderWorkspace: FounderWorkspaceDetail = {
  */
 
 export const QA_ROUTES: StubRoute[] = [
+  /*
+   * The session read, first — every Founder and Creator address is behind a
+   * role guard, so a flow that cannot answer "who is signed in?" renders the
+   * guard's waiting state instead of the flow, and §33.11.1's "a surface
+   * showing its error state is not the flow" would be silently violated.
+   *
+   * The role is derived from the flow's own address rather than fixed, for the
+   * same reason the rest of these fixtures share ONE campaign: a Creator flow
+   * rendered against a Founder session would render a refusal and pass axe
+   * with nothing on the page.
+   *
+   * Admin flows have their own `/api/admin/me` fixture further down; this is
+   * the account-level read every role performs.
+   */
+  {
+    match: /\/api\/account\/me$/,
+    body: () => ({
+      account: {
+        role: qaSessionRole(),
+        email: 'someone@example.com',
+        name: 'Someone',
+      },
+    }),
+  },
+
   /* Draft (§7, §9, §10) */
   { match: /\/api\/draft\/[^/]+\/vetting$/, body: vetting },
   { match: /\/api\/draft\/[^/]+\/creator-signal$/, body: creatorSignal },

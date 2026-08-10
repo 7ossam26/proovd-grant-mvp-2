@@ -13,12 +13,16 @@
  * an association belonging to someone else answers `not_found` — the same
  * answer as one that does not exist, so nothing can be enumerated.
  *
- * ── No TOTP here, and that is §5.1's rule, not an omission ─────────────────
- * §5.1 makes a second factor mandatory for Admin. §5.3 gives the Affiliate
- * "email + password, private campaign-specific invitation only". Requiring a
- * factor the Spec does not ask for would lock out every Creator who signed up
- * under 08b, and inventing an authentication policy is as much a §1 rule 6
- * violation as inventing a commercial one.
+ * ── No second factor here, and that is the Spec's rule, not an omission ────
+ * §5.3 gives the Affiliate "email + password, private campaign-specific
+ * invitation only". Requiring a factor the Spec does not ask for would lock out
+ * every Creator who signed up under 08b, and inventing an authentication policy
+ * is as much a §1 rule 6 violation as inventing a commercial one.
+ *
+ * §5.1 used to make a second factor mandatory for Admin, which is the contrast
+ * this note was written against. That layer was removed on 2026-08-10 by
+ * product direction (see `auth/auth.ts`), so no role has one now — which
+ * changes nothing here, because this route never had one to lose.
  *
  * ── What is deliberately absent ────────────────────────────────────────────
  * Accept, decline, propose, activate. §10: the Creator "cannot accept, decline,

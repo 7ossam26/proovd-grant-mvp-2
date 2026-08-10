@@ -198,11 +198,11 @@ export const LIVE_MODE_CONDITIONS: readonly LiveModeCondition[] = [
     key: 'admin_security',
     ordinal: 8,
     requirement:
-      'Admin MFA, reauthentication, audit, and token security pass.',
+      'Admin authentication, role authorization, reauthentication, audit, and token security pass.',
     specRef: '§34, §5.1, §25.6, §28.1, §33.12.5',
     verification: 'suite',
     cannotBeAutomatedBecause:
-      'Parts of this ARE observable — the guards are mounted, the audit tables have no UPDATE grant, `user.phone_verified` is CHECK-pinned false. But §34 asks whether the tests pass, and the ones that matter drive a stale session, an unenrolled factor, and a token rejection through real HTTP. A live check of the mounted routes would report the half it can see as the whole answer.',
+      'Parts of this ARE observable — the guards are mounted, the audit tables have no UPDATE grant, `user.phone_verified` is CHECK-pinned false. But §34 asks whether the tests pass, and the ones that matter drive a stale session, a wrong-role session, and a token rejection through real HTTP. A live check of the mounted routes would report the half it can see as the whole answer. NOTE (2026-08-10): §5.1 and §28.2 require Admin MFA and this deployment no longer has a second factor — it was removed by product direction. The condition was restated to name the controls that DO exist rather than to quietly keep asserting one that does not; whoever signs this off is signing off a deployment where a password plus the reauthentication window is the whole of Admin authentication.',
     provedBy: [
       'backend/src/tests/system-contract.test.ts',
       'backend/src/tests/admin-settings.test.ts',

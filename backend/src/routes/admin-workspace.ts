@@ -159,7 +159,7 @@ export function createAdminWorkspaceRouter({ db, auth }: AdminWorkspaceDeps): Ro
       // database cannot see.
       await db.insert(auditEvents).values({
         actor: actorOf(req),
-        mfaContext: req.authUser?.twoFactorEnabled ? 'totp' : null,
+        mfaContext: req.authUser ? 'password_session_admin_role_verified' : null,
         reauthContext: `session:${req.authSession?.id ?? 'unknown'}`,
         targetType: 'campaign_optional_item',
         targetId: `${campaignId}:${item}`,
@@ -206,7 +206,7 @@ export function createAdminWorkspaceRouter({ db, auth }: AdminWorkspaceDeps): Ro
 
       await db.insert(auditEvents).values({
         actor: actorOf(req),
-        mfaContext: req.authUser?.twoFactorEnabled ? 'totp' : null,
+        mfaContext: req.authUser ? 'password_session_admin_role_verified' : null,
         reauthContext: `session:${req.authSession?.id ?? 'unknown'}`,
         targetType: 'campaign_optional_item',
         targetId: `${campaignId}:${item}`,
@@ -284,7 +284,7 @@ export function createAdminWorkspaceRouter({ db, auth }: AdminWorkspaceDeps): Ro
 
       await db.insert(auditEvents).values({
         actor: actorOf(req),
-        mfaContext: req.authUser?.twoFactorEnabled ? 'totp' : null,
+        mfaContext: req.authUser ? 'password_session_admin_role_verified' : null,
         reauthContext: `session:${req.authSession?.id ?? 'unknown'}`,
         targetType: 'campaign_optional_item',
         targetId: `${campaignId}:${item}`,

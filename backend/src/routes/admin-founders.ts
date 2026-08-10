@@ -160,7 +160,7 @@ function whoOf(req: Request): ActorContext {
   const session = req.authSession;
   return {
     actor: actorOf(req),
-    mfaContext: 'totp_factor_registered',
+    mfaContext: 'password_session_admin_role_verified',
     reauthContext: session
       ? `session_established_at=${session.createdAt.toISOString()}`
       : 'session_unavailable',

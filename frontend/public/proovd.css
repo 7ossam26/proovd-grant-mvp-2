@@ -2695,3 +2695,25 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   .fdr-name:hover::after,
   .camp-link:hover::after { transform: scaleX(1); }
 }
+
+/* ══════════════════════════════════════════════════════════ 2026-08-10 · auth */
+/* The Admin sign-in page, standing on its own.
+
+   It used to render inside `.topbar`'s shell as the signed-out branch of the
+   Admin layout, which put the wordmark, the four section tabs, the Explore
+   control, and the environment chip in front of anybody who typed /admin. It
+   is now its own route with its own minimal frame: the wordmark, the form, and
+   nothing that describes what is behind the door.
+
+   `.admin-signin` above already owns the column; this only supplies the page
+   it now has to sit on by itself, since there is no `.views` wrapper around it
+   any more. */
+.admin-auth {
+  min-height: 100vh;
+  display: grid;
+  align-content: start;
+  padding: var(--sp-24);
+  background: var(--mode-bg);
+}
+.admin-auth .wordmark { justify-self: center; }
+.admin-auth .admin-signin { justify-items: stretch; }

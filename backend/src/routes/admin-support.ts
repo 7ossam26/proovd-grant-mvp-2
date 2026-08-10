@@ -82,7 +82,7 @@ function actorOf(req: express.Request): string {
 function securityContext(req: express.Request): { mfaContext: string; reauthContext: string } {
   const session = req.authSession;
   return {
-    mfaContext: 'totp_factor_registered',
+    mfaContext: 'password_session_admin_role_verified',
     reauthContext: session
       ? `session_established_at=${session.createdAt.toISOString()}`
       : 'session_unavailable',

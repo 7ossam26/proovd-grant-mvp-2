@@ -255,7 +255,7 @@ This is not four login types.
 
 | Actor | Mechanism | Library |
 |---|---|---|
-| **Admin** | Email + password, **mandatory TOTP MFA**, short session freshness window for money/refund/connected-account/kill actions | Better Auth + two-factor plugin |
+| **Admin** | Email + password, short session freshness window for money/refund/connected-account/kill actions. **No second factor** — the TOTP layer was removed on 2026-08-10 by product direction; see `backend/src/auth/auth.ts`. Spec §5.1/§28.2 still require MFA, so this is a recorded deviation, and the freshness window is now the only control on a high-impact action | Better Auth |
 | **Founder** | Email + password **or** Google OAuth. Private invitation establishes invited-email ownership | Better Auth |
 | **Affiliate** | Email + password, claimed only through a private campaign-specific invitation. No public signup route exists | Better Auth |
 | **Backer** | **No account.** Long-lived, campaign-scoped magic link | **Custom token table — not Better Auth** |
@@ -467,7 +467,7 @@ Spec §31.9's closing rule is a product constraint, not an analytics one: do not
 ## 15. Security baseline
 
 - helmet, express-rate-limit, CSRF protection on state-changing routes.
-- Admin MFA mandatory; recent-reauthentication gate on money, refund, connected-account, and kill/suspend actions, failing safely when stale (Spec §33.12.5).
+- Recent-reauthentication gate on money, refund, connected-account, and kill/suspend actions, failing safely when stale (Spec §33.12.5). Admin MFA is NOT in force: removed 2026-08-10 by product direction, against §5.1/§28.2 — recorded rather than silently dropped.
 - Raw card data never reaches Proovd servers — Stripe-controlled fields only.
 - Secrets in the Dokploy environment or a secrets manager. Never in the repository, the frontend bundle, email, or documentation.
 - No sensitive value in logs, client bundles, screenshots, or error messages.

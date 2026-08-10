@@ -104,6 +104,27 @@ const schema = z.object({
     .int()
     .positive('ADMIN_REAUTH_WINDOW_SECONDS must be a positive number of seconds'),
 
+  // ── How many reverse proxies sit in front of this process (§28.1) ─────────
+  //
+  // Decides what `req.ip` is, and therefore what every rate limiter keys on —
+  // including §28.1's limit on the credential endpoints.
+  //
+  // Defaults to 0, which means "nothing is in front of me; use the socket
+  // address". That is wrong behind a TLS terminator, and wrong in the safe
+  // direction: every request keys to the proxy and the per-address limits
+  // collapse into one global bucket, which throttles too much rather than not
+  // at all. The alternative default — trusting the header — lets any caller
+  // mint a fresh bucket per request and removes the limit entirely.
+  //
+  // Set this to the number of proxies actually in the chain (Dokploy's single
+  // ingress is 1). Never express it as a boolean: `trust proxy: true` takes
+  // the left-most forwarded address whoever wrote it.
+  TRUST_PROXY_HOPS: z.coerce
+    .number()
+    .int()
+    .min(0, 'TRUST_PROXY_HOPS must be 0 or a positive number of proxy hops')
+    .default(0),
+
   // ── Transactional email (§27.2) ──────────────────────────────────────────
   // Optional to boot, because the app has to start before an Admin can look at
   // the §6 prerequisites panel and see that it is missing. Absent, the panel's

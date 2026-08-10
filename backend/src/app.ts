@@ -15,6 +15,8 @@ import { findAccountForOwner } from './payments/connected-accounts.js';
 import { createEnforcementRouter } from './routes/enforcement.js';
 import { createAccountRouter } from './routes/account.js';
 import { policyReacceptanceGate } from './enforcement/reacceptance.js';
+import { crossOriginWriteGuard } from './auth/origin-guard.js';
+import { founderStandingGate } from './enforcement/standing.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
@@ -90,6 +92,28 @@ export interface AppConfig {
    * next restart to Better Auth's. The settings surface says so.
    */
   adminReauthWindowSeconds: number;
+  /**
+   * How many reverse proxies sit in front of this process, or 0 for none.
+   *
+   * This is a security control, which is why it has no clever default.
+   *
+   *  - Set too LOW (0 behind a proxy, the state this app shipped in): every
+   *    request keys to the proxy's own address, so `express-rate-limit`'s
+   *    per-address limits become one shared global bucket. §28.1's 30
+   *    attempts per quarter-hour on `/api/auth` then means thirty for
+   *    *everybody*, which is simultaneously useless against a distributed
+   *    guesser and a way for one client to lock every real person out of
+   *    signing in.
+   *  - Set too HIGH (or `true`), every client can spoof `X-Forwarded-For` and
+   *    mint a fresh rate-limit bucket per request, which removes the limit
+   *    entirely.
+   *
+   * There is no value that is right without knowing the deployment, so the
+   * operator states it (`TRUST_PROXY_HOPS`) and the unset case keeps the
+   * over-restrictive behaviour rather than the spoofable one — wrong in the
+   * direction that fails closed.
+   */
+  trustProxyHops: number;
   /** Observable facts the §34 live-mode gate reads about this deployment. */
   liveModeEnvironment: LiveModeEnvironment;
   /**
@@ -178,6 +202,18 @@ export interface ProovdApp {
 export function createApp(db: Database, config: AppConfig): ProovdApp {
   const app = express();
 
+  // ── Proxy trust (§28.1) ────────────────────────────────────────────────────
+  // Set before anything that reads `req.ip` — which is every rate limiter
+  // below. Express's own semantics: a NUMBER means "trust exactly this many
+  // hops", so a client cannot lengthen the chain by adding its own
+  // `X-Forwarded-For` entries. `0` leaves `req.ip` as the socket address,
+  // which is correct when nothing is in front of this process.
+  //
+  // Deliberately never `true`. `trust proxy: true` accepts the left-most
+  // forwarded address whoever wrote it, which hands every caller its own
+  // rate-limit bucket.
+  app.set('trust proxy', config.trustProxyHops);
+
   // ── Auth (§5) ──────────────────────────────────────────────────────────────
   // Three account roles through Better Auth; the two account-less surfaces
   // through the token service. Both write to the same immutable audit table.
@@ -208,6 +244,10 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     secret: config.authSecret,
     adminReauthWindowSeconds: config.adminReauthWindowSeconds,
     trustedOrigins: corsOrigins,
+    // The same test the attribution cookie uses (`cookiesSecure` below), so
+    // the session cookie and the attribution cookie can never disagree about
+    // whether this deployment is https.
+    useSecureCookies: config.appBaseUrl.startsWith('https://'),
     sendResetPassword:
       config.sendResetPassword ??
       (async ({ user, url }) => {
@@ -243,7 +283,21 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   );
 
   // ── CORS ───────────────────────────────────────────────────────────────────
+  //
+  // Note what this does NOT do: `cors()` decides which response headers to set,
+  // and blocks nothing. A cross-site POST still reaches the handler, and one
+  // whose response the attacker never reads is a CSRF that succeeded. The guard
+  // below is what refuses it.
   app.use(cors({ origin: corsOrigins, credentials: true }));
+
+  // ── CSRF, second layer (§28.2) ─────────────────────────────────────────────
+  // `SameSite=Lax` on the session cookie is the first, and is what actually
+  // stops a malicious page attaching it. This refuses a state-changing request
+  // whose Origin is present and untrusted — the same idea Better Auth already
+  // applies to `/api/auth/*`, extended to the rest of the API. A missing Origin
+  // passes: that is a non-browser caller with no ambient cookie to borrow,
+  // which includes both signed webhook endpoints. See `auth/origin-guard.ts`.
+  app.use(crossOriginWriteGuard(corsOrigins));
 
   // ── Routes (per-router body parsing — no global express.json()) ────────────
   //
@@ -268,6 +322,18 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // at /api/account/policy-reacceptance, outside both gated prefixes.
   app.use('/api/founder', policyReacceptanceGate(db, auth, 'founder'));
   app.use('/api/creator', policyReacceptanceGate(db, auth, 'affiliate'));
+  // §26.7, §22.7. Account standing decided per request, beside the §29.8
+  // reacceptance gate and for the same reason: a suspension or a ban that only
+  // changes what the Admin workspace SAYS is not enforcement. Before this, an
+  // existing session kept full Founder access until it expired on its own.
+  //
+  // Mounted AFTER the reacceptance gate so a suspended Founder who also owes an
+  // acceptance is told about the suspension — the one that is not theirs to
+  // resolve — rather than being sent to a consent page that would not restore
+  // access. Unauthenticated and non-Founder requests pass through untouched;
+  // there is no Creator equivalent because §29 records Creator enforcement per
+  // association, not per account (see `enforcement/standing.ts`).
+  app.use('/api/founder', founderStandingGate(db, auth));
   // §5, §1.1. "Who is this session?" — the one read that lets a sign-in form
   // send somebody somewhere without asking them which role they hold. Mounted
   // beside the reacceptance routes and outside both gated prefixes above, for
@@ -286,9 +352,8 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   app.use(createAttributionRouter({ db, secret: config.authSecret, secure: cookiesSecure }));
   app.use(createPublicCampaignRouter({ db, secret: config.authSecret }));
   // Phase 06 (§6, §26). The first product routes any guard is mounted on:
-  // everything under /api/admin requires a session, the admin role, and a
-  // registered TOTP factor, and every write additionally requires a recent
-  // sign-in.
+  // everything under /api/admin requires a session and the admin role, and
+  // every write additionally requires a recent sign-in.
   app.use(createAdminRouter({ db, auth }));
   // Phase 24 (§34, Appendix C). The live-mode gate: the eleven conditions with
   // their filed evidence, the one named pilot enablement and its rollback, the
@@ -787,6 +852,68 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       }
     });
   });
+
+  // ── The last-resort error handler ─────────────────────────────────────────
+  //
+  // Until now there was none, so an unhandled throw anywhere in a route fell
+  // through to Express's built-in handler. That has two consequences worth
+  // stating separately, because only one of them is cosmetic:
+  //
+  //  1. Outside production, Express's default writes the STACK TRACE into the
+  //     response body. File paths, function names, and the shape of the query
+  //     that failed all go to the browser. §28.2 says no sensitive value
+  //     reaches a log; a stack in an HTTP body is worse than a log, because
+  //     the person reading it is whoever made the request.
+  //
+  //  2. In every environment the body is HTML. Both API clients decide by
+  //     parsing JSON, so an HTML 500 became `opaqueFailure(500)` — "The server
+  //     answered 500 with no explanation, so it is not certain whether the
+  //     change was applied." The client was telling the truth: the server had
+  //     explained nothing. That is §30's forbidden generic error, and on an
+  //     Admin money surface "it is not certain whether the change was applied"
+  //     is the worst sentence the product can produce.
+  //
+  // So: log the real error on the server, where support can read it, and
+  // answer with a fixed, deterministic, JSON body that says exactly what is
+  // and is not known. It carries no message from the exception — an error
+  // string is written by whoever threw it and may quote a row, a token, or a
+  // provider payload.
+  //
+  // Mounted last. Express selects an error handler by arity, so all four
+  // parameters are required even though `next` is unused.
+  app.use(
+    (
+      err: unknown,
+      req: express.Request,
+      res: express.Response,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      _next: express.NextFunction,
+    ) => {
+      // `redactTokenUrl` is not reached here: the path may itself carry a raw
+      // token (§28.1), so only the method and the route SHAPE are recorded.
+      console.error('[unhandled]', req.method, req.path.replace(/\/[^/]{16,}/g, '/[redacted]'), err);
+
+      if (res.headersSent) {
+        // A stream that already started cannot be given a JSON body. Ending it
+        // is the honest outcome; pretending to answer would append garbage to
+        // a half-written response.
+        res.end();
+        return;
+      }
+
+      res.status(500).json({
+        error: 'server_error',
+        title: 'Something went wrong at our end',
+        whatHappened:
+          'The request reached Proovd and did not complete. It is not known whether the ' +
+          'change was applied, so nothing about it should be assumed either way.',
+        next:
+          'Reload this page to see the current stored values before trying again. If it ' +
+          'keeps happening, contact support and quote the time.',
+        support: '/support',
+      });
+    },
+  );
 
   return { app, auth, tokens, notifier };
 }

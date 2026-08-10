@@ -1,18 +1,24 @@
 /**
- * Signing in as a real Admin, for suites that exercise Admin routes.
+ * Signing in as a real account, for suites that exercise guarded routes.
  *
- * There is no shortcut here on purpose. Setting `two_factor_enabled` in the
- * database would produce a session that `requireAdmin` accepts while skipping
- * the one step an unenrolled Admin cannot perform, and every Admin test would
- * then be testing a state that cannot occur in production. So enrolment goes
- * through the real endpoints: enable, read the provisioning URI, prove
- * possession with a generated code.
+ * There is no shortcut here on purpose. Every session these helpers return was
+ * established by POSTing a real password to the real `/api/auth/sign-in/email`
+ * and keeping the cookie the server set. Writing a session row directly — or
+ * stubbing `getSession` — would produce a session the guards accept while
+ * skipping the one step a real caller cannot skip, and every guarded test would
+ * then be exercising a state that cannot occur in production.
+ *
+ * Before 2026-08-10 `createAdmin` additionally enrolled a TOTP factor through
+ * `/api/auth/two-factor/*` and signed in twice. The second factor was removed
+ * by product direction (see `src/auth/auth.ts`), so those endpoints no longer
+ * exist and an Admin session is now exactly what a Founder's or a Creator's is:
+ * one password, one cookie. `AdminSession.secret` went with it — nothing needs
+ * a shared secret to mint a second session any more, because `signInAs` does it
+ * with the password every caller already has.
  */
 
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { createOTP } from '@better-auth/utils/otp';
-import { base32 } from '@better-auth/utils/base32';
 import { seedAccount } from '../auth/seed.js';
 import { createAuditWriter } from '../auth/audit.js';
 import type { Harness } from './app-harness.js';
@@ -29,24 +35,9 @@ export function cookiesOf(res: request.Response): string {
 export interface AdminSession {
   id: string;
   email: string;
-  /** The TOTP secret, so a later test can mint a fresh session. */
-  secret: string;
   /** A cookie header carrying a full, freshly established session. */
   cookie: string;
 }
-
-/**
- * The `secret` in a provisioning URI is base32 — what an authenticator app
- * scans. Better Auth verifies against the raw secret it encoded, so a code
- * generated from the URI parameter directly is computed over the wrong input.
- */
-function secretFromTotpUri(uri: string): string {
-  const encoded = new URL(uri).searchParams.get('secret');
-  if (!encoded) throw new Error('provisioning URI carried no secret');
-  return new TextDecoder().decode(base32.decode(encoded));
-}
-
-const totpCode = (secret: string): Promise<string> => createOTP(secret).totp();
 
 export async function seedUser(
   h: Harness,
@@ -63,7 +54,13 @@ export async function seedUser(
   return { id: seeded.id, email };
 }
 
-/** Password-only sign-in. Valid for an account with no second factor yet. */
+/**
+ * Password sign-in. The only way any of the three account roles gets a session.
+ *
+ * Kept under its historical name so the suites that already call it do not
+ * change. `signInAs` is the same function under a name that no longer implies
+ * there is a richer variant somewhere.
+ */
 export async function signInPlain(h: Harness, email: string): Promise<string> {
   const res = await request(h.app)
     .post('/api/auth/sign-in/email')
@@ -72,46 +69,27 @@ export async function signInPlain(h: Harness, email: string): Promise<string> {
   return cookiesOf(res);
 }
 
-/** Password, then the second factor. The only way an enrolled Admin gets in. */
-export async function signInWithTotp(
-  h: Harness,
-  email: string,
-  secret: string,
-): Promise<string> {
-  const first = await request(h.app)
-    .post('/api/auth/sign-in/email')
-    .send({ email, password: TEST_PASSWORD })
-    .expect(200);
+export const signInAs = signInPlain;
 
-  const second = await request(h.app)
-    .post('/api/auth/two-factor/verify-totp')
-    .set('cookie', cookiesOf(first))
-    .send({ code: await totpCode(secret) })
-    .expect(200);
-
-  return cookiesOf(second);
-}
-
-/** A seeded Admin with a real TOTP factor and a fresh session. */
+/** A seeded Admin with a fresh session. */
 export async function createAdmin(h: Harness, label = 'admin'): Promise<AdminSession> {
   const { id, email } = await seedUser(h, 'admin', label);
+  const cookie = await signInPlain(h, email);
+  return { id, email, cookie };
+}
 
-  const initial = await signInPlain(h, email);
-  const enabled = await request(h.app)
-    .post('/api/auth/two-factor/enable')
-    .set('cookie', initial)
-    .send({ password: TEST_PASSWORD })
-    .expect(200);
-
-  const secret = secretFromTotpUri(enabled.body.totpURI);
-  await request(h.app)
-    .post('/api/auth/two-factor/verify-totp')
-    .set('cookie', [initial, cookiesOf(enabled)].filter(Boolean).join('; '))
-    .send({ code: await totpCode(secret) })
-    .expect(200);
-
-  // Enrolment leaves a session that predates the factor. Sign in again so the
-  // returned cookie is one a fully enrolled Admin would actually hold.
-  const cookie = await signInWithTotp(h, email, secret);
-  return { id, email, secret, cookie };
+/**
+ * A seeded account of any role, with a fresh session.
+ *
+ * Exists so the authorization matrix can drive a Founder and a Creator at Admin
+ * routes without each suite rebuilding the two-step seed-then-sign-in dance.
+ */
+export async function createSignedInUser(
+  h: Harness,
+  role: ProovdRole,
+  label = role,
+): Promise<AdminSession> {
+  const { id, email } = await seedUser(h, role, label);
+  const cookie = await signInPlain(h, email);
+  return { id, email, cookie };
 }

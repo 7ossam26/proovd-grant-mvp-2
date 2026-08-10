@@ -221,7 +221,7 @@ describe('a settings change is versioned, historied, and audited', () => {
       value: '6',
       actor: 'user:test-admin',
       reason: 'pilot cohort spacing agreed with the founding team',
-      mfaContext: 'totp_factor_registered',
+      mfaContext: 'password_session_admin_role_verified',
       reauthContext: 'session_established_at=2026-07-31T00:00:00.000Z',
     });
 
@@ -253,7 +253,7 @@ describe('a settings change is versioned, historied, and audited', () => {
     expect(audit).toMatchObject({
       actor: 'user:test-admin',
       action: 'setting.updated',
-      mfaContext: 'totp_factor_registered',
+      mfaContext: 'password_session_admin_role_verified',
       internalReason: 'pilot cohort spacing agreed with the founding team',
     });
     expect(audit!.priorValue).toEqual({ value: '3', version: priorVersion });
@@ -445,15 +445,19 @@ describe('the Admin routes are guarded (§5.1, §28.2, §33.12.5)', () => {
     await request(h.app).get('/api/admin/settings').set('cookie', cookie).expect(403);
   });
 
-  it('refuses an Admin who has not enrolled a second factor', async () => {
-    const unenrolled = await seedUser(h, 'admin', 'unenrolled');
-    const cookie = await signInPlain(h, unenrolled.email);
+  it('refuses a Creator', async () => {
+    // The other half of the role matrix. A Creator holds a valid session and
+    // is refused for what the session IS, not for whether one exists — which
+    // is the distinction that used to be carried by the second-factor check
+    // and now rests entirely on the role.
+    const creator = await seedUser(h, 'affiliate', 'creator');
+    const cookie = await signInPlain(h, creator.email);
     const res = await request(h.app).get('/api/admin/settings').set('cookie', cookie);
     expect(res.status).toBe(403);
-    expect(res.body.error).toBe('mfa_enrollment_required');
+    expect(res.body.error).toBe('forbidden');
   });
 
-  it('serves the settings surface to an enrolled Admin', async () => {
+  it('serves the settings surface to an Admin', async () => {
     const res = await request(h.app)
       .get('/api/admin/settings')
       .set('cookie', admin.cookie)
@@ -511,7 +515,7 @@ describe('the Admin routes are guarded (§5.1, §28.2, §33.12.5)', () => {
         )
         .orderBy(desc(auditEvents.occurredAt))
         .limit(1);
-      expect(audit!.mfaContext).toBe('totp_factor_registered');
+      expect(audit!.mfaContext).toBe('password_session_admin_role_verified');
       expect(audit!.reauthContext).toMatch(/^session_established_at=/);
     } finally {
       await restore('required_promotional_posts');

@@ -67,30 +67,24 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 /* ── Signing in (§5.1, §5.2, §5.3) ────────────────────────────────────────── */
 
 /**
- * `twoFactorRedirect` is Better Auth telling us the password was right and the
- * session is not issued yet, because this account has a registered second
- * factor. §5.1 makes that mandatory for Admin and §5.2/§5.3 give neither of
- * the other roles one — but this client does not assume that, because an
- * account's factor is a fact about the account, not about the route it signs
- * in through.
+ * One call. A successful password establishes the session outright.
+ *
+ * There used to be a `twoFactorRedirect` flag here — Better Auth's way of
+ * saying "the password was right and the session is not issued yet, because
+ * this account has a registered second factor". The Admin second factor was
+ * removed on 2026-08-10 (see `backend/src/auth/auth.ts`) and no role has one,
+ * so the flag can no longer be returned and a client branch on it would be
+ * dead code that looks like a security step.
+ *
+ * The response body is deliberately not inspected for anything else. What
+ * matters — who this is, and therefore where they belong — is read from
+ * `/api/account/me` afterwards, because the server decides that and the
+ * sign-in response is not where the product should learn it.
  */
-export interface PasswordSignInResult {
-  twoFactorRedirect?: boolean;
-}
-
-export const signInWithPassword = (
-  email: string,
-  password: string,
-): Promise<PasswordSignInResult> =>
+export const signInWithPassword = (email: string, password: string): Promise<unknown> =>
   call('/api/auth/sign-in/email', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
-  });
-
-export const verifyTotp = (code: string): Promise<unknown> =>
-  call('/api/auth/two-factor/verify-totp', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
   });
 
 export const signOut = (): Promise<unknown> =>

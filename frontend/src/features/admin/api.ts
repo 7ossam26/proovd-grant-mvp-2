@@ -147,25 +147,19 @@ export interface AdminIdentity {
 export const fetchAdminIdentity = (): Promise<AdminIdentity> =>
   call<AdminIdentity>('/api/admin/me');
 
-/**
- * Password, then the second factor. Two calls because §5.1 makes them two
- * facts: the password alone never yields a session for an enrolled Admin, and
- * Better Auth answers the first call with `twoFactorRedirect` to say so.
+/*
+ * Signing in is NOT here any more.
+ *
+ * `signInWithPassword` and `verifyTotp` used to live in this module, which put
+ * two implementations of "sign in" in the codebase — one for Admin, one for
+ * everybody else — differing in their refusal wording and in how they
+ * classified a failure. That is the shape a leak takes: the copy nobody is
+ * looking at grows a helpful branch.
+ *
+ * Both doors now call `surfaces/auth/api.ts`, and both render the refusal from
+ * `surfaces/auth/refusal.ts`. The second factor `verifyTotp` drove was removed
+ * on 2026-08-10 (see `backend/src/auth/auth.ts`).
  */
-export const signInWithPassword = (
-  email: string,
-  password: string,
-): Promise<{ twoFactorRedirect?: boolean }> =>
-  call('/api/auth/sign-in/email', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  });
-
-export const verifyTotp = (code: string): Promise<unknown> =>
-  call('/api/auth/two-factor/verify-totp', {
-    method: 'POST',
-    body: JSON.stringify({ code }),
-  });
 
 export const signOut = (): Promise<unknown> =>
   call('/api/auth/sign-out', { method: 'POST', body: JSON.stringify({}) });
