@@ -25,7 +25,7 @@ import type {
   FounderListRow,
   FounderWorkspaceDetail,
 } from '../admin/api.js';
-import type { ClaimView, CreatorSignal, VettingState } from '../../surfaces/draft/api.js';
+import type { ClaimView, VettingState } from '../../surfaces/draft/api.js';
 import type {
   BuildState,
   CampaignHomeView,
@@ -95,7 +95,7 @@ const draftLanding: DraftLanding = {
   lastContactAt: new Date(Date.now() - 3 * 60_000).toISOString(),
   reference: 'PVD-QA100-QA200',
   processSummary: [
-    'You answer four questions about the problem, your solution, and the competition.',
+    'You answer three questions about the problem, your solution, and the views your content gets.',
     'A person at Proovd reads them and decides whether to continue.',
     'If it continues, you build the campaign page and pay the listing fee.',
   ],
@@ -109,7 +109,7 @@ const vetting: VettingState = {
   selectedType: 'pre_launch',
   problem: 'Hobby electronics benches are lit by ceiling lights that cast a shadow over the board.',
   solution: 'A clamp lamp with a 96 CRI head and a magnetic arm that holds its position.',
-  competition: 'Two incumbents sell at US$300 and neither publishes a colour-rendering figure.',
+  views: '10k_100k',
   provenance: {
     problem: {
       supplier: 'proovd',
@@ -125,28 +125,14 @@ const vetting: VettingState = {
       firstEditedAt: '2026-08-01T09:25:00.000Z',
       lastEditedAt: '2026-08-01T09:41:00.000Z',
     },
-    competition: {
-      supplier: 'founder',
-      prefilledText: null,
-      prefilledAt: null,
-      firstEditedAt: '2026-08-01T09:30:00.000Z',
-      lastEditedAt: '2026-08-01T09:42:00.000Z',
-    },
   },
   lastSavedAt: '2026-08-01T09:42:00.000Z',
   resumeStep: null,
   submittedAt: null,
-  completeness: { campaign_path: true, problem: true, solution: true, competition: true },
+  completeness: { problem: true, solution: true, views: true },
   campaignStatus: 'vetting_in_progress',
   lockedType: null,
   typeLockedAt: null,
-};
-
-const creatorSignal: CreatorSignal = {
-  status: 'available',
-  count: 12,
-  recordedAt: '2026-08-02T12:00:00.000Z',
-  submittedAt: '2026-08-01T10:00:00.000Z',
 };
 
 const claim: ClaimView = {
@@ -1256,14 +1242,17 @@ const founderWorkspace: FounderWorkspaceDetail = {
     },
     vetting: {
       progress: [
-        { label: 'Campaign path chosen', done: true },
         { label: 'Problem', done: true },
         { label: 'Solution', done: true },
-        { label: 'Competition', done: true },
+        { label: 'Amount of views', done: true },
       ],
-      progressStatus: '4 of 4 setup questions completed',
+      progressStatus: '3 of 3 questions completed',
       campaignType: 'Product Campaign',
       campaignTypeAt: 'Aug 1, 2026 · 10:00 AM',
+      campaignTypeSelected: 'Product Campaign',
+      campaignTypeSelectedRaw: 'pre_launch',
+      campaignTypeEditable: false,
+      draftId: QA.draftId,
       answers: [
         {
           key: 'problem',
@@ -1278,10 +1267,10 @@ const founderWorkspace: FounderWorkspaceDetail = {
           provenance: 'Written by Rae',
         },
         {
-          key: 'competition',
-          label: 'Competition',
-          text: 'Two incumbents sell at US$300 and neither publishes a colour-rendering figure.',
-          provenance: 'Written by Rae',
+          key: 'views',
+          label: 'Amount of views',
+          text: '10,000 – 100,000',
+          provenance: 'Chosen by Rae',
         },
       ],
       lastSaved: 'Aug 1, 2026 · 9:42 AM',
@@ -1479,7 +1468,6 @@ export const QA_ROUTES: StubRoute[] = [
 
   /* Draft (§7, §9, §10) */
   { match: /\/api\/draft\/[^/]+\/vetting$/, body: vetting },
-  { match: /\/api\/draft\/[^/]+\/creator-signal$/, body: creatorSignal },
   { match: /\/api\/draft\/[^/]+\/claim$/, body: claim },
   { match: /\/api\/draft\/[^/]+$/, body: draftLanding },
 

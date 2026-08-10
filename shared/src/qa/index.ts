@@ -75,10 +75,10 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_vetting',
-    label: 'Founder vetting, the possible-creator result, and the account claim',
+    label: 'Founder vetting and the account claim (simplified flow)',
     specRef: '§9, §10',
     audience: 'founder',
-    routes: ['/draft/:token', '/draft/:token/vetting', '/draft/:token/result', '/draft/:token/claim'],
+    routes: ['/draft/:token', '/draft/:token/vetting', '/draft/:token/claim'],
     keyboardPathRequired: true,
   },
   {

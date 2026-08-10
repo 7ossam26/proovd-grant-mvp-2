@@ -30,6 +30,7 @@ import {
   founderProspects,
 } from '../db/schema/invitations.js';
 import { campaigns, campaignStatusHistory } from '../db/schema/domain.js';
+import { campaignVetting } from '../db/schema/vetting.js';
 import { user as userTable, session as sessionTable } from '../db/schema/auth.js';
 import { TOKEN_REJECTION_STATUS, TOKEN_REJECTION_BODY } from '../auth/token-rejection.js';
 import {
@@ -312,11 +313,15 @@ describe('§7 Admin creates a Founder prospect and the initial campaign containe
     expect(res.body.provenance.solution.supplier).toBe('proovd');
     expect(res.body.provenance.problem.firstEditedAt).toBeNull();
     // §33.1.5: Competition is never prefilled, whatever the intake collected.
-    // An unanswered field has no supplier at all — and can never acquire
-    // 'proovd', which a 0007 CHECK enforces regardless of what any route does.
-    expect(res.body.competition).toBeNull();
-    expect(res.body.provenance.competition.supplier).toBeNull();
-    expect(res.body.provenance.competition.prefilledText ?? null).toBeNull();
+    // The simplified flow dropped it from the state payload entirely, so the
+    // guarantee is checked at the row: no text, no supplier — and 'proovd' is
+    // unrecordable regardless, which a 0007 CHECK enforces.
+    const [vettingRow] = await h.db
+      .select()
+      .from(campaignVetting)
+      .where(eq(campaignVetting.draftId, created.body.draftId));
+    expect(vettingRow!.competitionText).toBeNull();
+    expect(vettingRow!.competitionSupplier).toBeNull();
   });
 
   it('has no way to prefill Competition from the intake (§33.1.5)', async () => {
@@ -339,7 +344,11 @@ describe('§7 Admin creates a Founder prospect and the initial campaign containe
       .set('cookie', admin.cookie)
       .expect(200);
 
-    expect(detail.body.vetting.competition).toBeNull();
+    const [vettingRow] = await h.db
+      .select()
+      .from(campaignVetting)
+      .where(eq(campaignVetting.draftId, created.body.draftId));
+    expect(vettingRow!.competitionText).toBeNull();
     expect(JSON.stringify(detail.body)).not.toContain('THIS MUST NOT LAND');
   });
 

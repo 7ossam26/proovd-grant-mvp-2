@@ -63,7 +63,7 @@ export const NO_GUARANTEE_TEXT =
 
 /** §7's process summary. Fixed for the same reason. */
 export const PROCESS_SUMMARY: readonly string[] = [
-  'You tell us about the product, the problem it solves, and who else is solving it.',
+  'You tell us about the product, the problem it solves, and how many views your content gets.',
   'A person at Proovd reviews it with you, and may ask for a short interview.',
   'If it goes ahead, you set up your Stripe account, pay a listing fee, and build the campaign page.',
   'We introduce the campaign to Creators we have recruited for it. They decide for themselves whether to take it on.',

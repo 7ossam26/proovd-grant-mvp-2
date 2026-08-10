@@ -166,6 +166,7 @@ export async function anonymiseDraft(
         solutionPrefilledText: null,
         solutionText: null,
         competitionText: null,
+        viewsRange: null,
         resumeStep: null,
         anonymisedAt: now,
         updatedBy: 'system:unclaimed-draft-retention',

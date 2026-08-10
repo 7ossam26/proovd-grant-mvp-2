@@ -295,6 +295,13 @@
       "when": 1786118400000,
       "tag": "0041_remove_admin_totp",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1786204800000,
+      "tag": "0042_simplified_vetting",
+      "breakpoints": true
     }
   ]
 }

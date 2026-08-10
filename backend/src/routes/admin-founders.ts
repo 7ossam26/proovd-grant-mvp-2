@@ -83,10 +83,12 @@ import { NO_GUARANTEE_TEXT, PROCESS_SUMMARY } from '../notifications/templates/f
 import {
   readVetting,
   prefillVetting,
+  setCampaignPath,
   readFieldEdits,
   readPossibleCreatorSignal,
   recordPossibleCreatorSignal,
   archiveAndRestartVetting,
+  type CampaignTypeValue,
 } from '../vetting/service.js';
 import { readClaimProfile, readSignupComplete } from '../vetting/claim.js';
 import { editReasonRequired, founderFieldByKey } from '../founders/logic.js';
@@ -1092,6 +1094,51 @@ export function createAdminFoundersRouter({
     if (!result.ok) {
       res.status(422).json({
         error: 'prefill_rejected',
+        title: 'That could not be saved',
+        whatHappened: result.message,
+        next: 'Nothing has changed.',
+      });
+      return;
+    }
+
+    res.json(result.state);
+  });
+
+  /* ── The campaign path (simplified flow, 2026-08-10) ───────────────────── */
+
+  /**
+   * Admin sets Idea/Product on the draft; the Founder no longer chooses. It
+   * stays changeable until the Founder submits, which is when §9's permanent
+   * lock happens — after that this refuses and the archive-and-restart path
+   * is the only correction.
+   *
+   * No freshness gate, same reasoning as the prefill above: nothing leaves
+   * the building and nobody's access changes until the Founder submits.
+   */
+  router.put(`${ADMIN_FOUNDERS_PATH}/:draftId/campaign-path`, admin, json, async (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    const raw = body['campaignPath'];
+    const type =
+      raw === null ? null : raw === 'pre_build' || raw === 'pre_launch' ? (raw as CampaignTypeValue) : undefined;
+
+    if (type === undefined) {
+      res.status(422).json({
+        error: 'campaign_path_rejected',
+        title: 'That could not be saved',
+        whatHappened: 'That is not one of the two campaign paths.',
+        next: 'Nothing has changed.',
+      });
+      return;
+    }
+
+    const result = await setCampaignPath(db, req.params['draftId'] as string, {
+      type,
+      actor: actorOf(req),
+    });
+
+    if (!result.ok) {
+      res.status(422).json({
+        error: 'campaign_path_rejected',
         title: 'That could not be saved',
         whatHappened: result.message,
         next: 'Nothing has changed.',

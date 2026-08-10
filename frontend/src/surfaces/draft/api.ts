@@ -65,7 +65,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 const base = (token: string) => `/api/draft/${encodeURIComponent(token)}`;
 
-/* ── §9 the vetting sequence ──────────────────────────────────────────────── */
+/* ── The vetting sequence (simplified flow) ───────────────────────────────── */
 
 export type CampaignTypeValue = 'pre_build' | 'pre_launch';
 
@@ -80,29 +80,29 @@ export interface FieldProvenance {
 export interface VettingState {
   draftId: string;
   campaignId: string;
+  /** The campaign path Admin set from discovery. Read-only here. */
   selectedType: CampaignTypeValue | null;
   problem: string | null;
   solution: string | null;
-  competition: string | null;
+  /** The amount-of-views answer, as a shared range id. */
+  views: import('@proovd/shared').ViewsRangeId | null;
   provenance: {
     problem: FieldProvenance;
     solution: FieldProvenance;
-    competition: FieldProvenance;
   };
   lastSavedAt: string | null;
   resumeStep: string | null;
   submittedAt: string | null;
-  completeness: Record<'campaign_path' | 'problem' | 'solution' | 'competition', boolean>;
+  completeness: Record<'problem' | 'solution' | 'views', boolean>;
   campaignStatus: string;
   lockedType: CampaignTypeValue | null;
   typeLockedAt: string | null;
 }
 
 export interface VettingPatch {
-  selectedType?: CampaignTypeValue | null;
   problem?: string | null;
   solution?: string | null;
-  competition?: string | null;
+  views?: string | null;
   resumeStep?: string;
 }
 
@@ -114,19 +114,6 @@ export const saveVetting = (token: string, patch: VettingPatch): Promise<Vetting
 
 export const submitVetting = (token: string): Promise<VettingState> =>
   call(`${base(token)}/vetting/submit`, { method: 'POST', body: JSON.stringify({}) });
-
-/* ── §10 the possible-creator result ──────────────────────────────────────── */
-
-export interface CreatorSignal {
-  /** `available` renders the count; `with_admin` never does (§10). */
-  status: 'available' | 'with_admin';
-  count: number | null;
-  recordedAt: string | null;
-  submittedAt: string;
-}
-
-export const fetchCreatorSignal = (token: string): Promise<CreatorSignal> =>
-  call(`${base(token)}/creator-signal`);
 
 /* ── §10 the account claim ────────────────────────────────────────────────── */
 

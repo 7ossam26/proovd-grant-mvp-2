@@ -322,14 +322,17 @@ function workspaceFixture(): FounderWorkspaceDetail {
       },
       vetting: {
         progress: [
-          { label: 'Campaign path chosen', done: true },
           { label: 'Problem answered', done: true },
           { label: 'Solution answered', done: true },
-          { label: 'Competition answered', done: true },
+          { label: 'Amount of views chosen', done: true },
         ],
-        progressStatus: '4 of 4 setup questions completed',
+        progressStatus: '3 of 3 questions completed',
         campaignType: 'Product Campaign',
         campaignTypeAt: 'Aug 1, 2026 · 10:00 AM',
+        campaignTypeSelected: 'Product Campaign',
+        campaignTypeSelectedRaw: 'pre_launch',
+        campaignTypeEditable: false,
+        draftId: 'draft-1',
         answers: [
           {
             key: 'problem',
@@ -342,6 +345,12 @@ function workspaceFixture(): FounderWorkspaceDetail {
             label: 'Solution',
             text: 'A clamp lamp with a 96 CRI head and a magnetic arm that holds position.',
             provenance: 'Written by Rae',
+          },
+          {
+            key: 'views',
+            label: 'Amount of views',
+            text: '10,000 – 100,000',
+            provenance: 'Chosen by Rae',
           },
           {
             key: 'competition',
@@ -936,10 +945,10 @@ describe('§26.1 — one person, five panes', () => {
   });
 });
 
-/* ── 5. The three setup answers ────────────────────────────────────────────── */
+/* ── 5. The setup answers ──────────────────────────────────────────────────── */
 
-describe('§9 — Problem, Solution, and Competition are the Founder’s own words', () => {
-  it('renders all three with their provenance and no way to change any of them', async () => {
+describe('the setup answers are the Founder’s own, with legacy Competition preserved', () => {
+  it('renders every answer with its provenance and no way to change any of them', async () => {
     const { container } = await renderWorkspace();
 
     const answerRows = [...container.querySelectorAll('.frow')].filter((row) =>
@@ -949,6 +958,7 @@ describe('§9 — Problem, Solution, and Competition are the Founder’s own wor
     expect(answerRows.map((row) => row.querySelector('dt')?.textContent)).toEqual([
       'Problem',
       'Solution',
+      'Amount of views',
       'Competition',
     ]);
 
@@ -956,13 +966,14 @@ describe('§9 — Problem, Solution, and Competition are the Founder’s own wor
       const label = row.querySelector('dt')?.textContent;
       // An Admin correcting a Founder's answer is a support case, not a field
       // edit — which is why `FOUNDER_EDITABLE_FIELDS` has no entry for any of
-      // the three and this pane has nothing to offer. Competition is the one
-      // §9 states twice: it may never even be prefilled.
+      // them and this pane has nothing to offer. Competition is a legacy
+      // answer: the simplified flow no longer asks it, and a recorded one
+      // still renders read-only.
       expect(controlsIn(row), `“${label}” offers a control`).toEqual([]);
     }
 
     expect(
-      screen.queryByRole('button', { name: /^Edit (Problem|Solution|Competition)$/ }),
+      screen.queryByRole('button', { name: /^Edit (Problem|Solution|Competition|Amount of views)$/ }),
     ).toBeNull();
     expect(screen.getByText('Originally prepared by Proovd · Last edited by Rae')).toBeInTheDocument();
   });

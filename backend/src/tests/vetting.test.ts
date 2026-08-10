@@ -1,29 +1,30 @@
 /**
- * Phase 07 acceptance suite — §33.1.4 through §33.1.9.
+ * The vetting and account-claim suite — §33.1.4 through §33.1.9, adjusted for
+ * the simplified flow (2026-08-10, product direction).
  *
- * §33's own framing: these are requirements, not examples.
+ * The recorded deviation, stated once: the Founder now answers THREE questions
+ * — Problem, Solution, and the amount of views — the campaign path is set by
+ * Admin on the draft and still locks permanently at submission, Competition is
+ * no longer collected (its guarantees survive for existing records), and the
+ * possible-creator result no longer gates the account claim.
  *
- *   33.1.4  Path/Problem/Solution/Competition order, progress, Back/Continue,
- *           autosave, restore, unsaved warning, and provenance work.
- *   33.1.5  Competition cannot be prefilled.
- *   33.1.6  Possible-creator result precedes account and cannot promise
- *           acceptance.
- *   33.1.7  Type locks at vetting; wrong type archives and restarts without
+ * What each §33.1 item means under that deviation:
+ *
+ *   33.1.4  Problem/Solution/Views order, progress, autosave, restore, and
+ *           provenance work.
+ *   33.1.5  Competition cannot be prefilled — the column guarantees survive
+ *           even though the flow no longer asks the question.
+ *   33.1.6  The possible-creator result remains an Admin-recorded assessment;
+ *           it never renders a promise and NO LONGER blocks the claim.
+ *   33.1.7  Type locks at submission; wrong type archives and restarts without
  *           migrating agreements/payments/consents.
  *   33.1.8  No SMS OTP exists.
- *   33.1.9  `founder_signup_complete` emits once and reveals the preparing
- *           campaign to only eligible campaign-specific Affiliates once.
+ *   33.1.9  `founder_signup_complete` emits once.
  *
- * The parts of §33.1.4 that are surface behaviour — Back/Continue, the visible
- * progress, the browser warning on leaving with unsaved data — are proved by
+ * The parts that are surface behaviour are proved by
  * `frontend/src/surfaces/draft/vetting.test.tsx` against the real components.
  * What is proved here is everything the server owns: order, storage,
  * provenance, restore, and the failure directions.
- *
- * §33.1.9's second half — revealing the preparing campaign to recruited
- * Affiliates — is Phase 08's, because no Affiliate exists to reveal it to. What
- * this file proves is the half Phase 07 owns: the event is emitted, exactly
- * once, under retry and under concurrency.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -54,6 +55,7 @@ import { TOKEN_REJECTION_STATUS } from '../auth/token-rejection.js';
 import {
   VETTING_ANSWER_STEPS,
   VETTING_STEPS as BACKEND_VETTING_STEPS,
+  VIEWS_RANGES,
   CAMPAIGN_TYPES,
 } from '../vetting/service.js';
 import {
@@ -65,8 +67,8 @@ import { sweepUnclaimedDrafts } from '../invitations/retention.js';
 import {
   VETTING_STEP_IDS,
   VETTING_ANSWER_STEP_IDS,
+  VIEWS_RANGE_IDS,
   CAMPAIGN_PATH_CHOICES,
-  POSSIBLE_CREATOR_RESULT_DISCLOSURES,
 } from '@proovd/shared';
 
 let h: Harness;
@@ -141,25 +143,27 @@ const ANSWERS = {
     'Clinics lose two or three appointments a week to late cancellations and the slot just goes empty.',
   solution:
     'When a slot frees up we text the waitlist in order and the first person to answer takes it.',
-  competition:
-    'Most clinics use a paper list and a receptionist with a phone. The scheduling suites do not do this at all.',
+  views: '10k_100k',
 };
 
-/** Fills in all four answers and submits. Returns the vetting state. */
+/** Admin's half of the simplified flow: the campaign path, set on the draft. */
+function setPath(draftId: string, type: 'pre_build' | 'pre_launch') {
+  return request(h.app)
+    .put(`/api/admin/founders/${draftId}/campaign-path`)
+    .set('cookie', admin.cookie)
+    .send({ campaignPath: type });
+}
+
+/** Sets the path, fills in all three answers, and submits. */
 async function completeVetting(
-  raw: string,
+  invited: Invited,
   type: 'pre_build' | 'pre_launch' = 'pre_launch',
 ): Promise<Record<string, unknown>> {
-  await request(h.app)
-    .patch(`/api/draft/${raw}/vetting`)
-    .send({ selectedType: type })
-    .expect(200);
+  await setPath(invited.draftId, type).expect(200);
+  const raw = invited.raw;
   await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: ANSWERS.problem }).expect(200);
   await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ solution: ANSWERS.solution }).expect(200);
-  await request(h.app)
-    .patch(`/api/draft/${raw}/vetting`)
-    .send({ competition: ANSWERS.competition })
-    .expect(200);
+  await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
 
   const res = await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(201);
   return res.body;
@@ -235,17 +239,21 @@ const stripComments = (source: string): string =>
    The shared register and the backend restatement agree
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('the §9 sequence is stated once', () => {
+describe('the simplified sequence is stated once', () => {
   it('matches the shared register exactly, in order', () => {
     expect([...BACKEND_VETTING_STEPS]).toEqual([...VETTING_STEP_IDS]);
     expect([...VETTING_ANSWER_STEPS]).toEqual([...VETTING_ANSWER_STEP_IDS]);
   });
 
-  it('offers exactly the two campaign paths §4 defines', () => {
+  it('restates the views ranges exactly', () => {
+    expect([...VIEWS_RANGES]).toEqual([...VIEWS_RANGE_IDS]);
+  });
+
+  it('offers exactly the two campaign paths §4 defines, to Admin', () => {
     expect(CAMPAIGN_PATH_CHOICES.map((c) => c.type).sort()).toEqual([...CAMPAIGN_TYPES].sort());
   });
 
-  it('never renders an internal type name to a Founder (§3)', () => {
+  it('never renders an internal type name to a person (§3)', () => {
     for (const choice of CAMPAIGN_PATH_CHOICES) {
       const rendered = [choice.prompt, choice.name, choice.summary, ...choice.commitments].join(' ');
       expect(rendered).not.toMatch(/pre[-_ ]build/i);
@@ -270,13 +278,12 @@ describe('§33.1.4 the vetting sequence', () => {
     expect(res.body.selectedType).toBeNull();
     expect(res.body.problem).toBeNull();
     expect(res.body.solution).toBeNull();
-    expect(res.body.competition).toBeNull();
+    expect(res.body.views).toBeNull();
     expect(res.body.submittedAt).toBeNull();
     expect(res.body.completeness).toEqual({
-      campaign_path: false,
       problem: false,
       solution: false,
-      competition: false,
+      views: false,
     });
   });
 
@@ -293,46 +300,61 @@ describe('§33.1.4 the vetting sequence', () => {
     expect(first.body.completeness.problem).toBe(true);
   });
 
+  it('saves the views range and refuses one that is not in the register', async () => {
+    const { raw } = await invite('views');
+
+    const saved = await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ views: ANSWERS.views })
+      .expect(200);
+    expect(saved.body.views).toBe(ANSWERS.views);
+    expect(saved.body.completeness.views).toBe(true);
+
+    const refused = await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ views: 'a-billion' })
+      .expect(422);
+    expect(refused.body.whatHappened).toMatch(/not one of the view ranges/i);
+
+    // The refusal changed nothing.
+    const after = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
+    expect(after.body.views).toBe(ANSWERS.views);
+  });
+
   it('restores the latest saved draft on a later visit (§9, DNA §5.12)', async () => {
     const { raw } = await invite('restore');
 
     await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ selectedType: 'pre_build', problem: ANSWERS.problem, resumeStep: 'solution' })
+      .send({ problem: ANSWERS.problem, resumeStep: 'solution' })
       .expect(200);
 
     const reopened = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
     expect(reopened.body.problem).toBe(ANSWERS.problem);
-    expect(reopened.body.selectedType).toBe('pre_build');
     // Position survives: the link reopens where they left off.
     expect(reopened.body.resumeStep).toBe('solution');
     expect(reopened.body.lastSavedAt).toBeTruthy();
   });
 
   it('preserves later answers when an earlier one is changed', async () => {
-    // §9: "Returning to an earlier item preserves later valid answers." This is
+    // "Returning to an earlier item preserves later valid answers." This is
     // the requirement a wizard that rebuilds forward state from the current
     // step silently breaks.
     const { raw } = await invite('preserve');
 
-    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ selectedType: 'pre_launch' }).expect(200);
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: ANSWERS.problem }).expect(200);
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ solution: ANSWERS.solution }).expect(200);
-    await request(h.app)
-      .patch(`/api/draft/${raw}/vetting`)
-      .send({ competition: ANSWERS.competition })
-      .expect(200);
+    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
 
-    // Back to step 2, and change it.
+    // Back to step 1, and change it.
     const after = await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
       .send({ problem: 'A different problem statement entirely.' })
       .expect(200);
 
     expect(after.body.problem).toBe('A different problem statement entirely.');
-    expect(after.body.competition).toBe(ANSWERS.competition);
     expect(after.body.solution).toBe(ANSWERS.solution);
-    expect(after.body.selectedType).toBe('pre_launch');
+    expect(after.body.views).toBe(ANSWERS.views);
   });
 
   it('a save that carries one field does not clear the others', async () => {
@@ -348,7 +370,7 @@ describe('§33.1.4 the vetting sequence', () => {
 
     const after = await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ resumeStep: 'competition' })
+      .send({ resumeStep: 'views' })
       .expect(200);
 
     expect(after.body.problem).toBe(ANSWERS.problem);
@@ -415,6 +437,7 @@ describe('§33.1.4 the vetting sequence', () => {
       .send({ problem: 'Our draft.' })
       .expect(200);
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: 'Their draft.' }).expect(200);
+    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
 
     const rows = await h.db
       .select()
@@ -427,22 +450,58 @@ describe('§33.1.4 the vetting sequence', () => {
     expect(problemEdits.some((r) => r.supplier === 'founder' && r.newValue === 'Their draft.')).toBe(
       true,
     );
+
+    // The views answer earns a history row like every other answer.
+    const viewsEdits = rows.filter((r) => r.field === 'views_range');
+    expect(viewsEdits.some((r) => r.supplier === 'founder' && r.newValue === ANSWERS.views)).toBe(
+      true,
+    );
   });
 
   it('refuses to submit while an answer is missing, and names which', async () => {
-    const { raw } = await invite('incomplete');
-    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ selectedType: 'pre_build' }).expect(200);
+    const invited = await invite('incomplete');
+    await setPath(invited.draftId, 'pre_build').expect(200);
 
-    const res = await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(422);
-    expect(res.body.missing).toEqual(['problem', 'solution', 'competition']);
+    const res = await request(h.app)
+      .post(`/api/draft/${invited.raw}/vetting/submit`)
+      .send({})
+      .expect(422);
+    expect(res.body.missing).toEqual(['problem', 'solution', 'views']);
     // Nothing was locked on the way to refusing.
-    const state = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
+    const state = await request(h.app).get(`/api/draft/${invited.raw}/vetting`).expect(200);
     expect(state.body.lockedType).toBeNull();
   });
 
+  it('refuses to submit while Admin has not set the campaign path, and owns the wait', async () => {
+    const { raw } = await invite('no-path');
+    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: ANSWERS.problem }).expect(200);
+    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ solution: ANSWERS.solution }).expect(200);
+    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
+
+    const res = await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(422);
+    // §27.1: the wait is Proovd's, and the message says so rather than blaming
+    // the Founder for a step that is not theirs.
+    expect(res.body.whatHappened).toMatch(/on our side/i);
+
+    const state = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
+    expect(state.body.submittedAt).toBeNull();
+    expect(state.body.lockedType).toBeNull();
+  });
+
+  it('the campaign path is not writable through the Founder route', async () => {
+    const { raw } = await invite('path-founder');
+    await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ selectedType: 'pre_launch' })
+      .expect(200);
+
+    const state = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
+    expect(state.body.selectedType).toBeNull();
+  });
+
   it('grants no access to anything but this draft', async () => {
-    // §33.1.1's guarantee has to survive the routes Phase 07 adds. A draft
-    // token is still not a session and still reaches exactly one record.
+    // §33.1.1's guarantee has to survive these routes. A draft token is still
+    // not a session and still reaches exactly one record.
     const { raw } = await invite('scoped');
     const other = await invite('scoped-other');
 
@@ -455,18 +514,85 @@ describe('§33.1.4 the vetting sequence', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
+   The Admin campaign path (simplified flow)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('the campaign path is Admin’s, and stays changeable until submission', () => {
+  it('is set on the draft and rendered read-only to the Founder', async () => {
+    const invited = await invite('path-set');
+    await setPath(invited.draftId, 'pre_build').expect(200);
+
+    const state = await request(h.app).get(`/api/draft/${invited.raw}/vetting`).expect(200);
+    expect(state.body.selectedType).toBe('pre_build');
+    expect(state.body.lockedType).toBeNull();
+  });
+
+  it('can be changed before submission, and the change is audited', async () => {
+    const invited = await invite('path-change');
+    await setPath(invited.draftId, 'pre_build').expect(200);
+    await setPath(invited.draftId, 'pre_launch').expect(200);
+
+    const state = await request(h.app).get(`/api/draft/${invited.raw}/vetting`).expect(200);
+    expect(state.body.selectedType).toBe('pre_launch');
+
+    const events = await h.db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.targetId, invited.draftId),
+          eq(auditEvents.action, 'vetting.campaign_path_set'),
+        ),
+      );
+    expect(events.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('refuses a value that is not one of the two paths', async () => {
+    const invited = await invite('path-invalid');
+    const res = await request(h.app)
+      .put(`/api/admin/founders/${invited.draftId}/campaign-path`)
+      .set('cookie', admin.cookie)
+      .send({ campaignPath: 'crowdfunding' })
+      .expect(422);
+    expect(res.body.whatHappened).toMatch(/not one of the two campaign paths/i);
+  });
+
+  it('refuses after submission — the lock is §9’s, unchanged', async () => {
+    const invited = await invite('path-locked');
+    await completeVetting(invited, 'pre_build');
+
+    const res = await setPath(invited.draftId, 'pre_launch').expect(422);
+    expect(res.body.whatHappened).toMatch(/locked/i);
+
+    const [row] = await h.db
+      .select()
+      .from(campaigns)
+      .where(eq(campaigns.id, invited.campaignId));
+    expect(row!.type).toBe('pre_build');
+  });
+
+  it('requires an Admin session', async () => {
+    const invited = await invite('path-auth');
+    await request(h.app)
+      .put(`/api/admin/founders/${invited.draftId}/campaign-path`)
+      .send({ campaignPath: 'pre_build' })
+      .expect(401);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
    §33.1.5 — Competition cannot be prefilled
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('§33.1.5 Competition cannot be prefilled', () => {
+describe('§33.1.5 Competition cannot be prefilled (the guarantees outlive the question)', () => {
   it('has no column to be prefilled into', async () => {
     const columns = await h.pool.query<{ column_name: string }>(
       `SELECT column_name FROM information_schema.columns
         WHERE table_name = 'campaign_vetting' AND column_name LIKE 'competition%'`,
     );
     const names = columns.rows.map((r) => r.column_name).sort();
-    // Supplier and the two edit timestamps — §9 asks every vetting field to
-    // store those. No `competition_prefilled_*` of any kind.
+    // Supplier and the two edit timestamps survive for existing records. No
+    // `competition_prefilled_*` of any kind.
     expect(names).toEqual([
       'competition_first_edited_at',
       'competition_last_edited_at',
@@ -489,30 +615,32 @@ describe('§33.1.5 Competition cannot be prefilled', () => {
       })
       .expect(200);
 
-    const state = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
-    expect(state.body.competition).toBeNull();
-    expect(state.body.provenance.competition.supplier).toBeNull();
-    // The shape itself carries no prefill key, so nothing downstream can start
-    // reading one.
-    expect(state.body.provenance.competition).not.toHaveProperty('prefilledText');
+    await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
+    const [row] = await h.db
+      .select()
+      .from(campaignVetting)
+      .where(eq(campaignVetting.draftId, draftId));
+    expect(row!.competitionText).toBeNull();
+    expect(row!.competitionSupplier).toBeNull();
   });
 
-  it('records a Founder-written competition answer as the Founder’s', async () => {
-    const { raw } = await invite('competition-supplier');
-    const res = await request(h.app)
+  it('the Founder route no longer accepts a competition answer either', async () => {
+    const { draftId, raw } = await invite('no-founder-competition');
+    await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ competition: ANSWERS.competition })
+      .send({ competition: 'A competition answer the flow no longer asks for.' })
       .expect(200);
 
-    expect(res.body.provenance.competition.supplier).toBe('founder');
+    const [row] = await h.db
+      .select()
+      .from(campaignVetting)
+      .where(eq(campaignVetting.draftId, draftId));
+    expect(row!.competitionText).toBeNull();
   });
 
   it('the database refuses to record it as Proovd’s, even by direct statement', async () => {
     const { draftId, raw } = await invite('competition-check');
-    await request(h.app)
-      .patch(`/api/draft/${raw}/vetting`)
-      .send({ competition: ANSWERS.competition })
-      .expect(200);
+    await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
 
     await expect(
       h.pool.query(
@@ -523,10 +651,6 @@ describe('§33.1.5 Competition cannot be prefilled', () => {
   });
 
   it('no source file offers a competition prefill', () => {
-    // The rule §9 states twice, checked the way §33.1.8 checks its own: by
-    // reading the tree, so a future phase adding one fails here rather than in
-    // production.
-    //
     // Comments are stripped first, for the same reason the §33.1.8 scan strips
     // them: the files that most need to say "there is deliberately no
     // competition prefill here" would otherwise be the ones this fails on,
@@ -542,107 +666,47 @@ describe('§33.1.5 Competition cannot be prefilled', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   §33.1.6 — the possible-creator result
+   §33.1.6 — the possible-creator result no longer gates anything
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('§33.1.6 the possible-creator result', () => {
-  it('is not available before vetting is submitted', async () => {
-    const { raw } = await invite('signal-early');
-    const res = await request(h.app).get(`/api/draft/${raw}/creator-signal`).expect(409);
-    expect(res.body.error).toBe('vetting_not_submitted');
+describe('§33.1.6 the possible-creator result is a record, not a gate', () => {
+  it('the founder-facing result route is gone', async () => {
+    const invited = await invite('signal-route');
+    await completeVetting(invited);
+    await request(h.app).get(`/api/draft/${invited.raw}/creator-signal`).expect(404);
   });
 
-  it('renders the recorded count once vetting is submitted', async () => {
-    const { raw, campaignId } = await invite('signal-ready');
-    await completeVetting(raw);
-    await recordSignal(campaignId, 7).expect(201);
+  it('Admin can still record the assessment, and a zero is recordable', async () => {
+    const invited = await invite('signal-record');
+    await completeVetting(invited);
+    await recordSignal(invited.campaignId, 0, 'no channel in this niche has been recruited yet').expect(201);
 
-    const res = await request(h.app).get(`/api/draft/${raw}/creator-signal`).expect(200);
-    expect(res.body.status).toBe('available');
-    expect(res.body.count).toBe(7);
-  });
-
-  it('never renders a zero — it routes to Admin instead (§10)', async () => {
-    const { raw, campaignId } = await invite('signal-zero');
-    await completeVetting(raw);
-    await recordSignal(campaignId, 0, 'no channel in this niche has been recruited yet').expect(201);
-
-    const res = await request(h.app).get(`/api/draft/${raw}/creator-signal`).expect(200);
-    expect(res.body.status).toBe('with_admin');
-    expect(res.body.count).toBeNull();
-
-    // The zero is recorded — that is what makes it actionable for Admin.
     const [recorded] = await h.db
       .select()
       .from(possibleCreatorResults)
-      .where(eq(possibleCreatorResults.campaignId, campaignId));
+      .where(eq(possibleCreatorResults.campaignId, invited.campaignId));
     expect(recorded!.count).toBe(0);
   });
 
-  it('an unrecorded result is indistinguishable from a zero, to the Founder', async () => {
-    const { raw } = await invite('signal-none');
-    await completeVetting(raw);
-
-    const res = await request(h.app).get(`/api/draft/${raw}/creator-signal`).expect(200);
-    expect(res.body.status).toBe('with_admin');
-    expect(res.body.count).toBeNull();
-  });
-
-  it('never sends the basis, the recorder, or any Creator to the Founder', async () => {
-    const { raw, campaignId } = await invite('signal-private');
-    await completeVetting(raw);
-    await recordSignal(campaignId, 4, 'internal note nobody outside Proovd should read').expect(201);
-
-    const res = await request(h.app).get(`/api/draft/${raw}/creator-signal`).expect(200);
-    expect(JSON.stringify(res.body)).not.toContain('internal note');
-    expect(res.body).not.toHaveProperty('basis');
-    expect(res.body).not.toHaveProperty('recordedBy');
-  });
-
   it('refuses a count with no stated basis', async () => {
-    const { raw, campaignId } = await invite('signal-basis');
-    await completeVetting(raw);
-    const res = await recordSignal(campaignId, 5, '   ');
+    const invited = await invite('signal-basis');
+    await completeVetting(invited);
+    const res = await recordSignal(invited.campaignId, 5, '   ');
     expect(res.status).toBe(422);
     expect(res.body.whatHappened).toMatch(/basis/i);
   });
 
-  it('precedes the account, and the claim is closed until it is available', async () => {
-    // §33.1.6: "Possible-creator result precedes account". Enforced on the
-    // server, not by hiding a button (§1.1).
+  it('the claim opens without any recorded result (simplified flow)', async () => {
     await publishClaimPolicies();
-    const { raw } = await invite('signal-gate');
-    await completeVetting(raw);
+    const invited = await invite('signal-no-gate');
+    await completeVetting(invited);
+    await request(h.app).patch(`/api/draft/${invited.raw}/claim`).send(CLAIM_FIELDS).expect(200);
 
+    // No creator-signal was recorded, and the claim succeeds anyway.
     await request(h.app)
-      .patch(`/api/draft/${raw}/claim`)
-      .send(CLAIM_FIELDS)
-      .expect(200);
-
-    const refused = await request(h.app)
-      .post(`/api/draft/${raw}/claim`)
+      .post(`/api/draft/${invited.raw}/claim`)
       .send({ password: PASSWORD, acceptedPolicySlugs: [...FOUNDER_CLAIM_POLICY_SLUGS] })
-      .expect(422);
-
-    expect(refused.body.error).toBe('creator_signal_pending');
-  });
-
-  it('promises nothing: every §10 limit ships with the number', () => {
-    // §33.1.6: the result "cannot promise acceptance". The disclosures are the
-    // mechanism, so their content is the assertion.
-    const all = POSSIBLE_CREATOR_RESULT_DISCLOSURES.join(' ').toLowerCase();
-    expect(all).toContain('not a roster');
-    expect(all).toContain('names no creator');
-    expect(all).toContain('guarantees neither');
-    expect(all).toContain('recruited or accepted');
-    expect(all).toContain('72-hour');
-    // Every occurrence of the idea of participation is a denial of it. Nothing
-    // in this list may read as a commitment, an endorsement, or momentum (§30).
-    expect(all).toContain('guarantees neither');
-    expect(all).not.toMatch(/\bguaranteed\b/);
-    expect(all).not.toMatch(/\b(?:are|is) interested\b/);
-    expect(all).not.toMatch(/\bhave (?:agreed|accepted|signed up)\b/);
-    expect(all).not.toMatch(/\bready to\b/);
+      .expect(201);
   });
 });
 
@@ -652,8 +716,8 @@ describe('§33.1.6 the possible-creator result', () => {
 
 describe('§33.1.7 the campaign type locks at vetting', () => {
   it('locks the type and moves the campaign to vetting_submitted', async () => {
-    const { raw, campaignId } = await invite('lock');
-    const state = await completeVetting(raw, 'pre_build');
+    const invited = await invite('lock');
+    const state = await completeVetting(invited, 'pre_build');
 
     expect(state['lockedType']).toBe('pre_build');
     expect(state['typeLockedAt']).toBeTruthy();
@@ -662,45 +726,45 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
     const history = await h.db
       .select()
       .from(campaignStatusHistory)
-      .where(eq(campaignStatusHistory.campaignId, campaignId));
+      .where(eq(campaignStatusHistory.campaignId, invited.campaignId));
     expect(history.map((r) => r.toStatus)).toContain('vetting_submitted');
   });
 
   it('makes the answers and the type read-only afterwards', async () => {
-    const { raw } = await invite('locked-readonly');
-    await completeVetting(raw, 'pre_launch');
+    const invited = await invite('locked-readonly');
+    await completeVetting(invited, 'pre_launch');
 
     const res = await request(h.app)
-      .patch(`/api/draft/${raw}/vetting`)
+      .patch(`/api/draft/${invited.raw}/vetting`)
       .send({ problem: 'Changed my mind.' })
       .expect(422);
     expect(res.body.whatHappened).toMatch(/already submitted/i);
   });
 
   it('the database refuses to change a locked type (§9: no migration exists)', async () => {
-    const { raw, campaignId } = await invite('lock-db');
-    await completeVetting(raw, 'pre_build');
+    const invited = await invite('lock-db');
+    await completeVetting(invited, 'pre_build');
 
     await expect(
-      h.pool.query(`UPDATE campaigns SET type = 'pre_launch' WHERE id = $1`, [campaignId]),
+      h.pool.query(`UPDATE campaigns SET type = 'pre_launch' WHERE id = $1`, [invited.campaignId]),
     ).rejects.toThrow(/cannot be changed/i);
 
     await expect(
-      h.pool.query(`UPDATE campaigns SET type_locked_at = NULL WHERE id = $1`, [campaignId]),
+      h.pool.query(`UPDATE campaigns SET type_locked_at = NULL WHERE id = $1`, [invited.campaignId]),
     ).rejects.toThrow();
   });
 
   it('submitting twice locks once', async () => {
-    const { raw, campaignId } = await invite('lock-twice');
-    await completeVetting(raw, 'pre_build');
-    await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(422);
+    const invited = await invite('lock-twice');
+    await completeVetting(invited, 'pre_build');
+    await request(h.app).post(`/api/draft/${invited.raw}/vetting/submit`).send({}).expect(422);
 
     const history = await h.db
       .select()
       .from(campaignStatusHistory)
       .where(
         and(
-          eq(campaignStatusHistory.campaignId, campaignId),
+          eq(campaignStatusHistory.campaignId, invited.campaignId),
           eq(campaignStatusHistory.toStatus, 'vetting_submitted'),
         ),
       );
@@ -708,8 +772,9 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
   });
 
   it('a wrong type archives and restarts, carrying nothing across', async () => {
-    const { raw, campaignId, draftId, prospectId } = await invite('wrong-type');
-    await completeVetting(raw, 'pre_build');
+    const invited = await invite('wrong-type');
+    const { raw, campaignId, draftId, prospectId } = invited;
+    await completeVetting(invited, 'pre_build');
 
     // Something that must NOT be copied: a Creator association and a consent
     // record on the old campaign. §9 and §33.1.7 both name these.
@@ -752,7 +817,7 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
     expect(freshVetting!.selectedType).toBeNull();
     expect(freshVetting!.problemText).toBeNull();
     expect(freshVetting!.solutionText).toBeNull();
-    expect(freshVetting!.competitionText).toBeNull();
+    expect(freshVetting!.viewsRange).toBeNull();
 
     const copiedAssociations = await h.db
       .select()
@@ -777,10 +842,10 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
   });
 
   it('archiving is recorded with actor, reason, prior and new value (§25.6)', async () => {
-    const { raw, campaignId } = await invite('archive-audit');
-    await completeVetting(raw, 'pre_launch');
+    const invited = await invite('archive-audit');
+    await completeVetting(invited, 'pre_launch');
     await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/archive-and-restart`)
+      .post(`/api/admin/campaigns/${invited.campaignId}/archive-and-restart`)
       .set('cookie', admin.cookie)
       .send({ reason: 'Wrong path locked.' })
       .expect(201);
@@ -790,7 +855,7 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
       .from(auditEvents)
       .where(
         and(
-          eq(auditEvents.targetId, campaignId),
+          eq(auditEvents.targetId, invited.campaignId),
           eq(auditEvents.action, 'vetting.archived_and_restarted'),
         ),
       );
@@ -810,15 +875,15 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
   });
 
   it('refuses to archive after the listing fee is paid — the refund rules control', async () => {
-    const { raw, campaignId } = await invite('archive-paid');
-    await completeVetting(raw, 'pre_build');
+    const invited = await invite('archive-paid');
+    await completeVetting(invited, 'pre_build');
     await h.db
       .update(campaigns)
       .set({ listingPaidAt: new Date() })
-      .where(eq(campaigns.id, campaignId));
+      .where(eq(campaigns.id, invited.campaignId));
 
     const res = await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/archive-and-restart`)
+      .post(`/api/admin/campaigns/${invited.campaignId}/archive-and-restart`)
       .set('cookie', admin.cookie)
       .send({ reason: 'Wrong path.' })
       .expect(422);
@@ -826,17 +891,17 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
   });
 
   it('archiving requires a reason and a fresh session', async () => {
-    const { raw, campaignId } = await invite('archive-guard');
-    await completeVetting(raw, 'pre_build');
+    const invited = await invite('archive-guard');
+    await completeVetting(invited, 'pre_build');
 
     await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/archive-and-restart`)
+      .post(`/api/admin/campaigns/${invited.campaignId}/archive-and-restart`)
       .set('cookie', admin.cookie)
       .send({})
       .expect(400);
 
     await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/archive-and-restart`)
+      .post(`/api/admin/campaigns/${invited.campaignId}/archive-and-restart`)
       .send({ reason: 'no session' })
       .expect(401);
   });
@@ -890,8 +955,9 @@ describe('§33.1.9 the account claim', () => {
   async function readyToClaim(label: string) {
     await publishClaimPolicies();
     const invited = await invite(label);
-    await completeVetting(invited.raw);
-    await recordSignal(invited.campaignId, 5).expect(201);
+    await completeVetting(invited);
+    // Deliberately no creator-signal recording: the simplified flow goes from
+    // submission straight to the claim.
     await request(h.app).patch(`/api/draft/${invited.raw}/claim`).send(CLAIM_FIELDS).expect(200);
     return invited;
   }
@@ -925,7 +991,7 @@ describe('§33.1.9 the account claim', () => {
       .from(campaignVetting)
       .where(eq(campaignVetting.draftId, draftId));
     expect(vetting!.problemText).toBe(ANSWERS.problem);
-    expect(vetting!.competitionText).toBe(ANSWERS.competition);
+    expect(vetting!.viewsRange).toBe(ANSWERS.views);
 
     // The prospect is now an account — which is also what takes it out of the
     // §25.8 sweep, twice over.
@@ -1116,7 +1182,7 @@ describe('§33.1.9 the account claim', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   §25.8 — the sweep reaches everything Phase 07 stores
+   §25.8 — the sweep reaches everything the vetting stores
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('the retention sweep covers the vetting record and the claim profile', () => {
@@ -1124,7 +1190,7 @@ describe('the retention sweep covers the vetting record and the claim profile', 
     const { raw, draftId } = await invite('sweep');
     await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ selectedType: 'pre_build', problem: ANSWERS.problem })
+      .send({ problem: ANSWERS.problem, views: ANSWERS.views })
       .expect(200);
     await request(h.app).patch(`/api/draft/${raw}/claim`).send(CLAIM_FIELDS).expect(200);
 
@@ -1137,6 +1203,7 @@ describe('the retention sweep covers the vetting record and the claim profile', 
       .from(campaignVetting)
       .where(eq(campaignVetting.draftId, draftId));
     expect(vetting!.problemText).toBeNull();
+    expect(vetting!.viewsRange).toBeNull();
     expect(vetting!.anonymisedAt).toBeTruthy();
 
     const [profile] = await h.db

@@ -25,6 +25,7 @@
 
 import {
   ATTENTION_CHIP_LABEL,
+  CAMPAIGN_PATH_CHOICES,
   CAMPAIGN_TYPE_LOCK_NOTE,
   CREATOR_MATCH_CAVEAT,
   INVITATION_FIXED_CONTENT_HELPER,
@@ -54,11 +55,9 @@ interface OverviewProps {
   actions: WorkspaceActions;
 }
 
-/** The empty-answer sentence, which differs for the one Proovd may not draft. */
-function unansweredText(key: 'problem' | 'solution' | 'competition'): string {
-  return key === 'competition'
-    ? 'Not written yet — this always starts blank and is written by the Founder.'
-    : 'Not answered yet.';
+/** The empty-answer sentence, which differs for the one the Founder chooses. */
+function unansweredText(key: 'problem' | 'solution' | 'views' | 'competition'): string {
+  return key === 'views' ? 'Not chosen yet.' : 'Not answered yet.';
 }
 
 export function Overview({ detail, actions }: OverviewProps) {
@@ -261,7 +260,45 @@ export function Overview({ detail, actions }: OverviewProps) {
           <Note>{CAMPAIGN_TYPE_LOCK_NOTE}</Note>
         </>
       ) : (
-        <p className="grey">Not confirmed yet</p>
+        <>
+          {/* Simplified flow: Admin chooses the path from discovery; the
+              Founder no longer does. It stays changeable until submission,
+              which is when it locks — the server refuses after that whatever
+              this pane offers (§1.1). */}
+          {vetting.campaignTypeSelected ? (
+            <p>
+              <b>{vetting.campaignTypeSelected}</b>
+              <span className="grey">
+                {' '}
+                · Set by Proovd — locks when {who} submits their answers
+              </span>
+            </p>
+          ) : (
+            <p className="grey">
+              Not set yet. Choose the path this campaign runs on — {who} cannot submit
+              their answers until one is set.
+            </p>
+          )}
+          {vetting.campaignTypeEditable && vetting.draftId ? (
+            <Actions>
+              {CAMPAIGN_PATH_CHOICES.map((choice) => {
+                const selected = vetting.campaignTypeSelectedRaw === choice.type;
+                const draftId = vetting.draftId!;
+                return (
+                  <Button
+                    key={choice.type}
+                    tier={selected ? 'secondary' : 'tertiary'}
+                    small
+                    disabled={selected}
+                    onClick={() => void actions.setCampaignPath(draftId, choice.type)}
+                  >
+                    {selected ? `${choice.name} (set)` : `Set ${choice.name}`}
+                  </Button>
+                );
+              })}
+            </Actions>
+          ) : null}
+        </>
       )}
 
       <SecTitle>Setup answers</SecTitle>
@@ -287,8 +324,9 @@ export function Overview({ detail, actions }: OverviewProps) {
       ) : vetting.creatorMatches.count === 0 ? (
         <AttentionBox chip={ATTENTION_CHIP_LABEL}>
           <p>
-            <b>No potential Creator matches were found.</b> {who} cannot continue until
-            Proovd reviews the campaign fit.
+            <b>No potential Creator matches were found.</b> The campaign fit is worth a
+            review before recruitment work begins — this no longer blocks {who}’s
+            account setup.
           </p>
           <ParkedButton parkedKey="creatorFit">Review Creator fit</ParkedButton>
         </AttentionBox>

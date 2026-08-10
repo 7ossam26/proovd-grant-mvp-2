@@ -134,12 +134,19 @@ const INVITATION_FIXED_CONTENT = [
   { key: 'invSupport', label: 'Support contact' },
 ] as const;
 
-const VETTING_STEP_LABELS = [
-  'Campaign type',
-  'Problem',
-  'Solution',
-  'Competition and alternatives',
-] as const;
+/** The simplified flow's three Founder steps (2026-08-10, product direction). */
+const VETTING_STEP_LABELS = ['Problem', 'Solution', 'Amount of views'] as const;
+
+/**
+ * The views-range labels, restated from `shared/src/vetting/steps.ts` (the
+ * backend cannot import shared at runtime) and drift-tested.
+ */
+const VIEWS_RANGE_LABELS: Record<string, string> = {
+  under_10k: 'Under 10,000',
+  '10k_100k': '10,000 – 100,000',
+  '100k_1m': '100,000 – 1,000,000',
+  over_1m: 'Over 1,000,000',
+};
 
 const CREATOR_MATCH_STEP_LABEL = 'Potential Creator matches';
 const ACCOUNT_CREATED_STEP_LABEL = 'Account created';
@@ -468,7 +475,7 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
           selectedType: campaignVetting.selectedType,
           problem: campaignVetting.problemText,
           solution: campaignVetting.solutionText,
-          competition: campaignVetting.competitionText,
+          viewsRange: campaignVetting.viewsRange,
         })
         .from(campaignVetting)
         .where(inArray(campaignVetting.draftId, draftIds))
@@ -567,20 +574,10 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
       claim?.preferredName ?? prospect.preferredName ?? claim?.legalName ?? prospect.legalName ?? '';
 
     // The list and the detail must not disagree about whether a Founder needs
-    // attention, so both feed the SAME kernel from the same facts. The two
-    // gates below are cost, not policy: §10's step is only live in two
-    // lifecycle states, and a campaign that has never closed has no §22.3
-    // payment to be blocked on — so neither read is skipped where it could
+    // attention, so both feed the SAME kernel from the same facts. The gate
+    // below is cost, not policy: a campaign that has never closed has no §22.3
+    // payment to be blocked on — so the read is not skipped where it could
     // have produced an answer.
-    const vettingComplete = vetting?.selectedType != null && answered === VETTING_STEP_LABELS.length;
-    const signalRelevant =
-      current !== null &&
-      vettingComplete &&
-      (current.campaign.status === 'vetting_submitted' ||
-        current.campaign.status === 'account_claimed');
-    const signal =
-      signalRelevant && current ? await readPossibleCreatorSignal(db, current.campaign.id) : null;
-
     const paymentStatus =
       current && current.campaign.campaignCloseAt !== null
         ? await readFounderPaymentStatus(db, { campaignId: current.campaign.id, now })
@@ -611,11 +608,6 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
         accountState,
         preferredName,
         standingDetail: access?.action === 'suspend' ? access.reason : null,
-        creatorSignalWithAdmin: creatorSignalIsWithAdmin(
-          current?.campaign.status ?? null,
-          vettingComplete,
-          signal?.count ?? null,
-        ),
         moneyBlocker: firstMoneyBlocker(paymentStatus),
         campaignIssue: current ? await campaignIssueOf(db, current.campaign) : null,
       }),
@@ -626,13 +618,12 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
 }
 
 function countAnswered(vetting: {
-  selectedType: string | null;
   problem: string | null;
   solution: string | null;
-  competition: string | null;
+  viewsRange: string | null;
 } | undefined): number {
   if (!vetting) return 0;
-  return [vetting.selectedType, vetting.problem, vetting.solution, vetting.competition].filter(
+  return [vetting.problem, vetting.solution, vetting.viewsRange].filter(
     (value) => typeof value === 'string' && value.trim().length > 0,
   ).length;
 }
@@ -651,7 +642,6 @@ function campaignNameOf(title: string | null, productName: string | null): strin
 interface AttentionInput {
   accountState: FounderAccountState;
   standingDetail: string | null;
-  creatorSignalWithAdmin: boolean;
   moneyBlocker: string | null;
   campaignIssue: string | null;
   preferredName: string;
@@ -665,11 +655,11 @@ interface AttentionInput {
  * action needed" instead of showing a blank cell that looks like missing data.
  *
  * The order is not arbitrary and is not a rule about money: it is severity for
- * the PERSON. A suspended Founder cannot act at all; a Founder with no recorded
- * Creator result is stuck at §10's step 5 and cannot proceed until Proovd looks
- * (§10 routes a zero to Admin by name); a payment blocker is money already
- * earned and waiting; a campaign issue is work in progress. Nothing here
- * decides anything — every branch names a fact another module recorded.
+ * the PERSON. A suspended Founder cannot act at all; a payment blocker is money
+ * already earned and waiting; a campaign issue is work in progress. Nothing
+ * here decides anything — every branch names a fact another module recorded.
+ * (The possible-creator branch went with the simplified flow: the assessment
+ * no longer blocks the Founder, so its absence is not a person stuck.)
  */
 export function deriveAttention(input: AttentionInput): FounderAttention {
   if (input.accountState === 'Permanently banned') {
@@ -688,13 +678,6 @@ export function deriveAttention(input: AttentionInput): FounderAttention {
       action: { label: 'View review', act: 'jump-access' },
     };
   }
-  if (input.creatorSignalWithAdmin) {
-    return {
-      needed: true,
-      text: `No potential Creator matches were recorded. ${input.preferredName} cannot continue until Proovd reviews the campaign fit.`,
-      action: { label: 'Review Creator fit', act: 'jump-overview' },
-    };
-  }
   if (input.moneyBlocker) {
     return {
       needed: true,
@@ -710,24 +693,6 @@ export function deriveAttention(input: AttentionInput): FounderAttention {
     };
   }
   return { needed: false };
-}
-
-/**
- * §10: "For the pre-screened invited cohort, the result must not be zero; a
- * zero result routes to Admin before the Founder proceeds."
- *
- * So this is true while the campaign is still in the two states where the
- * Founder is waiting on that step — never afterwards, because a campaign that
- * has paid its listing fee is past the question whatever the old record says.
- */
-function creatorSignalIsWithAdmin(
-  campaignStatus: string | null,
-  vettingComplete: boolean,
-  signalCount: number | null,
-): boolean {
-  if (!campaignStatus || !vettingComplete) return false;
-  if (campaignStatus !== 'vetting_submitted' && campaignStatus !== 'account_claimed') return false;
-  return signalCount === null || signalCount <= 0;
 }
 
 /** The first named blocker on a campaign's §22.3 payments, or null. */
@@ -783,13 +748,6 @@ export async function readFounderWorkspace(
     accountState: ctx.accountState,
     preferredName: ctx.identity.preferredName,
     standingDetail: details.standing.detail,
-    creatorSignalWithAdmin: creatorSignalIsWithAdmin(
-      ctx.currentCampaign?.campaign.status ?? null,
-      overview.vetting.progress
-        .slice(0, VETTING_STEP_LABELS.length)
-        .every((step) => step.done),
-      overview.vetting.creatorMatches?.count ?? null,
-    ),
     moneyBlocker: firstMoneyBlocker(currentStatus),
     campaignIssue: campaignsPane.current?.issue ?? null,
   });
@@ -1212,25 +1170,28 @@ async function composeVetting(db: Database, ctx: FounderContext): Promise<Vettin
         .limit(1)
     : [];
 
-  const answers: Array<{ key: 'problem' | 'solution' | 'competition'; text: string | null }> = [
+  const answers: Array<{ key: 'problem' | 'solution' | 'views' | 'competition'; text: string | null }> = [
     { key: 'problem', text: row?.problemText ?? null },
     { key: 'solution', text: row?.solutionText ?? null },
-    { key: 'competition', text: row?.competitionText ?? null },
+    { key: 'views', text: row?.viewsRange ? (VIEWS_RANGE_LABELS[row.viewsRange] ?? null) : null },
   ];
+  // Legacy records answered Competition under the five-step flow. The answer
+  // survives and Admin may still read it; a new record never shows the row.
+  if (present(row?.competitionText)) {
+    answers.push({ key: 'competition', text: row?.competitionText ?? null });
+  }
 
   const done = [
-    row?.selectedType != null,
     present(row?.problemText),
     present(row?.solutionText),
-    present(row?.competitionText),
+    row?.viewsRange != null,
   ];
 
   const signal = campaign ? await readPossibleCreatorSignal(db, campaign.id) : null;
 
   // Annotated rather than inferred: `.map` over a `as const` label tuple infers
   // the narrow literal union, and the two steps pushed below are not members of
-  // it — §10's Creator-matches step and the account creation. The checklist is
-  // six items, not four.
+  // it — §10's Creator-matches step and the account creation.
   const progress: { label: string; done: boolean }[] = VETTING_STEP_LABELS.map(
     (label, index) => ({
       label: label as string,
@@ -1254,6 +1215,13 @@ async function composeVetting(db: Database, ctx: FounderContext): Promise<Vettin
     campaignTypeAt: campaign?.typeLockedAt
       ? `${prefixed('Confirmed', campaign.typeLockedAt)} · ${CAMPAIGN_TYPE_LOCK_NOTE}`
       : null,
+    // The simplified flow: Admin chooses the path from discovery, and it stays
+    // changeable until the Founder submits — which is when it locks above.
+    campaignTypeSelected: campaignTypeLabel(row?.selectedType ?? null),
+    campaignTypeSelectedRaw: (row?.selectedType as 'pre_build' | 'pre_launch' | null) ?? null,
+    campaignTypeEditable: draft !== null && !campaign?.typeLockedAt && !row?.submittedAt,
+    /** The draft the campaign-path control writes against. */
+    draftId: draft?.id ?? null,
     answers: answers.map((answer) => ({
       key: answer.key,
       label: VETTING_ANSWER_LABELS[answer.key],
@@ -1262,16 +1230,18 @@ async function composeVetting(db: Database, ctx: FounderContext): Promise<Vettin
     })),
     lastSaved: prefixed('Last successful save:', row?.lastSavedAt ?? null),
     // §10: `null` means never recorded, which is NOT zero — and Admin is the
-    // one audience allowed to see a recorded zero, because §10 routes it here.
+    // one audience allowed to see a recorded zero. The assessment no longer
+    // blocks the Founder's claim; it remains a recordable fact.
     creatorMatches: signal
       ? { count: signal.count, recordedAt: formatInstant(new Date(signal.recordedAt)) }
       : null,
   };
 }
 
-const VETTING_ANSWER_LABELS: Record<'problem' | 'solution' | 'competition', string> = {
+const VETTING_ANSWER_LABELS: Record<'problem' | 'solution' | 'views' | 'competition', string> = {
   problem: 'Problem',
   solution: 'Solution',
+  views: 'Amount of views',
   competition: 'Competition and alternatives',
 };
 
@@ -1287,11 +1257,14 @@ function present(value: string | null | undefined): boolean {
  * (§33.1.5). The shape of this function is the third place that is true.
  */
 function provenanceOf(
-  key: 'problem' | 'solution' | 'competition',
+  key: 'problem' | 'solution' | 'views' | 'competition',
   row: typeof campaignVetting.$inferSelect | undefined,
   preferredName: string,
 ): string | null {
   if (!row) return null;
+  if (key === 'views') {
+    return row.viewsRange !== null ? `Chosen by ${preferredName}` : null;
+  }
   if (key === 'competition') {
     return present(row.competitionText) ? `Written by ${preferredName}` : null;
   }

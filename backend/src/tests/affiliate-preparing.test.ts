@@ -130,22 +130,29 @@ async function invitedFounder(): Promise<{ campaignId: string; draftId: string; 
   return { campaignId: created.body.campaignId, draftId: created.body.draftId, raw };
 }
 
-/** Drives the §9 vetting to a submitted state so the claim can proceed. */
-async function submitVetting(raw: string, campaignId: string): Promise<void> {
+/** Drives the simplified vetting to a submitted state so the claim can proceed. */
+async function submitVetting(raw: string, campaignId: string, draftId: string): Promise<void> {
+  // The campaign path is Admin's step now (simplified flow, 2026-08-10).
+  await request(h.app)
+    .put(`/api/admin/founders/${draftId}/campaign-path`)
+    .set('cookie', admin.cookie)
+    .send({ campaignPath: 'pre_build' })
+    .expect(200);
+
   await request(h.app)
     .patch(`/api/draft/${raw}/vetting`)
     .send({
-      selectedType: 'pre_build',
       problem: 'Independent physiotherapists lose income to last-minute cancellations.',
       solution: 'A waitlist that fills a cancelled slot automatically.',
-      competition: 'Most clinics use a paper list and a phone. Two apps do this for salons.',
+      views: '10k_100k',
     })
     .expect(200);
 
   await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(201);
 
-  // §10: the possible-creator result is a recorded Admin assessment and the
-  // claim will not proceed without one.
+  // The possible-creator result no longer gates the claim; it stays a
+  // recordable Admin assessment, and this journey still records one so the
+  // workspace has something to show.
   await request(h.app)
     .post(`/api/admin/campaigns/${campaignId}/creator-signal`)
     .set('cookie', admin.cookie)
@@ -262,7 +269,7 @@ async function claimFounder(raw: string): Promise<void> {
 async function journey(): Promise<Journey> {
   const founder = await invitedFounder();
   const creator = await signedUpCreator(founder.campaignId);
-  await submitVetting(founder.raw, founder.campaignId);
+  await submitVetting(founder.raw, founder.campaignId, founder.draftId);
   await claimFounder(founder.raw);
 
   return {
@@ -381,7 +388,7 @@ describe('§33.1.9 — founder_signup_complete reveals the preparing campaign on
 
   it('reveals to no one when the campaign has no signed-up Creator', async () => {
     const founder = await invitedFounder();
-    await submitVetting(founder.raw, founder.campaignId);
+    await submitVetting(founder.raw, founder.campaignId, founder.draftId);
     const before = h.sentEmails.messages.length;
     await claimFounder(founder.raw);
 
@@ -431,7 +438,7 @@ describe('§33.1.9 — founder_signup_complete reveals the preparing campaign on
       })
       .expect(201);
 
-    await submitVetting(founder.raw, founder.campaignId);
+    await submitVetting(founder.raw, founder.campaignId, founder.draftId);
     await claimFounder(founder.raw);
 
     const [association] = await h.db
@@ -517,12 +524,15 @@ describe('§33.2.4 — the preparing Campaign kit', () => {
 
     const kit = res.body.kit;
     // §10: "the complete currently available Founder/problem/solution/
-    // competition information and the single Campaign kit."
+    // competition information and the single Campaign kit." Competition is a
+    // legacy field under the simplified flow (2026-08-10): new campaigns never
+    // collect it, so "currently available" is honestly null here — a record
+    // that has one still renders it.
     expect(kit.founder.name).toBe('Rowan');
     expect(kit.productName).toBe('Waitlist');
     expect(kit.problem).toMatch(/last-minute cancellations/i);
     expect(kit.solution).toMatch(/waitlist that fills/i);
-    expect(kit.competition).toMatch(/paper list/i);
+    expect(kit.competition).toBeNull();
     // §3: the customer-facing name, never the internal one.
     expect(kit.campaignType).toBe('Idea Campaign');
     expect(JSON.stringify(kit)).not.toMatch(/pre_build|pre_launch/);

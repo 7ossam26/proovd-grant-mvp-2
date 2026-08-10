@@ -481,6 +481,12 @@ export const UNGATED_ADMIN_WRITES = [
       'Supplies Proovd’s half of two vetting fields, all of it provenance-tracked and Founder-editable. Competition cannot be prefilled by any route.',
   },
   {
+    route: 'PUT /api/admin/founders/:draftId/campaign-path',
+    specRef: '§9 (simplified flow, 2026-08-10)',
+    reason:
+      'Sets the Idea/Product path on an unsubmitted draft — the same act as the prefill beside it, and freely revisable until the Founder submits, which is when §9’s permanent lock happens and the service refuses further writes.',
+  },
+  {
     route: 'PUT /api/admin/founders/:draftId/invitation',
     specRef: '§7',
     reason:

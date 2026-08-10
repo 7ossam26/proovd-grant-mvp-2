@@ -91,6 +91,7 @@ import {
   recordDeletionReview,
   sendInvite,
   sendNewInvite,
+  setFounderCampaignPath,
   setInvitationOverride,
   setNextCampaignReadiness,
   updateFounderField,
@@ -472,6 +473,13 @@ export function FounderWorkspace() {
       }
       await clearInvitationOverride(prospectId, key);
       await refresh();
+    },
+    setCampaignPath: async (draftId, path) => {
+      await setFounderCampaignPath(draftId, path);
+      await refresh();
+      toast('Campaign type saved', {
+        sub: 'It locks when the Founder submits their answers.',
+      });
     },
   };
 

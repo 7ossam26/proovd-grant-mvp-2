@@ -1,9 +1,14 @@
 /**
- * Pre-account vetting — Spec §9, §23.1, §33.1.4, §33.1.5, §33.1.7.
+ * Pre-account vetting — Spec §9, §23.1, and the simplified flow.
  *
- * The Founder answers four questions behind a draft token, one at a time, with
- * every keystroke saved. Submitting locks the campaign type permanently and
- * moves the campaign to `vetting_submitted`.
+ * ── Recorded deviation from Spec §9 (2026-08-10, product direction) ─────────
+ * The Founder answers three questions behind a draft token — Problem, Solution,
+ * and the amount of views — with every keystroke saved. The campaign path is no
+ * longer the Founder's step: Admin sets it on this record from discovery
+ * (`setCampaignPath`), and submission still locks it permanently and moves the
+ * campaign to `vetting_submitted`, exactly as §9's lock requires. Competition
+ * is no longer collected; its columns, its never-prefill CHECK, and existing
+ * answers all survive untouched.
  *
  * ── Nothing here takes a campaign id or a draft id from a caller ────────────
  * Every entry point takes the draft id the *verified token* produced, exactly
@@ -45,7 +50,7 @@ import {
 import { auditEvents } from '../db/schema/integrity.js';
 
 /**
- * §9's four answered steps, restated.
+ * The three answered steps, restated.
  *
  * `@proovd/shared` owns the sequence and its copy, and the backend cannot
  * import it at runtime — the same constraint `db/schema/domain.ts` documents
@@ -53,16 +58,18 @@ import { auditEvents } from '../db/schema/integrity.js';
  * ids are restated and `src/tests/vetting.test.ts` fails the suite if the two
  * ever disagree.
  */
-export const VETTING_ANSWER_STEPS = [
-  'campaign_path',
-  'problem',
-  'solution',
-  'competition',
-] as const;
+export const VETTING_ANSWER_STEPS = ['problem', 'solution', 'views'] as const;
 
-export const VETTING_STEPS = [...VETTING_ANSWER_STEPS, 'possible_creator_result'] as const;
+export const VETTING_STEPS = VETTING_ANSWER_STEPS;
 
 export type VettingStep = (typeof VETTING_STEPS)[number];
+
+/**
+ * The amount-of-views ranges, restated from `shared/src/vetting/steps.ts` and
+ * drift-tested. The ids are stored; only shared's labels ever render.
+ */
+export const VIEWS_RANGES = ['under_10k', '10k_100k', '100k_1m', 'over_1m'] as const;
+export type ViewsRange = (typeof VIEWS_RANGES)[number];
 
 /** §3: internal type values. Never rendered — the surface reads shared's names. */
 export const CAMPAIGN_TYPES = ['pre_build', 'pre_launch'] as const;
@@ -83,19 +90,15 @@ export interface FieldProvenance {
 export interface VettingState {
   draftId: string;
   campaignId: string;
+  /** The campaign path Admin set from discovery. Read-only to the Founder. */
   selectedType: CampaignTypeValue | null;
   problem: string | null;
   solution: string | null;
-  competition: string | null;
+  /** The Founder's amount-of-views answer, as a shared range id. */
+  views: ViewsRange | null;
   provenance: {
     problem: FieldProvenance;
     solution: FieldProvenance;
-    /**
-     * No `prefilledText` and no `prefilledAt` — §9 forbids the field having
-     * either, and a null-valued key would leave a shape a later phase could
-     * quietly start filling.
-     */
-    competition: Omit<FieldProvenance, 'prefilledText' | 'prefilledAt'>;
   };
   /** §9: "Returning restores the latest saved draft and says when it was saved." */
   lastSavedAt: string | null;
@@ -115,6 +118,18 @@ function present(value: string | null): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+/**
+ * Stored resume positions from the five-step flow map onto the nearest live
+ * step, so a Founder who paused mid-flow before the simplification resumes
+ * somewhere real rather than at a screen that no longer exists.
+ */
+function normaliseResumeStep(value: string | null): VettingStep | null {
+  if (value === null) return null;
+  if ((VETTING_STEPS as readonly string[]).includes(value)) return value as VettingStep;
+  if (value === 'campaign_path') return 'problem';
+  return 'views';
+}
+
 function toState(row: CampaignVetting, campaignStatus: string, campaign: {
   type: string | null;
   typeLockedAt: Date | null;
@@ -125,7 +140,7 @@ function toState(row: CampaignVetting, campaignStatus: string, campaign: {
     selectedType: (row.selectedType as CampaignTypeValue | null) ?? null,
     problem: row.problemText,
     solution: row.solutionText,
-    competition: row.competitionText,
+    views: (row.viewsRange as ViewsRange | null) ?? null,
     provenance: {
       problem: {
         supplier: row.problemSupplier,
@@ -141,20 +156,14 @@ function toState(row: CampaignVetting, campaignStatus: string, campaign: {
         firstEditedAt: iso(row.solutionFirstEditedAt),
         lastEditedAt: iso(row.solutionLastEditedAt),
       },
-      competition: {
-        supplier: row.competitionSupplier,
-        firstEditedAt: iso(row.competitionFirstEditedAt),
-        lastEditedAt: iso(row.competitionLastEditedAt),
-      },
     },
     lastSavedAt: iso(row.lastSavedAt),
-    resumeStep: (row.resumeStep as VettingStep | null) ?? null,
+    resumeStep: normaliseResumeStep(row.resumeStep),
     submittedAt: iso(row.submittedAt),
     completeness: {
-      campaign_path: row.selectedType !== null,
       problem: present(row.problemText),
       solution: present(row.solutionText),
-      competition: present(row.competitionText),
+      views: row.viewsRange !== null,
     },
     campaignStatus,
     lockedType: (campaign.type as CampaignTypeValue | null) ?? null,
@@ -219,10 +228,9 @@ export async function readVetting(
 
 export interface SaveVettingInput {
   /** Absent keys are untouched. A key present with `null` clears that answer. */
-  selectedType?: CampaignTypeValue | null;
   problem?: string | null;
   solution?: string | null;
-  competition?: string | null;
+  views?: string | null;
   resumeStep?: VettingStep;
   actor: string;
 }
@@ -267,11 +275,11 @@ export async function saveVetting(
     };
   }
 
-  if (input.selectedType !== undefined && input.selectedType !== null) {
-    if (!CAMPAIGN_TYPES.includes(input.selectedType)) {
+  if (input.views !== undefined && input.views !== null) {
+    if (!(VIEWS_RANGES as readonly string[]).includes(input.views)) {
       return {
         ok: false,
-        message: 'That is not one of the two campaign paths.',
+        message: 'That is not one of the view ranges.',
         next: 'Choose one of the options shown. Nothing was changed.',
       };
     }
@@ -280,9 +288,8 @@ export async function saveVetting(
   const now = new Date();
   const patch: Record<string, unknown> = { lastSavedAt: now, updatedBy: input.actor };
 
-  if (input.selectedType !== undefined) {
-    patch['selectedType'] = input.selectedType;
-    patch['typeChosenAt'] = input.selectedType === null ? null : now;
+  if (input.views !== undefined) {
+    patch['viewsRange'] = input.views;
   }
   if (input.resumeStep !== undefined) {
     if (!VETTING_STEPS.includes(input.resumeStep)) {
@@ -304,21 +311,6 @@ export async function saveVetting(
     current.provenance.solution,
     now,
   );
-
-  if (input.competition !== undefined) {
-    const next = normalise(input.competition);
-    patch['competitionText'] = next;
-    // Never anything but `founder`, and never derived from a comparison against
-    // a prefill — there is no prefill to compare against and there never will
-    // be (§9, §33.1.5). The CHECK constraint says the same thing again.
-    patch['competitionSupplier'] = next === null ? null : 'founder';
-    if (next !== current.competition) {
-      if (!current.provenance.competition.firstEditedAt) {
-        patch['competitionFirstEditedAt'] = now;
-      }
-      patch['competitionLastEditedAt'] = now;
-    }
-  }
 
   await db.update(campaignVetting).set(patch).where(eq(campaignVetting.draftId, draftId));
 
@@ -450,6 +442,70 @@ export async function prefillVetting(
     : { ok: false, message: 'That draft is no longer available.' };
 }
 
+/* ── The campaign path, set by Admin (simplified flow, §9's lock kept) ─────── */
+
+export type SetCampaignPathResult =
+  | { ok: true; state: VettingState }
+  | { ok: false; message: string };
+
+/**
+ * Admin's half of the simplified flow: the campaign path is decided from
+ * discovery, on the draft, before the Founder submits — the Founder no longer
+ * chooses it. It stays freely changeable until submission, which is the moment
+ * §9's permanent lock still happens (`submitVetting` writes `campaigns.type`
+ * and the 0007 trigger keeps it immutable from then on).
+ */
+export async function setCampaignPath(
+  db: Database,
+  draftId: string,
+  input: { type: CampaignTypeValue | null; actor: string },
+): Promise<SetCampaignPathResult> {
+  if (input.type !== null && !CAMPAIGN_TYPES.includes(input.type)) {
+    return { ok: false, message: 'That is not one of the two campaign paths.' };
+  }
+
+  const current = await ensureVetting(db, draftId, input.actor);
+  if (!current) return { ok: false, message: 'That draft is no longer available.' };
+  if (current.submittedAt) {
+    return {
+      ok: false,
+      message:
+        'This Founder has submitted their answers, so the campaign type is locked. A wrong type is archived and a new setup begins — it is never switched in place.',
+    };
+  }
+  if (current.selectedType === input.type) {
+    return { ok: true, state: current };
+  }
+
+  const now = new Date();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(campaignVetting)
+      .set({
+        selectedType: input.type,
+        typeChosenAt: input.type === null ? null : now,
+        updatedBy: input.actor,
+      })
+      .where(eq(campaignVetting.draftId, draftId));
+
+    await tx.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_vetting',
+      targetId: draftId,
+      action: 'vetting.campaign_path_set',
+      internalReason:
+        'campaign path set by Admin from discovery (simplified flow); locks at Founder submission',
+      customerExplanation: null,
+      priorValue: { selectedType: current.selectedType },
+      newValue: { selectedType: input.type },
+    });
+  });
+
+  const state = await readVetting(db, draftId);
+  return state ? { ok: true, state } : { ok: false, message: 'That draft is no longer available.' };
+}
+
 /* ── Submission and the type lock (§9, §23.1, §33.1.7) ────────────────────── */
 
 export type SubmitResult =
@@ -499,13 +555,24 @@ export async function submitVetting(
   if (missing.length > 0) {
     return {
       ok: false,
-      message: 'Some answers are still empty, and the campaign path locks on submission.',
+      message: 'Some answers are still empty.',
       next: 'Go back and finish them. Everything you have written is saved.',
       missing: [...missing],
     };
   }
 
-  const type = current.selectedType!;
+  // The campaign path is Admin's answer now, and submission is the moment it
+  // locks — so a submission cannot happen before Proovd has recorded one. The
+  // message owns the wait (§27.1): it is our step, not the Founder's.
+  if (!current.selectedType) {
+    return {
+      ok: false,
+      message: 'We are still finishing the setup of your campaign record on our side.',
+      next: 'Everything you have written is saved. Try again shortly, or reply to your invitation email and we will sort it out.',
+    };
+  }
+
+  const type = current.selectedType;
   const now = new Date();
 
   const outcome = await db.transaction(async (tx) => {
@@ -526,7 +593,7 @@ export async function submitVetting(
 
     await tx
       .update(campaignVetting)
-      .set({ submittedAt: now, resumeStep: 'possible_creator_result', updatedBy: actor })
+      .set({ submittedAt: now, resumeStep: 'views', updatedBy: actor })
       .where(and(eq(campaignVetting.draftId, draftId), isNull(campaignVetting.submittedAt)));
 
     await tx.insert(auditEvents).values({
@@ -651,35 +718,6 @@ export async function recordPossibleCreatorSignal(
   return signal ? { ok: true, signal } : { ok: false, message: 'The record was not written.' };
 }
 
-/**
- * What the Founder is allowed to see at §9's fifth step.
- *
- * §10: "For the pre-screened invited cohort, the result must not be zero; a zero
- * result routes to Admin before the Founder proceeds." So there are exactly two
- * outcomes and no third:
- *
- *  - a count of one or more renders, with §10's disclosures;
- *  - anything else — zero, or nothing recorded yet — renders a waiting state
- *    owned by Proovd, and the claim stays closed until it changes.
- *
- * The zero and the not-yet-recorded cases deliberately produce the *same*
- * Founder-facing state. They mean the same thing to the Founder: Proovd is
- * looking at it. Distinguishing them would tell them a number they must not be
- * shown.
- */
-export interface CreatorSignalView {
-  status: 'available' | 'with_admin';
-  count: number | null;
-  recordedAt: string | null;
-}
-
-export function viewCreatorSignal(signal: PossibleCreatorSignal | null): CreatorSignalView {
-  if (!signal || signal.count <= 0) {
-    return { status: 'with_admin', count: null, recordedAt: null };
-  }
-  return { status: 'available', count: signal.count, recordedAt: signal.recordedAt };
-}
-
 /* ── The wrong-type path (§9, §33.1.7) ────────────────────────────────────── */
 
 export interface ArchiveAndRestartResult {
@@ -800,8 +838,8 @@ export async function archiveAndRestartVetting(
 
     const newDraftId = newDraft[0]!.id;
 
-    // Empty. The Founder answers again, including the campaign path — which is
-    // the point: the previous answer produced the wrong lock.
+    // Empty. The Founder answers again, and Admin sets the campaign path
+    // again — which is the point: the previous choice produced the wrong lock.
     await tx.insert(campaignVetting).values({
       draftId: newDraftId,
       campaignId: newCampaignId,

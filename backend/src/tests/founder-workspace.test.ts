@@ -163,16 +163,25 @@ async function invited(label: string): Promise<Founder & { raw: string }> {
   return { ...founder, raw: await sendInvitation(founder) };
 }
 
-/** Fills all four §9 answers through the Founder's own link and submits. */
-async function completeVetting(raw: string, type: 'pre_build' | 'pre_launch'): Promise<void> {
-  await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ selectedType: type }).expect(200);
+/** Fills the three simplified answers through the Founder's link and submits. */
+async function completeVetting(
+  raw: string,
+  type: 'pre_build' | 'pre_launch',
+  draftId: string,
+): Promise<void> {
+  // Admin's step in the simplified flow: the campaign path, set on the draft.
+  await request(h.app)
+    .put(`/api/admin/founders/${draftId}/campaign-path`)
+    .set('cookie', admin.cookie)
+    .send({ campaignPath: type })
+    .expect(200);
   await request(h.app)
     .patch(`/api/draft/${raw}/vetting`)
     .send({ problem: VETTING_ANSWERS.problem, solution: VETTING_ANSWERS.solution })
     .expect(200);
   await request(h.app)
     .patch(`/api/draft/${raw}/vetting`)
-    .send({ competition: VETTING_ANSWERS.competition })
+    .send({ views: '10k_100k' })
     .expect(200);
   await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(201);
 }
@@ -275,6 +284,7 @@ const ROUTES: ReadonlyArray<{ method: 'get' | 'put' | 'post' | 'delete'; path: s
     gated: true,
   },
   { method: 'put', path: `/api/admin/founders/${randomUUID()}/vetting-prefill`, gated: false },
+  { method: 'put', path: `/api/admin/founders/${randomUUID()}/campaign-path`, gated: false },
   { method: 'put', path: `/api/admin/founders/${randomUUID()}/invitation`, gated: false },
   { method: 'put', path: `/api/admin/founders/${randomUUID()}/prospect`, gated: false },
   { method: 'get', path: `/api/admin/founders/${randomUUID()}/preview`, gated: false },
@@ -353,7 +363,7 @@ describe('every workspace route fails closed (§1.1, §5.1, §33.12.5)', () => {
 describe('§26.1 the Founders list is keyed on the person, not the invitation', () => {
   it('shows a Founder once after §9’s archive-and-restart', async () => {
     const founder = await invited('restart');
-    await completeVetting(founder.raw, 'pre_build');
+    await completeVetting(founder.raw, 'pre_build', founder.draftId);
 
     // The wrong-type path: §9 archives the record and begins a fresh setup for
     // the same person. That makes a SECOND draft and a SECOND campaign, which
@@ -386,7 +396,7 @@ describe('§26.1 the Founders list is keyed on the person, not the invitation', 
 
   it('gathers both campaigns under the one workspace, the archived one behind', async () => {
     const founder = await invited('restart-panes');
-    await completeVetting(founder.raw, 'pre_launch');
+    await completeVetting(founder.raw, 'pre_launch', founder.draftId);
     const restarted = await request(h.app)
       .post(`/api/admin/campaigns/${founder.campaignId}/archive-and-restart`)
       .set('cookie', admin.cookie)
@@ -806,7 +816,7 @@ describe('§25.6 editing a Founder’s own record takes a reason and is recorded
 
   it('has no key, under any spelling, that writes the three §9 answers', async () => {
     const founder = await invited('no-vetting-key');
-    await completeVetting(founder.raw, 'pre_build');
+    await completeVetting(founder.raw, 'pre_build', founder.draftId);
 
     const [before] = await h.db
       .select()
@@ -1042,7 +1052,7 @@ describe('§22.7 a ban is refused unless the record already meets a defined trig
     // a locked type for the per-type triggers to be gated on) and owns an
     // account. Nothing about the record meets any of the four.
     const founder = await invited('ban-not-met');
-    await completeVetting(founder.raw, 'pre_launch');
+    await completeVetting(founder.raw, 'pre_launch', founder.draftId);
     await claimAccount(founder, 'ban-not-met-account');
 
     const res = await request(h.app)
@@ -1108,7 +1118,7 @@ describe('§22.7 a ban is refused unless the record already meets a defined trig
 
   it('refuses when there is no account to ban, and offers no ban control either', async () => {
     const founder = await invited('ban-no-account');
-    await completeVetting(founder.raw, 'pre_launch');
+    await completeVetting(founder.raw, 'pre_launch', founder.draftId);
     const res = await request(h.app)
       .post(`/api/admin/founders/${founder.prospectId}/ban`)
       .set('cookie', admin.cookie)
@@ -1361,7 +1371,7 @@ describe('§26.8 the Founder history is a read, scoped to one person', () => {
     // A person outlives a campaign: this is the case §26.8's campaign-scoped
     // timeline cannot hold, and the reason the feed is its own read.
     const founder = await invited('history-restart');
-    await completeVetting(founder.raw, 'pre_build');
+    await completeVetting(founder.raw, 'pre_build', founder.draftId);
     const restarted = await request(h.app)
       .post(`/api/admin/campaigns/${founder.campaignId}/archive-and-restart`)
       .set('cookie', admin.cookie)

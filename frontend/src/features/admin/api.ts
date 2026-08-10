@@ -290,10 +290,18 @@ export interface VettingView {
   /** The checklist, in order, with what is done. */
   progress: { label: string; done: boolean }[];
   progressStatus: string;
+  /** The LOCKED type (set at submission), or null while unlocked. */
   campaignType: string | null;
   campaignTypeAt: string | null;
+  /** The path Admin has set on the draft, shown before the lock. */
+  campaignTypeSelected: string | null;
+  campaignTypeSelectedRaw: 'pre_build' | 'pre_launch' | null;
+  /** True until the Founder submits; the control renders only while true. */
+  campaignTypeEditable: boolean;
+  /** The draft the campaign-path control writes against, when one exists. */
+  draftId: string | null;
   answers: {
-    key: 'problem' | 'solution' | 'competition';
+    key: 'problem' | 'solution' | 'views' | 'competition';
     label: string;
     text: string | null;
     /** "Originally prepared by Proovd · Last edited by Ahmed", or null. */
@@ -564,6 +572,20 @@ export interface UpdateProspectBody {
   internalOwner?: string | null;
   lastContactAt?: string | null;
 }
+
+/**
+ * The campaign path, set by Admin from discovery (simplified flow). Freely
+ * changeable until the Founder submits, which is when §9's permanent lock
+ * happens and the server refuses further writes.
+ */
+export const setFounderCampaignPath = (
+  draftId: string,
+  campaignPath: 'pre_build' | 'pre_launch',
+): Promise<unknown> =>
+  call(`/api/admin/founders/${encodeURIComponent(draftId)}/campaign-path`, {
+    method: 'PUT',
+    body: JSON.stringify({ campaignPath }),
+  });
 
 export const updateProspect = (
   draftId: string,

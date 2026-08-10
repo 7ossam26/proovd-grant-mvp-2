@@ -1,15 +1,16 @@
 /**
- * Phase 07 Founder surfaces — §33.1.4, §33.1.5, §33.1.6, §33.1.9, §33.11.
+ * The Founder draft surfaces under the simplified flow (2026-08-10, product
+ * direction) — order, progress, autosave, restore, the claim, and §33.11.
  *
  * The real route table in a memory router with `fetch` stubbed at the network
- * boundary. The server-side halves of these requirements — that the type lock
- * is permanent, that a zero never leaves the server, that
- * `founder_signup_complete` emits once — are proved in
- * `backend/src/tests/vetting.test.ts` against the real routes. What is proved
- * here is the half §33.1.4 puts on the surface and nowhere else: the fixed
+ * boundary. The server-side halves — that the type lock is permanent, that the
+ * campaign path is Admin's, that `founder_signup_complete` emits once — are
+ * proved in `backend/src/tests/vetting.test.ts` against the real routes. What
+ * is proved here is the half only the surface owns: the fixed three-step
  * order, the visible progress, Back and Continue, the three save phrases, the
- * restored-draft line, the unsaved-data warning, and that a failed save leaves
- * every field exactly as the Founder typed it.
+ * restored-draft line, the unsaved-data warning, that a failed save leaves
+ * every field exactly as the Founder typed it, and that submitting lands on
+ * the account claim.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -18,7 +19,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import { appRoutes } from '../../routes.js';
-import { POSSIBLE_CREATOR_RESULT_DISCLOSURES, VETTING_STEPS } from '@proovd/shared';
+import { VETTING_STEPS, VIEWS_RANGE_CHOICES } from '@proovd/shared';
 
 type StubResult = { status: number; body: unknown } | undefined;
 type Handler = (url: string, init?: RequestInit) => StubResult;
@@ -52,7 +53,13 @@ afterEach(() => vi.unstubAllGlobals());
 
 const TOKEN = 'a'.repeat(43);
 
-const EMPTY_PROVENANCE = { supplier: null, firstEditedAt: null, lastEditedAt: null };
+const EMPTY_PROVENANCE = {
+  supplier: null,
+  prefilledText: null,
+  prefilledAt: null,
+  firstEditedAt: null,
+  lastEditedAt: null,
+};
 
 function vettingState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -61,16 +68,15 @@ function vettingState(overrides: Record<string, unknown> = {}): Record<string, u
     selectedType: null,
     problem: null,
     solution: null,
-    competition: null,
+    views: null,
     provenance: {
-      problem: { ...EMPTY_PROVENANCE, prefilledText: null, prefilledAt: null },
-      solution: { ...EMPTY_PROVENANCE, prefilledText: null, prefilledAt: null },
-      competition: { ...EMPTY_PROVENANCE },
+      problem: { ...EMPTY_PROVENANCE },
+      solution: { ...EMPTY_PROVENANCE },
     },
     lastSavedAt: null,
     resumeStep: null,
     submittedAt: null,
-    completeness: { campaign_path: false, problem: false, solution: false, competition: false },
+    completeness: { problem: false, solution: false, views: false },
     campaignStatus: 'invited_draft',
     lockedType: null,
     typeLockedAt: null,
@@ -91,16 +97,52 @@ function stubVetting(initial: Record<string, unknown> = {}) {
       const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
       state = { ...state, ...patch, lastSavedAt: '2026-07-31T12:00:00.000Z' };
       state['completeness'] = {
-        campaign_path: state['selectedType'] !== null,
         problem: typeof state['problem'] === 'string' && state['problem'] !== '',
         solution: typeof state['solution'] === 'string' && state['solution'] !== '',
-        competition: typeof state['competition'] === 'string' && state['competition'] !== '',
+        views: typeof state['views'] === 'string' && state['views'] !== '',
       };
       return { status: 200, body: state };
     }
     return { status: 200, body: state };
   });
   return () => state;
+}
+
+const CLAIM_PROFILE = {
+  draftId: 'd1',
+  campaignId: 'c1',
+  fields: {
+    legalName: { value: 'Rowan Vale', supplier: 'proovd', prefilled: 'Rowan Vale', editedAt: null },
+    preferredName: { value: 'Rowan', supplier: 'proovd', prefilled: 'Rowan', editedAt: null },
+    email: { value: 'rowan@example.com', supplier: 'proovd', prefilled: 'rowan@example.com', editedAt: null },
+    phone: { value: '+1 555 0100', supplier: 'proovd', prefilled: '+1 555 0100', editedAt: null },
+    dateOfBirth: { value: null, supplier: null, prefilled: null, editedAt: null },
+    country: { value: null, supplier: null, prefilled: null, editedAt: null },
+    stateRegion: { value: null, supplier: null, prefilled: null, editedAt: null },
+    businessName: { value: null, supplier: null, prefilled: null, editedAt: null },
+    businessEntityType: { value: null, supplier: null, prefilled: null, editedAt: null },
+  },
+  soleProprietor: null,
+  emailOwnership: 'invited_link',
+  phoneVerified: false,
+  representations: { usPerson: false, age18Plus: false, sanctions: false },
+  lastSavedAt: null,
+  claimedAt: null,
+};
+
+const PUBLISHED_POLICIES = [
+  { slug: 'terms', route: '/terms', title: 'Terms of Service', version: '1.0', status: 'published' },
+  { slug: 'aup', route: '/acceptable-use', title: 'Founder Acceptable Use Policy', version: '1.0', status: 'published' },
+  { slug: 'privacy', route: '/privacy', title: 'Privacy Policy', version: '1.0', status: 'published' },
+];
+
+function stubClaim(policies: unknown[] = PUBLISHED_POLICIES, profile = CLAIM_PROFILE) {
+  handlers.push((url, init) => {
+    if (!url.includes('/claim')) return undefined;
+    if (init?.method === 'PATCH') return { status: 200, body: profile };
+    if (init?.method === 'POST') return { status: 201, body: { ok: true, campaignId: 'c1' } };
+    return { status: 200, body: { profile, policies } };
+  });
 }
 
 function renderAt(path: string) {
@@ -110,102 +152,112 @@ function renderAt(path: string) {
 
 const renderVetting = () => renderAt(`/draft/${TOKEN}/vetting`);
 
+const viewsLabel = VIEWS_RANGE_CHOICES[1]!.label;
+
 /* ══════════════════════════════════════════════════════════════════════════
-   §33.1.4 — order, progress, Back/Continue, autosave, restore
+   The simplified sequence — order, progress, Back/Continue, autosave, restore
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('§33.1.4 the vetting sequence', () => {
-  it('opens on step 1 of 5 and shows the progress', async () => {
+describe('the simplified vetting sequence', () => {
+  it('opens on step 1 of 3 and shows the progress', async () => {
     stubVetting();
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    expect(await screen.findByText('Step 1 of 5')).toBeTruthy();
+    await screen.findByRole('heading', { name: /what problem does your product solve/i });
+    expect(await screen.findByText('Step 1 of 3')).toBeTruthy();
   });
 
-  it('walks §9’s fixed order and never varies it', async () => {
+  it('walks the fixed order and submitting lands on the account claim', async () => {
     const user = userEvent.setup();
     stubVetting();
+    stubClaim();
     renderVetting();
 
-    // 1. Campaign path
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('radio', { name: /i have a product/i }));
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
-
-    // 2. Problem
+    // 1. Problem
     await screen.findByRole('heading', { name: /what problem does your product solve/i });
     await user.type(screen.getByLabelText(/what problem does your product solve/i), 'A problem.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
-    // 3. Solution
+    // 2. Solution
     await screen.findByRole('heading', { name: /what does your product do about it/i });
     await user.type(screen.getByLabelText(/what does your product do about it/i), 'A solution.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
-    // 4. Competition
-    await screen.findByRole('heading', { name: /who else is solving this/i });
-    await user.type(screen.getByLabelText(/who else is solving this/i), 'Spreadsheets.');
-    await user.click(screen.getByRole('button', { name: 'Review my answers' }));
+    // 3. Amount of views — the hook stage, then the submit moment.
+    await screen.findByRole('heading', { name: /how many views does your content get/i });
+    await user.click(screen.getByRole('radio', { name: viewsLabel }));
+    await user.click(screen.getByRole('button', { name: /submit and set up my account/i }));
 
-    // 5. The review moment (DNA §5.9)
-    await screen.findByRole('heading', { name: /everything you have told us/i });
+    // The claim, directly. No review screen and no result page between.
+    await screen.findByRole('heading', { name: /what you are agreeing to/i });
+    expect(requests.some((r) => r.url.endsWith('/vetting/submit') && r.method === 'POST')).toBe(
+      true,
+    );
   });
 
   it('Continue is unavailable until the step is answered', async () => {
     stubVetting();
     renderVetting();
-    await screen.findByRole('heading', { name: /which of these is closer/i });
+    await screen.findByRole('heading', { name: /what problem does your product solve/i });
     expect(screen.getByRole('button', { name: /^Continue to / }).hasAttribute('disabled')).toBe(true);
   });
 
   it('Back returns to the previous step and does not exist on the first', async () => {
     const user = userEvent.setup();
-    stubVetting({ selectedType: 'pre_launch' });
+    stubVetting({ problem: 'A problem.', completeness: { problem: true, solution: false, views: false } });
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    // Phase 23a (§33.11.4, §1.4): nothing precedes step 1, so there is no
-    // control rather than a permanently disabled one — and every nav control
-    // now names where it goes.
+    await screen.findByRole('heading', { name: /what problem does your product solve/i });
+    // §33.11.4, §1.4: nothing precedes step 1, so there is no control rather
+    // than a permanently disabled one — and every nav control names where it
+    // goes.
     expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
-    await screen.findByRole('heading', { name: /what problem does your product solve/i });
+    await screen.findByRole('heading', { name: /what does your product do about it/i });
     await user.click(screen.getByRole('button', { name: /^Back to / }));
-    await screen.findByRole('heading', { name: /which of these is closer/i });
+    await screen.findByRole('heading', { name: /what problem does your product solve/i });
   });
 
-  it('returning to an earlier step preserves a later answer (§9)', async () => {
+  it('returning to an earlier step preserves a later answer', async () => {
     const user = userEvent.setup();
-    stubVetting({ selectedType: 'pre_launch' });
+    stubVetting();
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+    await screen.findByRole('heading', { name: /what problem/i });
     await user.type(screen.getByLabelText(/what problem/i), 'A problem.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what does your product do/i), 'A solution.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
-    await user.type(screen.getByLabelText(/who else is solving this/i), 'Spreadsheets.');
+    await screen.findByRole('heading', { name: /how many views/i });
+    await user.click(screen.getByRole('radio', { name: viewsLabel }));
 
-    // All the way back to step 2, then forward again. Step 4's answer survives.
-    await user.click(within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', { name: 'Problem' }));
+    // All the way back to step 1, then forward again. Step 3's answer survives.
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', {
+        name: 'Problem',
+      }),
+    );
     await screen.findByRole('heading', { name: /what problem/i });
     expect((screen.getByLabelText(/what problem/i) as HTMLTextAreaElement).value).toBe('A problem.');
 
-    await user.click(within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', { name: 'Competition' }));
-    await screen.findByRole('heading', { name: /who else is solving this/i });
-    expect((screen.getByLabelText(/who else/i) as HTMLTextAreaElement).value).toBe('Spreadsheets.');
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', {
+        name: 'Amount of views',
+      }),
+    );
+    await screen.findByRole('heading', { name: /how many views/i });
+    expect(
+      screen.getByRole('radio', { name: viewsLabel }).getAttribute('aria-checked'),
+    ).toBe('true');
   });
 
   it('says Saving… then Saved with a time (§9’s vocabulary)', async () => {
     const user = userEvent.setup();
-    stubVetting({ selectedType: 'pre_launch' });
+    stubVetting();
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+    await screen.findByRole('heading', { name: /what problem/i });
     await user.type(screen.getByLabelText(/what problem/i), 'A problem.');
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Saved /), {
@@ -223,12 +275,11 @@ describe('§33.1.4 the vetting sequence', () => {
         // A 500 is transient: worth retrying, and the line may say so.
         return { status: 500, body: { title: 'Proovd could not be reached' } };
       }
-      return { status: 200, body: vettingState({ selectedType: 'pre_launch' }) };
+      return { status: 200, body: vettingState() };
     });
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+    await screen.findByRole('heading', { name: /what problem/i });
     await user.type(screen.getByLabelText(/what problem/i), 'A problem.');
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/retrying/i), {
@@ -247,12 +298,11 @@ describe('§33.1.4 the vetting sequence', () => {
           body: { title: 'That was not saved', whatHappened: 'Refused.', next: 'Nothing changed.' },
         };
       }
-      return { status: 200, body: vettingState({ selectedType: 'pre_launch' }) };
+      return { status: 200, body: vettingState() };
     });
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+    await screen.findByRole('heading', { name: /what problem/i });
     const box = screen.getByLabelText(/what problem/i) as HTMLTextAreaElement;
     await user.type(box, 'Work I do not want to lose.');
 
@@ -272,12 +322,11 @@ describe('§33.1.4 the vetting sequence', () => {
         attempts += 1;
         return { status: 422, body: { title: 'That was not saved', whatHappened: 'Refused.' } };
       }
-      return { status: 200, body: vettingState({ selectedType: 'pre_launch' }) };
+      return { status: 200, body: vettingState() };
     });
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+    await screen.findByRole('heading', { name: /what problem/i });
     await user.type(screen.getByLabelText(/what problem/i), 'Refused text.');
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Not saved/i), {
@@ -292,7 +341,7 @@ describe('§33.1.4 the vetting sequence', () => {
       problem: 'Written last week.',
       lastSavedAt: '2026-07-24T09:30:00.000Z',
       resumeStep: 'problem',
-      completeness: { campaign_path: false, problem: true, solution: false, competition: false },
+      completeness: { problem: true, solution: false, views: false },
     });
     renderVetting();
 
@@ -313,46 +362,48 @@ describe('§33.1.4 the vetting sequence', () => {
       return original(type, listener as EventListener, options);
     });
 
-    stubVetting({ selectedType: 'pre_launch' });
+    stubVetting();
     renderVetting();
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+    await screen.findByRole('heading', { name: /what problem/i });
     await user.type(screen.getByLabelText(/what problem/i), 'U');
 
     await waitFor(() => expect(added).toContain('beforeunload'));
     vi.restoreAllMocks();
   });
 
-  it('shows the permanence of the campaign path before it is chosen, and again at review', async () => {
-    const user = userEvent.setup();
+  it('offers all four view ranges as one radio group', async () => {
     stubVetting({
-      selectedType: 'pre_launch',
       problem: 'p',
       solution: 's',
-      competition: 'c',
-      completeness: { campaign_path: true, problem: true, solution: true, competition: true },
+      resumeStep: 'views',
+      completeness: { problem: true, solution: true, views: false },
     });
     renderVetting();
 
-    expect(await screen.findAllByText(/this choice is permanent/i)).toHaveLength(1);
-
-    await user.click(
-      within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', {
-        name: 'Review',
-      }),
-    );
-    await screen.findByRole('heading', { name: /everything you have told us/i });
-    expect(screen.getAllByText(/this choice is permanent/i).length).toBeGreaterThan(0);
+    await screen.findByRole('heading', { name: /how many views does your content get/i });
+    for (const choice of VIEWS_RANGE_CHOICES) {
+      expect(screen.getByRole('radio', { name: choice.label })).toBeTruthy();
+    }
+    // Submit stays closed until the range is chosen.
+    expect(
+      screen.getByRole('button', { name: /submit and set up my account/i }).hasAttribute('disabled'),
+    ).toBe(true);
   });
 
-  it('renders both campaign paths in full, with what each commits them to (§4, §9)', async () => {
+  it('asks no campaign-path question and no competition question', async () => {
     stubVetting();
-    renderVetting();
+    const { container } = renderVetting();
+    await screen.findByRole('heading', { name: /tell us about your product/i });
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    expect(screen.getByText('Idea Campaign')).toBeTruthy();
-    expect(screen.getByText('Product Campaign')).toBeTruthy();
-    expect(screen.getAllByText(/what this commits you to/i)).toHaveLength(2);
+    const nav = screen.getByRole('navigation', { name: 'All steps' });
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(
+      VETTING_STEPS.map((s) => s.label),
+    );
+
+    const text = container.textContent ?? '';
+    expect(text).not.toMatch(/which of these is closer/i);
+    expect(text).not.toMatch(/who else is solving this/i);
+    expect(text).not.toMatch(/\bCompetition\b/);
   });
 
   it('never renders an internal name (§3)', async () => {
@@ -364,57 +415,9 @@ describe('§33.1.4 the vetting sequence', () => {
     expect(text).not.toMatch(/pre[-_]launch/i);
     expect(text).not.toMatch(/\breservation\b/i);
   });
-});
-
-/* ══════════════════════════════════════════════════════════════════════════
-   §33.1.5 — Competition is never prefilled
-   ══════════════════════════════════════════════════════════════════════════ */
-
-describe('§33.1.5 the Competition step', () => {
-  it('starts blank even when Proovd prefilled the other two', async () => {
-    const user = userEvent.setup();
-    stubVetting({
-      selectedType: 'pre_launch',
-      problem: 'Our draft of the problem.',
-      solution: 'Our draft of the solution.',
-      provenance: {
-        problem: {
-          supplier: 'proovd',
-          prefilledText: 'Our draft of the problem.',
-          prefilledAt: '2026-07-30T09:00:00.000Z',
-          firstEditedAt: null,
-          lastEditedAt: null,
-        },
-        solution: {
-          supplier: 'proovd',
-          prefilledText: 'Our draft of the solution.',
-          prefilledAt: '2026-07-30T09:00:00.000Z',
-          firstEditedAt: null,
-          lastEditedAt: null,
-        },
-        competition: { supplier: null, firstEditedAt: null, lastEditedAt: null },
-      },
-      completeness: { campaign_path: true, problem: true, solution: true, competition: false },
-    });
-    renderVetting();
-
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(
-      within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', {
-        name: 'Competition',
-      }),
-    );
-
-    const box = (await screen.findByLabelText(/who else is solving this/i)) as HTMLTextAreaElement;
-    expect(box.value).toBe('');
-    // And it says why, rather than leaving the Founder to wonder.
-    expect(screen.getByText(/this one is yours from a blank page/i)).toBeTruthy();
-  });
 
   it('shows the Proovd-drafted fields as drafted, and never claims a draft it does not have', async () => {
-    const user = userEvent.setup();
     stubVetting({
-      selectedType: 'pre_launch',
       problem: 'Our draft of the problem.',
       provenance: {
         problem: {
@@ -424,97 +427,26 @@ describe('§33.1.5 the Competition step', () => {
           firstEditedAt: null,
           lastEditedAt: null,
         },
-        solution: { supplier: null, prefilledText: null, prefilledAt: null, firstEditedAt: null, lastEditedAt: null },
-        competition: { supplier: null, firstEditedAt: null, lastEditedAt: null },
+        solution: { ...EMPTY_PROVENANCE },
       },
-      completeness: { campaign_path: true, problem: true, solution: false, competition: false },
+      completeness: { problem: true, solution: false, views: false },
     });
     renderVetting();
 
-    await screen.findByRole('heading', { name: /which of these is closer/i });
-    await user.click(
-      within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', {
-        name: 'Problem',
-      }),
-    );
+    await screen.findByRole('heading', { name: /what problem/i });
     expect(await screen.findByText(/drafted by proovd/i)).toBeTruthy();
   });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   §33.1.6 — the possible-creator result
+   The old result address goes to the claim
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('§33.1.6 the possible-creator result', () => {
-  function stubSignal(body: Record<string, unknown>) {
-    handlers.push((url) =>
-      url.includes('/creator-signal') ? { status: 200, body } : undefined,
-    );
-  }
-
-  it('shows the count with every §10 limit beside it', async () => {
-    stubSignal({
-      status: 'available',
-      count: 7,
-      recordedAt: '2026-07-31T10:00:00.000Z',
-      submittedAt: '2026-07-31T09:00:00.000Z',
-    });
+describe('the retired possible-creators address', () => {
+  it('redirects to the account claim', async () => {
+    stubClaim();
     renderAt(`/draft/${TOKEN}/result`);
-
-    expect(await screen.findByText('7')).toBeTruthy();
-    for (const line of POSSIBLE_CREATOR_RESULT_DISCLOSURES) {
-      expect(screen.getByText(line)).toBeTruthy();
-    }
-  });
-
-  it('promises nothing and names nobody', async () => {
-    stubSignal({
-      status: 'available',
-      count: 7,
-      recordedAt: '2026-07-31T10:00:00.000Z',
-      submittedAt: '2026-07-31T09:00:00.000Z',
-    });
-    const { container } = renderAt(`/draft/${TOKEN}/result`);
-    await screen.findByText('7');
-
-    const text = (container.textContent ?? '').toLowerCase();
-    expect(text).toContain('it is not a roster');
-    expect(text).not.toMatch(/\bconfirmed\b/);
-    expect(text).not.toMatch(/\binterested\b/);
-    expect(text).not.toMatch(/\bwaiting to\b/);
-    // §3: `affiliate` is internal, always.
-    expect(text).not.toMatch(/\baffiliate/);
-  });
-
-  it('precedes the account: the only action is on to the claim', async () => {
-    stubSignal({
-      status: 'available',
-      count: 3,
-      recordedAt: '2026-07-31T10:00:00.000Z',
-      submittedAt: '2026-07-31T09:00:00.000Z',
-    });
-    const { container } = renderAt(`/draft/${TOKEN}/result`);
-    await screen.findByText('3');
-
-    const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
-    expect(hrefs).toContain(`/draft/${TOKEN}/claim`);
-  });
-
-  it('renders no number at all when the result is with Admin (§10)', async () => {
-    stubSignal({
-      status: 'with_admin',
-      count: null,
-      recordedAt: null,
-      submittedAt: '2026-07-31T09:00:00.000Z',
-    });
-    const { container } = renderAt(`/draft/${TOKEN}/result`);
-
-    expect(await screen.findByText(/we're reviewing your submission/i)).toBeTruthy();
-    // No zero, no "0 creators", nothing numeric standing in for a result.
-    expect(container.textContent).not.toMatch(/\b0\b/);
-    // And the claim is not offered.
-    const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
-    expect(hrefs).not.toContain(`/draft/${TOKEN}/claim`);
+    await screen.findByRole('heading', { name: /what you are agreeing to/i });
   });
 });
 
@@ -523,43 +455,6 @@ describe('§33.1.6 the possible-creator result', () => {
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('the account claim', () => {
-  const PROFILE = {
-    draftId: 'd1',
-    campaignId: 'c1',
-    fields: {
-      legalName: { value: 'Rowan Vale', supplier: 'proovd', prefilled: 'Rowan Vale', editedAt: null },
-      preferredName: { value: 'Rowan', supplier: 'proovd', prefilled: 'Rowan', editedAt: null },
-      email: { value: 'rowan@example.com', supplier: 'proovd', prefilled: 'rowan@example.com', editedAt: null },
-      phone: { value: '+1 555 0100', supplier: 'proovd', prefilled: '+1 555 0100', editedAt: null },
-      dateOfBirth: { value: null, supplier: null, prefilled: null, editedAt: null },
-      country: { value: null, supplier: null, prefilled: null, editedAt: null },
-      stateRegion: { value: null, supplier: null, prefilled: null, editedAt: null },
-      businessName: { value: null, supplier: null, prefilled: null, editedAt: null },
-      businessEntityType: { value: null, supplier: null, prefilled: null, editedAt: null },
-    },
-    soleProprietor: null,
-    emailOwnership: 'invited_link',
-    phoneVerified: false,
-    representations: { usPerson: false, age18Plus: false, sanctions: false },
-    lastSavedAt: null,
-    claimedAt: null,
-  };
-
-  const PUBLISHED = [
-    { slug: 'terms', route: '/terms', title: 'Terms of Service', version: '1.0', status: 'published' },
-    { slug: 'aup', route: '/acceptable-use', title: 'Founder Acceptable Use Policy', version: '1.0', status: 'published' },
-    { slug: 'privacy', route: '/privacy', title: 'Privacy Policy', version: '1.0', status: 'published' },
-  ];
-
-  function stubClaim(policies: unknown[] = PUBLISHED, profile = PROFILE) {
-    handlers.push((url, init) => {
-      if (!url.includes('/claim')) return undefined;
-      if (init?.method === 'PATCH') return { status: 200, body: profile };
-      if (init?.method === 'POST') return { status: 201, body: { ok: true, campaignId: 'c1' } };
-      return { status: 200, body: { profile, policies } };
-    });
-  }
-
   it('prefills every field and says where each value came from (§10)', async () => {
     stubClaim();
     renderAt(`/draft/${TOKEN}/claim`);
@@ -609,7 +504,7 @@ describe('the account claim', () => {
   it('does not offer to create an account while an agreement is unpublished (§31.4)', async () => {
     stubClaim([
       { slug: 'terms', route: '/terms', title: 'Terms of Service', version: '1.0', status: 'draft' },
-      ...PUBLISHED.slice(1),
+      ...PUBLISHED_POLICIES.slice(1),
     ]);
     renderAt(`/draft/${TOKEN}/claim`);
 
@@ -683,22 +578,15 @@ describe('§33.11 the Founder surfaces are operable', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  it('has no axe violations on the possible-creator result', async () => {
-    handlers.push((url) =>
-      url.includes('/creator-signal')
-        ? {
-            status: 200,
-            body: {
-              status: 'available',
-              count: 7,
-              recordedAt: '2026-07-31T10:00:00.000Z',
-              submittedAt: '2026-07-31T09:00:00.000Z',
-            },
-          }
-        : undefined,
-    );
-    const { container } = renderAt(`/draft/${TOKEN}/result`);
-    await screen.findByText('7');
+  it('has no axe violations on the views step', async () => {
+    stubVetting({
+      problem: 'p',
+      solution: 's',
+      resumeStep: 'views',
+      completeness: { problem: true, solution: true, views: false },
+    });
+    const { container } = renderVetting();
+    await screen.findByRole('heading', { name: /how many views does your content get/i });
     expect(await axe(container)).toHaveNoViolations();
   });
 
@@ -710,18 +598,12 @@ describe('§33.11 the Founder surfaces are operable', () => {
   });
 
   it('offers every step of the flow to the keyboard', async () => {
-    stubVetting({
-      selectedType: 'pre_launch',
-      completeness: { campaign_path: true, problem: false, solution: false, competition: false },
-    });
+    stubVetting();
     renderVetting();
 
     const nav = await screen.findByRole('navigation', { name: 'All steps' });
     const buttons = within(nav).getAllByRole('button');
-    expect(buttons.map((b) => b.textContent)).toEqual([
-      ...VETTING_STEPS.filter((s) => s.id !== 'possible_creator_result').map((s) => s.label),
-      'Review',
-    ]);
+    expect(buttons.map((b) => b.textContent)).toEqual(VETTING_STEPS.map((s) => s.label));
     for (const button of buttons) {
       expect(button.hasAttribute('disabled')).toBe(false);
     }

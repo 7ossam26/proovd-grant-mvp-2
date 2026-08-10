@@ -57,6 +57,8 @@ export interface WorkspaceActions {
   previewInvitation: (trigger: HTMLElement | null) => void;
   setOverride: (key: string, value: string) => Promise<void>;
   clearOverride: (key: string) => Promise<void>;
+  /** The simplified flow: Admin sets Idea/Product on the unsubmitted draft. */
+  setCampaignPath: (draftId: string, path: 'pre_build' | 'pre_launch') => Promise<void>;
 }
 
 /** A profile value nobody has supplied yet. The reference's own phrase. */

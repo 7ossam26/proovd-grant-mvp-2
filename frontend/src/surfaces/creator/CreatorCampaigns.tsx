@@ -465,10 +465,16 @@ export function CreatorCampaignKit() {
         <p>{kit.solution ?? 'The Founder has not written this yet.'}</p>
       </Card>
 
-      <Card>
-        <h2>The competition</h2>
-        <p>{kit.competition ?? 'The Founder has not written this yet.'}</p>
-      </Card>
+      {/* Legacy records only: the simplified flow (2026-08-10) no longer asks
+          the Founder for a competition answer, so a card promising one "yet"
+          would be waiting for something that will never arrive (§1.4). A
+          record that has one still shows it. */}
+      {kit.competition ? (
+        <Card>
+          <h2>The competition</h2>
+          <p>{kit.competition}</p>
+        </Card>
+      ) : null}
 
       {/* Naming the absences, rather than rendering empty sections. */}
       <Card>

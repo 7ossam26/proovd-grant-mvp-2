@@ -1,17 +1,23 @@
 /**
- * Pre-account vetting — Spec §9, DNA §5.9, §5.12, §33.1.4, §33.1.5, §33.1.7.
+ * Pre-account vetting — the simplified flow (2026-08-10, product direction),
+ * DNA §5.9, §5.12.
  *
- * Four questions, one per screen, in a fixed order, with everything saved as it
- * is typed. The fifth §9 item is a result rather than a question and lives on
- * its own surface (`CreatorResult.tsx`), which is where §10 puts it — after
- * valid vetting, before the account.
+ * Three questions, one per screen, in a fixed order, with everything saved as
+ * it is typed: Problem and Solution arrive pre-filled from discovery for the
+ * Founder to check and correct, and the amount of views is theirs to choose.
+ * Finishing the last step submits and lands directly on the account claim —
+ * there is no separate review screen and no result page between.
+ *
+ * The campaign path is no longer asked here: Admin sets it from discovery and
+ * it locks at submission (the server refuses a submission until it is set).
+ * Competition is no longer collected.
  *
  * ── This is a flow, not a wizard ────────────────────────────────────────────
- * §9: "Returning to an earlier item preserves later valid answers." So every
- * answer is held in one object and each step reads its own key out of it; going
- * back to step 2 cannot touch step 4, because step 2's control never writes to
- * step 4's key. A wizard that rebuilds forward state from the current step is
- * how that requirement is usually broken, and §33.1.4 tests it directly.
+ * "Returning to an earlier item preserves later valid answers." Every answer is
+ * held in one object and each step reads its own key out of it; going back to
+ * step 1 cannot touch step 3, because step 1's control never writes to step
+ * 3's key. A wizard that rebuilds forward state from the current step is how
+ * that requirement is usually broken.
  *
  * ── The typed value never comes back from the server ────────────────────────
  * `answers` is loaded once from the restored draft and is the only copy from
@@ -19,25 +25,19 @@
  * box. §9: "A failed save never clears valid fields" — and the obvious
  * implementation, clear-on-error-and-refetch, is the single most common
  * autosave bug.
- *
- * ── Competition ────────────────────────────────────────────────────────────
- * Its box starts empty and there is no code path in this file that could put
- * anything in it. §9 says so twice; §33.1.5 tests it. The copy beside it says
- * plainly that we do not draft it, rather than leaving a Founder to wonder why
- * this one is blank when the others were not.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   VETTING_STEPS,
-  CAMPAIGN_PATH_CHOICES,
-  CAMPAIGN_TYPE_LOCK_WARNING,
+  VIEWS_RANGE_CHOICES,
+  type ViewsRangeId,
   type VettingStepCopy,
 } from '@proovd/shared';
 import {
   Button,
-  Card,
+  Choice,
   Field,
   Measure,
   Progress,
@@ -56,28 +56,25 @@ import {
   saveVetting,
   submitVetting,
   DraftRequestError,
-  type CampaignTypeValue,
   type VettingPatch,
   type VettingState,
 } from './api.js';
 
 type Answers = {
-  selectedType: CampaignTypeValue | null;
   problem: string;
   solution: string;
-  competition: string;
+  views: ViewsRangeId | null;
 };
 
-type Screen = 'campaign_path' | 'problem' | 'solution' | 'competition' | 'review';
+type Screen = 'problem' | 'solution' | 'views';
 
-const SCREENS: Screen[] = ['campaign_path', 'problem', 'solution', 'competition', 'review'];
+const SCREENS: Screen[] = ['problem', 'solution', 'views'];
 
 const copyFor = (id: string): VettingStepCopy =>
   VETTING_STEPS.find((step) => step.id === id)!;
 
 /** One sentence, shown to the eye and announced to a screen reader. */
-const stepLabel = (screen: Screen, index: number): string =>
-  screen === 'review' ? 'Review and submit' : `Step ${index + 1} of ${SCREENS.length}`;
+const stepLabel = (index: number): string => `Step ${index + 1} of ${SCREENS.length}`;
 
 export function VettingFlow() {
   const { token = '' } = useParams();
@@ -86,7 +83,7 @@ export function VettingFlow() {
   const [loaded, setLoaded] = useState<VettingState | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [answers, setAnswers] = useState<Answers | null>(null);
-  const [screen, setScreen] = useState<Screen>('campaign_path');
+  const [screen, setScreen] = useState<Screen>('problem');
   const [submitError, setSubmitError] = useState<{ title: string; what: string; next: string } | null>(
     null,
   );
@@ -109,10 +106,9 @@ export function VettingFlow() {
         if (cancelled) return;
         setLoaded(state);
         setAnswers({
-          selectedType: state.selectedType,
           problem: state.problem ?? '',
           solution: state.solution ?? '',
-          competition: state.competition ?? '',
+          views: state.views,
         });
         // DNA §5.12: position survives. Coming back never means starting over.
         const resume = state.resumeStep;
@@ -126,12 +122,12 @@ export function VettingFlow() {
     };
   }, [token]);
 
-  // Already submitted: §9 makes the answers read-only and §10 puts the result
-  // next. Sending them backwards into a form they cannot change would be a
-  // dead end dressed as a step.
+  // Already submitted: the answers are read-only and the account claim is the
+  // next step. Sending them backwards into a form they cannot change would be
+  // a dead end dressed as a step.
   useEffect(() => {
     if (loaded?.submittedAt) {
-      void navigate(`/draft/${encodeURIComponent(token)}/result`, { replace: true });
+      void navigate(`/draft/${encodeURIComponent(token)}/claim`, { replace: true });
     }
   }, [loaded?.submittedAt, navigate, token]);
 
@@ -146,7 +142,7 @@ export function VettingFlow() {
   const go = useCallback(
     (to: Screen) => {
       setScreen(to);
-      autosave.queue({ resumeStep: to === 'review' ? 'competition' : to });
+      autosave.queue({ resumeStep: to });
     },
     [autosave],
   );
@@ -172,19 +168,18 @@ export function VettingFlow() {
   }
 
   const complete = {
-    campaign_path: answers.selectedType !== null,
     problem: answers.problem.trim() !== '',
     solution: answers.solution.trim() !== '',
-    competition: answers.competition.trim() !== '',
+    views: answers.views !== null,
   };
+  const allComplete = SCREENS.every((s) => complete[s]);
 
   const index = SCREENS.indexOf(screen);
-  const remaining = SCREENS.length - 1 - index;
   const statusLine = describeSaveState(autosave.state);
 
   async function advance(to: Screen) {
-    // Land what is typed before moving. The step that follows may be the review,
-    // and a review of unsaved answers is a review of the wrong thing.
+    // Land what is typed before moving. The step that follows may be the last,
+    // and submitting unsaved answers would submit the wrong thing.
     await autosave.flush();
     go(to);
   }
@@ -195,7 +190,7 @@ export function VettingFlow() {
     try {
       await autosave.flush();
       await submitVetting(token);
-      void navigate(`/draft/${encodeURIComponent(token)}/result`);
+      void navigate(`/draft/${encodeURIComponent(token)}/claim`);
     } catch (error) {
       const detail =
         error instanceof DraftRequestError
@@ -205,7 +200,7 @@ export function VettingFlow() {
         title: detail.title,
         what:
           detail.whatHappened ??
-          'The request did not complete, so nothing was submitted and your campaign path is not locked.',
+          'The request did not complete, so nothing was submitted.',
         next: detail.next ?? 'Everything you have written is still here. Try again.',
       });
     } finally {
@@ -247,10 +242,10 @@ export function VettingFlow() {
             <Progress
               value={(index + 1) / SCREENS.length}
               label="Vetting progress"
-              valueText={stepLabel(screen, index)}
+              valueText={stepLabel(index)}
             />
           </div>
-          <span className="vetting__count">{stepLabel(screen, index)}</span>
+          <span className="vetting__count">{stepLabel(index)}</span>
           <span
             className="vetting__status"
             role="status"
@@ -262,13 +257,6 @@ export function VettingFlow() {
         </div>
 
         <div className="vetting__stage" ref={stageRef} key={screen}>
-          {screen === 'campaign_path' ? (
-            <CampaignPathStep
-              selected={answers.selectedType}
-              onSelect={(type) => update({ selectedType: type })}
-            />
-          ) : null}
-
           {screen === 'problem' ? (
             <WrittenStep
               copy={copyFor('problem')}
@@ -289,59 +277,46 @@ export function VettingFlow() {
             />
           ) : null}
 
-          {screen === 'competition' ? (
-            <WrittenStep
-              copy={copyFor('competition')}
-              value={answers.competition}
-              supplier={loaded.provenance.competition.supplier}
-              /* No prefill, ever. §9, §33.1.5. */
-              prefilled={null}
-              onChange={(value) => update({ competition: value })}
-            />
-          ) : null}
-
-          {screen === 'review' ? (
-            <ReviewStep
-              answers={answers}
-              onEdit={(to) => void advance(to)}
-              submitting={submitting}
-              onSubmit={() => void submit()}
+          {screen === 'views' ? (
+            <ViewsStep
+              value={answers.views}
+              onChange={(value) => update({ views: value })}
               error={submitError}
-              incomplete={SCREENS.slice(0, 4).filter(
-                (s) => !complete[s as keyof typeof complete],
-              )}
+              /* The current step's own ask is the radio group above; the alert
+                 names only the EARLIER steps still unanswered. */
+              incomplete={SCREENS.filter((s) => s !== 'views' && !complete[s])}
             />
           ) : null}
         </div>
 
-        {screen !== 'review' ? (
-          <div className="vetting__nav">
-            {/* §33.11.4: a CTA names the action, so both of these name where
-                they go. `Continue` and `Back` alone are the same two words on
-                every flow in the product, which tells a screen-reader user
-                moving through a form nothing about what happens next. */}
-            {/* Nothing precedes the first step, so there is no control here
-                rather than a permanently disabled one — a dead button is a
-                promise of somewhere to go (§1.4). */}
-            {index > 0 ? (
-              <Button tier="tertiary" onClick={() => void advance(SCREENS[index - 1]!)}>
-                {`Back to ${copyFor(SCREENS[index - 1]!).label}`}
-              </Button>
-            ) : null}
+        <div className="vetting__nav">
+          {/* §33.11.4: a CTA names the action, so both of these name where
+              they go. Nothing precedes the first step, so there is no control
+              there rather than a permanently disabled one — a dead button is a
+              promise of somewhere to go (§1.4). */}
+          {index > 0 ? (
+            <Button tier="tertiary" onClick={() => void advance(SCREENS[index - 1]!)}>
+              {`Back to ${copyFor(SCREENS[index - 1]!).label}`}
+            </Button>
+          ) : null}
+          {screen === 'views' ? (
             <Button
               tier="primary"
-              disabled={!complete[screen as keyof typeof complete]}
+              disabled={!allComplete || submitting}
+              onClick={() => void submit()}
+            >
+              {submitting ? 'Submitting…' : 'Submit and set up my account'}
+            </Button>
+          ) : (
+            <Button
+              tier="primary"
+              disabled={!complete[screen]}
               onClick={() => void advance(SCREENS[index + 1]!)}
             >
-              {/* Not "Review": the overview below already offers a control by
-                  that name, and two buttons with one name is ambiguous to a
-                  screen reader before it is ambiguous to anyone else. */}
-              {remaining === 1
-                ? 'Review my answers'
-                : `Continue to ${copyFor(SCREENS[index + 1]!).label}`}
+              {`Continue to ${copyFor(SCREENS[index + 1]!).label}`}
             </Button>
-          </div>
-        ) : null}
+          )}
+        </div>
 
         {/* DNA §5.9: an overview of every step is one gesture away, and any
             visited step can be returned to. Rendered as a list rather than a
@@ -356,11 +331,9 @@ export function VettingFlow() {
                   aria-current={s === screen ? 'step' : undefined}
                   onClick={() => void advance(s)}
                 >
-                  {s === 'review' ? 'Review' : copyFor(s).label}
+                  {copyFor(s).label}
                 </Button>
-                {s !== 'review' && complete[s as keyof typeof complete] ? (
-                  <Tag variant="sage">Answered</Tag>
-                ) : null}
+                {complete[s] ? <Tag variant="sage">Answered</Tag> : null}
               </li>
             ))}
           </ol>
@@ -378,64 +351,7 @@ export function VettingFlow() {
   );
 }
 
-/* ── Step 1 (§9, §4.1, §4.2) ──────────────────────────────────────────────── */
-
-/**
- * §9: "the step must explain what is being chosen in plain language before it
- * is chosen", because everything downstream branches on it and the choice is
- * permanent. So both options are shown in full, side by side, with what each
- * one commits the Founder to — not a pair of buttons and a tooltip.
- */
-function CampaignPathStep({
-  selected,
-  onSelect,
-}: {
-  selected: CampaignTypeValue | null;
-  onSelect: (type: CampaignTypeValue) => void;
-}) {
-  const copy = copyFor('campaign_path');
-  return (
-    <>
-      <h2 className="step-title">{copy.title}</h2>
-      <p className="lede">{copy.why}</p>
-
-      <div className="path-choices" role="radiogroup" aria-label={copy.title}>
-        {CAMPAIGN_PATH_CHOICES.map((choice) => (
-          <Card
-            key={choice.type}
-            className={selected === choice.type ? 'path-choice is-selected' : 'path-choice'}
-          >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={selected === choice.type}
-              className="path-choice__control"
-              onClick={() => onSelect(choice.type)}
-            >
-              <span className="path-choice__prompt">{choice.prompt}</span>
-              {/* §3: only the customer-facing name ever renders. */}
-              <span className="path-choice__name">{choice.name}</span>
-            </button>
-            <p className="path-choice__summary">{choice.summary}</p>
-            <p className="path-choice__commit-head">What this commits you to</p>
-            <ul className="path-choice__commitments">
-              {choice.commitments.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          </Card>
-        ))}
-      </div>
-
-      <Card className="vetting__warning">
-        <p>{CAMPAIGN_TYPE_LOCK_WARNING}</p>
-      </Card>
-      <p className="field-hint">{copy.next}</p>
-    </>
-  );
-}
-
-/* ── Steps 2–4 (§9) ───────────────────────────────────────────────────────── */
+/* ── Steps 1–2: the written answers ───────────────────────────────────────── */
 
 function WrittenStep({
   copy,
@@ -492,56 +408,40 @@ function WrittenStep({
   );
 }
 
-/* ── The review moment (DNA §5.9) ─────────────────────────────────────────── */
+/* ── Step 3: the amount of views, and the submit moment ───────────────────── */
 
-function ReviewStep({
-  answers,
-  onEdit,
-  onSubmit,
-  submitting,
+/**
+ * Four exclusive ranges, so `Choice` (a real radio group) rather than four
+ * checkboxes that clear each other — keyboard users get arrow keys and one tab
+ * stop, and a screen reader announces one question with four answers.
+ */
+function ViewsStep({
+  value,
+  onChange,
   error,
   incomplete,
 }: {
-  answers: Answers;
-  onEdit: (to: Screen) => void;
-  onSubmit: () => void;
-  submitting: boolean;
+  value: ViewsRangeId | null;
+  onChange: (value: ViewsRangeId) => void;
   error: { title: string; what: string; next: string } | null;
   incomplete: Screen[];
 }) {
-  const chosen = useMemo(
-    () => CAMPAIGN_PATH_CHOICES.find((c) => c.type === answers.selectedType) ?? null,
-    [answers.selectedType],
-  );
-
-  const rows: Array<{ screen: Screen; label: string; value: string }> = [
-    { screen: 'campaign_path', label: 'Campaign path', value: chosen?.name ?? 'Not chosen' },
-    { screen: 'problem', label: 'Problem', value: answers.problem },
-    { screen: 'solution', label: 'Solution', value: answers.solution },
-    { screen: 'competition', label: 'Competition', value: answers.competition },
-  ];
-
+  const copy = copyFor('views');
   return (
     <>
-      <h2 className="step-title">Everything you have told us</h2>
+      <h2 className="step-title">{copy.title}</h2>
+      <p className="lede">{copy.why}</p>
 
-      <dl className="vetting__summary">
-        {rows.map((row) => (
-          <div className="vetting__summary-row" key={row.screen}>
-            <dt>{row.label}</dt>
-            <dd>{row.value || <span className="vetting__empty">Nothing written yet</span>}</dd>
-            <Button tier="tertiary" small onClick={() => onEdit(row.screen)}>
-              Edit
-            </Button>
-          </div>
-        ))}
-      </dl>
-
-      {/* Shown again here, immediately above the control that makes it true.
-          §9 locks the type at submission and there is no way back. */}
-      <Card className="vetting__warning">
-        <p>{CAMPAIGN_TYPE_LOCK_WARNING}</p>
-      </Card>
+      <Choice<ViewsRangeId>
+        label={copy.title}
+        entries={VIEWS_RANGE_CHOICES.map((choice) => ({
+          value: choice.id,
+          label: choice.label,
+        }))}
+        value={value ?? undefined}
+        onValueChange={onChange}
+      />
+      <p className="field-hint">{copy.expected}</p>
 
       {error ? (
         <StatePanel
@@ -556,24 +456,13 @@ function ReviewStep({
         />
       ) : null}
 
-      <div className="vetting__nav">
-        <Button tier="tertiary" onClick={() => onEdit('competition')}>
-          Back
-        </Button>
-        <Button
-          tier="primary"
-          disabled={incomplete.length > 0 || submitting}
-          onClick={onSubmit}
-        >
-          {submitting ? 'Submitting…' : 'Submit and lock my campaign path'}
-        </Button>
-      </div>
-
       {incomplete.length > 0 ? (
         <p className="field-error" role="alert">
           Still to answer: {incomplete.map((s) => copyFor(s).label).join(', ')}.
         </p>
       ) : null}
+
+      <p className="field-hint">{copy.next}</p>
     </>
   );
 }

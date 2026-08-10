@@ -2734,11 +2734,16 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 }
 
 .invite-landing__grid {
-  width: var(--wrap);
+  /* 100% of the padding box, never wider — `width: var(--wrap)` here would
+     overflow the gutter on viewports narrower than the wrap cap. The 82rem
+     cap reproduces the reference's outer margins at 1560px. */
+  width: 100%;
+  max-width: 82rem;
   margin-inline: auto;
   /* The reference sits the composition in the upper middle of the viewport —
-     not at the top edge, not vertically centered. */
-  padding-top: clamp(var(--sp-64), 22vh, 15rem);
+     the time line lands at roughly 31% of the height, not at the top edge and
+     not vertically centered. */
+  padding-top: clamp(var(--sp-64), 30vh, 20rem);
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
   column-gap: clamp(var(--sp-48), 7vw, var(--sp-160));
@@ -2747,28 +2752,32 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 }
 
 .invite-landing__time {
-  margin: 0 0 var(--sp-48);
-  font-size: 1.125rem;
+  margin: 0 0 var(--sp-64);
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--mode-title);
 }
 
 .invite-landing__headline {
   margin: 0 0 var(--sp-32);
-  font-size: clamp(2.25rem, 4.2vw, 4rem);
-  line-height: 1.12;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-size: clamp(2.25rem, 3.4vw, 3.375rem);
+  line-height: 1.16;
+  /* Bold with the hero's own tight tracking — measured against the reference:
+     500 renders visibly lighter than the mock, 900 visibly wider. */
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--mode-title);
-  max-width: 14em;
+  /* Breaks the reference's own way: "…our meeting got / us excited about…" */
+  max-width: 11.5em;
 }
 
 .invite-landing__lede {
   margin: 0;
-  font-size: clamp(1.125rem, 1.6vw, 1.375rem);
+  font-size: 1.375rem;
   line-height: 1.45;
+  font-weight: 500;
   color: var(--mode-body);
-  max-width: 26em;
+  max-width: 22em;
 }
 
 /* The invite card: brand outline, the pure-white component fill, the envelope
@@ -2776,8 +2785,8 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 .invite-landing__aside {
   justify-self: end;
   width: 100%;
-  max-width: 30rem;
-  margin-top: var(--sp-16);
+  max-width: 29rem;
+  margin-top: var(--sp-80);
 }
 
 .invite-card {
@@ -2801,10 +2810,9 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 
 .invite-card__email {
   margin: 0;
-  padding: clamp(var(--sp-64), 6vw, var(--sp-96)) var(--sp-24)
-    clamp(var(--sp-48), 5vw, var(--sp-80));
+  padding: var(--sp-64) var(--sp-24) var(--sp-48);
   text-align: center;
-  font-size: clamp(1.375rem, 2vw, 1.75rem);
+  font-size: clamp(1.375rem, 2vw, 1.875rem);
   font-weight: 500;
   color: var(--brand);
   overflow-wrap: anywhere;
@@ -2812,12 +2820,13 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 
 .invite-card__cta.btn {
   width: 100%;
-  min-height: 3.5rem;
+  min-height: 3.75rem;
+  font-size: 1.125rem;
   border-radius: 0;
 }
 
 .invite-card__terms {
-  margin: var(--sp-12) 0 0;
+  margin: var(--sp-24) 0 0;
   text-align: center;
   font-size: 0.75rem;
   color: var(--grey);
@@ -2833,8 +2842,10 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   right: var(--sp-32);
   bottom: var(--sp-32);
   --r-bg: var(--surface);
+  padding: var(--sp-8) var(--sp-32);
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
 }
 
 @media (max-width: 900px) {

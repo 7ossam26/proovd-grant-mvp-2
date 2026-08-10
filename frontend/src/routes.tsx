@@ -1,4 +1,4 @@
-import { Navigate, Outlet, type RouteObject } from 'react-router';
+import { Navigate, Outlet, useParams, type RouteObject } from 'react-router';
 import { lazy, Suspense } from 'react';
 import { POLICY_DOCUMENTS } from '@proovd/shared';
 import { MotionProvider } from './motion/MotionProvider.js';
@@ -45,12 +45,17 @@ import { CreatorCampaignClose } from './surfaces/creator/CreatorCampaignClose.js
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { BackerPage } from './features/public/backer/BackerPage.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
-import { CreatorResult } from './surfaces/draft/CreatorResult.js';
 import { AccountClaim } from './surfaces/draft/AccountClaim.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
 } from './features/public/campaign/samples.js';
+
+/** The old possible-creators result address, kept only as a way to the claim. */
+function DraftResultRedirect() {
+  const { token = '' } = useParams();
+  return <Navigate to={`/draft/${encodeURIComponent(token)}/claim`} replace />;
+}
 
 /**
  * The route table. Phase 05 fills it with §18's public inventory — all
@@ -229,8 +234,10 @@ const rootChildren: RouteObject[] = [
     element: <VettingFlow />,
   },
   {
+    // The result page went with the simplified flow; a bookmarked address
+    // lands on the claim, which is where the flow now goes after submission.
     path: 'draft/:token/result',
-    element: <CreatorResult />,
+    element: <DraftResultRedirect />,
   },
   {
     path: 'draft/:token/claim',

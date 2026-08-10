@@ -18,10 +18,10 @@
  * limiter that announces itself is the same enumeration oracle in a hat.
  *
  * ── The server re-decides everything the surface decided ────────────────────
- * The claim route re-checks submission, the possible-creator gate, the
- * representations, and the policy acceptances even though the surface will not
- * offer the button without them. §1.1 requires server-side authorization; a
- * hidden or disabled control is not one.
+ * The claim route re-checks submission, the representations, and the policy
+ * acceptances even though the surface will not offer the button without them.
+ * §1.1 requires server-side authorization; a hidden or disabled control is
+ * not one.
  */
 
 import { Router, type RequestHandler } from 'express';
@@ -37,9 +37,6 @@ import {
   ensureVetting,
   saveVetting,
   submitVetting,
-  readPossibleCreatorSignal,
-  viewCreatorSignal,
-  type CampaignTypeValue,
   type VettingStep,
 } from '../vetting/service.js';
 import {
@@ -142,12 +139,9 @@ export function createVettingRouter(
         : undefined;
 
     const result = await saveVetting(db, draftId, {
-      ...(('selectedType' in body)
-        ? { selectedType: (body['selectedType'] as CampaignTypeValue | null) ?? null }
-        : {}),
       ...(str('problem') !== undefined ? { problem: str('problem') } : {}),
       ...(str('solution') !== undefined ? { solution: str('solution') } : {}),
-      ...(str('competition') !== undefined ? { competition: str('competition') } : {}),
+      ...(str('views') !== undefined ? { views: str('views') } : {}),
       ...(typeof body['resumeStep'] === 'string'
         ? { resumeStep: body['resumeStep'] as VettingStep }
         : {}),
@@ -189,44 +183,10 @@ export function createVettingRouter(
     res.status(201).json(result.state);
   });
 
-  /* ── §10 — the possible-creator result ─────────────────────────────────── */
-
-  router.get(`${base}/creator-signal`, openLimiter, draft, async (req, res) => {
-    const draftId = draftIdOf(req, res);
-    if (!draftId) return;
-
-    const state = await ensureVetting(db, draftId, actorOf(draftId));
-    if (!state) {
-      res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
-      return;
-    }
-
-    // §10 puts this after valid vetting. Before that there is nothing to be a
-    // signal about, and answering anyway would leak the shape of the record.
-    if (!state.submittedAt) {
-      res.status(409).json({
-        error: 'vetting_not_submitted',
-        title: 'This step is not open yet',
-        whatHappened: 'Your answers have not been submitted.',
-        next: 'Finish the four questions first.',
-      });
-      return;
-    }
-
-    const view = viewCreatorSignal(await readPossibleCreatorSignal(db, state.campaignId, { stampRendered: true }));
-
-    // The count and nothing else. Never the basis, never who recorded it, never
-    // a Creator — §10: "It names no Creator." The basis is Proovd's internal
-    // reasoning and belongs in Admin.
-    res.json({
-      status: view.status,
-      count: view.count,
-      recordedAt: view.recordedAt,
-      submittedAt: state.submittedAt,
-    });
-  });
-
   /* ── §10 — the account claim ───────────────────────────────────────────── */
+  /* Simplified flow (2026-08-10): there is no possible-creator step between
+     submission and the claim any more, so no `/creator-signal` route either.
+     The Admin assessment is still recordable and renders in the workspace. */
 
   router.get(`${base}/claim`, openLimiter, draft, async (req, res) => {
     const draftId = draftIdOf(req, res);

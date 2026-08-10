@@ -58,7 +58,6 @@ import {
 import { policyVersions } from '../db/schema/policies.js';
 import { auditEvents, idempotencyKeys } from '../db/schema/integrity.js';
 import { user as userTable } from '../db/schema/auth.js';
-import { readPossibleCreatorSignal, viewCreatorSignal } from './service.js';
 
 /**
  * The domain event §10 names and §33.1.9 counts.
@@ -415,7 +414,6 @@ export type CompleteClaimResult =
 export type ClaimRefusal =
   | 'unavailable'
   | 'vetting_incomplete'
-  | 'creator_signal_pending'
   | 'profile_incomplete'
   | 'representations_missing'
   | 'consent_missing'
@@ -471,23 +469,14 @@ export async function completeClaim(
       ok: false,
       code: 'vetting_incomplete',
       message: 'Your answers have not been submitted yet.',
-      next: 'Finish the four questions first. Everything you have entered here is saved.',
+      next: 'Finish the setup questions first. Everything you have entered here is saved.',
     };
   }
 
-  // §10: the possible-creator result is shown "before account creation", and a
-  // zero routes to Admin "before the Founder proceeds". The surface already
-  // enforces the order; this enforces it again on the server, because §1.1
-  // requires server-side authorization and a hidden button is not one.
-  const signal = viewCreatorSignal(await readPossibleCreatorSignal(db, profile.campaignId, { stampRendered: true }));
-  if (signal.status !== 'available') {
-    return {
-      ok: false,
-      code: 'creator_signal_pending',
-      message: 'We are still reviewing your submission before this step opens.',
-      next: 'Nothing was created. We will email you when it is ready — there is nothing for you to do.',
-    };
-  }
+  // Simplified flow (2026-08-10, product direction): the possible-creator
+  // result no longer gates the claim. Submitting the answers lands the Founder
+  // directly here; the Admin assessment remains a recordable fact in the
+  // workspace, it just does not stand between a person and their account.
 
   const missing: string[] = [];
   if (!profile.fields.legalName.value) missing.push('legalName');

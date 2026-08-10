@@ -160,10 +160,18 @@ export interface VettingView {
   /** The checklist, in order, with what is done. */
   progress: { label: string; done: boolean }[];
   progressStatus: string;
+  /** The LOCKED type (set at submission), or null while unlocked. */
   campaignType: string | null;
   campaignTypeAt: string | null;
+  /** The path Admin has set on the draft, shown before the lock. */
+  campaignTypeSelected: string | null;
+  campaignTypeSelectedRaw: 'pre_build' | 'pre_launch' | null;
+  /** True until the Founder submits; the control renders only while true. */
+  campaignTypeEditable: boolean;
+  /** The draft the campaign-path control writes against, when one exists. */
+  draftId: string | null;
   answers: {
-    key: 'problem' | 'solution' | 'competition';
+    key: 'problem' | 'solution' | 'views' | 'competition';
     label: string;
     text: string | null;
     /** "Originally prepared by Proovd · Last edited by Ahmed", or null. */

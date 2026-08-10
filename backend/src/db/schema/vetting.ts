@@ -147,6 +147,13 @@ export const campaignVetting = pgTable(
     competitionFirstEditedAt: timestamp('competition_first_edited_at', { withTimezone: true }),
     competitionLastEditedAt: timestamp('competition_last_edited_at', { withTimezone: true }),
 
+    /* ── Step 3 (simplified flow, 2026-08-10) — Amount of views ───────────*/
+    /**
+     * One of the four range ids in `shared/src/vetting/steps.ts`, CHECK-pinned
+     * in migration 0042. The Founder's own answer; there is no prefill path.
+     */
+    viewsRange: text('views_range'),
+
     /* ── Autosave and position (§9, DNA §5.12) ────────────────────────────*/
     /** "Returning restores the latest saved draft and says when it was saved." */
     lastSavedAt: timestamp('last_saved_at', { withTimezone: true }),
