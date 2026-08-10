@@ -270,7 +270,32 @@ async function main() {
   logger.info('Job scheduler started');
 
   // ── Start ──────────────────────────────────────────────────────────────────
-  const server = app.listen(env.PORT, () => {
+  // The canonical-redirect decision tech-stack §10 asks for, recorded here at
+  // the deployment entrypoint rather than inside createApp: with
+  // MARKETING_HOME_URL set, a request for exactly `/` 301s to the marketing
+  // home (proovd.co), and every other route is untouched. A wrapper app rather
+  // than a route on `app` because Express matches in registration order and
+  // the SPA fallback would otherwise answer `/` first. In-app navigation to
+  // `/` (the client-side router) still renders the platform home — the
+  // redirect governs arrivals, which is what a canonical redirect is for.
+  let listener = app;
+  if (env.MARKETING_HOME_URL) {
+    const { default: express } = await import('express');
+    const outer = express();
+    outer.get('/', (req, res) => {
+      const target = new URL(env.MARKETING_HOME_URL!);
+      // Preserve the query string — a marketing link's UTM parameters belong
+      // to the marketing site it was aimed at.
+      const search = req.originalUrl.includes('?')
+        ? req.originalUrl.slice(req.originalUrl.indexOf('?'))
+        : '';
+      res.redirect(301, target.origin + target.pathname + search);
+    });
+    outer.use(app);
+    listener = outer;
+  }
+
+  const server = listener.listen(env.PORT, () => {
     logger.info(
       { port: env.PORT, env: env.NODE_ENV, stripeMode: env.STRIPE_MODE },
       'Proovd backend listening',

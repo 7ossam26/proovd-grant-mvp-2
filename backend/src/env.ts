@@ -6,6 +6,17 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   APP_BASE_URL: z.string().url('APP_BASE_URL must be a valid URL'),
 
+  /**
+   * tech-stack §10: proovd.co (the landing repository) is the marketing home,
+   * app.proovd.co is the platform — and "decide the canonical redirect and
+   * record it once." This is that record: when set, a request for exactly `/`
+   * on the platform origin 301s to the marketing home. Everything else —
+   * §18's policy routes, campaign pages, sign-in — stays on the platform
+   * origin, where consent records cite it and the attribution cookie is
+   * first-party. Unset (dev, tests), the platform home renders as itself.
+   */
+  MARKETING_HOME_URL: z.string().url().optional(),
+
   // ── Stripe (§6 / §32.2) — all required; mode-mismatch exits non-zero ──────
   /**
    * A declaration, not a credential. Stays required: it costs nothing to
