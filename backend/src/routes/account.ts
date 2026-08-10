@@ -33,37 +33,11 @@
  * proceeds (§33.12.5).
  */
 
-import express, { Router, type RequestHandler } from 'express';
-import rateLimit from 'express-rate-limit';
+import { Router } from 'express';
 import type { Auth } from '../auth/auth.js';
-import type { Database } from '../db/client.js';
-import type { AuditWriter } from '../auth/audit.js';
 import { requireSession } from '../auth/guards.js';
-import {
-  createFounderAccountPublicly,
-  readSignupAvailability,
-} from '../auth/public-signup.js';
 
-/**
- * Public Founder signup is an unauthenticated write that creates an account,
- * so it is bounded before it is anything else. The limit is per IP and covers
- * both the availability read and the create — the read is what an enumerator
- * would use to check the door is open before hammering it.
- *
- * This is also the only mitigation standing behind `email_taken`: see the
- * comment on that branch in `public-signup.ts` for why a signup form cannot
- * honour §5.5's non-enumeration rule the way the reset surface does.
- */
-const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
-const SIGNUP_LIMIT = 10;
-
-export interface AccountRouterDeps {
-  auth: Auth;
-  db: Database;
-  audit: AuditWriter;
-}
-
-export function createAccountRouter({ auth, db, audit }: AccountRouterDeps): Router {
+export function createAccountRouter(auth: Auth): Router {
   const router = Router();
 
   router.get('/api/account/me', requireSession(auth), (req, res) => {
@@ -79,87 +53,6 @@ export function createAccountRouter({ auth, db, audit }: AccountRouterDeps): Rou
         name: user.name,
       },
     });
-  });
-
-  /* ── Public Founder signup (operator decision; see auth/public-signup.ts) ── */
-
-  const signupLimiter = rateLimit({
-    windowMs: SIGNUP_WINDOW_MS,
-    limit: SIGNUP_LIMIT,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-  });
-
-  // Per-router, never global — `app.ts` mounts no `express.json()` because the
-  // Stripe and Cal.com webhooks verify signatures over the raw bytes.
-  const json: RequestHandler = express.json({ limit: '8kb' });
-
-  /**
-   * Whether the door is open, so the surface can render the closed state as a
-   * state rather than as a rejected form (§27.1, §1.1). Read-only; creates
-   * nothing.
-   */
-  router.get('/api/account/signup', signupLimiter, (_req, res) => {
-    void (async () => {
-      try {
-        res.json(await readSignupAvailability(db));
-      } catch {
-        // Fail closed. A signup form rendered because availability could not
-        // be read is a form that collects a password and then refuses.
-        res.status(503).json({
-          open: false,
-          reason: 'unavailable',
-          title: 'Signups cannot be opened right now',
-          whatHappened:
-            'Proovd could not check whether new accounts are being accepted. Nothing was created.',
-          next: 'Try again in a few minutes.',
-        });
-      }
-    })();
-  });
-
-  router.post('/api/account/signup', signupLimiter, json, (req, res) => {
-    void (async () => {
-      const body = (req.body ?? {}) as Partial<{
-        email: string;
-        password: string;
-        name: string;
-        acceptedPolicySlugs: string[];
-      }>;
-
-      try {
-        const result = await createFounderAccountPublicly(db, auth, audit, {
-          email: typeof body.email === 'string' ? body.email : '',
-          password: typeof body.password === 'string' ? body.password : '',
-          name: typeof body.name === 'string' ? body.name : '',
-          acceptedPolicySlugs: Array.isArray(body.acceptedPolicySlugs)
-            ? body.acceptedPolicySlugs.filter((s): s is string => typeof s === 'string')
-            : [],
-        });
-
-        if (!result.ok) {
-          // 409 for the two states that are about the world rather than the
-          // request: the agreements are not final, or the address is taken.
-          const status =
-            result.code === 'policies_unpublished' || result.code === 'email_taken' ? 409 : 400;
-          res.status(status).json(result);
-          return;
-        }
-
-        // No session is minted here. The surface signs in through the ordinary
-        // `/api/auth/sign-in/email` path immediately afterwards, so there is
-        // exactly one place in the product that issues a session and it is the
-        // one every other door already uses.
-        res.status(201).json({ ok: true, email: result.email });
-      } catch {
-        res.status(500).json({
-          ok: false,
-          code: 'unavailable',
-          message: 'Your account could not be created.',
-          next: 'Nothing was created. Try again in a few minutes.',
-        });
-      }
-    })();
   });
 
   return router;

@@ -277,7 +277,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // beside the reacceptance routes and outside both gated prefixes above, for
   // the reason `routes/account.ts` records: a person who owes an acceptance
   // must still be able to reach the surface that takes it.
-  app.use(createAccountRouter({ auth, db, audit }));
+  app.use(createAccountRouter(auth));
   // Phase 14b (§18, §33.6). Two public, session-less routes: `/c/:code` records
   // a tracking-link click, sets the per-browser attribution cookie, and
   // redirects to the live page; `/api/campaign/:id` returns the Backer-facing

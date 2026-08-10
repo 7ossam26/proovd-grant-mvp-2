@@ -28,7 +28,6 @@ import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { CampaignHome } from './surfaces/founder/CampaignHome.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
 import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
-import { SignUp } from './surfaces/auth/SignUp.js';
 import { CampaignResults } from './surfaces/founder/CampaignResults.js';
 import { Fulfillment } from './surfaces/founder/Fulfillment.js';
 import {
@@ -132,10 +131,6 @@ const rootChildren: RouteObject[] = [
       // around them. They are deliberately NOT in §18's fourteen-route
       // inventory; see `ACCOUNT_ROUTES` in `features/public/site.ts`.
       { path: 'signin', element: <SignIn /> },
-      // Public Founder signup — an operator decision. Founder-only: §5.1 seeds
-      // Admins and §5.3 admits Creators by private invitation, and the role is
-      // decided server-side rather than by anything this route carries.
-      { path: 'signup', element: <SignUp /> },
       { path: 'reset-password', element: <ResetPassword /> },
       { path: '*', element: <NotFoundSurface /> },
     ],

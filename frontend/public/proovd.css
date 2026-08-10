@@ -1985,25 +1985,3 @@ html.no-motion [data-splash] { display: none !important; }
 .campaign-list__what { display: grid; gap: var(--sp-4); }
 .campaign-list__what h2 { margin: 0; }
 .campaign-list__ref { margin: 0; color: var(--grey); font-size: 0.9375rem; }
-
-/* ─────────────────────────────────────────── PUBLIC FOUNDER SIGNUP (2026-08)
-   The consent block on /signup. §28.4 forbids bundling optional consent, so
-   each agreement is its own control beside its own link to the text — the
-   layout has to keep those two readable as a pair without implying that
-   ticking one is ticking all three. A fieldset rather than a div because
-   three related controls with one legend is what a fieldset is for, and it is
-   what a screen reader announces as a group (§33.11). */
-.auth__consents {
-  border: 0; margin: 0; padding: 0;
-  display: grid; gap: var(--sp-12); width: 100%;
-}
-.auth__consents legend {
-  padding: 0; margin-block-end: var(--sp-4);
-  color: var(--grey); font-size: 0.9375rem;
-}
-/* Wraps rather than truncates: at 320px the link drops under its control and
-   both stay reachable (§33.11 reflow). */
-.auth__consent {
-  display: flex; flex-wrap: wrap; align-items: center;
-  gap: var(--sp-8) var(--sp-12);
-}
