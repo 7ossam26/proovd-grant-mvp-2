@@ -13,8 +13,7 @@
  * response shape that changes fails typecheck here before it reaches a test.
  */
 
-import type { Scoreboard } from '../admin/api.js';
-import type { DraftLanding, PrerequisitePanel, FounderRow, AdminIdentity, SettingState, AffiliateRegistry, LedgerPageState, MoneyPanelState, RiskPanelState, SupportQueueState, CloseOperationsState, RefundQueueState, Day14QueueState, GhostBanQueueState, DisputeQueueState } from '../admin/api.js';
+import type { DraftLanding, FounderRow, AdminIdentity, SettingState, AffiliateRegistry, SupportQueueState, DisputeQueueState } from '../admin/api.js';
 import type { ClaimView, CreatorSignal, VettingState } from '../../surfaces/draft/api.js';
 import type {
   BuildState,
@@ -1137,41 +1136,6 @@ const settings: { settings: SettingState[] } = {
   ],
 };
 
-const prerequisites: PrerequisitePanel = {
-  blocking: true,
-  unsatisfiedKeys: ['policies_published'],
-  items: [
-    {
-      key: 'policies_published',
-      label: 'All canonical policy documents are published',
-      specRef: '§34',
-      verification: 'automatic',
-      requirement: 'Every §31.4 document is published, not draft.',
-      satisfied: false,
-      detail: 'Eight documents are in legal review.',
-      subjectKeys: ['terms'],
-      attestation: null,
-    },
-    {
-      key: 'monitoring_owner',
-      label: 'The pilot campaign has a named monitoring owner',
-      specRef: '§34',
-      verification: 'recorded',
-      requirement: 'A named person records who is watching the pilot.',
-      satisfied: true,
-      detail: 'Recorded by Sam Okafor.',
-      subjectKeys: [],
-      attestation: {
-        status: 'satisfied',
-        recordedBy: 'Sam Okafor',
-        recordedAt: '2026-08-01T10:00:00.000Z',
-        note: 'Sam owns monitoring; Ada owns rollback.',
-        evidenceLinks: ['https://example.com/runbook'],
-      },
-    },
-  ],
-};
-
 const founders: { founders: FounderRow[] } = {
   founders: [
     {
@@ -1204,100 +1168,6 @@ const affiliateRegistry: AffiliateRegistry = {
   },
 };
 
-const ledger: LedgerPageState = {
-  dimensions: ['campaign', 'status', 'attribution'],
-  rows: [
-    {
-      reservationId: QA.reservationId,
-      campaignId: QA.campaignId,
-      campaignType: 'pre_launch',
-      status: 'captured',
-      reservedAt: '2026-08-24T10:00:00.000Z',
-      rewardSku: QA.rewardSku,
-      rewardTitle: QA.rewardTitle,
-      rewardSubtotalCents: '12000',
-      salesTaxCents: '990',
-      totalAuthorizedCents: '12990',
-      totalCapturedCents: '12990',
-      taxJurisdiction: 'NY',
-      taxabilityReason: 'standard_rated',
-      taxCalculationExpiresAt: '2026-09-20T10:00:00.000Z',
-      taxCloseUsable: true,
-      consentAppendix: 'A.4',
-      consentVersion: 'v1',
-      founderMarketingConsent: false,
-      newsletterConsent: false,
-      attributionSource: 'creator_link',
-      attributionStatus: 'verified',
-      linkActivatedAt: '2026-08-20T15:00:00.000Z',
-      capResult: 'within_cap',
-      duplicateCaseStatus: null,
-      backerEmail: 'backer@example.com',
-      backerPhone: '+14155550100',
-    },
-  ],
-  total: 1,
-  summary: {
-    uniqueBackers: 44,
-    transactions: 44,
-    subtotalCents: '528000',
-    taxCents: '43560',
-    capturedCents: '571560',
-  },
-};
-
-const moneyControls: MoneyPanelState = {
-  campaignId: QA.campaignId,
-  campaignStatus: 'closed_reconciling',
-  lines: [
-    {
-      key: 'captured_total',
-      amounts: { totalCapturedCents: '571560', rewardSubtotalCapturedCents: '528000' },
-      populated: true,
-      populatedBy: 'close batch',
-      awaiting: null,
-    },
-    {
-      key: 'thank_you',
-      amounts: {},
-      populated: false,
-      populatedBy: 'thank_you_records',
-      awaiting: 'No thank-you has been recorded for this campaign.',
-    },
-  ],
-  provisionalReconciles: true,
-  taxExcludedFromFees: true,
-};
-
-const riskPanel: RiskPanelState = {
-  campaignId: QA.campaignId,
-  signals: [
-    {
-      key: 'tax_not_collecting',
-      severity: 'blocking',
-      count: 0,
-      instances: [],
-      notYetObservable: false,
-    },
-    {
-      key: 'radar_blocked_payments',
-      severity: 'monitor',
-      count: 0,
-      instances: [],
-      notYetObservable: true,
-    },
-  ],
-  blockingKeys: [],
-  sellerTaxReadiness: {
-    recorded: true,
-    ready: true,
-    missingFacts: [],
-    recordedBy: 'Sam Okafor',
-    evidenceReference: 'https://example.com/tax-record',
-    recordedAt: '2026-08-10T10:00:00.000Z',
-  },
-};
-
 const supportQueue: SupportQueueState = {
   entries: [
     {
@@ -1320,78 +1190,24 @@ const supportQueue: SupportQueueState = {
   overdueCount: 1,
 };
 
-const closeOperations: CloseOperationsState = {
-  operations: {
-    incomplete: [],
-    retryWindow: [],
-    reconciling: [
-      {
-        campaignId: QA.campaignId,
-        campaignStatus: 'closed_reconciling',
-        requiredItemsVerified: 3,
-        requiredItemsTotal: 4,
-        resultsPrepared: false,
-      },
-    ],
-  },
-  reconciliationItems: [
-    {
-      key: 'batch_completeness',
-      spec: '§21: every locked pre-order reached a terminal capture outcome.',
-      evaluation: 'app',
-      requiredForResults: true,
-      waitsOn: null,
-    },
-  ],
-  narrativeFields: [
-    { key: 'strongestSignal', label: 'Strongest signal' },
-    { key: 'whatThisDoesNotProve', label: 'What this does not prove' },
-  ],
-};
-
-const refundQueue: RefundQueueState = {
-  cases: [],
-  unreconciled: [],
-  bestEffortRecovery:
-    'Recovery beyond the available balance is best effort and is never promised as certain.',
+const disputeQueue: DisputeQueueState = {
+  disputes: [],
   causes: [
     {
       key: 'founder_caused',
       label: 'Founder-caused',
-      allocation: 'founder_liability',
+      allocation: 'founder',
       permittedAffiliateTreatments: ['earnings_remain'],
       requiresMandate: false,
     },
   ],
-  ideaExceptions: [{ key: 'duplicate_charge', label: 'A duplicate charge' }],
   proovdFeeTreatments: ['fee_returned', 'fee_retained'],
-};
-
-const disputeQueue: DisputeQueueState = {
-  disputes: [],
-  causes: refundQueue.causes,
-  proovdFeeTreatments: refundQueue.proovdFeeTreatments,
   evidenceItems: [
     { key: 'consent_text', label: 'The exact consent the Backer agreed to', required: true },
     { key: 'refund_policy_snapshot', label: 'The refund policy as it stood', required: true },
   ],
   bestEffortRecovery:
     'Recovery beyond the available balance is best effort and is never promised as certain.',
-};
-
-const day14Queue: Day14QueueState = {
-  queue: [],
-  failureReasons: [
-    { key: 'no_progress_evidence', label: 'No evidence of progress was provided' },
-    { key: 'no_backer_communication', label: 'Backers were not told where things stand' },
-  ],
-};
-
-const ghostBanQueue: GhostBanQueueState = {
-  candidates: [],
-  triggers: [{ key: 'failed_day_14', label: 'Failed the Day 14 Progress Check' }],
-  requiredFields: [{ key: 'notice', label: 'The notice sent to the Founder' }],
-  permanentSentence: 'A ghost ban is permanent and is recorded once.',
 };
 
 /* ── The stub table ────────────────────────────────────────────────────────── */
@@ -1402,47 +1218,6 @@ const ghostBanQueue: GhostBanQueueState = {
  * Order matters where one path is a prefix of another — `/api/founder/campaigns`
  * would otherwise answer `/api/founder/campaigns/:id/build`.
  */
-/* ── §31.9 the first-cohort scoreboard (Phase 23b) ─────────────────────────── */
-
-/**
- * Deliberately a cohort-incomplete board.
- *
- * §33.12.6's state is the one a fresh deployment is actually in, and it is the
- * one worth sweeping: it renders the `not measured` label, the reason, and no
- * number at all. A fixture with four measured values would sweep a screen the
- * product cannot currently produce.
- */
-const scoreboard: Scoreboard = {
-  notMeasuredLabel: 'not measured',
-  cohortSize: 10,
-  invitedFounders: 3,
-  baselineEstablished: false,
-  metrics: [
-    'time_to_first_magic',
-    'founder_completion',
-    'return_after_closure',
-    'next_action_correction_rate',
-  ].map((key) => ({
-    key,
-    value: {
-      state: 'not_measured' as const,
-      reason: 'cohort_incomplete' as const,
-      invitedFounders: 3,
-      cohortSize: 10,
-    },
-  })),
-  secondary: [
-    {
-      key: 'autosave_failures',
-      label: 'Autosave failures',
-      count: null,
-      absentBecause:
-        'Autosave reports its own outcome to the Founder and retries; a client-side beacon to count failures is the analytics warehouse §31.9 forbids.',
-    },
-    { key: 'proposal_outcomes', label: 'Proposal outcomes', count: 0 },
-    { key: 'support_sla_misses', label: 'Support SLA misses', count: 0 },
-  ],
-};
 
 export const QA_ROUTES: StubRoute[] = [
   /* Draft (§7, §9, §10) */
@@ -1495,20 +1270,11 @@ export const QA_ROUTES: StubRoute[] = [
   /* Admin (§26) */
   { match: /\/api\/admin\/me$/, body: adminIdentity },
   { match: /\/api\/admin\/settings$/, body: settings },
-  { match: /\/api\/admin\/prerequisites$/, body: prerequisites },
   { match: /\/api\/admin\/founders$/, body: founders },
   { match: /\/api\/admin\/affiliates\/registry$/, body: affiliateRegistry },
   { match: /\/api\/admin\/affiliates(\?.*)?$/, body: { creators: [], slots: { used: 0, cap: 4 } } },
-  { match: /\/api\/admin\/ledger/, body: ledger },
-  { match: /\/api\/admin\/money\//, body: moneyControls },
-  { match: /\/api\/admin\/risk/, body: riskPanel },
   { match: /\/api\/admin\/support\/queue$/, body: supportQueue },
-  { match: /\/api\/admin\/close$/, body: closeOperations },
-  { match: /\/api\/admin\/refunds(\?.*)?$/, body: refundQueue },
   { match: /\/api\/admin\/disputes(\?.*)?$/, body: disputeQueue },
-  { match: /\/api\/admin\/fulfillment\/day-14$/, body: day14Queue },
-  { match: /\/api\/admin\/fulfillment\/ghost-ban\/candidates$/, body: ghostBanQueue },
   { match: /\/api\/admin\/notifications\/catalog$/, body: { keys: [], deliberateAbsences: [] } },
   { match: /\/api\/admin\/notifications\/history/, body: { history: notificationHistory } },
-  { match: /\/api\/admin\/measurement$/, body: scoreboard },
 ];

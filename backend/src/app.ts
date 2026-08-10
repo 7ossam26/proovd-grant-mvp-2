@@ -35,14 +35,10 @@ import { createAttributionRouter } from './routes/attribution.js';
 import { createPublicCampaignRouter } from './routes/public-campaign.js';
 import { createBackerPreorderRouter } from './routes/backer-preorder.js';
 import { createBackerRouter } from './routes/backer.js';
-import { createAdminCloseRouter } from './routes/admin-close.js';
-import { createAdminRefundsRouter } from './routes/admin-refunds.js';
 import { createAdminLiveModeRouter } from './routes/admin-live-mode.js';
 import {
   createFounderFulfillmentRouter,
-  createAdminFulfillmentRouter,
   FOUNDER_FULFILLMENT_BASE_PATH,
-  ADMIN_FULFILLMENT_BASE_PATH,
 } from './routes/fulfillment.js';
 import { createAdminDisputesRouter } from './routes/admin-disputes.js';
 import {
@@ -74,7 +70,7 @@ import { createTokenService, type TokenService } from './auth/token-service.js';
 import { createNotifier, type EmailTransport, type Notifier } from './notifications/send.js';
 import { sendPasswordReset } from './notifications/customer-remaining.js';
 import { unconfiguredTransport } from './notifications/resend-transport.js';
-import type { PrerequisiteEnvironment } from './admin/prerequisites.js';
+import type { LiveModeEnvironment } from './live-mode/gate.js';
 import type { InvitationContext } from './invitations/service.js';
 
 export interface AppConfig {
@@ -94,8 +90,8 @@ export interface AppConfig {
    * next restart to Better Auth's. The settings surface says so.
    */
   adminReauthWindowSeconds: number;
-  /** Observable facts for the §6 prerequisites panel. */
-  prerequisiteEnvironment: PrerequisiteEnvironment;
+  /** Observable facts the §34 live-mode gate reads about this deployment. */
+  liveModeEnvironment: LiveModeEnvironment;
   /**
    * §27.2 transactional email. Defaults to the transport that refuses loudly:
    * an unconfigured deployment must fail visibly rather than report an
@@ -293,7 +289,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // everything under /api/admin requires a session, the admin role, and a
   // registered TOTP factor, and every write additionally requires a recent
   // sign-in.
-  app.use(createAdminRouter({ db, auth, environment: config.prerequisiteEnvironment }));
+  app.use(createAdminRouter({ db, auth }));
   // Phase 24 (§34, Appendix C). The live-mode gate: the eleven conditions with
   // their filed evidence, the one named pilot enablement and its rollback, the
   // three pre-first-reservation confirmations, and the recorded Appendix C
@@ -304,22 +300,15 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       db,
       auth,
       audit,
-      environment: config.prerequisiteEnvironment,
+      environment: config.liveModeEnvironment,
     }),
   );
-  // Phase 16a (§26.5, §26.6, §31.7, §33.12.4). The reservation and charge
-  // ledger with §25.7's permitted export, the money controls read against the
-  // Phase 03 ledger columns, the ten §31.7 risk signals, and the general
-  // high-impact/override machine Phases 18–20 reuse. Reads are `admin`; the
-  // seller-tax-readiness record and every override additionally take the
+  // Phase 16a (§26.6, §33.12.4). The general high-impact/override machine:
+  // preview the customer consequences, consume the preview exactly once, and
+  // record the override against the prior value read from the row itself.
+  // Listing the overrides is `admin`; the preview and the execution take the
   // freshness gate, because both are §5.1 high-impact actions.
-  app.use(
-    createAdminOperationsRouter({
-      db,
-      auth,
-      mode: config.stripeGateway?.mode ?? 'test',
-    }),
-  );
+  app.use(createAdminOperationsRouter({ db, auth }));
   // Phase 16b (§26.7, §26.8, §27.8). Support cases with their business-day
   // response promise and daily due/overdue queue, the four-field handoff note,
   // suspend/kill with its complete behaviour, and the read-only timeline
@@ -569,17 +558,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       tokens,
     }),
   );
-  app.use(
-    ADMIN_FULFILLMENT_BASE_PATH,
-    createAdminFulfillmentRouter({
-      db,
-      auth,
-      audit,
-      notifier,
-      notificationContext: launchContext,
-      tokens,
-    }),
-  );
   // Phase 21b (§22.8–§22.11, §31.8, §33.10.5–10). The last of the lifecycle:
   // the Creator's completion status against its five criteria, the work-again
   // request that creates nothing, the Founder's two independent next-campaign
@@ -760,38 +738,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     // same token guard; the campaign comes from the token subject, never the
     // body, so a link for one campaign cannot post to another.
     app.use(createBackerCommentRouter({ db, tokens, audit }));
-    // Phase 18b (§21, §33.7.12). Admin's close operations: the visibly
-    // recoverable batch queue, resume (the same idempotent machine the sweep
-    // runs), §21 reconciliation records, and results preparation — the one
-    // sender of `Results ready` (§33.7.11). Reads are `admin`; resume,
-    // reconciliation, and results take the freshness gate.
-    app.use(
-      createAdminCloseRouter({
-        db,
-        auth,
-        audit,
-        gateway: config.stripeGateway,
-        notifier,
-        notificationContext: launchContext,
-        tokens,
-      }),
-    );
-    // Phase 20a (§24.8, §24.9, §33.9.2–6). Admin's refund operations: the case
-    // queue with the Founder-issued refunds awaiting classification, recording
-    // the §24.8 cause allocation, the §26.6 customer-consequence preview, and
-    // the execution under the stable per-case key. Reads are `admin`; the
-    // money decisions take the freshness gate.
-    app.use(
-      createAdminRefundsRouter({
-        db,
-        auth,
-        audit,
-        gateway: config.stripeGateway,
-        notifier,
-        notificationContext: launchContext,
-        tokens,
-      }),
-    );
     // Phase 20b (§24.11, §33.9.7). Admin's dispute operations: the queue with
     // its overdue 24-hour tasks first, the assembled evidence packet, the
     // recorded assembly, and the §24.8 classification through 20a's register.

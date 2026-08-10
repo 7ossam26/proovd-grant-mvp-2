@@ -981,26 +981,19 @@ describe('§33.7.12 — visible recovery: locked reservations, resume, no duplic
     expect(entry!.lockedReservations).toBe(1);
     expect(entry!.recovery).toContain('Resume');
 
-    // The same queue over HTTP, behind the real Admin guards.
-    const queueRes = await request(h.app).get('/api/admin/close').set('cookie', admin.cookie);
-    expect(queueRes.status).toBe(200);
-    expect(
-      queueRes.body.operations.incomplete.some(
-        (b: { campaignId: string }) => b.campaignId === c.campaignId,
-      ),
-    ).toBe(true);
-    // And never without a session (§33.12.5's posture).
-    expect((await request(h.app).get('/api/admin/close')).status).toBe(401);
+    // The `/admin/close` surface and its router were removed, so the queue is
+    // driven through the service the sweep and the surface both called. What
+    // §33.7.12 is about — the batch is visibly incomplete, and resuming it
+    // double-charges nobody — is a property of this machine, not of the route.
 
     const pisBefore = piCountFor(c.connectedAccountId);
     const emailsBefore = h.sentEmails.messages.length;
 
-    const resume = await request(h.app)
-      .post(`/api/admin/close/${c.campaignId}/resume`)
-      .set('cookie', admin.cookie)
-      .send({});
-    expect(resume.status).toBe(200);
-    expect(resume.body.batch.status).toBe('complete');
+    const resume = await runCloseBatch(closeDeps(), {
+      campaignId: c.campaignId,
+      actor: 'admin:test',
+    });
+    expect(resume.status).toBe('complete');
 
     // One intent per reservation EVER, one receipt each — the retried attempt
     // reused its stable key (§33.7.7, §33.7.12).
@@ -1018,37 +1011,37 @@ describe('§33.7.12 — visible recovery: locked reservations, resume, no duplic
     }
 
     // A second resume changes nothing.
-    const again = await request(h.app)
-      .post(`/api/admin/close/${c.campaignId}/resume`)
-      .set('cookie', admin.cookie)
-      .send({});
-    expect(again.status).toBe(200);
-    expect(again.body.batch.status).toBe('already_complete');
+    const again = await runCloseBatch(closeDeps(), {
+      campaignId: c.campaignId,
+      actor: 'admin:test',
+    });
+    expect(again.status).toBe('already_complete');
     expect(piCountFor(c.connectedAccountId)).toBe(2);
     expect(h.sentEmails.messages.length).toBeGreaterThanOrEqual(emailsBefore);
 
-    // The detail read shows the completed batch and the attempt ledger.
-    const detail = await request(h.app)
-      .get(`/api/admin/close/${c.campaignId}`)
-      .set('cookie', admin.cookie);
-    expect(detail.status).toBe(200);
-    expect(detail.body.detail.batch.completedAt).toBeTruthy();
-    expect(detail.body.detail.reservationsByStatus.captured).toBe(2);
-    expect(detail.body.reconciliation.open).toBe(true);
+    // The batch record shows it completed, and the attempt ledger agrees.
+    const completed = await findCloseBatch(h.db, c.campaignId);
+    expect(completed!.completedAt).toBeTruthy();
 
-    // The full Admin flow over HTTP: verify the four items, then prepare.
+    // Verify the four required items, then prepare the results.
     for (const item of BACKEND_RECONCILIATION_ITEMS.filter((i) => i.requiredForResults)) {
-      const rec = await request(h.app)
-        .post(`/api/admin/close/${c.campaignId}/reconciliation`)
-        .set('cookie', admin.cookie)
-        .send({ itemKey: item.key, result: 'verified', note: `checked ${item.key}` });
-      expect(rec.status).toBe(201);
+      const rec = await recordReconciliationItem(
+        { db: h.db, audit },
+        {
+          campaignId: c.campaignId,
+          itemKey: item.key,
+          result: 'verified',
+          note: `checked ${item.key}`,
+          actor: 'admin:test',
+        },
+      );
+      expect(rec.status).toBe('recorded');
     }
-    const results = await request(h.app)
-      .post(`/api/admin/close/${c.campaignId}/results`)
-      .set('cookie', admin.cookie)
-      .send(NARRATIVE);
-    expect(results.status).toBe(201);
+    const results = await prepareResults(
+      { db: h.db, audit, notifications: { db: h.db, notifier: h.notifier, context: CONTEXT, tokens: h.tokens } },
+      { campaignId: c.campaignId, narrative: NARRATIVE, actor: 'admin:test' },
+    );
+    expect(results.status).toBe('prepared');
 
     const rows = await h.db
       .select()

@@ -199,14 +199,14 @@ describe('§26.1 the Founders list', () => {
     expect(screen.getByText(/nothing is sent until you compose/i)).toBeInTheDocument();
   });
 
+  // The discovery record moved to the draft surface with the rest of §7's
+  // invitation-creation list, so these two assertions follow it there. Neither
+  // is about which page the field is on; both are about what the product
+  // refuses to promise, and that has to hold wherever the field lives.
   it('offers no field that would promise an outcome (§7)', async () => {
-    const user = userEvent.setup();
     stubAdmin();
-    renderAt('/admin/founders');
-    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
-
-    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
-    await screen.findByRole('heading', { name: /new founder prospect/i });
+    renderAt('/admin/founders/d1');
+    await screen.findByRole('heading', { name: /the invitation record/i });
 
     // §7 forbids promising acceptance, results, reward pricing, or a named
     // Creator's participation. There is no field for any of them.
@@ -219,18 +219,15 @@ describe('§26.1 the Founders list', () => {
   });
 
   it('says the phone is never verified (§33.1.8)', async () => {
-    const user = userEvent.setup();
     stubAdmin();
-    renderAt('/admin/founders');
-    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
-    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
+    renderAt('/admin/founders/d1');
 
     expect(
       await screen.findByText(/never verifies a phone number and never sends codes/i),
     ).toBeInTheDocument();
   });
 
-  it('will not create a prospect without the fields §7 requires', async () => {
+  it('will not create a prospect without a name and an email', async () => {
     const user = userEvent.setup();
     stubAdmin();
     renderAt('/admin/founders');
@@ -240,14 +237,133 @@ describe('§26.1 the Founders list', () => {
     const submit = await screen.findByRole('button', { name: /create prospect and campaign/i });
     expect(submit).toBeDisabled();
 
-    await user.type(screen.getByLabelText(/legal name/i), 'Rowan Vale');
-    await user.type(screen.getByLabelText(/email address/i), 'rowan@example.com');
-    await user.type(screen.getByLabelText(/product or startup name/i), 'Waitlist');
+    await user.type(screen.getByLabelText(/founder name/i), 'Rowan Vale');
     expect(submit).toBeDisabled();
 
-    await user.type(screen.getByLabelText(/invitation source/i), 'a mutual contact');
-    await user.type(screen.getByLabelText(/internal campaign owner/i), 'Ada Admin');
+    await user.type(screen.getByLabelText(/founder email/i), 'rowan@example.com');
     expect(submit).toBeEnabled();
+  });
+
+  /**
+   * §7's two acts. The intake records who was met; the invitation-creation list
+   * lives on the draft, where the message it feeds is. What keeps that from
+   * being a loophole is the Send gate, proved in the backend suite.
+   */
+  it('asks only who was met, and says where the rest is filled in', async () => {
+    const user = userEvent.setup();
+    stubAdmin();
+    renderAt('/admin/founders');
+    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
+    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
+
+    await screen.findByLabelText(/founder name/i);
+    for (const present of [
+      /founder email/i,
+      /company or product name/i,
+      /last time we spoke/i,
+      /^problem$/i,
+      /^solution$/i,
+    ]) {
+      expect(screen.getByLabelText(present)).toBeInTheDocument();
+    }
+
+    for (const absent of [
+      /invitation source/i,
+      /internal campaign owner/i,
+      /discovery evidence/i,
+      /launch frame/i,
+      /creator-sourcing hypothesis/i,
+    ]) {
+      expect(screen.queryByLabelText(absent)).not.toBeInTheDocument();
+    }
+
+    expect(
+      screen.getByText(/filled in on the draft, where you compose and preview before sending/i),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * §33.1.5. The intake now carries Problem and Solution, which makes "add
+   * Competition too" the obvious next edit — so the absence is asserted at the
+   * surface as well as in the tree scan the backend suite runs.
+   */
+  it('offers no way to prefill Competition (§9, §33.1.5)', async () => {
+    const user = userEvent.setup();
+    stubAdmin();
+    renderAt('/admin/founders');
+    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
+    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
+
+    await screen.findByLabelText(/^problem$/i);
+    expect(screen.queryByLabelText(/competition/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/no box for Competition/i)).toBeInTheDocument();
+  });
+
+  /**
+   * §12's Story is a Founder-approved item worth US$2 off the listing fee. An
+   * Admin-written one here would be Proovd's content earning that discount, and
+   * §12 makes the Founder's approval the completing act.
+   */
+  it('offers no way to write the campaign Story (§12)', async () => {
+    const user = userEvent.setup();
+    stubAdmin();
+    renderAt('/admin/founders');
+    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
+    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
+
+    await screen.findByLabelText(/^problem$/i);
+    expect(screen.queryByLabelText(/story/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/none for the campaign Story/i)).toBeInTheDocument();
+  });
+
+  /**
+   * What both of the above are allowed to become: an internal note. The
+   * distinction that makes it safe is that the Founder never sees it.
+   */
+  it('records what was learned as an internal note instead', async () => {
+    const user = userEvent.setup();
+    stubAdmin();
+    renderAt('/admin/founders');
+    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
+    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
+
+    expect(await screen.findByLabelText(/notes from the conversation/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/never reaches the Founder, never becomes one of their answers/i),
+    ).toBeInTheDocument();
+  });
+
+  /** §9: a prefill is Proovd's draft, not the Founder's answer. */
+  it('says a prefill never overwrites the Founder’s own words (§9)', async () => {
+    const user = userEvent.setup();
+    stubAdmin();
+    renderAt('/admin/founders');
+    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
+    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
+
+    expect(
+      await screen.findByText(/their words are never overwritten/i),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * §30 forbids automated engagement sequences. The last-contact date records a
+   * conversation that happened; there is no field that plans the next one.
+   */
+  it('records the last conversation without scheduling another (§30)', async () => {
+    const user = userEvent.setup();
+    stubAdmin();
+    renderAt('/admin/founders');
+    await screen.findByRole('heading', { name: /^founders$/i, level: 1 });
+    await user.click(screen.getByRole('button', { name: /create a prospect/i }));
+
+    const field = await screen.findByLabelText(/last time we spoke/i);
+    expect(field).toHaveAttribute('type', 'date');
+    expect(screen.getByText(/Proovd never follows up on its own/i)).toBeInTheDocument();
+
+    for (const absent of [/next contact/i, /follow[- ]?up/i, /remind/i, /cadence/i]) {
+      expect(screen.queryByLabelText(absent)).not.toBeInTheDocument();
+    }
   });
 });
 

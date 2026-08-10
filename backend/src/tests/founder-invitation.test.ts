@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, sql } from 'drizzle-orm';
 
 import { startHarness, type Harness } from './app-harness.js';
 import { createAdmin, type AdminSession } from './admin-session.js';
@@ -199,14 +199,11 @@ describe('§7 Admin creates a Founder prospect and the initial campaign containe
     expect(event!.internalReason).toContain('introduced by a mutual contact');
   });
 
-  it('refuses a prospect with no product or no source', async () => {
-    for (const missing of ['productName', 'invitationSource', 'email']) {
+  it('refuses a prospect with no name or no email', async () => {
+    for (const missing of ['legalName', 'email']) {
       const body: Record<string, string> = {
         legalName: 'Rowan Vale',
         email: 'rowan@example.com',
-        productName: 'Waitlist',
-        invitationSource: 'introduction',
-        internalOwner: 'Ada Admin',
       };
       delete body[missing];
       await request(h.app)
@@ -215,6 +212,148 @@ describe('§7 Admin creates a Founder prospect and the initial campaign containe
         .send(body)
         .expect(400);
     }
+  });
+
+  /**
+   * §7 describes two acts: writing somebody down after off-platform discovery,
+   * and creating the invitation. The rest of §7's list belongs to the second,
+   * so a prospect may exist without it — and Send is where that costs
+   * something, which the invitation suite below proves.
+   */
+  it('accepts a prospect with only a name and an email (§7)', async () => {
+    const email = `sparse-${randomUUID()}@example.com`;
+    const res = await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({ legalName: 'Rowan Vale', email })
+      .expect(201);
+
+    const [row] = await h.db
+      .select()
+      .from(founderProspects)
+      .where(eq(founderProspects.email, email));
+
+    expect(row!.productName).toBeNull();
+    expect(row!.invitationSource).toBeNull();
+    expect(row!.internalOwner).toBeNull();
+    // The audit row still says something true rather than "undefined".
+    const [event] = await h.db
+      .select()
+      .from(auditEvents)
+      .where(eq(auditEvents.action, 'invitation.prospect_created'))
+      .orderBy(desc(auditEvents.occurredAt))
+      .limit(1);
+    expect(event!.internalReason).toContain('not yet recorded');
+  });
+
+  it('records the last-contact date, and offers nowhere to schedule a follow-up (§30)', async () => {
+    const email = `contacted-${randomUUID()}@example.com`;
+    await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({ legalName: 'Rowan Vale', email, lastContactAt: '2026-07-02' })
+      .expect(201);
+
+    const [row] = await h.db
+      .select()
+      .from(founderProspects)
+      .where(eq(founderProspects.email, email));
+    expect(row!.lastContactAt?.toISOString().slice(0, 10)).toBe('2026-07-02');
+
+    // §30 forbids automated engagement sequences. The strongest form of that
+    // promise is having nowhere to record a cadence: the column records a
+    // conversation that happened and there is no companion that plans one.
+    const columns = await h.db.execute<{ column_name: string }>(
+      sql`select column_name from information_schema.columns where table_name = 'founder_prospects'`,
+    );
+    const names = columns.rows.map((r) => r.column_name);
+    for (const forbidden of [
+      'next_contact_at',
+      'follow_up_at',
+      'contact_cadence',
+      'recurrence',
+      'reminder_at',
+    ]) {
+      expect(names).not.toContain(forbidden);
+    }
+  });
+
+  /**
+   * §9: Problem and Solution are "human-prefilled by Proovd from discovery",
+   * and the intake form is the discovery record. What matters is that they go
+   * through `prefillVetting` with its provenance intact rather than being
+   * written as if the Founder had answered.
+   */
+  it('writes Problem and Solution as a §9 prefill, attributed to Proovd', async () => {
+    const email = `prefilled-${randomUUID()}@example.com`;
+    const created = await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({
+        legalName: 'Rowan Vale',
+        email,
+        productName: 'Waitlist',
+        problem: 'Clinics lose late-cancelled slots and the time just goes empty.',
+        solution: 'A freed slot texts the waitlist in order; first to answer takes it.',
+      })
+      .expect(201);
+
+    const detail = await request(h.app)
+      .get(`/api/admin/founders/${created.body.draftId}`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    const res = { body: detail.body.vetting };
+
+    expect(res.body.problem).toContain('late-cancelled slots');
+    expect(res.body.solution).toContain('texts the waitlist');
+    // Proovd's draft, not the Founder's answer — and the Founder has not
+    // touched it, so nothing is recorded as their edit yet.
+    expect(res.body.provenance.problem.supplier).toBe('proovd');
+    expect(res.body.provenance.solution.supplier).toBe('proovd');
+    expect(res.body.provenance.problem.firstEditedAt).toBeNull();
+    // §33.1.5: Competition is never prefilled, whatever the intake collected.
+    // An unanswered field has no supplier at all — and can never acquire
+    // 'proovd', which a 0007 CHECK enforces regardless of what any route does.
+    expect(res.body.competition).toBeNull();
+    expect(res.body.provenance.competition.supplier).toBeNull();
+    expect(res.body.provenance.competition.prefilledText ?? null).toBeNull();
+  });
+
+  it('has no way to prefill Competition from the intake (§33.1.5)', async () => {
+    const email = `nocomp-${randomUUID()}@example.com`;
+    const created = await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({
+        legalName: 'Rowan Vale',
+        email,
+        problem: 'p',
+        // Offered by a caller that skipped the surface entirely. The route has
+        // nowhere to put it, so it is ignored rather than stored.
+        competition: 'THIS MUST NOT LAND',
+      })
+      .expect(201);
+
+    const detail = await request(h.app)
+      .get(`/api/admin/founders/${created.body.draftId}`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+
+    expect(detail.body.vetting.competition).toBeNull();
+    expect(JSON.stringify(detail.body)).not.toContain('THIS MUST NOT LAND');
+  });
+
+  it('refuses a last-contact date it cannot read, and stores nothing', async () => {
+    const email = `baddate-${randomUUID()}@example.com`;
+    await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({ legalName: 'Rowan Vale', email, lastContactAt: 'last tuesday' })
+      .expect(400);
+
+    expect(
+      await h.db.select().from(founderProspects).where(eq(founderProspects.email, email)),
+    ).toHaveLength(0);
   });
 });
 
@@ -253,6 +392,88 @@ describe('§7 preview shows final variables and no unresolved placeholder', () =
     expect(preview.body.blocked).toBe(false);
     expect(preview.body.subject).toContain('Waitlist');
     expect(preview.body.html).toContain('Rowan');
+  });
+
+  /**
+   * The two §7 list items that never reach the Founder.
+   *
+   * The marker gate is stronger than a field check wherever a field renders
+   * into the message — an empty product name comes out as `[PRODUCT NAME]`. But
+   * the invitation source and the internal campaign owner appear nowhere in the
+   * email, and §7 additionally requires the send row to store the source, so a
+   * rendered-output gate alone would let both go out blank.
+   */
+  it('blocks Send while the invitation source or campaign owner is blank (§7)', async () => {
+    const email = `sparse-send-${randomUUID()}@example.com`;
+    const created = await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({ legalName: 'Rowan Vale', email })
+      .expect(201);
+
+    // Everything that renders into the message is filled in, so the marker
+    // gate has nothing left to say — and Send must still refuse.
+    await request(h.app)
+      .put(`/api/admin/founders/${created.body.draftId}/prospect`)
+      .set('cookie', admin.cookie)
+      .send({ productName: 'Waitlist', productUrl: 'https://waitlist.example' })
+      .expect(200);
+    await compose(created.body.draftId);
+
+    const preview = await request(h.app)
+      .get(`/api/admin/founders/${created.body.draftId}/preview`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+
+    expect(preview.body.unresolved).toEqual([]);
+    expect(preview.body.missingFields).toEqual(
+      expect.arrayContaining(['Invitation source', 'Internal campaign owner']),
+    );
+    expect(preview.body.blocked).toBe(true);
+
+    // Server-side, not merely a disabled button (§1.1).
+    const refused = await request(h.app)
+      .post(`/api/admin/founders/${created.body.draftId}/send`)
+      .set('cookie', admin.cookie)
+      .send({});
+    expect(refused.status).toBe(422);
+    expect(await h.db.select().from(campaignInvitationSends)).toHaveLength(0);
+
+    // Recording both opens the gate, and the send row stores the source §7
+    // requires it to store.
+    await request(h.app)
+      .put(`/api/admin/founders/${created.body.draftId}/prospect`)
+      .set('cookie', admin.cookie)
+      .send({ invitationSource: 'a mutual contact', internalOwner: 'Ada Admin' })
+      .expect(200);
+
+    const opened = await request(h.app)
+      .get(`/api/admin/founders/${created.body.draftId}/preview`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect(opened.body.missingFields).toEqual([]);
+    expect(opened.body.blocked).toBe(false);
+  });
+
+  /** §9's autosave rule: a key not in the request writes nothing. */
+  it('saving one field does not blank another', async () => {
+    const created = await createProspect();
+
+    await request(h.app)
+      .put(`/api/admin/founders/${created.draftId}/prospect`)
+      .set('cookie', admin.cookie)
+      .send({ adminNotes: 'spoke again' })
+      .expect(200);
+
+    const [row] = await h.db
+      .select()
+      .from(founderProspects)
+      .where(eq(founderProspects.email, created.email));
+
+    expect(row!.adminNotes).toBe('spoke again');
+    expect(row!.invitationSource).toBe('introduced by a mutual contact');
+    expect(row!.internalOwner).toBe('Ada Admin');
+    expect(row!.productName).toBe('Waitlist');
   });
 
   it('refuses the send itself while a placeholder remains — the gate is server-side', async () => {

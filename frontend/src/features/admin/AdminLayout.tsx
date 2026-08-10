@@ -36,25 +36,12 @@ import { AdminSignIn } from './AdminSignIn.js';
 const NAV = [
   { to: '/admin/founders', label: 'Founders' },
   { to: '/admin/creators', label: 'Creators' },
-  // Phase 16a (§26.5, §26.6, §31.7).
-  { to: '/admin/ledger', label: 'Ledger' },
-  { to: '/admin/money', label: 'Money controls' },
-  { to: '/admin/risk', label: 'Risk controls' },
   // Phase 16b (§26.7, §26.8, §27.8).
   { to: '/admin/support', label: 'Support queue' },
   { to: '/admin/campaign-operations', label: 'Campaign operations' },
-  // Phase 18b (§21, §33.7.12).
-  { to: '/admin/close', label: 'Close operations' },
-  // Phase 20a (§24.8, §24.9).
-  { to: '/admin/refunds', label: 'Refunds' },
-  // Phase 21a (§22.4, §22.7). The Day 14 Progress Check and the ghost ban.
-  { to: '/admin/fulfillment', label: 'Fulfillment' },
   // Phase 22c (§27.7, §27.2). Delivery history and the message preview.
   { to: '/admin/notifications', label: 'Notifications' },
-  // Phase 23b (§31.9, §33.12.6). The first-cohort scoreboard.
-  { to: '/admin/measurement', label: 'Measurement' },
   { to: '/admin/settings', label: 'Global configuration' },
-  { to: '/admin/prerequisites', label: 'Production prerequisites' },
 ];
 
 type SessionState =

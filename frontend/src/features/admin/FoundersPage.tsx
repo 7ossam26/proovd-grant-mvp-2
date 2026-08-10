@@ -9,13 +9,60 @@
  * retention window closes — the rest of §26.1 lives on the detail surface one
  * gesture away, rather than in forty columns nobody reads.
  *
+ * ── Two acts, two surfaces ──────────────────────────────────────────────────
+ * §7 describes creating a prospect after off-platform discovery, and then
+ * separately lists what "the invitation-creation surface contains". This form
+ * is the first act: what a discovery conversation actually produces — who they
+ * are, their company, and the problem and solution they described. The rest of
+ * §7's list — the invitation source, the internal campaign owner, the launch
+ * frame, notes, evidence — lives on the draft surface beside the message it
+ * feeds, and Send stays closed until it is there.
+ *
+ * ── Problem and Solution are §9 prefills, not fields of this record ──────────
+ * §9 has Proovd draft those two from discovery for the Founder to review and
+ * edit, so they are written through `prefillVetting` with its provenance
+ * intact: they land in the Founder's own boxes only while untouched, and a
+ * later Admin edit never overwrites words the Founder has since typed.
+ *
+ * ── The two boxes this form will keep being asked for, and must not grow ────
+ * **Competition.** §9 Step 4 is three sentences: "Always blank. Written by the
+ * Founder. Must never be prefilled or represented as AI-generated." §33.1.5
+ * tests it, `campaign_vetting` has no `competition_prefilled_*` column to write
+ * into, and a CHECK pins `competition_supplier` to `founder` so even a
+ * hand-written UPDATE cannot record it as ours. It is the one answer that
+ * proves the Founder did their own thinking.
+ *
+ * **The campaign Story.** §12 makes it one of five optional items, and each
+ * objective completion takes US$2 off the listing fee — so an Admin-written
+ * story here would be Proovd's content earning the Founder a discount. §12 also
+ * says a "transcript, generated summary, or unapproved draft does not count":
+ * the Founder's approval IS the completing act, and there is nobody else who
+ * can perform it.
+ *
+ * Both are real things to learn on a discovery call, so both belong in the
+ * notes — internal, never rendered to the Founder, never read by the §9 prefill
+ * or the §12 evaluation. That is the difference between recording what we heard
+ * and answering on their behalf.
+ *
+ * That gate is real rather than a convention. An empty product name renders as
+ * `[PRODUCT NAME]` and the marker check refuses the send; the invitation source
+ * and campaign owner never reach the Founder, so `missingInvitationFields`
+ * checks those two by name. Demanding all of it here did not make the record
+ * more complete — it made an Admin type something into `invitationSource` to
+ * get past a form, which is a worse record than an honestly incomplete one.
+ *
  * ── What Admin may record, and what it may not ──────────────────────────────
  * §7 lets Admin record the product, launch frame, US/18+ fit, delivery
  * feasibility, early compensation expectations, and the Creator-sourcing
  * hypothesis. It forbids promising acceptance, results, reward pricing, or a
- * named Creator's participation — so there is no field for any of those, and
- * the labels below say "hypothesis" and "expectations" rather than anything
- * that reads as a commitment.
+ * named Creator's participation — so there is no field for any of those on
+ * either surface, and the labels say "hypothesis" and "expectations" rather
+ * than anything that reads as a commitment.
+ *
+ * ── The last-contact date is not a follow-up ────────────────────────────────
+ * It records a conversation that happened. There is no next-contact field, no
+ * recurrence, and no job that reads it — §30 forbids automated engagement
+ * sequences, and having nowhere to put a cadence is what keeps it that way.
  */
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
@@ -201,7 +248,7 @@ function NewProspectForm({ onCreated }: { onCreated: () => void }) {
   const set = (key: string) => (event: { target: { value: string } }) =>
     setValues((current) => ({ ...current, [key]: event.target.value }));
 
-  const required = ['legalName', 'email', 'productName', 'invitationSource', 'internalOwner'];
+  const required = ['legalName', 'email'];
   const complete = required.every((key) => (values[key] ?? '').trim().length > 0);
 
   async function submit(event: FormEvent) {
@@ -211,24 +258,16 @@ function NewProspectForm({ onCreated }: { onCreated: () => void }) {
     try {
       await createProspect({
         legalName: values['legalName']!.trim(),
-        preferredName: values['preferredName']?.trim() || undefined,
         email: values['email']!.trim(),
-        phone: values['phone']?.trim() || undefined,
-        productName: values['productName']!.trim(),
-        productUrl: values['productUrl']?.trim() || undefined,
-        launchFrame: values['launchFrame']?.trim() || undefined,
-        usAgeFit: values['usAgeFit']?.trim() || undefined,
-        deliveryFeasibility: values['deliveryFeasibility']?.trim() || undefined,
-        compensationExpectations: values['compensationExpectations']?.trim() || undefined,
-        affiliateSourcingHypothesis:
-          values['affiliateSourcingHypothesis']?.trim() || undefined,
+        // A date input gives `YYYY-MM-DD` with no zone. Sent as-is; the server
+        // reads it as an instant. It records a day somebody spoke to someone,
+        // which is what §7's discovery record is for — not a deadline, so
+        // there is nothing here for §29.6's calendar rules to govern.
+        lastContactAt: values['lastContactAt']?.trim() || undefined,
+        productName: values['productName']?.trim() || undefined,
+        problem: values['problem']?.trim() || undefined,
+        solution: values['solution']?.trim() || undefined,
         adminNotes: values['adminNotes']?.trim() || undefined,
-        discoveryEvidence: (values['discoveryEvidence'] ?? '')
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean),
-        invitationSource: values['invitationSource']!.trim(),
-        internalOwner: values['internalOwner']!.trim(),
       });
       onCreated();
     } catch (caught) {
@@ -247,63 +286,53 @@ function NewProspectForm({ onCreated }: { onCreated: () => void }) {
       <form className="admin-form admin-form--wide" onSubmit={submit} noValidate>
         <h2>New Founder prospect</h2>
         <p className="admin-form__note">
-          Creating a prospect also creates the campaign container. Nothing is sent — the
-          invitation is composed, previewed, and sent separately.
+          What you learned from the conversation. Creating a prospect also creates the
+          campaign container. Nothing is sent — the invitation source, the campaign owner,
+          and the message itself are filled in on the draft, where you compose and preview
+          before sending.
         </p>
 
-        <Field label="Legal name">
+        <Field label="Founder name">
           <Input value={values['legalName'] ?? ''} onChange={set('legalName')} required />
         </Field>
-        <Field label="Preferred name" hint="What the invitation will call them.">
-          <Input value={values['preferredName'] ?? ''} onChange={set('preferredName')} />
-        </Field>
-        <Field label="Email address">
+        <Field label="Founder email">
           <Input type="email" value={values['email'] ?? ''} onChange={set('email')} required />
         </Field>
-        <Field
-          label="Phone, if known"
-          hint="Stored so support can call. Proovd never verifies a phone number and never sends codes to one."
-        >
-          <Input type="tel" value={values['phone'] ?? ''} onChange={set('phone')} />
-        </Field>
-        <Field label="Product or startup name">
-          <Input value={values['productName'] ?? ''} onChange={set('productName')} required />
-        </Field>
-        <Field label="Product URL">
-          <Input type="url" value={values['productUrl'] ?? ''} onChange={set('productUrl')} />
-        </Field>
-        <Field label="Launch frame" hint="Roughly when they are hoping to launch.">
-          <Input value={values['launchFrame'] ?? ''} onChange={set('launchFrame')} />
-        </Field>
-        <Field label="US and 18+ fit" hint="What you established, and how.">
-          <Input value={values['usAgeFit'] ?? ''} onChange={set('usAgeFit')} />
-        </Field>
-        <Field label="Delivery feasibility">
-          <Textarea rows={2} value={values['deliveryFeasibility'] ?? ''} onChange={set('deliveryFeasibility')} />
+        <Field label="Company or product name">
+          <Input value={values['productName'] ?? ''} onChange={set('productName')} />
         </Field>
         <Field
-          label="Early compensation expectations"
-          hint="What they said they expect. Not an agreement, and not a price."
+          label="Last time we spoke"
+          hint="The day of the last conversation, if there was one. A record, not a reminder — Proovd never follows up on its own."
         >
-          <Textarea rows={2} value={values['compensationExpectations'] ?? ''} onChange={set('compensationExpectations')} />
+          <Input type="date" value={values['lastContactAt'] ?? ''} onChange={set('lastContactAt')} />
         </Field>
+
+        <p className="admin-form__note">
+          §9 has Proovd draft the Problem and the Solution from what we learned; the Founder
+          reviews and edits them in their own words. Once they have edited a field, a later
+          edit here only updates our original — their words are never overwritten.
+        </p>
+        <Field label="Problem">
+          <Textarea rows={4} value={values['problem'] ?? ''} onChange={set('problem')} />
+        </Field>
+        <Field label="Solution">
+          <Textarea rows={4} value={values['solution'] ?? ''} onChange={set('solution')} />
+        </Field>
+        {/* No Competition box, and no campaign Story box. §9 Step 4, §12. */}
+        <p className="field-hint">
+          There is no box for Competition, and none for the campaign Story. §9 keeps
+          Competition always blank and written by the Founder — it is the one answer that
+          proves they did their own thinking — and §12 makes the Story theirs to write and
+          approve, because approving it is what earns the discount. What you learned about
+          either belongs in the notes below, which they never see.
+        </p>
+
         <Field
-          label="Creator-sourcing hypothesis"
-          hint="Where you think Creators for this campaign would come from. A hypothesis, never a commitment that a named Creator will take it on."
+          label="Notes from the conversation"
+          hint="Anything you learned — how they see the competition, why they are building it, anything worth knowing later. Internal only: it never reaches the Founder, never becomes one of their answers, and never completes a campaign item."
         >
-          <Textarea rows={2} value={values['affiliateSourcingHypothesis'] ?? ''} onChange={set('affiliateSourcingHypothesis')} />
-        </Field>
-        <Field label="Invitation source">
-          <Input value={values['invitationSource'] ?? ''} onChange={set('invitationSource')} required />
-        </Field>
-        <Field label="Internal campaign owner">
-          <Input value={values['internalOwner'] ?? ''} onChange={set('internalOwner')} required />
-        </Field>
-        <Field label="Admin notes">
-          <Textarea rows={3} value={values['adminNotes'] ?? ''} onChange={set('adminNotes')} />
-        </Field>
-        <Field label="Discovery evidence" hint="One link per line.">
-          <Textarea rows={2} value={values['discoveryEvidence'] ?? ''} onChange={set('discoveryEvidence')} />
+          <Textarea rows={4} value={values['adminNotes'] ?? ''} onChange={set('adminNotes')} />
         </Field>
 
         {error ? (

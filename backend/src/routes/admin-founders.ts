@@ -36,6 +36,7 @@ import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import { campaigns } from '../db/schema/domain.js';
 import {
   createProspect,
+  updateProspect,
   composeInvitation,
   previewInvitation,
   sendInvitation,
@@ -65,6 +66,23 @@ export interface AdminFoundersDeps {
   tokens: TokenService;
   notifier: Notifier;
   context: InvitationContext;
+}
+
+/**
+ * Reads an optional instant from a request body.
+ *
+ * Three answers, not two: `undefined` means "not in this request" and writes
+ * nothing (§9's autosave rule), `null` means "clear it", and `'invalid'` is a
+ * value that could not be read — which the caller reports rather than silently
+ * storing as NULL, because a date that vanished on save is worse than one that
+ * was refused.
+ */
+function parseInstant(value: unknown): Date | null | undefined | 'invalid' {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string') return 'invalid';
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? 'invalid' : at;
 }
 
 function actorOf(req: express.Request): string {
@@ -126,7 +144,12 @@ export function createAdminFoundersRouter({
   router.post(ADMIN_FOUNDERS_PATH, admin, json, async (req, res) => {
     const body = req.body as Record<string, unknown>;
 
-    const required = ['legalName', 'email', 'productName', 'invitationSource', 'internalOwner'];
+    // §7 splits into two acts and this route is the first: writing down a
+    // person somebody met off-platform. Only the two facts that identify them
+    // are required. The rest of §7's invitation-creation list is filled in on
+    // the draft surface and enforced at Send, which is where a blank one
+    // actually costs something.
+    const required = ['legalName', 'email'];
     for (const field of required) {
       if (typeof body[field] !== 'string' || !(body[field] as string).trim()) {
         badRequest(
@@ -138,12 +161,23 @@ export function createAdminFoundersRouter({
       }
     }
 
+    const lastContactAt = parseInstant(body['lastContactAt']);
+    if (lastContactAt === 'invalid') {
+      badRequest(
+        res,
+        'That last-contact date could not be read.',
+        'Give a date, or leave it empty if you do not remember.',
+      );
+      return;
+    }
+
     const created = await createProspect(db, {
       legalName: body['legalName'] as string,
       preferredName: (body['preferredName'] as string) ?? null,
       email: body['email'] as string,
       phone: (body['phone'] as string) ?? null,
-      productName: body['productName'] as string,
+      lastContactAt,
+      productName: (body['productName'] as string) ?? null,
       productUrl: (body['productUrl'] as string) ?? null,
       launchFrame: (body['launchFrame'] as string) ?? null,
       usAgeFit: (body['usAgeFit'] as string) ?? null,
@@ -156,10 +190,29 @@ export function createAdminFoundersRouter({
             (v): v is string => typeof v === 'string',
           )
         : null,
-      invitationSource: body['invitationSource'] as string,
-      internalOwner: body['internalOwner'] as string,
+      invitationSource: (body['invitationSource'] as string) ?? null,
+      internalOwner: (body['internalOwner'] as string) ?? null,
       actor: actorOf(req),
     });
+
+    // §9: Problem and Solution are "human-prefilled by Proovd from discovery",
+    // and this form IS the discovery record — so a call that produced them can
+    // write them here rather than making an Admin retype them on the draft.
+    //
+    // Written after the prospect transaction commits, on 08c's precedent: the
+    // prefill is idempotent and its own surface already exists, so a crash
+    // between the two costs a retry rather than correctness. Holding a row lock
+    // open across a second write would be a more expensive way to be no safer.
+    //
+    // There is no third key. Competition is never prefilled (§9, §33.1.5), and
+    // `prefillVetting` has nowhere to put one.
+    const prefill = {
+      ...(typeof body['problem'] === 'string' ? { problem: body['problem'] } : {}),
+      ...(typeof body['solution'] === 'string' ? { solution: body['solution'] } : {}),
+    };
+    if (Object.keys(prefill).length > 0) {
+      await prefillVetting(db, created.draftId, { ...prefill, actor: actorOf(req) });
+    }
 
     res.status(201).json(created);
   });
@@ -204,6 +257,7 @@ export function createAdminFoundersRouter({
         preferredName: record.prospect.preferredName,
         email: record.prospect.email,
         phone: record.prospect.phone,
+        lastContactAt: record.prospect.lastContactAt?.toISOString() ?? null,
         productName: record.prospect.productName,
         productUrl: record.prospect.productUrl,
         launchFrame: record.prospect.launchFrame,
@@ -432,6 +486,66 @@ export function createAdminFoundersRouter({
     res.json({ ok: true });
   });
 
+  /* ── The rest of §7's invitation-creation surface ──────────────────────── */
+
+  // Not gated, for the same reason composing is not: nothing leaves the
+  // building. A key absent from the body writes nothing (§9's autosave rule),
+  // so saving the product name cannot blank an invitation source recorded on a
+  // different visit.
+  router.put(`${ADMIN_FOUNDERS_PATH}/:draftId/prospect`, admin, json, async (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    const str = (key: string): string | null | undefined =>
+      key in body ? (typeof body[key] === 'string' ? (body[key] as string) : null) : undefined;
+    const pick = (key: string) => (str(key) !== undefined ? { [key]: str(key) } : {});
+
+    const lastContactAt = parseInstant(body['lastContactAt']);
+    if (lastContactAt === 'invalid') {
+      badRequest(
+        res,
+        'That last-contact date could not be read.',
+        'Give a date, or clear the field. Nothing has changed.',
+      );
+      return;
+    }
+
+    const result = await updateProspect(db, req.params['draftId'] as string, {
+      ...pick('preferredName'),
+      ...pick('phone'),
+      ...pick('productName'),
+      ...pick('productUrl'),
+      ...pick('launchFrame'),
+      ...pick('usAgeFit'),
+      ...pick('deliveryFeasibility'),
+      ...pick('compensationExpectations'),
+      ...pick('affiliateSourcingHypothesis'),
+      ...pick('adminNotes'),
+      ...pick('invitationSource'),
+      ...pick('internalOwner'),
+      ...(lastContactAt !== undefined ? { lastContactAt } : {}),
+      ...('discoveryEvidence' in body
+        ? {
+            discoveryEvidence: Array.isArray(body['discoveryEvidence'])
+              ? (body['discoveryEvidence'] as unknown[]).filter(
+                  (v): v is string => typeof v === 'string',
+                )
+              : null,
+          }
+        : {}),
+      actor: actorOf(req),
+    });
+
+    if (!result.ok) {
+      res.status(422).json({
+        error: 'prospect_update_rejected',
+        title: 'That could not be saved',
+        whatHappened: result.message,
+        next: 'Nothing has changed.',
+      });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
   /* ── Preview — §7's gate ───────────────────────────────────────────────── */
 
   router.get(`${ADMIN_FOUNDERS_PATH}/:draftId/preview`, admin, async (req, res) => {
@@ -447,6 +561,10 @@ export function createAdminFoundersRouter({
       text: preview.text,
       recipientEmail: preview.recipientEmail,
       unresolved: preview.unresolved,
+      // §7 list items that never appear in the message, so the marker gate
+      // cannot report them. Named so the surface says which one is blank
+      // rather than refusing without a reason.
+      missingFields: preview.missingFields,
       // The server's answer to "may this be sent". The surface disables Send on
       // it; the send route re-decides independently, because §1.1 requires
       // server-side authorization and a disabled button is not one.

@@ -99,6 +99,16 @@ export const founderProspects = pgTable(
     affiliateSourcingHypothesis: text('affiliate_sourcing_hypothesis'),
     adminNotes: text('admin_notes'),
     discoveryEvidence: jsonb('discovery_evidence'),
+    /**
+     * When Proovd last spoke to this person off-platform. Discovery provenance
+     * in the same sense as the notes and evidence above, and §26.8's one-time
+     * relationship touches in the same posture: a recorded human contact.
+     *
+     * Deliberately a bare instant. There is no recurrence, no next-contact, and
+     * no job that reads it — §30 forbids automated engagement sequences, and
+     * having nowhere to record a cadence is what keeps this from becoming one.
+     */
+    lastContactAt: timestamp('last_contact_at', { withTimezone: true }),
 
     /* ── Provenance (§7, §26.1) ────────────────────────────────────────────*/
     invitationSource: text('invitation_source'),

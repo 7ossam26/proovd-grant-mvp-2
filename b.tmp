@@ -1,0 +1,515 @@
+
+ RUN  v3.2.7 D:/proovd-grant-mvp-2-main/backend
+
+ ✓  backend  src/tests/fulfillment.test.ts (22 tests) 14821ms
+   ✓ §33.10.1 — the delivery notification carries access, the original promise, and support > sends every §22.5 item, with the ORIGINAL commitment even after a revision  454ms
+   ✓ §33.10.2 — a revised date preserves the original and takes the correct path > Product before the remaining payment: Admin approval BEFORE Backers are notified  551ms
+   ✓ §33.10.2 — a revised date preserves the original and takes the correct path > after the remaining payment: notice, no Admin preapproval — and an Idea campaign is always the notice path  547ms
+   ✓ §33.10.3 — Day 14 pass/fail evidence and consequences match the campaign type > gives Product an extra optional evidence item and Idea an enforcement-only review  374ms
+   ✓ §33.10.3 — Day 14 pass/fail evidence and consequences match the campaign type > a Product failure blocks the unreleased remaining payment; an Idea failure has none to block  4944ms
+   ✓ §33.10.3 — Day 14 pass/fail evidence and consequences match the campaign type > refuses an inconsistent outcome, an unknown reason, and a raw provider code — and decides once  1811ms
+   ✓ §33.10.3 — Day 14 pass/fail evidence and consequences match the campaign type > opens the review only where something was captured, and the queue leads with overdue  394ms
+   ✓ §33.10.4 — the ghost ban fires only under the four defined conditions > a failed Day 14 bans once, permanently, with all five §22.7 facts and a full audit row  363ms
+ ✓  backend  src/tests/live-operations.test.ts (53 tests) 9194ms
+   ✓ §33.6.6 — the Glance delta is exact and a failed render does not advance last-seen > serves Glance and the acknowledgement over HTTP, scoped to the session  433ms
+ ✓  backend  src/tests/refunds.test.ts (21 tests) 6855ms
+   ✓ §33.9.1 — the Product consent preserves the immutable Founder policy version > a later website edit cannot alter an existing transaction  310ms
+   ✓ §33.9.3 — a Founder-caused refund does not claw back finalized valid Affiliate earnings > finalized earnings are byte-identical after the refund, and the clawback is unrecordable  449ms
+   ✓ §33.9.4 — an Affiliate-caused refund cancels or recovers only invalid earnings > pre-finalization: only the refunded transaction cancels; the other finalizes normally  550ms
+   ✓ §33.9.4 — an Affiliate-caused refund cancels or recovers only invalid earnings > post-Transfer: the recovery record carries ONLY the invalid amount, never the whole Transfer  424ms
+   ✓ §33.9.5 — a Proovd error does not debit an unrelated Affiliate and returns the fee where appropriate > the unrelated Creator is byte-identical and the fee return is recorded  397ms
+   ✓ §33.9.6 — an unrelated dispute does not automatically claw back the Affiliate > finalized earnings remain, and the clawback treatments are unrecordable under this cause  374ms
+(node:1660) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓  backend  src/tests/campaign-workspace.test.ts (54 tests) 27132ms
+   ✓ §33.3.1 — placeholders and empty files, decided from the bytes > rejects an empty upload end to end  3269ms
+   ✓ §33.3.1 — placeholders and empty files, decided from the bytes > rejects a 1×1 placeholder after reading it back out of the bucket  4286ms
+   ✓ §33.3.1 — placeholders and empty files, decided from the bytes > rejects an image narrower than the narrowest viewport the product supports  2348ms
+   ✓ §33.3.1 — placeholders and empty files, decided from the bytes > rejects a duplicate upload (§12 "duplicate uploads")  353ms
+   ✓ §33.3.1 — placeholders and empty files, decided from the bytes > refuses a content type a campaign page cannot carry  470ms
+   ✓ §33.3.1 — placeholders and empty files, decided from the bytes > completes Visuals once a real file is uploaded and approved  392ms
+   ✓ §33.3.2 — the listing fee, on a real campaign > takes $2 off per completed item and floors at $25, across all 32 combinations  364ms
+   ✓ §33.3.2 — the listing fee, on a real campaign > carries §24.6’s separate-stream explanation with every preview  310ms
+   ✓ §33.3.4 — high-effort across all eight combinations, persisted > is true only when visuals, branding, and an interview are all absent  419ms
+   ✓ §33.3.4 — high-effort across all eight combinations, persisted > counts a selected-but-unconfirmed interview for high effort, not for the discount  319ms
+   ✓ §6 — nothing is bookable until an operator states the interview settings > names the missing settings rather than failing  307ms
+   ✓ §33.3.3 — canceling before payment recalculates; after payment does not > leaves `confirmed` reachable without a webhook  443ms
+   ✓ §33.3.3 — canceling before payment recalculates; after payment does not > refuses to confirm a booking missing any fact §12 requires  979ms
+   ✓ §12 Admin — invalidation, correction, and the recorded override > invalidates an item with a reason and hands the Founder a correction  553ms
+   ✓ §12 Admin — invalidation, correction, and the recorded override > records an override as an override, with all six §12 facts  362ms
+   ✓ §12 Admin — invalidation, correction, and the recorded override > writes the item history by trigger, and refuses to rewrite it  326ms
+   ✓ §12 — approval is of a version, and authorization is per campaign > revokes the approval when the approved text is edited  309ms
+   ✓ §12 — approval is of a version, and authorization is per campaign > writes only the keys a save was given  316ms
+   ✓ §12 — approval is of a version, and authorization is per campaign > answers 404 for another Founder’s campaign, exactly as for one that does not exist  1825ms
+   ✓ §12 — approval is of a version, and authorization is per campaign > refuses the workspace to a signed-out caller and to a Creator  1588ms
+   ✓ §12 — approval is of a version, and authorization is per campaign > refuses Admin item routes to a Founder  387ms
+ ✓  backend  src/tests/completion.test.ts (46 tests) 15989ms
+   ✓ §33.10.5 — successfully_completed requires all five criteria > completes a Creator who met every one, with the findings stored as evidence  912ms
+   ✓ §33.10.5 — successfully_completed requires all five criteria > refuses each missing criterion by name, one at a time  2106ms
+   ✓ §33.10.5 — successfully_completed requires all five criteria > §22.9 — a correction supersedes and keeps the history  346ms
+   ✓ §33.10.7 — only an eligible completed Creator can be asked > refuses a Creator with no completion decision, and one who was disqualified  458ms
+   ✓ §33.10.7 — only an eligible completed Creator can be asked > cannot cite a superseded completion status  319ms
+   ✓ §33.10.8 — accept/decline creates nothing and bypasses nothing > changes no campaign, no readiness record, and no cooldown  324ms
+   ✓ §33.10.10 — one click, and a negative result owns a follow-up > a negative answer creates exactly ONE owned Admin case  356ms
+ ✓  backend  src/tests/live-editing.test.ts (43 tests) 7829ms
+   ✓ §33.6.12 — a non-material live edit versions; a material one cannot publish directly > serves the one edit route over HTTP, scoped to the session  395ms
+   ✓ §33.6.13 — a mid-campaign Creator gets remaining-time terms and no retroactive credit > the active-partnership cap blocks a fourth concurrent slot (§2.2)  429ms
+   ✓ §33.6.13 — a mid-campaign Creator gets remaining-time terms and no retroactive credit > an ended campaign rejects addition  411ms
+ ✓  backend  src/tests/support-operations.test.ts (36 tests) 6352ms
+   ✓ §33.9.10 a support case has stable reference, owner, due time, context, and the 48-hour rule > fixes the reference and the deadline at submission — the database refuses to move them  429ms
+ ✓  backend  src/tests/founder-invitation.test.ts (51 tests) 5005ms
+   ✓ §33.1.2 alteration, cross-Founder access, replay, expiry, revoke, resend, and simultaneous claim fail safely > answers every failure mode with one byte-identical rejection  453ms
+ ✓  backend  src/tests/vetting.test.ts (50 tests) 6495ms
+   ✓ §33.1.9 the account claim > creates the account, invalidates the token, and moves the campaign  498ms
+   ✓ §33.1.9 the account claim > emits founder_signup_complete exactly once, and a retry adds nothing  331ms
+   ✓ §33.1.9 the account claim > a claimed draft is exempt from the §25.8 sweep  332ms
+(node:26024) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓  backend  src/tests/affiliate-decisions.test.ts (30 tests) 20216ms
+   ✓ §14.2 + §31.5 — a draft IP agreement blocks acceptance, in the open > refuses with policies_unpublished and changes nothing  905ms
+   ✓ §33.2.6 — the three decisions > the opportunity names all three outcomes and hides none  531ms
+   ✓ §33.2.6 — the three decisions > accept locks standard terms, mints an INACTIVE link, and confirms durably  599ms
+   ✓ §33.2.6 — the three decisions > a missing confirmation refuses by name — no bundling (§28.4)  538ms
+   ✓ §33.2.6 — the three decisions > decline records time and optional reason, and carries no penalty  575ms
+   ✓ §33.2.6 — the three decisions > propose is reachable and notifies both parties  519ms
+   ✓ §33.2.7 — six compensation-matrix cells > the four campaign configurations serve the correct cell facts  2080ms
+   ✓ §33.2.7 — six compensation-matrix cells > an accepted fixed payment produces the 20% base (Product, standard)  584ms
+   ✓ §33.2.7 — six compensation-matrix cells > an accepted fixed payment plus a bid produces 20 + increase (Product, high effort)  550ms
+   ✓ §33.2.8 — Idea rejects a fixed request; standard rejects a bid above base > an Idea Campaign refuses a fixed-payment request, at the route and in the database  513ms
+   ✓ §33.2.8 — Idea rejects a fixed request; standard rejects a bid above base > a standard campaign refuses a bid above base  593ms
+   ✓ §33.2.9 / §33.2.10 — only exact bilateral acceptance locks, once > a Founder revision is a new immutable version awaiting the Creator — not acceptance  525ms
+   ✓ §33.2.9 / §33.2.10 — only exact bilateral acceptance locks, once > a stale acceptance of a superseded version matches nothing  553ms
+   ✓ §33.2.9 / §33.2.10 — only exact bilateral acceptance locks, once > concurrent accept-and-counter resolves to exactly one outcome, never two locks  526ms
+   ✓ §33.2.9 / §33.2.10 — only exact bilateral acceptance locks, once > a second acceptance changes nothing — one lock, one agreement, ever  527ms
+   ✓ §33.2.9 / §33.2.10 — only exact bilateral acceptance locks, once > the Creator accepting a Founder revision locks that exact version, with the §14.2 requirements  666ms
+   ✓ §33.2.9 / §33.2.10 — only exact bilateral acceptance locks, once > Admin can reject a version but has no path to lock one  658ms
+   ✓ §33.2.11 — a pending proposal expires and does not prevent the refund > the sweep expires the proposals, fails the roster, and refunds the full total once  382ms
+   ✓ §33.2.12 — base + bid + bonus never exceeds 50% > a bid over the ceiling is refused at submission  567ms
+   ✓ §33.2.12 — base + bid + bonus never exceeds 50% > a bonus that would breach the ceiling over locked terms is refused; one inside it stores the §14.3 facts  588ms
+   ✓ §33.2.13 — Creator-specific bonuses ignore organic, house, and other-Creator results > only the Creator’s own captured, validly attributed, pre-tax subtotal triggers the stored bonus  937ms
+   ✓ §14.5 — the roster view > serves the cards, the exact deadline, the refund outcome, and the pending-proposal note — and leaks nothing  756ms
+   ✓ §14.5 — the roster view > another Founder cannot read the roster  1000ms
+   ✓ §14.5 — the roster view > another Creator cannot reach someone else’s opportunity or decisions  753ms
+ ❯  backend  src/tests/close-recovery.test.ts (12 tests | 1 failed) 4721ms
+   ✓ drift — the 18b registers and sentences match the shared originals > restates the nine §21 reconciliation items with the same gating 2ms
+   ✓ drift — the 18b registers and sentences match the shared originals > restates the five narrative fields and the retry-window drop sentence 0ms
+   ✓ drift — the 18b registers and sentences match the shared originals > restates the Appendix B.7 resolver 1ms
+   ✓ §33.7.9 — the B.5 update-card retry > captures under the stable attempt-2 key, preserves every context field, and duplicates nothing  446ms
+   ✓ §33.7.9 — the B.5 update-card retry > requires_action routes to a customer action, and the webhook completes it as a retry success 226ms
+   ✓ §33.7.9 — the B.5 update-card retry > refuses after the stored deadline — the anchor gates, not the sweep tick 172ms
+   ✓ §33.7.10 — the retry window ends: recoveries captured, the rest zero everywhere > drops remaining failures at US$0 with no revenue, no commission, no Founder share  458ms
+   ✓ §33.7.10 — the retry window ends: recoveries captured, the rest zero everywhere > a met Idea threshold stays successful when the last failure drops (§33.7.5 through the window) 246ms
+   ✓ §33.7.11 — Results ready is its own gated event, and the narrative is Admin-reviewed > prepares results only after reconciliation, sends once, and carries the honest narrative 265ms
+   ✓ §33.7.11 — Results ready is its own gated event, and the narrative is Admin-reviewed > refuses to prepare or reconcile while the retry window is open (§21) 160ms
+   × §33.7.12 — visible recovery: locked reservations, resume, no duplicates > shows the interrupted batch in the Admin queue and resumes it without double charges or receipts 196ms
+     → expected 404 to be 200 // Object.is equality
+   ✓ §33.7.12 — visible recovery: locked reservations, resume, no duplicates > endRetryWindow leaves an unresolved in-flight attempt untouched and visible 205ms
+ ✓  backend  src/tests/close-batch.test.ts (20 tests) 5091ms
+   ✓ §33.7.3 — cancellation shows US$0 on screen and in email, duplicated harmlessly > the cancel response and the B.4 email both state US$0, and a duplicate changes nothing  348ms
+   ✓ §33.7.5 — the threshold decision is fixed at close and failures never reverse it > a met threshold stays met when cards later fail, and the decision is immutable  335ms
+   ✓ §33.7.6 — Product charges every active transaction regardless of internal target > captures each active transaction for its exact authorized total  325ms
+   ✓ §33.7.7 — no double charge, earnings, or email under retry, redelivery, or crash > a crash mid-batch resumes cleanly under the same attempt keys  353ms
+   ✓ §21 — an unusable tax calculation drops the reservation, never substitutes a total > an expired stored calculation creates no PaymentIntent and closes at US$0  356ms
+(node:13604) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓  backend  src/tests/listing-checkout.test.ts (24 tests) 7307ms
+   ✓ failed or abandoned Checkout > expiry preserves everything, starts nothing, and a retry pays once  391ms
+   ✓ §33.3.8 — the single full refund > a provider failure leaves a visible claim, and the retry refunds once  365ms
+   ✓ §33.3.11 — Founder cancellation > within 48 hours and before live: cancels and refunds the full total  486ms
+   ✓ §33.3.11 — Founder cancellation > after 48 hours: requires Admin approval and refunds nothing automatically  391ms
+   ✓ the deadline sweep > notices each deadline once and routes the 72-hour one to Admin  367ms
+   ✓ authorization on the new routes > another Founder's campaign answers the identical 404  522ms
+ ✓  backend  src/tests/p0-pass.test.ts (29 tests) 8106ms
+   ✓ scope 4 — the money path under all three adversarial cases > crash_midway: a provider error leaves the claim, and the resume uses the same key  317ms
+ ✓  backend  src/tests/launch.test.ts (19 tests) 7317ms
+   ✓ §33.4.5 — launch order: page first, links second > the scheduled sweep launches a campaign whose campaign_live_at has arrived, and only then  484ms
+   ✓ §33.4.5 — launch order: page first, links second > end-to-end through HTTP: launch, then the Creator submits, then Admin verifies  455ms
+   ✓ §33.4.9 — required launch Creator failure and the three-business-day window > a missed deadline returns the funded allocation and refunds the full listing total  326ms
+ ✓  backend  src/tests/affiliate-recruitment.test.ts (45 tests) 5584ms
+ ✓  backend  src/tests/enforcement-20b.test.ts (8 tests) 11756ms
+   ✓ §33.9.8 — pre-charge kill closes without charge; post-charge kill invokes recovery > a pre-charge kill closes reservations at US$0, keeps the SetupIntent, and creates no PaymentIntent  1026ms
+   ✓ §33.9.8 — pre-charge kill closes without charge; post-charge kill invokes recovery > a post-charge kill leaves charged money in its recorded state, holds unreleased funds by name, and opens the §24.8 path  567ms
+   ✓ §33.9.9 — ended pages distinguish the four outcomes > threshold miss, natural close, pre-charge kill, and post-charge suspension are four different answers  889ms
+   ✓ §29.4 — affiliate enforcement states the whole customer statement > §29.1: a disclosed self-pre-order attributed to the discloser earns nothing  540ms
+   ✓ §29.10 — Founder first, then the recorded escalation to Proovd > opens a case with full context, relays the Founder response, and records the escalation  485ms
+stderr | src/tests/auth-tokens.test.ts > §33.1.8 no SMS OTP path exists > does not register a second factor that could deliver a code by phone
+2026-08-10T03:55:35.897Z ERROR [Better Auth]: send otp isn't configured. Please configure the send otp function on otp options.
+
+stderr | src/tests/auth-tokens.test.ts > §5.5 password and link recovery > answers identically for an address that has no account — no enumeration
+2026-08-10T03:55:36.144Z WARN [Better Auth]: Reset Password: User not found
+
+ ✓  backend  src/tests/auth-tokens.test.ts (41 tests) 10327ms
+   ✓ §33.1.1 personalized draft link opens without an account and grants no other access > opens the invited draft with no session, no cookie, and no account  652ms
+   ✓ rate limits on verification are enforced and stay non-enumerating > throttles repeated attempts and answers with the ordinary rejection, not a 429  776ms
+   ✓ §33.12.5 MFA is enforced and a sensitive action without recent reauthentication fails safely > will not issue a session on the password alone once a factor is registered  486ms
+   ✓ §33.12.5 MFA is enforced and a sensitive action without recent reauthentication fails safely > admits an Admin once the factor is registered and verified  488ms
+   ✓ §33.12.5 MFA is enforced and a sensitive action without recent reauthentication fails safely > blocks a sensitive action on a stale session and does not proceed  481ms
+   ✓ §33.12.5 MFA is enforced and a sensitive action without recent reauthentication fails safely > lets a reauthenticated Admin through again — the gate prompts, it does not lock out  608ms
+ ✓  backend  src/tests/creator-payment-funding.test.ts (23 tests) 9016ms
+   ✓ §33.4.3 — fixed funding requires the exact full amount and an accepted version > creates exactly ONE allocation for the exact accepted amount, idempotently  442ms
+   ✓ §33.4.3 — fixed funding requires the exact full amount and an accepted version > the EXACT full amount marks it funded  336ms
+   ✓ An Idea Campaign cannot reach a fixed-payment allocation > the allocation trigger refuses an Idea campaign_id even by direct INSERT  756ms
+   ✓ §33.4.4 — readiness drives the association status (integration) > a fully-ready Creator (no fixed payment) moves accepted → ready  1242ms
+   ✓ §33.4.4 — readiness drives the association status (integration) > a Creator whose only gap is the unfunded fixed allocation stays blocked until funded  365ms
+ ✓  backend  src/tests/disputes.test.ts (8 tests) 5768ms
+   ✓ §33.9.13 — the computed campaign descriptor > passes provider validation and matches campaign, checkout, receipt, magic link, support, and evidence — and the capture sends the SUFFIX  673ms
+   ✓ §33.9.6 dispute half — ingestion claws nothing back > opens the 24-hour task, moves the reservation, touches NO earnings, and classification has the §24.8 ceiling  713ms
+   ✓ §33.9.6 dispute half — ingestion claws nothing back > a lost dispute moves the reservation to reversed and flips do-not-fulfill; a won one restores captured  381ms
+   ✓ §33.9.12 — one customer message, and a timeline suppression record > a redelivered transfer.reversed under a FRESH event id sends nothing more, and the timeline shows the suppression  437ms
+ ✓  backend  src/tests/stripe-foundations.test.ts (42 tests) 4560ms
+(node:3020) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓  backend  src/tests/interview-webhook.test.ts (32 tests) 10103ms
+   ✓ a delivery binds only when two independent facts agree > refuses another campaign’s reference used by the wrong person  436ms
+   ✓ a verified, bound delivery moves the booking record > creates a confirmed booking, sends one email, and earns the US$2  316ms
+   ✓ `confirmed` is reachable without a webhook > confirms through the Admin reconciliation route and records the source  538ms
+   ✓ `confirmed` is reachable without a webhook > does not send a second confirmation when the webhook turns up late  329ms
+   ✓ the workspace hands the Founder an embed, bound to their campaign > gives one Founder no usable reference for another’s campaign  444ms
+ ✓  backend  src/tests/campaign-build.test.ts (10 tests) 9430ms
+   ✓ §33.3.10 — review_ready needs both tracks > is false while the build is incomplete or the roster is not launch-ready, true only when both are done  883ms
+   ✓ §33.3.9 — roster readiness follows all six rules > a non-required pending Creator does not block after Admin records the decision  924ms
+   ✓ §33.3.9 — roster readiness follows all six rules > rule 1 blocks when no Creator has accepted, and rule 2 blocks until Admin finalizes  620ms
+   ✓ §33.4.1 — changes-required feedback > groups required/optional, deep-links, identifies owner, and preserves all valid work  649ms
+   ✓ §33.4.2 — materiality and reacceptance > a non-material change preserves readiness and manufactures no reacceptance task  588ms
+   ✓ §33.4.2 — materiality and reacceptance > a material change versions, invalidates readiness, and requires the affected Creator to reaccept  1146ms
+   ✓ §33.4.2 — materiality and reacceptance > a Founder cannot publish a material change directly — the build refuses after submission  641ms
+   ✓ §15 — approval and the immutable snapshot > approving preserves an immutable approved campaign/Creator terms version and moves to approved  585ms
+   ✓ preview (§15) — collects no payment information > returns the assembled public campaign and example amounts, and takes no card  582ms
+ ✓  backend  src/tests/notification-digest.test.ts (25 tests) 10161ms
+   ✓ §27.7 — the digest preference > no row means "has not chosen", which is not the same as "chose off" (§1.4)  446ms
+   ✓ §27.7 — the digest preference > nothing on the read path creates a preference row (§30: no prechecked consent)  505ms
+   ✓ §27.7 — the digest preference > `off` is a recorded choice, and the history keeps every change (§1.1)  369ms
+   ✓ §27.7 — the digest preference > refuses a frequency that is not one of the three, by name  325ms
+   ✓ §27.7 — the digest preference > a preference cannot be re-pointed at another person (trigger)  623ms
+   ✓ §27.7 — the digest preference > the preference history is insert-only (trigger)  579ms
+   ✓ §27.7 — the digest preference > a Backer preference is per campaign, because the identity is (§4.1)  548ms
+   ✓ §27.7 — what a digest is made of > carries only the three §27.7 activity kinds, and never a delivery record  329ms
+ ❯  backend  src/tests/live-mode.test.ts (36 tests | 3 failed) 2836ms
+   ✓ §34 — the register and its runtime restatement > names exactly §34's eleven, in §34's order 2ms
+   ✓ §34 — the register and its runtime restatement > does not drift from the backend restatement 1ms
+   ✓ §34 — the register and its runtime restatement > records why every non-automatic condition needs a filed answer 0ms
+   ✓ §34 — the register and its runtime restatement > names the Track A item behind every condition the code cannot close 0ms
+   ✓ §34 — every gateway operation has a decided disposition > covers every callable member of the real gateway shape 1ms
+   ✓ §34 — every gateway operation has a decided disposition > refuses to construct when a gateway carries an undecided operation 4ms
+   ✓ §34 — every gateway operation has a decided disposition > blocks what §34 blocks and permits what §34 permits — both directions 1ms
+   ✓ §34 — the gate is closed and says why > blocks on every condition nobody has answered 48ms
+   ✓ §34 — the gate is closed and says why > reads condition 4 from the policy records rather than from a signature 3ms
+   ✓ §34 — the gate is closed and says why > names the specific separation failure rather than a generic one 2ms
+   ✓ §34 — the gate is closed and says why > closes when it cannot read itself 0ms
+   ✓ §34 — no condition can be satisfied by inference > refuses to file an answer for a condition the app re-decides 0ms
+   ✓ §34 — no condition can be satisfied by inference > has no row shape for one either 3ms
+   ✓ §34 — no condition can be satisfied by inference > refuses a satisfied answer with no evidence, and a blank finding 0ms
+   ✓ §34 — no condition can be satisfied by inference > records a not_satisfied answer without demanding evidence 4ms
+   ✓ §34 — layer one: the gateway refuses while the gate is closed > leaves the test-mode gateway untouched 0ms
+   ✓ §34 — layer one: the gateway refuses while the gate is closed > throws on every blocked operation in live mode 63ms
+   ✓ §34 — layer one: the gateway refuses while the gate is closed > throws rather than returning a normalized failure 2ms
+   ✓ §34 — layer one: the gateway refuses while the gate is closed > withholds the raw SDK, which is the only way around the decorator 1ms
+   × §34 — layer one: the gateway refuses while the gate is closed > and nothing in the tree reads it anyway 10ms
+     → ENOENT: no such file or directory, scandir 'D:\proovd-grant-mvp-2-main\backend\backend\src'
+   ✓ §34 — layer one: the gateway refuses while the gate is closed > lets the unwinding operations through, so a rollback strands nobody 2ms
+   ✓ §34, §6 — layer two: the pilot scope > permits everything in test mode 13ms
+   ✓ §34, §6 — layer two: the pilot scope > gives three distinct answers, because they are three different facts 61ms
+   ✓ §34, §6 — layer two: the pilot scope > refuses a second enablement at the database, not in a service 7ms
+   ✓ §34, §6 — layer two: the pilot scope > rolls back in one statement, and the next call sees it 67ms
+   ✓ §34, §6 — layer two: the pilot scope > keeps the enablement immutable, so its justification cannot be rewritten 35ms
+   ✓ §34, §6 — layer two: the pilot scope > records the three pre-first-reservation confirmations, and knows it is short 69ms
+   ✓ §34 condition 11 — the enablement refuses by name > refuses a closed gate, a team alias, and an incomplete plan 17ms
+   ✓ §34 condition 11 — the enablement refuses by name > asks for all five rollback-plan facts and every one carries a requirement 0ms
+   ✓ Appendix C — the recorded walks > covers all four actors with their constraint stated 1ms
+   ✓ Appendix C — the recorded walks > refuses a pass that needed undocumented knowledge 1ms
+   ✓ Appendix C — the recorded walks > separates never-walked from walked-and-failed 37ms
+   × §34 — every gated money entry point actually calls the guard > and every ungated one records why 1ms
+     → ENOENT: no such file or directory, open 'D:\proovd-grant-mvp-2-main\backend\backend\src\reservations\preorder.ts'
+   ✓ §34 — every gated money entry point actually calls the guard > gates every entry point that creates exposure 0ms
+   ✓ §2.1 — the approval copy, in both directions > keeps the conditional wording correct while approval does not exist 0ms
+   × §2.1 — the approval copy, in both directions > still ships the conditional architecture sentence 0ms
+     → ENOENT: no such file or directory, open 'D:\proovd-grant-mvp-2-main\backend\frontend\src\features\public\trust-strip.ts'
+ ✓  backend  src/tests/affiliate-preparing.test.ts (30 tests) 24349ms
+   ✓ §33.1.9 — founder_signup_complete reveals the preparing campaign once > moves an eligible Creator to preparing and records the reveal  702ms
+   ✓ §33.1.9 — founder_signup_complete reveals the preparing campaign once > sends exactly one notification, carrying exactly one action  500ms
+   ✓ §33.1.9 — founder_signup_complete reveals the preparing campaign once > produces no second reveal and no second email when re-run  515ms
+   ✓ §33.1.9 — founder_signup_complete reveals the preparing campaign once > reveals only to Creators on that campaign (§33.1.9 "only eligible")  834ms
+   ✓ §33.1.9 — founder_signup_complete reveals the preparing campaign once > records the reveal in the audit trail with its §31.5 justification  455ms
+   ✓ §33.1.9 — founder_signup_complete reveals the preparing campaign once > refuses to change the reveal stamp once set  2349ms
+   ✓ §33.2.4 — the preparing Campaign kit > is PRIVATE: an unauthenticated request gets nothing  5362ms
+   ✓ §33.2.4 — the preparing Campaign kit > is SCOPED: another Creator cannot read it, and cannot tell it exists  835ms
+   ✓ §33.2.4 — the preparing Campaign kit > is scoped by role: an Admin session is not a Creator session  490ms
+   ✓ §33.2.4 — the preparing Campaign kit > is COMPLETE for what §10 names as currently available  494ms
+   ✓ §33.2.4 — the preparing Campaign kit > names what is not decided yet rather than rendering it empty (§1.4)  470ms
+   ✓ §33.2.4 — the preparing Campaign kit > exposes NO compensation decision and NO work permission (§10, §12)  502ms
+   ✓ §33.2.4 — the preparing Campaign kit > offers no accept, decline, propose, or activate route at all  483ms
+   ✓ §33.2.4 — the preparing Campaign kit > is LOGGED: every read writes an access row  488ms
+   ✓ §33.2.4 — the preparing Campaign kit > keeps the access log free of the confidential content it records  478ms
+   ✓ §33.2.4 — the preparing Campaign kit > is REVOCABLE: access ends immediately, and the content is not selected  486ms
+   ✓ §33.2.4 — the preparing Campaign kit > does not log a refused read as an access  486ms
+   ✓ §33.2.4 — the preparing Campaign kit > refuses to un-revoke at the database level  482ms
+   ✓ §33.2.4 — the preparing Campaign kit > requires a stored reason to revoke (§25.6)  620ms
+   ✓ §33.2.4 — the preparing Campaign kit > does not re-reveal a revoked association on a later run  481ms
+   ✓ §10 — Admin sees who has preparing visibility > lists the revealed set, the access counts, and any revocation  499ms
+   ✓ §10 — Admin sees who has preparing visibility > serves the full access log for one association  485ms
+   ✓ §10 — Admin sees who has preparing visibility > keeps the visibility and access-log routes behind the Admin guards  708ms
+   ✓ the Creator sees only their own campaigns > lists the campaign with a review action once revealed  464ms
+   ✓ the Creator sees only their own campaigns > keeps a revoked campaign visible but not reviewable  478ms
+   ✓ the Creator sees only their own campaigns > never lists another Creator’s campaign  793ms
+ ✓  backend  src/tests/affiliate-signup.test.ts (35 tests) 8435ms
+   ✓ the signup confirmation uses the §27.4 key > claims no key that nothing actually sends (§1.4)  375ms
+   ✓ §11 — Confirm and create account > emits affiliate_signup_complete exactly once; a retry adds nothing  320ms
+   ✓ §33.2.3 — the waiting state is named and no-action-needed > reports awaiting_founder while the Founder has not claimed  307ms
+   ✓ §33.2.1 — the signup route grants nothing wider > refuses a Founder draft token at every Creator signup route  404ms
+ ✓  backend  src/tests/backer-preorder.test.ts (18 tests) 7054ms
+   ✓ §33.5.8 — a failed reward replacement preserves the old selection > a successful replacement cancels the old and activates the new  1208ms
+ ✓  backend  src/tests/notification-remainder.test.ts (24 tests) 6337ms
+   ✓ §27.3 roster updates > announces a real change, on the history row, exactly once  348ms
+   ✓ §5.5 magic-link reissue > does not leak one campaigns Backer to another campaign  438ms
+ ❯  backend  src/tests/system-contract.test.ts (20 tests | 2 failed) 4094ms
+   ✓ §33.12.1 — listing_paid_at, campaign_live_at, and campaign_close_at anchor independently > gives each anchor a dedicated column on campaigns 23ms
+   ✓ §33.12.1 — listing_paid_at, campaign_live_at, and campaign_close_at anchor independently > has a real column behind every stored deadline in the register 28ms
+   ✓ §33.12.1 — listing_paid_at, campaign_live_at, and campaign_close_at anchor independently > has a real column behind every anchor the register names 17ms
+   ✓ §33.12.1 — listing_paid_at, campaign_live_at, and campaign_close_at anchor independently > pins each stored deadline to its own anchor, by CHECK 6ms
+   ✓ §33.12.1 — listing_paid_at, campaign_live_at, and campaign_close_at anchor independently > derives no stored deadline from a row timestamp 2ms
+   ✓ §33.12.1 — listing_paid_at, campaign_live_at, and campaign_close_at anchor independently > moves one anchor without moving another anchor’s deadline 4ms
+   ✓ §33.12.1 — listing_paid_at, campaign_live_at, and campaign_close_at anchor independently > never reads a campaign anchor out of campaigns.createdAt or campaigns.updatedAt 33ms
+   ✓ §33.12.2 — the replacement deadline is exact, versioned, and cannot silently reset > is exactly N business days from the recorded failure, on the stored calendar 169ms
+   ✓ §33.12.2 — the replacement deadline is exact, versioned, and cannot silently reset > refuses a later edit of the deadline or its calendar version, at the database 42ms
+   ✓ §33.12.2 — the replacement deadline is exact, versioned, and cannot silently reset > records the failure once, so a retry cannot recompute the window 73ms
+   ✓ §33.12.2 — the replacement deadline is exact, versioned, and cannot silently reset > matches the shared contract on where the deadline and its version live 0ms
+   ✓ §33.12.3 — lifecycle and payment flags stay separate and independently auditable > shares no value between the lifecycle enum and the payment-flag enum 4ms
+   ✓ §33.12.3 — lifecycle and payment flags stay separate and independently auditable > keeps payment facts in their own rows with amount, actor, and evidence 31ms
+   ✓ §33.12.3 — lifecycle and payment flags stay separate and independently auditable > records a payment flag without touching the lifecycle, and vice versa 6ms
+   ✓ §33.12.3 — lifecycle and payment flags stay separate and independently auditable > makes both trails append-only for the application role 5ms
+   ✓ §33.12.3 — lifecycle and payment flags stay separate and independently auditable > has no timeline-shaped second store to drift from either 1ms
+   × §33.12.5 — MFA is enforced and a stale session fails safely > refuses an Admin with no registered second factor 236ms
+     → expected 404 to be 403 // Object.is equality
+   ✓ §33.12.5 — MFA is enforced and a stale session fails safely > partitions every admin write into gated and deliberately-ungated, with nothing left over  873ms
+   ✓ §33.12.5 — MFA is enforced and a stale session fails safely > gives every deliberately-ungated route a reason and a section 1ms
+   × §33.12.5 — MFA is enforced and a stale session fails safely > refuses rather than warning and proceeding, and says the same thing every time 215ms
+     → expected 404 to be 401 // Object.is equality
+ ✓  backend  src/tests/stripe-onboarding.test.ts (27 tests) 7479ms
+   ✓ §5.3, §11, §13 — Proovd collects nothing itself > refuses a Creator the Founder routes and a Founder the Creator routes  448ms
+   ✓ §5.3, §11, §13 — Proovd collects nothing itself > gives one person no sight of another’s account  451ms
+ ✓  backend  src/tests/attribution.test.ts (12 tests) 5371ms
+   ✓ §33.6.1 the last valid same-browser Creator link wins, and a direct return preserves it > a valid click attributes; a direct return keeps it; a later valid click replaces it  557ms
+   ✓ §33.6.2 a later valid click replaces the earlier, and the cookie ends at close > the winner cookie carries Expires = campaign_close_at  514ms
+   ✓ §33.6.2 a later valid click replaces the earlier, and the cookie ends at close > replacement is last-write-wins in the ledger and the resolution  383ms
+   ✓ §33.6.3 pre-activation, paused, post-close, and mid-campaign prior traffic earn nothing > a click on a never-activated link is ignored (before_activation) and sets no cookie  376ms
+ ❯  backend  src/tests/cross-surface.test.ts (5 tests | 5 skipped) 2572ms
+   ↓ §33.11.5 — seven surfaces, eight facts, one pre-order > reads every one of the seven surfaces
+   ↓ §33.11.5 — seven surfaces, eight facts, one pre-order > finds no disagreement across any fact
+   ↓ §33.11.5 — seven surfaces, eight facts, one pre-order > renders the §24.12 descriptor identically everywhere it appears
+   ↓ §33.11.5 — seven surfaces, eight facts, one pre-order > assembles a complete evidence packet from the same records
+   ↓ §33.11.5 — seven surfaces, eight facts, one pre-order > states the same order threshold on the two surfaces that print the number
+ ✓  backend  src/tests/notification-coverage.test.ts (30 tests) 382ms
+   ✓ §27.2 — high-impact messages can be previewed before manual send > every message previews, and the preview agrees with the contract  316ms
+ ✓  backend  src/tests/backer-cancellation.test.ts (8 tests) 3331ms
+   ✓ §33.7.1 — cancellation is safe and reference-aware > cancels, preserves the successful SetupIntent as history, and detaches a lone card  344ms
+ ✓  backend  src/tests/campaign-updates.test.ts (11 tests) 3487ms
+   ✓ §18 the Founder posts through the authenticated route > posts an update and reads it back; another Founder cannot  499ms
+ ✓  backend  src/tests/domain-kernel.test.ts (17 tests) 668ms
+ ✓  backend  src/tests/creator-partnership.test.ts (4 tests) 3175ms
+   ✓ §18 the Creator active-partnership surface > assembles the link, disclosure, terms, readiness, and deferred metrics  365ms
+   ✓ §18 the Creator active-partnership surface > is served over HTTP to the owning Creator, and 404s another Creator  593ms
+   ✓ §18 the Creator active-partnership surface > answers not_active for an association that has not accepted yet  333ms
+ ✓  backend  src/tests/policy-versions.test.ts (13 tests) 130ms
+ ✓  backend  src/tests/env.test.ts (20 tests) 12ms
+ ✓  backend  src/tests/account.test.ts (11 tests) 3174ms
+ ✓  backend  src/tests/attribution-unit.test.ts (12 tests) 6ms
+ ✓  backend  src/tests/health.test.ts (1 test) 1822ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL   backend  src/tests/admin-operations.test.ts [ src/tests/admin-operations.test.ts ]
+Error: Cannot find module '../admin/risk.js' imported from 'D:/proovd-grant-mvp-2-main/backend/src/tests/admin-operations.test.ts'
+ ❯ src/tests/admin-operations.test.ts:69:1
+     67| } from '../admin/logic.js';
+     68| import { seedAdminReauthWindow } from '../settings/service.js';
+     69| import { readRiskPanel, recordSellerTaxReadiness, readSellerTaxReadine…
+       | ^
+     70| import { readMoneyControls } from '../admin/money-controls.js';
+     71| import { listLedger, exportLedger } from '../admin/ledger.js';
+
+Caused by: Error: Failed to load url ../admin/risk.js (resolved id: ../admin/risk.js) in D:/proovd-grant-mvp-2-main/backend/src/tests/admin-operations.test.ts. Does the file exist?
+ ❯ loadAndTransform ../node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL   backend  src/tests/admin-settings.test.ts [ src/tests/admin-settings.test.ts ]
+Error: Cannot find module '../admin/prerequisites.js' imported from 'D:/proovd-grant-mvp-2-main/backend/src/tests/admin-settings.test.ts'
+ ❯ src/tests/admin-settings.test.ts:41:1
+     39|   SettingNotConfigured,
+     40| } from '../settings/service.js';
+     41| import {
+       | ^
+     42|   readPrerequisites,
+     43|   recordPrerequisite,
+
+Caused by: Error: Failed to load url ../admin/prerequisites.js (resolved id: ../admin/prerequisites.js) in D:/proovd-grant-mvp-2-main/backend/src/tests/admin-settings.test.ts. Does the file exist?
+ ❯ loadAndTransform ../node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL   backend  src/tests/creator-earnings.test.ts [ src/tests/creator-earnings.test.ts ]
+Error: Cannot find module '../admin/money-controls.js' imported from 'D:/proovd-grant-mvp-2-main/backend/src/tests/creator-earnings.test.ts'
+ ❯ src/tests/creator-earnings.test.ts:75:1
+     73|   thankYouPaymentKey,
+     74| } from '../close/earnings.js';
+     75| import { readMoneyControls } from '../admin/money-controls.js';
+       | ^
+     76| import { readCreatorClose } from '../close/creator-close.js';
+     77| import { recordTaxAccountability } from '../payments/tax-accountabilit…
+
+Caused by: Error: Failed to load url ../admin/money-controls.js (resolved id: ../admin/money-controls.js) in D:/proovd-grant-mvp-2-main/backend/src/tests/admin-operations.test.ts. Does the file exist?
+ ❯ loadAndTransform ../node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL   backend  src/tests/cross-surface.test.ts [ src/tests/cross-surface.test.ts ]
+Error: expected 200 "OK", got 404 "Not Found"
+ ❯ src/tests/cross-surface.test.ts:384:6
+    382|     .get(`/api/admin/ledger?campaignId=${campaignId}`)
+    383|     .set('cookie', admin.cookie)
+    384|     .expect(200);
+       |      ^
+    385|   const row = ledgerRes.body.rows.find(
+    386|     (r: { reservationId: string }) => r.reservationId === reservationI…
+ ❯ Test._assertStatus ../node_modules/supertest/lib/test.js:309:14
+ ❯ ../node_modules/supertest/lib/test.js:365:13
+ ❯ Test._assertFunction ../node_modules/supertest/lib/test.js:342:13
+ ❯ Test.assert ../node_modules/supertest/lib/test.js:195:23
+ ❯ localAssert ../node_modules/supertest/lib/test.js:138:14
+ ❯ Server.<anonymous> ../node_modules/supertest/lib/test.js:152:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL   backend  src/tests/founder-payments.test.ts [ src/tests/founder-payments.test.ts ]
+Error: Cannot find module '../admin/money-controls.js' imported from 'D:/proovd-grant-mvp-2-main/backend/src/tests/founder-payments.test.ts'
+ ❯ src/tests/founder-payments.test.ts:63:1
+     61|   looksLikeTin,
+     62| } from '../close/founder-payments.js';
+     63| import { readMoneyControls } from '../admin/money-controls.js';
+       | ^
+     64| import { formatCents } from '../reservations/restated.js';
+     65| import {
+
+Caused by: Error: Failed to load url ../admin/money-controls.js (resolved id: ../admin/money-controls.js) in D:/proovd-grant-mvp-2-main/backend/src/tests/admin-operations.test.ts. Does the file exist?
+ ❯ loadAndTransform ../node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL   backend  src/tests/measurement.test.ts [ src/tests/measurement.test.ts ]
+Error: Cannot find module '../measurement/service.js' imported from 'D:/proovd-grant-mvp-2-main/backend/src/tests/measurement.test.ts'
+ ❯ src/tests/measurement.test.ts:36:1
+     34| import { seedAdminReauthWindow } from '../settings/service.js';
+     35| import { createMemoryStripeGateway } from '../payments/stripe-client.j…
+     36| import { readScoreboard } from '../measurement/service.js';
+       | ^
+     37| import {
+     38|   COHORT_BASELINE_SIZE as BACKEND_COHORT_SIZE,
+
+Caused by: Error: Failed to load url ../measurement/service.js (resolved id: ../measurement/service.js) in D:/proovd-grant-mvp-2-main/backend/src/tests/measurement.test.ts. Does the file exist?
+ ❯ loadAndTransform ../node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL   backend  src/tests/close-recovery.test.ts > §33.7.12 — visible recovery: locked reservations, resume, no duplicates > shows the interrupted batch in the Admin queue and resumes it without double charges or receipts
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ src/tests/close-recovery.test.ts:986:29
+    984|     // The same queue over HTTP, behind the real Admin guards.
+    985|     const queueRes = await request(h.app).get('/api/admin/close').set(…
+    986|     expect(queueRes.status).toBe(200);
+       |                             ^
+    987|     expect(
+    988|       queueRes.body.operations.incomplete.some(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL   backend  src/tests/live-mode.test.ts > §34 — layer one: the gateway refuses while the gate is closed > and nothing in the tree reads it anyway
+Error: ENOENT: no such file or directory, scandir 'D:\proovd-grant-mvp-2-main\backend\backend\src'
+ ❯ walkTs src/tests/live-mode.test.ts:753:23
+    751|   const { readdirSync, statSync } = require('node:fs') as typeof impor…
+    752|   const out: string[] = [];
+    753|   for (const entry of readdirSync(dir)) {
+       |                       ^
+    754|     const full = path.join(dir, entry);
+    755|     if (statSync(full).isDirectory()) out.push(...walkTs(full));
+ ❯ src/tests/live-mode.test.ts:430:23
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL   backend  src/tests/live-mode.test.ts > §34 — every gated money entry point actually calls the guard > and every ungated one records why
+Error: ENOENT: no such file or directory, open 'D:\proovd-grant-mvp-2-main\backend\backend\src\reservations\preorder.ts'
+ ❯ src/tests/live-mode.test.ts:695:22
+    693| 
+    694|     for (const entry of MONEY_ENTRY_POINTS) {
+    695|       const source = readFileSync(path.join(root, entry.module), 'utf8…
+       |                      ^
+    696|       const stripped = stripComments(source);
+    697|       const calls = stripped.includes('checkLiveMoneyPermitted(');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL   backend  src/tests/live-mode.test.ts > §2.1 — the approval copy, in both directions > still ships the conditional architecture sentence
+Error: ENOENT: no such file or directory, open 'D:\proovd-grant-mvp-2-main\backend\frontend\src\features\public\trust-strip.ts'
+ ❯ src/tests/live-mode.test.ts:740:19
+    738|     // once A1 closes is the second, which is why the state is derived…
+    739|     // condition 1 rather than remembered.
+    740|     const strip = readFileSync(
+       |                   ^
+    741|       path.join(process.cwd(), 'frontend', 'src', 'features', 'public'…
+    742|       'utf8',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+ FAIL   backend  src/tests/system-contract.test.ts > §33.12.5 — MFA is enforced and a stale session fails safely > refuses an Admin with no registered second factor
+AssertionError: expected 404 to be 403 // Object.is equality
+
+- Expected
++ Received
+
+- 403
++ 404
+
+ ❯ src/tests/system-contract.test.ts:482:24
+    480|     const cookie = await signInPlain(h, unenrolled.email);
+    481|     const res = await request(h.app).get('/api/admin/measurement').set…
+    482|     expect(res.status).toBe(403);
+       |                        ^
+    483|   });
+    484| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
+
+ FAIL   backend  src/tests/system-contract.test.ts > §33.12.5 — MFA is enforced and a stale session fails safely > refuses rather than warning and proceeding, and says the same thing every time
+AssertionError: expected 404 to be 401 // Object.is equality
+
+- Expected
++ Received
+
+- 401
++ 404
+
+ ❯ src/tests/system-contract.test.ts:579:30
+    577|       .set('cookie', await signInPlain(h, (await seedUser(h, 'founder'…
+    578| 
+    579|     expect(noSession.status).toBe(401);
+       |                              ^
+    580|     expect(wrongRole.status).toBe(403);
+    581|     // Neither carries which check failed beyond the coarse status, an…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+
+
+ Test Files  9 failed | 39 passed (48)
+      Tests  6 failed | 1067 passed | 5 skipped (1078)
+   Start at  06:51:33
+   Duration  435.36s (transform 5.16s, setup 0ms, collect 99.14s, tests 313.85s, environment 9ms, prepare 3.82s)
+

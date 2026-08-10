@@ -32,6 +32,7 @@ import {
   fetchInvitationPreview,
   fetchInvitationCopy,
   composeInvitation,
+  updateProspect,
   sendInvitation,
   revokeInvitation,
   prefillVetting,
@@ -697,6 +698,178 @@ function AnchorRow({ label, value }: { label: string; value: string | null }) {
   );
 }
 
+/* ── §7's invitation-creation fields ──────────────────────────────────────── */
+
+/**
+ * The part of §7's "invitation-creation surface contains" list that describes
+ * the prospect rather than the message.
+ *
+ * It lives here rather than on the create form because §7 separates the two
+ * acts: a prospect is written down after a conversation, and the invitation is
+ * created later. Two of these are what hold Send closed — the invitation source
+ * and the internal campaign owner never reach the Founder, so the marker gate
+ * cannot see them and the server checks them by name.
+ *
+ * A field left blank saves as blank. The gate is at Send, where a missing value
+ * actually costs something; refusing the save instead would push an Admin to
+ * type a placeholder to get past it, which is a worse record than an honestly
+ * incomplete one (§5.3's reasoning, same shape).
+ */
+function ProspectFieldsPanel({
+  detail,
+  onChanged,
+}: {
+  detail: FounderDetailData;
+  onChanged: () => void;
+}) {
+  const prospect = detail.prospect as Record<string, unknown>;
+  const text = (key: string) => (typeof prospect[key] === 'string' ? (prospect[key] as string) : '');
+  const evidence = Array.isArray(prospect['discoveryEvidence'])
+    ? (prospect['discoveryEvidence'] as unknown[]).filter((v): v is string => typeof v === 'string')
+    : [];
+
+  const [values, setValues] = useState({
+    productName: text('productName'),
+    productUrl: text('productUrl'),
+    invitationSource: text('invitationSource'),
+    internalOwner: text('internalOwner'),
+    preferredName: text('preferredName'),
+    phone: text('phone'),
+    // A date input needs `YYYY-MM-DD`; the record carries a full instant.
+    lastContactAt: text('lastContactAt').slice(0, 10),
+    launchFrame: text('launchFrame'),
+    usAgeFit: text('usAgeFit'),
+    deliveryFeasibility: text('deliveryFeasibility'),
+    compensationExpectations: text('compensationExpectations'),
+    affiliateSourcingHypothesis: text('affiliateSourcingHypothesis'),
+    adminNotes: text('adminNotes'),
+    discoveryEvidence: evidence.join('\n'),
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const set = (key: keyof typeof values) => (event: { target: { value: string } }) =>
+    setValues((current) => ({ ...current, [key]: event.target.value }));
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await updateProspect(detail.draft.id, {
+        ...values,
+        lastContactAt: values.lastContactAt || null,
+        discoveryEvidence: values.discoveryEvidence
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean),
+      });
+      setNotice('Saved.');
+      onChanged();
+    } catch (caught) {
+      setError(
+        caught instanceof AdminRequestError
+          ? [caught.detail.whatHappened, caught.detail.next].filter(Boolean).join(' ')
+          : 'That did not save. Nothing has changed.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card className="admin-form-card">
+      <div className="admin-form admin-form--wide">
+        <h3>The invitation record</h3>
+        <p className="admin-form__note">
+          What the invitation is about and where this Founder came from. The product name
+          appears in the message itself; the invitation source and the campaign owner do
+          not, but Send stays unavailable until both are written down.
+        </p>
+
+        <Field label="Product or startup name" hint="Named in the invitation subject and body.">
+          <Input value={values.productName} onChange={set('productName')} />
+        </Field>
+        <Field label="Product URL">
+          <Input type="url" value={values.productUrl} onChange={set('productUrl')} />
+        </Field>
+        <Field label="Invitation source" hint="Where this Founder was found. Stored on the send record.">
+          <Input value={values.invitationSource} onChange={set('invitationSource')} />
+        </Field>
+        <Field label="Internal campaign owner" hint="The named Admin who owns this campaign here.">
+          <Input value={values.internalOwner} onChange={set('internalOwner')} />
+        </Field>
+        <Field label="Preferred name" hint="What the invitation will call them, if not their full name.">
+          <Input value={values.preferredName} onChange={set('preferredName')} />
+        </Field>
+        <Field
+          label="Phone, if known"
+          hint="Stored so support can call. Proovd never verifies a phone number and never sends codes to one."
+        >
+          <Input type="tel" value={values.phone} onChange={set('phone')} />
+        </Field>
+        <Field
+          label="Last time we spoke"
+          hint="A record of a conversation, not a reminder — nothing follows up on it."
+        >
+          <Input type="date" value={values.lastContactAt} onChange={set('lastContactAt')} />
+        </Field>
+        <Field label="Launch frame" hint="Roughly when they are hoping to launch.">
+          <Input value={values.launchFrame} onChange={set('launchFrame')} />
+        </Field>
+        <Field label="US and 18+ fit" hint="What you established, and how.">
+          <Input value={values.usAgeFit} onChange={set('usAgeFit')} />
+        </Field>
+        <Field label="Delivery feasibility">
+          <Textarea rows={2} value={values.deliveryFeasibility} onChange={set('deliveryFeasibility')} />
+        </Field>
+        <Field
+          label="Early compensation expectations"
+          hint="What they said they expect. Not an agreement, and not a price."
+        >
+          <Textarea
+            rows={2}
+            value={values.compensationExpectations}
+            onChange={set('compensationExpectations')}
+          />
+        </Field>
+        <Field
+          label="Creator-sourcing hypothesis"
+          hint="Where you think Creators for this campaign would come from. A hypothesis, never a commitment that a named Creator will take it on."
+        >
+          <Textarea
+            rows={2}
+            value={values.affiliateSourcingHypothesis}
+            onChange={set('affiliateSourcingHypothesis')}
+          />
+        </Field>
+        <Field label="Admin notes">
+          <Textarea rows={3} value={values.adminNotes} onChange={set('adminNotes')} />
+        </Field>
+        <Field label="Discovery evidence" hint="One link per line.">
+          <Textarea rows={2} value={values.discoveryEvidence} onChange={set('discoveryEvidence')} />
+        </Field>
+
+        {error ? (
+          <p className="field-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {notice ? (
+          <p className="admin-note" role="status">
+            {notice}
+          </p>
+        ) : null}
+
+        <Button tier="secondary" disabled={busy} onClick={() => void save()}>
+          {busy ? 'Saving…' : 'Save invitation record'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 /* ── §7 the invitation: compose, preview, send, resend, revoke ────────────── */
 
 function InvitationPanel({
@@ -782,6 +955,8 @@ function InvitationPanel({
         </p>
       </Card>
 
+      {!disabled ? <ProspectFieldsPanel detail={detail} onChanged={onChanged} /> : null}
+
       {!disabled ? (
         <Card className="admin-form-card">
           <div className="admin-form admin-form--wide">
@@ -831,7 +1006,12 @@ function InvitationPanel({
               <p>
                 {preview.unresolved.length > 0
                   ? 'A Founder must never receive a placeholder. Fill these in:'
-                  : 'This prospect has no email address to send to.'}
+                  : preview.missingFields.length > 0
+                    ? // Not in the message, so the marker list above cannot
+                      // report them — but §7 requires both before an invitation
+                      // goes out, and the send row stores the source.
+                      'The invitation record is incomplete. Fill these in above:'
+                    : 'This prospect has no email address to send to.'}
               </p>
               {preview.unresolved.length > 0 ? (
                 <ul className="invitation__unresolved">
@@ -839,6 +1019,12 @@ function InvitationPanel({
                     <li key={marker}>
                       <code>{marker}</code>
                     </li>
+                  ))}
+                </ul>
+              ) : preview.missingFields.length > 0 ? (
+                <ul className="invitation__unresolved">
+                  {preview.missingFields.map((field) => (
+                    <li key={field}>{field}</li>
                   ))}
                 </ul>
               ) : null}

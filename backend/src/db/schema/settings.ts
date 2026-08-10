@@ -181,7 +181,12 @@ export const productionPrerequisites = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
 
-    /** A key from `backend/src/admin/prerequisites.ts`. */
+    /**
+     * A §6 prerequisite key. The register that defined them
+     * (`backend/src/admin/prerequisites.ts`) and the `/admin/prerequisites`
+     * surface were both removed; the recorded attestations are kept because
+     * §25.6 makes this table insert-only, and nothing reads them today.
+     */
     prerequisiteKey: text('prerequisite_key').notNull(),
     status: prerequisiteStatus('status').notNull(),
 

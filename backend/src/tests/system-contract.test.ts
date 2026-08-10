@@ -478,7 +478,7 @@ describe('§33.12.5 — MFA is enforced and a stale session fails safely', () =>
   it('refuses an Admin with no registered second factor', async () => {
     const unenrolled = await seedUser(h, 'admin', 'system-contract-unenrolled');
     const cookie = await signInPlain(h, unenrolled.email);
-    const res = await request(h.app).get('/api/admin/measurement').set('cookie', cookie);
+    const res = await request(h.app).get('/api/admin/settings').set('cookie', cookie);
     expect(res.status).toBe(403);
   });
 
@@ -571,9 +571,9 @@ describe('§33.12.5 — MFA is enforced and a stale session fails safely', () =>
     // the same regardless of which check failed.
     expect(UNSAFE_GUARD_FAILURES).toContain('warns_and_proceeds');
 
-    const noSession = await request(h.app).get('/api/admin/measurement');
+    const noSession = await request(h.app).get('/api/admin/settings');
     const wrongRole = await request(h.app)
-      .get('/api/admin/measurement')
+      .get('/api/admin/settings')
       .set('cookie', await signInPlain(h, (await seedUser(h, 'founder', 'system-contract-founder')).email));
 
     expect(noSession.status).toBe(401);

@@ -72,7 +72,6 @@ import {
   earningsTransferKey,
   thankYouPaymentKey,
 } from '../close/earnings.js';
-import { readMoneyControls } from '../admin/money-controls.js';
 import { readCreatorClose } from '../close/creator-close.js';
 import { recordTaxAccountability } from '../payments/tax-accountability.js';
 import { BACKEND_NOTIFICATION_EVENTS } from '../notifications/events.js';
@@ -684,9 +683,12 @@ describe('§33.8.1–§33.8.4 — finalization, reconciliation, and the one Tran
     expect(camp.affiliateProvisionalCents).toBe(1_500n);
     expect(camp.affiliateEarnedCents).toBe(750n);
     expect(camp.affiliateUnearnedReturnedCents).toBe(750n);
-    const panel = await readMoneyControls(h.db, campaignId);
-    expect(panel?.provisionalReconciles).toBe(true);
-    expect(panel?.taxExcludedFromFees).toBe(true);
+    // §24.4's identity, asserted on the ledger columns directly. The §26.6
+    // money-control panel used to derive this line; that surface is gone, and
+    // the aggregate it derived from is what the identity actually lives on.
+    expect(camp.affiliateEarnedCents + camp.affiliateUnearnedReturnedCents).toBe(
+      camp.affiliateProvisionalCents,
+    );
     // Provisional resolved to the Creator and the Founder — never to Proovd:
     // the 5% is untouched by finalization (§24.4, §33.8.2).
     expect(camp.proovdFeeCents).toBe(125n * 3n);
@@ -1232,11 +1234,15 @@ describe('§33.8.14 — the §22.2 thank-you', () => {
       gateway.transfers.filter((t) => t.idempotencyKey === thankYouPaymentKey(creator.associationId)),
     ).toHaveLength(1);
 
-    // The §26.6 line reads the record — the separate expense is visible.
-    const panel = await readMoneyControls(h.db, campaignId);
-    const line = panel?.lines.find((l) => l.key === 'thank_you_expense');
-    expect(line?.populated).toBe(true);
-    expect(line?.amounts['paidCents']).toBe('5000');
+    // The §26.6 money-control line that rendered this expense went with the
+    // Admin money panel; the record it read is what actually holds the amount,
+    // and it is separate from every campaign money column (asserted below).
+    const [thankYou] = await h.db
+      .select()
+      .from(thankYouRecords)
+      .where(eq(thankYouRecords.associationId, creator.associationId))
+      .limit(1);
+    expect(thankYou!.amountCents).toBe(5_000n);
   });
 
   it('is never estimated: no store, no route, and no message promises one', async () => {

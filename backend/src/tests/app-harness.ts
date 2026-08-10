@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { createDb, createDbPool, type Database } from '../db/client.js';
 import { createApp, type AppConfig, type ProovdApp } from '../app.js';
 import type { OutgoingEmail } from '../notifications/send.js';
-import type { PrerequisiteEnvironment } from '../admin/prerequisites.js';
+import type { LiveModeEnvironment } from '../live-mode/gate.js';
 import {
   migrateSerialized,
   provisionIsolatedDatabase,
@@ -41,7 +41,7 @@ export const TEST_REAUTH_WINDOW_SECONDS = 300;
  * starting state: the panel must block, and a suite that started from a
  * satisfied panel would never notice if `blocking` stopped meaning anything.
  */
-export const TEST_PREREQUISITE_ENVIRONMENT: PrerequisiteEnvironment = {
+export const TEST_PREREQUISITE_ENVIRONMENT: LiveModeEnvironment = {
   stripeMode: 'test',
   stripeKeysMatchMode: true,
   platformWebhookSecretPresent: false,
@@ -49,7 +49,6 @@ export const TEST_PREREQUISITE_ENVIRONMENT: PrerequisiteEnvironment = {
   // Two absent secrets are not the same secret, and the §34 gate reports the
   // absence rather than a false sharing.
   webhookSecretsDiffer: true,
-  transactionalEmailConfigured: false,
 };
 
 export interface CapturedEmail extends OutgoingEmail {
@@ -106,7 +105,7 @@ export async function startHarness(
     publicDir: path.resolve(__dirname, '../../public'),
     authSecret: TEST_AUTH_SECRET,
     adminReauthWindowSeconds: TEST_REAUTH_WINDOW_SECONDS,
-    prerequisiteEnvironment: TEST_PREREQUISITE_ENVIRONMENT,
+    liveModeEnvironment: TEST_PREREQUISITE_ENVIRONMENT,
     invitationContext: {
       appBaseUrl: 'http://localhost:3000',
       supportEmail: 'support@proovd.co',

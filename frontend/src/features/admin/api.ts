@@ -168,35 +168,6 @@ export const fetchSettingHistory = (
 ): Promise<{ history: SettingHistoryEntry[] }> =>
   call(`/api/admin/settings/${encodeURIComponent(key)}/history`);
 
-/* ── Prerequisites (§6) ───────────────────────────────────────────────────── */
-
-export interface PrerequisiteItem {
-  key: string;
-  label: string;
-  specRef: string;
-  verification: 'automatic' | 'recorded';
-  requirement: string;
-  satisfied: boolean;
-  detail: string;
-  subjectKeys: string[];
-  attestation: {
-    status: 'satisfied' | 'not_satisfied';
-    recordedBy: string;
-    recordedAt: string;
-    note: string;
-    evidenceLinks: string[] | null;
-  } | null;
-}
-
-export interface PrerequisitePanel {
-  blocking: boolean;
-  unsatisfiedKeys: string[];
-  items: PrerequisiteItem[];
-}
-
-export const fetchPrerequisites = (): Promise<PrerequisitePanel> =>
-  call('/api/admin/prerequisites');
-
 /* ── Founders and invitations (§7, §26.1, §26.2) ──────────────────────────── */
 
 export interface FounderRow {
@@ -219,28 +190,67 @@ export interface FounderRow {
 export const fetchFounders = (): Promise<{ founders: FounderRow[] }> =>
   call('/api/admin/founders');
 
+/**
+ * §7's first act: writing down somebody met off-platform. Only the two facts
+ * that identify them are required; the rest of §7's invitation-creation list is
+ * filled in on the draft surface through {@link updateProspect}, and Send stays
+ * closed until it is there.
+ */
 export interface CreateProspectBody {
   legalName: string;
-  preferredName?: string;
   email: string;
-  phone?: string;
-  productName: string;
-  productUrl?: string;
-  launchFrame?: string;
-  usAgeFit?: string;
-  deliveryFeasibility?: string;
-  compensationExpectations?: string;
-  affiliateSourcingHypothesis?: string;
+  /** `YYYY-MM-DD` from a date input. A record of a conversation, not a plan. */
+  lastContactAt?: string;
+  productName?: string;
+  /**
+   * §9's two prefillable vetting answers, drafted by Proovd from discovery and
+   * editable by the Founder. There is deliberately no `competition` key —
+   * §33.1.5, and the route that receives this has nowhere to put one.
+   */
+  problem?: string;
+  solution?: string;
+  /**
+   * Internal discovery notes. This is where what Admin learned about the
+   * competition and about why the Founder is building it belongs — §9 Step 4
+   * keeps the Competition *answer* always blank and the Founder's, and §12
+   * keeps the campaign Story theirs to write and approve.
+   */
   adminNotes?: string;
-  discoveryEvidence?: string[];
-  invitationSource: string;
-  internalOwner: string;
 }
 
 export const createProspect = (
   body: CreateProspectBody,
 ): Promise<{ draftId: string; campaignId: string; prospectId: string }> =>
   call('/api/admin/founders', { method: 'POST', body: JSON.stringify(body) });
+
+/**
+ * The rest of §7's invitation-creation surface, saved against the draft.
+ *
+ * A key left out writes nothing (§9's autosave rule), so saving one panel can
+ * never blank a field recorded on another visit.
+ */
+export interface UpdateProspectBody {
+  preferredName?: string | null;
+  phone?: string | null;
+  lastContactAt?: string | null;
+  productName?: string | null;
+  productUrl?: string | null;
+  launchFrame?: string | null;
+  usAgeFit?: string | null;
+  deliveryFeasibility?: string | null;
+  compensationExpectations?: string | null;
+  affiliateSourcingHypothesis?: string | null;
+  adminNotes?: string | null;
+  discoveryEvidence?: string[] | null;
+  invitationSource?: string | null;
+  internalOwner?: string | null;
+}
+
+export const updateProspect = (draftId: string, body: UpdateProspectBody): Promise<{ ok: true }> =>
+  call(`/api/admin/founders/${draftId}/prospect`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
 
 export interface FounderDetail {
   draft: {
@@ -426,6 +436,11 @@ export interface InvitationPreview {
   recipientEmail: string | null;
   /** Bracketed markers still in the rendered message. §7's gate. */
   unresolved: string[];
+  /**
+   * §7 list items that never appear in the message, so the marker gate above
+   * cannot see them: the invitation source and the internal campaign owner.
+   */
+  missingFields: string[];
   blocked: boolean;
 }
 
@@ -689,17 +704,6 @@ export const revokeAffiliateInvitation = (
     body: JSON.stringify({ reason }),
   });
 
-export const recordPrerequisite = (
-  key: string,
-  status: 'satisfied' | 'not_satisfied',
-  note: string,
-  evidenceLinks: string[],
-): Promise<{ blocking: boolean; unsatisfiedKeys: string[] }> =>
-  call(`/api/admin/prerequisites/${encodeURIComponent(key)}`, {
-    method: 'POST',
-    body: JSON.stringify({ status, note, evidenceLinks }),
-  });
-
 /* ── Phase 09a: the §12 optional items, evidence, and the fee ─────────────── */
 
 export type AdminOptionalItemKey = 'visuals' | 'branding' | 'interview' | 'story' | 'socials';
@@ -932,108 +936,7 @@ export const scheduleCampaignLive = (
     body: JSON.stringify({ liveAt }),
   });
 
-/* ── Phase 16a: §26.5 ledger, §26.6 money, §31.7 risk, §33.12.4 overrides ─── */
-
-export interface LedgerRowState {
-  reservationId: string;
-  campaignId: string;
-  campaignType: string | null;
-  status: string;
-  reservedAt: string | null;
-  rewardSku: string | null;
-  rewardTitle: string | null;
-  rewardSubtotalCents: string;
-  salesTaxCents: string;
-  totalAuthorizedCents: string | null;
-  totalCapturedCents: string;
-  taxJurisdiction: string | null;
-  taxabilityReason: string | null;
-  taxCalculationExpiresAt: string | null;
-  taxCloseUsable: boolean | null;
-  consentAppendix: string | null;
-  consentVersion: string | null;
-  founderMarketingConsent: boolean;
-  newsletterConsent: boolean;
-  attributionSource: string | null;
-  attributionStatus: string | null;
-  linkActivatedAt: string | null;
-  capResult: string | null;
-  duplicateCaseStatus: string | null;
-  /** §25.7 restricted — rendered on screen, never written into an export. */
-  backerEmail: string | null;
-  backerPhone: string | null;
-}
-
-export interface LedgerPageState {
-  dimensions: string[];
-  rows: LedgerRowState[];
-  total: number;
-  summary: {
-    uniqueBackers: number;
-    transactions: number;
-    subtotalCents: string;
-    taxCents: string;
-    capturedCents: string;
-  };
-}
-
-export const fetchLedger = (query: string): Promise<LedgerPageState> =>
-  call<LedgerPageState>(`/api/admin/ledger${query ? `?${query}` : ''}`);
-
-export interface MoneyControlLineState {
-  key: string;
-  amounts: Record<string, string>;
-  populated: boolean;
-  populatedBy: string;
-  awaiting: string | null;
-}
-
-export interface MoneyPanelState {
-  campaignId: string;
-  campaignStatus: string;
-  lines: MoneyControlLineState[];
-  provisionalReconciles: boolean | null;
-  taxExcludedFromFees: boolean | null;
-}
-
-export const fetchMoneyControls = (campaignId: string): Promise<MoneyPanelState> =>
-  call<MoneyPanelState>(`/api/admin/money/${encodeURIComponent(campaignId)}`);
-
-export interface RiskSignalState {
-  key: string;
-  severity: 'blocking' | 'review' | 'monitor';
-  count: number;
-  instances: Array<{ id: string; detail: string }>;
-  notYetObservable: boolean;
-}
-
-export interface RiskPanelState {
-  campaignId: string | null;
-  signals: RiskSignalState[];
-  blockingKeys: string[];
-  sellerTaxReadiness: {
-    recorded: boolean;
-    ready: boolean;
-    missingFacts: string[];
-    recordedBy: string | null;
-    evidenceReference: string | null;
-    recordedAt: string | null;
-  };
-}
-
-export const fetchRiskPanel = (campaignId?: string): Promise<RiskPanelState> =>
-  call<RiskPanelState>(
-    `/api/admin/risk${campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : ''}`,
-  );
-
-export const recordSellerTaxReadiness = (
-  campaignId: string,
-  body: Record<string, string>,
-): Promise<{ ready: boolean; missingFacts: string[] }> =>
-  call(`/api/admin/risk/${encodeURIComponent(campaignId)}/seller-tax-readiness`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+/* ── Phase 16a: the §26.6 high-impact/override machine (§33.12.4) ─────────── */
 
 export interface OverridePreviewState {
   previewId: string;
@@ -1234,433 +1137,6 @@ export const recordRelationshipTouch = (
     body: JSON.stringify(body),
   });
 
-/* ── §21 close operations (Phase 18b) ──────────────────────────────────────── */
-
-export interface CloseOperationsState {
-  operations: {
-    incomplete: Array<{
-      campaignId: string;
-      batchStatus: string;
-      campaignStatus: string;
-      startedAt: string;
-      lockedReservations: number;
-      unresolvedAttempts: number;
-      openDedupCases: number;
-      recovery: string;
-    }>;
-    retryWindow: Array<{
-      campaignId: string;
-      firstFailureAt: string | null;
-      retryDeadlineAt: string | null;
-      retrying: number;
-    }>;
-    reconciling: Array<{
-      campaignId: string;
-      campaignStatus: string;
-      requiredItemsVerified: number;
-      requiredItemsTotal: number;
-      resultsPrepared: boolean;
-    }>;
-  };
-  reconciliationItems: Array<{
-    key: string;
-    spec: string;
-    evaluation: 'app' | 'admin';
-    requiredForResults: boolean;
-    waitsOn: string | null;
-  }>;
-  narrativeFields: Array<{ key: string; label: string }>;
-}
-
-export interface CloseBatchDetailState {
-  detail: {
-    campaignId: string;
-    campaignStatus: string;
-    batch: {
-      status: string;
-      startedAt: string;
-      completedAt: string | null;
-      thresholdDecision: { met: boolean; unique: number; required: number } | null;
-      retryWindowHours: number;
-      firstFailureAt: string | null;
-      retryDeadlineAt: string | null;
-    } | null;
-    reservationsByStatus: Record<string, number>;
-    attempts: Array<{
-      reservationId: string;
-      attemptNumber: number;
-      idempotencyKey: string;
-      amountCents: string;
-      outcome: string | null;
-      paymentIntentId: string | null;
-      requestedAt: string;
-      resolvedAt: string | null;
-    }>;
-  };
-  reconciliation: {
-    campaignId: string;
-    campaignStatus: string;
-    open: boolean;
-    openReason: string | null;
-    items: Array<{
-      key: string;
-      spec: string;
-      evaluation: 'app' | 'admin';
-      requiredForResults: boolean;
-      derived: Record<string, unknown> | null;
-      waitsOn: string | null;
-      latest: { result: string; note: string; actor: string; recordedAt: string } | null;
-      history: Array<{ result: string; note: string; actor: string; recordedAt: string }>;
-    }>;
-    resultsPrepared: boolean;
-  } | null;
-}
-
-export const fetchCloseOperations = (): Promise<CloseOperationsState> =>
-  call<CloseOperationsState>('/api/admin/close');
-
-export const fetchCloseDetail = (campaignId: string): Promise<CloseBatchDetailState> =>
-  call<CloseBatchDetailState>(`/api/admin/close/${encodeURIComponent(campaignId)}`);
-
-export const resumeCloseBatch = (
-  campaignId: string,
-): Promise<{ batch: { status: string }; windowEnd: { status: string } }> =>
-  call(`/api/admin/close/${encodeURIComponent(campaignId)}/resume`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-export const recordCloseReconciliation = (
-  campaignId: string,
-  body: { itemKey: string; result: 'verified' | 'discrepancy'; note: string },
-): Promise<{ record: unknown }> =>
-  call(`/api/admin/close/${encodeURIComponent(campaignId)}/reconciliation`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const prepareCloseResults = (
-  campaignId: string,
-  body: {
-    strongestSignal: string;
-    weakestSignal: string;
-    leadingSurveyReason: string;
-    whatThisProves: string;
-    whatThisDoesNotProve: string;
-  },
-): Promise<{ results: unknown }> =>
-  call(`/api/admin/close/${encodeURIComponent(campaignId)}/results`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-/* ── §22.1/§22.2 Creator earnings (Phase 19a) ──────────────────────────────── */
-
-export interface EarningsCreatorRow {
-  associationId: string;
-  associationStatus: string;
-  publicHandle: string | null;
-  email: string | null;
-  attributedCaptured: number;
-  validSubtotalCents: string;
-  latestDecision: {
-    id: string;
-    outcome: string;
-    deliverablesNote: string;
-    waiver: string | null;
-    decidedBy: string;
-    decidedAt: string;
-  } | null;
-  earnings: {
-    id: string;
-    state: string;
-    earnedPercent: number;
-    earnedBonusPercent: number;
-    commissionCents: string;
-    bonusCents: string;
-    eligibleFixedCents: string;
-    provisionalTotalCents: string;
-    earnedTotalCents: string;
-    unearnedReturnedCents: string;
-  } | null;
-  transfer: {
-    id: string;
-    status: string;
-    totalCents: string;
-    providerTransferId: string | null;
-    attemptCount: number;
-  } | null;
-  allocation: { status: string; amountCents: string } | null;
-  thankYou: Array<{ kind: string; amountCents: string | null; createdAt: string }>;
-  transferEarliestAt: string | null;
-}
-
-export interface CampaignEarningsState {
-  creators: EarningsCreatorRow[];
-  completionOutcomes: Array<{ key: string; spec: string }>;
-  thankYouEligibilityFacts: Array<{ key: string; label: string }>;
-}
-
-export const fetchCampaignEarnings = (campaignId: string): Promise<CampaignEarningsState> =>
-  call<CampaignEarningsState>(`/api/admin/close/${encodeURIComponent(campaignId)}/earnings`);
-
-export const recordCompletionDecision = (
-  associationId: string,
-  body: {
-    outcome: string;
-    deliverablesNote: string;
-    waiver?: string;
-    waiverAgreedByFounder?: boolean;
-    waiverAgreedByAdmin?: boolean;
-  },
-): Promise<{ decision: unknown; fixedAction: string }> =>
-  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/completion`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const finalizeCreatorEarnings = (associationId: string): Promise<{ earnings: unknown }> =>
-  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/finalize`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-export const approveCreatorEarnings = (associationId: string): Promise<{ earnings: unknown }> =>
-  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/approve`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-export const createCreatorTransfer = (associationId: string): Promise<{ transfer: unknown }> =>
-  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/transfer`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-export const recordCreatorThankYou = (
-  associationId: string,
-  body: {
-    kind: 'recognition' | 'payment';
-    reason: string;
-    amountCents?: string;
-    minimumWorkCompleted: boolean;
-    clickThresholdMet: boolean;
-    brandAupCompliant: boolean;
-    approvalReference?: string;
-    approvedBy?: string;
-    taxTreatment?: string;
-  },
-): Promise<{ record: unknown }> =>
-  call(`/api/admin/close/creators/${encodeURIComponent(associationId)}/thank-you`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-/* ── §22.3: the Founder payment queue (Phase 19b) ──────────────────────────── */
-
-export interface AdminFounderPaymentLine {
-  kind: 'single_payment' | 'first_payment' | 'remaining_payment';
-  label: string;
-  percent: number;
-  amountCents: string;
-  amountExact: boolean;
-  status: 'blocked' | 'eligible' | 'released';
-  blockers: string[];
-  secureAction: string | null;
-  noActionNeeded: boolean;
-  dueAt: string;
-  releasedAt: string | null;
-  releasedEarly: boolean;
-}
-
-export interface AdminFounderPaymentState {
-  status: {
-    campaignId: string;
-    model: 'idea' | 'product';
-    campaignStatus: string;
-    applicable: boolean;
-    notApplicableReason: string | null;
-    w9: {
-      state: 'not_requested' | 'requested' | 'submitted' | 'verified';
-      line: string;
-      action: string;
-      requestedAt: string | null;
-      submittedAt: string | null;
-      verifiedAt: string | null;
-      returnReason: string | null;
-      blocksPayments: boolean;
-    };
-    eligibleShare: { exact: boolean; amountCents: string; note: string };
-    payments: AdminFounderPaymentLine[];
-    nextReviewDate: string | null;
-    day14: { dueAt: string; line: string } | null;
-    earlyRelease: {
-      settingEnabled: boolean;
-      evidence: { id: string; recordedAt: string; missingFacts: string[] } | null;
-      pendingRequest: { id: string; createdAt: string } | null;
-      neverSkipsDay14: string;
-    } | null;
-  };
-  requests: Array<{
-    id: string;
-    status: 'pending' | 'approved' | 'declined';
-    message: string;
-    requestedBy: string;
-    createdAt: string;
-    decisionReason: string | null;
-  }>;
-  evidenceFacts: Array<{ key: string; label: string; note: string | null }>;
-}
-
-const founderPaymentsBase = (campaignId: string) =>
-  `/api/admin/close/${encodeURIComponent(campaignId)}/founder-payments`;
-
-export const fetchFounderPaymentQueue = (campaignId: string): Promise<AdminFounderPaymentState> =>
-  call<AdminFounderPaymentState>(founderPaymentsBase(campaignId));
-
-export const requestW9 = (campaignId: string): Promise<{ record: unknown }> =>
-  call(`${founderPaymentsBase(campaignId)}/w9/request`, { method: 'POST', body: JSON.stringify({}) });
-
-export const recordW9Receipt = (
-  campaignId: string,
-  reference: string,
-): Promise<{ record: unknown }> =>
-  call(`${founderPaymentsBase(campaignId)}/w9/submitted`, {
-    method: 'POST',
-    body: JSON.stringify({ reference }),
-  });
-
-export const decideW9 = (
-  campaignId: string,
-  decision: 'verified' | 'resubmission_required',
-  note: string,
-): Promise<{ record: unknown; status: string }> =>
-  call(`${founderPaymentsBase(campaignId)}/w9/decide`, {
-    method: 'POST',
-    body: JSON.stringify({ decision, note }),
-  });
-
-export const recordEarlyEvidence = (
-  campaignId: string,
-  facts: Record<string, { recorded: boolean; detail: string }>,
-): Promise<{ evidence: unknown; missing: string[] }> =>
-  call(`${founderPaymentsBase(campaignId)}/evidence`, {
-    method: 'POST',
-    body: JSON.stringify({ facts }),
-  });
-
-export const decideEarlyRelease = (
-  campaignId: string,
-  decision: 'approved' | 'declined',
-  reason: string,
-): Promise<{ request: unknown; status: string }> =>
-  call(`${founderPaymentsBase(campaignId)}/early-release/decide`, {
-    method: 'POST',
-    body: JSON.stringify({ decision, reason }),
-  });
-
-export const createFounderPayment = (
-  campaignId: string,
-  body: { kind: string; checksNote?: string; approvedBy?: string },
-): Promise<{ payment: unknown }> =>
-  call(founderPaymentsBase(campaignId), { method: 'POST', body: JSON.stringify(body) });
-
-export const releaseFounderPayment = (
-  campaignId: string,
-  kind: string,
-): Promise<{ payment: unknown }> =>
-  call(`${founderPaymentsBase(campaignId)}/${encodeURIComponent(kind)}/release`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-/* ── Phase 20a: refunds and §24.8 cause allocation ─────────────────────────── */
-
-export interface RefundCaseState {
-  refundId: string;
-  reference: string;
-  reservationId: string;
-  campaignId: string;
-  status: 'requested' | 'submitted' | 'succeeded' | 'failed';
-  amountCents: string;
-  ideaExceptionReason: string | null;
-  cause: string;
-  affiliateTreatment: string;
-  proovdFeeTreatment: string;
-  affiliateInvalidCents: string | null;
-  founderLiabilityCents: string;
-  evidence: string;
-  mandate: string | null;
-  recoveryNote: string | null;
-  decidedBy: string;
-  failureMessage: string | null;
-  providerRefundId: string | null;
-  createdAt: string;
-}
-
-export interface RefundQueueState {
-  cases: RefundCaseState[];
-  unreconciled: Array<{
-    providerRefundId: string;
-    reservationId: string | null;
-    campaignId: string | null;
-    amountCents: string | null;
-    status: string | null;
-    recordedAt: string;
-  }>;
-  bestEffortRecovery: string;
-  causes: Array<{
-    key: string;
-    label: string;
-    allocation: string;
-    permittedAffiliateTreatments: string[];
-    requiresMandate: boolean;
-  }>;
-  ideaExceptions: Array<{ key: string; label: string }>;
-  proovdFeeTreatments: string[];
-}
-
-export const fetchRefundQueue = (campaignId?: string): Promise<RefundQueueState> =>
-  call<RefundQueueState>(
-    `/api/admin/refunds${campaignId ? `?campaignId=${encodeURIComponent(campaignId)}` : ''}`,
-  );
-
-export interface RecordRefundCaseBody {
-  reservationId: string;
-  cause: string;
-  affiliateTreatment: string;
-  proovdFeeTreatment: string;
-  affiliateInvalidCents?: string | null;
-  founderLiabilityCents: string;
-  evidence: string;
-  recoveryNote?: string | null;
-  mandate?: string | null;
-  amountCents: string;
-  ideaExceptionReason?: string | null;
-  providerRefundId?: string | null;
-}
-
-export const recordRefundCase = (
-  body: RecordRefundCaseBody,
-): Promise<{ refund: { id: string; reference: string; status: string }; allocationId: string }> =>
-  call('/api/admin/refunds/case', { method: 'POST', body: JSON.stringify(body) });
-
-export const previewRefund = (
-  refundId: string,
-): Promise<{ previewId: string; consequences: Array<{ audience: string; text: string }>; expiresAt: string }> =>
-  call(`/api/admin/refunds/${encodeURIComponent(refundId)}/preview`, {
-    method: 'POST',
-    body: JSON.stringify({}),
-  });
-
-export const executeRefund = (
-  refundId: string,
-  previewId: string,
-): Promise<{ status: string; refund?: { id: string; reference: string; status: string } }> =>
-  call(`/api/admin/refunds/${encodeURIComponent(refundId)}/execute`, {
-    method: 'POST',
-    body: JSON.stringify({ previewId }),
-  });
 
 /* ── Phase 20b (§24.11): the dispute queue, evidence packet, classification ── */
 
@@ -1684,7 +1160,18 @@ export interface DisputeQueueEntry {
 
 export interface DisputeQueueState {
   disputes: DisputeQueueEntry[];
-  causes: RefundQueueState['causes'];
+  /**
+   * The §24.8 cause register a dispute is classified through — the same rows
+   * the refund case form used to constrain, carried here because a dispute
+   * reuses 20a's register rather than a second one.
+   */
+  causes: Array<{
+    key: string;
+    label: string;
+    allocation: string;
+    permittedAffiliateTreatments: string[];
+    requiresMandate: boolean;
+  }>;
   proovdFeeTreatments: string[];
   evidenceItems: Array<{ key: string; label: string; required: boolean }>;
   bestEffortRecovery: string;
@@ -1742,118 +1229,3 @@ export const classifyDispute = (
     body: JSON.stringify(body),
   });
 
-/* ── Phase 21a (§22.4, §22.7) — Day 14 and the one-strike ghost ban ────────── */
-
-export interface Day14QueueRowView {
-  campaignId: string;
-  campaignTitle: string | null;
-  campaignType: 'pre_build' | 'pre_launch';
-  reviewId: string;
-  dueAt: string;
-  overdue: boolean;
-  outcome: string;
-  submissionCount: number;
-  latestSubmissionAt: string | null;
-  openClarifications: number;
-  overdueClarifications: number;
-  daysSinceLastUpdate: number | null;
-  noSubstantiveUpdateInSevenDays: boolean;
-  blocksAPayment: boolean;
-}
-
-export interface Day14QueueState {
-  queue: Day14QueueRowView[];
-  failureReasons: { key: string; label: string }[];
-}
-
-export interface GhostBanCandidateView {
-  campaignId: string;
-  campaignTitle: string | null;
-  founderUserId: string | null;
-  triggersMet: string[];
-  labels: string[];
-  alreadyBanned: boolean;
-}
-
-export interface GhostBanQueueState {
-  candidates: GhostBanCandidateView[];
-  triggers: { key: string; label: string }[];
-  requiredFields: { key: string; label: string }[];
-  permanentSentence: string;
-}
-
-export const fetchDay14Queue = (): Promise<Day14QueueState> =>
-  call('/api/admin/fulfillment/day-14');
-
-export const fetchGhostBanCandidates = (): Promise<GhostBanQueueState> =>
-  call('/api/admin/fulfillment/ghost-ban/candidates');
-
-export const decideDay14 = (
-  campaignId: string,
-  body: {
-    outcome: 'pass' | 'fail';
-    adequateProgressEvidence: boolean;
-    requiredCommunication: boolean;
-    failureReasons?: string[];
-    internalReason: string;
-    customerExplanation: string;
-  },
-): Promise<{ status: string; consequences?: { key: string; label: string }[] }> =>
-  call(`/api/admin/fulfillment/campaigns/${encodeURIComponent(campaignId)}/day-14/decide`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-export const requestDay14Clarification = (
-  campaignId: string,
-  question: string,
-): Promise<{ status: string; dueAt?: string }> =>
-  call(`/api/admin/fulfillment/campaigns/${encodeURIComponent(campaignId)}/day-14/clarification`, {
-    method: 'POST',
-    body: JSON.stringify({ question }),
-  });
-
-export const recordGhostBan = (
-  campaignId: string,
-  body: {
-    trigger: string;
-    evidence: string;
-    notice: string;
-    paymentRecoveryStatus: string;
-    enforcementDecision: string;
-    internalReason: string;
-  },
-): Promise<{ status: string; banId?: string; permanentSentence?: string; met?: string[] }> =>
-  call(`/api/admin/fulfillment/campaigns/${encodeURIComponent(campaignId)}/ghost-ban`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-
-/* ── §31.9 first-cohort measurement (Phase 23b) ────────────────────────────── */
-
-export type MetricValue =
-  | {
-      state: 'not_measured';
-      reason: 'cohort_incomplete' | 'no_observations' | 'input_not_recorded';
-      invitedFounders: number;
-      cohortSize: number;
-      missingInput?: string;
-    }
-  | { state: 'measured'; unit: 'median_hours'; value: number; observations: number }
-  | { state: 'measured'; unit: 'rate'; numerator: number; denominator: number; value: number };
-
-export interface Scoreboard {
-  notMeasuredLabel: string;
-  cohortSize: number;
-  invitedFounders: number;
-  baselineEstablished: boolean;
-  metrics: Array<{ key: string; value: MetricValue }>;
-  secondary: Array<{ key: string; label: string; count: number | null; absentBecause?: string }>;
-}
-
-/**
- * A read, and there is deliberately no writer beside it. §33.12.6 forbids an
- * invented baseline, and the surest way to have none is to leave nowhere on the
- * client to send one.
- */
-export const fetchScoreboard = (): Promise<Scoreboard> => call<Scoreboard>('/api/admin/measurement');

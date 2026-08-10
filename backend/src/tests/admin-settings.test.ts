@@ -1,6 +1,9 @@
 /**
- * Phase 06a suite — global configuration and the production prerequisites
- * panel, against a real Postgres and the real `createApp` wiring.
+ * Phase 06a suite — global configuration (§6).
+ *
+ * Drives the settings surface against a real Postgres and the real `createApp`
+ * wiring. The production-prerequisites half of this suite was removed with the
+ * `/admin/prerequisites` surface and its service.
  *
  *  - Drift guard: `app_settings` mirrors `shared/src/settings/registry.ts` row
  *    for row, the same way `policy_versions` mirrors the policy register. The
@@ -8,7 +11,6 @@
  *    can disagree, one of them is lying.
  *  - §6: every constant is persisted, versioned, and audited; a `derived` value
  *    cannot be edited; a setting §6 fixes no number for ships unset.
- *  - §6: incomplete prerequisites BLOCK. Not warn.
  *  - §25.6: every change records actor, prior and new value, reason, and time.
  *  - §33.12.5: the Admin routes are the first real mount of the Phase 04
  *    guards — no session, wrong role, unenrolled factor, and stale session all
@@ -24,7 +26,7 @@ import request from 'supertest';
 import { eq, and, desc } from 'drizzle-orm';
 import type { PoolClient } from 'pg';
 
-import { startHarness, type Harness, TEST_PREREQUISITE_ENVIRONMENT } from './app-harness.js';
+import { startHarness, type Harness } from './app-harness.js';
 import { createAdmin, seedUser, signInPlain, type AdminSession } from './admin-session.js';
 import { appSettings, appSettingVersions } from '../db/schema/settings.js';
 import { auditEvents } from '../db/schema/integrity.js';
@@ -38,11 +40,6 @@ import {
   seedAdminReauthWindow,
   SettingNotConfigured,
 } from '../settings/service.js';
-import {
-  readPrerequisites,
-  recordPrerequisite,
-  PREREQUISITE_DEFINITIONS,
-} from '../admin/prerequisites.js';
 import { parseValue } from '../settings/values.js';
 import {
   SETTING_DEFINITIONS,
@@ -435,131 +432,6 @@ describe('the Admin reauthentication window is seeded once, then owned by the se
   });
 });
 
-/* ── §6 prerequisites fail closed ──────────────────────────────────────────── */
-
-describe('§6 production prerequisites block rather than warn', () => {
-  it('covers every item §6 names', () => {
-    expect(PREREQUISITE_DEFINITIONS.map((d) => d.key)).toEqual([
-      'public_routes',
-      'policies',
-      'support_details',
-      'sample_campaigns',
-      'transactional_email',
-      'stripe_key_separation',
-      'webhook_endpoints',
-      'tax_configuration',
-      'pilot_feature_flags',
-      'operating_constants',
-    ]);
-  });
-
-  it('blocks on the shipped state, and every unsatisfied item says what would satisfy it', async () => {
-    const panel = await readPrerequisites(h.db, TEST_PREREQUISITE_ENVIRONMENT);
-
-    expect(panel.blocking).toBe(true);
-    expect(panel.unsatisfiedKeys.length).toBeGreaterThan(0);
-
-    for (const item of panel.items) {
-      expect(item.definition.requirement).toBeTruthy();
-      expect(item.detail).toBeTruthy();
-    }
-  });
-
-  it('treats an unverified recorded item as unsatisfied, not as unknown', async () => {
-    const panel = await readPrerequisites(h.db, TEST_PREREQUISITE_ENVIRONMENT);
-    const routes = panel.items.find((i) => i.definition.key === 'public_routes')!;
-    expect(routes.satisfied).toBe(false);
-    expect(routes.attestation).toBeNull();
-    expect(routes.detail).toMatch(/Not verified yet/);
-  });
-
-  it('blocks on the policy gate while any document is a draft', async () => {
-    const panel = await readPrerequisites(h.db, TEST_PREREQUISITE_ENVIRONMENT);
-    const policies = panel.items.find((i) => i.definition.key === 'policies')!;
-    expect(policies.satisfied).toBe(false);
-    expect(policies.detail).toMatch(/still in draft/);
-  });
-
-  it('blocks on unset operating constants and names them', async () => {
-    const panel = await readPrerequisites(h.db, TEST_PREREQUISITE_ENVIRONMENT);
-    const constants = panel.items.find((i) => i.definition.key === 'operating_constants')!;
-    expect(constants.satisfied).toBe(false);
-    expect(constants.detail).toMatch(/have no value yet/);
-    // Keys, not labels — the Admin surface renders the label from the register
-    // it imports, so no §6 prose is duplicated server-side.
-    expect(constants.subjectKeys).toContain('interview_providers');
-  });
-
-  it('blocks on a missing webhook secret and names which stream is unprotected', async () => {
-    const panel = await readPrerequisites(h.db, {
-      ...TEST_PREREQUISITE_ENVIRONMENT,
-      platformWebhookSecretPresent: true,
-      connectWebhookSecretPresent: false,
-    });
-    const webhooks = panel.items.find((i) => i.definition.key === 'webhook_endpoints')!;
-    expect(webhooks.satisfied).toBe(false);
-    expect(webhooks.subjectKeys).toEqual(['connect']);
-  });
-
-  it('records an attestation with a named person, a note, and evidence', async () => {
-    const recorded = await recordPrerequisite(h.db, {
-      prerequisiteKey: 'sample_campaigns',
-      status: 'satisfied',
-      recordedBy: 'user:test-admin',
-      note: 'Both sample pages inspected: no form, input, iframe, or provider script in the DOM.',
-      evidenceLinks: ['https://example.test/run/1'],
-    });
-    expect(recorded).toEqual({ ok: true });
-
-    const panel = await readPrerequisites(h.db, TEST_PREREQUISITE_ENVIRONMENT);
-    const samples = panel.items.find((i) => i.definition.key === 'sample_campaigns')!;
-    expect(samples.satisfied).toBe(true);
-    expect(samples.attestation?.recordedBy).toBe('user:test-admin');
-    // The panel still blocks — one satisfied item is not a satisfied gate.
-    expect(panel.blocking).toBe(true);
-  });
-
-  it('lets a later row withdraw an earlier attestation without erasing it', async () => {
-    await recordPrerequisite(h.db, {
-      prerequisiteKey: 'sample_campaigns',
-      status: 'not_satisfied',
-      recordedBy: 'user:second-admin',
-      note: 'A payment iframe appeared on the Product sample after the last deploy.',
-    });
-
-    const panel = await readPrerequisites(h.db, TEST_PREREQUISITE_ENVIRONMENT);
-    const samples = panel.items.find((i) => i.definition.key === 'sample_campaigns')!;
-    expect(samples.satisfied).toBe(false);
-    expect(samples.attestation?.recordedBy).toBe('user:second-admin');
-
-    const { rows } = await h.pool.query<{ count: string }>(
-      `SELECT count(*)::text AS count FROM production_prerequisites WHERE prerequisite_key = 'sample_campaigns'`,
-    );
-    expect(Number(rows[0]!.count)).toBe(2);
-  });
-
-  it('refuses a human attestation over an automatic check', async () => {
-    const result = await recordPrerequisite(h.db, {
-      prerequisiteKey: 'policies',
-      status: 'satisfied',
-      recordedBy: 'user:test-admin',
-      note: 'Counsel says the documents are fine.',
-    });
-    expect(result.ok).toBe(false);
-    expect(result.ok === false && result.message).toMatch(/checked by the system/);
-  });
-
-  it('refuses an attestation with no note', async () => {
-    const result = await recordPrerequisite(h.db, {
-      prerequisiteKey: 'tax_configuration',
-      status: 'satisfied',
-      recordedBy: 'user:test-admin',
-      note: '  ',
-    });
-    expect(result.ok).toBe(false);
-  });
-});
-
 /* ── The guards, on a real product surface (§33.12.5) ──────────────────────── */
 
 describe('the Admin routes are guarded (§5.1, §28.2, §33.12.5)', () => {
@@ -669,21 +541,6 @@ describe('the Admin routes are guarded (§5.1, §28.2, §33.12.5)', () => {
       admin = await createAdmin(h, 'settings-admin-refreshed');
     }
   });
-
-  it('reports the prerequisites panel as blocking to an Admin', async () => {
-    const res = await request(h.app)
-      .get('/api/admin/prerequisites')
-      .set('cookie', admin.cookie)
-      .expect(200);
-
-    expect(res.body.blocking).toBe(true);
-    expect(res.body.items).toHaveLength(PREREQUISITE_DEFINITIONS.length);
-    for (const item of res.body.items) {
-      expect(typeof item.satisfied).toBe('boolean');
-      expect(item.requirement).toBeTruthy();
-    }
-  });
-
   it('rejects a settings write with no value or no reason', async () => {
     await seedAdminReauthWindow(h.db, 3600);
     try {

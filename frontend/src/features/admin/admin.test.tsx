@@ -5,7 +5,7 @@
  * suite does, and stub `fetch` at the network boundary. Everything above that
  * boundary is the code that ships: the layout's session gate, the two-step
  * sign-in, the settings rows built from the shared §6 register, the §9 save
- * vocabulary, and the fail-closed prerequisites panel.
+ * vocabulary. The fail-closed prerequisites panel went with its surface.
  *
  * What is deliberately NOT asserted here: that an unauthenticated caller is
  * refused. That is a server fact, proved in `backend/src/tests/admin-settings.test.ts`
@@ -64,7 +64,6 @@ const IDENTITY = {
   name: 'Ada Admin',
   email: 'ada@proovd.co',
   sessionEstablishedAt: '2026-07-31T09:00:00.000Z',
-  prerequisiteKeys: [],
 };
 
 /** Settings state matching the register, so the surface renders every row. */
@@ -87,46 +86,11 @@ function settingsPayload(overrides: Record<string, string | null> = {}) {
   };
 }
 
-const PREREQ_ITEMS = [
-  {
-    key: 'policies',
-    label: 'Canonical policy documents',
-    specRef: '§6, §31.4, §34 condition 4',
-    verification: 'automatic' as const,
-    requirement: 'All eight §31.4 documents exist and are published.',
-    satisfied: false,
-    detail: '8 policy document(s) still in draft: terms, privacy',
-    subjectKeys: ['terms', 'privacy'],
-    attestation: null,
-  },
-  {
-    key: 'sample_campaigns',
-    label: 'Sample campaigns collect nothing',
-    specRef: '§6, §34, Appendix A.6',
-    verification: 'recorded' as const,
-    requirement: 'Both sample campaigns mount no payment field at all.',
-    satisfied: false,
-    detail: 'Not verified yet. A named person has to check this and record what they found.',
-    subjectKeys: [],
-    attestation: null,
-  },
-];
-
-function stubSignedIn(settings = settingsPayload(), prereqs = PREREQ_ITEMS) {
+function stubSignedIn(settings = settingsPayload()) {
   handlers.push((url, init) => {
     if (url === '/api/admin/me') return { status: 200, body: IDENTITY };
     if (url === '/api/admin/settings' && (init?.method ?? 'GET') === 'GET') {
       return { status: 200, body: settings };
-    }
-    if (url === '/api/admin/prerequisites') {
-      return {
-        status: 200,
-        body: {
-          blocking: prereqs.some((p) => !p.satisfied),
-          unsatisfiedKeys: prereqs.filter((p) => !p.satisfied).map((p) => p.key),
-          items: prereqs,
-        },
-      };
     }
     return undefined as never;
   });
@@ -469,102 +433,11 @@ describe('§9 save vocabulary', () => {
     expect(MAX_SAVE_ATTEMPTS).toBeGreaterThan(1);
   });
 });
-
-/* ── Production prerequisites (§6) ────────────────────────────────────────── */
-
-describe('the prerequisites panel fails closed', () => {
-  it('states that live card collection is unavailable, and offers no override', async () => {
-    stubSignedIn();
-    renderAdmin('/admin/prerequisites');
-
-    expect(
-      await screen.findByText(/live card collection is unavailable/i),
-    ).toBeInTheDocument();
-
-    // §34 is released by satisfying it. Nothing here starts live mode.
-    for (const name of [/enable live/i, /override/i, /proceed anyway/i, /go live/i, /skip/i]) {
-      expect(screen.queryByRole('button', { name })).toBeNull();
-    }
-  });
-
-  it('labels an automatic check apart from a human one (§1.4)', async () => {
-    stubSignedIn();
-    renderAdmin('/admin/prerequisites');
-
-    await screen.findByRole('heading', { name: /production prerequisites/i });
-
-    const automatic = screen
-      .getByRole('heading', { name: /canonical policy documents/i })
-      .closest('.prereq') as HTMLElement;
-    expect(within(automatic).getByText('Checked by Proovd')).toBeInTheDocument();
-    expect(within(automatic).queryByRole('button', { name: /record/i })).toBeNull();
-
-    const recorded = screen
-      .getByRole('heading', { name: /sample campaigns collect nothing/i })
-      .closest('.prereq') as HTMLElement;
-    expect(within(recorded).getByText('Verified by a person')).toBeInTheDocument();
-    expect(within(recorded).getByRole('button', { name: /record a check/i })).toBeInTheDocument();
-  });
-
-  it('will not record an attestation with no note', async () => {
-    const user = userEvent.setup();
-    stubSignedIn();
-    renderAdmin('/admin/prerequisites');
-
-    await screen.findByRole('heading', { name: /production prerequisites/i });
-
-    const row = screen
-      .getByRole('heading', { name: /sample campaigns collect nothing/i })
-      .closest('.prereq') as HTMLElement;
-
-    await user.click(within(row).getByRole('button', { name: /record a check/i }));
-    expect(within(row).getByRole('button', { name: /record as satisfied/i })).toBeDisabled();
-
-    await user.type(
-      within(row).getByLabelText(/what did you check/i),
-      'Inspected both sample pages: no form, input, iframe, or provider script.',
-    );
-    expect(within(row).getByRole('button', { name: /record as satisfied/i })).toBeEnabled();
-  });
-
-  it('records the check with its note and evidence', async () => {
-    const user = userEvent.setup();
-    stubSignedIn();
-    handlers.unshift((url, init) =>
-      url === '/api/admin/prerequisites/sample_campaigns' && init?.method === 'POST'
-        ? { status: 201, body: { blocking: true, unsatisfiedKeys: ['policies'] } }
-        : (undefined as never),
-    );
-
-    renderAdmin('/admin/prerequisites');
-    await screen.findByRole('heading', { name: /production prerequisites/i });
-
-    const row = screen
-      .getByRole('heading', { name: /sample campaigns collect nothing/i })
-      .closest('.prereq') as HTMLElement;
-
-    await user.click(within(row).getByRole('button', { name: /record a check/i }));
-    await user.type(within(row).getByLabelText(/what did you check/i), 'No payment field in the DOM.');
-    await user.type(within(row).getByLabelText(/evidence links/i), 'https://example.test/run/1');
-    await user.click(within(row).getByRole('button', { name: /record as satisfied/i }));
-
-    await waitFor(() => {
-      const post = requests.find((r) => r.method === 'POST');
-      expect(post?.body).toEqual({
-        status: 'satisfied',
-        note: 'No payment field in the DOM.',
-        evidenceLinks: ['https://example.test/run/1'],
-      });
-    });
-  });
-});
-
 /* ── Accessibility (§33.11) ───────────────────────────────────────────────── */
 
 describe('§33.11 the Admin surfaces are operable', () => {
   it.each([
     ['/admin/settings', /global configuration/i],
-    ['/admin/prerequisites', /production prerequisites/i],
   ])('has no axe violations at %s', async (path, heading) => {
     stubSignedIn();
     const { container } = renderAdmin(path);

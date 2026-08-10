@@ -233,6 +233,9 @@ export async function anonymiseDraft(
           affiliateSourcingHypothesis: null,
           adminNotes: null,
           discoveryEvidence: null,
+          // When we last spoke to them is a fact about a person, so §25.8's
+          // "irreversibly anonymized" covers it like every other field here.
+          lastContactAt: null,
           anonymisedAt: now,
         })
         .where(eq(founderProspects.id, due.prospectId));

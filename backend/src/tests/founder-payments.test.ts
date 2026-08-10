@@ -60,7 +60,6 @@ import {
   sweepFounderPaymentSchedule,
   looksLikeTin,
 } from '../close/founder-payments.js';
-import { readMoneyControls } from '../admin/money-controls.js';
 import { formatCents } from '../reservations/restated.js';
 import {
   W9_STATUSES as BACKEND_W9_STATUSES,
@@ -798,13 +797,10 @@ describe('§33.8.9 / §33.8.10 — the W-9 block and the Idea single payment', (
     expect(founderView.eligibleShare.amountCents).toBe(EXPECTED_SHARE.toString());
     expect(founderView.payments[0].status).toBe('released');
 
-    // The §26.6 money-control line reads the same resolver.
-    const controls = await readMoneyControls(h.db, campaignId);
-    const line = controls!.lines.find((l) => l.key === 'founder_payment')!;
-    expect(line.populated).toBe(true);
-    expect(line.amounts['eligibleShareCents']).toBe(EXPECTED_SHARE.toString());
-    expect(line.amounts['single_payment_cents']).toBe(EXPECTED_SHARE.toString());
-    expect(line.amounts['releasedTotalCents']).toBe(EXPECTED_SHARE.toString());
+    // §33.8.13's "one source, many renderers" — the §26.6 money-control line
+    // was a third renderer of `readFounderPaymentStatus` and went with the
+    // Admin money panel. The Founder and Admin views above are the two that
+    // remain, and they are compared against each other and the stored amount.
 
     // The release email carried the identical amount.
     expect(

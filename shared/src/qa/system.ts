@@ -487,6 +487,12 @@ export const UNGATED_ADMIN_WRITES = [
       'Composes a draft invitation. The send is a separate act, and the §7 preview gate re-decides server-side whatever this wrote.',
   },
   {
+    route: 'PUT /api/admin/founders/:draftId/prospect',
+    specRef: '§7',
+    reason:
+      'Records the rest of §7’s invitation-creation list — the product, the invitation source, the campaign owner, notes, evidence — against an unsent draft. Same act as composing the message, and gated the same way: it reaches nobody, and Send re-decides server-side, refusing while the source or the owner is blank.',
+  },
+  {
     route: 'POST /api/admin/affiliates',
     specRef: '§8',
     reason: 'Creates a Creator prospect and its association. No money, no standing, no configuration.',

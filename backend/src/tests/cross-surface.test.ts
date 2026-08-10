@@ -41,7 +41,7 @@ import {
 } from '@proovd/shared';
 
 import { startHarness, type Harness } from './app-harness.js';
-import { seedUser, createAdmin, type AdminSession } from './admin-session.js';
+import { seedUser } from './admin-session.js';
 import { seedAdminReauthWindow } from '../settings/service.js';
 import { createAuditWriter } from '../auth/audit.js';
 import { createMemoryStripeGateway, type MemoryStripeGateway } from '../payments/stripe-client.js';
@@ -69,7 +69,6 @@ const gateway: MemoryStripeGateway = createMemoryStripeGateway({
 });
 
 let h: Harness;
-let admin: AdminSession;
 
 const CONTEXT = {
   appBaseUrl: 'http://localhost:3000',
@@ -82,7 +81,6 @@ beforeAll(async () => {
     { stripeGateway: gateway, authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
     'cross-surface',
   );
-  admin = await createAdmin(h, 'cross-surface-admin');
   await seedAdminReauthWindow(h.db, 900);
 }, 180_000);
 
@@ -294,7 +292,7 @@ function policySnapshot(item: Record<string, unknown>): Record<string, unknown> 
  * §27.8's promise, as the surface and the inbox each render it.
  *
  * The published *sentence* lives in the site footer, which is not one of these
- * seven surfaces. What a Backer asking for help is actually told is Appendix
+ * surfaces. What a Backer asking for help is actually told is Appendix
  * B.8's `Human response due:` line — the deadline that promise produced — and
  * it is rendered twice: once into the HTTP response the magic-link page shows,
  * once into the acknowledgement email. Comparing that line is how "the string
@@ -377,17 +375,10 @@ beforeAll(async () => {
     .slice(supportBefore)
     .find((m) => /received your message|support/i.test(`${m.subject} ${m.text ?? ''}`));
 
-  /* 6. The Admin ledger row (§26.5). */
-  const ledgerRes = await request(h.app)
-    .get(`/api/admin/ledger?campaignId=${campaignId}`)
-    .set('cookie', admin.cookie)
-    .expect(200);
-  const row = ledgerRes.body.rows.find(
-    (r: { reservationId: string }) => r.reservationId === reservationId,
-  );
-  expect(row, 'the pre-order is not in the ledger').toBeTruthy();
-
-  /* 7. The §24.11 evidence packet, from a real dispute on the captured charge. */
+  /* 6. The §24.11 evidence packet, from a real dispute on the captured charge.
+     §33.11.5's seventh surface was the §26.5 Admin ledger row; that surface and
+     its read were removed with the Admin money panels, so the register carries
+     six and this walk reads six. */
   await h.db
     .update(campaigns)
     .set({ campaignCloseAt: new Date(Date.now() - 60_000) })
@@ -520,16 +511,6 @@ beforeAll(async () => {
       descriptor: transaction.statementDescriptor,
       sla: slaLine(String(supportRes.body.acknowledgement ?? '')),
     },
-    admin: {
-      reward: row.rewardTitle,
-      amounts: amounts(row.rewardSubtotalCents, row.salesTaxCents, row.totalAuthorizedCents),
-      seller: seeded.founderLegalName,
-      trigger: null,
-      delivery: null,
-      policy: null,
-      descriptor: captured!.statementDescriptor,
-      sla: null,
-    },
     evidence: {
       reward: String(packetAmounts['rewardTitle'] ?? ''),
       amounts: amounts(
@@ -554,8 +535,8 @@ beforeAll(async () => {
 
 /* ── §33.11.5 ──────────────────────────────────────────────────────────────── */
 
-describe('§33.11.5 — seven surfaces, eight facts, one pre-order', () => {
-  it('reads every one of the seven surfaces', () => {
+describe('§33.11.5 — six surfaces, eight facts, one pre-order', () => {
+  it('reads every one of the six surfaces', () => {
     for (const surface of CONSISTENCY_SURFACE_KEYS) {
       expect(facts[surface], `${surface} was not read`).toBeTruthy();
     }

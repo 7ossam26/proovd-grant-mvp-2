@@ -3,9 +3,11 @@
  *
  * §33.11 is seven sentences of prose about everything built so far: "full
  * principal flows pass", "every CTA names the actual action", "campaign,
- * checkout, confirmation, email, magic link, Admin, and evidence agree". Read as
+ * checkout, confirmation, email, magic link, and evidence agree" (the Admin
+ * ledger surface §33.11.5 also named was removed with the rest of the Admin
+ * money panels). Read as
  * prose those are a review; read as registers they are a test, and the phase's
- * own trap says why the difference matters — eight facts across seven surfaces
+ * own trap says why the difference matters — eight facts across six surfaces
  * is beyond what a person checks reliably, and a flow nobody listed is a flow
  * nobody swept.
  *
@@ -190,18 +192,11 @@ export const PRINCIPAL_FLOWS = [
     audience: 'admin',
     routes: [
       '/admin/settings',
-      '/admin/prerequisites',
       '/admin/founders',
       '/admin/creators',
-      '/admin/ledger',
-      '/admin/money',
-      '/admin/risk',
       '/admin/support',
-      '/admin/close',
-      '/admin/refunds',
-      '/admin/fulfillment',
+      '/admin/campaign-operations',
       '/admin/notifications',
-      '/admin/measurement',
     ],
     keyboardPathRequired: true,
   },
@@ -468,11 +463,6 @@ export const CONSISTENCY_SURFACES = {
     description: 'The campaign-scoped magic-link page, the Backer’s durable copy.',
     readBy: 'backend/src/reservations/backer-page.ts — readBackerPage',
   },
-  admin: {
-    specRef: '§26.5',
-    description: 'The Admin ledger row and the support context beside it.',
-    readBy: 'backend/src/admin/ledger.ts — listLedger',
-  },
   evidence: {
     specRef: '§24.11',
     description: 'The dispute evidence packet assembled from stored records.',
@@ -515,45 +505,45 @@ export const CONSISTENCY_FACTS = {
   reward: {
     specRef: '§18, §19',
     description: 'The reward package the pre-order is for, by its name.',
-    requiredOn: ['campaign', 'checkout', 'confirmation', 'email', 'magic_link', 'admin', 'evidence'],
+    requiredOn: ['campaign', 'checkout', 'confirmation', 'email', 'magic_link', 'evidence'],
   },
   amounts: {
     specRef: '§19, §24.3',
     description: 'Subtotal, sales tax, and total, in integer cents.',
-    requiredOn: ['checkout', 'confirmation', 'email', 'magic_link', 'admin', 'evidence'],
+    requiredOn: ['checkout', 'confirmation', 'email', 'magic_link', 'evidence'],
     absentBecause:
       'The campaign page shows the reward price; a total exists only once there is a billing address to tax against (§24.3).',
   },
   seller: {
     specRef: '§2.1, §3.3',
     description: 'The Founder as merchant of record, by the name that is disclosed.',
-    requiredOn: ['campaign', 'checkout', 'confirmation', 'email', 'magic_link', 'admin', 'evidence'],
+    requiredOn: ['campaign', 'checkout', 'confirmation', 'email', 'magic_link', 'evidence'],
   },
   trigger: {
     specRef: '§19, §21',
     description: 'The disclosed rule under which the card is charged later.',
     requiredOn: ['campaign', 'checkout', 'confirmation', 'email', 'magic_link'],
     absentBecause:
-      'The Admin ledger row and the evidence packet carry the reservation’s own state and its stored snapshots rather than the campaign’s charge rule — the ledger names the campaign the rule belongs to, and §24.11 asks the packet for the consent and the disclosure version, which is where the rule the Backer agreed to actually lives.',
+      'The evidence packet carries the reservation’s own state and its stored snapshots rather than the campaign’s charge rule — §24.11 asks it for the consent and the disclosure version, which is where the rule the Backer agreed to actually lives.',
   },
   delivery: {
     specRef: '§18, §22.5',
     description: 'The delivery commitment the Backer was shown.',
     requiredOn: ['campaign', 'checkout', 'confirmation', 'email', 'magic_link', 'evidence'],
     absentBecause:
-      'Delivery is a campaign-level promise; the ledger row reports money, and §22.5 tracks the commitment on its own record.',
+      'Delivery is a campaign-level promise, and §22.5 tracks the commitment on its own record.',
   },
   policy: {
     specRef: '§24.10',
     description: 'The refund and cancellation policy version the pre-order was made under.',
     requiredOn: ['campaign', 'checkout', 'confirmation', 'magic_link', 'evidence'],
     absentBecause:
-      'A transactional message names the recovery path rather than reciting a policy version (§27.2), and the Admin ledger row stores the snapshot the evidence packet reads back rather than restating it as a line.',
+      'A transactional message names the recovery path rather than reciting a policy version (§27.2); the snapshot itself is what the evidence packet reads back.',
   },
   descriptor: {
     specRef: '§24.12',
     description: 'The statement descriptor the charge will appear under.',
-    requiredOn: ['checkout', 'confirmation', 'email', 'magic_link', 'admin', 'evidence'],
+    requiredOn: ['checkout', 'confirmation', 'email', 'magic_link', 'evidence'],
     absentBecause:
       'A descriptor belongs to a card charge. The campaign page is read by people who have not pre-ordered, and asserting one there implies a charge that does not exist (§30).',
   },

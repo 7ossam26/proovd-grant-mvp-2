@@ -14,7 +14,6 @@ import { CampaignPage } from './features/public/campaign/CampaignPage.js';
 import { LiveCampaignPage } from './features/public/campaign/LiveCampaignPage.js';
 import { AdminLayout } from './features/admin/AdminLayout.js';
 import { SettingsPage } from './features/admin/SettingsPage.js';
-import { PrerequisitesPage } from './features/admin/PrerequisitesPage.js';
 import { FoundersPage } from './features/admin/FoundersPage.js';
 import { FounderDetail } from './features/admin/FounderDetail.js';
 import { CampaignCreators } from './features/admin/CampaignCreators.js';
@@ -35,15 +34,8 @@ import {
   FounderNotificationSettings,
 } from './surfaces/notifications/NotificationSettings.js';
 import { CreatorReadinessPanel } from './features/admin/CreatorReadiness.js';
-import { LedgerPage } from './features/admin/Ledger.js';
-import { MoneyControlsPage } from './features/admin/MoneyControls.js';
-import { RiskPanelPage } from './features/admin/RiskPanel.js';
-import { MeasurementPage } from './features/admin/Measurement.js';
 import { SupportQueuePage } from './features/admin/SupportQueue.js';
 import { CampaignOperationsPage } from './features/admin/CampaignOperations.js';
-import { CloseOperationsPage } from './features/admin/CloseOperations.js';
-import { RefundsPage } from './features/admin/Refunds.js';
-import { AdminFulfillmentPage } from './features/admin/Fulfillment.js';
 import { AdminNotificationsPage } from './features/admin/Notifications.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
@@ -158,41 +150,17 @@ const rootChildren: RouteObject[] = [
       // Phase 13 (§16). Scoped to one campaign by query string, like the
       // Creators and optional-items panels: readiness is always one campaign's.
       { path: 'creator-readiness', element: <CreatorReadinessPanel /> },
-      // Phase 16a (§26.5, §26.6, §31.7). The ledger sweeps every campaign by
-      // default and narrows by filter; money and risk are per-campaign, scoped
-      // by query string like the panels above — money reconciles per campaign
-      // and §31.7's seller tax readiness is a campaign's own gate.
-      { path: 'ledger', element: <LedgerPage /> },
-      { path: 'money', element: <MoneyControlsPage /> },
-      { path: 'risk', element: <RiskPanelPage /> },
-      // Phase 23b (§31.9, §33.12.6). Account-wide rather than campaign-scoped:
-      // a cohort is the first ten Founders, not one campaign's.
-      { path: 'measurement', element: <MeasurementPage /> },
       // Phase 16b (§26.7, §26.8, §27.8). The support queue sweeps every case and
       // opens one by query string; campaign operations — timeline, enforcement,
       // and relationship touches — is campaign-scoped like the panels above.
       { path: 'support', element: <SupportQueuePage /> },
       { path: 'campaign-operations', element: <CampaignOperationsPage /> },
-      // Phase 18b (§21, §33.7.12). The close-operations queue: incomplete
-      // batches first (visibly recoverable), then open retry windows, then
-      // reconciliation and results preparation, scoped per campaign by query
-      // string like the panels above.
-      { path: 'close', element: <CloseOperationsPage /> },
-      // Phase 20a (§24.8, §24.9). Refund cases with their cause allocation,
-      // the Founder-issued provider refunds awaiting classification, and the
-      // preview-then-execute machine — campaign-scoped by query string.
-      { path: 'refunds', element: <RefundsPage /> },
-      // Phase 21a (§22.4, §22.7). The Day 14 Progress Check queue — overdue
-      // first — and the campaigns whose stored records already meet a §22.7 ban
-      // trigger. Every decision here takes the freshness gate on the server.
-      { path: 'fulfillment', element: <AdminFulfillmentPage /> },
       // Phase 22c (§27.7, §27.2). The delivery history for any address — "did
       // they get the email" is the first question of half the support cases —
       // and the message preview, which reports the §27.2 contract and sends
       // nothing to anyone.
       { path: 'notifications', element: <AdminNotificationsPage /> },
       { path: 'settings', element: <SettingsPage /> },
-      { path: 'prerequisites', element: <PrerequisitesPage /> },
     ],
   },
   {

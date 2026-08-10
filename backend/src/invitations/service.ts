@@ -80,12 +80,30 @@ export interface InvitationContext {
 
 /* ── Creating a prospect and its campaign container (§7) ───────────────────── */
 
+/**
+ * §7 describes two acts, and this is the first of them.
+ *
+ * "Admin creates a Founder prospect and the initial campaign container after
+ * off-platform discovery" is the moment somebody is written down. "The
+ * invitation-creation surface contains: …" is a separate list, belonging to the
+ * surface where the invitation is actually composed — which is why only the two
+ * facts that identify the person are required here. Everything else on §7's
+ * list is filled in through `updateProspect` before Send, and is enforced
+ * there rather than being demanded from an Admin who has just got off a call.
+ *
+ * Requiring the whole list at discovery time did not make the record more
+ * complete; it made an Admin type a placeholder into `invitationSource` to get
+ * past the form, which is a worse record than an honestly incomplete one — the
+ * reasoning §5.3's verification evidence already records for the same shape.
+ */
 export interface CreateProspectInput {
   legalName: string;
   preferredName?: string | null;
   email: string;
   phone?: string | null;
-  productName: string;
+  /** When Proovd last spoke to them off-platform. Not a schedule (§30). */
+  lastContactAt?: Date | null;
+  productName?: string | null;
   productUrl?: string | null;
   launchFrame?: string | null;
   usAgeFit?: string | null;
@@ -94,8 +112,8 @@ export interface CreateProspectInput {
   affiliateSourcingHypothesis?: string | null;
   adminNotes?: string | null;
   discoveryEvidence?: readonly string[] | null;
-  invitationSource: string;
-  internalOwner: string;
+  invitationSource?: string | null;
+  internalOwner?: string | null;
   /** `user:<id>` of the Admin. */
   actor: string;
 }
@@ -127,7 +145,8 @@ export async function createProspect(
         preferredName: input.preferredName?.trim() || null,
         email: input.email.trim().toLowerCase(),
         phone: input.phone?.trim() || null,
-        productName: input.productName.trim(),
+        lastContactAt: input.lastContactAt ?? null,
+        productName: input.productName?.trim() || null,
         productUrl: input.productUrl?.trim() || null,
         launchFrame: input.launchFrame?.trim() || null,
         usAgeFit: input.usAgeFit?.trim() || null,
@@ -136,8 +155,8 @@ export async function createProspect(
         affiliateSourcingHypothesis: input.affiliateSourcingHypothesis?.trim() || null,
         adminNotes: input.adminNotes?.trim() || null,
         discoveryEvidence: input.discoveryEvidence ? [...input.discoveryEvidence] : null,
-        invitationSource: input.invitationSource.trim(),
-        internalOwner: input.internalOwner.trim(),
+        invitationSource: input.invitationSource?.trim() || null,
+        internalOwner: input.internalOwner?.trim() || null,
         createdBy: input.actor,
       })
       .returning({ id: founderProspects.id });
@@ -170,17 +189,131 @@ export async function createProspect(
       targetType: 'campaign_draft',
       targetId: draft!.id,
       action: 'invitation.prospect_created',
-      internalReason: `prospect created from ${input.invitationSource}; owner ${input.internalOwner}`,
+      internalReason: `prospect created from ${input.invitationSource?.trim() || 'a source not yet recorded'}; owner ${input.internalOwner?.trim() || 'not yet assigned'}`,
       customerExplanation: null,
       newValue: {
         prospectId: prospect!.id,
         campaignId: campaign!.id,
-        productName: input.productName,
+        productName: input.productName?.trim() || null,
       },
     });
 
     return { prospectId: prospect!.id, campaignId: campaign!.id, draftId: draft!.id };
   });
+}
+
+/* ── The rest of §7's invitation-creation surface ─────────────────────────── */
+
+/**
+ * The §7 fields the invitation-creation surface owns, filled in on the draft
+ * detail surface rather than at discovery.
+ *
+ * `undefined` means "not in this request" and writes nothing — §9's autosave
+ * rule, which this file has to honour for the same reason: a partial write that
+ * blanked the fields it was not given would silently erase an invitation source
+ * an Admin recorded last week.
+ */
+export interface UpdateProspectInput {
+  preferredName?: string | null;
+  phone?: string | null;
+  lastContactAt?: Date | null;
+  productName?: string | null;
+  productUrl?: string | null;
+  launchFrame?: string | null;
+  usAgeFit?: string | null;
+  deliveryFeasibility?: string | null;
+  compensationExpectations?: string | null;
+  affiliateSourcingHypothesis?: string | null;
+  adminNotes?: string | null;
+  discoveryEvidence?: readonly string[] | null;
+  invitationSource?: string | null;
+  internalOwner?: string | null;
+  actor: string;
+}
+
+const PROSPECT_TEXT_FIELDS = [
+  'preferredName',
+  'phone',
+  'productName',
+  'productUrl',
+  'launchFrame',
+  'usAgeFit',
+  'deliveryFeasibility',
+  'compensationExpectations',
+  'affiliateSourcingHypothesis',
+  'adminNotes',
+  'invitationSource',
+  'internalOwner',
+] as const;
+
+export async function updateProspect(
+  db: Database,
+  draftId: string,
+  input: UpdateProspectInput,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const record = await readDraft(db, draftId);
+  if (!record) return { ok: false, message: 'That draft does not exist.' };
+  if (record.prospect.anonymisedAt) {
+    return {
+      ok: false,
+      message:
+        'This prospect was anonymised after 30 calendar days without a claim. Its content is gone and cannot be restored — create a new prospect if you want to invite them again.',
+    };
+  }
+
+  const prior: Record<string, unknown> = {};
+  const next: Record<string, unknown> = {};
+
+  for (const field of PROSPECT_TEXT_FIELDS) {
+    const supplied = input[field];
+    if (supplied === undefined) continue;
+    prior[field] = record.prospect[field];
+    next[field] = supplied?.trim() || null;
+  }
+  if (input.lastContactAt !== undefined) {
+    prior['lastContactAt'] = record.prospect.lastContactAt;
+    next['lastContactAt'] = input.lastContactAt;
+  }
+  if (input.discoveryEvidence !== undefined) {
+    prior['discoveryEvidence'] = record.prospect.discoveryEvidence;
+    next['discoveryEvidence'] = input.discoveryEvidence ? [...input.discoveryEvidence] : null;
+  }
+
+  if (Object.keys(next).length === 0) return { ok: true };
+
+  await db.transaction(async (tx) => {
+    await tx.update(founderProspects).set(next).where(eq(founderProspects.id, record.prospect.id));
+    await tx.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_draft',
+      targetId: draftId,
+      action: 'invitation.prospect_updated',
+      internalReason: 'invitation-creation fields edited',
+      customerExplanation: null,
+      priorValue: prior,
+      newValue: next,
+    });
+  });
+
+  return { ok: true };
+}
+
+/**
+ * §7's invitation-creation list, minus the parts the rendered message already
+ * proves.
+ *
+ * The bracketed-marker gate is stronger than a field check wherever a field
+ * reaches the Founder: an empty product name renders as `[PRODUCT NAME]` and
+ * Send refuses on the output itself. But two items on §7's list never appear in
+ * the message — the invitation source and the internal campaign owner — and one
+ * of them §7 additionally requires the send row to store. A rendered-output gate
+ * cannot see either, so they are checked by name, here, and nowhere else.
+ */
+export function missingInvitationFields(record: DraftRecord): string[] {
+  const missing: string[] = [];
+  if (!record.prospect.invitationSource?.trim()) missing.push('Invitation source');
+  if (!record.prospect.internalOwner?.trim()) missing.push('Internal campaign owner');
+  return missing;
 }
 
 /* ── Composing (§7) ───────────────────────────────────────────────────────── */
@@ -329,6 +462,11 @@ export function previewDraftUrl(appBaseUrl: string): string {
 
 export interface InvitationPreview extends RenderedInvitation {
   recipientEmail: string | null;
+  /**
+   * §7 list items that are still blank and never appear in the message, so the
+   * marker gate cannot report them. Named so the surface can say which.
+   */
+  missingFields: string[];
   /** True while §7's gate holds Send closed. */
   blocked: boolean;
 }
@@ -345,10 +483,13 @@ export async function previewInvitation(
     variablesFor(record, previewDraftUrl(context.appBaseUrl), context.supportEmail),
   );
 
+  const missingFields = missingInvitationFields(record);
+
   return {
     ...rendered,
     recipientEmail: record.prospect.email,
-    blocked: rendered.unresolved.length > 0 || !record.prospect.email,
+    missingFields,
+    blocked: rendered.unresolved.length > 0 || !record.prospect.email || missingFields.length > 0,
   };
 }
 
@@ -409,6 +550,19 @@ export async function sendInvitation(
   }
   if (!record.prospect.email) {
     return { ok: false, message: 'This prospect has no email address to send to.' };
+  }
+
+  // The two §7 list items that never reach the Founder, so the marker gate
+  // below cannot see them. §7 also requires the send row to store the
+  // invitation source, and a NULL there is a send record that does not say
+  // where the person came from. Checked before anything is issued or written.
+  const missingFields = missingInvitationFields(record);
+  if (missingFields.length > 0) {
+    return {
+      ok: false,
+      message: `§7 requires the invitation source and the internal campaign owner before an invitation goes out. Still blank: ${missingFields.join(', ')}.`,
+      unresolved: missingFields,
+    };
   }
 
   // §7's gate, enforced on the rendered output rather than on a list of fields
