@@ -26,11 +26,13 @@
  * `policyReacceptanceGate` (§29.8) is built on, and this mounts beside it.
  *
  * ── What it deliberately does NOT do ────────────────────────────────────────
- * It does not touch `/api/creator`. §29's Creator enforcement (pause,
- * termination) is recorded per ASSOCIATION — a Creator paused on one campaign
- * is not paused on another — and the association status already governs every
- * campaign-scoped read. There is no account-level Creator ban in the Spec, and
- * inventing one here would be §1 rule 6.
+ * It did not touch `/api/creator` until 2026-08-11, and the reason is worth
+ * keeping: §29's Creator enforcement (pause, termination) is recorded per
+ * ASSOCIATION — a Creator paused on one campaign is not paused on another — and
+ * the association status already governs every campaign-scoped read. There is
+ * still no account-level Creator BAN, and inventing one would be §1 rule 6.
+ * What was added by product direction is a reversible standing review; see
+ * `creatorStandingGate` at the bottom of this file for the whole decision.
  *
  * It does not touch `/api/account/*`. A suspended person must still be able to
  * learn that they are signed in and reach support — a suspension you cannot
@@ -42,11 +44,13 @@
 
 import type { RequestHandler } from 'express';
 import { fromNodeHeaders } from 'better-auth/node';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, or } from 'drizzle-orm';
 import type { Auth } from '../auth/auth.js';
 import type { Database } from '../db/client.js';
 import { founderAccessActions } from '../db/schema/founder-workspace.js';
 import { founderGhostBans } from '../db/schema/fulfillment.js';
+import { affiliateAccessActions } from '../db/schema/creator-workspace.js';
+import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 
 /** What a standing read concluded. `null` means "in good standing". */
 export type StandingBlock =
@@ -176,6 +180,137 @@ export function founderStandingGate(db: Database, auth: Auth): RequestHandler {
       // §27.1's "who owns this": named when the record names one, and never
       // invented when it does not.
       owner: standing.reviewOwner ?? 'Proovd',
+      support: '/support',
+    });
+  };
+}
+
+/* ── Creator standing (added 2026-08-11, by product direction) ─────────────── */
+
+/**
+ * The same gate for an Affiliate account, and it is a RECORDED DEVIATION.
+ *
+ * The header above says this file deliberately does not touch `/api/creator`,
+ * and the reasoning was sound at the time: §29 records Creator enforcement per
+ * ASSOCIATION — a Creator paused on one campaign is not paused on another — and
+ * inventing an account-level Creator ban would be §1 rule 6.
+ *
+ * On 2026-08-11 the supplied Creator-workspace reference asked for account-level
+ * suspend/restore, by product direction, exactly as the Founders reference asked
+ * for `founder_access_actions`. The same answer was given, and the reasoning
+ * that survives is this: the deviation is a reversible standing REVIEW, not a
+ * sanction. What did not change —
+ *
+ *   · §29's association-scoped enforcement is untouched. A pause, a termination,
+ *     and their five-business-day appeal window are still per relationship, and
+ *     the association status still governs every campaign-scoped read.
+ *   · There is no ban. `affiliate_access_actions.action` admits exactly two
+ *     values by CHECK, there is no `affiliate_ghost_bans` table, and this
+ *     function has no ban branch to reach.
+ *
+ * ── Matched on the account OR through the prospect ──────────────────────────
+ * `affiliate_access_actions.user_id` is nullable, because a suspension before
+ * the claim is legal — the invitation is live and worth stopping. So a
+ * suspension recorded before somebody claimed still binds afterwards, which it
+ * would not if this read by account id alone.
+ */
+export async function readCreatorStanding(
+  db: Database,
+  userId: string,
+): Promise<StandingBlock | null> {
+  const [latest] = await db
+    .select({
+      action: affiliateAccessActions.action,
+      reviewOwner: affiliateAccessActions.reviewOwner,
+      nextReviewAt: affiliateAccessActions.nextReviewAt,
+    })
+    .from(affiliateAccessActions)
+    .leftJoin(
+      affiliateSignupProfiles,
+      eq(affiliateSignupProfiles.prospectId, affiliateAccessActions.prospectId),
+    )
+    .where(
+      or(
+        eq(affiliateAccessActions.userId, userId),
+        eq(affiliateSignupProfiles.claimedUserId, userId),
+      ),
+    )
+    .orderBy(desc(affiliateAccessActions.occurredAt))
+    .limit(1);
+
+  if (latest?.action === 'suspend') {
+    return {
+      kind: 'suspended',
+      reviewOwner: latest.reviewOwner ?? null,
+      nextReviewAt: latest.nextReviewAt ?? null,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Refuses a Creator whose account access has been suspended.
+ *
+ * The same asymmetry as the Founder gate: an unauthenticated request passes
+ * THROUGH unanswered — the routers' own guards refuse it, and answering here
+ * would be a second, weaker authentication path — while a request that IS
+ * authenticated as a Creator and whose standing cannot be read is refused.
+ *
+ * Deliberately NOT mounted on `/api/account/*`: a suspended person must still
+ * be able to learn that they are signed in and reach support. A suspension you
+ * cannot ask about is a ban wearing a different word.
+ */
+export function creatorStandingGate(db: Database, auth: Auth): RequestHandler {
+  return async function creatorStandingGuard(req, res, next) {
+    let session;
+    try {
+      session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+    } catch {
+      next();
+      return;
+    }
+
+    const raw = session?.user as unknown as Record<string, unknown> | undefined;
+    if (!session?.user || raw?.['role'] !== 'affiliate') {
+      next();
+      return;
+    }
+
+    let standing: StandingBlock | null;
+    try {
+      standing = await readCreatorStanding(db, session.user.id);
+    } catch {
+      res.status(503).json({
+        error: 'standing_unavailable',
+        title: 'Proovd cannot open your account right now',
+        whatHappened:
+          'We could not read your account standing, so we did not act on your request. ' +
+          'Nothing has been changed.',
+        next: 'Try again in a few minutes.',
+        support: '/support',
+      });
+      return;
+    }
+
+    if (!standing) {
+      next();
+      return;
+    }
+
+    // There is no ban branch, because there is no permanent Creator sanction in
+    // the Spec — and `action` cannot hold one.
+    res.status(403).json({
+      error: 'account_suspended',
+      title: 'Your Creator access is paused',
+      whatHappened:
+        'Proovd has paused access to this account while a review is open. Your campaign ' +
+        'relationships, your accepted terms, and anything already earned are unchanged.',
+      next: standing.kind === 'suspended' && standing.nextReviewAt
+        ? `The review is open. The next update is due ${standing.nextReviewAt.toISOString()}.`
+        : 'The review is open and a person will come back to you.',
+      owner:
+        standing.kind === 'suspended' ? (standing.reviewOwner ?? 'Proovd') : 'Proovd',
       support: '/support',
     });
   };

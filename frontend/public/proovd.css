@@ -3418,3 +3418,451 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 /* Every operable thing in this section clears the 44px minimum. The row's own
    click target is the row, which is 5.5rem tall. */
 .cr-row__name { min-height: var(--touch); display: inline-flex; align-items: center; }
+
+
+/* ────────────────────────── §26.1 THE CAMPAIGN RELATIONSHIP (added with it)
+
+   Four panes of one object. The rail is vertical because the reference's is,
+   and because four labels down the side leave the pane its full width — which
+   is what a checklist of thirteen items and a seven-column metric strip need.
+   ------------------------------------------------------------------------- */
+
+.cr-state {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: var(--sp-32);
+  padding: var(--sp-32);
+  margin-bottom: var(--sp-32);
+  background: var(--dark);
+  color: var(--mint);
+  border-radius: var(--radius);
+}
+.cr-state__badge {
+  display: inline-block;
+  margin-bottom: var(--sp-16);
+  padding: var(--sp-4) var(--sp-8);
+  background: var(--white);
+  color: var(--dark);
+  border-radius: var(--radius);
+  font-size: 0.625rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cr-state h2 {
+  margin: 0 0 var(--sp-12);
+  color: var(--white);
+  font-size: clamp(1.75rem, 4.5vw, 3rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-weight: 900;
+}
+.cr-state dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-24);
+  margin: 0;
+}
+.cr-state dl div { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-state dt {
+  color: var(--mint);
+  font-size: 0.625rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.cr-state dd { margin: 0; color: var(--white); font-size: 0.8125rem; font-weight: 800; }
+.cr-state dd .grey { color: var(--sage); }
+/* RESPONSIVE CORRECTION — the two-column band puts a 3rem heading beside four
+   facts, which at 900px leaves neither enough room to read. */
+@media (max-width: 900px) {
+  .cr-state { grid-template-columns: minmax(0, 1fr); }
+}
+
+.cr-shell {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: var(--sp-48);
+  align-items: start;
+}
+.cr-rail {
+  position: relative;
+  position: sticky;
+  top: var(--sp-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.cr-rail__btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  min-height: var(--touch);
+  padding: var(--sp-8) var(--sp-12);
+  border: none;
+  background: none;
+  border-radius: var(--radius);
+  color: var(--grey);
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+}
+/* Weight as well as ink, so the current pane survives the mark being absent —
+   the no-GSAP path, and the same reasoning PHASE 25's `.tabbtn` records. */
+.cr-rail__btn.is-active { background: var(--dark); color: var(--mint); font-weight: 900; }
+.cr-rail__count {
+  min-width: 1.375rem;
+  height: 1.375rem;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: var(--dark);
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+  font-weight: 900;
+}
+/* The mark is decoration on top of the active state, never the state itself. */
+.cr-rail__mark { display: none; }
+
+.cr-pane { min-width: 0; }
+.cr-stack { display: flex; flex-direction: column; gap: var(--sp-48); }
+
+/* RESPONSIVE CORRECTION — an 11rem rail beside a pane leaves under 9rem for the
+   pane at 320px. Below 900px the rail becomes a horizontal scroller pinned
+   under the header, which is where a four-item nav belongs on a phone. */
+@media (max-width: 900px) {
+  .cr-shell { grid-template-columns: minmax(0, 1fr); gap: var(--sp-24); }
+  .cr-rail {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-block: var(--sp-4);
+  }
+  .cr-rail__btn { flex: none; }
+}
+
+
+/* ── Tasks and waiting states ─────────────────────────────────────────────── */
+
+.cr-task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-24);
+  padding: var(--sp-24);
+  background: var(--dark);
+  color: var(--mint);
+  border-radius: var(--radius);
+}
+.cr-task h3 {
+  margin: var(--sp-8) 0 0;
+  color: var(--white);
+  font-size: clamp(1.25rem, 3vw, 1.875rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-weight: 900;
+}
+.cr-task p { margin: var(--sp-8) 0 0; }
+/* A waiting state is somebody else's work: quiet, and with no primary action. */
+.cr-task--waiting { background: var(--grey-lightest); color: var(--moss); }
+.cr-task--waiting h3 { color: var(--darker); }
+@media (max-width: 760px) {
+  .cr-task { grid-template-columns: minmax(0, 1fr); }
+  .cr-task .btn { width: 100%; }
+}
+
+.cr-count { color: var(--grey); font-size: 0.875rem; font-weight: 800; }
+.cr-owner-note {
+  margin-left: auto;
+  color: var(--grey);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+
+/* ── Agreement ────────────────────────────────────────────────────────────── */
+
+.cr-terms { padding: var(--sp-32); background: var(--mint); border-radius: var(--radius); }
+.cr-terms h2 {
+  margin: var(--sp-8) 0 0;
+  color: var(--dark);
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+  font-weight: 900;
+}
+.cr-terms h2 b { font-weight: 900; }
+.cr-terms h2 span {
+  display: block;
+  max-width: 32rem;
+  margin-top: var(--sp-12);
+  color: var(--moss);
+  font-size: clamp(0.9375rem, 2vw, 1.25rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+.cr-terms__bonus { margin: var(--sp-16) 0 0; color: var(--dark); font-weight: 800; }
+
+/* The state chain. A list, so its length and position are announced; the
+   current step carries `aria-current` as well as the mark. */
+.cr-chain {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  margin: var(--sp-16) 0 0;
+  padding: 0;
+  counter-reset: none;
+}
+.cr-chain li {
+  padding: var(--sp-4) var(--sp-8);
+  background: var(--grey-light);
+  color: var(--grey);
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+  font-weight: 800;
+}
+.cr-chain li.is-current { background: var(--dark); color: var(--mint); }
+
+.cr-versions { display: flex; flex-direction: column; border-top: 1px solid var(--brand); }
+.cr-version {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--brand);
+}
+.cr-version__no {
+  min-width: 2.5rem;
+  padding: var(--sp-4) var(--sp-8);
+  background: var(--grey-light);
+  color: var(--moss);
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+  font-weight: 900;
+  text-align: center;
+}
+.cr-version__main,
+.cr-version__state { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-version__main strong { font-weight: 800; color: var(--darker); overflow-wrap: anywhere; }
+.cr-version__main small,
+.cr-version__state small { color: var(--grey); font-size: 0.6875rem; }
+.cr-version__state { text-align: right; }
+.cr-version__state strong { font-weight: 800; color: var(--darker); text-transform: capitalize; }
+@media (max-width: 760px) {
+  .cr-version { grid-template-columns: auto minmax(0, 1fr); }
+  .cr-version__state { grid-column: 1 / -1; text-align: left; }
+}
+
+
+/* ── Content ──────────────────────────────────────────────────────────────── */
+
+.cr-post {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-24);
+  padding: var(--sp-24);
+  background: var(--dark);
+  color: var(--mint);
+  border-radius: var(--radius);
+}
+.cr-post h3 {
+  margin: var(--sp-8) 0 0;
+  color: var(--white);
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  letter-spacing: -0.035em;
+  font-weight: 900;
+}
+.cr-post .kicker { color: var(--mint); }
+.cr-post a {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: var(--sp-8);
+  color: var(--leaf);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.cr-post small { display: block; margin-top: var(--sp-8); color: var(--mint); }
+.cr-post__actions { display: flex; flex-direction: column; gap: var(--sp-8); }
+/* A rejected or corrected post is darker rather than red: the words carry the
+   outcome, and a red panel on an internal record reads as an error state. */
+.cr-post--rejected,
+.cr-post--correction_needed { background: var(--darker); }
+@media (max-width: 760px) {
+  .cr-post { grid-template-columns: minmax(0, 1fr); }
+  .cr-post .btn { width: 100%; }
+}
+
+.cr-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--sp-24);
+  padding: var(--sp-24);
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+}
+.cr-metrics > div { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-metrics span {
+  color: var(--grey);
+  font-size: 0.625rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.cr-metrics strong {
+  font-size: clamp(1.125rem, 2.4vw, 1.5rem);
+  font-weight: 900;
+  color: var(--darker);
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* ── Money ────────────────────────────────────────────────────────────────── */
+
+.cr-money-hero {
+  padding: var(--sp-32);
+  background: var(--dark);
+  color: var(--mint);
+  border-radius: var(--radius);
+}
+.cr-money-hero .kicker { color: var(--mint); }
+.cr-money-hero h2 {
+  margin: var(--sp-8) 0 0;
+  color: var(--white);
+  font-size: clamp(2.5rem, 9vw, 5.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.07em;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.cr-money-hero > p:last-of-type { margin: var(--sp-16) 0 0; }
+/* The sentence that keeps an estimated hero from reading as "earned nothing". */
+.cr-money-hero__note {
+  margin: var(--sp-16) 0 0;
+  padding-top: var(--sp-16);
+  border-top: 1px solid var(--sage);
+  color: var(--leaf);
+  font-size: 0.8125rem;
+}
+
+
+/* ── The §17 review ───────────────────────────────────────────────────────── */
+
+.cr-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--sp-48);
+  align-items: start;
+}
+.cr-review__decision {
+  position: sticky;
+  top: var(--sp-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-24);
+}
+.cr-post__url {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  font-weight: 800;
+}
+.cr-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-8); }
+.cr-check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--touch);
+  padding: var(--sp-8) var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  background: none;
+  border-radius: var(--radius);
+  color: var(--moss);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-align: left;
+}
+.cr-check.is-on { border-color: var(--brand); background: var(--brand-5); color: var(--darker); }
+.cr-check__mark {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: grid;
+  place-items: center;
+  border: var(--bw) solid var(--grey);
+  border-radius: var(--radius);
+}
+.cr-check.is-on .cr-check__mark { border-color: var(--brand); color: var(--brand); }
+.cr-check__mark svg { width: 0.75rem; height: 0.75rem; fill: none; stroke: currentColor; stroke-width: 3; }
+.cr-review__actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-8); }
+.cr-failed { margin: 0; padding-left: var(--sp-16); color: var(--moss); }
+.cr-failed li { margin-bottom: var(--sp-4); }
+/* RESPONSIVE CORRECTION — two columns of checks below 760px are two words wide.
+   The decision column also stops being sticky, because a sticky panel taller
+   than the viewport traps the content behind it. */
+@media (max-width: 1000px) {
+  .cr-review { grid-template-columns: minmax(0, 1fr); }
+  .cr-review__decision { position: static; }
+}
+@media (max-width: 760px) {
+  .cr-checks { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* ─────────────────── §26.1 POLICY, CASES AND ACCESS (added with the above) */
+
+/* The standing banner. Yellow only when a review is genuinely open — an
+   eligible account is quiet, because a coloured panel that is always there
+   stops meaning anything. */
+.cr-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-24);
+  padding: var(--sp-24);
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+}
+.cr-banner--warn { background: var(--accent-yellow); color: var(--darker); }
+.cr-banner h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  letter-spacing: -0.035em;
+  font-weight: 900;
+  color: var(--darker);
+}
+.cr-banner p { margin: var(--sp-8) 0 0; }
+@media (max-width: 760px) {
+  .cr-banner { grid-template-columns: minmax(0, 1fr); }
+  .cr-banner .btn { width: 100%; }
+}
+
+/* One §29 action, with all five customer-facing statement fields. Its own
+   block rather than a table row: five wide sentences in a row would wrap into
+   something nobody reads, and these are the words the Creator was given. */
+.cr-enforcement {
+  padding: var(--sp-16) 0;
+  border-bottom: 1px solid var(--brand);
+}
+.cr-enforcement header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-8);
+}
+.cr-enforcement header strong {
+  font-weight: 900;
+  color: var(--darker);
+  text-transform: capitalize;
+}
+.cr-enforcement header small { color: var(--grey); font-size: 0.75rem; }

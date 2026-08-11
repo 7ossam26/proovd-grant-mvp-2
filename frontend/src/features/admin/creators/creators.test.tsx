@@ -32,6 +32,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
   CREATOR_NO_ATTENTION_LABEL,
   CREATOR_PARKED_MESSAGES,
+  CREATOR_SUSPENSION_IS_NOT_A_BAN,
   FOUNDER_NEVER_SEES_THIS,
   PROSPECT_CREATES_NO_ACCOUNT,
   QUALITY_TIER_HELPER,
@@ -359,6 +360,12 @@ function mayaDetail(
       ],
       deletionRequest: null,
     },
+    standing: {
+      account: { state: 'Eligible', latest: null, history: [] },
+      enforcement: [],
+      disclosures: [],
+      policyReacceptanceOpen: false,
+    },
     history: [
       {
         category: 'account',
@@ -602,14 +609,18 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
     expect(screen.getByText('Active partnership')).toBeTruthy();
   });
 
-  it('parks the relationship view and says what it is, rather than 404-ing', async () => {
+  it('opens the campaign relationship, which is a real destination now', async () => {
     serve(recordRoutes());
-    await renderAdmin(`/admin/creators/${PROSPECT}`);
+    const view = await renderAdmin(`/admin/creators/${PROSPECT}`);
 
     const control = screen.getByRole('button', { name: /View campaign relationship/i });
-    expect(control.getAttribute('aria-disabled')).toBe('true');
+    expect(control.getAttribute('aria-disabled')).toBeNull();
     await userEvent.click(control);
-    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.relationship);
+    await waitFor(() => {
+      expect(view.router.state.location.pathname).toBe(
+        `/admin/creators/${PROSPECT}/relationships/${ASSOCIATION}`,
+      );
+    });
   });
 
   it('offers no action for an item somebody else owns', async () => {
@@ -784,6 +795,88 @@ describe('§8, §5.3 — the Add Affiliate flow', () => {
   });
 });
 
+/* ── Policy, cases and access ──────────────────────────────────────────────── */
+
+describe('§26.7, §29 — the controls surface keeps the two scopes apart', () => {
+  it('is quiet when no review is open, and says so', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+
+    expect(screen.getByText('Account eligible')).toBeTruthy();
+    expect(screen.getByText('No account-level review is open.')).toBeTruthy();
+    expect(screen.getByText(CREATOR_SUSPENSION_IS_NOT_A_BAN)).toBeTruthy();
+  });
+
+  it('offers suspend and restore, and never a third control', async () => {
+    serve(recordRoutes());
+    const view = await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+
+    expect(screen.getByRole('button', { name: /Suspend Affiliate account/i })).toBeTruthy();
+    // §22.7's one-strike sanction is a FOUNDER record. There is no permanent
+    // Creator equivalent in the Spec, so there is nothing here to press.
+    for (const control of within(view.container).getAllByRole('button')) {
+      expect(control.textContent?.toLowerCase()).not.toContain('ban');
+      expect(control.textContent?.toLowerCase()).not.toContain('permanent');
+    }
+  });
+
+  it('demands §27.1’s two promises before a suspension can be sent', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+
+    await userEvent.click(screen.getByRole('button', { name: /Suspend Affiliate account/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText(/Who owns the review/i)).toBeTruthy();
+    expect(within(dialog).getByLabelText(/When they hear next/i)).toBeTruthy();
+    // §30: a commitment shown on a surface, never a schedule.
+    expect(within(dialog).getByText(/nothing sweeps it/i)).toBeTruthy();
+  });
+
+  it('renders all five §29 statement fields when an action is recorded', async () => {
+    const detail = mayaDetail();
+    detail.standing.enforcement = [
+      {
+        id: 'enf-1',
+        associationId: ASSOCIATION,
+        campaignName: 'Teeb Founding Launch',
+        actionKind: 'pause',
+        reasonCategory: 'content_policy',
+        statement: {
+          evidenceAndBehavior: 'The post omitted the required disclosure.',
+          ruleViolated: 'Campaign AUP · disclosure must be hard to miss.',
+          immediateEffect: 'The Affiliate link is paused.',
+          correctionPath: 'Repost with the disclosure and submit the corrected URL.',
+          humanRoute: 'Reply to this message and a person will read it.',
+        },
+        appealDueAt: 'Aug 18, 2026 · 5:00 PM UTC',
+        appeal: null,
+        at: 'Aug 11, 2026 · 10:00 AM UTC',
+      },
+    ];
+    serve(recordRoutes(detail));
+    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+
+    expect(screen.getByText('The post omitted the required disclosure.')).toBeTruthy();
+    expect(screen.getByText(/disclosure must be hard to miss/)).toBeTruthy();
+    expect(screen.getByText('The Affiliate link is paused.')).toBeTruthy();
+    expect(screen.getByText(/submit the corrected URL/)).toBeTruthy();
+    expect(screen.getByText(/a person will read it/)).toBeTruthy();
+    expect(screen.getByText(/Five business days/)).toBeTruthy();
+  });
+
+  it('parks case intake and says the console owns it', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+
+    const control = screen.getByRole('button', {
+      name: /Record a compliance or support case/i,
+    });
+    expect(control.getAttribute('aria-disabled')).toBe('true');
+    await userEvent.click(control);
+    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.caseIntake);
+  });
+});
+
 /* ── Naming and copy ───────────────────────────────────────────────────────── */
 
 describe('§3.1, §3.2 — no internal name reaches the rendered surface', () => {
@@ -826,6 +919,7 @@ describe('§3.1, §3.2 — no internal name reaches the rendered surface', () =>
       `/admin/creators/${PROSPECT}`,
       `/admin/creators/${PROSPECT}/profile`,
       `/admin/creators/${PROSPECT}/history`,
+      `/admin/creators/${PROSPECT}/controls`,
     ]) {
       serve([...directoryRoutes(), ...recordRoutes()]);
       const view = await renderAdmin(path);
@@ -856,6 +950,7 @@ describe('§33.11.1, §28.5 — every Creator surface is operable', () => {
       `/admin/creators/${PROSPECT}`,
       `/admin/creators/${PROSPECT}/profile`,
       `/admin/creators/${PROSPECT}/history`,
+      `/admin/creators/${PROSPECT}/controls`,
     ]) {
       serve([...directoryRoutes(), ...recordRoutes()]);
       const view = await renderAdmin(path);

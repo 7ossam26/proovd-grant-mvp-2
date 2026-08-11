@@ -33,6 +33,7 @@ import { seedAdminReauthWindow } from '../settings/service.js';
 
 import { auditEvents } from '../db/schema/integrity.js';
 import { affiliateProspects } from '../db/schema/affiliates.js';
+import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import { campaignAffiliateAssociations } from '../db/schema/domain.js';
 import {
   affiliateDeletionRequests,
@@ -719,3 +720,156 @@ describe('§8, §5.3 — recruiting saves an honestly incomplete record', () => 
  * with Stage 3 and are asserted there. A test that drove a route that does not
  * exist would be a claim that it does (§1.4).
  */
+
+/* ── §26.7's account standing, and the gate it decides ────────────────────── */
+
+describe('§26.7 — account standing is an access decision, per request', () => {
+  it('suspends, and the Creator stops reaching /api/creator on the next call', async () => {
+    const campaign = await createCampaign('standing');
+    const { prospectId, associationId } = await recruit(campaign.campaignId, 'standing');
+
+    // A claimed account, so there is a session to refuse. The signup profile is
+    // what carries the account identity — `affiliate_id` is the PROSPECT id.
+    const creator = await seedUser(h, 'affiliate', 'standing-creator');
+    const creatorCookie = await signInPlain(h, creator.email);
+    await h.db.insert(affiliateSignupProfiles).values({
+      prospectId,
+      associationId,
+      claimedUserId: creator.id,
+      claimedAt: new Date(),
+      updatedBy: 'user:test',
+    });
+
+    // Before: the Creator reaches their own surface.
+    await request(h.app)
+      .get('/api/creator/campaigns')
+      .set('cookie', creatorCookie)
+      .expect(200);
+
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/access`)
+      .set('cookie', admin.cookie)
+      .send({
+        action: 'suspend',
+        reason: 'Reviewing a disclosed conflict before the relationship continues.',
+        reviewOwner: 'Ada Admin',
+      })
+      .expect(200);
+
+    // After: the same session is refused, with §27.1's two promises.
+    const refused = await request(h.app)
+      .get('/api/creator/campaigns')
+      .set('cookie', creatorCookie)
+      .expect(403);
+    expect((refused.body as { error: string }).error).toBe('account_suspended');
+    expect((refused.body as { owner: string }).owner).toBe('Ada Admin');
+
+    // And a restore lets them back in, on the next call.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/access`)
+      .set('cookie', admin.cookie)
+      .send({ action: 'restore', reason: 'Review closed; nothing was substantiated.' })
+      .expect(200);
+
+    await request(h.app)
+      .get('/api/creator/campaigns')
+      .set('cookie', creatorCookie)
+      .expect(200);
+  });
+
+  it('binds a suspension recorded BEFORE the account was claimed', async () => {
+    const campaign = await createCampaign('pre-claim');
+    const { prospectId, associationId } = await recruit(campaign.campaignId, 'pre-claim');
+
+    // The invitation is live and worth stopping, so a suspension before the
+    // claim is legal — `affiliate_access_actions.user_id` is nullable for it.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/access`)
+      .set('cookie', admin.cookie)
+      .send({
+        action: 'suspend',
+        reason: 'Sanctions research is outstanding.',
+        reviewOwner: 'Ada Admin',
+      })
+      .expect(200);
+
+    const creator = await seedUser(h, 'affiliate', 'pre-claim-creator');
+    const creatorCookie = await signInPlain(h, creator.email);
+    await h.db.insert(affiliateSignupProfiles).values({
+      prospectId,
+      associationId,
+      claimedUserId: creator.id,
+      claimedAt: new Date(),
+      updatedBy: 'user:test',
+    });
+
+    // The gate matches through the prospect, so the earlier decision binds.
+    await request(h.app)
+      .get('/api/creator/campaigns')
+      .set('cookie', creatorCookie)
+      .expect(403);
+  });
+
+  it('never lets a suspended Creator be recorded as banned', async () => {
+    const campaign = await createCampaign('no-ban-route');
+    const { prospectId } = await recruit(campaign.campaignId, 'no-ban-route');
+
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/access`)
+      .set('cookie', admin.cookie)
+      .send({ action: 'ban', reason: 'Nope.', reviewOwner: 'Ada Admin' })
+      .expect(422);
+    expect((res.body as { whatHappened: string }).whatHappened).toContain(
+      'no permanent Creator sanction',
+    );
+  });
+
+  it('refuses a suspension with no named review owner', async () => {
+    const campaign = await createCampaign('no-owner');
+    const { prospectId } = await recruit(campaign.campaignId, 'no-owner');
+
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/access`)
+      .set('cookie', admin.cookie)
+      .send({ action: 'suspend', reason: 'Reviewing.' })
+      .expect(422);
+    // §27.1 asks a suspended person who owns the review. A suspension with no
+    // owner is a promise nobody is on the hook for.
+    expect((res.body as { whatHappened: string }).whatHappened).toContain('who owns the review');
+  });
+
+  it('takes the freshness gate, because it changes standing', async () => {
+    const campaign = await createCampaign('access-fresh');
+    const { prospectId } = await recruit(campaign.campaignId, 'access-fresh');
+
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/access`)
+      .set('cookie', staleAdmin.cookie)
+      .send({ action: 'suspend', reason: 'Reviewing.', reviewOwner: 'Ada Admin' })
+      .expect(403);
+  });
+
+  it('surfaces the standing and the §29 records without merging them', async () => {
+    const campaign = await createCampaign('standing-pane');
+    const { prospectId } = await recruit(campaign.campaignId, 'standing-pane');
+
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/access`)
+      .set('cookie', admin.cookie)
+      .send({
+        action: 'suspend',
+        reason: 'Reviewing a disclosed conflict.',
+        reviewOwner: 'Ada Admin',
+      })
+      .expect(200);
+
+    const detail = await readWorkspace(prospectId);
+    expect(detail.standing.account.state).toBe('Access suspended');
+    expect(detail.standing.account.latest?.reviewOwner).toBe('Ada Admin');
+    // The two scopes are separate lists. An account suspension is not a §29
+    // enforcement action, and reading them as one is the mistake the pane
+    // exists to prevent.
+    expect(detail.standing.enforcement).toHaveLength(0);
+    expect(detail.standing.disclosures).toHaveLength(0);
+  });
+});

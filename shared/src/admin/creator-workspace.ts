@@ -588,10 +588,6 @@ export const CREATOR_PARKED_MESSAGES = {
   requestCorrection:
     'Asking the Affiliate to correct their own record is parked: §27 defines ' +
     'no correction-request message.',
-  relationship:
-    'The campaign relationship view is parked while it is built.',
-  controls:
-    'Policy, cases and access is parked while it is built.',
 } as const;
 
 export type CreatorParkedKey = keyof typeof CREATOR_PARKED_MESSAGES;
@@ -606,11 +602,28 @@ export type CreatorParkedKey = keyof typeof CREATOR_PARKED_MESSAGES;
  * `NO_GUARANTEE_TEXT` does: a promise about how Proovd behaves is not the
  * renderer's to reword.
  */
-export const UPFRONT_FEE_LABEL = 'Upfront fee' as const;
+/**
+ * §24.7's fourth money stream, named as §3.2 requires.
+ *
+ * ── A conflict, resolved in the Spec's favour, and worth recording ──────────
+ * The supplied reference calls this an "upfront fee" and its acceptance audit
+ * refuses "fixed payment" by name. §3.2 bans the opposite: `upfront fee`,
+ * `upfront payout`, and `upfront payment` are UNIVERSALLY banned terms, and
+ * §33.11.3 scans the whole shipped bundle for them — so the two rules are exact
+ * inverses and only one can hold. §1.8 makes the Spec win on all of it, and
+ * §3.2's own mandated replacement is "optional fixed Creator payment / Creator
+ * payment funded", which is what these constants say.
+ *
+ * The reason §3.2 bans the reference's word is the reason the reference wanted
+ * it: "upfront" reads as money already handed over. Everything the reference
+ * was protecting survives — the Product-only rule, the seven-state chain, and
+ * the sentence below that funded is not paid.
+ */
+export const FIXED_CREATOR_PAYMENT_LABEL = 'Fixed Creator payment' as const;
 
-export const UPFRONT_FEE_FUNDED_IS_NOT_PAID =
-  'Funded means the campaign-specific upfront fee was funded. It does not ' +
-  'mean the Creator was paid.';
+export const FIXED_PAYMENT_FUNDED_IS_NOT_PAID =
+  'Funded means the campaign-specific fixed Creator payment was funded. It ' +
+  'does not mean the Creator was paid.';
 
 export const ADMIN_CANNOT_ACCEPT =
   'Admin cannot accept for either party.' as const;

@@ -197,6 +197,7 @@ export interface CreatorWorkspaceDetail {
   header: CreatorHeader;
   relationships: CreatorRelationshipSummary[];
   profile: CreatorProfilePane;
+  standing: CreatorStandingPane;
   history: CreatorHistoryEntry[];
   historyCounts: Record<string, number>;
 }
@@ -385,4 +386,279 @@ export interface AssignableCampaign {
 
 export function fetchAssignableCampaigns(): Promise<{ campaigns: AssignableCampaign[] }> {
   return call('/api/admin/creators/campaigns');
+}
+
+/* ── One campaign relationship ──────────────────────────────────────────────*/
+
+export interface RelationshipTask {
+  kind: 'task' | 'waiting';
+  owner: AttentionOwner;
+  title: string;
+  meta: string;
+  action: { label: string; to: 'review' | 'agreement' | 'money' | 'profile' } | null;
+}
+
+export interface RelationshipSection<T> {
+  populated: boolean;
+  waitingOn: string | null;
+  value: T | null;
+}
+
+export interface RelationshipBand {
+  campaignName: string;
+  campaignType: string | null;
+  founderName: string | null;
+  status: string;
+  statusRaw: string;
+  owner: AttentionOwner;
+  designation: string;
+  activatedAt: string | null;
+  closesAt: string | null;
+  responseDeadlineAt: string | null;
+}
+
+export interface RelationshipLink {
+  state: 'inactive' | 'active' | 'paused';
+  label: string;
+  url: string | null;
+  code: string | null;
+  activatedAt: string | null;
+  pausedAt: string | null;
+  pausedReason: string | null;
+  testUrl: string | null;
+}
+
+export interface CreatorRelationshipDetail {
+  associationId: string;
+  prospectId: string;
+  campaignId: string;
+  creatorName: string;
+  band: RelationshipBand;
+  overview: {
+    tasks: RelationshipTask[];
+    link: RelationshipLink | null;
+    readiness: {
+      complete: number;
+      applicable: number;
+      canBeginWork: boolean;
+      items: {
+        key: string;
+        label: string;
+        owner: string;
+        complete: boolean;
+        applicable: boolean;
+      }[];
+    } | null;
+    kit: {
+      revealedAt: string | null;
+      revokedAt: string | null;
+      revokedReason: string | null;
+      accessCount: number;
+      lastAccessAt: string | null;
+    };
+  };
+  agreement: {
+    lockState: string;
+    headlinePercent: string | null;
+    headlineRest: string;
+    bonus: string | null;
+    versions: {
+      id: string;
+      number: number;
+      proposedBy: string;
+      totalPercent: number | null;
+      fixedPaymentCents: string | null;
+      state: string;
+      affiliateDecision: string | null;
+      founderDecision: string | null;
+      createdAt: string | null;
+      lockedAt: string | null;
+    }[];
+    agreement: {
+      basePercent: number;
+      bidIncreasePercent: number;
+      totalPercent: number;
+      fixedPayment: string | null;
+      acceptedAt: string | null;
+    } | null;
+    fixedPayment: {
+      available: boolean;
+      rule: string;
+      status: string;
+      amount: string | null;
+      source: string;
+      fundedAt: string | null;
+      deadlineAt: string | null;
+    };
+  };
+  content: {
+    submission: {
+      id: string;
+      version: number;
+      url: string;
+      status: string;
+      statusLabel: string;
+      submittedAt: string | null;
+      verifiedAt: string | null;
+      verifiedBy: string | null;
+      correctionDetail: string | null;
+      correctionDueAt: string | null;
+      enforcementReason: string | null;
+      checklist: { id: string; label: string; passed: boolean }[] | null;
+    } | null;
+    history: { version: number; url: string; status: string; submittedAt: string | null }[];
+    performance: RelationshipSection<{
+      clicks: number;
+      attributedReservations: number;
+      capturedAttributed: number;
+      conversion: string | null;
+      capturedSubtotal: string;
+      freshness: string;
+    }>;
+  };
+  money: {
+    headline: { status: string; label: string; amount: string; owner: string };
+    earnings: RelationshipSection<{
+      validSubtotal: string;
+      commission: string;
+      bonus: string;
+      fixedPayment: string;
+      taxInBase: string;
+      lockedPercent: number;
+      earnedPercent: number;
+      provisionalTotal: string;
+      earnedTotal: string;
+      unearnedReturned: string;
+      state: string;
+      stateHistory: { at: string; from: string | null; to: string; reason: string | null }[];
+    }>;
+    transfer: RelationshipSection<{
+      status: string;
+      total: string;
+      requestedAt: string | null;
+      confirmedAt: string | null;
+      attempts: number;
+    }>;
+    completion: {
+      outcome: string | null;
+      decidedAt: string | null;
+      deliverablesNote: string | null;
+    } | null;
+  };
+}
+
+export function fetchRelationship(
+  prospectId: string,
+  associationId: string,
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}`,
+  );
+}
+
+/**
+ * Pausing or reactivating the tracking link.
+ *
+ * Answers with the whole relationship re-read, so the surface never patches a
+ * link state locally — a locally-flipped pause is a claim about attribution
+ * nobody confirmed.
+ */
+export function setLinkPaused(
+  prospectId: string,
+  associationId: string,
+  body: { action: 'pause' | 'reactivate'; reason?: string | null },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/link`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * The §17 verification, at the route that already owns it.
+ *
+ * Addressed by SUBMISSION id, not by association: §17 verifies one submitted
+ * post, and a corrected resubmission is a new record with its own decision.
+ * Building a second verify route here would be a second set of §17's three
+ * outcomes and their effects.
+ */
+export function verifyPost(
+  submissionId: string,
+  body: {
+    outcome: 'passed' | 'correction_needed' | 'rejected';
+    checklist: Record<string, boolean>;
+    correctionDetail?: string;
+    correctionDueAt?: string;
+    enforcementReason?: string;
+  },
+): Promise<unknown> {
+  return call(`/api/admin/post-submissions/${encodeURIComponent(submissionId)}/verify`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/* ── Policy, cases, and access (§26.7, §29) ────────────────────────────────*/
+
+export interface CreatorStandingPane {
+  account: {
+    state: CreatorAccountState;
+    latest: {
+      action: string;
+      reason: string;
+      evidence: string | null;
+      reviewOwner: string | null;
+      nextReviewAt: string | null;
+      actor: string;
+      at: string;
+    } | null;
+    history: { action: string; reason: string; actor: string; at: string }[];
+  };
+  enforcement: {
+    id: string;
+    associationId: string;
+    campaignName: string;
+    actionKind: string;
+    reasonCategory: string;
+    statement: {
+      evidenceAndBehavior: string;
+      ruleViolated: string;
+      immediateEffect: string;
+      correctionPath: string;
+      humanRoute: string;
+    };
+    appealDueAt: string | null;
+    appeal: { grounds: string; decision: string | null; decidedAt: string | null } | null;
+    at: string;
+  }[];
+  disclosures: {
+    kind: 'conflict' | 'self_preorder';
+    associationId: string;
+    campaignName: string;
+    detail: string;
+    at: string;
+  }[];
+  policyReacceptanceOpen: boolean;
+}
+
+/**
+ * The §26.7 access decision.
+ *
+ * Two actions and no third: there is no permanent Creator sanction in the Spec,
+ * and the column admits nothing else.
+ */
+export function recordAccessDecision(
+  prospectId: string,
+  body: {
+    action: 'suspend' | 'restore';
+    reason: string;
+    evidence?: string | null;
+    reviewOwner?: string | null;
+    nextReviewAt?: string | null;
+  },
+): Promise<CreatorWorkspaceDetail> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/access`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }

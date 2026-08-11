@@ -32,9 +32,16 @@ import {
 } from '../../db/schema/affiliates.js';
 import { affiliateSignupProfiles } from '../../db/schema/affiliate-signup.js';
 import {
+  affiliateAccessActions,
   affiliateDeletionRequests,
   affiliateDeletionReviews,
 } from '../../db/schema/creator-workspace.js';
+import {
+  affiliateEnforcementActions,
+  affiliateEnforcementAppeals,
+  affiliateConflictDisclosures,
+  affiliateSelfPreorderDisclosures,
+} from '../../db/schema/enforcement.js';
 import { campaignAffiliateAssociations, campaigns } from '../../db/schema/domain.js';
 import { associationStatusHistory } from '../../db/schema/domain.js';
 import { stripeConnectedAccounts } from '../../db/schema/payments.js';
@@ -52,6 +59,7 @@ import type {
   CreatorMenuAction,
   CreatorProfilePane,
   CreatorRelationshipSummary,
+  CreatorStandingPane,
   CreatorWorkspaceDetail,
   EvidenceItem,
   ProfileBlock,
@@ -59,6 +67,7 @@ import type {
   ProviderBlock,
   VerificationBlock,
 } from './types.js';
+import type { CreatorAccountState } from './labels.js';
 import {
   ACTIVE_PARTNERSHIP_SLOT_LIMIT,
   SLOT_OCCUPYING_STATUSES,
@@ -255,6 +264,15 @@ export async function readCreatorWorkspace(
   return {
     header,
     relationships,
+    standing: await composeStanding(db, {
+      prospectId,
+      account,
+      associationIds,
+      associationCampaign: new Map(
+        facts.associations.map((a) => [a.associationId, a.campaignName]),
+      ),
+      policyReacceptanceOpen: facts.policyReacceptanceOpen,
+    }),
     profile: await composeProfile(db, {
       prospect,
       profile: profile ?? null,
@@ -748,4 +766,146 @@ const INVITATION_STATE_LABELS: Record<string, string> = {
 
 function invitationStateLabel(state: string): string {
   return INVITATION_STATE_LABELS[state] ?? state;
+}
+
+/* ── Policy, cases, and access (§26.7, §29) ────────────────────────────────*/
+
+/**
+ * What is open against this person, and what standing they hold.
+ *
+ * Two scopes side by side and never merged: an ACCOUNT suspension is a
+ * reversible review of the person; a §29 enforcement action is against ONE
+ * campaign relationship and carries its own five customer-facing statement
+ * fields and a five-business-day appeal window. Reading them into one list
+ * would let a link pause and a termination look like the same kind of thing.
+ */
+async function composeStanding(
+  db: Database,
+  input: {
+    prospectId: string;
+    account: CreatorAccountState;
+    associationIds: readonly string[];
+    associationCampaign: ReadonlyMap<string, string>;
+    policyReacceptanceOpen: boolean;
+  },
+): Promise<CreatorStandingPane> {
+  const accessRows = await db
+    .select()
+    .from(affiliateAccessActions)
+    .where(eq(affiliateAccessActions.prospectId, input.prospectId))
+    .orderBy(desc(affiliateAccessActions.occurredAt));
+
+  const ids = [...input.associationIds];
+
+  const enforcementRows = ids.length
+    ? await db
+        .select()
+        .from(affiliateEnforcementActions)
+        .where(inArray(affiliateEnforcementActions.associationId, ids))
+        .orderBy(desc(affiliateEnforcementActions.occurredAt))
+    : [];
+
+  const appeals = enforcementRows.length
+    ? await db
+        .select()
+        .from(affiliateEnforcementAppeals)
+        .where(
+          inArray(
+            affiliateEnforcementAppeals.actionId,
+            enforcementRows.map((row) => row.id),
+          ),
+        )
+    : [];
+
+  const conflicts = ids.length
+    ? await db
+        .select()
+        .from(affiliateConflictDisclosures)
+        .where(inArray(affiliateConflictDisclosures.associationId, ids))
+    : [];
+
+  const selfPreorders = ids.length
+    ? await db
+        .select()
+        .from(affiliateSelfPreorderDisclosures)
+        .where(inArray(affiliateSelfPreorderDisclosures.associationId, ids))
+    : [];
+
+  const names = await resolveActorNames(db, [
+    ...accessRows.map((row) => row.actor),
+    ...enforcementRows.map((row) => row.actor),
+  ]);
+
+  const campaignFor = (associationId: string): string =>
+    input.associationCampaign.get(associationId) ?? 'Unknown campaign';
+
+  const latest = accessRows[0];
+
+  return {
+    account: {
+      state: input.account,
+      latest: latest
+        ? {
+            action: latest.action,
+            reason: latest.reason,
+            evidence: latest.evidence,
+            reviewOwner: latest.reviewOwner,
+            nextReviewAt: formatInstant(latest.nextReviewAt),
+            actor: actorName(names, latest.actor) ?? latest.actor,
+            at: formatInstant(latest.occurredAt) ?? '',
+          }
+        : null,
+      history: accessRows.map((row) => ({
+        action: row.action,
+        reason: row.reason,
+        actor: actorName(names, row.actor) ?? row.actor,
+        at: formatInstant(row.occurredAt) ?? '',
+      })),
+    },
+    enforcement: enforcementRows.map((row) => {
+      const appeal = appeals.find((entry) => entry.actionId === row.id);
+      return {
+        id: row.id,
+        associationId: row.associationId,
+        campaignName: campaignFor(row.associationId),
+        actionKind: row.actionKind,
+        reasonCategory: row.reasonCategory,
+        // The five §29 fields, as recorded. A record with no row shape for them
+        // cannot exist — the CHECK refuses it — so they are never absent here.
+        statement: {
+          evidenceAndBehavior: row.evidenceAndBehavior,
+          ruleViolated: row.ruleViolated,
+          immediateEffect: row.immediateEffect,
+          correctionPath: row.correctionPath,
+          humanRoute: row.humanRoute,
+        },
+        appealDueAt: formatInstant(row.appealDueAt),
+        appeal: appeal
+          ? {
+              grounds: appeal.grounds,
+              decision: appeal.decision,
+              decidedAt: formatInstant(appeal.decidedAt),
+            }
+          : null,
+        at: formatInstant(row.occurredAt) ?? '',
+      };
+    }),
+    disclosures: [
+      ...conflicts.map((row) => ({
+        kind: 'conflict' as const,
+        associationId: row.associationId,
+        campaignName: campaignFor(row.associationId),
+        detail: `${row.relationshipKind} — ${row.detail}`,
+        at: formatInstant(row.occurredAt) ?? '',
+      })),
+      ...selfPreorders.map((row) => ({
+        kind: 'self_preorder' as const,
+        associationId: row.associationId,
+        campaignName: campaignFor(row.associationId),
+        detail: row.intentNote,
+        at: formatInstant(row.occurredAt) ?? '',
+      })),
+    ].sort((a, b) => b.at.localeCompare(a.at)),
+    policyReacceptanceOpen: input.policyReacceptanceOpen,
+  };
 }

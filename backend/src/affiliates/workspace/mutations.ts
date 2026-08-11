@@ -28,12 +28,15 @@ import {
 } from '../../db/schema/creator-workspace.js';
 import { campaignAffiliateAssociations, campaigns, associationStatusHistory } from '../../db/schema/domain.js';
 import { campaignBuild } from '../../db/schema/build.js';
+import { trackingLinks } from '../../db/schema/decisions.js';
 import { campaignDrafts, founderProspects } from '../../db/schema/invitations.js';
 import {
   CREATOR_ACCESS_RECORDED,
   CREATOR_ASSIGNED_TO_CAMPAIGN,
   CREATOR_DELETION_REQUESTED,
   CREATOR_DELETION_REVIEWED,
+  CREATOR_LINK_PAUSED,
+  CREATOR_LINK_REACTIVATED,
 } from './audit-actions.js';
 import { campaignNameOf, isCreatorAccessAction } from './labels.js';
 
@@ -412,4 +415,89 @@ export async function recordCreatorDeletionReview(
   });
 
   return { ok: true, reviewId };
+}
+
+/* ── Tracking-link controls (§17, §18, §29.5) ──────────────────────────────*/
+
+/**
+ * Pausing and reactivating one Creator's tracking link.
+ *
+ * §17's first-post verification already pauses a link on a `correction_needed`
+ * or `rejected` outcome, and resumes it on a corrected pass. This is the manual
+ * equivalent for the cases §29.5 leaves to a recorded Admin decision — and it
+ * writes the SAME three columns, so a paused link is one state whichever path
+ * paused it, and the §18 ingest needs no second rule.
+ *
+ * ── What it does not do ─────────────────────────────────────────────────────
+ * It never touches `active` or `activated_at`. §14.2 makes the link's identity
+ * immutable by trigger and the 0017 CHECK pins `active` to `activated_at`; more
+ * importantly, §18 decides every click against `activated_at`, so moving it
+ * would silently re-decide clicks that were already recorded. A pause is a
+ * pause, and the ledger keeps recording the reason each ignored click earned
+ * nothing.
+ *
+ * It does not move the association either. A paused LINK stops attribution; a
+ * paused CREATOR is §29's enforcement action with its own five customer-facing
+ * statement fields and its five-business-day appeal window. Collapsing the two
+ * would let a link pause quietly become a sanction with no statement.
+ */
+export async function setTrackingLinkPaused(
+  deps: CreatorMutationDeps,
+  input: {
+    associationId: string;
+    paused: boolean;
+    reason: string | null;
+    who: ActorContext;
+  },
+): Promise<MutationResult<{ associationId: string }>> {
+  const [link] = await deps.db
+    .select()
+    .from(trackingLinks)
+    .where(eq(trackingLinks.associationId, input.associationId))
+    .limit(1);
+  if (!link) {
+    return notFound(
+      'This campaign relationship has no tracking link yet. One is minted when the formal terms are accepted.',
+    );
+  }
+
+  const reason = text(input.reason);
+  if (input.paused && !reason) {
+    return invalid(
+      'Say why the link is being paused. The reason is stored with the decision and the Creator may be told it.',
+    );
+  }
+  if (input.paused && link.pausedAt !== null) {
+    return invalid('This tracking link is already paused.');
+  }
+  if (!input.paused && link.pausedAt === null) {
+    return invalid('This tracking link is not paused, so there is nothing to reactivate.');
+  }
+
+  await deps.db.transaction(async (tx) => {
+    await tx
+      .update(trackingLinks)
+      .set(
+        input.paused
+          ? { pausedAt: new Date(), pausedReason: reason, pausedBy: input.who.actor }
+          : { pausedAt: null, pausedReason: null, pausedBy: null },
+      )
+      .where(eq(trackingLinks.id, link.id));
+
+    await tx.insert(auditEvents).values({
+      actor: input.who.actor,
+      mfaContext: input.who.mfaContext,
+      reauthContext: input.who.reauthContext,
+      targetType: 'campaign_affiliate_association',
+      targetId: input.associationId,
+      action: input.paused ? CREATOR_LINK_PAUSED : CREATOR_LINK_REACTIVATED,
+      internalReason:
+        reason ?? 'Tracking link reactivated; new traffic is attributable again.',
+      // Read from the row inside the write (§33.12.4), never supplied.
+      priorValue: { paused: link.pausedAt !== null, reason: link.pausedReason },
+      newValue: { paused: input.paused, reason: input.paused ? reason : null },
+    });
+  });
+
+  return { ok: true, associationId: input.associationId };
 }

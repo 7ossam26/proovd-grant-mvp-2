@@ -46,7 +46,6 @@ import {
   payoutTone,
   verificationTone,
 } from './shared.js';
-import { useCreatorParked } from './parked.js';
 import { AssignCampaignDialog } from './dialogs/AssignCampaignDialog.js';
 import { DeletionRequestDialog } from './dialogs/DeletionRequestDialog.js';
 
@@ -61,7 +60,6 @@ export function CreatorRecord() {
   const [loadError, setLoadError] = useState<AdminRequestError | null>(null);
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const surface = useRef<HTMLDivElement>(null);
-  const parked = useCreatorParked();
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -126,6 +124,9 @@ export function CreatorRecord() {
   }
 
   const { header, relationships } = detail;
+  /* Bound once so the branch below narrows: `associationId` exists only on the
+     needed shape, and TypeScript cannot follow it through a JSX ternary. */
+  const attention = header.attention.needed ? header.attention : null;
   const canAssign = header.availableActions.includes('assign');
   const canRecordDeletion = header.availableActions.includes('deletion');
 
@@ -179,7 +180,11 @@ export function CreatorRecord() {
             >
               View profile &amp; evidence
             </Button>
-            <Button tier="secondary" small {...parked('controls')}>
+            <Button
+              tier="secondary"
+              small
+              onClick={() => void navigate(`/admin/creators/${header.prospectId}/controls`)}
+            >
               View account controls
             </Button>
             <Button
@@ -209,11 +214,11 @@ export function CreatorRecord() {
       </section>
 
       <div className="cr-record">
-        {header.attention.needed ? (
+        {attention ? (
           <AttentionObject
-            owner={header.attention.owner}
-            label={header.attention.label}
-            detail={header.attention.detail}
+            owner={attention.owner}
+            label={attention.label}
+            detail={attention.detail}
             action={
               /*
                * The owner decides which control appears. An Admin-owned item
@@ -221,9 +226,17 @@ export function CreatorRecord() {
                * none, because offering Proovd a button for somebody else's work
                * is §1.4's failure.
                */
-              header.attention.owner === 'Admin' && header.attention.associationId ? (
-                <Button {...parked('relationship')}>Open the campaign relationship</Button>
-              ) : header.attention.owner === 'Admin' ? (
+              attention.owner === 'Admin' && attention.associationId ? (
+                <Button
+                  onClick={() =>
+                    void navigate(
+                      `/admin/creators/${header.prospectId}/relationships/${attention.associationId}`,
+                    )
+                  }
+                >
+                  Open the campaign relationship
+                </Button>
+              ) : attention.owner === 'Admin' ? (
                 <Button
                   onClick={() => void navigate(`/admin/creators/${header.prospectId}/profile`)}
                 >
@@ -283,7 +296,15 @@ export function CreatorRecord() {
                         : relationship.campaignType ?? 'Campaign type not set'}
                     </small>
                   </span>
-                  <Button tier="secondary" small {...parked('relationship')}>
+                  <Button
+                    tier="secondary"
+                    small
+                    onClick={() =>
+                      void navigate(
+                        `/admin/creators/${header.prospectId}/relationships/${relationship.associationId}`,
+                      )
+                    }
+                  >
                     View campaign relationship
                   </Button>
                 </article>

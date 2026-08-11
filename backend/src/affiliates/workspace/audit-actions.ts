@@ -17,6 +17,8 @@ export const CREATOR_ACCESS_RECORDED = 'creator.access_recorded' as const;
 export const CREATOR_ASSIGNED_TO_CAMPAIGN = 'creator.assigned_to_campaign' as const;
 export const CREATOR_DELETION_REQUESTED = 'creator.deletion_requested' as const;
 export const CREATOR_DELETION_REVIEWED = 'creator.deletion_reviewed' as const;
+export const CREATOR_LINK_PAUSED = 'creator.link_paused' as const;
+export const CREATOR_LINK_REACTIVATED = 'creator.link_reactivated' as const;
 
 /**
  * Every action `history.ts` will render, with the plain sentence it renders as.
@@ -30,6 +32,8 @@ export const CREATOR_AUDIT_TITLES: Record<string, string> = {
   [CREATOR_ASSIGNED_TO_CAMPAIGN]: 'Assigned to another campaign',
   [CREATOR_DELETION_REQUESTED]: 'Account deletion request recorded',
   [CREATOR_DELETION_REVIEWED]: 'Deletion request reviewed',
+  [CREATOR_LINK_PAUSED]: 'Affiliate link paused by Proovd',
+  [CREATOR_LINK_REACTIVATED]: 'Affiliate link reactivated',
   // The names the Phase 08–11 affiliate services actually write. A send is not
   // here because it is its own record (`affiliate_invitation_sends`), which the
   // composer reads directly — an audit row beside it would render the same

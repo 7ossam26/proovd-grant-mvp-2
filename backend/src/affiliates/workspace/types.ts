@@ -267,6 +267,63 @@ export interface CreatorProfilePane {
   } | null;
 }
 
+/* ── Policy, cases, and access (§26.7, §29) ─────────────────────────────────*/
+
+/**
+ * What is open against this person, and what standing they hold.
+ *
+ * Two scopes deliberately side by side, because collapsing them is the mistake
+ * this pane exists to prevent: an ACCOUNT suspension is a reversible review of
+ * the person, and a §29 enforcement action is against ONE campaign relationship
+ * and carries five customer-facing statement fields and an appeal window. The
+ * pane shows both and never merges them.
+ */
+export interface CreatorStandingPane {
+  account: {
+    state: CreatorAccountState;
+    /** The latest recorded decision, when there is one. */
+    latest: {
+      action: string;
+      reason: string;
+      evidence: string | null;
+      reviewOwner: string | null;
+      nextReviewAt: string | null;
+      actor: string;
+      at: string;
+    } | null;
+    history: { action: string; reason: string; actor: string; at: string }[];
+  };
+  /** §29's records, per campaign relationship. */
+  enforcement: {
+    id: string;
+    associationId: string;
+    campaignName: string;
+    actionKind: string;
+    reasonCategory: string;
+    /** The five §29 customer-facing statement fields, as recorded. */
+    statement: {
+      evidenceAndBehavior: string;
+      ruleViolated: string;
+      immediateEffect: string;
+      correctionPath: string;
+      humanRoute: string;
+    };
+    appealDueAt: string | null;
+    appeal: { grounds: string; decision: string | null; decidedAt: string | null } | null;
+    at: string;
+  }[];
+  /** §29.1 and §29.2, recorded rather than decided. */
+  disclosures: {
+    kind: 'conflict' | 'self_preorder';
+    associationId: string;
+    campaignName: string;
+    detail: string;
+    at: string;
+  }[];
+  /** §29.8: an outstanding requirement blocks every `/api/creator` call. */
+  policyReacceptanceOpen: boolean;
+}
+
 /* ── History ────────────────────────────────────────────────────────────────*/
 
 export interface CreatorHistoryEntry {
@@ -289,6 +346,7 @@ export interface CreatorWorkspaceDetail {
   header: CreatorHeader;
   relationships: CreatorRelationshipSummary[];
   profile: CreatorProfilePane;
+  standing: CreatorStandingPane;
   history: CreatorHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;

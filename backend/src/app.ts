@@ -16,7 +16,7 @@ import { createEnforcementRouter } from './routes/enforcement.js';
 import { createAccountRouter } from './routes/account.js';
 import { policyReacceptanceGate } from './enforcement/reacceptance.js';
 import { crossOriginWriteGuard } from './auth/origin-guard.js';
-import { founderStandingGate } from './enforcement/standing.js';
+import { creatorStandingGate, founderStandingGate } from './enforcement/standing.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAdminCreatorsRouter } from './routes/admin-creators.js';
@@ -328,13 +328,16 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // changes what the Admin workspace SAYS is not enforcement. Before this, an
   // existing session kept full Founder access until it expired on its own.
   //
-  // Mounted AFTER the reacceptance gate so a suspended Founder who also owes an
+  // Mounted AFTER the reacceptance gate so a suspended person who also owes an
   // acceptance is told about the suspension — the one that is not theirs to
   // resolve — rather than being sent to a consent page that would not restore
-  // access. Unauthenticated and non-Founder requests pass through untouched;
-  // there is no Creator equivalent because §29 records Creator enforcement per
-  // association, not per account (see `enforcement/standing.ts`).
+  // access. Unauthenticated and wrong-role requests pass through untouched.
   app.use('/api/founder', founderStandingGate(db, auth));
+  // The same gate for a Creator, added 2026-08-11 by product direction and
+  // recorded as a deviation in `enforcement/standing.ts`. It is a reversible
+  // standing review and never a ban: §29's association-scoped enforcement is
+  // untouched, and there is no permanent Creator sanction in the Spec.
+  app.use('/api/creator', creatorStandingGate(db, auth));
   // §5, §1.1. "Who is this session?" — the one read that lets a sign-in form
   // send somebody somewhere without asking them which role they hold. Mounted
   // beside the reacceptance routes and outside both gated prefixes above, for
@@ -476,7 +479,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // is keyed on one campaign relationship, and both are mounted because they
   // answer different questions. Nothing here reimplements recruitment,
   // verification, or the invitation: the surface calls both routers.
-  app.use(createAdminCreatorsRouter({ db, auth }));
+  app.use(
+    createAdminCreatorsRouter({
+      db,
+      auth,
+      appBaseUrl: config.invitationContext.appBaseUrl,
+      ...(config.stripeGateway ? { stripeMode: config.stripeGateway.mode } : {}),
+    }),
+  );
   // Phase 08b (§11, §33.2.1–33.2.3). The one route a Creator reaches with no
   // account. It takes a token, never an association id, so there is nothing in
   // the request to substitute — see `routes/affiliate-invitation.ts`.

@@ -27,7 +27,10 @@
  * that somebody ASKED to close their account (Phase 20b's §29.1 decision,
  * applied here: writing down what somebody told us decides nothing).
  *
- * The §26.7 access decision is Stage 3's and takes the gate when it lands.
+ * The §26.7 access decision takes the gate too: suspending somebody stops them
+ * reaching `/api/creator/*` on their next call, which is the property §5.1
+ * names. It is a reversible standing review and never a ban — §29's
+ * association-scoped enforcement is untouched.
  *
  * ── Every mutation answers with a full re-read ──────────────────────────────
  * `sendWorkspace` re-reads the whole record, so no surface patches a payload
@@ -51,10 +54,15 @@ import {
   looksLikeRecordId,
 } from '../affiliates/workspace/directory.js';
 import { readCreatorWorkspace } from '../affiliates/workspace/record.js';
+import { readCreatorRelationship } from '../affiliates/workspace/relationship.js';
+import { LINK_TEST_MARKER } from '../affiliates/roster-labels.js';
+import type { StripeModeValue } from '../payments/stripe-client.js';
 import {
   assignProspectToCampaign,
+  recordCreatorAccessAction,
   recordCreatorDeletionRequest,
   recordCreatorDeletionReview,
+  setTrackingLinkPaused,
   type ActorContext,
   type MutationFailure,
 } from '../affiliates/workspace/mutations.js';
@@ -65,6 +73,16 @@ export const ADMIN_CREATORS_PATH = '/api/admin/creators';
 export interface AdminCreatorsDeps {
   db: Database;
   auth: Auth;
+  /** Where a tracking link resolves — the `/c/:code` origin the ingest serves. */
+  appBaseUrl: string;
+  /**
+   * §32.2's mode, for §16's connected-account readiness item.
+   *
+   * Absent means this deployment has no Stripe client, so the readiness read
+   * would be answering a question about an account it cannot see. The pane says
+   * so rather than reporting a thirteenth item as incomplete (§1.4, §32.2).
+   */
+  stripeMode?: StripeModeValue | undefined;
 }
 
 /* ── Small shared shapes ────────────────────────────────────────────────────*/
@@ -139,7 +157,12 @@ function parseInstant(value: unknown): Date | null | undefined | 'invalid' {
 
 /* ── The router ─────────────────────────────────────────────────────────────*/
 
-export function createAdminCreatorsRouter({ db, auth }: AdminCreatorsDeps): Router {
+export function createAdminCreatorsRouter({
+  db,
+  auth,
+  appBaseUrl,
+  stripeMode,
+}: AdminCreatorsDeps): Router {
   const router = Router();
   const admin = requireAdmin(auth);
   const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
@@ -233,6 +256,99 @@ export function createAdminCreatorsRouter({ db, auth }: AdminCreatorsDeps): Rout
     }
   });
 
+  /* ── One campaign relationship (§14–§18, §22.1, §24.4, §24.7) ─────────── */
+
+  router.get(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId`,
+    admin,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId } = req.params as {
+          prospectId: string;
+          associationId: string;
+        };
+        if (!looksLikeRecordId(prospectId) || !looksLikeRecordId(associationId)) {
+          notFound(res, 'Relationship not found', 'There is no campaign relationship at that address.');
+          return;
+        }
+
+        const detail = await readCreatorRelationship(db, associationId, {
+          publicOrigin: appBaseUrl,
+          linkTestMarker: LINK_TEST_MARKER,
+          stripeMode: stripeMode ?? 'test',
+        });
+        if (!detail) {
+          notFound(res, 'Relationship not found', 'There is no campaign relationship at that address.');
+          return;
+        }
+        /*
+         * The address carries both ids, so it can carry a pair that does not
+         * belong together. A relationship read under the wrong person's id
+         * answers the same 404 an unknown one does — otherwise the URL would be
+         * a way to confirm which Affiliate an association belongs to.
+         */
+        if (detail.prospectId !== prospectId) {
+          notFound(res, 'Relationship not found', 'There is no campaign relationship at that address.');
+          return;
+        }
+        res.json(detail);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /**
+   * Pausing and reactivating a tracking link — §17, §18, §29.5.
+   *
+   * GATED. A paused link stops new attribution, and an unpaused one starts it
+   * again: §18 decides every click against the link's state at the instant it
+   * arrives, so this is a control over whether traffic can become money. It is
+   * not enforcement — §29's action against the Creator is a separate record
+   * with its own five customer-facing statement fields and its appeal window.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/link`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId } = req.params as {
+          prospectId: string;
+          associationId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const action = str(body, 'action');
+        if (action !== 'pause' && action !== 'reactivate') {
+          badRequest(
+            res,
+            'A link control is either a pause or a reactivation.',
+            'Choose one. Ending the partnership is a §29 enforcement action with its own record.',
+          );
+          return;
+        }
+
+        const result = await setTrackingLinkPaused(
+          { db },
+          {
+            associationId,
+            paused: action === 'pause',
+            reason: str(body, 'reason'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That link control could not be applied');
+          return;
+        }
+        await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   /* ── Assign to another campaign (§8, §11) ─────────────────────────────── */
 
   /**
@@ -282,6 +398,60 @@ export function createAdminCreatorsRouter({ db, auth }: AdminCreatorsDeps): Rout
         );
         if (!result.ok) {
           fail(res, result, 'That relationship could not be created');
+          return;
+        }
+        await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── Account standing (§26.7) ─────────────────────────────────────────── */
+
+  /**
+   * GATED. Suspending a person's Affiliate access stops them reaching
+   * `/api/creator/*` on their very next call, and restoring it lets them back
+   * in — which is exactly the "changes standing" property §5.1 names.
+   *
+   * A recorded deviation, and a narrow one: this is a reversible review, never
+   * a ban. `action` admits two values by CHECK, and §29's association-scoped
+   * enforcement — with its five customer-facing statement fields and its
+   * five-business-day appeal window — is untouched and lives elsewhere.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/access`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const nextReviewAt = parseInstant(body['nextReviewAt']);
+        if (nextReviewAt === 'invalid') {
+          badRequest(
+            res,
+            'That next-review date could not be read.',
+            'Use a full date, or leave it blank.',
+          );
+          return;
+        }
+
+        const result = await recordCreatorAccessAction(
+          { db },
+          {
+            prospectId,
+            action: str(body, 'action') ?? '',
+            reason: str(body, 'reason'),
+            evidence: str(body, 'evidence'),
+            reviewOwner: str(body, 'reviewOwner'),
+            nextReviewAt: nextReviewAt ?? null,
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That access decision could not be recorded');
           return;
         }
         await sendWorkspace(res, prospectId);

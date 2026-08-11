@@ -417,8 +417,8 @@ export async function readCreatorHistory(
         drafts.push({
           category: 'money',
           at: allocation.fundedAt,
-          title: 'Upfront fee funded',
-          detail: `Funded means the campaign-specific upfront fee was funded. It does not mean the Creator was paid.`,
+          title: 'Fixed Creator payment funded',
+          detail: `Funded means the campaign-specific fixed Creator payment was funded. It does not mean the Creator was paid.`,
           actor: null,
           source: 'creator_payment_allocations',
           id: `${allocation.id}:funded`,
@@ -428,7 +428,7 @@ export async function readCreatorHistory(
         drafts.push({
           category: 'money',
           at: allocation.canceledAt,
-          title: 'Upfront fee allocation closed',
+          title: 'Fixed Creator payment allocation closed',
           detail: allocation.canceledReason ?? 'The allocation was closed.',
           actor: allocation.canceledBy,
           source: 'creator_payment_allocations',
