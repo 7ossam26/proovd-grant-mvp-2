@@ -2,6 +2,7 @@ import { Navigate, Outlet, useParams, type RouteObject } from 'react-router';
 import { lazy, Suspense } from 'react';
 import { POLICY_DOCUMENTS } from '@proovd/shared';
 import { MotionProvider } from './motion/MotionProvider.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { LinkUnavailable } from './surfaces/LinkUnavailable.js';
 import { PublicLayout } from './features/public/PublicLayout.js';
 import { Home } from './features/public/Home.js';
@@ -82,7 +83,15 @@ function DraftResultRedirect() {
 function Root() {
   return (
     <MotionProvider>
-      <Outlet />
+      {/*
+        The boundary sits INSIDE MotionProvider, not outside it. A throw from a
+        surface must not take the motion runtime's context down with it — and
+        more practically, the provider's own fail-loud notice has to survive a
+        crash, since "motion did not load" is frequently the reason for one.
+      */}
+      <ErrorBoundary>
+        <Outlet />
+      </ErrorBoundary>
     </MotionProvider>
   );
 }

@@ -3900,7 +3900,12 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
    panel that grows in both directions moves the box you are typing into. */
 .cr-palette {
   position: fixed;
-  z-index: 60;
+  /* Above `.scrim` (940), for the same reason `.modal` is 950: the palette is
+     rendered by a Radix dialog, so its own overlay is painted first and a
+     lower value puts the box the Admin is typing into behind a green wash.
+     Nothing else in this stylesheet occupies 950 with it — `.toast` at 1000 is
+     deliberately still on top, because a confirmation must clear a panel. */
+  z-index: 950;
   top: 12vh;
   left: 50%;
   transform: translateX(-50%);

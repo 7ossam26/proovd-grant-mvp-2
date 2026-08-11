@@ -41,6 +41,7 @@ export { Tabs, type TabEntry } from './Tabs.js';
 
 // Structural primitives
 export { StatePanel, NO_ACTION, type StateOwner } from './StatePanel.js';
+export { ErrorBoundary } from './ErrorBoundary.js';
 export { Flow, type FlowStep } from './Flow.js';
 export { Scaffold } from './Scaffold.js';
 export { Reveal, type RevealKind } from './Reveal.js';
