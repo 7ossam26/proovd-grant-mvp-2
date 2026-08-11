@@ -150,3 +150,9 @@ export * from './live-mode.js';
 // from the campaign-scoped enforcement action) and the §25.8 account-deletion
 // ask, which records a request and deletes nothing.
 export * from './founder-workspace.js';
+
+// The Creator Admin workspace: the same two person-level records for an
+// Affiliate — account standing (§26.7, distinct from the association-scoped
+// §29 enforcement action) and the §25.8 deletion ask. Added 2026-08-11 as a
+// recorded deviation; see the file header for what it deliberately excludes.
+export * from './creator-workspace.js';

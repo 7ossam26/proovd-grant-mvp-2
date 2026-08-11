@@ -87,7 +87,14 @@ function opaqueFailure(status: number): AdminError {
   };
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * Exported for `creators/api.ts`, which is the Creator workspace's own client.
+ *
+ * One fetch helper, not two: §27.1's answers arrive in `whatHappened` / `next`
+ * / `action`, and a second `call` would be a second place for the rule that the
+ * server's refusal is rendered verbatim to drift.
+ */
+export async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, {

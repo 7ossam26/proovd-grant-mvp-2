@@ -232,7 +232,7 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
           <button type="button" className="navlink" {...parked('tabs')}>
             Today
           </button>
-          {/* The one section that exists, and therefore the one real link. */}
+          {/* The two sections that exist, and therefore the two real links. */}
           <NavLink
             to="/admin/founders"
             className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
@@ -242,9 +242,23 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
           <button type="button" className="navlink" {...parked('tabs')}>
             Campaigns
           </button>
-          <button type="button" className="navlink" {...parked('tabs')}>
+          {/*
+            §26.1, §8 — the Creator workspace, built 2026-08-11.
+
+            The tab keeps the §3.1 substitution ("Creators") while the workspace
+            behind it uses the reference's internal record vocabulary
+            ("Affiliate"). That is the reference's own split and not an
+            inconsistency: a Founder-facing distribution partner is a Creator,
+            and internal records may say Affiliate. Nothing in that workspace
+            reaches a customer — the Founder-visible projection selects seven
+            columns and none of its vocabulary.
+          */}
+          <NavLink
+            to="/admin/creators"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
             Creators
-          </button>
+          </NavLink>
         </nav>
 
         <div className="topbar__right">

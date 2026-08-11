@@ -19,6 +19,7 @@ import { crossOriginWriteGuard } from './auth/origin-guard.js';
 import { founderStandingGate } from './enforcement/standing.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
+import { createAdminCreatorsRouter } from './routes/admin-creators.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
 import { createDraftRouter } from './routes/draft.js';
 import { createVettingRouter } from './routes/vetting.js';
@@ -471,6 +472,11 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       context: config.invitationContext,
     }),
   );
+  // The Creator Admin workspace (§26.1). Keyed on the PERSON — the router above
+  // is keyed on one campaign relationship, and both are mounted because they
+  // answer different questions. Nothing here reimplements recruitment,
+  // verification, or the invitation: the surface calls both routers.
+  app.use(createAdminCreatorsRouter({ db, auth }));
   // Phase 08b (§11, §33.2.1–33.2.3). The one route a Creator reaches with no
   // account. It takes a token, never an association id, so there is nothing in
   // the request to substitute — see `routes/affiliate-invitation.ts`.

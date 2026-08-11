@@ -1,0 +1,721 @@
+/**
+ * The Creator (Affiliate) Admin workspace, driven over real HTTP — Spec §8,
+ * §5.3, §11, §2.2, §25.6, §25.8, §26.1, §26.7, §33.12.5.
+ *
+ * `creator-workspace-registers.test.ts` proves the vocabulary does not drift
+ * across the package boundary. This file proves the product: the routes a
+ * person actually reaches, with a real session, a real Postgres, and the real
+ * `createApp` wiring — because a guard that only works when a test wires it is a
+ * guard that is not mounted.
+ *
+ * Five things here are not "coverage" but the claims the workspace was built to
+ * make true, and each is asserted as a property rather than as a happy path:
+ *
+ *   · the directory is PER PERSON, so a Creator recruited to two campaigns is
+ *     one row that names both;
+ *   · the §2.2 slot count is derived across every campaign, never per campaign;
+ *   · the history composes and STORES NOTHING, which is checkable from the
+ *     response because every entry names the table it came from;
+ *   · a second relationship on the same campaign is refused, and the refusal
+ *     says why;
+ *   · the freshness gate is on the review and off the two acts that record what
+ *     somebody told us — exactly the partition the register declares.
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import request from 'supertest';
+import { randomUUID } from 'node:crypto';
+import { and, eq } from 'drizzle-orm';
+
+import { startHarness, type Harness } from './app-harness.js';
+import { createAdmin, seedUser, signInPlain, type AdminSession } from './admin-session.js';
+import { seedAdminReauthWindow } from '../settings/service.js';
+
+import { auditEvents } from '../db/schema/integrity.js';
+import { affiliateProspects } from '../db/schema/affiliates.js';
+import { campaignAffiliateAssociations } from '../db/schema/domain.js';
+import {
+  affiliateDeletionRequests,
+  affiliateDeletionReviews,
+} from '../db/schema/creator-workspace.js';
+import {
+  CREATOR_ASSIGNED_TO_CAMPAIGN,
+  CREATOR_DELETION_REVIEWED,
+} from '../affiliates/workspace/audit-actions.js';
+import { recordCreatorAccessAction } from '../affiliates/workspace/mutations.js';
+import type {
+  CreatorDirectoryRow,
+  CreatorWorkspaceDetail,
+} from '../affiliates/workspace/types.js';
+
+let h: Harness;
+let admin: AdminSession;
+/** A real Admin whose sign-in is two days old. Nothing else about it differs. */
+let staleAdmin: AdminSession;
+let founderCookie: string;
+let affiliateCookie: string;
+
+beforeAll(async () => {
+  h = await startHarness({}, 'creator-workspace');
+  admin = await createAdmin(h, 'creators-admin');
+
+  // Every gated route below fails closed while §6's reauthentication window is
+  // unset, which would make the whole sweep pass for the wrong reason.
+  await seedAdminReauthWindow(h.db, 3600);
+
+  staleAdmin = await createAdmin(h, 'creators-stale-admin');
+  await h.pool.query(`UPDATE session SET created_at = now() - interval '2 days' WHERE user_id = $1`, [
+    staleAdmin.id,
+  ]);
+
+  const founder = await seedUser(h, 'founder', 'creators-founder');
+  founderCookie = await signInPlain(h, founder.email);
+  const affiliate = await seedUser(h, 'affiliate', 'creators-affiliate');
+  affiliateCookie = await signInPlain(h, affiliate.email);
+}, 180_000);
+
+afterAll(async () => {
+  await h?.stop();
+});
+
+/* ── helpers ──────────────────────────────────────────────────────────────── */
+
+/**
+ * A campaign, made the way the product makes one: by recording a Founder
+ * prospect, which creates the campaign, draft, and vetting record together.
+ * Fabricating a bare `campaigns` row would leave the name composition — build
+ * title, else product name — with nothing to read.
+ */
+async function createCampaign(label: string): Promise<{ campaignId: string; name: string }> {
+  const res = await request(h.app)
+    .post('/api/admin/founders')
+    .set('cookie', admin.cookie)
+    .send({
+      legalName: `Founder ${label}`,
+      preferredName: label,
+      email: `${label}-${randomUUID()}@example.com`,
+      productName: `Product ${label}`,
+    })
+    .expect(201);
+  const body = res.body as { campaignId: string };
+  return { campaignId: body.campaignId, name: `Product ${label}` };
+}
+
+const RECRUIT = {
+  publicHandle: '@rowan.builds',
+  channelReference: 'https://instagram.com/rowan.builds',
+  audienceNiche: 'Independent clinic operations',
+  permissionBasis: 'Sole operator of the account; no manager or agency involved.',
+  adminBio: 'Posts weekly about running a one-person clinic.',
+  recruitmentSource: 'Found through a clinic-operations newsletter.',
+  recruitingAdmin: 'Ada Admin',
+  subtype: 'social_creator',
+};
+
+/** Recruits a Creator to a campaign and returns both ids. */
+async function recruit(
+  campaignId: string,
+  label: string,
+  extra: Record<string, unknown> = {},
+): Promise<{ prospectId: string; associationId: string; email: string }> {
+  const email = `${label}-${randomUUID()}@example.com`;
+  const res = await request(h.app)
+    .post('/api/admin/affiliates')
+    .set('cookie', admin.cookie)
+    .send({ ...RECRUIT, legalName: `Rowan ${label}`, email, campaignId, ...extra })
+    .expect(201);
+  const body = res.body as { prospectId: string; associationId: string };
+  return { ...body, email };
+}
+
+async function readDirectory(): Promise<CreatorDirectoryRow[]> {
+  const res = await request(h.app)
+    .get('/api/admin/creators')
+    .set('cookie', admin.cookie)
+    .expect(200);
+  return (res.body as { creators: CreatorDirectoryRow[] }).creators;
+}
+
+async function readWorkspace(prospectId: string): Promise<CreatorWorkspaceDetail> {
+  const res = await request(h.app)
+    .get(`/api/admin/creators/${prospectId}`)
+    .set('cookie', admin.cookie)
+    .expect(200);
+  return res.body as CreatorWorkspaceDetail;
+}
+
+/* ── The directory is per person ──────────────────────────────────────────── */
+
+describe('§26.1, §8 — the directory answers for a PERSON, not a campaign', () => {
+  it('shows one row for a Creator recruited to two campaigns, naming both', async () => {
+    const first = await createCampaign('two-camps-a');
+    const second = await createCampaign('two-camps-b');
+    const { prospectId } = await recruit(first.campaignId, 'two-camps');
+
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/assign-campaign`)
+      .set('cookie', admin.cookie)
+      .send({ campaignId: second.campaignId, rosterIntent: 'initial_roster' })
+      .expect(200);
+
+    const rows = await readDirectory();
+    const mine = rows.filter((row) => row.prospectId === prospectId);
+
+    // The claim the whole read exists to make. The deleted campaign-scoped
+    // screen produced two unrelated rows here.
+    expect(mine).toHaveLength(1);
+    expect(mine[0]!.campaigns.total).toBe(2);
+
+    // And both campaigns are searchable from the one row, so an Admin who
+    // remembers only the campaign can still find the person.
+    expect(mine[0]!.searchText).toContain(first.name.toLowerCase());
+    expect(mine[0]!.searchText).toContain(second.name.toLowerCase());
+  });
+
+  it('derives the §2.2 slot count across every campaign, and never stores it', async () => {
+    const campaign = await createCampaign('slots');
+    const { prospectId, associationId } = await recruit(campaign.campaignId, 'slots');
+
+    const before = await readWorkspace(prospectId);
+    expect(before.header.slots).toEqual({ used: 0, limit: 3, remaining: 3, atLimit: false });
+
+    // §2.2: a slot runs from tracking-link activation, and `paused` still holds
+    // one — a paused Creator is not a closed campaign.
+    await h.db
+      .update(campaignAffiliateAssociations)
+      .set({ status: 'paused' })
+      .where(eq(campaignAffiliateAssociations.id, associationId));
+
+    const after = await readWorkspace(prospectId);
+    expect(after.header.slots.used).toBe(1);
+
+    // There is no column holding it, so it cannot go stale.
+    const columns = await h.pool.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'affiliate_prospects' AND column_name LIKE '%slot%'`,
+    );
+    expect(columns.rowCount).toBe(0);
+  });
+
+  it('resolves every cell server-side, including the filter answers', async () => {
+    const campaign = await createCampaign('filters');
+    const { prospectId } = await recruit(campaign.campaignId, 'filters');
+
+    const row = (await readDirectory()).find((r) => r.prospectId === prospectId)!;
+
+    // A freshly recruited prospect is unverified with §5.3 evidence
+    // outstanding, so the verification pill selects it; nobody has claimed the
+    // account, so the payout pill does NOT — §16a's rule, applied to a filter:
+    // an unclaimed prospect has no payout problem, it has no payout.
+    expect(row.filters.verification).toBe(true);
+    expect(row.filters.payout).toBe(false);
+    expect(row.verification.label).toBe('Not verified yet');
+    expect(row.payout.label).toBe('No payout account yet');
+    expect(row.account).toBe('Not claimed yet');
+  });
+
+  it('names one thing to do, from a record, with the owner who owns it', async () => {
+    const campaign = await createCampaign('attention');
+    const { prospectId } = await recruit(campaign.campaignId, 'attention');
+
+    const row = (await readDirectory()).find((r) => r.prospectId === prospectId)!;
+    expect(row.attention.needed).toBe(true);
+    if (!row.attention.needed) throw new Error('unreachable');
+
+    // Verification outranks the unsent invitation: the register's order is the
+    // priority, and a row shows one thing (DNA §5.1).
+    expect(row.attention.kind).toBe('verification_due');
+    expect(row.attention.owner).toBe('Admin');
+    expect(row.filters.adminWork).toBe(true);
+  });
+});
+
+/* ── The record ───────────────────────────────────────────────────────────── */
+
+describe('§26.1, §5.3, §13 — the record is composed from the records that hold it', () => {
+  it('splits the profile by who supplied each value', async () => {
+    const campaign = await createCampaign('provenance');
+    const { prospectId } = await recruit(campaign.campaignId, 'provenance');
+
+    const detail = await readWorkspace(prospectId);
+    const provenances = detail.profile.blocks.map((block) => block.provenance);
+    expect(provenances).toEqual(['affiliate', 'admin']);
+
+    const research = detail.profile.blocks.find((b) => b.provenance === 'admin')!;
+    expect(research.fields.find((f) => f.key === 'bio')?.value).toBe(RECRUIT.adminBio);
+
+    // §13: Proovd holds a status and an id, never the data behind them. Before
+    // a claim there is no connected account at all, and the block says what it
+    // is waiting on rather than rendering an empty Stripe panel (§16a).
+    expect(detail.profile.provider.populated).toBe(false);
+    expect(detail.profile.provider.waitingOn).toContain('claimed');
+    expect(detail.profile.provider.accountId).toBeNull();
+  });
+
+  it('reports the §5.3 evidence gap without enforcing it', async () => {
+    const campaign = await createCampaign('evidence');
+    const { prospectId } = await recruit(campaign.campaignId, 'evidence');
+
+    const detail = await readWorkspace(prospectId);
+    // The record saved with evidence outstanding — refusing the save would push
+    // an Admin to type a placeholder into an evidence field, which is a worse
+    // record than an honestly incomplete one.
+    expect(detail.header.verification.missing.length).toBeGreaterThan(0);
+    expect(detail.profile.verification.evidence.some((item) => item.required)).toBe(true);
+    expect(
+      detail.profile.verification.evidence.every((item) => item.value === null || item.value !== ''),
+    ).toBe(true);
+  });
+
+  it('offers exactly the actions the record permits, and no others', async () => {
+    const campaign = await createCampaign('actions');
+    const { prospectId } = await recruit(campaign.campaignId, 'actions');
+
+    const before = await readWorkspace(prospectId);
+    expect(before.header.availableActions).toContain('suspend');
+    expect(before.header.availableActions).not.toContain('restore');
+
+    await recordCreatorAccessAction(
+      { db: h.db },
+      {
+        prospectId,
+        action: 'suspend',
+        reason: 'Reviewing a disclosed conflict before the relationship continues.',
+        evidence: null,
+        reviewOwner: 'Ada Admin',
+        nextReviewAt: null,
+        who: { actor: 'user:test', mfaContext: 'test', reauthContext: 'test' },
+      },
+    );
+
+    const after = await readWorkspace(prospectId);
+    expect(after.header.account).toBe('Access suspended');
+    expect(after.header.availableActions).toContain('restore');
+    expect(after.header.availableActions).not.toContain('suspend');
+  });
+
+  it('has no permanent Creator sanction to record, at the database', async () => {
+    // §22.7's one-strike ban is a FOUNDER record with four defined triggers.
+    // The Spec states no Creator equivalent, so `action` admits two values and
+    // there is nowhere for a third to go without editing the constraint.
+    const campaign = await createCampaign('no-ban');
+    const { prospectId } = await recruit(campaign.campaignId, 'no-ban');
+
+    await expect(
+      h.pool.query(
+        `INSERT INTO affiliate_access_actions (prospect_id, action, reason, actor)
+         VALUES ($1, 'ban', 'because', 'user:test')`,
+        [prospectId],
+      ),
+    ).rejects.toThrow();
+
+    const tables = await h.pool.query(
+      `SELECT table_name FROM information_schema.tables
+        WHERE table_name LIKE '%affiliate%ban%'`,
+    );
+    expect(tables.rowCount).toBe(0);
+  });
+});
+
+/* ── The history ──────────────────────────────────────────────────────────── */
+
+describe('§26.8, §25.6 — the history composes and stores nothing', () => {
+  it('names the table every entry came from, and has no store of its own', async () => {
+    const campaign = await createCampaign('history');
+    const { prospectId } = await recruit(campaign.campaignId, 'history');
+
+    const detail = await readWorkspace(prospectId);
+    expect(detail.history.length).toBeGreaterThan(0);
+    for (const entry of detail.history) {
+      expect(entry.source).toMatch(/^[a-z_]+$/);
+      expect(entry.reference.startsWith(`${entry.source}:`)).toBe(true);
+    }
+
+    // The claim is checkable both ways: from the response, and from the schema.
+    const tables = await h.pool.query(
+      `SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND (table_name LIKE '%creator_history%' OR table_name LIKE '%affiliate_history%'
+               OR table_name LIKE '%creator_timeline%')`,
+    );
+    expect(tables.rowCount).toBe(0);
+  });
+
+  it('writes nothing: the composer has no insert, update, or delete in it', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, '../affiliates/workspace/history.ts'), 'utf8');
+    // Comments strip first: this file explains at length what it refuses to do,
+    // and a scan that could not tell an explanation from a usage would force
+    // the explanations out.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/\.insert\(/);
+    expect(code).not.toMatch(/\.update\(/);
+    expect(code).not.toMatch(/\.delete\(/);
+  });
+
+  it('reads the same facts twice without changing them', async () => {
+    const campaign = await createCampaign('idempotent-read');
+    const { prospectId } = await recruit(campaign.campaignId, 'idempotent-read');
+
+    const first = await readWorkspace(prospectId);
+    const second = await readWorkspace(prospectId);
+    expect(second).toEqual(first);
+  });
+
+  it('renders no raw audit action name it does not recognise', async () => {
+    const campaign = await createCampaign('allowlist');
+    const { prospectId } = await recruit(campaign.campaignId, 'allowlist');
+
+    await h.db.insert(auditEvents).values({
+      actor: 'user:test',
+      targetType: 'affiliate_prospect',
+      targetId: prospectId,
+      action: 'affiliate.some_future_action_nobody_mapped',
+      internalReason: 'A later phase wrote this and did not tell the history about it.',
+    });
+
+    const detail = await readWorkspace(prospectId);
+    // §3.1: an audit action name is an internal identifier, and a history line
+    // reading it aloud on a support call is the leak §3.1 names. Skipped, never
+    // rendered raw.
+    expect(
+      detail.history.some((entry) => entry.title.includes('some_future_action')),
+    ).toBe(false);
+  });
+});
+
+/* ── Assigning to another campaign ────────────────────────────────────────── */
+
+describe('§8, §11 — a second relationship is a second row, never a second person', () => {
+  it('creates a prospect-state relationship and sends nothing', async () => {
+    const first = await createCampaign('assign-a');
+    const second = await createCampaign('assign-b');
+    const { prospectId } = await recruit(first.campaignId, 'assign');
+
+    const before = h.sentEmails.messages.length;
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/assign-campaign`)
+      .set('cookie', admin.cookie)
+      .send({ campaignId: second.campaignId, rosterIntent: 'mid_campaign' })
+      .expect(200);
+
+    const detail = res.body as CreatorWorkspaceDetail;
+    expect(detail.relationships).toHaveLength(2);
+    const fresh = detail.relationships.find((r) => r.campaignId === second.campaignId)!;
+    expect(fresh.statusRaw).toBe('prospect');
+    expect(fresh.designation).toBe('Mid-campaign addition');
+
+    // No message, no account. The invitation is the separate act.
+    expect(h.sentEmails.messages.length).toBe(before);
+
+    // And exactly one prospect row exists for this person, so their §2.2 count,
+    // verification, and history are not split in half.
+    const prospects = await h.db
+      .select({ id: affiliateProspects.id })
+      .from(affiliateProspects)
+      .where(eq(affiliateProspects.id, prospectId));
+    expect(prospects).toHaveLength(1);
+  });
+
+  it('refuses a second relationship on the same campaign, and says why', async () => {
+    const campaign = await createCampaign('duplicate');
+    const { prospectId } = await recruit(campaign.campaignId, 'duplicate');
+
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/assign-campaign`)
+      .set('cookie', admin.cookie)
+      .send({ campaignId: campaign.campaignId, rosterIntent: 'initial_roster' })
+      .expect(422);
+
+    expect((res.body as { whatHappened: string }).whatHappened).toContain(
+      'one relationship per campaign',
+    );
+  });
+
+  it('records the §25.6 row in the same transaction as the relationship', async () => {
+    const first = await createCampaign('audit-a');
+    const second = await createCampaign('audit-b');
+    const { prospectId } = await recruit(first.campaignId, 'audit');
+
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/assign-campaign`)
+      .set('cookie', admin.cookie)
+      .send({ campaignId: second.campaignId, rosterIntent: 'initial_roster' })
+      .expect(200);
+
+    const rows = await h.db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.targetId, prospectId),
+          eq(auditEvents.action, CREATOR_ASSIGNED_TO_CAMPAIGN),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.actor).toBe(`user:${admin.id}`);
+    expect(rows[0]!.reauthContext).toContain('session_established_at=');
+  });
+});
+
+/* ── The §25.8 deletion ask ───────────────────────────────────────────────── */
+
+describe('§25.8 — the deletion request records an ask and deletes nothing', () => {
+  it('records the ask, its provenance, and when they asked', async () => {
+    const campaign = await createCampaign('deletion');
+    const { prospectId } = await recruit(campaign.campaignId, 'deletion');
+
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/deletion-request`)
+      .set('cookie', admin.cookie)
+      .send({
+        detail: 'Asked us to close the account and remove their details.',
+        receivedVia: 'Support case PVD-38fkx-2q7wp',
+        requestedAt: '2026-08-01T09:00:00.000Z',
+      })
+      .expect(200);
+
+    const detail = res.body as CreatorWorkspaceDetail;
+    expect(detail.profile.deletionRequest?.receivedVia).toContain('PVD-');
+
+    const [row] = await h.db
+      .select()
+      .from(affiliateDeletionRequests)
+      .where(eq(affiliateDeletionRequests.prospectId, prospectId));
+    // When they asked, not when an Admin got round to it.
+    expect(row!.requestedAt.toISOString()).toBe('2026-08-01T09:00:00.000Z');
+  });
+
+  it('refuses a request with no provenance', async () => {
+    const campaign = await createCampaign('deletion-no-source');
+    const { prospectId } = await recruit(campaign.campaignId, 'deletion-no-source');
+
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/deletion-request`)
+      .set('cookie', admin.cookie)
+      .send({ detail: 'Wants the account closed.' })
+      .expect(422);
+    expect((res.body as { whatHappened: string }).whatHappened).toContain('provenance');
+  });
+
+  it('has no deleted_at, no purge schedule, and no approval state', async () => {
+    const columns = await h.pool.query(
+      `SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'affiliate_deletion_requests'`,
+    );
+    const names = columns.rows.map((r) => (r as { column_name: string }).column_name);
+    for (const forbidden of ['deleted_at', 'purge_scheduled_at', 'approved', 'approved_at']) {
+      expect(names).not.toContain(forbidden);
+    }
+  });
+
+  it('makes all three records insert-only for the application role', async () => {
+    for (const table of [
+      'affiliate_access_actions',
+      'affiliate_deletion_requests',
+      'affiliate_deletion_reviews',
+    ]) {
+      const grants = await h.pool.query(
+        `SELECT privilege_type FROM information_schema.role_table_grants
+          WHERE grantee = 'proovd_app' AND table_name = $1`,
+        [table],
+      );
+      const privileges = grants.rows.map((r) => (r as { privilege_type: string }).privilege_type);
+      expect(privileges).toContain('INSERT');
+      expect(privileges).toContain('SELECT');
+      expect(privileges).not.toContain('UPDATE');
+      expect(privileges).not.toContain('DELETE');
+    }
+  });
+});
+
+/* ── Authorization ────────────────────────────────────────────────────────── */
+
+describe('§33.12.5 — the Admin boundary holds, and the gate is where the register says', () => {
+  const READS = (prospectId: string) => [
+    '/api/admin/creators',
+    '/api/admin/creators/campaigns',
+    `/api/admin/creators/${prospectId}`,
+    `/api/admin/creators/${prospectId}/history`,
+  ];
+
+  it('refuses an anonymous caller on every route', async () => {
+    const campaign = await createCampaign('anon');
+    const { prospectId } = await recruit(campaign.campaignId, 'anon');
+    for (const path of READS(prospectId)) {
+      await request(h.app).get(path).expect(401);
+    }
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/assign-campaign`)
+      .send({ campaignId: campaign.campaignId })
+      .expect(401);
+  });
+
+  it('refuses a signed-in Founder and a signed-in Creator on every route', async () => {
+    const campaign = await createCampaign('wrong-role');
+    const { prospectId } = await recruit(campaign.campaignId, 'wrong-role');
+    for (const cookie of [founderCookie, affiliateCookie]) {
+      for (const path of READS(prospectId)) {
+        await request(h.app).get(path).set('cookie', cookie).expect(403);
+      }
+    }
+  });
+
+  it('refuses a two-day-old Admin session on the review, and only there', async () => {
+    const campaign = await createCampaign('freshness');
+    const { prospectId } = await recruit(campaign.campaignId, 'freshness');
+
+    // Ungated by decision, and registered with its reason: recording that
+    // somebody asked decides nothing (Phase 20b's §29.1 posture).
+    const created = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/deletion-request`)
+      .set('cookie', staleAdmin.cookie)
+      .send({ detail: 'Please close it.', receivedVia: 'Email' })
+      .expect(200);
+    const requestId = (created.body as CreatorWorkspaceDetail).profile.deletionRequest!.id;
+
+    // Gated: the review is a decision somebody may be asked to stand behind.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/deletion-request/${requestId}/reviews`)
+      .set('cookie', staleAdmin.cookie)
+      // 403, not 401: the session is real and the role is right — what is stale
+      // is the sign-in. `requireFreshSession` says so rather than pretending
+      // the caller is anonymous.
+      .expect(403);
+
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/deletion-request/${requestId}/reviews`)
+      .set('cookie', admin.cookie)
+      .send({ note: 'Acknowledged; retention obligations reviewed.' })
+      .expect(200);
+
+    const reviews = await h.db
+      .select()
+      .from(affiliateDeletionReviews)
+      .where(eq(affiliateDeletionReviews.requestId, requestId));
+    expect(reviews).toHaveLength(1);
+
+    const audits = await h.db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.targetId, prospectId),
+          eq(auditEvents.action, CREATOR_DELETION_REVIEWED),
+        ),
+      );
+    expect(audits).toHaveLength(1);
+  });
+
+  it('answers the same 404 for a malformed id and an unknown one', async () => {
+    const malformed = await request(h.app)
+      .get('/api/admin/creators/not-an-id')
+      .set('cookie', admin.cookie)
+      .expect(404);
+    const unknown = await request(h.app)
+      .get(`/api/admin/creators/${randomUUID()}`)
+      .set('cookie', admin.cookie)
+      .expect(404);
+    expect(malformed.body).toEqual(unknown.body);
+  });
+
+  it('never puts an invitation token anywhere in the payload (§28.1)', async () => {
+    const campaign = await createCampaign('token');
+    const { prospectId } = await recruit(campaign.campaignId, 'token');
+
+    const detail = await readWorkspace(prospectId);
+    const serialized = JSON.stringify(detail);
+    expect(serialized).not.toMatch(/creator-invitation\/[A-Za-z0-9_-]{10,}/);
+    expect(serialized).not.toMatch(/"token"\s*:/);
+  });
+});
+
+/* ── The campaign picker ──────────────────────────────────────────────────── */
+
+describe('§8 — the campaign is chosen from a list, never typed', () => {
+  it('lists campaigns with their Founder and status, and excludes archived ones', async () => {
+    const campaign = await createCampaign('picker');
+
+    const res = await request(h.app)
+      .get('/api/admin/creators/campaigns')
+      .set('cookie', admin.cookie)
+      .expect(200);
+    const rows = (res.body as { campaigns: { campaignId: string; name: string; status: string }[] })
+      .campaigns;
+
+    const mine = rows.find((row) => row.campaignId === campaign.campaignId);
+    expect(mine).toBeTruthy();
+    expect(mine!.name).toBe(campaign.name);
+    // §3.1: a lifecycle value never reaches a screen raw.
+    expect(mine!.status).not.toMatch(/_/);
+
+    // §9's archive-and-restart records all three facts together — the
+    // `campaigns_archive_pair` CHECK refuses a half-archived row.
+    await h.pool.query(
+      `UPDATE campaigns
+          SET archived_at = now(), archived_reason = 'wrong type', archived_by = 'user:test'
+        WHERE id = $1`,
+      [campaign.campaignId],
+    );
+    const after = await request(h.app)
+      .get('/api/admin/creators/campaigns')
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect(
+      (after.body as { campaigns: { campaignId: string }[] }).campaigns.some(
+        (row) => row.campaignId === campaign.campaignId,
+      ),
+    ).toBe(false);
+  });
+});
+
+/* ── §8's own rule, re-proved where it changed ────────────────────────────── */
+
+describe('§8, §5.3 — recruiting saves an honestly incomplete record', () => {
+  it('records a prospect with no campaign-fit note, and keeps the column', async () => {
+    const campaign = await createCampaign('no-fit');
+    const { prospectId } = await recruit(campaign.campaignId, 'no-fit');
+
+    const [row] = await h.db
+      .select({ campaignFit: affiliateProspects.campaignFit })
+      .from(affiliateProspects)
+      .where(eq(affiliateProspects.id, prospectId));
+    expect(row!.campaignFit).toBeNull();
+
+    // The column is still there, still editable through the research record,
+    // and still rendered — only the required-at-create rule went.
+    const detail = await readWorkspace(prospectId);
+    const research = detail.profile.blocks.find((b) => b.provenance === 'admin')!;
+    expect(research.fields.some((field) => field.key === 'fit')).toBe(true);
+  });
+
+  it('still refuses a numeric quality tier (§8)', async () => {
+    const campaign = await createCampaign('tier');
+    const res = await request(h.app)
+      .post('/api/admin/affiliates')
+      .set('cookie', admin.cookie)
+      .send({
+        ...RECRUIT,
+        legalName: 'Rowan Tier',
+        email: `tier-${randomUUID()}@example.com`,
+        campaignId: campaign.campaignId,
+        qualityTier: '3',
+      })
+      .expect(400);
+    expect(JSON.stringify(res.body)).toMatch(/tier/i);
+  });
+});
+
+/* ── A note on what is NOT asserted here ──────────────────────────────────── */
+
+/*
+ * The campaign-relationship views, the post review, and the account-standing
+ * route are Stage 2 and Stage 3. `recordCreatorAccessAction` is exercised above
+ * as a service because the workspace already derives account state from it;
+ * its ROUTE, its freshness gate, and the `/api/creator` standing gate arrive
+ * with Stage 3 and are asserted there. A test that drove a route that does not
+ * exist would be a claim that it does (§1.4).
+ */

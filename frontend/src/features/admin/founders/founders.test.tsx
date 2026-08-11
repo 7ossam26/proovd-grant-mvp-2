@@ -628,7 +628,7 @@ afterEach(() => {
 /* ── 1. The shell ──────────────────────────────────────────────────────────── */
 
 describe('§26, §1.4 — the Admin shell says what exists and what does not', () => {
-  it('renders the wordmark, the four sections, and marks only Founders active', async () => {
+  it('renders the wordmark, the four sections, and marks only the current one active', async () => {
     const { container } = await renderList();
 
     expect(container.querySelector('.wordmark')?.textContent).toBe('proovdAdmin');
@@ -641,19 +641,24 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
       'Creators',
     ]);
 
-    // Founders is the one destination that exists, so it is the one anchor —
-    // and the only one carrying the active state.
+    // Founders and Creators are the two destinations that exist, so they are
+    // the two anchors — and only the one being viewed carries the active state.
     const founders = within(nav).getByRole('link', { name: 'Founders' });
     expect(founders).toHaveAttribute('href', '/admin/founders');
     expect(founders.className).toContain('is-active');
+    const creators = within(nav).getByRole('link', { name: 'Creators' });
+    expect(creators).toHaveAttribute('href', '/admin/creators');
+    expect(creators.className).not.toContain('is-active');
     expect(container.querySelectorAll('.navlink.is-active')).toHaveLength(1);
   });
 
-  it('keeps the three parked sections operable rather than removing them', async () => {
+  it('keeps the parked sections operable rather than removing them', async () => {
     await renderList();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
 
-    for (const label of ['Today', 'Campaigns', 'Creators']) {
+    // Creators left this list on 2026-08-11 when its workspace was built. The
+    // two that remain are the two that genuinely do not exist.
+    for (const label of ['Today', 'Campaigns']) {
       const control = within(nav).getByRole('button', { name: label });
       // `aria-disabled`, never `disabled`: a disabled button leaves a keyboard
       // user with nothing at all where a sighted user sees a greyed section and

@@ -185,13 +185,28 @@ export function createAdminAffiliatesRouter({
   router.post(ADMIN_AFFILIATES_PATH, admin, json, async (req, res) => {
     const body = req.body as Record<string, unknown>;
 
+    /*
+     * `campaignFit` left this list on 2026-08-11, and the column stays.
+     *
+     * §8 names it and `affiliate_prospects.campaign_fit` is nullable, so it was
+     * required by this route rather than by the record. The supplied
+     * Creator-workspace reference removes the field an Admin would fill it from
+     * — its acceptance audit refuses a visible "Why fit" control by name —
+     * which left one route demanding a value with no surface behind it, and the
+     * only way past a required box is to type something into it. §5.3's
+     * reasoning, already recorded in `recruitment.ts`: an honestly incomplete
+     * record beats a placeholder somebody invented to get through a form.
+     *
+     * Nothing else changed. The column is still written when a value arrives,
+     * still rendered on the workspace, and still editable through the PATCH
+     * below.
+     */
     const required = [
       'legalName',
       'publicHandle',
       'email',
       'channelReference',
       'audienceNiche',
-      'campaignFit',
       'permissionBasis',
       'adminBio',
       'recruitmentSource',

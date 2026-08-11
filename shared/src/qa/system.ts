@@ -522,6 +522,18 @@ export const UNGATED_ADMIN_WRITES = [
     reason: 'Creates a Creator prospect and its association. No money, no standing, no configuration.',
   },
   {
+    route: 'POST /api/admin/creators/:prospectId/assign-campaign',
+    specRef: '§8, §11',
+    reason:
+      'Creates a second campaign relationship for a Creator Proovd already recruited. It starts at `prospect` — no message, no account, no money, no standing change — and the invitation it leads to is composed and sent under its own gate, which re-decides server-side.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/deletion-request',
+    specRef: '§25.8',
+    reason:
+      'Records that the Creator ASKED to close their account, and its provenance. Phase 20b’s §29.1 decision applied to the other role: writing down what somebody told us decides nothing, and §25.8’s retention obligations are unaffected by it. The review that follows decides an outcome and takes the gate.',
+  },
+  {
     route: 'PATCH /api/admin/affiliates/:associationId/prospect',
     specRef: '§8, §5.3',
     reason:
