@@ -20,6 +20,7 @@ import { creatorStandingGate, founderStandingGate } from './enforcement/standing
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAdminCreatorsRouter } from './routes/admin-creators.js';
+import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
 import { createDraftRouter } from './routes/draft.js';
 import { createVettingRouter } from './routes/vetting.js';
@@ -479,6 +480,10 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // is keyed on one campaign relationship, and both are mounted because they
   // answer different questions. Nothing here reimplements recruitment,
   // verification, or the invitation: the surface calls both routers.
+  // §22.3, §33.8.13. The Admin half of "one source, many renderers" — restored
+  // because a named acceptance test drives it and the dashboard replacement
+  // deleted the router along with its screen. See `routes/admin-close.ts`.
+  app.use(createAdminCloseRouter({ db, auth }));
   app.use(
     createAdminCreatorsRouter({
       db,

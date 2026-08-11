@@ -24,13 +24,16 @@ import { Button } from '../../../../components/index.js';
 import type { CreatorRelationshipDetail } from '../api.js';
 import { Group, Note, Section } from '../shared.js';
 import { useCreatorParked } from '../parked.js';
+import type { RelationshipOp } from '../dialogs/RelationshipOpsDialog.js';
 
 export function RelContent({
   detail,
   onReview,
+  onOp,
 }: {
   detail: CreatorRelationshipDetail;
   onReview: () => void;
+  onOp: (op: RelationshipOp, trigger: HTMLElement | null) => void;
 }) {
   const parked = useCreatorParked();
   const { content } = detail;
@@ -121,6 +124,86 @@ export function RelContent({
             ))}
           </div>
           <Note>Every corrected version stays in the record. A resubmission is a new one.</Note>
+        </Section>
+      ) : null}
+
+      {/* ── §29.6: the required Creator who did not post ───────────────────── */}
+      {content.launchFailure.required || content.launchFailure.failure ? (
+        <Section
+          eyebrow="§29.6 · Required for launch"
+          title={
+            content.launchFailure.failure
+              ? content.launchFailure.failure.status === 'replacement_pending'
+                ? 'Replacement window open'
+                : content.launchFailure.failure.status.replace(/_/g, ' ')
+              : 'Required launch Creator'
+          }
+          actions={
+            content.launchFailure.failure === null ? (
+              /*
+                Offered only against a Creator §15 marked required for launch.
+                A failure against somebody nobody is waiting on would start a
+                replacement clock for a roster that is already whole.
+              */
+              <Button
+                tier="tertiary"
+                small
+                onClick={(event) => onOp('creator_failure', event.currentTarget)}
+              >
+                Record a failure to post
+              </Button>
+            ) : content.launchFailure.failure.status === 'replacement_pending' ? (
+              <Button
+                tier="secondary"
+                small
+                onClick={(event) => onOp('resolve_replacement', event.currentTarget)}
+              >
+                Mark the replacement ready
+              </Button>
+            ) : null
+          }
+        >
+          {content.launchFailure.failure ? (
+            <>
+              <Group>
+                <div className="frow">
+                  <dt>Replacement due</dt>
+                  <dd>
+                    {content.launchFailure.failure.dueAt ?? (
+                      <span className="grey">Not recorded</span>
+                    )}
+                    <p className="helper">
+                      Three US business days on calendar {content.launchFailure.failure.calendarVersion},
+                      stored with the version that produced it. The window is non-resettable —
+                      a retry returns the same deadline rather than moving it.
+                    </p>
+                  </dd>
+                </div>
+                <div className="frow frow--wide">
+                  <dt>Replacement plan</dt>
+                  <dd>{content.launchFailure.failure.replacementDesignation}</dd>
+                </div>
+                <div className="frow">
+                  <dt>Recorded</dt>
+                  <dd>
+                    {content.launchFailure.failure.recordedAt ?? (
+                      <span className="grey">Not recorded</span>
+                    )}
+                  </dd>
+                </div>
+              </Group>
+              <Note>
+                If the window lapses, every funded fixed Creator payment on the campaign is
+                returned and the full listing fee is refunded. Nothing here does that — the
+                sweep does, at the deadline.
+              </Note>
+            </>
+          ) : (
+            <p className="grey">
+              §15 marked this Creator required for launch. Nothing has been recorded against
+              them.
+            </p>
+          )}
         </Section>
       ) : null}
 

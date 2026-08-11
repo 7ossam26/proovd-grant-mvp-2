@@ -323,6 +323,7 @@ export function CreatorRelationship() {
           {pane === 'content' ? (
             <RelContent
               detail={detail}
+              onOp={(next, trigger) => setOp({ op: next, trigger })}
               onReview={() =>
                 void navigate(`/admin/creators/${prospectId}/relationships/${associationId}/review`)
               }

@@ -1237,11 +1237,19 @@ describe('§33.8.14 — the §22.2 thank-you', () => {
     // The §26.6 money-control line that rendered this expense went with the
     // Admin money panel; the record it read is what actually holds the amount,
     // and it is separate from every campaign money column (asserted below).
+    // Named by KIND, not by `limit(1)`. An earlier test in this describe
+    // records a RECOGNITION for the same association — which carries no amount
+    // by CHECK — so an unordered single-row read returns whichever row Postgres
+    // feels like, and the assertion is about the payment.
     const [thankYou] = await h.db
       .select()
       .from(thankYouRecords)
-      .where(eq(thankYouRecords.associationId, creator.associationId))
-      .limit(1);
+      .where(
+        and(
+          eq(thankYouRecords.associationId, creator.associationId),
+          eq(thankYouRecords.kind, 'payment'),
+        ),
+      );
     expect(thankYou!.amountCents).toBe(5_000n);
   });
 

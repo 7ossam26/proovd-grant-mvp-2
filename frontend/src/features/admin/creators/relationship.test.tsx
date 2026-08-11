@@ -240,6 +240,7 @@ function detail(
           submittedAt: 'Aug 11, 2026 · 9:00 AM UTC',
         },
       ],
+      launchFailure: { required: false, failure: null },
       performance: {
         populated: true,
         waitingOn: null,
@@ -584,6 +585,54 @@ describe('§17, §18 — the Content pane', () => {
     const availability = screen.getByRole('button', { name: /Verify content availability/i });
     await userEvent.click(availability);
     expect(toasts).toContain(CREATOR_PARKED_MESSAGES.availability);
+  });
+
+  it('offers §29.6 only against a Creator §15 marked required for launch', async () => {
+    serve(routes());
+    await renderAdmin(`${BASE}?pane=content`);
+    // Not required, nothing recorded — so no replacement clock to start.
+    expect(screen.queryByRole('button', { name: /Record a failure to post/i })).toBeNull();
+
+    serve(
+      routes(
+        detail((draft) => {
+          draft.content.launchFailure = { required: true, failure: null };
+        }),
+      ),
+    );
+    const required = await renderAdmin(`${BASE}?pane=content`);
+    expect(screen.getByRole('button', { name: /Record a failure to post/i })).toBeTruthy();
+    required.unmount();
+  });
+
+  it('states the §29.6 window is non-resettable, with the calendar it was cut on', async () => {
+    serve(
+      routes(
+        detail((draft) => {
+          draft.content.launchFailure = {
+            required: true,
+            failure: {
+              status: 'replacement_pending',
+              dueAt: 'Aug 14, 2026 · 5:00 PM UTC',
+              calendarVersion: 'us-federal.v1',
+              replacementDesignation: 'Approaching two Creators from the same niche.',
+              recordedAt: 'Aug 11, 2026 · 9:00 AM UTC',
+            },
+          };
+        }),
+      ),
+    );
+    await renderAdmin(`${BASE}?pane=content`);
+
+    expect(screen.getByText('Replacement window open')).toBeTruthy();
+    expect(screen.getByText(/us-federal\.v1/)).toBeTruthy();
+    expect(screen.getByText(/non-resettable/)).toBeTruthy();
+    // The consequence of a lapse is stated, and stated as the sweep's — not as
+    // something this surface does.
+    expect(screen.getByText(/the sweep does, at the deadline/)).toBeTruthy();
+    // Recording a second failure is not offered against an open window.
+    expect(screen.queryByRole('button', { name: /Record a failure to post/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /Mark the replacement ready/i })).toBeTruthy();
   });
 
   it('renders an em dash rather than 0% when there are no clicks', async () => {

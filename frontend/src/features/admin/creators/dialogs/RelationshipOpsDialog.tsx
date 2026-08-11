@@ -35,7 +35,9 @@ import {
   fetchCompletion,
   fetchKitAccessLog,
   fetchRelationship,
+  recordCreatorFailure,
   rejectProposalVersion,
+  resolveCreatorReplacement,
   revealPreparing,
   revokeKitAccess,
   setFundingDeadline,
@@ -51,6 +53,8 @@ export type RelationshipOp =
   | 'revoke_kit'
   | 'reveal'
   | 'completion'
+  | 'creator_failure'
+  | 'resolve_replacement'
   | 'access_log';
 
 export function RelationshipOpsDialog({
@@ -198,6 +202,17 @@ export function RelationshipOpsDialog({
             break;
           case 'reveal':
             await revealPreparing(campaignId);
+            break;
+          case 'creator_failure':
+            await recordCreatorFailure(campaignId, {
+              failedAssociationId: associationId,
+              replacementDesignation: values['replacementDesignation'] ?? '',
+            });
+            break;
+          case 'resolve_replacement':
+            await resolveCreatorReplacement(campaignId, {
+              ...(values['resolutionNote'] ? { resolutionNote: values['resolutionNote'] } : {}),
+            });
             break;
           case 'completion':
             await assignCompletion(associationId, {
@@ -379,6 +394,52 @@ function specFor(
         ),
         fields: [],
         primary: 'Run the reveal',
+        secondary: 'Cancel',
+      };
+
+    case 'creator_failure':
+      return {
+        kicker: `${kicker} · §29.6`,
+        title: 'Record a required-Creator failure',
+        body: (
+          <>
+            <p>
+              Records that this required launch Creator did not post, and opens the
+              replacement window: three US business days on the committed holiday calendar,
+              stored with the version that produced it.
+            </p>
+            <p className="helper">
+              The window is non-resettable. Recording this twice returns the first record
+              unchanged rather than moving the deadline — and if it lapses, every funded
+              fixed Creator payment is returned and the full listing fee is refunded.
+            </p>
+          </>
+        ),
+        fields: [
+          {
+            id: 'replacementDesignation',
+            label: 'The replacement plan',
+            required: true,
+            textarea: true,
+            hint: 'Who is being approached, or how the roster will be made whole. Recorded on the failure.',
+          },
+        ],
+        primary: 'Record the failure',
+        secondary: 'Cancel',
+      };
+
+    case 'resolve_replacement':
+      return {
+        kicker: `${kicker} · §29.6`,
+        title: 'Mark the replacement ready',
+        body: (
+          <p>
+            The replacement Creator is ready, so the campaign returns to Creator prep and the
+            window closes. Recorded against the campaign&rsquo;s one failure record.
+          </p>
+        ),
+        fields: [{ id: 'resolutionNote', label: 'Resolution note', textarea: true }],
+        primary: 'Mark it resolved',
         secondary: 'Cancel',
       };
 

@@ -507,6 +507,16 @@ export interface CreatorRelationshipDetail {
       checklist: { id: string; label: string; passed: boolean }[] | null;
     } | null;
     history: { version: number; url: string; status: string; submittedAt: string | null }[];
+    launchFailure: {
+      required: boolean;
+      failure: {
+        status: string;
+        dueAt: string | null;
+        calendarVersion: string;
+        replacementDesignation: string;
+        recordedAt: string | null;
+      } | null;
+    };
     performance: RelationshipSection<{
       clicks: number;
       attributedReservations: number;
@@ -850,4 +860,35 @@ export function assignCompletion(
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+/* ── §29.6: the required-Creator failure and its replacement ───────────────*/
+
+/**
+ * Records that a required launch Creator did not post.
+ *
+ * It opens a NON-RESETTABLE three-business-day replacement window on the
+ * committed holiday calendar, stored with the version that produced it. The
+ * route is idempotent: a retry returns the first record unchanged rather than
+ * moving the deadline, which is the whole reason it can be offered twice.
+ */
+export function recordCreatorFailure(
+  campaignId: string,
+  body: { failedAssociationId: string; replacementDesignation: string },
+): Promise<unknown> {
+  return call(
+    `/api/admin/campaigns/${encodeURIComponent(campaignId)}/creator-failure`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/** Marks the replacement ready, returning the campaign to Creator prep. */
+export function resolveCreatorReplacement(
+  campaignId: string,
+  body: { resolutionNote?: string },
+): Promise<unknown> {
+  return call(
+    `/api/admin/campaigns/${encodeURIComponent(campaignId)}/creator-replacement/resolve`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
 }

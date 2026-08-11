@@ -45,7 +45,8 @@ import {
   creatorBonuses,
   responseDeadlineEvaluations,
 } from '../../db/schema/decisions.js';
-import { creatorPostSubmissions } from '../../db/schema/launch.js';
+import { creatorPostSubmissions, requiredCreatorFailures } from '../../db/schema/launch.js';
+import { associationReadiness } from '../../db/schema/build.js';
 import { creatorPaymentAllocations } from '../../db/schema/creator-payment.js';
 import {
   creatorEarnings,
@@ -201,6 +202,29 @@ export interface ContentPane {
     checklist: { id: string; label: string; passed: boolean }[] | null;
   } | null;
   history: { version: number; url: string; status: string; submittedAt: string | null }[];
+  /**
+   * §29.6: whether this Creator was required for launch, and what has been
+   * recorded if they did not post.
+   *
+   * `required` is read from §15's roster decision, not inferred from the
+   * association's state — a Creator can be active and not required, and
+   * offering a failure control against one would be offering to start a
+   * replacement clock for somebody nobody is waiting on.
+   *
+   * `failure` is the campaign's ONE record, and it is surfaced here only when
+   * it names THIS relationship. A failure recorded against a different Creator
+   * on the same campaign is not this Creator's to resolve.
+   */
+  launchFailure: {
+    required: boolean;
+    failure: {
+      status: string;
+      dueAt: string | null;
+      calendarVersion: string;
+      replacementDesignation: string;
+      recordedAt: string | null;
+    } | null;
+  };
   /** §18's traffic, with a conversion that is null rather than 0% over zero. */
   performance: RelationshipSection<{
     clicks: number;
@@ -317,6 +341,8 @@ export async function readCreatorRelationship(
     [deadline],
     readinessSnapshot,
     kitAccess,
+    [rosterDecision],
+    [launchFailureRow],
   ] = await Promise.all([
     db
       .select({ occurredAt: associationStatusHistory.occurredAt })
@@ -397,6 +423,18 @@ export async function readCreatorRelationship(
       .from(campaignKitAccess)
       .where(eq(campaignKitAccess.associationId, associationId))
       .orderBy(desc(campaignKitAccess.occurredAt)),
+    // §15's roster decision, which is where "required for launch" is recorded.
+    db
+      .select({ launchRequired: associationReadiness.launchRequired })
+      .from(associationReadiness)
+      .where(eq(associationReadiness.associationId, associationId))
+      .limit(1),
+    // The campaign's one §29.6 record, matched to THIS relationship.
+    db
+      .select()
+      .from(requiredCreatorFailures)
+      .where(eq(requiredCreatorFailures.failedAssociationId, associationId))
+      .limit(1),
   ]);
 
   const campaignName = campaignNameOf(row.campaignTitle, row.campaignProduct);
@@ -639,6 +677,22 @@ export async function readCreatorRelationship(
       submittedAt: formatInstant(submission.submittedAt),
     })),
     performance,
+    launchFailure: {
+      required: rosterDecision?.launchRequired ?? false,
+      failure: launchFailureRow
+        ? {
+            status: launchFailureRow.status,
+            // §29.6's window is three business days on the committed calendar,
+            // stored WITH the version that produced it and immutable by
+            // trigger. Rendered from the record rather than recomputed — a
+            // deadline a surface works out is one that can drift from the sweep.
+            dueAt: formatInstant(launchFailureRow.dueAt),
+            calendarVersion: launchFailureRow.dueCalendarVersion,
+            replacementDesignation: launchFailureRow.replacementDesignation,
+            recordedAt: formatInstant(launchFailureRow.creatorFailureRecordedAt),
+          }
+        : null,
+    },
   };
 
   /* ── Money ─────────────────────────────────────────────────────────────── */
