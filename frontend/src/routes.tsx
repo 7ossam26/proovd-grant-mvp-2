@@ -18,6 +18,13 @@ import { RequireRole, RedirectIfAuthenticated } from './lib/routeGuards.js';
 import { roleHome } from './lib/session.js';
 import { FoundersList } from './features/admin/founders/FoundersList.js';
 import { FounderWorkspace } from './features/admin/founders/FounderWorkspace.js';
+import { CreatorsDirectory } from './features/admin/creators/CreatorsDirectory.js';
+import { CreatorRecord } from './features/admin/creators/CreatorRecord.js';
+import { CreatorProfile } from './features/admin/creators/CreatorProfile.js';
+import { CreatorHistory } from './features/admin/creators/CreatorHistory.js';
+import { CreatorRelationship } from './features/admin/creators/CreatorRelationship.js';
+import { PostReview } from './features/admin/creators/PostReview.js';
+import { CreatorControls } from './features/admin/creators/CreatorControls.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
@@ -199,12 +206,41 @@ const rootChildren: RouteObject[] = [
       // whose campaign was archived-and-restarted (§9's wrong-type path) has
       // more than one of each and is still one person.
       //
-      // The Admin panel's other sections — Today, Campaigns, Creators — are
-      // parked in the shell rather than routed here. A route with no surface is
-      // a claim that a surface exists (§1.4); the shell's parked control says
-      // what the destination is instead.
+      // The Admin panel's other sections — Today and Campaigns — are parked in
+      // the shell rather than routed here. A route with no surface is a claim
+      // that a surface exists (§1.4); the shell's parked control says what the
+      // destination is instead.
       { path: 'founders', element: <FoundersList /> },
       { path: 'founders/:prospectId', element: <FounderWorkspace /> },
+      // §26.1, §8. The Creator (Affiliate) workspace, keyed on the PERSON for
+      // the same reason the Founder one is: a Creator recruited to two
+      // campaigns is one person with two `campaign_affiliate_associations`
+      // rows, and the deleted campaign-scoped screen could not say so.
+      //
+      // Four addresses rather than one stateful page: DNA §5.12 requires
+      // position to survive interruption, and a URL is the cheapest durable
+      // position there is. The campaign-relationship view and the controls
+      // surface are parked in the record until they are built.
+      { path: 'creators', element: <CreatorsDirectory /> },
+      { path: 'creators/:prospectId', element: <CreatorRecord /> },
+      { path: 'creators/:prospectId/profile', element: <CreatorProfile /> },
+      { path: 'creators/:prospectId/history', element: <CreatorHistory /> },
+      // §14–§18, §22.1. One campaign relationship, four panes of one object.
+      // The pane is a search param rather than a path segment: it is a view of
+      // the same record, and a bookmark to Money should still be that record.
+      {
+        path: 'creators/:prospectId/relationships/:associationId',
+        element: <CreatorRelationship />,
+      },
+      // §17's decision is its own address, because it is its own act — an
+      // Admin part-way through seven checks who reloads gets the checks back.
+      {
+        path: 'creators/:prospectId/relationships/:associationId/review',
+        element: <PostReview />,
+      },
+      // §26.7, §29. Account standing and every recorded enforcement action, on
+      // the person's own address — the two scopes side by side and never merged.
+      { path: 'creators/:prospectId/controls', element: <CreatorControls /> },
     ],
   },
   {

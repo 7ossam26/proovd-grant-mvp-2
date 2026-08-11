@@ -309,6 +309,13 @@
       "when": 1786291200000,
       "tag": "0043_prospect_identity_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1786377600000,
+      "tag": "0044_creator_workspace",
+      "breakpoints": true
     }
   ]
 }

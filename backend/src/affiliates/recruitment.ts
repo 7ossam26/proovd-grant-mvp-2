@@ -67,7 +67,16 @@ export interface CreateAffiliateProspectInput {
   subtype: AffiliateSubtype;
   channelReference: string;
   audienceNiche: string;
-  campaignFit: string;
+  /**
+   * §8's "why THIS campaign fits THIS channel", when Admin recorded one.
+   *
+   * Optional since 2026-08-11: the column has always been nullable, and the
+   * Creator-workspace reference removes the visible control an Admin filled it
+   * from. `admin-affiliates.ts` records the full reasoning; the short version
+   * is §5.3's, that an honestly incomplete record beats a placeholder somebody
+   * typed to get past a required box.
+   */
+  campaignFit?: string | null;
   audienceSize?: string | null;
   engagementEvidence?: Record<string, string> | null;
   audienceDemographics?: string | null;
@@ -165,7 +174,7 @@ export async function createAffiliateProspect(
         subtype: input.subtype,
         channelReference: input.channelReference.trim(),
         audienceNiche: input.audienceNiche.trim(),
-        campaignFit: input.campaignFit.trim(),
+        campaignFit: trim(input.campaignFit),
         audienceSize: trim(input.audienceSize),
         engagementEvidence: input.engagementEvidence ?? null,
         audienceDemographics: trim(input.audienceDemographics),
