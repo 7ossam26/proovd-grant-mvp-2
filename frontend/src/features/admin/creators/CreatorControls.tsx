@@ -35,12 +35,29 @@ import { fetchCreator, AdminRequestError, type CreatorWorkspaceDetail } from './
 import { Group, Note, Section } from './shared.js';
 import { useCreatorParked } from './parked.js';
 import { AccessDecisionDialog } from './dialogs/AccessDecisionDialog.js';
+import {
+  EnforcementDialog,
+  type EnforcementDialogKind,
+} from './dialogs/EnforcementDialog.js';
 
 export function CreatorControls() {
   const { prospectId = '' } = useParams();
   const [detail, setDetail] = useState<CreatorWorkspaceDetail | null>(null);
   const [loadError, setLoadError] = useState<AdminRequestError | null>(null);
   const [accessTrigger, setAccessTrigger] = useState<HTMLElement | null>(null);
+  /**
+   * A §29 form is always against ONE relationship, so the open dialog carries
+   * which — there is no account-level enforcement to fall back on, and a form
+   * that had to guess would be guessing which campaign somebody is sanctioned
+   * on.
+   */
+  const [enforcement, setEnforcement] = useState<{
+    kind: EnforcementDialogKind;
+    associationId: string;
+    campaignName: string;
+    appealId?: string;
+    trigger: HTMLElement | null;
+  } | null>(null);
   const surface = useRef<HTMLDivElement>(null);
   const parked = useCreatorParked();
 
@@ -194,6 +211,67 @@ export function CreatorControls() {
               : `${standing.enforcement.length} enforcement ${standing.enforcement.length === 1 ? 'action' : 'actions'}`
           }
         >
+          {/*
+            One row per relationship, because §29 records against a relationship
+            and an Admin has to say which. A single "record an action" control
+            with a campaign picker would be the same choice made worse: the
+            record already knows which relationships exist.
+          */}
+          <div className="cr-rel-list">
+            {detail.relationships.map((relationship) => (
+              <article className="cr-rel" key={relationship.associationId}>
+                <span className="cr-rel__main">
+                  <strong>{relationship.campaignName}</strong>
+                  <small>{relationship.status}</small>
+                </span>
+                <div className="case-actions">
+                  <Button
+                    tier="secondary"
+                    small
+                    onClick={(event) =>
+                      setEnforcement({
+                        kind: 'action',
+                        associationId: relationship.associationId,
+                        campaignName: relationship.campaignName,
+                        trigger: event.currentTarget,
+                      })
+                    }
+                  >
+                    Record enforcement action
+                  </Button>
+                  <Button
+                    tier="tertiary"
+                    small
+                    onClick={(event) =>
+                      setEnforcement({
+                        kind: 'conflict',
+                        associationId: relationship.associationId,
+                        campaignName: relationship.campaignName,
+                        trigger: event.currentTarget,
+                      })
+                    }
+                  >
+                    Record conflict
+                  </Button>
+                  <Button
+                    tier="tertiary"
+                    small
+                    onClick={(event) =>
+                      setEnforcement({
+                        kind: 'self_preorder',
+                        associationId: relationship.associationId,
+                        campaignName: relationship.campaignName,
+                        trigger: event.currentTarget,
+                      })
+                    }
+                  >
+                    Record self-pre-order
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+
           {standing.enforcement.length === 0 ? (
             <p className="grey">
               Nothing has been recorded against any of this Affiliate&rsquo;s campaign
@@ -256,6 +334,30 @@ export function CreatorControls() {
                       </div>
                     ) : null}
                   </Group>
+                  {/*
+                    Offered only while the decision is genuinely open. §29.4
+                    makes it write-once, so a second control against a decided
+                    appeal would be one the route refuses.
+                  */}
+                  {action.appeal && !action.appeal.decision ? (
+                    <div className="case-actions">
+                      <Button
+                        tier="secondary"
+                        small
+                        onClick={(event) =>
+                          setEnforcement({
+                            kind: 'appeal',
+                            associationId: action.associationId,
+                            campaignName: action.campaignName,
+                            appealId: action.appeal!.id,
+                            trigger: event.currentTarget,
+                          })
+                        }
+                      >
+                        Decide the appeal
+                      </Button>
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -318,6 +420,22 @@ export function CreatorControls() {
           <Note>{ISSUER_RIGHTS_SENTENCE}</Note>
         </Section>
       </div>
+
+      {enforcement ? (
+        <EnforcementDialog
+          kind={enforcement.kind}
+          prospectId={header.prospectId}
+          associationId={enforcement.associationId}
+          campaignName={enforcement.campaignName}
+          {...(enforcement.appealId ? { appealId: enforcement.appealId } : {})}
+          trigger={enforcement.trigger}
+          onClose={() => setEnforcement(null)}
+          onDone={(next) => {
+            setDetail(next);
+            setEnforcement(null);
+          }}
+        />
+      ) : null}
 
       {accessTrigger ? (
         <AccessDecisionDialog

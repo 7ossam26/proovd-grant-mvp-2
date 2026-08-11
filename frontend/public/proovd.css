@@ -3866,3 +3866,82 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   text-transform: capitalize;
 }
 .cr-enforcement header small { color: var(--grey); font-size: 0.75rem; }
+
+
+/* ─────────────────────────────────── §26.1 THE `/` PALETTE (added with it) */
+
+.cr-hero__actions { display: flex; align-items: center; gap: var(--sp-12); flex-wrap: wrap; }
+
+/* Reads as a search field rather than a button, because that is what pressing
+   it produces — but it is a button, so it is announced as one. */
+.cr-searchbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--touch);
+  padding: 0 var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  background: var(--surface);
+  border-radius: var(--radius);
+  color: var(--grey);
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cr-searchbtn kbd {
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 0.6875rem;
+}
+
+/* Near the top rather than centred: the results grow downward, and a centred
+   panel that grows in both directions moves the box you are typing into. */
+.cr-palette {
+  position: fixed;
+  z-index: 60;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(38rem, calc(100% - var(--sp-32)));
+  max-height: 70vh;
+  overflow: auto;
+  padding: var(--sp-16);
+  background: var(--surface);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+}
+.cr-palette__input { width: 100%; margin-bottom: var(--sp-12); }
+.cr-palette__row {
+  width: 100%;
+  min-height: var(--touch);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-8) var(--sp-12);
+  border: none;
+  background: none;
+  border-radius: var(--radius);
+  text-align: left;
+}
+.cr-palette__row span { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-palette__row strong { font-weight: 800; color: var(--darker); }
+.cr-palette__row small { color: var(--grey); font-size: 0.75rem; }
+/* The active row is filled AND holds `aria-selected`, so the state is not
+   colour alone for either kind of reader. */
+.cr-palette__row.is-active { background: var(--brand-5); outline: 1px solid var(--brand); }
+
+@media (max-width: 600px) {
+  /* A bottom sheet on a phone, the same posture every other overlay takes. */
+  .cr-palette {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-height: 88svh;
+    border-width: var(--bw) 0 0;
+  }
+}

@@ -309,7 +309,12 @@ export interface CreatorStandingPane {
       humanRoute: string;
     };
     appealDueAt: string | null;
-    appeal: { grounds: string; decision: string | null; decidedAt: string | null } | null;
+    appeal: {
+      id: string;
+      grounds: string;
+      decision: string | null;
+      decidedAt: string | null;
+    } | null;
     at: string;
   }[];
   /** §29.1 and §29.2, recorded rather than decided. */

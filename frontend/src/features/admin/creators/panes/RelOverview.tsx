@@ -14,16 +14,19 @@ import type { CreatorRelationshipDetail, RelationshipTask } from '../api.js';
 import { Group, Note, OwnerPill, Section } from '../shared.js';
 import { useCreatorParked } from '../parked.js';
 import { LinkControlsDialog } from '../dialogs/LinkControlsDialog.js';
+import type { RelationshipOp } from '../dialogs/RelationshipOpsDialog.js';
 
 export function RelOverview({
   detail,
   tasks,
   onGo,
+  onOp,
   onChanged,
 }: {
   detail: CreatorRelationshipDetail;
   tasks: RelationshipTask[];
   onGo: (to: 'review' | 'agreement' | 'money' | 'profile') => void;
+  onOp: (op: RelationshipOp, trigger: HTMLElement | null) => void;
   onChanged: (detail: CreatorRelationshipDetail) => void;
 }) {
   const parked = useCreatorParked();
@@ -145,6 +148,31 @@ export function RelOverview({
             </span>
           ) : null
         }
+        actions={
+          <>
+            <Button
+              tier="secondary"
+              small
+              onClick={(event) => onOp('confirm_deliverables', event.currentTarget)}
+            >
+              Confirm required posts and deliverables
+            </Button>
+            <Button
+              tier="secondary"
+              small
+              onClick={(event) => onOp('funding_deadline', event.currentTarget)}
+            >
+              Set the funding deadline
+            </Button>
+            <Button
+              tier="tertiary"
+              small
+              onClick={(event) => onOp('evaluate', event.currentTarget)}
+            >
+              Re-derive readiness
+            </Button>
+          </>
+        }
       >
         {overview.readiness ? (
           <>
@@ -215,9 +243,36 @@ export function RelOverview({
               : 'Kit not revealed yet'
         }
         actions={
-          <Button tier="secondary" small {...parked('evidenceUpload')}>
-            Open visual Campaign kit
-          </Button>
+          <>
+            <Button
+              tier="secondary"
+              small
+              onClick={(event) => onOp('access_log', event.currentTarget)}
+            >
+              View the access log
+            </Button>
+            {overview.kit.revealedAt === null ? (
+              <Button
+                tier="secondary"
+                small
+                onClick={(event) => onOp('reveal', event.currentTarget)}
+              >
+                Reveal the preparing campaign
+              </Button>
+            ) : null}
+            {overview.kit.revealedAt !== null && overview.kit.revokedAt === null ? (
+              <Button
+                tier="tertiary"
+                small
+                onClick={(event) => onOp('revoke_kit', event.currentTarget)}
+              >
+                Revoke kit access
+              </Button>
+            ) : null}
+            <Button tier="tertiary" small {...parked('kitVisuals')}>
+              Open visual Campaign kit
+            </Button>
+          </>
         }
       >
         <Group>

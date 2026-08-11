@@ -19,8 +19,8 @@
  * ── The campaign type leads ─────────────────────────────────────────────────
  * The reference's eyebrow is `{type} · {name} · Campaign relationship`, and the
  * order is deliberate: almost every rule on this screen differs between an Idea
- * and a Product campaign — the upfront fee exists for one and not the other —
- * so the type is read before anything it governs.
+ * and a Product campaign — the fixed Creator payment exists for one and not
+ * the other — so the type is read before anything it governs.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
@@ -39,6 +39,10 @@ import { RelOverview } from './panes/RelOverview.js';
 import { RelAgreement } from './panes/RelAgreement.js';
 import { RelContent } from './panes/RelContent.js';
 import { RelMoney } from './panes/RelMoney.js';
+import {
+  RelationshipOpsDialog,
+  type RelationshipOp,
+} from './dialogs/RelationshipOpsDialog.js';
 
 const PANES = [
   { key: 'overview', label: 'Overview' },
@@ -63,6 +67,16 @@ export function CreatorRelationship() {
   const paneRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const markRef = useRef<HTMLSpanElement>(null);
+  /**
+   * Three panes open operations against the same relationship, so the open
+   * dialog lives here rather than in each of them — one place decides what is
+   * open, and closing it re-reads once.
+   */
+  const [op, setOp] = useState<{
+    op: RelationshipOp;
+    versionId?: string;
+    trigger: HTMLElement | null;
+  } | null>(null);
 
   const raw = params.get('pane') ?? 'overview';
   const pane: PaneKey = isPane(raw) ? raw : 'overview';
@@ -281,6 +295,7 @@ export function CreatorRelationship() {
             <RelOverview
               detail={detail}
               tasks={tasks}
+              onOp={(next, trigger) => setOp({ op: next, trigger })}
               onGo={(to) => {
                 if (to === 'profile') {
                   void navigate(`/admin/creators/${prospectId}/profile`);
@@ -297,7 +312,14 @@ export function CreatorRelationship() {
               onChanged={setDetail}
             />
           ) : null}
-          {pane === 'agreement' ? <RelAgreement detail={detail} /> : null}
+          {pane === 'agreement' ? (
+            <RelAgreement
+              detail={detail}
+              onOp={(next, versionId, trigger) =>
+                setOp({ op: next, ...(versionId ? { versionId } : {}), trigger })
+              }
+            />
+          ) : null}
           {pane === 'content' ? (
             <RelContent
               detail={detail}
@@ -306,9 +328,31 @@ export function CreatorRelationship() {
               }
             />
           ) : null}
-          {pane === 'money' ? <RelMoney detail={detail} /> : null}
+          {pane === 'money' ? (
+            <RelMoney
+              detail={detail}
+              onOp={(next, trigger) => setOp({ op: next, trigger })}
+            />
+          ) : null}
         </div>
       </div>
+
+      {op ? (
+        <RelationshipOpsDialog
+          op={op.op}
+          prospectId={prospectId}
+          associationId={associationId}
+          campaignId={detail.campaignId}
+          campaignName={detail.band.campaignName}
+          {...(op.versionId ? { versionId: op.versionId } : {})}
+          trigger={op.trigger}
+          onClose={() => setOp(null)}
+          onDone={(next) => {
+            setDetail(next);
+            setOp(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

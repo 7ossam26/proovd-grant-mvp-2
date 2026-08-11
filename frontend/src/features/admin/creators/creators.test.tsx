@@ -864,6 +864,47 @@ describe('§26.7, §29 — the controls surface keeps the two scopes apart', () 
     expect(screen.getByText(/Five business days/)).toBeTruthy();
   });
 
+  it('offers a §29 action per relationship, because §29 is per relationship', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+
+    // One row per relationship rather than one control with a campaign picker:
+    // the record already knows which relationships exist.
+    await userEvent.click(
+      screen.getByRole('button', { name: /Record enforcement action/i }),
+    );
+    const dialog = await screen.findByRole('dialog');
+
+    // All five customer-facing statement fields, separately — §28.4's rule
+    // applied to a statement: five things in one textarea is one thing.
+    for (const label of [
+      /What happened/i,
+      /Which rule/i,
+      /Immediate effect/i,
+      /How to correct it/i,
+      /Human route/i,
+    ]) {
+      expect(within(dialog).getByLabelText(label)).toBeTruthy();
+    }
+    // And the internal reason is a sixth field, kept apart (§25.6).
+    expect(within(dialog).getByLabelText(/Internal reason/i)).toBeTruthy();
+    expect(within(dialog).getByText(/belongs here and nowhere below/)).toBeTruthy();
+  });
+
+  it('records a conflict and a self-pre-order as two separate certifications', async () => {
+    serve([
+      ...recordRoutes(),
+      { match: /self-preorder-disclosures$/, status: 201, body: { ok: true } },
+    ]);
+    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+
+    await userEvent.click(screen.getByRole('button', { name: /Record self-pre-order/i }));
+    const dialog = await screen.findByRole('dialog');
+    // §28.4 forbids bundling, so §29.2's two certifications are two answers.
+    expect(within(dialog).getByLabelText(/Certified self-funded/i)).toBeTruthy();
+    expect(within(dialog).getByLabelText(/Identity disclosed/i)).toBeTruthy();
+  });
+
   it('parks case intake and says the console owns it', async () => {
     serve(recordRoutes());
     await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
@@ -874,6 +915,52 @@ describe('§26.7, §29 — the controls surface keeps the two scopes apart', () 
     expect(control.getAttribute('aria-disabled')).toBe('true');
     await userEvent.click(control);
     expect(toasts).toContain(CREATOR_PARKED_MESSAGES.caseIntake);
+  });
+});
+
+/* ── The `/` palette ───────────────────────────────────────────────────────── */
+
+describe('§26.1, §28.5 — the search palette', () => {
+  it('opens on `/` and finds an Affiliate by campaign, not just by name', async () => {
+    serve([...directoryRoutes(), ...recordRoutes()]);
+    const view = await renderAdmin('/admin/creators');
+
+    await userEvent.keyboard('/');
+    const palette = await screen.findByRole('dialog');
+
+    // `searchText` is composed server-side and includes every campaign the
+    // person is on, which is why typing a campaign finds its Creators.
+    await userEvent.type(within(palette).getByRole('searchbox'), 'teeb');
+    const option = await within(palette).findByRole('option', { name: /Maya Johnson/ });
+    expect(option).toBeTruthy();
+
+    await userEvent.click(option);
+    await waitFor(() => {
+      expect(view.router.state.location.pathname).toBe(`/admin/creators/${PROSPECT}`);
+    });
+  });
+
+  it('does not open while somebody is typing a slash into a field', async () => {
+    serve(directoryRoutes());
+    await renderAdmin('/admin/creators');
+
+    const box = screen.getByRole('searchbox', { name: /Search Affiliates/i });
+    await userEvent.type(box, 'a/b');
+
+    // Without the guard, a slash inside a reason field opens an overlay on top
+    // of the form and eats the keystroke.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect((box as HTMLInputElement).value).toBe('a/b');
+  });
+
+  it('says nothing matched rather than showing an empty panel', async () => {
+    serve(directoryRoutes());
+    await renderAdmin('/admin/creators');
+
+    await userEvent.keyboard('/');
+    const palette = await screen.findByRole('dialog');
+    await userEvent.type(within(palette).getByRole('searchbox'), 'zzzz');
+    expect(await within(palette).findByText('No matching Affiliate.')).toBeTruthy();
   });
 });
 

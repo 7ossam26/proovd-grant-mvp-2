@@ -628,7 +628,12 @@ export interface CreatorStandingPane {
       humanRoute: string;
     };
     appealDueAt: string | null;
-    appeal: { grounds: string; decision: string | null; decidedAt: string | null } | null;
+    appeal: {
+      id: string;
+      grounds: string;
+      decision: string | null;
+      decidedAt: string | null;
+    } | null;
     at: string;
   }[];
   disclosures: {
@@ -658,6 +663,190 @@ export function recordAccessDecision(
   },
 ): Promise<CreatorWorkspaceDetail> {
   return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/access`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/* ── §29 enforcement, appeals, and disclosures ─────────────────────────────*/
+
+/**
+ * The §29.4 action, at the route that already owns it.
+ *
+ * Association-scoped, because §29 records Creator enforcement per campaign
+ * relationship — a Creator paused on one campaign is not paused on another.
+ * All five customer-facing statement fields are required by the schema, by the
+ * service, and by a CHECK: a record with no row shape for them cannot exist.
+ */
+export function recordEnforcement(
+  associationId: string,
+  body: {
+    actionKind: string;
+    reasonCategory: string;
+    internalReason: string;
+    evidenceAndBehavior: string;
+    ruleViolated: string;
+    immediateEffect: string;
+    correctionPath: string;
+    humanRoute: string;
+    terminationValidity?: string | null;
+  },
+): Promise<unknown> {
+  return call(`/api/admin/associations/${encodeURIComponent(associationId)}/enforcement`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** §29.4's appeal. Write-once — "final" means the decision does not move. */
+export function decideAppeal(
+  appealId: string,
+  body: { decision: 'upheld' | 'overturned'; note?: string },
+): Promise<unknown> {
+  return call(`/api/admin/appeals/${encodeURIComponent(appealId)}/decide`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** §29.1. Recording what somebody told us — it decides nothing. */
+export function recordConflictDisclosure(
+  associationId: string,
+  body: { relationshipKind: string; detail: string; disclosedBy: string },
+): Promise<unknown> {
+  return call(
+    `/api/admin/associations/${encodeURIComponent(associationId)}/conflict-disclosures`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * §29.2. Both certifications are required and CHECK-pinned true.
+ *
+ * The consequence — the own-link reservation's attribution moving to `blocked`,
+ * so it earns no commission — follows from the recorded fact rather than from
+ * an Admin's discretion.
+ */
+export function recordSelfPreorderDisclosure(
+  associationId: string,
+  body: {
+    reservationId?: string | null;
+    intentNote: string;
+    selfFundedCertified: boolean;
+    identityDisclosed: boolean;
+  },
+): Promise<unknown> {
+  return call(
+    `/api/admin/associations/${encodeURIComponent(associationId)}/self-preorder-disclosures`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/* ── Relationship operations, at the routes that already own them ──────────*/
+
+/**
+ * §14.2's one Admin action on a proposal: rejecting a policy violation.
+ *
+ * Admin may observe, mediate, and reject — and may never accept for either
+ * party. §25.6 requires both an internal reason and a customer-facing
+ * explanation, and the route refuses without both.
+ */
+export function rejectProposalVersion(
+  versionId: string,
+  body: { internalReason: string; customerExplanation: string },
+): Promise<unknown> {
+  return call(`/api/admin/proposals/${encodeURIComponent(versionId)}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** §16: Admin confirms the deliverables item. Readiness re-derives after it. */
+export function confirmDeliverables(
+  campaignId: string,
+  associationId: string,
+  body: { confirmed: boolean },
+): Promise<unknown> {
+  return call(
+    `/api/admin/campaigns/${encodeURIComponent(campaignId)}/creators/${encodeURIComponent(associationId)}/confirm-deliverables`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/**
+ * §16: re-derive readiness from the thirteen live facts.
+ *
+ * It grants nothing. The derivation is what moves the association between
+ * `ready` and `readiness_blocked`, and an Admin cannot mark an item complete by
+ * hand from anywhere.
+ */
+export function evaluateReadiness(
+  campaignId: string,
+  associationId: string,
+): Promise<unknown> {
+  return call(
+    `/api/admin/campaigns/${encodeURIComponent(campaignId)}/creators/${encodeURIComponent(associationId)}/evaluate`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+}
+
+/** §16, §24.7: the Admin-configured funding deadline for a fixed payment. */
+export function setFundingDeadline(
+  campaignId: string,
+  associationId: string,
+  body: { deadlineAt: string },
+): Promise<unknown> {
+  return call(
+    `/api/admin/campaigns/${encodeURIComponent(campaignId)}/creators/${encodeURIComponent(associationId)}/funding-deadline`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/** §31.5: every kit read, in order. The evidence the exception was operated. */
+export function fetchKitAccessLog(associationId: string): Promise<{
+  access: { id: string; section: string; affiliateUserId: string | null; occurredAt: string }[];
+}> {
+  return call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/access-log`);
+}
+
+/** §31.5: withdrawing the pre-view. One-way at the database. */
+export function revokeKitAccess(
+  associationId: string,
+  body: { reason: string },
+): Promise<unknown> {
+  return call(`/api/admin/affiliates/${encodeURIComponent(associationId)}/revoke-kit-access`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** §10's reveal, re-run. Idempotent — the reason it can be offered at all. */
+export function revealPreparing(campaignId: string): Promise<unknown> {
+  return call('/api/admin/affiliates/reveal', {
+    method: 'POST',
+    body: JSON.stringify({ campaignId }),
+  });
+}
+
+/** §22.8's five criteria, evaluated from the record. Never asserted. */
+export interface CompletionFindings {
+  findings: { key: string; met: boolean; detail: string }[];
+  current: { status: string; decidedAt: string | null } | null;
+}
+
+export function fetchCompletion(associationId: string): Promise<CompletionFindings> {
+  return call(`/api/admin/completion/${encodeURIComponent(associationId)}`);
+}
+
+export function assignCompletion(
+  associationId: string,
+  body: {
+    status: 'successfully_completed' | 'completion_disqualified';
+    evidenceNote?: string | null;
+    disqualifyingReason?: string;
+  },
+): Promise<unknown> {
+  return call(`/api/admin/completion/${encodeURIComponent(associationId)}`, {
     method: 'POST',
     body: JSON.stringify(body),
   });

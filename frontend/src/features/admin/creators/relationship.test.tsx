@@ -387,6 +387,40 @@ describe('§16, §18, §31.5 — the Overview', () => {
     expect(screen.getByText(ATTRIBUTION_FOOTNOTE)).toBeTruthy();
   });
 
+  it('offers the §16 operations, none of which grants anything', async () => {
+    serve(routes());
+    await renderAdmin(BASE);
+
+    await userEvent.click(screen.getByRole('button', { name: /Re-derive readiness/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/It grants nothing/)).toBeTruthy();
+    expect(
+      within(dialog).getByText(/no control anywhere can mark an item done by hand/i),
+    ).toBeTruthy();
+  });
+
+  it('offers the kit access log, and revocation only while access exists', async () => {
+    serve([...routes(), { match: /access-log$/, body: { access: [] } }]);
+    await renderAdmin(BASE);
+
+    expect(screen.getByRole('button', { name: /View the access log/i })).toBeTruthy();
+    // Revealed and not revoked, so revocation is offered and a second reveal is
+    // not — §10's reveal is idempotent, but offering it again where it has
+    // already happened would claim there is something to do.
+    expect(screen.getByRole('button', { name: /Revoke kit access/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Reveal the preparing campaign/i })).toBeNull();
+  });
+
+  it('says the visual kit is unavailable because the bucket is not configured', async () => {
+    serve(routes());
+    await renderAdmin(BASE);
+
+    const control = screen.getByRole('button', { name: /Open visual Campaign kit/i });
+    expect(control.getAttribute('aria-disabled')).toBe('true');
+    await userEvent.click(control);
+    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.kitVisuals);
+  });
+
   it('states §16’s complete-or-not rule beside a checklist that is short', async () => {
     serve(routes());
     await renderAdmin(BASE);
@@ -476,6 +510,46 @@ describe('§14.2, §14.3, §24.7 — the Agreement', () => {
     // The chain and the funded-is-not-paid sentence only appear where the fee
     // can exist — on an Idea campaign there is nothing for them to describe.
     expect(screen.queryByText(FIXED_PAYMENT_FUNDED_IS_NOT_PAID)).toBeNull();
+  });
+
+  it('offers the one Admin move on an open version, and only on an open one', async () => {
+    serve(
+      routes(
+        detail((draft) => {
+          draft.agreement.versions = [
+            {
+              id: 'v2',
+              number: 2,
+              proposedBy: 'affiliate',
+              totalPercent: 35,
+              fixedPaymentCents: null,
+              state: 'awaiting_founder',
+              affiliateDecision: 'proposed',
+              founderDecision: null,
+              createdAt: 'Aug 3, 2026 · 9:00 AM UTC',
+              lockedAt: null,
+            },
+            {
+              id: 'v1',
+              number: 1,
+              proposedBy: 'founder',
+              totalPercent: 30,
+              fixedPaymentCents: null,
+              state: 'superseded',
+              affiliateDecision: 'declined',
+              founderDecision: 'proposed',
+              createdAt: 'Aug 1, 2026 · 9:00 AM UTC',
+              lockedAt: null,
+            },
+          ];
+        }),
+      ),
+    );
+    await renderAdmin(`${BASE}?pane=agreement`);
+
+    // §14.2: Admin may reject a policy violation, on a version that is still
+    // open. A superseded one has nothing left to reject.
+    expect(screen.getAllByRole('button', { name: /Reject for policy/i })).toHaveLength(1);
   });
 
   it('offers no accept control anywhere', async () => {
@@ -581,6 +655,21 @@ describe('§22.1, §24.3, §24.4 — the Money pane', () => {
     expect(screen.getByText(/Sales tax is excluded from every Creator percentage/)).toBeTruthy();
     expect(screen.getByText(/Earned plus returned equals the provisional total/)).toBeTruthy();
     expect(screen.getByText(/never Proovd revenue/)).toBeTruthy();
+  });
+
+  it('reads §22.8’s criteria rather than asking an Admin to assert them', async () => {
+    serve([
+      ...routes(),
+      { match: /\/api\/admin\/completion\//, body: { findings: [], current: null } },
+    ]);
+    await renderAdmin(`${BASE}?pane=money`);
+
+    expect(
+      screen.getByText(/read from readiness, post verification, the §22.1 decision/i),
+    ).toBeTruthy();
+    // §22.8's own rule, where somebody would otherwise supply a sales figure.
+    expect(screen.getAllByText(/Sales performance is not a completion requirement/).length)
+      .toBeGreaterThan(0);
   });
 
   it('offers no Transfer control — the one Transfer is the close queue’s', async () => {

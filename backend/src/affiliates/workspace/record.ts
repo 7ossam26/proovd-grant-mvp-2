@@ -882,6 +882,7 @@ async function composeStanding(
         appealDueAt: formatInstant(row.appealDueAt),
         appeal: appeal
           ? {
+              id: appeal.id,
               grounds: appeal.grounds,
               decision: appeal.decision,
               decidedAt: formatInstant(appeal.decidedAt),

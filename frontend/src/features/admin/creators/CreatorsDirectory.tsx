@@ -45,6 +45,7 @@ import { useProovdMotion } from '../../../motion/MotionProvider.js';
 import { fetchCreators, AdminRequestError, type CreatorDirectoryRow } from './api.js';
 import { Monogram, OwnerPill, StateChip, payoutTone, verificationTone } from './shared.js';
 import { AddCreatorDialog } from './dialogs/AddCreatorDialog.js';
+import { CreatorSearch } from './CreatorSearch.js';
 
 export function CreatorsDirectory() {
   const navigate = useNavigate();
@@ -129,7 +130,15 @@ export function CreatorsDirectory() {
             </p>
           ) : null}
         </div>
-        <Button onClick={(event) => setAddTrigger(event.currentTarget)}>Add Affiliate</Button>
+        <div className="cr-hero__actions">
+          {/*
+            The `/` palette. It finds a person from anywhere in the section,
+            which is the move the box below cannot make — that one narrows a
+            list you are already looking at.
+          */}
+          <CreatorSearch />
+          <Button onClick={(event) => setAddTrigger(event.currentTarget)}>Add Affiliate</Button>
+        </div>
       </div>
 
       {addTrigger ? (

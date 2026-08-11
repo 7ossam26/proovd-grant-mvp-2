@@ -572,12 +572,13 @@ export const CREATOR_PARKED_MESSAGES = {
   stripeRefresh:
     'A live Stripe read is parked. This page shows the status Stripe last ' +
     'reported, which is what the connected-account record holds.',
-  globalSearch:
-    'The global search palette is parked. The directory search covers every ' +
-    'Affiliate, and campaign search belongs to the Campaigns section.',
   evidenceUpload:
     'Evidence file upload is parked: verification evidence is recorded as ' +
     'text against the §5.3 register, and there is no evidence file store.',
+  kitVisuals:
+    'The visual kit is parked: §12 uploads go to an R2 bucket that is not ' +
+    'configured in this deployment, so there are no approved visuals to show. ' +
+    'Every kit read is still logged, and the log is on this page.',
   caseIntake:
     'Compliance and support case intake is parked until the Creator controls ' +
     'surface is built.',

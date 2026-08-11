@@ -20,8 +20,10 @@
  */
 
 import { SALES_ARE_NOT_A_COMPLETION_REQUIREMENT } from '@proovd/shared';
+import { Button } from '../../../../components/index.js';
 import type { CreatorRelationshipDetail } from '../api.js';
 import { Group, Note, Section } from '../shared.js';
+import type { RelationshipOp } from '../dialogs/RelationshipOpsDialog.js';
 
 /** §22.1's lifecycle, in the reference's order. */
 const MONEY_CHAIN = [
@@ -44,7 +46,13 @@ const CHAIN_KEYS: Record<string, string> = {
   adjusted: 'Adjusted',
 };
 
-export function RelMoney({ detail }: { detail: CreatorRelationshipDetail }) {
+export function RelMoney({
+  detail,
+  onOp,
+}: {
+  detail: CreatorRelationshipDetail;
+  onOp: (op: RelationshipOp, trigger: HTMLElement | null) => void;
+}) {
   const { money } = detail;
   const current = CHAIN_KEYS[money.headline.status] ?? null;
 
@@ -209,6 +217,33 @@ export function RelMoney({ detail }: { detail: CreatorRelationshipDetail }) {
           The Creator never requests a withdrawal. Proovd creates the one Transfer once
           earnings are approved and the §11 tax gate is satisfied.
         </Note>
+      </Section>
+
+      {/*
+        §22.8's completion status, which is a different decision from §22.1's
+        earnings outcome shown above — one is about the work, the other about
+        the money. The control is here because this is where an Admin reads
+        whether the money resolved, which is criterion five.
+      */}
+      <Section
+        eyebrow="Successful completion"
+        title="§22.8's five criteria"
+        actions={
+          <Button
+            tier="secondary"
+            small
+            onClick={(event) => onOp('completion', event.currentTarget)}
+          >
+            Review successful completion
+          </Button>
+        }
+      >
+        <p className="grey">
+          The criteria are read from readiness, post verification, the §22.1 decision,
+          enforcement, and the money — never asserted. A completion whose findings are short
+          is refused, naming which criterion.
+        </p>
+        <Note>{SALES_ARE_NOT_A_COMPLETION_REQUIREMENT}</Note>
       </Section>
 
       {money.completion ? (

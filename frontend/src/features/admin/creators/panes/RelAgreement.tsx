@@ -23,8 +23,10 @@ import {
   FIXED_PAYMENT_FUNDED_IS_NOT_PAID,
   FIXED_CREATOR_PAYMENT_LABEL,
 } from '@proovd/shared';
+import { Button } from '../../../../components/index.js';
 import type { CreatorRelationshipDetail } from '../api.js';
 import { Group, Note, Section } from '../shared.js';
+import type { RelationshipOp } from '../dialogs/RelationshipOpsDialog.js';
 
 /** §24.7's own state chain, in the reference's order. */
 const FIXED_PAYMENT_CHAIN = [
@@ -37,7 +39,17 @@ const FIXED_PAYMENT_CHAIN = [
   'Paid',
 ];
 
-export function RelAgreement({ detail }: { detail: CreatorRelationshipDetail }) {
+export function RelAgreement({
+  detail,
+  onOp,
+}: {
+  detail: CreatorRelationshipDetail;
+  onOp: (
+    op: RelationshipOp,
+    versionId: string | undefined,
+    trigger: HTMLElement | null,
+  ) => void;
+}) {
   const { agreement } = detail;
 
   return (
@@ -185,6 +197,24 @@ export function RelAgreement({ detail }: { detail: CreatorRelationshipDetail }) 
                     Creator {version.affiliateDecision ?? 'no answer'} · Founder{' '}
                     {version.founderDecision ?? 'no answer'}
                   </small>
+                  {/*
+                    §14.2's only Admin move, offered only while the version is
+                    genuinely open. There is deliberately no accept control:
+                    the locked agreement is the exact version both parties
+                    accepted, and a third party accepting would make that false.
+                  */}
+                  {version.state === 'awaiting_founder' ||
+                  version.state === 'awaiting_creator' ? (
+                    <Button
+                      tier="tertiary"
+                      small
+                      onClick={(event) =>
+                        onOp('reject_version', version.id, event.currentTarget)
+                      }
+                    >
+                      Reject for policy
+                    </Button>
+                  ) : null}
                 </span>
               </article>
             ))}
