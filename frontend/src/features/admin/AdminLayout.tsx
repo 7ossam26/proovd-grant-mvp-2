@@ -28,11 +28,13 @@
  * `/admin/signin` — its own address, its own minimal shell. The absence of the
  * branch is what keeps the leak from coming back: there is nowhere to put it.
  *
- * ── Three of the four sections are parked, and they are still shown ─────────
- * Today, Campaigns, and Creators have no workspace yet. Hiding them would make
- * the shell describe a one-section product; showing them enabled would claim a
- * capability that does not exist (§1.4). So they are `aria-disabled`, still
- * reachable by keyboard, and each one names what it is when pressed.
+ * ── Two of the five sections are parked, and they are still shown ───────────
+ * Today and Campaigns have no workspace yet. Hiding them would make the shell
+ * describe a smaller product; showing them enabled would claim a capability
+ * that does not exist (§1.4). So they are `aria-disabled`, still reachable by
+ * keyboard, and each one names what it is when pressed.
+ *
+ * Founders, Creators, and Support are real links to real workspaces.
  *
  * ── The environment chip never claims a mode it did not check ───────────────
  * `TEST MODE` is the single most consequential sentence this page could say,
@@ -258,6 +260,19 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
             className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
           >
             Creators
+          </NavLink>
+          {/*
+            §26.7, §26.8, §27.8 — the Support workspace, built 2026-08-13 over
+            the case domain Phase 16b already shipped. It is the operations
+            console for `support_cases`: the §27.8 promise, the §26.8 handoff
+            and timeline, and the §33.9.11 split between what an internal note
+            may carry and what a reply may not.
+          */}
+          <NavLink
+            to="/admin/support"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
+            Support
           </NavLink>
         </nav>
 

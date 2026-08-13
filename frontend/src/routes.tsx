@@ -26,6 +26,8 @@ import { CreatorHistory } from './features/admin/creators/CreatorHistory.js';
 import { CreatorRelationship } from './features/admin/creators/CreatorRelationship.js';
 import { PostReview } from './features/admin/creators/PostReview.js';
 import { CreatorControls } from './features/admin/creators/CreatorControls.js';
+import { SupportQueue } from './features/admin/support/SupportQueue.js';
+import { SupportCase } from './features/admin/support/SupportCase.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
@@ -250,6 +252,17 @@ const rootChildren: RouteObject[] = [
       // §26.7, §29. Account standing and every recorded enforcement action, on
       // the person's own address — the two scopes side by side and never merged.
       { path: 'creators/:prospectId/controls', element: <CreatorControls /> },
+      // §26.7, §26.8, §27.8. The Support workspace over the case domain Phase
+      // 16b shipped. Two addresses: the queue, and one case.
+      //
+      // The four tabs are a `?tab=` search param rather than path segments,
+      // for the reason the Creator relationship panes are: they are four views
+      // of ONE record, and a bookmark to the evidence should still be that
+      // case. The queue's filter is a search param for the same reason — a
+      // filtered queue is a position, and a position that vanishes on reload
+      // is one an Admin cannot send to a colleague (DNA §5.12).
+      { path: 'support', element: <SupportQueue /> },
+      { path: 'support/:caseId', element: <SupportCase /> },
     ],
   },
   {

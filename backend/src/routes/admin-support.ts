@@ -28,8 +28,30 @@ import {
   addCaseMessage,
   transferCaseOwnership,
   readSupportQueue,
-  resolveCase,
 } from '../support/cases.js';
+import { readSupportWorkspaceQueue, readSupportCase } from '../support/workspace/read.js';
+import {
+  assignCase,
+  classifyCase,
+  setCaseTriage,
+  setCaseWaiting,
+  setNextUpdateDue,
+  resolveCaseWithResolution,
+  closeCase,
+  reopenCase,
+  addCaseEvidence,
+  recordCaseContact,
+  recordContactOutcome,
+  setCaseSubject,
+  type MutationOutcome,
+} from '../support/workspace/mutations.js';
+import type {
+  SupportTriageLevel,
+  SupportWaitingParty,
+  SupportEvidenceKind,
+  SupportLinkedRecordKind,
+  SupportContactParty,
+} from '../support/workspace/logic.js';
 import { RESPONSE_TEMPLATES, renderTemplate } from '../support/templates.js';
 import {
   enforceCampaign,
@@ -77,6 +99,35 @@ export interface AdminSupportRouterDeps {
 
 function actorOf(req: express.Request): string {
   return `user:${req.authUser?.id ?? 'unknown'}`;
+}
+
+/**
+ * One answer shape for every workspace write.
+ *
+ * §27.1's six questions, answered from the SERVICE's own refusal rather than
+ * from a friendlier sentence composed here — the browser renders whatever comes
+ * back, so a paraphrase at this layer is how the API and the surface start
+ * disagreeing about what went wrong.
+ *
+ * `next` always states what happened to the record, because the most useful
+ * thing an operator can be told about a failed write is whether anything moved.
+ */
+function sendMutation(
+  res: express.Response,
+  result: MutationOutcome<Record<string, unknown>>,
+  title: string,
+): void {
+  if (result.ok) {
+    const { ok: _ok, ...rest } = result;
+    res.status(200).json({ ok: true, ...rest });
+    return;
+  }
+  res.status(result.code === 'not_found' ? 404 : 422).json({
+    error: result.code,
+    title,
+    whatHappened: result.message,
+    next: 'Nothing has changed. Correct it and try again.',
+  });
 }
 
 function securityContext(req: express.Request): { mfaContext: string; reauthContext: string } {
@@ -354,13 +405,295 @@ export function createAdminSupportRouter({
     },
   );
 
+  /**
+   * §26.7's resolution, upgraded to record WHAT resolved it.
+   *
+   * The service beneath it (`resolveCase`) is untouched and still exported —
+   * other modules call it — but no route reaches it any more. A case finished
+   * from a human surface always says why: §26.7 wants the decision reviewable,
+   * and "resolved" with no recorded resolution is the state nobody can review.
+   */
   router.post(
     `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/resolve`,
     admin,
     json,
     async (req, res) => {
-      const result = await resolveCase(db, req.params['caseId'] as string);
-      res.status(result.ok ? 200 : 422).json(result);
+      const body = req.body as Record<string, unknown>;
+      const result = await resolveCaseWithResolution(db, {
+        caseId: req.params['caseId'] as string,
+        resolution: typeof body['resolution'] === 'string' ? body['resolution'] : '',
+        operationalNote:
+          typeof body['operationalNote'] === 'string' ? body['operationalNote'] : null,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That case was not resolved');
+    },
+  );
+
+  /* ── The Support workspace (2026-08-13) ────────────────────────────────── */
+
+  /**
+   * The workspace directory.
+   *
+   * Deliberately a different address from `/support/queue`, which stays exactly
+   * as Phase 16b built it: that one answers §27.8's "what is due or overdue"
+   * and is what the `support-promises` sweep and the daily queue read. This one
+   * shows finished cases too, because a workspace that hid them could not
+   * answer "what did we tell this person last month".
+   */
+  router.get(`${ADMIN_SUPPORT_BASE_PATH}/support/workspace`, admin, async (_req, res) => {
+    res.json(await readSupportWorkspaceQueue(db));
+  });
+
+  router.get(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/workspace/:caseId`,
+    admin,
+    async (req, res) => {
+      const detail = await readSupportCase(db, req.params['caseId'] as string, {
+        viewerUserId: req.authUser?.id,
+      });
+      if (!detail) {
+        res.status(404).json({
+          error: 'not_found',
+          title: 'No such case',
+          whatHappened: 'That case reference does not match anything on the record.',
+          next: 'Go back to the queue and open it from there.',
+        });
+        return;
+      }
+      res.json(detail);
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/assign`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      // `assignToSelf` is the reference's "Assign to me". It resolves to the
+      // SESSION's user id rather than to anything in the body — a caller that
+      // could name its own actor could attribute a decision to somebody else.
+      const toUserId =
+        body['assignToSelf'] === true
+          ? (req.authUser?.id ?? '')
+          : typeof body['toUserId'] === 'string'
+            ? body['toUserId']
+            : '';
+
+      if (!toUserId) {
+        res.status(400).json({
+          error: 'invalid_request',
+          title: 'That case was not assigned',
+          whatHappened: 'No Admin was named.',
+          next: 'Choose an Admin, or use “Assign to me”.',
+        });
+        return;
+      }
+
+      const result = await assignCase(db, {
+        caseId: req.params['caseId'] as string,
+        toUserId,
+        reason: typeof body['reason'] === 'string' ? body['reason'] : null,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That case was not assigned');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/classify`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await classifyCase(db, {
+        caseId: req.params['caseId'] as string,
+        topic: (typeof body['topic'] === 'string' ? body['topic'] : '') as SupportTopic,
+        subcategory: typeof body['subcategory'] === 'string' ? body['subcategory'] : null,
+        internalReason:
+          typeof body['internalReason'] === 'string' ? body['internalReason'] : null,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That case was not reclassified');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/triage`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await setCaseTriage(db, {
+        caseId: req.params['caseId'] as string,
+        triage: (typeof body['triage'] === 'string' ? body['triage'] : '') as SupportTriageLevel,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'The triage level was not changed');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/waiting`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const promised = typeof body['nextPromisedUpdateAt'] === 'string'
+        ? new Date(body['nextPromisedUpdateAt'])
+        : null;
+
+      if (promised && Number.isNaN(promised.getTime())) {
+        res.status(400).json({
+          error: 'invalid_request',
+          title: 'That case was not changed',
+          whatHappened: 'The promised update time is not a date and time.',
+          next: 'Correct it and try again. Nothing has changed.',
+        });
+        return;
+      }
+
+      const result = await setCaseWaiting(db, {
+        caseId: req.params['caseId'] as string,
+        waitingOn: (typeof body['waitingOn'] === 'string'
+          ? body['waitingOn']
+          : '') as SupportWaitingParty,
+        nextAction: typeof body['nextAction'] === 'string' ? body['nextAction'] : '',
+        nextPromisedUpdateAt: promised,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That case was not changed');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/next-update`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await setNextUpdateDue(db, {
+        caseId: req.params['caseId'] as string,
+        at: new Date(typeof body['at'] === 'string' ? body['at'] : ''),
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'The promised update time was not set');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/close`,
+    admin,
+    json,
+    async (req, res) => {
+      const result = await closeCase(db, {
+        caseId: req.params['caseId'] as string,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That case was not closed');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/reopen`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await reopenCase(db, {
+        caseId: req.params['caseId'] as string,
+        reason: typeof body['reason'] === 'string' ? body['reason'] : '',
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That case was not reopened');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/evidence`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await addCaseEvidence(db, {
+        caseId: req.params['caseId'] as string,
+        kind: (typeof body['kind'] === 'string' ? body['kind'] : '') as SupportEvidenceKind,
+        description: typeof body['description'] === 'string' ? body['description'] : '',
+        linkedKind: (typeof body['linkedKind'] === 'string'
+          ? body['linkedKind']
+          : 'none') as SupportLinkedRecordKind,
+        linkedReference:
+          typeof body['linkedReference'] === 'string' ? body['linkedReference'] : null,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That evidence was not attached');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/contacts`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const expected =
+        typeof body['expectedResponseAt'] === 'string'
+          ? new Date(body['expectedResponseAt'])
+          : null;
+
+      const result = await recordCaseContact(db, {
+        caseId: req.params['caseId'] as string,
+        partyKind: (typeof body['partyKind'] === 'string'
+          ? body['partyKind']
+          : '') as SupportContactParty,
+        partyLabel: typeof body['partyLabel'] === 'string' ? body['partyLabel'] : '',
+        message: typeof body['message'] === 'string' ? body['message'] : '',
+        expectedResponseAt: expected && !Number.isNaN(expected.getTime()) ? expected : null,
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That contact was not recorded');
+    },
+  );
+
+  router.post(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/contacts/:contactId/outcome`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await recordContactOutcome(db, {
+        caseId: req.params['caseId'] as string,
+        contactId: req.params['contactId'] as string,
+        outcome: typeof body['outcome'] === 'string' ? body['outcome'] : '',
+        actor: actorOf(req),
+        ...securityContext(req),
+      });
+      sendMutation(res, result, 'That outcome was not recorded');
+    },
+  );
+
+  router.put(
+    `${ADMIN_SUPPORT_BASE_PATH}/support/cases/:caseId/subject`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await setCaseSubject(db, {
+        caseId: req.params['caseId'] as string,
+        subject: typeof body['subject'] === 'string' ? body['subject'] : '',
+      });
+      sendMutation(res, result, 'The subject was not changed');
     },
   );
 

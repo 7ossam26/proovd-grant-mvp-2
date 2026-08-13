@@ -628,7 +628,7 @@ afterEach(() => {
 /* ── 1. The shell ──────────────────────────────────────────────────────────── */
 
 describe('§26, §1.4 — the Admin shell says what exists and what does not', () => {
-  it('renders the wordmark, the four sections, and marks only the current one active', async () => {
+  it('renders the wordmark, the five sections, and marks only the current one active', async () => {
     const { container } = await renderList();
 
     expect(container.querySelector('.wordmark')?.textContent).toBe('proovdAdmin');
@@ -639,16 +639,23 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
       'Founders',
       'Campaigns',
       'Creators',
+      'Support',
     ]);
 
-    // Founders and Creators are the two destinations that exist, so they are
-    // the two anchors — and only the one being viewed carries the active state.
+    // Founders, Creators, and Support are the three destinations that exist, so
+    // they are the three anchors — and only the one being viewed carries the
+    // active state. The order is the shell's, not this list's: asserting the
+    // exact children is what caught Support being added, which is the whole
+    // reason this reads them positionally rather than by name.
     const founders = within(nav).getByRole('link', { name: 'Founders' });
     expect(founders).toHaveAttribute('href', '/admin/founders');
     expect(founders.className).toContain('is-active');
     const creators = within(nav).getByRole('link', { name: 'Creators' });
     expect(creators).toHaveAttribute('href', '/admin/creators');
     expect(creators.className).not.toContain('is-active');
+    const support = within(nav).getByRole('link', { name: 'Support' });
+    expect(support).toHaveAttribute('href', '/admin/support');
+    expect(support.className).not.toContain('is-active');
     expect(container.querySelectorAll('.navlink.is-active')).toHaveLength(1);
   });
 
@@ -656,8 +663,9 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
     await renderList();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
 
-    // Creators left this list on 2026-08-11 when its workspace was built. The
-    // two that remain are the two that genuinely do not exist.
+    // Creators left this list on 2026-08-11 and Support on 2026-08-13, each
+    // when its workspace was built. The two that remain are the two that
+    // genuinely do not exist.
     for (const label of ['Today', 'Campaigns']) {
       const control = within(nav).getByRole('button', { name: label });
       // `aria-disabled`, never `disabled`: a disabled button leaves a keyboard

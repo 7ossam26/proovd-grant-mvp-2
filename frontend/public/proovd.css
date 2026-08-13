@@ -3950,3 +3950,518 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
     border-width: var(--bw) 0 0;
   }
 }
+
+
+/* ════════════════════════════════════ PHASE 27 — the Support Admin workspace
+   (Spec §26.7, §26.8, §27.8, §29.9, §33.9.11), added 2026-08-13.
+
+   Built from the supplied Support reference. Its palette is the proovd token
+   set already — brand green, dark green, mint, the accent yellow and blue — so
+   nothing here introduces a value; the reference's inline CSS is a visual guide
+   and was never copied.
+
+   The three conventions PHASE 25 set and PHASE 26 restated bind here too:
+
+     1. TOKENS ONLY. Read a mode slot or a token, never a raw value. px is
+        legal for hairlines, radii, and the 44px touch minimum (via --touch).
+
+     2. SCOPED OVERRIDES. Where proovd.css already owns a selector this section
+        does not redefine it. Everything new is prefixed .sup-, and the pieces
+        that already exist — .filters/.filter-tag, .case-actions, .helper,
+        .grey, .kicker, .mono, .modal, .field-error — are reused rather than
+        restyled.
+
+     3. RESPONSIVE IS A CORRECTION. Each media rule below names the overflow
+        problem it answers. Wide content scrolls inside its own container; the
+        page body never scrolls sideways.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+
+/* ───────────────────────────────────────── A GENERAL UTILITY, DEFINED LATE
+
+   `.sr-only` — announced to a screen reader, invisible on screen.
+
+   It is in this section because this section is where it was FOUND missing,
+   not because it belongs to Support. `CreatorsDirectory.tsx` and
+   `CreatorSearch.tsx` have used the class since 2026-08-11 and nothing ever
+   defined it, so three labels that were meant to be screen-reader-only have
+   been rendering as visible text: "Search Affiliates" above the directory box,
+   and the palette's title and description inside its dialog.
+
+   axe cannot catch this — the accessible name is correct either way, and a
+   visible label is not a violation. Only a person looking at the page, or a
+   grep for the class against the stylesheet, finds it.
+
+   The clip-rect pair rather than `display: none` or `visibility: hidden`:
+   those two remove the element from the accessibility tree as well, which is
+   the opposite of what the class is for. `white-space: nowrap` stops a
+   one-pixel box wrapping its text into an infinite column. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+
+/* ──────────────────────────────────────────────────────── §27.8 THE QUEUE */
+
+/* The hero IS the ranked Act — an overdue promise, then an unowned case, then
+   work waiting on Proovd. Fluid so the longest of those survives 320px. */
+.sup-hero {
+  display: grid;
+  gap: var(--sp-16);
+  margin-bottom: var(--sp-32);
+}
+.sup-hero__title {
+  margin: var(--sp-8) 0 0;
+  font-size: clamp(1.75rem, 5.5vw, 3.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-weight: 900;
+  color: var(--darker);
+}
+
+.sup-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-24);
+  margin-bottom: var(--sp-24);
+}
+.sup-search { display: block; min-width: 0; }
+.sup-search .input { width: 100%; }
+
+/* The definition of whatever filter is active, under the row rather than only
+   in a `title` — §20's rule that a count ships with what it counts. */
+.sup-filter-note { margin: var(--sp-12) 0 var(--sp-24); }
+
+/* A grid of rows rather than a table element: each row carries a link and a
+   chip, and a table with controls in its cells is the layout that breaks first
+   when the viewport narrows. */
+.sup-list { border-top: var(--bw) solid var(--brand); }
+
+.sup-row {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1.4fr) minmax(12rem, 1fr) auto;
+  gap: var(--sp-24);
+  align-items: center;
+  min-height: 5.5rem;
+  padding: var(--sp-16) var(--sp-8);
+  border-bottom: 1px solid var(--grey-light);
+  cursor: pointer;
+}
+.sup-row:hover { background: var(--grey-lightest); }
+
+/* An overdue promise is marked by a bar AND by the words in the row — never by
+   colour alone (§33.11). */
+.sup-row--late { box-shadow: inset 3px 0 0 0 var(--darker); }
+
+.sup-cell { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.sup-row__ref {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.sup-row__subject {
+  font-weight: 700;
+  color: var(--darker);
+  text-decoration: none;
+}
+.sup-row__subject:hover { text-decoration: underline; }
+.sup-row__next { color: var(--darker); }
+.sup-row__go { color: var(--grey); font-size: 1.25rem; }
+
+.sup-empty { padding: var(--sp-48) var(--sp-8); color: var(--grey); }
+
+
+/* ─────────────────────────────────────────────────── STATE, TRIAGE, TIMING */
+
+/* The chip's word carries the meaning; the fill is a second signal. */
+.sup-chip {
+  display: inline-block;
+  padding: 2px var(--sp-8);
+  border: var(--bw) solid var(--darker);
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.sup-chip--sm { font-size: 0.625rem; }
+.sup-chip--new    { background: var(--accent-yellow); color: var(--darker); }
+.sup-chip--wait   { background: var(--surface);       color: var(--darker); }
+.sup-chip--done   { background: var(--brand);         color: var(--darker); }
+.sup-chip--closed {
+  background: var(--grey-light);
+  color: var(--ink-50);
+  border-color: var(--grey);
+}
+
+.sup-triage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: 0.6875rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--darker);
+  white-space: nowrap;
+}
+.sup-triage i {
+  width: 8px;
+  height: 8px;
+  border: var(--bw) solid var(--darker);
+  border-radius: 50%;
+  background: var(--surface);
+}
+.sup-triage--urgent i { background: var(--darker); }
+.sup-triage--high   i { background: var(--accent-yellow); }
+.sup-triage--normal i { background: var(--brand); }
+.sup-triage--low    i { background: var(--surface); }
+
+.sup-due { white-space: nowrap; }
+.sup-due--late { font-weight: 900; color: var(--darker); text-decoration: underline; }
+.sup-due__at {
+  display: block;
+  color: var(--grey);
+  font-size: 0.8125rem;
+  white-space: normal;
+}
+
+
+/* ───────────────────────────────────────────────────────── §26.8 THE CASE */
+
+.sup-crumb { margin-bottom: var(--sp-16); }
+.sup-crumb a { color: var(--ink-50); text-decoration: none; }
+.sup-crumb a:hover { text-decoration: underline; }
+
+.sup-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-24);
+  align-items: start;
+  padding: var(--sp-24);
+  border: var(--bw) solid var(--darker);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: var(--sp-24);
+}
+/* Loud only while the case is open AND Proovd owes the next move. */
+.sup-band--blocked { background: var(--accent-yellow); }
+.sup-band--done    { background: var(--mint); }
+
+.sup-band__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-12);
+}
+.sup-band__title h1 {
+  margin: 0;
+  font-size: clamp(1.25rem, 3.5vw, 2rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--darker);
+}
+.sup-band__meta { margin: var(--sp-8) 0 0; color: var(--ink-50); font-size: 0.875rem; }
+
+.sup-band__next {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-8);
+  margin: var(--sp-16) 0 0;
+  font-weight: 700;
+  color: var(--darker);
+}
+.sup-band__next i {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--darker);
+  transform: translateY(-2px);
+}
+.sup-band__calm { margin: var(--sp-16) 0 0; color: var(--darker); }
+
+.sup-band__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-8);
+  text-align: right;
+}
+
+
+/* The tab rail. Hand-built markup, so it is styled here rather than by PHASE
+   25's .tabbtn — same look, different element tree. */
+.sup-tabs {
+  display: flex;
+  gap: var(--sp-8);
+  overflow-x: auto;
+  border-bottom: var(--bw) solid var(--brand);
+  margin-bottom: var(--sp-32);
+  /* The rail scrolls inside itself at 320px; the page never does. */
+  scrollbar-width: thin;
+}
+.sup-tab {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--touch);
+  padding: var(--sp-8) var(--sp-16);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--ink-50);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sup-tab:hover { color: var(--darker); }
+.sup-tab.is-active { color: var(--darker); border-bottom-color: var(--darker); }
+.sup-tab__count {
+  padding: 0 var(--sp-8);
+  border: var(--bw) solid var(--darker);
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+  font-weight: 900;
+}
+
+/* The panel takes focus on tab change; it must not draw a stray outline when
+   that focus was moved programmatically rather than by the keyboard. */
+.sup-panel:focus { outline: none; }
+.sup-panel:focus-visible {
+  outline: var(--bw) solid var(--darker);
+  outline-offset: var(--sp-4);
+}
+
+
+/* ────────────────────────────────────────────────────── SECTIONS AND FACTS */
+
+.sup-section {
+  padding: var(--sp-24) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.sup-section:last-child { border-bottom: 0; }
+/* A section that needs attention, marked by a rule and by its own copy. */
+.sup-section--flag {
+  padding-left: var(--sp-16);
+  border-left: 3px solid var(--darker);
+}
+.sup-section__head { margin-bottom: var(--sp-16); }
+.sup-section__title {
+  margin: 0;
+  font-size: 1.125rem;
+  letter-spacing: -0.01em;
+  color: var(--darker);
+}
+.sup-section__head .helper { margin-top: var(--sp-4); }
+
+.sup-facts { margin: 0; display: grid; gap: var(--sp-16); }
+.sup-facts > div { min-width: 0; }
+.sup-facts dt {
+  color: var(--grey);
+  font-size: 0.6875rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--sp-4);
+}
+.sup-facts dd { margin: 0; color: var(--darker); overflow-wrap: anywhere; }
+.sup-facts--wide { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+
+.sup-note { margin: 0 0 var(--sp-16); }
+
+
+/* ──────────────────────────────────────────────────── THE CONVERSATION TAB */
+
+.sup-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--sp-48);
+  align-items: start;
+}
+.sup-split__main, .sup-split__side { min-width: 0; }
+
+.sup-thread { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-24); }
+
+.sup-msg {
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+/* An internal note is visibly a different KIND of thing, and the tag inside it
+   says so in words — the fill is never carrying that alone (§33.9.11). */
+.sup-msg--note {
+  background: var(--grey-lightest);
+  border-style: dashed;
+  border-color: var(--grey);
+}
+.sup-msg__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-8);
+  font-size: 0.875rem;
+}
+.sup-internal-tag {
+  padding: 2px var(--sp-8);
+  border: 1px solid var(--grey);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-50);
+  font-size: 0.625rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* A reply is written with paragraphs; collapsing them turns a considered
+   message into a wall. */
+.sup-msg__body { margin: 0; white-space: pre-wrap; color: var(--darker); }
+.sup-msg__meta { margin: var(--sp-12) 0 0; color: var(--grey); font-size: 0.8125rem; }
+
+.sup-links { display: grid; gap: var(--sp-8); margin-top: var(--sp-24); }
+.sup-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-8);
+  min-height: var(--touch);
+  padding: var(--sp-8) var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  color: var(--darker);
+  text-decoration: none;
+}
+.sup-link:hover { border-color: var(--darker); }
+/* A destination that does not exist yet is shown and says why (§1.4). */
+.sup-link--off {
+  display: block;
+  color: var(--ink-50);
+  background: var(--grey-lightest);
+  cursor: default;
+}
+.sup-link--off:hover { border-color: var(--grey-light); }
+.sup-link--off .helper { margin-top: var(--sp-4); }
+
+.sup-internal-note {
+  margin-top: var(--sp-24);
+  padding: var(--sp-12);
+  border-left: 3px solid var(--grey);
+  background: var(--grey-lightest);
+}
+
+
+/* ────────────────────────────────────────────── EVIDENCE, CONTACTS, NOTES */
+
+.sup-items { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-12); }
+.sup-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-16);
+  align-items: center;
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+}
+.sup-item > div { min-width: 0; }
+.sup-item b { color: var(--darker); }
+.sup-item__body { margin: var(--sp-8) 0 0; white-space: pre-wrap; }
+
+.sup-handoffs, .sup-reopens { margin-top: var(--sp-24); display: grid; gap: var(--sp-16); }
+.sup-handoff, .sup-reopen {
+  padding: var(--sp-16);
+  border-left: 3px solid var(--brand);
+  background: var(--grey-lightest);
+}
+.sup-handoff p:first-child, .sup-reopen p:first-child { margin-top: 0; }
+
+
+/* ─────────────────────────────────────────────────────────── THE TIMELINE */
+
+.sup-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-16); }
+.sup-timeline > li {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) minmax(0, 1fr);
+  gap: var(--sp-24);
+  padding-bottom: var(--sp-16);
+  border-bottom: 1px solid var(--grey-light);
+}
+.sup-timeline > li:last-child { border-bottom: 0; }
+.sup-timeline time { color: var(--grey); font-size: 0.8125rem; }
+.sup-timeline b { color: var(--darker); }
+.sup-timeline p { margin: var(--sp-4) 0 0; }
+/* The source table, read as an identifier rather than as prose. */
+.sup-timeline code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
+
+
+/* ──────────────────────────────────────────────────────── DECISION PANELS */
+
+/* The reference gives every modal a consequence line stating what happens on
+   confirm. Kept, because §1.1 requires a person to know what a control will do
+   before they press it. */
+.sup-consequence {
+  margin: var(--sp-16) 0;
+  padding: var(--sp-12) var(--sp-16);
+  border-left: 3px solid var(--darker);
+  background: var(--mint);
+  color: var(--darker);
+}
+.sup-facts-note {
+  margin-bottom: var(--sp-16);
+  padding: var(--sp-12);
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+}
+.sup-facts-note .helper { margin: 0; overflow-wrap: anywhere; }
+
+
+/* ═══════════════════════════════════════════════════════════ RESPONSIVE ══ */
+
+/* <=1080px — the two-column Conversation tab. The context panel is the facts an
+   Admin answers FROM, so it moves BELOW the thread rather than behind a toggle:
+   one gesture away on the smallest screen is where a reply gets written from
+   memory. Thread first, because the message is what they came to read. */
+@media (max-width: 1080px) {
+  .sup-split { grid-template-columns: minmax(0, 1fr); gap: var(--sp-32); }
+}
+
+/* <=900px — the queue row's three columns stop fitting side by side. It becomes
+   one stack, and the arrow is dropped: the whole row is the control, and an
+   arrow pointing down the page would be pointing at the next case. */
+@media (max-width: 900px) {
+  .sup-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-8);
+  }
+  .sup-row__go { display: none; }
+  .sup-band { grid-template-columns: minmax(0, 1fr); }
+  .sup-band__side { align-items: flex-start; text-align: left; }
+  .sup-timeline > li { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+}
+
+/* <=640px — the search box and the Create control stop fitting on one line, and
+   an evidence row's action stops fitting beside its description. */
+@media (max-width: 640px) {
+  .sup-tools { grid-template-columns: minmax(0, 1fr); }
+  .sup-item { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .sup-facts--wide { grid-template-columns: minmax(0, 1fr); }
+}

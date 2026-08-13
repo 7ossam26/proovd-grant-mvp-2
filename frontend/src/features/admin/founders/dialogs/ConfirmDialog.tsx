@@ -192,8 +192,16 @@ export interface DialogField {
    * ban triggers are stored as `failed_day_14` and shown as the sentence.
    */
   options?: readonly (string | { value: string; label: string })[];
-  /** Native input type where the value has one — a date, an address, a number. */
-  inputType?: 'text' | 'email' | 'tel' | 'url' | 'date';
+  /**
+   * Native input type where the value has one — a date, an address, a number.
+   *
+   * `datetime-local` was added for the Support workspace: §27.8's promised
+   * checkpoint and §26.8's expected-response time are INSTANTS, and a date
+   * picker with no time would have an Admin promising "some time on Thursday"
+   * and the queue reporting the breach at midnight. Additive — no existing
+   * caller changes behaviour.
+   */
+  inputType?: 'text' | 'email' | 'tel' | 'url' | 'date' | 'datetime-local';
   placeholder?: string;
   value?: string;
   /** A quiet line under the label, when it changes what the Admin types. */

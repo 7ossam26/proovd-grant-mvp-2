@@ -573,6 +573,86 @@ export const UNGATED_ADMIN_WRITES = [
     reason:
       'Closes a case. Reversible by opening another, and it moves no money and ends no partnership.',
   },
+  /*
+    The Support workspace's writes (2026-08-13).
+
+    All of them are the same class as the three above: they record what an Admin
+    did on a case, they move no money, they change nobody's eligibility, and
+    every one is superseded by a later record rather than being destructive.
+    §26.7 makes support a routine daily activity, and `admin-support.ts` has
+    recorded since Phase 16b that a freshness gate on routine work is how the
+    prompt stops meaning anything.
+
+    Two are worth naming individually because they LOOK consequential and are
+    not: closing keeps the entire case readable and reopening is one recorded
+    act away, and triage is explicitly severed from §27.8's deadline.
+  */
+  {
+    route: 'POST /api/admin/support/cases/:caseId/assign',
+    specRef: '§26.7',
+    reason:
+      'Names which Admin owns the case. The assignee must already be an `admin` account — the same boundary `requireAdmin` decides on — so this redistributes work among people who all already hold the access it would be gating.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/classify',
+    specRef: '§26.7',
+    reason:
+      'Sets the §26.7 topic, its free-text subcategory, and the internal reason. It changes how a case is filed, not what was decided or promised.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/triage',
+    specRef: '§27.8',
+    reason:
+      'Orders this queue and nothing else. §27.8 publishes one response promise for every case, `human_response_due_at` is immutable by trigger, and no code path reads triage when computing a deadline.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/waiting',
+    specRef: '§26.7, §27.1',
+    reason:
+      'Names the party that owes the next move and what they owe. It is the §27.1 "who owns it / what next" pair being recorded — a statement about the case, not an action against anybody.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/next-update',
+    specRef: '§27.8',
+    reason:
+      'Records the checkpoint the customer was promised. Making that harder to set is how a promise goes unrecorded and then unmet.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/evidence',
+    specRef: '§26.8',
+    reason:
+      'Attaches a reference to a record that already exists. It stores no file — object storage is unconfigured — and adds nothing a person did not observe.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/contacts',
+    specRef: '§26.8',
+    reason:
+      'Records that an Admin contacted a party outside the customer thread. It sends nothing — §27 defines no key for it — so this is a note about work already done.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/contacts/:contactId/outcome',
+    specRef: '§26.8',
+    reason:
+      'Records what came back from a contact. Write-once at the service and again by trigger, so it can add an answer and never revise one.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/close',
+    specRef: '§26.7',
+    reason:
+      'Stamps a resolved case as closed. Nothing is deleted, every attached record is insert-only, the case stays fully readable, and reopening is one recorded act away — it is the least destructive write in the module.',
+  },
+  {
+    route: 'POST /api/admin/support/cases/:caseId/reopen',
+    specRef: '§26.8',
+    reason:
+      'Says a resolution did not hold. The prior resolution is copied onto the reopen record before it is cleared, so it destroys nothing, and refusing without a reason is enforced at the service and by CHECK.',
+  },
+  {
+    route: 'PUT /api/admin/support/cases/:caseId/subject',
+    specRef: '§26.7',
+    reason:
+      'Sets the one sentence the queue lists the case by. It reaches nobody: the subject appears on no customer message, which all render from Appendix B.8 and the templates.',
+  },
   {
     route: 'POST /api/admin/associations/:associationId/conflict-disclosures',
     specRef: '§29.1',

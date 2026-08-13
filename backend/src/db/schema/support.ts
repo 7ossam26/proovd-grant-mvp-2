@@ -86,6 +86,52 @@ export const supportCases = pgTable(
     lastResponseAt: timestamp('last_response_at', { withTimezone: true }),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 
+    /* ── The Support workspace (migration 0045) ────────────────────────────
+       Everything below was added for the Admin Support surface. None of it
+       changes what §27.8 promises: `human_response_due_at` and its calendar
+       version are still the deadline, and the 0025 trigger still refuses to
+       move them. */
+
+    /** The one sentence a person recognises the case by. Null → render the topic. */
+    subject: text('subject'),
+    /** Free-text detail under the §26.7 topic. The topics themselves are fixed. */
+    subcategory: text('subcategory'),
+    /** Admin-only. Never rendered to a customer and never sent (§26.8). */
+    internalReason: text('internal_reason'),
+
+    /**
+     * Queue order, and nothing else.
+     *
+     * §27.8 publishes ONE response promise — one business day, every case. A
+     * triage level that shortened or lengthened it would be a commercial rule
+     * the Spec does not state (§1 rule 6), so nothing reads this column when
+     * computing a deadline and `TRIAGE_NEVER_CHANGES_THE_PROMISE` rides the
+     * control that sets it.
+     */
+    triagePriority: text('triage_priority').notNull().default('normal'),
+
+    /**
+     * Who the case is blocked on right now.
+     *
+     * Distinct from `owner`, which is the §26.7 ORGANISATION accountable for
+     * the response and what Appendix B.8 tells the customer. A case owned by
+     * Proovd can truthfully be waiting on Stripe. A CHECK pins this to
+     * `status` so the two can never drift.
+     */
+    waitingOn: text('waiting_on'),
+    /** What that party owes, in words. §27.1's "what next", stated not implied. */
+    nextAction: text('next_action'),
+
+    /** The named Admin. Read from the session server-side, never from a body. */
+    assigneeUserId: text('assignee_user_id'),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }),
+
+    /** What actually fixed it, and who reached that. Both or neither (CHECK). */
+    resolution: text('resolution'),
+    resolvedBy: text('resolved_by'),
+    /** A stamp on a resolved case — deliberately not a fifth status. */
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+
     createdBy: text('created_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -96,6 +142,8 @@ export const supportCases = pgTable(
     campaignIdx: index('support_cases_campaign_idx').on(t.campaignId, t.createdAt),
     reservationIdx: index('support_cases_reservation_idx').on(t.reservationId),
     associationIdx: index('support_cases_association_idx').on(t.associationId),
+    assigneeIdx: index('support_cases_assignee_idx').on(t.assigneeUserId, t.status),
+    directoryIdx: index('support_cases_directory_idx').on(t.createdAt),
   }),
 );
 
@@ -159,6 +207,139 @@ export const supportCaseHandoffs = pgTable(
   },
   (t) => ({
     caseIdx: index('support_case_handoffs_case_idx').on(t.caseId, t.occurredAt),
+  }),
+);
+
+/* ── support_case_assignments (§25.6, migration 0045) ──────────────────────── */
+
+/**
+ * How a case came to have the Admin it has.
+ *
+ * Insert-only. The reference renders "previous owner" and "reason for
+ * reassignment" as two fields on the ticket; keeping them there would preserve
+ * exactly one handover and overwrite it on the next. §25.6 wants the actor, the
+ * reason, and the before/after preserved — which is a history table.
+ *
+ * Deliberately NOT `support_case_handoffs`. That one changes the accountable
+ * ORGANISATION and §26.8 gates it on four facts about what the customer was
+ * already told. Passing a case between two Proovd Admins promises the customer
+ * nothing new, and demanding the same four sentences for routine work is how a
+ * gate becomes something people type past without reading.
+ */
+export const supportCaseAssignments = pgTable(
+  'support_case_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => supportCases.id),
+    fromUserId: text('from_user_id'),
+    toUserId: text('to_user_id').notNull(),
+    reason: text('reason'),
+    actor: text('actor').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    caseIdx: index('support_case_assignments_case_idx').on(t.caseId, t.occurredAt),
+  }),
+);
+
+/* ── support_case_evidence (§24.11's posture, migration 0045) ──────────────── */
+
+/**
+ * What the case is evidenced by.
+ *
+ * A REFERENCE, never a file: §12's object storage is Track A4 and
+ * `unconfiguredStorage` throws, so a `storage_key` column would be a promise
+ * the deployment cannot keep (§1.4). `linkedKind` is CHECKed against a register
+ * rather than being free text, because evidence pointing at a typed string is
+ * evidence that can point at nothing — which reads as complete inside a §24.11
+ * dispute packet while proving none of it.
+ */
+export const supportCaseEvidence = pgTable(
+  'support_case_evidence',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => supportCases.id),
+    kind: text('kind').notNull(),
+    description: text('description').notNull(),
+    linkedKind: text('linked_kind').notNull().default('none'),
+    linkedReference: text('linked_reference'),
+    addedBy: text('added_by').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    caseIdx: index('support_case_evidence_case_idx').on(t.caseId, t.occurredAt),
+  }),
+);
+
+/* ── support_case_contacts (§26.8, §30, migration 0045) ────────────────────── */
+
+/**
+ * Coordination Proovd did outside the customer thread.
+ *
+ * It RECORDS; it does not send. §27 defines four support notification keys and
+ * none of them is "an Admin contacted a party about a case" — inventing a fifth
+ * would be §1 rule 6 applied to a message, so the control says plainly that the
+ * Admin sends it themselves and records it here.
+ *
+ * There is no `remind_at`, no `recurrence`, and no job that reads this table.
+ * §30 forbids automated engagement sequences, and `relationshipTouches` records
+ * the same absence for the same reason: having nowhere to put a schedule is
+ * what keeps one from appearing.
+ */
+export const supportCaseContacts = pgTable(
+  'support_case_contacts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => supportCases.id),
+    partyKind: text('party_kind').notNull(),
+    partyLabel: text('party_label').notNull(),
+    message: text('message').notNull(),
+    /** A date somebody watches, never one anything sweeps (§30). */
+    expectedResponseAt: timestamp('expected_response_at', { withTimezone: true }),
+    /** The only mutable column on this table, and write-once by trigger. */
+    outcome: text('outcome'),
+    outcomeRecordedAt: timestamp('outcome_recorded_at', { withTimezone: true }),
+    recordedBy: text('recorded_by').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    caseIdx: index('support_case_contacts_case_idx').on(t.caseId, t.occurredAt),
+  }),
+);
+
+/* ── support_case_reopens (§26.8, migration 0045) ──────────────────────────── */
+
+/**
+ * The record that a resolution did not hold.
+ *
+ * Insert-only, and the reason is required: "reopened" with no cause is a state
+ * nobody can review. The prior resolution is copied onto the row before it is
+ * cleared, so reopening never destroys the answer that was given — §26.8's
+ * "nothing is deleted", applied to the one operation whose whole job is to
+ * undo something.
+ */
+export const supportCaseReopens = pgTable(
+  'support_case_reopens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => supportCases.id),
+    reason: text('reason').notNull(),
+    priorResolution: text('prior_resolution'),
+    priorResolvedAt: timestamp('prior_resolved_at', { withTimezone: true }),
+    priorClosedAt: timestamp('prior_closed_at', { withTimezone: true }),
+    actor: text('actor').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    caseIdx: index('support_case_reopens_case_idx').on(t.caseId, t.occurredAt),
   }),
 );
 
@@ -236,5 +417,9 @@ export const relationshipTouches = pgTable(
 export type SupportCase = typeof supportCases.$inferSelect;
 export type SupportCaseMessage = typeof supportCaseMessages.$inferSelect;
 export type SupportCaseHandoff = typeof supportCaseHandoffs.$inferSelect;
+export type SupportCaseAssignment = typeof supportCaseAssignments.$inferSelect;
+export type SupportCaseEvidence = typeof supportCaseEvidence.$inferSelect;
+export type SupportCaseContact = typeof supportCaseContacts.$inferSelect;
+export type SupportCaseReopen = typeof supportCaseReopens.$inferSelect;
 export type CampaignEnforcementAction = typeof campaignEnforcementActions.$inferSelect;
 export type RelationshipTouch = typeof relationshipTouches.$inferSelect;

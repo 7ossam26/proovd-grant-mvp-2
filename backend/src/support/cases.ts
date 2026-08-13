@@ -166,6 +166,10 @@ export async function openSupportCase(
         backerIdentityId: input.backerIdentityId ?? null,
         requesterUserId: input.requesterUserId ?? null,
         requesterEmail: input.requesterEmail,
+        // Migration 0045 pins `waiting_on` to `status` with a CHECK, so the two
+        // are written together everywhere. A case Proovd owns opens waiting on
+        // Proovd; one the Founder is accountable for opens waiting on them.
+        waitingOn: input.owner === 'founder_coordinated' ? 'founder' : 'proovd',
         campaignId: input.campaignId ?? null,
         reservationId: input.reservationId ?? null,
         associationId: input.associationId ?? null,
@@ -521,6 +525,10 @@ export async function transferCaseOwnership(
       .set({
         owner: input.toOwner,
         status: input.toOwner === 'founder_coordinated' ? 'awaiting_founder' : 'open',
+        // Written with the status (migration 0045). A handoff to the Founder
+        // means the Founder owes the next move; a handoff back to Proovd means
+        // Proovd does — and neither leaves the two columns disagreeing.
+        waitingOn: input.toOwner === 'founder_coordinated' ? 'founder' : 'proovd',
         // The 48-hour clock starts when the Founder actually acquires the case,
         // not when it opened — a Founder cannot be late for a case they were
         // handed five minutes ago.
@@ -645,7 +653,16 @@ export async function resolveCase(
   const now = new Date();
   const moved = await db
     .update(supportCases)
-    .set({ status: 'resolved', resolvedAt: now, updatedAt: now, founderFollowupDueAt: null })
+    // `waiting_on` is nulled with the status: a resolved case waits on nobody,
+    // and migration 0045's CHECK is what makes that true rather than customary.
+    .set({
+      status: 'resolved',
+      waitingOn: null,
+      nextAction: null,
+      resolvedAt: now,
+      updatedAt: now,
+      founderFollowupDueAt: null,
+    })
     .where(and(eq(supportCases.id, caseId), sql`${supportCases.status}::text <> 'resolved'`))
     .returning({ id: supportCases.id });
   return { ok: moved.length === 1 };
