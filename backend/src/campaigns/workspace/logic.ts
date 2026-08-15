@@ -103,13 +103,10 @@ export const CAMPAIGN_DESTINATIONS: readonly CampaignDestination[] = [
   { key: 'founder_admin', label: 'Founder Admin', mark: 'F', built: true },
   { key: 'affiliate_admin', label: 'Affiliate Admin', mark: 'A', built: true },
   { key: 'support_admin', label: 'Support Admin', mark: 'S', built: true },
-  {
-    key: 'backer_admin',
-    label: 'Backer Admin',
-    mark: 'B',
-    built: false,
-    absentBecause: 'No Backer workspace yet — open a pre-order from its support case.',
-  },
+  /* Built 2026-08-15. The link lands on the Backers workspace already filtered
+     to this campaign; a pre-order still has no address of its own, which is the
+     Backers reference's own promise rather than a gap. */
+  { key: 'backer_admin', label: 'Backer Admin', mark: 'B', built: true },
   {
     key: 'money_admin',
     label: 'Money & Fulfillment',

@@ -25,28 +25,28 @@ the CLI forwarding webhooks, and it is an open item until it happens.
 
 | Scenario | Result | Campaign | Reservation | PaymentIntent | Endpoint | Disposition |
 |---|---|---|---|---|---|---|
-| Successful setup and later charge | pass | `5c3303d3-a691-484c-b6ec-b0ee8e6c3356` | `69732e95-0582-48c3-88b4-b259df4f104e` | `pi_capture0000000020` | connect | marked_invalid_artifact |
-| Generic decline | pass | `afae2459-b104-45b6-b42d-c5c14801a9d6` | `fc317919-885f-4c58-be2f-32b2cd0329a7` | `pi_capture0000000024` | connect | marked_invalid_artifact |
-| Insufficient funds | pass | `0718bf58-8fb2-4ec1-9f74-6fc371abb2e5` | `ce038f68-2fc6-4404-93b7-159b1f6ea4c6` | `pi_capture0000000028` | connect | marked_invalid_artifact |
-| Off-session authentication / 3DS required | pass | `bd330662-01aa-4324-92f8-ce0afb4e78ef` | `f4069ba4-3502-4241-9d10-0afac0a58e25` | `pi_capture0000000032` | connect | marked_invalid_artifact |
-| Expired card | pass | `6f0b0eb7-a756-4d03-ac0f-65d195d6c679` | `68c40bf8-2e54-4250-8a5d-dc2fa7a69972` | `pi_capture0000000036` | connect | marked_invalid_artifact |
-| Processing / API error | pass | `33284bf3-c690-4101-bb55-9f9dcdf09267` | `a826876c-3bbc-47e9-8586-ddac35712517` | `pi_capture0000000040` | connect | marked_invalid_artifact |
-| Incorrect CVC | pass | `6baa4177-bbc9-4b4f-8c2e-2df8539d6784` | — | — | connect | marked_invalid_artifact |
-| Setup failure | pass | `bdaae3d2-5440-434f-9830-58e549bbacf5` | — | — | connect | marked_invalid_artifact |
-| Full refund | pass | `5c3303d3-a691-484c-b6ec-b0ee8e6c3356` | `69732e95-0582-48c3-88b4-b259df4f104e` | `pi_capture0000000020` | connect | marked_invalid_artifact |
-| Partial refund | pass | `43bd59bb-cfbc-4766-bada-362919ab7f3a` | `716bfd4b-2150-426c-9c17-c109079d0703` | `pi_capture0000000051` | connect | marked_invalid_artifact |
-| Dispute | pass | `62635a5d-0588-4b7d-ba7c-09f65745a59d` | `985d02cf-408c-4922-b6b7-054b9393d9bb` | `pi_capture0000000056` | connect | marked_invalid_artifact |
+| Successful setup and later charge | pass | `d58264b4-f6dc-4ad5-8ba0-13c4f828af08` | `a62a0f4e-bec5-45ac-9114-8698434739b4` | `pi_capture0000000020` | connect | marked_invalid_artifact |
+| Generic decline | pass | `5eccf45b-25c0-4b6d-bdee-1a1be6efb659` | `e64d855e-2ffc-43ee-af7a-b762f64a2c46` | `pi_capture0000000024` | connect | marked_invalid_artifact |
+| Insufficient funds | pass | `e80ce71c-528f-4041-89c3-735ad08dd4c9` | `e50b6703-1208-4422-882c-571b0584c61e` | `pi_capture0000000028` | connect | marked_invalid_artifact |
+| Off-session authentication / 3DS required | pass | `1ad677be-0616-4848-9655-13c98b27b624` | `8bac3136-90b3-4406-bc7b-6fd47b6610ad` | `pi_capture0000000032` | connect | marked_invalid_artifact |
+| Expired card | pass | `cab2b670-ec5a-40a1-bb3a-46e61fe6b356` | `64b8fdc2-918e-42a8-b1e2-3cb5bfff7c08` | `pi_capture0000000036` | connect | marked_invalid_artifact |
+| Processing / API error | pass | `f1ff2e9c-1ba7-4fd9-a9b6-ce3b74a67b94` | `0093f607-92ac-4b02-9849-e9cde6ab48e3` | `pi_capture0000000040` | connect | marked_invalid_artifact |
+| Incorrect CVC | pass | `2d2de284-a74e-47be-adc4-5664a93ceb25` | — | — | connect | marked_invalid_artifact |
+| Setup failure | pass | `a4b80d34-30ac-4111-ab74-e48a5ab9bdaf` | — | — | connect | marked_invalid_artifact |
+| Full refund | pass | `d58264b4-f6dc-4ad5-8ba0-13c4f828af08` | `a62a0f4e-bec5-45ac-9114-8698434739b4` | `pi_capture0000000020` | connect | marked_invalid_artifact |
+| Partial refund | pass | `9ca6af70-6d28-4509-8d98-2126d4af92a6` | `2d8fbe52-7ae5-479d-b7cd-0fd7e34e8b83` | `pi_capture0000000051` | connect | marked_invalid_artifact |
+| Dispute | pass | `6fc91751-fbce-4295-9dec-14149ded96d6` | `946c5505-cbfc-43ed-9f21-bee3e2c22aec` | `pi_capture0000000056` | connect | marked_invalid_artifact |
 
 ## Connected accounts
 
-- Successful setup and later charge: acct_p072fe902d-a, acct_platformtestaccount
-- Generic decline: acct_p0d338a703-6, acct_platformtestaccount
-- Insufficient funds: acct_p0a74d7248-a, acct_platformtestaccount
-- Off-session authentication / 3DS required: acct_p0c5aef58a-3, acct_platformtestaccount
-- Expired card: acct_p02b0a96f4-4, acct_platformtestaccount
-- Processing / API error: acct_p09777f8e9-8, acct_platformtestaccount
-- Incorrect CVC: acct_p05d2a6862-d, acct_platformtestaccount
-- Setup failure: acct_p0b2fc5d5e-3, acct_platformtestaccount
-- Full refund: acct_p072fe902d-a, acct_platformtestaccount
-- Partial refund: acct_p002c1b092-d, acct_platformtestaccount
-- Dispute: acct_p09e829e66-a, acct_platformtestaccount
+- Successful setup and later charge: acct_p01be0a65b-b, acct_platformtestaccount
+- Generic decline: acct_p03cedf72c-b, acct_platformtestaccount
+- Insufficient funds: acct_p0ab23b0ff-a, acct_platformtestaccount
+- Off-session authentication / 3DS required: acct_p0ff8ca5a5-1, acct_platformtestaccount
+- Expired card: acct_p08cb8ed5f-1, acct_platformtestaccount
+- Processing / API error: acct_p016d4e595-d, acct_platformtestaccount
+- Incorrect CVC: acct_p0f6f1c105-3, acct_platformtestaccount
+- Setup failure: acct_p02dedb441-0, acct_platformtestaccount
+- Full refund: acct_p01be0a65b-b, acct_platformtestaccount
+- Partial refund: acct_p0eff9e7d2-a, acct_platformtestaccount
+- Dispute: acct_p00b0936cb-b, acct_platformtestaccount

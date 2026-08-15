@@ -30,6 +30,7 @@ import { SupportQueue } from './features/admin/support/SupportQueue.js';
 import { SupportCase } from './features/admin/support/SupportCase.js';
 import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirectory.js';
 import { CampaignRecord } from './features/admin/campaigns/CampaignRecord.js';
+import { BackersWorkspace } from './features/admin/backers/BackersWorkspace.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
@@ -280,6 +281,12 @@ const rootChildren: RouteObject[] = [
       // search param for the same reason.
       { path: 'campaigns', element: <CampaignsDirectory /> },
       { path: 'campaigns/:campaignId', element: <CampaignRecord /> },
+      /* §26.1, §26.5, §25.7 — Backers. One address, because §5.4 gives a Backer
+         no account and the reference's own promise is "One row per Backer. No
+         extra record page." Everything a row holds is on the row; the position
+         (view, filters, page) lives in the query string so a drilled-through
+         list is a link an Admin can send. */
+      { path: 'backers', element: <BackersWorkspace /> },
     ],
   },
   {

@@ -5131,3 +5131,460 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
      none. The name link still carries the affordance. */
   .cmp-row__go { display: none; }
 }
+
+
+/* ════════════════════════════════════ PHASE 29 — the Backers Admin workspace
+   (Spec §26.1, §26.5, §25.7, §28.4, §18, §24.3), added 2026-08-15.
+
+   Built from the supplied Backers reference. Its palette maps onto the proovd
+   token set already — the reference's --forest is --dark, --night is --darker,
+   --light is --mint, --muted is --moss, --soft is --stat-mint-bg, --blue is
+   --accent-blue — so nothing here introduces a value. Its inline CSS is a
+   visual guide and was never copied, and its leftover .topbar / .wordmark /
+   .main-nav rules are ignored: this content mounts inside the Admin shell
+   PHASE 25 owns.
+
+   The three conventions PHASE 25 set, and 26–28 restated, bind here too:
+
+     1. TOKENS ONLY. Read a mode slot or a token, never a raw value. px is
+        legal for hairlines, radii, and the 44px touch minimum (via --touch).
+
+     2. SCOPED OVERRIDES. Where proovd.css already owns a selector this section
+        does not redefine it. Everything new is prefixed .bkr-, and the pieces
+        that already exist — .input, .helper, .grey, .kicker, .btn, .sr-only —
+        are reused rather than restyled.
+
+     3. RESPONSIVE IS A CORRECTION. Each media rule names the overflow problem
+        it answers. The pressure point here is real, new, and the hardest in
+        the Admin so far: the Backer table's SIX columns include a free-text
+        cell holding a person's own multi-line answer. It is answered by
+        letting that cell wrap while the table scrolls inside its own
+        container, and by dropping to stacked cards on phones — never by
+        truncating the answers, which are the point of the view. The page body
+        never scrolls sideways (§33.11.1).
+   ═════════════════════════════════════════════════════════════════════════ */
+
+
+/* ──────────────────────────────────────────────────────────── PAGE HEADER */
+
+.bkr-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-32);
+  align-items: end;
+  margin-bottom: var(--sp-32);
+}
+.bkr-hero__lede { max-width: 43rem; margin: 0; }
+/* The read-only posture rides the header rather than sitting in a footer: an
+   Admin who believes a pre-order can be changed from here will look for the
+   control, not find it, and conclude the page is broken. */
+.bkr-hero__posture { margin: var(--sp-12) 0 0; max-width: 46rem; }
+
+/* The reference's three figures, in the same treatment the Campaigns hero
+   count uses, so the two pages read as one system. */
+.bkr-totals { display: flex; gap: clamp(1.5rem, 3vw, 4rem); padding-bottom: var(--sp-8); }
+.bkr-total strong,
+.bkr-total span { display: block; }
+.bkr-total strong {
+  color: var(--dark);
+  font-size: clamp(1.7rem, 3vw, 2.8rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.bkr-total span { margin-top: var(--sp-4); color: var(--moss); font-size: 0.8rem; }
+
+/* What the totals leave out, and the consent sentences, share one voice.
+   `.helper` already owns the treatment; this only lifts the measure cap that
+   `p` sets globally, which would otherwise break these mid-sentence. */
+.bkr-note { max-width: 68ch; margin: 0 0 var(--sp-24); }
+
+
+/* ───────────────────────────────────────────────────────────── VIEW TABS */
+
+.bkr-views {
+  display: flex;
+  gap: 0;
+  margin-bottom: var(--sp-32);
+  border-bottom: var(--bw) solid var(--brand);
+}
+.bkr-view {
+  min-height: var(--touch);
+  padding: var(--sp-12) var(--sp-24);
+  border: 0;
+  border-bottom: 4px solid transparent;
+  background: transparent;
+  color: var(--moss);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bkr-view.is-active { border-bottom-color: var(--brand); color: var(--dark); }
+.bkr-view:hover { color: var(--dark); }
+
+
+/* ────────────────────────────────────────────────── VIEW HEAD + FILTERS */
+
+.bkr-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-32);
+  align-items: end;
+  margin-bottom: var(--sp-24);
+}
+.bkr-head h2 { margin: 0; }
+.bkr-head p { margin: var(--sp-8) 0 0; }
+.bkr-shown { color: var(--moss); font-size: 0.85rem; white-space: nowrap; }
+
+.bkr-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 20rem) minmax(12rem, 20rem) minmax(14rem, 1fr);
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-24);
+  align-items: start;
+}
+.bkr-filter { display: grid; gap: var(--sp-4); }
+.bkr-filter__label {
+  color: var(--moss);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+/* The window filter's anchor note: which instant the window measures from, so
+   "First 7 days" is never ambiguous — and why the control is disabled when no
+   campaign is chosen. */
+.bkr-filter__hint { color: var(--moss); font-size: 0.75rem; line-height: 1.4; max-width: 34ch; }
+.bkr-filter select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+
+/* ───────────────────────────────────────────────────────────────  TABLES
+
+   Grid rather than <table>: the Backer row's answers cell is a stack of
+   question/answer pairs whose height drives the row, and its five siblings
+   must top-align against that. The head carries role="row" in the markup so
+   the structure is still announced. */
+
+.bkr-table { border-top: var(--bw) solid var(--brand); }
+
+.bkr-thead,
+.bkr-row {
+  display: grid;
+  gap: clamp(0.75rem, 1.4vw, 1.75rem);
+  align-items: center;
+}
+.bkr-table--aff .bkr-thead,
+.bkr-table--aff .bkr-row {
+  grid-template-columns:
+    minmax(13rem, 1.25fr) minmax(13rem, 1.35fr)
+    0.65fr 0.8fr 0.75fr 0.75fr 1.5rem;
+}
+/* Every track carries an explicit floor, including the two narrow ones.
+   A bare `0.6fr` still has `min-width: auto`, so a track whose content is wider
+   than its share does not shrink — it pushes the row past the container and the
+   LAST column is what falls off the edge. That is what clipped the Date column
+   at 1440 in the screenshot pass; the mins below are sized so the six fit
+   inside the Admin gutter at desktop without scrolling. */
+.bkr-table--bkr .bkr-thead,
+.bkr-table--bkr .bkr-row {
+  grid-template-columns:
+    minmax(13rem, 1.05fr) minmax(6rem, 0.5fr) minmax(10rem, 0.85fr)
+    minmax(9rem, 0.75fr) minmax(19rem, 1.8fr) minmax(8.5rem, 0.6fr);
+}
+/* A safety net at every width, not only under the 1100px rule: if a future
+   column or a longer label pushes the row out again, it scrolls inside its own
+   container rather than clipping. The page body still never scrolls sideways
+   (§33.11.1). */
+.bkr-table--bkr { overflow-x: auto; }
+/* The Backer row's cells top-align: the answers cell is the tall one and
+   centring the other five against it strands them mid-row. */
+.bkr-table--bkr .bkr-row { align-items: start; }
+
+.bkr-thead {
+  min-height: 3.3rem;
+  padding: 0 var(--sp-8);
+  color: var(--moss);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  align-items: center;
+}
+
+.bkr-row {
+  width: 100%;
+  min-height: 5.6rem;
+  padding: var(--sp-16) var(--sp-8);
+  border: 0;
+  border-top: 1px solid var(--brand);
+  background: transparent;
+  color: var(--darker);
+  font: inherit;
+  text-align: left;
+}
+/* Only the Affiliate row is a control — it drills through. The Backer row is
+   not: there is no Backer record page, by the reference's own promise. */
+button.bkr-row { cursor: pointer; }
+button.bkr-row:hover,
+button.bkr-row:focus-visible { background: var(--stat-mint-bg); }
+
+/* ── Cells ───────────────────────────────────────────────────────────── */
+
+/* The person / campaign cell: a strong line over a grey one. It ellipsises
+   because a Creator handle or a campaign name is a single unbroken token that
+   would otherwise widen its column past its share. The answers cell is the
+   deliberate exception — it wraps instead. */
+.bkr-person strong,
+.bkr-person small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bkr-person strong { font-size: 1rem; }
+.bkr-person small { margin-top: var(--sp-4); color: var(--moss); font-size: 0.8rem; }
+
+/* The Backer's identity cell is the exception to the ellipsis above, at EVERY
+   width rather than only on a phone.
+
+   The email IS the identity here — there is no Backer name in this product —
+   and `a-very-long-address-for-lay…` is one an Admin cannot read off the screen
+   to a colleague or paste into a support case. The row is already tall enough
+   for the answers beside it, so wrapping costs nothing. Its status line wraps
+   for the same reason: `Card failed — in retry wind…` is the half of the
+   sentence that matters, cut off. */
+.bkr-table--bkr .bkr-person strong,
+.bkr-table--bkr .bkr-person small {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+
+/* The value + label numeric cell. */
+.bkr-num strong,
+.bkr-num span { display: block; }
+.bkr-num strong { font-size: 1.05rem; }
+.bkr-num span { margin-top: var(--sp-4); color: var(--moss); font-size: 0.76rem; }
+/* A cell with nothing to show says what it is waiting for, and the em dash is
+   greyed so it never reads as a zero (§16a: not yet populated is not zero). */
+.bkr-num--waiting strong { color: var(--grey); }
+.bkr-num--waiting span { max-width: 22ch; }
+
+/* Attribution: a named Creator, or the absence of one. Visually distinct
+   because they are different kinds of fact. */
+.bkr-attr { display: block; }
+.bkr-badge {
+  display: inline-block;
+  padding: 0.18rem 0.4rem;
+  background: var(--accent-blue);
+  color: var(--dark);
+  font-size: 0.72rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.bkr-attr small,
+.bkr-organic small {
+  display: block;
+  margin-top: var(--sp-4);
+  color: var(--moss);
+  font-size: 0.75rem;
+}
+.bkr-organic { display: block; color: var(--moss); font-size: 0.85rem; font-weight: 700; }
+
+/* `formatDay` renders `August 12, 2026` in full. The year is not droppable on
+   an Admin surface reading historical records, so the column carries it and the
+   cell wraps rather than losing it — an earlier pass clipped it to
+   `August 12, 202`, which is worse than either. */
+.bkr-date { color: var(--moss); font-size: 0.85rem; white-space: normal; }
+.bkr-arrow { color: var(--dark); font-size: 1.4rem; line-height: 1; }
+
+/* ── Consent (§28.4) ─────────────────────────────────────────────────────
+   The tone is a second signal and never the only one: the label says what the
+   consent permits, so the badge reads correctly in monochrome and to a screen
+   reader (§33.11, and DNA's rule that state is never colour alone). */
+.bkr-consent {
+  display: inline-block;
+  margin-bottom: var(--sp-8);
+  padding: 0.18rem 0.4rem;
+  border: 1px solid transparent;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.bkr-consent--granted { background: var(--stat-mint-bg); color: var(--stat-mint-text); }
+/* Not-granted is the DEFAULT state and by far the more common one, so it is
+   deliberately not an alarm colour — it is a boundary, not a failure. This is
+   the accent the product already uses for "read this before acting". */
+.bkr-consent--not_granted {
+  background: var(--accent-yellow);
+  color: var(--darker);
+  border-color: var(--darker);
+}
+/* The full permission sentence, rendered rather than left on a `title` — a
+   pointer-only explanation is unavailable to a keyboard or screen-reader user
+   (§28.5), and this is the sentence the decision turns on. */
+.bkr-consent__permits {
+  display: block;
+  margin-top: var(--sp-8);
+  color: var(--moss);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  max-width: 46ch;
+}
+
+/* ── The stacked question/answer cell ────────────────────────────────────
+   The one cell in the Admin that holds a person's own words. It wraps rather
+   than ellipsising, and there is no line clamp: these answers are the point of
+   the view, and a truncated one is a quote with its end cut off. */
+.bkr-answers { display: block; min-width: 0; }
+.bkr-qa { display: grid; }
+.bkr-qa__item { padding: var(--sp-8) 0; }
+.bkr-qa__item:first-child { padding-top: 0; }
+.bkr-qa__item + .bkr-qa__item { border-top: 1px solid var(--brand); }
+.bkr-qa__item b,
+.bkr-qa__item span { display: block; }
+.bkr-qa__item b {
+  margin-bottom: var(--sp-4);
+  color: var(--moss);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.bkr-qa__item span {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  /* A free-text answer can contain an unbroken 200-character token. Without
+     this it widens the grid column past its share and forces the page to
+     scroll sideways — which §33.11.1 forbids. */
+  overflow-wrap: anywhere;
+}
+/* An unanswered question. Never a substituted default — the reference filled
+   both of its optional answers with a plausible value. */
+.bkr-qa__none { color: var(--grey); font-style: italic; }
+
+/* ── Empty states ────────────────────────────────────────────────────── */
+.bkr-empty {
+  padding: var(--sp-48) var(--sp-16);
+  border-top: 1px solid var(--brand);
+  margin: 0;
+  max-width: none;
+  color: var(--moss);
+  text-align: center;
+}
+
+/* ── The pager ───────────────────────────────────────────────────────── */
+.bkr-pager {
+  display: flex;
+  gap: var(--sp-16);
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--sp-24) var(--sp-8);
+}
+.bkr-pager__at { color: var(--moss); font-size: 0.85rem; }
+
+.bkr-consent-note {
+  margin-top: var(--sp-24);
+  padding: var(--sp-16);
+  border-left: 4px solid var(--brand);
+  background: var(--grey-lightest);
+}
+.bkr-consent-note .helper { margin: 0 0 var(--sp-8); max-width: 72ch; }
+.bkr-consent-note .helper:last-child { margin-bottom: 0; }
+
+/* The table dims while a filter change is in flight. It is a real state — the
+   rows on screen are the PREVIOUS query's — and saying so beats showing a
+   stale table as though it were the answer (§1.4). */
+.bkr.is-loading .bkr-table { opacity: 0.55; transition: opacity 120ms linear; }
+
+
+/* ═══════════════════════════════════════════════ PHASE 29 — RESPONSIVE ══ */
+
+@media (max-width: 1100px) {
+  /* The header's two halves stop competing; the totals move under the lede. */
+  .bkr-hero { grid-template-columns: 1fr; }
+  .bkr-totals { justify-content: flex-start; }
+  .bkr-head { grid-template-columns: 1fr; }
+  .bkr-shown { white-space: normal; }
+
+  /* Affiliate table: Average is the first column worth losing — it is derived
+     from the two columns either side of it, so a reader can still get it. */
+  .bkr-table--aff .bkr-thead,
+  .bkr-table--aff .bkr-row {
+    grid-template-columns:
+      minmax(12rem, 1.2fr) minmax(12rem, 1.2fr) 0.65fr 0.8fr 0.75fr 1.5rem;
+  }
+  .bkr-table--aff .bkr-thead > :nth-child(6),
+  .bkr-table--aff .bkr-row > :nth-child(6) { display: none; }
+
+  /* Backer table: six columns including free text will not fit, so the table
+     scrolls inside ITS OWN container. The page body still never scrolls
+     sideways, which is the rule (§33.11.1). */
+  .bkr-table--bkr { overflow-x: auto; }
+  .bkr-table--bkr .bkr-thead,
+  .bkr-table--bkr .bkr-row { min-width: 64rem; }
+}
+
+@media (max-width: 700px) {
+  .bkr-filters { grid-template-columns: 1fr; }
+  .bkr-view { padding-inline: var(--sp-16); }
+  .bkr-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-16); }
+  .bkr-total strong { font-size: 1.5rem; }
+
+  /* Both tables become stacked cards. The column head is meaningless once the
+     grid is gone, so it is hidden — every cell already carries its own label
+     (the value+label pair, the bold question above each answer), which is why
+     this degrades to a readable card rather than to unlabelled fragments. */
+  .bkr-thead { display: none; }
+  .bkr-table { border-top-width: 1px; }
+
+  .bkr-table--aff .bkr-row {
+    grid-template-columns: 1fr auto;
+    gap: var(--sp-12);
+    padding: var(--sp-16) var(--sp-4);
+  }
+  .bkr-table--aff .bkr-row > :nth-child(2) { grid-column: 1; }
+  /* The numeric cells lie down into value-then-label lines, so a card reads
+     "18 Backers" rather than stacking two lines per figure. */
+  .bkr-table--aff .bkr-row > :nth-child(3),
+  .bkr-table--aff .bkr-row > :nth-child(4),
+  .bkr-table--aff .bkr-row > :nth-child(5) {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-4);
+  }
+  .bkr-table--aff .bkr-row > :nth-child(3) .bkr-num span,
+  .bkr-table--aff .bkr-row > :nth-child(4) .bkr-num span,
+  .bkr-table--aff .bkr-row > :nth-child(5) .bkr-num span { margin-top: 0; }
+  .bkr-table--aff .bkr-row > :nth-child(7) { grid-column: 2; grid-row: 1 / span 2; }
+
+  /* The Backer row stops scrolling and becomes a card. This is the deliberate
+     choice: at 320px a 64rem horizontal scroller holding a person's paragraph
+     is unreadable, and truncating the answers would remove the reason the view
+     exists. So the row stacks and the answers wrap in full — the one column
+     that must never be clipped. */
+  .bkr-table--bkr { overflow-x: visible; }
+  .bkr-table--bkr .bkr-thead,
+  .bkr-table--bkr .bkr-row { min-width: 0; }
+  .bkr-table--bkr .bkr-row {
+    grid-template-columns: 1fr;
+    gap: var(--sp-8);
+    padding: var(--sp-24) var(--sp-4);
+  }
+  /* The email must wrap on a phone: it is the identity, and an ellipsised
+     address is one an Admin cannot read off the screen to a colleague. */
+  .bkr-table--bkr .bkr-person strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  /* Pledge lies down beside its label, as the Affiliate card does. */
+  .bkr-table--bkr .bkr-row > :nth-child(2) .bkr-num {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-4);
+  }
+  .bkr-table--bkr .bkr-row > :nth-child(2) .bkr-num span { margin-top: 0; }
+
+  .bkr-pager { justify-content: space-between; }
+  .bkr-empty { padding: var(--sp-32) var(--sp-8); }
+}

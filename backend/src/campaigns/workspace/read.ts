@@ -277,7 +277,16 @@ export async function readCampaignRecord(
   );
   const affiliateLink = link('affiliate_admin', `Creator work: ${affiliates}`, affiliateHrefOf(name));
   const supportLink = link('support_admin', `Support cases: ${support}`, SUPPORT_HREF);
-  const backerLink = link('backer_admin', `${activeCount} active pre-orders`, null);
+  /* Built 2026-08-15. The link lands on the Backers workspace already filtered
+     to this campaign and on the Every Backer view, so the destination answers
+     the question the row was asking rather than opening an unfiltered list.
+     `campaignId` is a uuid from our own row, so it needs no escaping beyond
+     `encodeURIComponent`'s. */
+  const backerLink = link(
+    'backer_admin',
+    `${activeCount} active pre-orders`,
+    `/admin/backers?view=backers&campaignId=${encodeURIComponent(campaign.id)}`,
+  );
   const moneyLink = link('money_admin', moneyLine(entry), null);
   const tasksLink = link('tasks', 'Work is recorded on the record it belongs to', null);
 

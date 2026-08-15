@@ -227,10 +227,15 @@ export const CAMPAIGN_DESTINATIONS = [
     key: 'backer_admin',
     label: 'Backer Admin',
     mark: 'B',
-    built: false,
-    /* A pre-order has no Admin address of its own. Its facts live on the
-       support case that raised it and in the §26.5 reservation ledger. */
-    absentBecause: 'No Backer workspace yet — open a pre-order from its support case.',
+    /* Built 2026-08-15. It lands on the Backers workspace filtered to this
+       campaign — the deep link is `/admin/backers?view=backers&campaignId=…`,
+       which is a real position rather than an unfiltered list an Admin then has
+       to narrow by hand.
+
+       A pre-order still has no address of its OWN, and that is the Backers
+       reference's own promise ("One row per Backer. No extra record page."),
+       not a gap: everything a pre-order holds is on its row. */
+    built: true,
   },
   {
     key: 'money_admin',

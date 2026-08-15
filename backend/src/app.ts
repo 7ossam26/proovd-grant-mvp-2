@@ -21,6 +21,7 @@ import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAdminCreatorsRouter } from './routes/admin-creators.js';
 import { createAdminCampaignsRouter } from './routes/admin-campaigns.js';
+import { createAdminBackersRouter } from './routes/admin-backers.js';
 import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
 import { createDraftRouter } from './routes/draft.js';
@@ -508,6 +509,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       appBaseUrl: config.invitationContext.appBaseUrl,
     }),
   );
+  // §26.1, §26.5, §25.7, §28.4 — the Backers workspace, built 2026-08-15. Also
+  // read-only, and for a second reason on top of the Campaigns one: this is the
+  // only route in the product that returns a Backer's survey answer beside
+  // their email, so it carries no write AND no export. §25.7 keeps those two
+  // fields on screen and out of every file, and the absence of the route is
+  // what enforces it. `requireAdmin` refuses a Founder and a Creator by role
+  // before any query runs.
+  app.use(createAdminBackersRouter({ db, auth }));
   // Phase 08b (§11, §33.2.1–33.2.3). The one route a Creator reaches with no
   // account. It takes a token, never an association id, so there is nothing in
   // the request to substitute — see `routes/affiliate-invitation.ts`.

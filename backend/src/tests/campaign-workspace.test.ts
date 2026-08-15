@@ -723,7 +723,7 @@ describe('the record', () => {
     expect(result.waitingOn).toMatch(/close batch has not run/);
   });
 
-  it('the three unbuilt destinations are shown and say why; the three built ones link', async () => {
+  it('the two unbuilt destinations are shown and say why; the four built ones link', async () => {
     const { campaignId, prospectId } = await seedCampaign('links');
     const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
 
@@ -733,8 +733,14 @@ describe('the record', () => {
     expect(byKey.get('founder_admin')!['href']).toBe(`/admin/founders/${prospectId}`);
     expect(byKey.get('affiliate_admin')!['href']).toMatch(/^\/admin\/creators\?q=/);
     expect(byKey.get('support_admin')!['href']).toBe('/admin/support');
+    /* Built 2026-08-15. It lands on the Backers workspace already filtered to
+       this campaign and on the Every Backer view — an unfiltered list would
+       make the Admin narrow it again by hand. */
+    expect(byKey.get('backer_admin')!['href']).toBe(
+      `/admin/backers?view=backers&campaignId=${campaignId}`,
+    );
 
-    for (const key of ['backer_admin', 'money_admin', 'tasks']) {
+    for (const key of ['money_admin', 'tasks']) {
       const link = byKey.get(key)!;
       expect(link['href'], `${key} must not fabricate a destination`).toBeNull();
       expect(String(link['unavailableBecause']).length).toBeGreaterThan(40);

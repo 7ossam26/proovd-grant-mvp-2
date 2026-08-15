@@ -256,6 +256,26 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
             Campaigns
           </NavLink>
           {/*
+            §26.1, §26.5, §25.7, §28.4 — the Backers workspace, built
+            2026-08-15. Placed beside Campaigns because that is the section
+            which links into it: a campaign row routes to this list already
+            filtered to that campaign.
+
+            Read-only like Campaigns, and for a second reason: it is the only
+            surface in the product that shows a Backer's survey answer beside
+            their email, so it carries no write AND no export. The consent that
+            rides each row is §28.4's optional Founder marketing/survey consent
+            — never the reference's "share my name and email", which describes a
+            choice §19 does not offer, since the Founder receives the email
+            mandatorily at pre-order and cannot retract it.
+          */}
+          <NavLink
+            to="/admin/backers"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
+            Backers
+          </NavLink>
+          {/*
             §26.1, §8 — the Creator workspace, built 2026-08-11.
 
             The tab keeps the §3.1 substitution ("Creators") while the workspace
