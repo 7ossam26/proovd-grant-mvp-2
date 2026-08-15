@@ -55,9 +55,9 @@ function installMotionRuntime(): void {
     toast: (message: string) => {
       toasts.push(message);
     },
-    buttonProgress: async (_element: HTMLElement, work: () => Promise<unknown>) => {
+    buttonProgress: async (_element: HTMLElement, work: Promise<unknown>) => {
       try {
-        await work();
+        await work;
       } catch {
         /* the real runtime restores the button and resolves */
       }

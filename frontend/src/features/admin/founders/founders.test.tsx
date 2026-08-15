@@ -92,9 +92,9 @@ function installMotionRuntime(): void {
     // The real morph swallows a rejected `work` and restores the button; the
     // double does the same, because `ConfirmDialog` reads the refusal back out
     // afterwards rather than letting it propagate.
-    buttonProgress: async (_element: HTMLElement, work: () => Promise<unknown>) => {
+    buttonProgress: async (_element: HTMLElement, work: Promise<unknown>) => {
       try {
-        await work();
+        await work;
       } catch {
         /* the real runtime restores the button and resolves */
       }
@@ -663,10 +663,10 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
     await renderList();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
 
-    // Creators left this list on 2026-08-11 and Support on 2026-08-13, each
-    // when its workspace was built. The two that remain are the two that
-    // genuinely do not exist.
-    for (const label of ['Today', 'Campaigns']) {
+    // Creators left this list on 2026-08-11, Support on 2026-08-13, and
+    // Campaigns on 2026-08-15, each when its workspace was built. Today is the
+    // one that remains, and it genuinely does not exist.
+    for (const label of ['Today']) {
       const control = within(nav).getByRole('button', { name: label });
       // `aria-disabled`, never `disabled`: a disabled button leaves a keyboard
       // user with nothing at all where a sighted user sees a greyed section and
@@ -697,10 +697,26 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
     const user = userEvent.setup();
     const { router } = await renderList();
 
-    await user.click(screen.getByRole('button', { name: 'Campaigns' }));
+    await user.click(screen.getByRole('button', { name: 'Today' }));
 
     expect(toastMessages()).toContain(PARKED_MESSAGES.tabs);
     expect(router.state.location.pathname).toBe('/admin/founders');
+  });
+
+  /**
+   * The Campaigns hub landed on 2026-08-15, so the shell's fourth real link is
+   * asserted here beside the three that were already links — the positional
+   * check above catches a section being ADDED, and this catches one silently
+   * going back to parked.
+   */
+  it('renders Campaigns as a real link', async () => {
+    await renderList();
+    const nav = screen.getByRole('navigation', { name: 'Admin sections' });
+
+    const campaigns = within(nav).getByRole('link', { name: 'Campaigns' });
+    expect(campaigns).toHaveAttribute('href', '/admin/campaigns');
+    expect(campaigns.className).not.toContain('is-active');
+    expect(within(nav).queryByRole('button', { name: 'Campaigns' })).toBeNull();
   });
 });
 

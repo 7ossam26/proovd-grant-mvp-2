@@ -20,6 +20,7 @@ import { creatorStandingGate, founderStandingGate } from './enforcement/standing
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAdminCreatorsRouter } from './routes/admin-creators.js';
+import { createAdminCampaignsRouter } from './routes/admin-campaigns.js';
 import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
 import { createDraftRouter } from './routes/draft.js';
@@ -490,6 +491,21 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       auth,
       appBaseUrl: config.invitationContext.appBaseUrl,
       ...(config.stripeGateway ? { stripeMode: config.stripeGateway.mode } : {}),
+    }),
+  );
+  // The Campaigns Admin hub (§26.1), built 2026-08-15. Two GETs and nothing
+  // else: it summarises five domains and links into the workspaces that own
+  // them. Every campaign operation already has a router — §15's review, §16's
+  // readiness, §17's launch, §20's live edits, §21's close, §22.1's earnings,
+  // §24.8's refunds, §26.7's suspend/kill — and a duplicate control here would
+  // be a second door into rules those encode. `requireAdmin` only: there is no
+  // write for a freshness gate to protect, and §33.12.5's write partition is
+  // untouched because this router contributes none.
+  app.use(
+    createAdminCampaignsRouter({
+      db,
+      auth,
+      appBaseUrl: config.invitationContext.appBaseUrl,
     }),
   );
   // Phase 08b (§11, §33.2.1–33.2.3). The one route a Creator reaches with no

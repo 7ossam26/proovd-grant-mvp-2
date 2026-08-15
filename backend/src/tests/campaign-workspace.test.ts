@@ -1,1418 +1,859 @@
 /**
- * Phase 09a acceptance suite — §33.3.1, §33.3.2, §33.3.3, §33.3.4.
+ * The Campaigns Admin hub — §26.1, §23.1, §23.2, §18, §26.8, §33.12.5.
  *
- * §33's own framing: these are requirements, not examples.
+ * Built 2026-08-15 over the campaign domain the product already has. This suite
+ * proves what the hub reads and, more importantly, what it was not allowed to
+ * add. The five decisions a later session is most likely to undo by accident:
  *
- *   33.3.1  Objective evidence rules reject placeholders, inaccessible links,
- *           unapproved Story, and unconfirmed interview.
- *   33.3.2  Every item combination produces US$35 minus US$2/item to US$25
- *           minimum.
- *   33.3.3  Canceled interview before payment recalculates; after payment does
- *           not.
- *   33.3.4  High-effort is correct for all eight combinations (the lock at
- *           payment lands in Phase 11).
- *
- * §33.3.1's near-misses are asserted against *real bytes in a real bucket*
- * rather than against a stub: an in-memory `ObjectStorage` is injected and the
- * suite puts a zero-byte file, a 1×1 PNG, and a valid PNG into it, so the
- * server's own verification path decides. A test that asserted a mock was
- * called would prove the call, not the rule.
- *
- * Also proved here, because §12 states them and a later phase would otherwise
- * inherit them untested: the register does not drift from `shared/workspace`,
- * the backend's fee arithmetic agrees with the `shared/money` kernel across all
- * 32 combinations, an override is recorded as an override, editing approved
- * content revokes the approval, one Founder cannot read another's workspace,
- * and the four §6 interview settings ship unset so nothing is bookable.
+ *   1. It is READ-ONLY. Every verb but GET answers 404 at both addresses, and
+ *      the module contains no `.insert(` / `.update(` / `.delete(` at all.
+ *   2. It stores nothing. No `campaign_events` table, no `group` column, no
+ *      cached blocker — §26.8's trap and §23.1's single-authority rule.
+ *   3. An unpublished campaign has NO public address. Not a disabled control:
+ *      `publicUrl` is null, so there is nothing for one to open (brief §9).
+ *   4. The Idea denominator is the Founder's own §14.4 threshold, and an unset
+ *      one produces no bar rather than the prototype's hardcoded 120.
+ *   5. The payload carries no Backer identity and no support-case body. It
+ *      summarises five domains and must expose only what a hub needs.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { randomUUID, createHash } from 'node:crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { startHarness, type Harness } from './app-harness.js';
-import type { PoolClient } from 'pg';
-import { createAdmin, seedUser, signInPlain, type AdminSession } from './admin-session.js';
+import { createAdmin, seedUser, signInAs, type AdminSession } from './admin-session.js';
 import { seedAdminReauthWindow } from '../settings/service.js';
-import { createMemoryStorage } from '../storage/object-storage.js';
-import { campaigns } from '../db/schema/domain.js';
-import { founderProspects, campaignDrafts } from '../db/schema/invitations.js';
-import { founderClaimProfiles } from '../db/schema/vetting.js';
-import {
-  campaignOptionalItems,
-  campaignAssets,
-  optionalItemEvents,
-  highEffortClassifications,
-  listingFeeCalculations,
-  founderInterviewBookings,
-  interviewBookingEvents,
-} from '../db/schema/workspace.js';
-import { auditEvents } from '../db/schema/integrity.js';
-import {
-  OPTIONAL_ITEM_KEYS as BACKEND_ITEM_KEYS,
-  EVIDENCE_REJECTION_CODES as BACKEND_REJECTIONS,
-  DECISION_SOURCES as BACKEND_SOURCES,
-  INTERVIEW_STATUSES as BACKEND_INTERVIEW_STATUSES,
-  MEETING_PROVIDERS as BACKEND_PROVIDERS,
-} from '../workspace/registry.js';
-import { decideItems, type WorkspaceSnapshot } from '../workspace/evidence.js';
-import { computeListingFee, readListingFeeSettings } from '../workspace/listing-fee.js';
-import {
-  evaluateWorkspace,
-  ensureWorkspace,
-  recordHighEffort,
-  recordListingFee,
-} from '../workspace/service.js';
-import { recordBooking, confirmBooking, cancelBooking } from '../workspace/interview.js';
-import { INTERVIEW_SETTING_KEYS } from '../workspace/interview.js';
-import { inspectMedia, MIN_VISUAL_EDGE_PX } from '../storage/media.js';
-import {
-  OPTIONAL_ITEM_KEYS,
-  EVIDENCE_REJECTION_CODES,
-  DECISION_SOURCES,
-  INTERVIEW_STATUSES,
-  MEETING_PROVIDERS,
-  computeListingFee as sharedComputeListingFee,
-  type OptionalItemCompletion,
-} from '@proovd/shared';
 
-const storage = createMemoryStorage('workspace-test');
+import { campaigns, campaignStatusHistory, reservations } from '../db/schema/domain.js';
+import { campaignBuild, campaignReviews } from '../db/schema/build.js';
+import { campaignDrafts, founderProspects } from '../db/schema/invitations.js';
+import { backerIdentities } from '../db/schema/reservations.js';
+
+import {
+  CAMPAIGN_BLOCKER_OWNERS,
+  CAMPAIGN_BLOCKER_OWNER_LABELS,
+  CAMPAIGN_DESTINATIONS,
+  CAMPAIGN_FILTERS,
+  CAMPAIGN_GROUPS,
+  CAMPAIGN_HISTORY_SOURCES,
+  CAMPAIGN_HISTORY_TAGS,
+  CAMPAIGN_PUBLIC_STATES,
+  CAMPAIGN_PUBLIC_STATE_LABELS,
+  CAMPAIGN_RECORD_TABS,
+  CAMPAIGN_STAGES,
+  CAMPAIGN_STAGE_LABELS,
+  CAMPAIGN_STATE_KINDS,
+  CAMPAIGNS_IS_READ_ONLY,
+  CLOSED_CAMPAIGN_STATUSES,
+  AT_RISK_CAMPAIGN_STATUSES,
+  KNOWN_LINK_ONLY_NOTE,
+  NO_BLOCKER_LABEL,
+  NO_PERSON_NEEDED_LABEL,
+  THRESHOLD_NOT_SET_NOTE,
+  PROOVD_DECISION_HAS_NO_SCREEN,
+  FRESHNESS_PREFIX,
+  campaignDisplayId,
+  campaignInitials,
+  campaignStateKind,
+  ownerNeedsRouting,
+} from '../campaigns/workspace/logic.js';
+
+import {
+  CAMPAIGN_BLOCKER_OWNERS as SHARED_OWNERS,
+  CAMPAIGN_BLOCKER_OWNER_LABELS as SHARED_OWNER_LABELS,
+  CAMPAIGN_DESTINATIONS as SHARED_DESTINATIONS,
+  CAMPAIGN_FILTERS as SHARED_FILTERS,
+  CAMPAIGN_GROUPS as SHARED_GROUPS,
+  CAMPAIGN_HISTORY_SOURCES as SHARED_SOURCES,
+  CAMPAIGN_HISTORY_TAGS as SHARED_TAGS,
+  CAMPAIGN_PUBLIC_STATES as SHARED_PUBLIC_STATES,
+  CAMPAIGN_PUBLIC_STATE_LABELS as SHARED_PUBLIC_LABELS,
+  CAMPAIGN_RECORD_TABS as SHARED_TABS,
+  CAMPAIGN_STAGES as SHARED_STAGES,
+  CAMPAIGN_STAGE_LABELS as SHARED_STAGE_LABELS,
+  CAMPAIGN_STATE_KINDS as SHARED_KINDS,
+  CAMPAIGNS_IS_READ_ONLY as SHARED_READ_ONLY,
+  CLOSED_CAMPAIGN_STATUSES as SHARED_CLOSED,
+  AT_RISK_CAMPAIGN_STATUSES as SHARED_RISK,
+  KNOWN_LINK_ONLY_NOTE as SHARED_LINK_NOTE,
+  NO_BLOCKER_LABEL as SHARED_NO_BLOCKER,
+  NO_PERSON_NEEDED_LABEL as SHARED_NO_PERSON,
+  THRESHOLD_NOT_SET_NOTE as SHARED_THRESHOLD_NOTE,
+  PROOVD_DECISION_HAS_NO_SCREEN as SHARED_NO_SCREEN,
+  FRESHNESS_PREFIX as SHARED_FRESHNESS,
+  CAMPAIGN_FILTER_DEFINITIONS,
+  CAMPAIGN_BANNED_TERMS,
+  CAMPAIGN_STATUSES,
+  UNGATED_ADMIN_WRITES,
+  campaignDisplayId as sharedDisplayId,
+  campaignInitials as sharedInitials,
+  campaignStateKind as sharedStateKind,
+} from '@proovd/shared';
 
 let h: Harness;
 let admin: AdminSession;
 
 beforeAll(async () => {
-  // Each case signs in a fresh Founder, and §28.1's per-address credential
-  // limit would trip partway through — turning unrelated assertions into
-  // limiter tests. The limiter's own behaviour is covered by
-  // `auth-tokens.test.ts`, which mounts it with a deliberately tiny limit.
   h = await startHarness(
-    { objectStorage: storage, authRouteLimit: 1_000_000, draftVerifyLimit: 1_000_000 },
-    'workspace',
+    { authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    'campaign-workspace',
   );
-  admin = await createAdmin(h, 'workspace-admin');
-  await seedAdminReauthWindow(h.db, 3600);
+  await seedAdminReauthWindow(h.db, 900);
+  admin = await createAdmin(h, 'campws');
 }, 180_000);
 
 afterAll(async () => {
-  await h?.stop();
+  await h.stop();
 });
 
 /* ── Fixtures ─────────────────────────────────────────────────────────────── */
 
-/**
- * Runs a statement as the unprivileged application role.
- *
- * The suite connects as the owner, and `REVOKE … FROM proovd_app` binds the
- * role the application actually uses. Asserting insert-only from the owning
- * connection would prove nothing at all — the same helper, for the same reason,
- * as `domain-kernel.test.ts`.
- */
-async function asAppRole<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await h.pool.connect();
-  try {
-    await client.query('SET ROLE proovd_app');
-    return await fn(client);
-  } finally {
-    await client.query('RESET ROLE');
-    client.release();
-  }
+interface SeedOptions {
+  status?: string;
+  type?: 'pre_build' | 'pre_launch' | null;
+  listingPaid?: boolean;
+  liveAt?: Date | null;
+  closeAt?: Date | null;
+  discoveryOpened?: boolean;
+  orderThreshold?: number | null;
+  title?: string | null;
 }
 
-/**
- * A claimed campaign with a signed-in Founder.
- *
- * Built directly rather than by driving the Phase 06–07 journey: what is under
- * test here is §12, and re-running a whole invitation and vetting sequence per
- * case would make every failure in this file look like a Phase 07 failure.
- * The one thing that must be real is the authorization edge — the claim profile
- * carrying `claimed_user_id`, which is what `findFounderCampaign` joins on.
- */
-async function makeCampaign(label: string): Promise<{
-  campaignId: string;
-  founderId: string;
-  cookie: string;
-}> {
-  const founder = await seedUser(h, 'founder', label);
-
-  const [campaign] = await h.db
-    .insert(campaigns)
-    // `campaigns_type_lock_pair` (Phase 07) requires the type and its lock
-    // stamp to arrive together — the type is locked at vetting submission and
-    // there is no state where one exists without the other.
-    .values({ status: 'account_claimed', type: 'pre_build', typeLockedAt: new Date() })
-    .returning({ id: campaigns.id });
-
+async function seedCampaign(label: string, options: SeedOptions = {}) {
+  const founder = await seedUser(h, 'founder', `campws-${label}`);
   const [prospect] = await h.db
     .insert(founderProspects)
     .values({
-      preferredName: `Founder ${label}`,
+      legalName: `Founder ${label}`,
+      preferredName: `F-${label}`,
       email: founder.email,
       productName: `Product ${label}`,
-      createdBy: `user:${admin.id}`,
-      // `founder_prospects_claim_pair` (Phase 06b): the claimed user and the
-      // claim time arrive together, because a claim with no time is not one.
+      businessName: `${label} Labs LLC`,
+      createdBy: 'admin:test',
       claimedUserId: founder.id,
       claimedAt: new Date(),
     })
     .returning({ id: founderProspects.id });
 
-  const [draft] = await h.db
-    .insert(campaignDrafts)
+  const [campaign] = await h.db
+    .insert(campaigns)
     .values({
-      prospectId: prospect!.id,
-      campaignId: campaign!.id,
-      status: 'claimed',
-      createdBy: `user:${admin.id}`,
-      updatedBy: `user:${admin.id}`,
+      status: (options.status ?? 'live') as never,
+      type: options.type === undefined ? 'pre_launch' : (options.type as never),
+      typeLockedAt: options.type === null ? null : new Date(),
+      listingPaidAt: options.listingPaid === false ? null : new Date(),
+      campaignLiveAt: options.liveAt === undefined ? new Date(Date.now() - 86_400_000) : options.liveAt,
+      campaignCloseAt:
+        options.closeAt === undefined ? new Date(Date.now() + 14 * 86_400_000) : options.closeAt,
+      discoveryOpenedAt: options.discoveryOpened ? new Date() : null,
     })
-    .returning({ id: campaignDrafts.id });
+    .returning({ id: campaigns.id });
 
-  await h.db.insert(founderClaimProfiles).values({
-    draftId: draft!.id,
-    prospectId: prospect!.id,
+  await h.db.insert(campaignDrafts).values({
     campaignId: campaign!.id,
-    claimedUserId: founder.id,
-    claimedAt: new Date(),
-    updatedBy: `user:${founder.id}`,
+    prospectId: prospect!.id,
+    status: 'claimed',
+    createdBy: 'admin:test',
   });
 
-  const cookie = await signInPlain(h, founder.email);
-  return { campaignId: campaign!.id, founderId: founder.id, cookie };
+  await h.db.insert(campaignBuild).values({
+    campaignId: campaign!.id,
+    title: options.title === undefined ? `Campaign ${label}` : options.title,
+    founderDisplayName: `Founder ${label}`,
+    founderEntityDisplay: `${label} Labs LLC`,
+    founderCountry: 'United States',
+    publicStory: 'A story.',
+    closesAt: new Date(Date.now() + 14 * 86_400_000),
+    orderThreshold: options.orderThreshold ?? null,
+    refundPolicyTitle: 'Refund Policy',
+    refundPolicyVersion: 'v1',
+    refundPolicySourceUrl: 'https://app.proovd.co/policies/refund/v1',
+    updatedBy: 'user:test',
+  });
+
+  return { campaignId: campaign!.id, prospectId: prospect!.id, founderId: founder.id };
 }
 
-/** A valid PNG of the given size. Real bytes — the server parses the header. */
-function png(width: number, height: number): Buffer {
-  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  const ihdr = Buffer.alloc(25);
-  ihdr.writeUInt32BE(13, 0);
-  ihdr.write('IHDR', 4, 'latin1');
-  ihdr.writeUInt32BE(width, 8);
-  ihdr.writeUInt32BE(height, 12);
-  ihdr[16] = 8; // bit depth
-  ihdr[17] = 6; // truecolour with alpha
-  return Buffer.concat([signature, ihdr, Buffer.from('IEND')]);
-}
-
-const sha = (body: Buffer) => createHash('sha256').update(body).digest('hex');
-
-/**
- * Puts a file through the whole three-step upload path: presign, PUT to the
- * bucket, verify. Returns the asset id and the server's decision.
- */
-async function upload(
+async function seedReservations(
   campaignId: string,
-  cookie: string,
-  input: { purpose: 'visual' | 'logo'; body: Buffer; contentType?: string; filename?: string },
-): Promise<{ status: number; assetId?: string; error?: string }> {
-  const contentType = input.contentType ?? 'image/png';
-  const presign = await request(h.app)
-    .post(`/api/founder/campaigns/${campaignId}/uploads`)
-    .set('cookie', cookie)
-    .send({
-      purpose: input.purpose,
-      contentType,
-      byteSize: input.body.byteLength,
-      checksumSha256: sha(input.body),
-      filename: input.filename ?? 'file.png',
+  statuses: string[],
+  subtotalCents = 12_000n,
+): Promise<string[]> {
+  const identities: string[] = [];
+  for (const [index, status] of statuses.entries()) {
+    const [identity] = await h.db
+      .insert(backerIdentities)
+      .values({
+        campaignId,
+        email: `backer-${index}-${campaignId}@example.com`,
+        phone: `+1555000${index}`,
+        emailNormalized: `backer-${index}-${campaignId}@example.com`,
+        phoneNormalized: `1555000${index}`,
+        dedupKey: `${campaignId}-${index}`,
+      })
+      .returning({ id: backerIdentities.id });
+    identities.push(identity!.id);
+    await h.db.insert(reservations).values({
+      campaignId,
+      backerIdentityId: identity!.id,
+      status: status as never,
+      rewardSku: 'SKU-1',
+      rewardSubtotalCents: subtotalCents,
     });
-
-  if (presign.status !== 200) {
-    return { status: presign.status, error: presign.body.error };
   }
-
-  // The browser's PUT. The suite writes the bytes into the same bucket the
-  // server will read them back out of.
-  storage.put(presign.body.assetId, contentType, input.body);
-  const [row] = await h.db
-    .select({ key: campaignAssets.storageKey })
-    .from(campaignAssets)
-    .where(eq(campaignAssets.id, presign.body.assetId))
-    .limit(1);
-  storage.put(row!.key, contentType, input.body);
-
-  await request(h.app)
-    .post(`/api/founder/campaigns/${campaignId}/uploads/${presign.body.assetId}/verify`)
-    .set('cookie', cookie)
-    .send({})
-    .expect(200);
-
-  return { status: 200, assetId: presign.body.assetId };
+  return identities;
 }
 
-const itemOf = (body: any, key: string) =>
-  body.workspace.items.find((i: { item: string }) => i.item === key);
-
-/* ── Drift ────────────────────────────────────────────────────────────────── */
-
-describe('the backend register mirrors shared/workspace', () => {
-  it('restates the five §12 items exactly', () => {
-    expect([...BACKEND_ITEM_KEYS]).toEqual([...OPTIONAL_ITEM_KEYS]);
-  });
-
-  it('restates the rejection vocabulary, the decision sources, and the enums', () => {
-    expect([...BACKEND_REJECTIONS].sort()).toEqual([...EVIDENCE_REJECTION_CODES].sort());
-    expect([...BACKEND_SOURCES]).toEqual([...DECISION_SOURCES]);
-    expect([...BACKEND_INTERVIEW_STATUSES]).toEqual([...INTERVIEW_STATUSES]);
-    expect([...BACKEND_PROVIDERS]).toEqual([...MEETING_PROVIDERS]);
-  });
-
-  it('agrees with the shared money kernel on all 32 fee combinations', async () => {
-    // The backend computes from `app_settings`; `shared/money` computes from the
-    // §6 seed defaults. On a freshly migrated database those are the same four
-    // numbers, so the two must produce identical answers — and if an Admin later
-    // changes one, this is the test that says which side moved.
-    const settings = await readListingFeeSettings(h.db);
-    const keys = ['visuals', 'branding', 'interviewConfirmed', 'story', 'socials'] as const;
-
-    for (let mask = 0; mask < 32; mask += 1) {
-      const flags = Object.fromEntries(
-        keys.map((key, index) => [key, Boolean(mask & (1 << index))]),
-      ) as OptionalItemCompletion;
-
-      const completed = OPTIONAL_ITEM_KEYS.filter((key) =>
-        key === 'interview' ? flags.interviewConfirmed : flags[key as keyof OptionalItemCompletion],
-      );
-
-      const mine = computeListingFee(settings, completed);
-      const theirs = sharedComputeListingFee(flags);
-
-      expect(mine.subtotalCents).toBe(theirs.subtotalCents);
-      expect(mine.discountCents).toBe(theirs.discountCents);
-      expect(mine.completedItems).toBe(theirs.completedItems);
-    }
-  });
-});
-
-/* ── §33.3.1 — the evidence rules ─────────────────────────────────────────── */
-
-describe('§33.3.1 — the objective completion rules', () => {
-  const empty: WorkspaceSnapshot = {
-    assets: [],
-    socials: [],
-    brand: { colors: null, typography: null, approved: false },
-    story: { text: null, approved: false },
-    interview: { status: null },
-    invalidated: {},
-  };
-
-  const decision = (snapshot: Partial<WorkspaceSnapshot>, item: string) =>
-    decideItems({ ...empty, ...snapshot }).find((d) => d.item === item)!;
-
-  it('completes nothing from an empty workspace', () => {
-    for (const d of decideItems(empty)) {
-      expect(d.complete).toBe(false);
-      expect(d.rejections.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('rejects a visual that was uploaded but never approved (§12 "unapproved")', () => {
-    const d = decision(
-      {
-        assets: [
-          { id: 'a', purpose: 'visual', state: 'stored', rejection: null, approved: false, removed: false },
-        ],
-      },
-      'visuals',
-    );
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toContain('not_approved');
-  });
-
-  it('rejects an approved visual that failed verification', () => {
-    // Approval of something we have established is not usable completes
-    // nothing — and the database refuses the pairing anyway.
-    const d = decision(
-      {
-        assets: [
-          {
-            id: 'a',
-            purpose: 'visual',
-            state: 'rejected',
-            rejection: 'file_placeholder',
-            approved: true,
-            removed: false,
-          },
-        ],
-      },
-      'visuals',
-    );
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toContain('file_placeholder');
-  });
-
-  it('completes Visuals only on a stored AND approved file', () => {
-    const d = decision(
-      {
-        assets: [
-          { id: 'a', purpose: 'visual', state: 'stored', rejection: null, approved: true, removed: false },
-        ],
-      },
-      'visuals',
-    );
-    expect(d.complete).toBe(true);
-    expect(d.rejections).toEqual([]);
-  });
-
-  it('rejects Branding with a logo but no written direction', () => {
-    const d = decision(
-      {
-        assets: [
-          { id: 'l', purpose: 'logo', state: 'stored', rejection: null, approved: true, removed: false },
-        ],
-      },
-      'branding',
-    );
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toContain('nothing_supplied');
-  });
-
-  it('rejects Branding with colours but no typography (§12 "at least colors AND typography")', () => {
-    const d = decision(
-      {
-        assets: [
-          { id: 'l', purpose: 'logo', state: 'stored', rejection: null, approved: true, removed: false },
-        ],
-        brand: { colors: 'Deep green and bone', typography: null, approved: true },
-      },
-      'branding',
-    );
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toContain('direction_incomplete');
-  });
-
-  it('rejects a direction of whitespace', () => {
-    const d = decision(
-      {
-        assets: [
-          { id: 'l', purpose: 'logo', state: 'stored', rejection: null, approved: true, removed: false },
-        ],
-        brand: { colors: '   ', typography: '\n', approved: true },
-      },
-      'branding',
-    );
-    expect(d.complete).toBe(false);
-  });
-
-  it('rejects a written but unapproved Story (§12: "unapproved draft does not count")', () => {
-    const d = decision(
-      { story: { text: 'A long and genuine story about the product.', approved: false } },
-      'story',
-    );
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toEqual(['not_approved']);
-  });
-
-  it('completes Story only when approved', () => {
-    const d = decision({ story: { text: 'The story.', approved: true } }, 'story');
-    expect(d.complete).toBe(true);
-  });
-
-  it('rejects an inaccessible social link (§12 "inaccessible URLs")', () => {
-    const d = decision(
-      {
-        socials: [
-          {
-            id: 's',
-            url: 'https://example.test/gone',
-            accessible: false,
-            rejection: 'url_unreachable',
-            controlsConfirmed: true,
-            removed: false,
-          },
-        ],
-      },
-      'socials',
-    );
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toContain('url_unreachable');
-  });
-
-  it('rejects a private profile as not public', () => {
-    const d = decision(
-      {
-        socials: [
-          {
-            id: 's',
-            url: 'https://example.test/private',
-            accessible: false,
-            rejection: 'url_not_public',
-            controlsConfirmed: true,
-            removed: false,
-          },
-        ],
-      },
-      'socials',
-    );
-    expect(d.rejections).toContain('url_not_public');
-  });
-
-  it('rejects an accessible profile the Founder has not claimed', () => {
-    const d = decision(
-      {
-        socials: [
-          {
-            id: 's',
-            url: 'https://example.test/someone-else',
-            accessible: true,
-            rejection: null,
-            controlsConfirmed: false,
-            removed: false,
-          },
-        ],
-      },
-      'socials',
-    );
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toContain('not_approved');
-  });
-
-  it('rejects a selected-but-unconfirmed interview (§12, §33.3.1)', () => {
-    const d = decision({ interview: { status: 'selected' } }, 'interview');
-    expect(d.complete).toBe(false);
-    expect(d.rejections).toEqual(['booking_unconfirmed']);
-  });
-
-  it('rejects a canceled and an abandoned interview separately', () => {
-    expect(decision({ interview: { status: 'canceled' } }, 'interview').rejections).toEqual([
-      'booking_canceled',
-    ]);
-    expect(decision({ interview: { status: 'abandoned' } }, 'interview').rejections).toEqual([
-      'booking_absent',
-    ]);
-  });
-
-  it('completes the interview item only on `confirmed`', () => {
-    expect(decision({ interview: { status: 'confirmed' } }, 'interview').complete).toBe(true);
-  });
-
-  it('holds an item incomplete while an Admin invalidation stands', () => {
-    const d = decideItems({
-      ...empty,
-      story: { text: 'Approved and good.', approved: true },
-      invalidated: { story: true },
-    }).find((x) => x.item === 'story')!;
-
-    expect(d.complete).toBe(false);
-    expect(d.rejections[0]).toBe('invalidated');
-    // The evidence the rule produced survives: an invalidation is a decision
-    // ABOUT evidence, and discarding it would make the correction unreviewable.
-    expect(d.evidence).toMatchObject({ written: true, approved: true });
-  });
-});
-
-describe('§33.3.1 — placeholders and empty files, decided from the bytes', () => {
-  it('reads real dimensions out of a PNG header', () => {
-    expect(inspectMedia(png(1200, 800))).toMatchObject({
-      detectedType: 'image/png',
-      width: 1200,
-      height: 800,
-    });
-  });
-
-  it('treats a zero-byte file as unreadable rather than as an image', () => {
-    expect(inspectMedia(Buffer.alloc(0)).detectedType).toBeNull();
-  });
-
-  it('does not recognise an HTML document declared as a PNG', () => {
-    expect(inspectMedia(Buffer.from('<html><script>alert(1)</script>')).detectedType).toBeNull();
-  });
-
-  it('rejects an empty upload end to end', async () => {
-    const { campaignId, cookie } = await makeCampaign('empty-file');
-    const result = await upload(campaignId, cookie, {
-      purpose: 'visual',
-      body: Buffer.alloc(0),
-    });
-    // Refused before a URL is even issued: a zero-length object is not
-    // something to sign a URL for.
-    expect(result.status).toBe(422);
-    expect(result.error).toBe('file_empty');
-  });
-
-  it('rejects a 1×1 placeholder after reading it back out of the bucket', async () => {
-    const { campaignId, cookie } = await makeCampaign('placeholder');
-    const result = await upload(campaignId, cookie, { purpose: 'visual', body: png(1, 1) });
-    expect(result.status).toBe(200);
-
-    const [asset] = await h.db
-      .select()
-      .from(campaignAssets)
-      .where(eq(campaignAssets.id, result.assetId!))
-      .limit(1);
-
-    expect(asset!.state).toBe('rejected');
-    expect(asset!.rejection).toBe('file_placeholder');
-    expect(asset!.width).toBe(1);
-
-    const view = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-
-    expect(itemOf(view.body, 'visuals').complete).toBe(false);
-    expect(itemOf(view.body, 'visuals').rejections).toContain('file_placeholder');
-  });
-
-  it('rejects an image narrower than the narrowest viewport the product supports', async () => {
-    const { campaignId, cookie } = await makeCampaign('too-small');
-    const result = await upload(campaignId, cookie, {
-      purpose: 'visual',
-      body: png(MIN_VISUAL_EDGE_PX - 1, MIN_VISUAL_EDGE_PX - 1),
-    });
-
-    const [asset] = await h.db
-      .select()
-      .from(campaignAssets)
-      .where(eq(campaignAssets.id, result.assetId!))
-      .limit(1);
-
-    expect(asset!.rejection).toBe('file_placeholder');
-  });
-
-  it('rejects a duplicate upload (§12 "duplicate uploads")', async () => {
-    const { campaignId, cookie } = await makeCampaign('duplicate');
-    const body = png(1200, 800);
-
-    const first = await upload(campaignId, cookie, { purpose: 'visual', body });
-    expect(first.status).toBe(200);
-
-    const second = await upload(campaignId, cookie, {
-      purpose: 'visual',
-      body,
-      filename: 'a-different-name.png',
-    });
-    // Content, not filename. Two copies of the same photo named differently is
-    // the case the rule is actually about.
-    expect(second.status).toBe(422);
-    expect(second.error).toBe('file_duplicate');
-  });
-
-  it('refuses a content type a campaign page cannot carry', async () => {
-    const { campaignId, cookie } = await makeCampaign('bad-type');
-    const result = await upload(campaignId, cookie, {
-      purpose: 'visual',
-      body: png(1200, 800),
-      contentType: 'image/svg+xml',
-    });
-    // SVG is a script container browsers execute. Excluded deliberately.
-    expect(result.status).toBe(422);
-    expect(result.error).toBe('file_type_unsupported');
-  });
-
-  it('completes Visuals once a real file is uploaded and approved', async () => {
-    const { campaignId, cookie } = await makeCampaign('good-visual');
-    const result = await upload(campaignId, cookie, { purpose: 'visual', body: png(1600, 900) });
-
-    const before = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-    expect(itemOf(before.body, 'visuals').complete).toBe(false);
-    expect(itemOf(before.body, 'visuals').rejections).toContain('not_approved');
-
-    const after = await request(h.app)
-      .post(`/api/founder/campaigns/${campaignId}/uploads/${result.assetId}/approval`)
-      .set('cookie', cookie)
-      .send({ approved: true })
-      .expect(200);
-
-    expect(itemOf(after.body, 'visuals').complete).toBe(true);
-    expect(itemOf(after.body, 'visuals').decisionSource).toBe('founder_approval');
-  });
-});
-
-/* ── §33.3.2 — the fee, through the service ───────────────────────────────── */
-
-describe('§33.3.2 — the listing fee, on a real campaign', () => {
-  it('starts at $35 with nothing done', async () => {
-    const { campaignId, cookie } = await makeCampaign('fee-base');
-    const view = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-
-    expect(view.body.workspace.fee.subtotalCents).toBe('3500');
-    expect(view.body.workspace.fee.discountLines).toEqual([]);
-  });
-
-  it('takes $2 off per completed item and floors at $25, across all 32 combinations', async () => {
-    const { campaignId } = await makeCampaign('fee-walk');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-
-    const settings = await readListingFeeSettings(h.db);
-
-    // Walked through `recordListingFee` rather than by hand-setting the item
-    // rows: the evaluation re-derives every decision from the content, so a
-    // hand-set completion is overwritten a millisecond later — which is exactly
-    // the property §33.3.1 is about. What §33.3.2 is about is the arithmetic
-    // over a set of completed items, and this walks all 32 of them against the
-    // §6 settings and the row that was stored.
-    for (let mask = 0; mask < 32; mask += 1) {
-      const complete = OPTIONAL_ITEM_KEYS.filter((_, index) => mask & (1 << index));
-      const expected = computeListingFee(settings, complete);
-
-      const result = await recordListingFee(h.db, {
-        campaignId,
-        actor: 'test',
-        trigger: `walk:${mask}`,
-        completed: complete,
-      });
-
-      expect(result.completedItems).toBe(complete.length);
-      expect(result.discountLines).toHaveLength(complete.length);
-      expect(result.subtotalCents).toBe(expected.subtotalCents);
-
-      // Never below the floor, never above the base — the two bounds §12 fixes.
-      expect(result.subtotalCents).toBeGreaterThanOrEqual(2500n);
-      expect(result.subtotalCents).toBeLessThanOrEqual(3500n);
-
-      // The quote the Founder would be shown is the stored row, not the return
-      // value — a calculation that was computed and not recorded is not one.
-      const [written] = await h.db
-        .select()
-        .from(listingFeeCalculations)
-        .where(eq(listingFeeCalculations.campaignId, campaignId))
-        .orderBy(desc(listingFeeCalculations.calculatedAt))
-        .limit(1);
-
-      expect(written!.subtotalCents).toBe(expected.subtotalCents);
-      expect(written!.completedItems).toBe(complete.length);
-    }
-  });
-
-  it('reaches exactly $25 with all five and $35 with none', async () => {
-    const { campaignId } = await makeCampaign('fee-bounds');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-
-    const all = await recordListingFee(h.db, {
-      campaignId,
-      actor: 'test',
-      trigger: 'all',
-      completed: [...OPTIONAL_ITEM_KEYS],
-    });
-    expect(all.subtotalCents).toBe(2500n);
-    // The cap and the floor are different constraints and both bind here.
-    expect(all.discountCents).toBe(1000n);
-
-    const none = await recordListingFee(h.db, {
-      campaignId,
-      actor: 'test',
-      trigger: 'none',
-      completed: [],
-    });
-    expect(none.subtotalCents).toBe(3500n);
-  });
-
-  it('records every calculation with the §6 values that were in force', async () => {
-    const { campaignId } = await makeCampaign('fee-record');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await evaluateWorkspace(h.db, { campaignId, actor: 'test', trigger: 'first' });
-
-    const rows = await h.db
-      .select()
-      .from(listingFeeCalculations)
-      .where(eq(listingFeeCalculations.campaignId, campaignId));
-
-    expect(rows.length).toBeGreaterThan(0);
-    // §29.6's reasoning applied to money: a setting an Admin changes tomorrow
-    // must not silently rewrite what a Founder was quoted today.
-    expect(rows[0]!.baseCents).toBe(3500n);
-    expect(rows[0]!.itemDiscountCents).toBe(200n);
-    expect(rows[0]!.maxDiscountCents).toBe(1000n);
-    expect(rows[0]!.minSubtotalCents).toBe(2500n);
-  });
-
-  it('writes no new calculation when nothing changed', async () => {
-    const { campaignId } = await makeCampaign('fee-idempotent');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await evaluateWorkspace(h.db, { campaignId, actor: 'test', trigger: 'a' });
-    const before = await h.db
-      .select()
-      .from(listingFeeCalculations)
-      .where(eq(listingFeeCalculations.campaignId, campaignId));
-
-    await evaluateWorkspace(h.db, { campaignId, actor: 'test', trigger: 'b' });
-    await evaluateWorkspace(h.db, { campaignId, actor: 'test', trigger: 'c' });
-
-    const after = await h.db
-      .select()
-      .from(listingFeeCalculations)
-      .where(eq(listingFeeCalculations.campaignId, campaignId));
-
-    // "The fee was recalculated at 14:32" only means something if it changed.
-    expect(after.length).toBe(before.length);
-  });
-
-  it('carries §24.6’s separate-stream explanation with every preview', async () => {
-    const { campaignId, cookie } = await makeCampaign('fee-note');
-    const view = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-
-    const note: string = view.body.workspace.fee.separateStreamNote;
-    expect(note).toContain('5%');
-    expect(note.toLowerCase()).toContain('separate');
-    // §3's banned vocabulary must not reach a Founder-facing sentence.
-    for (const banned of ['pledge', 'donate', 'escrow', 'all-or-nothing', 'tranche']) {
-      expect(note.toLowerCase()).not.toContain(banned);
-    }
-  });
-});
-
-/* ── §33.3.4 — high effort ────────────────────────────────────────────────── */
-
-describe('§33.3.4 — high-effort across all eight combinations, persisted', () => {
-  it('is true only when visuals, branding, and an interview are all absent', async () => {
-    const { campaignId } = await makeCampaign('high-effort');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-
-    for (let mask = 0; mask < 8; mask += 1) {
-      const inputs = {
-        visualsCompleted: Boolean(mask & 1),
-        brandingCompleted: Boolean(mask & 2),
-        interviewScheduledOrConfirmed: Boolean(mask & 4),
-      };
-
-      const result = await recordHighEffort(h.db, {
-        campaignId,
-        actor: 'test',
-        trigger: `combination:${mask}`,
-        ...inputs,
-      });
-
-      expect(result.highEffort).toBe(mask === 0);
-
-      const [mirrored] = await h.db
-        .select({ highEffort: campaigns.highEffort })
-        .from(campaigns)
-        .where(eq(campaigns.id, campaignId))
-        .limit(1);
-
-      // §25.1: the campaign record stores the result. Phase 12's matrix reads it.
-      expect(mirrored!.highEffort).toBe(mask === 0);
-    }
-
-    const rows = await h.db
-      .select()
-      .from(highEffortClassifications)
-      .where(eq(highEffortClassifications.campaignId, campaignId));
-
-    // §12: "Store the three inputs, result, calculation time, and actor/system."
-    for (const row of rows) {
-      expect(row.actor).toBe('test');
-      expect(row.trigger).toMatch(/^combination:|^workspace_opened$/);
-      expect(row.highEffort).toBe(
-        !row.visualsCompleted && !row.brandingCompleted && !row.interviewScheduledOrConfirmed,
-      );
-    }
-  });
-
-  it('refuses at the database level to store a classification that breaks §12’s rule', async () => {
-    const { campaignId } = await makeCampaign('high-effort-check');
-
-    // The service computes it, and the CHECK constraint is the second mechanism
-    // — this is the number Phase 12's compensation matrix reads, so a wrong one
-    // is a commercial term that is wrong.
-    await expect(
-      h.db.execute(`
-        INSERT INTO high_effort_classifications
-          (campaign_id, visuals_completed, branding_completed, interview_scheduled_or_confirmed,
-           high_effort, actor, trigger)
-        VALUES ('${campaignId}', true, false, false, true, 'test', 'hand-written')
-      `),
-    ).rejects.toThrow();
-  });
-
-  it('counts a selected-but-unconfirmed interview for high effort, not for the discount', async () => {
-    const { campaignId } = await makeCampaign('high-effort-selected');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await configureInterviews();
-
-    const booked = await recordBooking(h.db, {
-      campaignId,
-      scheduledAt: new Date('2026-09-01T15:00:00Z'),
-      founderTimezone: 'America/New_York',
-      meetingProvider: 'zoom',
-      actor: 'test',
-      source: 'test',
-    });
-    expect(booked.ok).toBe(true);
-
-    const result = await evaluateWorkspace(h.db, {
-      campaignId,
-      actor: 'test',
-      trigger: 'after-booking',
-    });
-
-    // §12 uses "scheduled/confirmed" for high effort and `confirmed` for the item.
-    expect(result.highEffort.interviewScheduledOrConfirmed).toBe(true);
-    expect(result.highEffort.highEffort).toBe(false);
-    expect(result.completed).not.toContain('interview');
-  });
-});
-
-/* ── The four §6 interview settings ───────────────────────────────────────── */
-
-/**
- * §6 names interview providers, availability, interviewers, and the reminder
- * lead time and fixes a value for none of them, so all four ship unset. Booking
- * is refused until an operator states them; this states them for the suite.
- */
-async function configureInterviews(): Promise<void> {
-  const values: Record<string, string> = {
-    interview_providers: 'Zoom\nGoogle Meet',
-    interview_availability: 'Mon–Fri 09:00–17:00 America/New_York',
-    interviewers: 'Alex Interviewer',
-    interview_reminder_lead_hours: '24',
-  };
-
-  for (const [key, value] of Object.entries(values)) {
-    await h.db.execute(`
-      UPDATE app_settings
-         SET value = '${value.replace(/'/g, "''")}',
-             updated_by = 'test',
-             update_reason = 'stated for the acceptance suite'
-       WHERE key = '${key}'
-    `);
-  }
+function get(path: string, cookie = admin.cookie) {
+  return request(h.app).get(path).set('Cookie', cookie);
 }
 
-describe('§6 — nothing is bookable until an operator states the interview settings', () => {
-  it('names the missing settings rather than failing', async () => {
-    // Runs against a fresh campaign but reads global settings, so it asserts
-    // the shape rather than the emptiness once the suite has configured them.
-    const { campaignId, cookie } = await makeCampaign('interview-config');
-    const view = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
+/* ── The registers do not drift ───────────────────────────────────────────── */
 
-    const interview = view.body.workspace.interview;
-    expect(Array.isArray(interview.missingSettings)).toBe(true);
-    expect(interview.bookable).toBe(interview.missingSettings.length === 0);
-    // §1 rule 6: the four keys exist and none of them has an invented default.
-    expect([...INTERVIEW_SETTING_KEYS]).toEqual([
-      'interview_providers',
-      'interview_availability',
-      'interviewers',
-      'interview_reminder_lead_hours',
+describe('the shared registers and the backend restatement agree', () => {
+  it('every vocabulary matches @proovd/shared', () => {
+    expect(CAMPAIGN_BLOCKER_OWNERS).toEqual([...SHARED_OWNERS]);
+    expect(CAMPAIGN_BLOCKER_OWNER_LABELS).toEqual({ ...SHARED_OWNER_LABELS });
+    expect(CAMPAIGN_FILTERS).toEqual([...SHARED_FILTERS]);
+    expect(CAMPAIGN_GROUPS).toEqual([...SHARED_GROUPS]);
+    expect(CAMPAIGN_HISTORY_SOURCES).toEqual([...SHARED_SOURCES]);
+    expect(CAMPAIGN_HISTORY_TAGS).toEqual([...SHARED_TAGS]);
+    expect(CAMPAIGN_PUBLIC_STATES).toEqual([...SHARED_PUBLIC_STATES]);
+    expect(CAMPAIGN_PUBLIC_STATE_LABELS).toEqual({ ...SHARED_PUBLIC_LABELS });
+    expect(CAMPAIGN_RECORD_TABS).toEqual([...SHARED_TABS]);
+    expect(CAMPAIGN_STAGES).toEqual([...SHARED_STAGES]);
+    expect(CAMPAIGN_STAGE_LABELS).toEqual({ ...SHARED_STAGE_LABELS });
+    expect(CAMPAIGN_STATE_KINDS).toEqual([...SHARED_KINDS]);
+    expect(CLOSED_CAMPAIGN_STATUSES).toEqual([...SHARED_CLOSED]);
+    expect(AT_RISK_CAMPAIGN_STATUSES).toEqual([...SHARED_RISK]);
+    expect(CAMPAIGN_DESTINATIONS.map((d) => d.key)).toEqual(
+      SHARED_DESTINATIONS.map((d) => d.key),
+    );
+  });
+
+  it('every pinned sentence matches @proovd/shared', () => {
+    expect(CAMPAIGNS_IS_READ_ONLY).toBe(SHARED_READ_ONLY);
+    expect(KNOWN_LINK_ONLY_NOTE).toBe(SHARED_LINK_NOTE);
+    expect(NO_BLOCKER_LABEL).toBe(SHARED_NO_BLOCKER);
+    expect(NO_PERSON_NEEDED_LABEL).toBe(SHARED_NO_PERSON);
+    expect(THRESHOLD_NOT_SET_NOTE).toBe(SHARED_THRESHOLD_NOTE);
+    expect(FRESHNESS_PREFIX).toBe(SHARED_FRESHNESS);
+  });
+
+  it('the two derivation kernels agree', () => {
+    for (const status of CAMPAIGN_STATUSES) {
+      for (const blocked of [true, false]) {
+        expect(campaignStateKind({ status, blocked })).toBe(
+          sharedStateKind({ status, blocked }),
+        );
+      }
+    }
+    const id = '0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0';
+    expect(campaignDisplayId(id)).toBe(sharedDisplayId(id));
+    expect(campaignInitials('Teeb Founding Launch')).toBe(
+      sharedInitials('Teeb Founding Launch'),
+    );
+  });
+
+  /**
+   * The registers are a partition over §23.1, checked in BOTH directions so
+   * neither can rot: a 28th lifecycle state is either closed, at risk, pre-live,
+   * `live`, or `suspended`, and nothing may be in two of the first three at
+   * once. `capture_retry_window` is deliberately in `closed` AND `at risk` —
+   * a campaign whose cards are failing has ended and is still in trouble — so
+   * that one pair is exempted by name rather than by loosening the check.
+   */
+  it('the status registers name only real §23.1 states', () => {
+    for (const status of [...CLOSED_CAMPAIGN_STATUSES, ...AT_RISK_CAMPAIGN_STATUSES]) {
+      expect(CAMPAIGN_STATUSES as readonly string[]).toContain(status);
+    }
+  });
+
+  it('every filter has a definition and every destination decides whether it exists', () => {
+    expect(CAMPAIGN_FILTER_DEFINITIONS.map((d) => d.key)).toEqual([...SHARED_FILTERS]);
+    for (const definition of CAMPAIGN_FILTER_DEFINITIONS) {
+      expect(definition.counts.length).toBeGreaterThan(20);
+    }
+    for (const destination of SHARED_DESTINATIONS) {
+      if (destination.built) {
+        expect(destination).not.toHaveProperty('absentBecause');
+      } else {
+        expect(destination.absentBecause ?? '').not.toBe('');
+      }
+    }
+  });
+
+  /**
+   * The one gap the destination register cannot express: a blocker Proovd
+   * itself owes, whose decision surface does not exist. Naming it is the point
+   * — routing an operator to the Founder workspace instead would be a wrong
+   * destination presented as a right one, which is worse than none.
+   */
+  it('a Proovd decision with no screen says so rather than routing somewhere plausible', async () => {
+    expect(PROOVD_DECISION_HAS_NO_SCREEN).toBe(SHARED_NO_SCREEN);
+
+    const { campaignId, prospectId } = await seedCampaign('review-route', {
+      status: 'pending_review',
+      liveAt: null,
+    });
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    const route = res.body.overview.blocker.route;
+
+    expect(res.body.overview.blocker.owner).toBe('proovd_review');
+    expect(route.href).toBeNull();
+    expect(route.unavailableBecause).toBe(PROOVD_DECISION_HAS_NO_SCREEN);
+    // Specifically NOT the Founder workspace, which is the plausible wrong one.
+    expect(JSON.stringify(route)).not.toContain(prospectId);
+  });
+
+  it('`system` is the one owner with no routing, and it is the only one', () => {
+    for (const owner of SHARED_OWNERS) {
+      expect(ownerNeedsRouting(owner)).toBe(owner !== 'system');
+    }
+  });
+});
+
+/* ── Authorization (brief §9) ─────────────────────────────────────────────── */
+
+describe('server-side authorization', () => {
+  it('refuses an anonymous caller at both addresses', async () => {
+    await request(h.app).get('/api/admin/campaigns').expect(401);
+    const { campaignId } = await seedCampaign('anon');
+    await request(h.app).get(`/api/admin/campaigns/${campaignId}`).expect(401);
+  });
+
+  it('refuses a signed-in Founder and a signed-in Creator', async () => {
+    const { campaignId } = await seedCampaign('roles');
+
+    const founder = await seedUser(h, 'founder', 'campws-role-f');
+    const founderCookie = await signInAs(h, founder.email);
+    await get('/api/admin/campaigns', founderCookie).expect(403);
+    await get(`/api/admin/campaigns/${campaignId}`, founderCookie).expect(403);
+
+    const creator = await seedUser(h, 'affiliate', 'campws-role-c');
+    const creatorCookie = await signInAs(h, creator.email);
+    await get('/api/admin/campaigns', creatorCookie).expect(403);
+    await get(`/api/admin/campaigns/${campaignId}`, creatorCookie).expect(403);
+  });
+
+  it('answers an authorized Admin', async () => {
+    await get('/api/admin/campaigns').expect(200);
+  });
+
+  /**
+   * A guessed id and a real one that does not exist answer identically, and a
+   * malformed one answers 404 rather than erroring at the driver — a 500 where
+   * a 404 belongs tells a caller their guess was interesting.
+   */
+  it('id manipulation reaches nothing, and every shape answers the same 404', async () => {
+    const missing = await get('/api/admin/campaigns/0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0').expect(404);
+    const malformed = await get('/api/admin/campaigns/not-a-uuid').expect(404);
+    const traversal = await get('/api/admin/campaigns/..%2F..%2Fadmin').expect(404);
+    expect(missing.body.error).toBe('not_found');
+    expect(malformed.body).toEqual(missing.body);
+    expect(traversal.body.error).toBe('not_found');
+  });
+});
+
+/* ── Read-only (brief §3) ─────────────────────────────────────────────────── */
+
+describe('the hub is read-only', () => {
+  it('every verb but GET answers 404 at both addresses', async () => {
+    const { campaignId } = await seedCampaign('readonly');
+    for (const path of ['/api/admin/campaigns', `/api/admin/campaigns/${campaignId}`]) {
+      await request(h.app).post(path).set('Cookie', admin.cookie).send({}).expect(404);
+      await request(h.app).put(path).set('Cookie', admin.cookie).send({}).expect(404);
+      await request(h.app).patch(path).set('Cookie', admin.cookie).send({}).expect(404);
+      await request(h.app).delete(path).set('Cookie', admin.cookie).expect(404);
+    }
+  });
+
+  /**
+   * The stronger form of the same claim: the module cannot write, whatever a
+   * route is added later. Comments are stripped first — these files explain at
+   * length what they refuse to do, and a scan that could not tell an
+   * explanation from a usage would force the explanations out (§22a's rule).
+   */
+  it('the workspace module contains no write at all', () => {
+    // Resolved from this file, not from `process.cwd()` — the working directory
+    // is the workspace root under `vitest --project`, and a scan that silently
+    // found nothing would pass by having nothing to check.
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'campaigns', 'workspace');
+    const files = readdirSync(dir).filter((name) => name.endsWith('.ts'));
+    expect(files.length).toBeGreaterThan(0);
+    for (const name of files) {
+      const source = readFileSync(join(dir, name), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      for (const verb of ['.insert(', '.update(', '.delete(']) {
+        expect(source, `${name} must not ${verb}`).not.toContain(verb);
+      }
+    }
+  });
+
+  /**
+   * §33.12.5's partition enumerates the mounted router's WRITES and requires
+   * gated and ungated to cover it exactly. This router contributes none, so
+   * neither of its two addresses belongs to either set — and if a write is ever
+   * added here, that sweep fails until somebody decides which side it is on.
+   *
+   * Scoped to the two exact paths rather than to the `/campaigns` prefix:
+   * §12's workspace, §15's review, §16's readiness, §17's launch and §22.10's
+   * next-campaign decision all live under it already, and a prefix match would
+   * fail on their entries while proving nothing about this router.
+   */
+  it('contributes no entry to the ungated-write register', () => {
+    for (const entry of UNGATED_ADMIN_WRITES) {
+      expect(entry.route).not.toMatch(/\s\/api\/admin\/campaigns$/);
+      expect(entry.route).not.toMatch(/\s\/api\/admin\/campaigns\/:campaignId$/);
+    }
+  });
+
+  it('stores nothing: no campaign-events table exists', async () => {
+    const rows = await h.db.execute(
+      sql`select table_name from information_schema.tables
+          where table_schema = 'public'
+            and (table_name like '%campaign_event%'
+              or table_name like '%campaign_timeline%'
+              or table_name = 'campaign_hub_cache')`,
+    );
+    expect(rows.rows ?? rows).toHaveLength(0);
+  });
+
+  it('stores no filter membership: campaigns has no group column', async () => {
+    const rows = await h.db.execute(
+      sql`select column_name from information_schema.columns
+          where table_name = 'campaigns'
+            and column_name in ('group', 'groups', 'state_kind', 'blocker', 'blocker_owner')`,
+    );
+    expect(rows.rows ?? rows).toHaveLength(0);
+  });
+});
+
+/* ── The directory ────────────────────────────────────────────────────────── */
+
+describe('the directory', () => {
+  it('carries a freshness stamp and a derived blocked count, and claims no live data', async () => {
+    await seedCampaign('fresh');
+    const res = await get('/api/admin/campaigns').expect(200);
+
+    expect(new Date(res.body.checkedAt).getTime()).toBeGreaterThan(Date.now() - 60_000);
+    expect(typeof res.body.blockedCount).toBe('number');
+    // The caption says "waiting for SOMEONE", so it counts named owners only.
+    expect(res.body.blockedCount).toBe(
+      res.body.rows.filter((row: { blocker: { blocked: boolean } }) => row.blocker.blocked).length,
+    );
+
+    const body = JSON.stringify(res.body).toLowerCase();
+    for (const term of CAMPAIGN_BANNED_TERMS) {
+      expect(body, `banned term "${term}" reached the payload`).not.toContain(term.toLowerCase());
+    }
+  });
+
+  it('resolves every cell server-side, so the browser derives nothing', async () => {
+    const { campaignId } = await seedCampaign('cells', { orderThreshold: null });
+    const res = await get('/api/admin/campaigns').expect(200);
+    const row = res.body.rows.find((r: { campaignId: string }) => r.campaignId === campaignId);
+
+    expect(row.name).toBe('Campaign cells');
+    expect(row.initials).toBe('CC');
+    expect(row.displayId).toBe(campaignDisplayId(campaignId));
+    expect(row.typeLabel).toBe('Product Campaign');
+    expect(row.stateLabel).toBe('Live');
+    expect(row.stateKind).toBe('live');
+    expect(row.company).toBe('cells Labs LLC');
+    expect(row.founderName).toBe('F-cells');
+    expect(row.founderHref).toMatch(/^\/admin\/founders\//);
+    expect(row.dateLabel).toMatch(/^Close /);
+    // The haystack the browser filters on, composed once by the server.
+    expect(row.searchText).toContain('campaign cells');
+    expect(row.searchText).toContain(campaignId);
+    expect(row.searchText).toContain(campaignDisplayId(campaignId).toLowerCase());
+  });
+
+  /**
+   * The reference's own model, and it is deliberately not exclusive: a campaign
+   * can be blocked, live, and an Idea Campaign at once because those answer
+   * different questions.
+   */
+  it('filter membership overlaps, and every group is a real filter', async () => {
+    const { campaignId, founderId } = await seedCampaign('groups', {
+      type: 'pre_build',
+      orderThreshold: 40,
+    });
+    // A live Idea campaign with an open support case is blocked AND live AND idea.
+    await request(h.app)
+      .post('/api/admin/support/cases')
+      .set('Cookie', admin.cookie)
+      .send({
+        topic: 'delivery',
+        owner: 'proovd_support',
+        requesterKind: 'founder',
+        requesterUserId: founderId,
+        requesterEmail: 'someone@example.com',
+        campaignId,
+        message: 'A question.',
+      })
+      .expect(201);
+
+    const res = await get('/api/admin/campaigns').expect(200);
+    const row = res.body.rows.find((r: { campaignId: string }) => r.campaignId === campaignId);
+
+    expect(row.groups).toEqual(expect.arrayContaining(['needs', 'live', 'idea']));
+    for (const group of row.groups) {
+      expect(SHARED_GROUPS as readonly string[]).toContain(group);
+    }
+    // The lifecycle label stays the lifecycle; only the TONE moves.
+    expect(row.stateLabel).toBe('Live');
+    expect(row.stateKind).toBe('risk');
+    expect(row.blocker.owner).toBe('proovd_support');
+    expect(row.blocker.text).toMatch(/support case is open/);
+    expect(row.blocker.route.href).toBe('/admin/support');
+  });
+
+  it('a campaign nobody owes reads as clear, with no routing control', async () => {
+    const { campaignId } = await seedCampaign('clear');
+    const res = await get('/api/admin/campaigns').expect(200);
+    const row = res.body.rows.find((r: { campaignId: string }) => r.campaignId === campaignId);
+
+    expect(row.blocker.blocked).toBe(false);
+    expect(row.blocker.clear).toBe(true);
+    expect(row.blocker.text).toBe(NO_BLOCKER_LABEL);
+    expect(row.blocker.owner).toBe('system');
+    expect(row.blocker.route).toBeNull();
+    expect(row.groups).not.toContain('needs');
+  });
+
+  /**
+   * §21's retry window is the case that proves `blocked` and `clear` are not
+   * opposites: a real blocker sentence that nobody at Proovd owes. Getting this
+   * wrong would either hide it from an operator or offer them "Open System".
+   */
+  it('a blocker with no named owner is stated and still offers no route', async () => {
+    const { campaignId } = await seedCampaign('retry', { status: 'capture_retry_window' });
+    const res = await get('/api/admin/campaigns').expect(200);
+    const row = res.body.rows.find((r: { campaignId: string }) => r.campaignId === campaignId);
+
+    expect(row.blocker.clear).toBe(false);
+    expect(row.blocker.blocked).toBe(false);
+    expect(row.blocker.owner).toBe('system');
+    expect(row.blocker.route).toBeNull();
+    // Still `risk`, from the register rather than from being blocked.
+    expect(row.stateKind).toBe('risk');
+  });
+
+  it('an unlocked campaign type is stated, never guessed', async () => {
+    const { campaignId } = await seedCampaign('untyped', {
+      status: 'invited_draft',
+      type: null,
+      listingPaid: false,
+      liveAt: null,
+      closeAt: null,
+    });
+    const res = await get('/api/admin/campaigns').expect(200);
+    const row = res.body.rows.find((r: { campaignId: string }) => r.campaignId === campaignId);
+
+    expect(row.typeLabel).toBeNull();
+    expect(row.groups).not.toContain('idea');
+    expect(row.groups).not.toContain('product');
+    expect(row.groups).toContain('waiting');
+    expect(row.blocker.owner).toBe('founder');
+    expect(row.dateLabel).toBe('Launch not set');
+  });
+
+  it('an archived campaign is not in the directory', async () => {
+    const { campaignId } = await seedCampaign('archived');
+    await h.db
+      .update(campaigns)
+      .set({ archivedAt: new Date(), archivedReason: 'wrong type', archivedBy: 'admin:test' })
+      .where(eq(campaigns.id, campaignId));
+
+    const res = await get('/api/admin/campaigns').expect(200);
+    expect(res.body.rows.map((r: { campaignId: string }) => r.campaignId)).not.toContain(campaignId);
+  });
+});
+
+/* ── The record ───────────────────────────────────────────────────────────── */
+
+describe('the record', () => {
+  it('carries every tab in one payload and states the read-only posture', async () => {
+    const { campaignId } = await seedCampaign('record');
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+
+    expect(Object.keys(res.body).sort()).toEqual(
+      ['checkedAt', 'close', 'header', 'history', 'liveTab', 'overview'].sort(),
+    );
+    expect(res.body.overview.stages.map((s: { key: string }) => s.key)).toEqual([
+      ...CAMPAIGN_STAGES,
     ]);
-  });
-});
-
-/* ── §33.3.3 — the cancellation asymmetry ─────────────────────────────────── */
-
-describe('§33.3.3 — canceling before payment recalculates; after payment does not', () => {
-  it('recalculates high effort and the fee when canceled before payment', async () => {
-    const { campaignId } = await makeCampaign('cancel-before');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await configureInterviews();
-
-    const booked = await recordBooking(h.db, {
-      campaignId,
-      scheduledAt: new Date('2026-09-02T15:00:00Z'),
-      founderTimezone: 'America/New_York',
-      meetingProvider: 'google_meet',
-      actor: 'test',
-      source: 'test',
-    });
-    if (!booked.ok) throw new Error(booked.message);
-
-    const confirmed = await confirmBooking(h.db, {
-      bookingId: booked.bookingId,
-      campaignId,
-      meetingLink: 'https://meet.example/abc-defg-hij',
-      interviewer: 'Alex Interviewer',
-      actor: 'test',
-      source: 'test',
-    });
-    if (!confirmed.ok) throw new Error(confirmed.message);
-
-    // Confirmed: the item completes, the discount lands, high effort is false.
-    expect(confirmed.evaluation.completed).toContain('interview');
-    expect(confirmed.evaluation.fee.subtotalCents).toBe(3300n);
-    expect(confirmed.evaluation.highEffort.highEffort).toBe(false);
-
-    const canceled = await cancelBooking(h.db, {
-      bookingId: booked.bookingId,
-      campaignId,
-      actor: 'test',
-      source: 'founder',
-      reason: 'Something came up',
-    });
-    if (!canceled.ok) throw new Error(canceled.message);
-
-    // §12: "Canceling before listing-fee payment recalculates both high-effort
-    // status and the fee."
-    expect(canceled.evaluation.completed).not.toContain('interview');
-    expect(canceled.evaluation.fee.subtotalCents).toBe(3500n);
-    expect(canceled.evaluation.highEffort.interviewScheduledOrConfirmed).toBe(false);
-    expect(canceled.evaluation.highEffort.highEffort).toBe(true);
+    expect(res.body.overview.links).toHaveLength(CAMPAIGN_DESTINATIONS.length);
+    expect(SHARED_READ_ONLY.length).toBeGreaterThan(60);
   });
 
-  it('does not change the amount already paid when canceled after payment', async () => {
-    const { campaignId } = await makeCampaign('cancel-after');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await configureInterviews();
-
-    const booked = await recordBooking(h.db, {
-      campaignId,
-      scheduledAt: new Date('2026-09-03T15:00:00Z'),
-      founderTimezone: 'America/New_York',
-      meetingProvider: 'microsoft_teams',
-      actor: 'test',
-      source: 'test',
+  /**
+   * The brief's §9: nothing unpublished may become publicly reachable through
+   * this tab. Structural — there is no address, not a disabled control.
+   */
+  it('a campaign that never went live has NO public address', async () => {
+    const { campaignId } = await seedCampaign('draft', {
+      status: 'listing_fee_pending',
+      listingPaid: false,
+      liveAt: null,
+      closeAt: null,
     });
-    if (!booked.ok) throw new Error(booked.message);
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
 
-    const confirmed = await confirmBooking(h.db, {
-      bookingId: booked.bookingId,
-      campaignId,
-      meetingLink: 'https://teams.example/xyz',
-      interviewer: 'Alex Interviewer',
-      actor: 'test',
-      source: 'test',
-    });
-    if (!confirmed.ok) throw new Error(confirmed.message);
-    expect(confirmed.evaluation.fee.subtotalCents).toBe(3300n);
+    expect(res.body.header.publicUrl).toBeNull();
+    expect(res.body.header.publicState).toBe('private_draft');
+    expect(res.body.header.publicStateLabel).toBe('Not public');
+    expect(res.body.header.publicUrlUnavailableBecause).toMatch(/never been public/);
+    expect(JSON.stringify(res.body)).not.toContain(`/campaign/${campaignId}`);
+  });
 
-    // Phase 11's act, performed by hand: the payment stamps the anchor and locks
-    // §12's evidence snapshot and the calculation that was charged.
-    const paidAt = new Date();
-    await h.db.update(campaigns).set({ listingPaidAt: paidAt }).where(eq(campaigns.id, campaignId));
+  it('a live campaign in Days 1–7 is link-only, and Day 8 opens it', async () => {
+    const { campaignId } = await seedCampaign('day7');
+    const early = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    expect(early.body.header.publicState).toBe('known_link_only');
+    expect(early.body.header.publicUrl).toContain(`/campaign/${campaignId}`);
+    const note = early.body.overview.quickFacts.find(
+      (f: { label: string }) => f.label === 'Public page',
+    );
+    expect(note.waitingOn).toBe(KNOWN_LINK_ONLY_NOTE);
+
     await h.db
-      .update(campaignOptionalItems)
-      .set({ lockedAt: paidAt, updatedBy: 'system:listing_payment' })
-      .where(eq(campaignOptionalItems.campaignId, campaignId));
-    await h.db.execute(`
-      UPDATE listing_fee_calculations SET locked_at = now()
-       WHERE campaign_id = '${campaignId}'
-         AND calculated_at = (SELECT max(calculated_at) FROM listing_fee_calculations WHERE campaign_id = '${campaignId}')
-    `);
-
-    const canceled = await cancelBooking(h.db, {
-      bookingId: booked.bookingId,
-      campaignId,
-      actor: 'test',
-      source: 'founder',
-      reason: 'Canceled after paying',
-    });
-    if (!canceled.ok) throw new Error(canceled.message);
-
-    // §12: "Canceling after successful payment does not change the amount
-    // already paid." The cancellation is real — the booking moved — and the
-    // money did not.
-    expect(canceled.status).toBe('canceled');
-    expect(canceled.evaluation.fee.subtotalCents).toBe(3300n);
-    expect(canceled.evaluation.completed).toContain('interview');
-    expect(canceled.evaluation.locked).toBe(true);
-
-    const [booking] = await h.db
-      .select()
-      .from(founderInterviewBookings)
-      .where(eq(founderInterviewBookings.id, booked.bookingId))
-      .limit(1);
-    expect(booking!.status).toBe('canceled');
-    expect(booking!.cancellationReason).toBe('Canceled after paying');
+      .update(campaigns)
+      .set({ discoveryOpenedAt: new Date() })
+      .where(eq(campaigns.id, campaignId));
+    const open = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    expect(open.body.header.publicState).toBe('public');
   });
 
-  it('refuses at the database level to edit a locked evidence snapshot', async () => {
-    const { campaignId } = await makeCampaign('lock-trigger');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await h.db
-      .update(campaignOptionalItems)
-      .set({ lockedAt: new Date(), updatedBy: 'system:listing_payment' })
-      .where(eq(campaignOptionalItems.campaignId, campaignId));
+  /**
+   * The prototype hardcodes 120. §14.4 makes the threshold the Founder's own
+   * build value, so an unset one is a fact to state rather than a default to
+   * invent — and there is no bar to draw against nothing.
+   */
+  it('the Idea denominator is the build threshold, and an unset one draws no bar', async () => {
+    const withThreshold = await seedCampaign('idea-goal', {
+      type: 'pre_build',
+      orderThreshold: 120,
+    });
+    await seedReservations(withThreshold.campaignId, [
+      'reserved_active',
+      'reserved_active',
+      'reserved_canceled',
+    ]);
+    const a = await get(`/api/admin/campaigns/${withThreshold.campaignId}`).expect(200);
+    expect(a.body.liveTab.metrics.active).toBe(2);
+    expect(a.body.liveTab.metrics.canceled).toBe(1);
+    expect(a.body.liveTab.metrics.third.value).toBe('2 of 120');
+    // `threshold`, never `goal` — §3.2 bans the word for an Idea threshold in
+    // every audience *including identifiers*, and a property name survives
+    // minification into the shipped bundle. §33.11.3's scan caught exactly that
+    // in the first draft of this surface.
+    expect(a.body.liveTab.metrics.third.progress.threshold).toBe(120);
+    expect(a.body.liveTab.metrics.third.progress).not.toHaveProperty('goal');
+    expect(a.body.liveTab.metrics.third.progress.percent).toBe(2);
 
-    await expect(
-      h.db.execute(`
-        UPDATE campaign_optional_items
-           SET complete = true, completed_at = now(), decision_source = 'founder_approval',
-               updated_by = 'someone'
-         WHERE campaign_id = '${campaignId}' AND item = 'story'
-      `),
-      // Drizzle wraps the trigger's message, so the assertion is that the
-      // statement was refused at all — the trigger is what refuses it.
-    ).rejects.toThrow();
+    const without = await seedCampaign('idea-nogoal', { type: 'pre_build', orderThreshold: null });
+    await seedReservations(without.campaignId, ['reserved_active']);
+    const b = await get(`/api/admin/campaigns/${without.campaignId}`).expect(200);
+    expect(b.body.liveTab.metrics.third.progress.percent).toBeNull();
+    expect(b.body.liveTab.metrics.third.progress.note).toBe(THRESHOLD_NOT_SET_NOTE);
+    // And the invented denominator appears nowhere at all.
+    expect(JSON.stringify(b.body)).not.toContain('120');
   });
 
-  it('records the cancellation in the append-only booking history (§12)', async () => {
-    const { campaignId } = await makeCampaign('booking-history');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await configureInterviews();
+  it('a Product campaign shows the reserved subtotal and no progress bar', async () => {
+    const { campaignId } = await seedCampaign('product-live', { orderThreshold: null });
+    await seedReservations(campaignId, ['reserved_active', 'reserved_active'], 12_000n);
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
 
-    const booked = await recordBooking(h.db, {
-      campaignId,
-      scheduledAt: new Date('2026-09-04T15:00:00Z'),
-      founderTimezone: 'America/Chicago',
-      meetingProvider: 'zoom',
-      actor: 'test',
-      source: 'founder',
-    });
-    if (!booked.ok) throw new Error(booked.message);
-
-    await cancelBooking(h.db, {
-      bookingId: booked.bookingId,
-      campaignId,
-      actor: 'test',
-      source: 'provider:cal.com',
-      reason: 'Canceled in the provider',
-    });
-
-    const history = await h.db
-      .select()
-      .from(interviewBookingEvents)
-      .where(eq(interviewBookingEvents.campaignId, campaignId));
-
-    expect(history.map((e) => e.event).sort()).toEqual(['canceled', 'created']);
-    // `source` is what makes a reconciliation distinguishable from a webhook
-    // after the fact, which is the question anyone debugging a missed delivery
-    // will actually ask.
-    expect(history.find((e) => e.event === 'canceled')!.source).toBe('provider:cal.com');
-
-    await expect(
-      asAppRole((client) =>
-        client.query(
-          `UPDATE interview_booking_events SET event = 'edited' WHERE campaign_id = $1`,
-          [campaignId],
-        ),
-      ),
-    ).rejects.toThrow(/permission denied/i);
+    expect(res.body.liveTab.metrics.third.label).toBe('Reserved before tax');
+    expect(res.body.liveTab.metrics.third.value).toBe('US$240.00');
+    expect(res.body.liveTab.metrics.third.progress).toBeNull();
   });
 
-  it('leaves `confirmed` reachable without a webhook', async () => {
-    // Phase 09's trap: "Cal.com is a source of events, not truth… don't leave
-    // `confirmed` reachable only by webhook." The reconciliation path is the
-    // same function the webhook will call in 09b.
-    const { campaignId } = await makeCampaign('reconcile');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await configureInterviews();
-
-    const booked = await recordBooking(h.db, {
-      campaignId,
-      scheduledAt: new Date('2026-09-05T15:00:00Z'),
-      founderTimezone: 'UTC',
-      meetingProvider: 'zoom',
-      actor: 'test',
-      source: 'founder',
+  /**
+   * §16a's rule on the most quotable panel in the section: a hero reading three
+   * zeros for a campaign that never launched is a zero meaning two things.
+   */
+  it('a campaign that never launched gets the not-live state, not three zeros', async () => {
+    const { campaignId } = await seedCampaign('notlive', {
+      status: 'approved',
+      liveAt: null,
+      closeAt: null,
     });
-    if (!booked.ok) throw new Error(booked.message);
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
 
-    const confirmed = await confirmBooking(h.db, {
-      bookingId: booked.bookingId,
-      campaignId,
-      meetingLink: 'https://zoom.example/123',
-      interviewer: 'Alex Interviewer',
-      actor: `user:${admin.id}`,
-      source: 'admin_reconciliation',
-    });
-    expect(confirmed.ok).toBe(true);
-
-    const history = await h.db
-      .select()
-      .from(interviewBookingEvents)
-      .where(eq(interviewBookingEvents.campaignId, campaignId));
-    expect(history.find((e) => e.event === 'confirmed')!.source).toBe('admin_reconciliation');
+    expect(res.body.liveTab.live).toBe(false);
+    expect(res.body.liveTab.metrics).toBeNull();
+    expect(res.body.liveTab.dates).toHaveLength(3);
   });
 
-  it('refuses to confirm a booking missing any fact §12 requires', async () => {
-    const { campaignId } = await makeCampaign('incomplete-confirm');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-    await configureInterviews();
-
-    const booked = await recordBooking(h.db, {
-      campaignId,
-      scheduledAt: new Date('2026-09-06T15:00:00Z'),
-      founderTimezone: 'UTC',
-      meetingProvider: 'zoom',
-      actor: 'test',
-      source: 'founder',
+  it('every fact carries a value or what it is waiting for, never a bare blank', async () => {
+    const { campaignId } = await seedCampaign('facts', {
+      status: 'listing_fee_pending',
+      listingPaid: false,
+      liveAt: null,
+      closeAt: null,
     });
-    if (!booked.ok) throw new Error(booked.message);
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
 
-    // No link, no interviewer. A confirmed booking nobody can attend would earn
-    // a US$2 discount and clear a high-effort input on the strength of nothing.
-    const result = await confirmBooking(h.db, {
-      bookingId: booked.bookingId,
+    const all = [
+      ...res.body.overview.quickFacts,
+      ...res.body.overview.dates,
+      ...res.body.liveTab.dates,
+      ...res.body.close.facts,
+    ];
+    expect(all.length).toBeGreaterThan(10);
+    for (const fact of all) {
+      expect(
+        fact.value !== null || fact.waitingOn !== null,
+        `"${fact.label}" is blank in both directions`,
+      ).toBe(true);
+    }
+    // The close pane specifically: no US$0.00 standing in for "never ran".
+    const result = res.body.close.facts.find((f: { label: string }) => f.label === 'Result');
+    expect(result.value).toBeNull();
+    expect(result.waitingOn).toMatch(/close batch has not run/);
+  });
+
+  it('the three unbuilt destinations are shown and say why; the three built ones link', async () => {
+    const { campaignId, prospectId } = await seedCampaign('links');
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+
+    const byKey = new Map(
+      res.body.overview.links.map((l: { key: string }) => [l.key, l as Record<string, unknown>]),
+    );
+    expect(byKey.get('founder_admin')!['href']).toBe(`/admin/founders/${prospectId}`);
+    expect(byKey.get('affiliate_admin')!['href']).toMatch(/^\/admin\/creators\?q=/);
+    expect(byKey.get('support_admin')!['href']).toBe('/admin/support');
+
+    for (const key of ['backer_admin', 'money_admin', 'tasks']) {
+      const link = byKey.get(key)!;
+      expect(link['href'], `${key} must not fabricate a destination`).toBeNull();
+      expect(String(link['unavailableBecause']).length).toBeGreaterThan(40);
+    }
+    // Never both, in either direction.
+    for (const link of res.body.overview.links) {
+      expect(Boolean(link.href) === Boolean(link.unavailableBecause)).toBe(false);
+    }
+  });
+
+  it('the six stages are marked from records, and one is current', async () => {
+    const { campaignId } = await seedCampaign('stages', { status: 'pending_review', liveAt: null });
+    await h.db.insert(campaignReviews).values({
       campaignId,
-      actor: 'test',
-      source: 'test',
+      round: 1,
+      submittedBy: 'user:founder',
+      outcome: 'pending' as never,
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.code).toBe('incomplete');
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    const stages = res.body.overview.stages as { key: string; state: string; caption: string }[];
+
+    expect(stages.filter((s) => s.state === 'current')).toHaveLength(1);
+    expect(stages.find((s) => s.key === 'founder_setup')!.state).toBe('done');
+    expect(stages.find((s) => s.key === 'campaign_review')!.state).toBe('current');
+    expect(stages.find((s) => s.key === 'campaign_review')!.caption).toBe('In review');
+    expect(stages.find((s) => s.key === 'closed')!.state).toBe('upcoming');
+    for (const stage of stages) expect(stage.caption.length).toBeGreaterThan(0);
+  });
+
+  it('the §26.7 CUSTOMER explanation is shown and the internal reason is not', async () => {
+    const { campaignId } = await seedCampaign('suspended');
+    await request(h.app)
+      .post(`/api/admin/campaigns/${campaignId}/enforcement`)
+      .set('Cookie', admin.cookie)
+      .send({
+        action: 'suspend',
+        reasonCategory: 'aup_violation',
+        reasonDetail: 'Radar flagged card_declined on three attempts',
+        customerExplanation: 'This campaign is paused while Proovd reviews it.',
+      })
+      .expect(201);
+
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    expect(res.body.overview.blocker.text).toBe('This campaign is paused while Proovd reviews it.');
+    const body = JSON.stringify(res.body);
+    expect(body).not.toContain('Radar flagged');
+    expect(body).not.toContain('card_declined');
+  });
+
+  /** The brief's §9: the hub exposes only what a hub needs. */
+  it('carries no Backer identity and no support-case body', async () => {
+    const { campaignId } = await seedCampaign('privacy');
+    const [identityId] = await seedReservations(campaignId, ['reserved_active']);
+    await request(h.app)
+      .post('/api/admin/support/cases')
+      .set('Cookie', admin.cookie)
+      .send({
+        topic: 'delivery',
+        owner: 'proovd_support',
+        requesterKind: 'backer',
+        backerIdentityId: identityId,
+        requesterEmail: 'private-backer@example.com',
+        campaignId,
+        message: 'A private thing I told support in confidence.',
+      })
+      .expect(201);
+
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    const body = JSON.stringify(res.body);
+    expect(body).not.toContain('private-backer@example.com');
+    expect(body).not.toContain('A private thing I told support');
+    expect(body).not.toContain('backer-0-');
   });
 });
 
-/* ── §12 Admin ────────────────────────────────────────────────────────────── */
+/* ── The composed history (§26.8) ─────────────────────────────────────────── */
 
-describe('§12 Admin — invalidation, correction, and the recorded override', () => {
-  it('invalidates an item with a reason and hands the Founder a correction', async () => {
-    const { campaignId, cookie } = await makeCampaign('admin-invalidate');
+describe('the history composes and stores nothing', () => {
+  it('every entry names the table it was read from, and the tag it belongs to', async () => {
+    const { campaignId } = await seedCampaign('history');
+    await h.db.insert(campaignStatusHistory).values({
+      campaignId,
+      fromStatus: 'approved' as never,
+      toStatus: 'live' as never,
+      actor: 'system:launch',
+    });
+    await h.db.insert(campaignReviews).values({
+      campaignId,
+      round: 1,
+      submittedBy: 'user:founder',
+      outcome: 'approved' as never,
+      decidedAt: new Date(),
+      decidedBy: 'user:admin',
+    });
 
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ storyText: 'A real story about the product.', storyApproved: true })
-      .expect(200);
-
-    const before = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-    expect(itemOf(before.body, 'story').complete).toBe(true);
-
-    const invalidated = await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/workspace/items/story/invalidate`)
-      .set('cookie', admin.cookie)
-      .send({
-        reason: 'Story reproduces a competitor’s marketing copy verbatim.',
-        explanation: 'We need this in your own words before it goes public.',
-      })
-      .expect(200);
-
-    expect(invalidated.body.workspace.items.find((i: any) => i.item === 'story').complete).toBe(false);
-
-    // The Founder reads the customer-facing explanation and never the internal
-    // reason (§25.6 keeps them in separate columns).
-    const founderView = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-
-    const story = itemOf(founderView.body, 'story');
-    expect(story.invalidated.explanation).toContain('your own words');
-    expect(JSON.stringify(founderView.body)).not.toContain('competitor’s marketing copy');
-
-    // §12: "the Founder can correct it." Re-approving after an edit is not
-    // enough on its own — the invalidation stands until Admin lifts it.
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ storyText: 'Rewritten entirely in my own words.', storyApproved: true })
-      .expect(200);
-
-    const stillHeld = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-    expect(itemOf(stillHeld.body, 'story').complete).toBe(false);
-
-    const reinstated = await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/workspace/items/story/reinstate`)
-      .set('cookie', admin.cookie)
-      .send({ reason: 'Rewritten; reads as their own.' })
-      .expect(200);
-
-    expect(reinstated.body.workspace.items.find((i: any) => i.item === 'story').complete).toBe(true);
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    expect(res.body.history.length).toBeGreaterThan(0);
+    for (const item of res.body.history) {
+      expect(SHARED_SOURCES as readonly string[]).toContain(item.source);
+      expect(SHARED_TAGS as readonly string[]).toContain(item.tag);
+      expect(item.headline.length).toBeGreaterThan(0);
+      expect(item.detail.length).toBeGreaterThan(0);
+      expect(Number.isNaN(new Date(item.at).getTime())).toBe(false);
+      // §27.1: an instant spells out its zone. A bare ISO string spells nothing.
+      expect(item.atLabel).toMatch(/UTC$/);
+    }
+    // Newest first.
+    const times = res.body.history.map((i: { at: string }) => i.at);
+    expect([...times].sort().reverse()).toEqual(times);
   });
 
-  it('refuses an invalidation with no reason or no Founder-facing explanation', async () => {
-    const { campaignId } = await makeCampaign('admin-no-reason');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-
-    await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/workspace/items/story/invalidate`)
-      .set('cookie', admin.cookie)
-      .send({ reason: 'because' })
-      .expect(400);
-  });
-
-  it('records an override as an override, with all six §12 facts', async () => {
-    const { campaignId, cookie } = await makeCampaign('admin-override');
-    await ensureWorkspace(h.db, { campaignId, actor: 'test' });
-
-    await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/workspace/items/visuals/override`)
-      .set('cookie', admin.cookie)
-      .send({
-        complete: true,
-        reason: 'Founder emailed the files; upload was failing on their network.',
-        explanation: 'We have your visuals and have counted them.',
-        evidence: 'support ticket 4821, files received 2026-08-01',
-      })
-      .expect(200);
-
-    const [item] = await h.db
-      .select()
-      .from(campaignOptionalItems)
-      .where(
-        and(
-          eq(campaignOptionalItems.campaignId, campaignId),
-          eq(campaignOptionalItems.item, 'visuals'),
-        ),
-      )
-      .limit(1);
-
-    expect(item!.complete).toBe(true);
-    expect(item!.decisionSource).toBe('admin_override');
-
-    // §25.6: prior value, new value, reason, actor, time, and evidence.
-    const audits = await h.db
-      .select()
-      .from(auditEvents)
-      .where(eq(auditEvents.targetId, `${campaignId}:visuals`));
-
-    const override = audits.find((a) => a.action === 'optional_item.overridden');
-    expect(override).toBeDefined();
-    expect(override!.internalReason).toContain('upload was failing');
-    expect(override!.customerExplanation).toContain('counted them');
-    expect(override!.actor).toBe(`user:${admin.id}`);
-    expect(JSON.stringify(override!.newValue)).toContain('support ticket 4821');
-
-    // The override survives re-evaluation — otherwise the next autosave would
-    // silently withdraw a decision a person made.
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ brandNotes: 'anything' })
-      .expect(200);
-
-    const after = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-    expect(itemOf(after.body, 'visuals').complete).toBe(true);
-    expect(itemOf(after.body, 'visuals').decisionSource).toBe('admin_override');
-  });
-
-  it('writes the item history by trigger, and refuses to rewrite it', async () => {
-    const { campaignId, cookie } = await makeCampaign('history');
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ storyText: 'Something worth publishing.', storyApproved: true })
-      .expect(200);
-
-    const events = await h.db
-      .select()
-      .from(optionalItemEvents)
-      .where(eq(optionalItemEvents.campaignId, campaignId));
-
-    expect(events.some((e) => e.item === 'story' && e.event === 'completed')).toBe(true);
-
-    await expect(
-      asAppRole((client) =>
-        client.query(`UPDATE optional_item_events SET event = 'x' WHERE campaign_id = $1`, [
-          campaignId,
-        ]),
-      ),
-    ).rejects.toThrow(/permission denied/i);
-  });
-});
-
-/* ── §12's other rules ────────────────────────────────────────────────────── */
-
-describe('§12 — approval is of a version, and authorization is per campaign', () => {
-  it('revokes the approval when the approved text is edited', async () => {
-    const { campaignId, cookie } = await makeCampaign('approval-version');
-
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ storyText: 'The first version.', storyApproved: true })
-      .expect(200);
-
-    const approved = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-    expect(approved.body.workspace.story.approved).toBe(true);
-
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ storyText: 'A completely different second version.' })
-      .expect(200);
-
-    const edited = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-
-    // §12 rejects unapproved drafts, and an edited approved story is one.
-    expect(edited.body.workspace.story.approved).toBe(false);
-    expect(itemOf(edited.body, 'story').complete).toBe(false);
-  });
-
-  it('writes only the keys a save was given', async () => {
-    // §9's rule, restated for this surface: `undefined` means "not in this
-    // request", and the obvious implementation empties a story on the first
-    // partial save.
-    const { campaignId, cookie } = await makeCampaign('partial-save');
-
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ storyText: 'Keep me.' })
-      .expect(200);
-
-    await request(h.app)
-      .patch(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .send({ brandColors: 'Deep green' })
-      .expect(200);
-
-    const view = await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', cookie)
-      .expect(200);
-
-    expect(view.body.workspace.story.text).toBe('Keep me.');
-    expect(view.body.workspace.brand.colors).toBe('Deep green');
-  });
-
-  it('answers 404 for another Founder’s campaign, exactly as for one that does not exist', async () => {
-    const mine = await makeCampaign('owner');
-    const theirs = await makeCampaign('intruder');
-
-    const crossed = await request(h.app)
-      .get(`/api/founder/campaigns/${mine.campaignId}/workspace`)
-      .set('cookie', theirs.cookie)
-      .expect(404);
-
-    const absent = await request(h.app)
-      .get(`/api/founder/campaigns/${randomUUID()}/workspace`)
-      .set('cookie', theirs.cookie)
-      .expect(404);
-
-    // Indistinguishable, so nothing can be enumerated.
-    expect(crossed.body).toEqual(absent.body);
-  });
-
-  it('refuses the workspace to a signed-out caller and to a Creator', async () => {
-    const { campaignId } = await makeCampaign('guarded');
-    const creator = await seedUser(h, 'affiliate', 'workspace-creator');
-    const creatorCookie = await signInPlain(h, creator.email);
-
-    await request(h.app).get(`/api/founder/campaigns/${campaignId}/workspace`).expect(401);
-    await request(h.app)
-      .get(`/api/founder/campaigns/${campaignId}/workspace`)
-      .set('cookie', creatorCookie)
-      .expect(403);
-  });
-
-  it('refuses Admin item routes to a Founder', async () => {
-    const { campaignId, cookie } = await makeCampaign('admin-guarded');
-    await request(h.app)
-      .post(`/api/admin/campaigns/${campaignId}/workspace/items/story/invalidate`)
-      .set('cookie', cookie)
-      .send({ reason: 'x', explanation: 'y' })
-      .expect(403);
-  });
-
-  it('mounts no route that accepts a file body (tech-stack §9)', async () => {
-    // The bytes go from the browser to R2. There is no upload endpoint, and
-    // "no file touches the VPS disk" is true because there is nowhere to put one.
-    const { campaignId, cookie } = await makeCampaign('no-file-route');
-    const response = await request(h.app)
-      .post(`/api/founder/campaigns/${campaignId}/uploads`)
-      .set('cookie', cookie)
-      .set('content-type', 'multipart/form-data; boundary=x')
-      .send('--x\r\nContent-Disposition: form-data; name="f"; filename="a.png"\r\n\r\nx\r\n--x--');
-
-    expect(response.status).not.toBe(200);
+  it('a campaign with nothing recorded gets an empty feed, not a fabricated one', async () => {
+    const { campaignId } = await seedCampaign('quiet', {
+      status: 'invited_draft',
+      listingPaid: false,
+      liveAt: null,
+      closeAt: null,
+    });
+    const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
+    expect(Array.isArray(res.body.history)).toBe(true);
   });
 });

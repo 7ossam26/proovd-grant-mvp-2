@@ -28,13 +28,13 @@
  * `/admin/signin` — its own address, its own minimal shell. The absence of the
  * branch is what keeps the leak from coming back: there is nowhere to put it.
  *
- * ── Two of the five sections are parked, and they are still shown ───────────
- * Today and Campaigns have no workspace yet. Hiding them would make the shell
- * describe a smaller product; showing them enabled would claim a capability
- * that does not exist (§1.4). So they are `aria-disabled`, still reachable by
- * keyboard, and each one names what it is when pressed.
+ * ── One of the five sections is parked, and it is still shown ───────────────
+ * Today has no workspace yet. Hiding it would make the shell describe a smaller
+ * product; showing it enabled would claim a capability that does not exist
+ * (§1.4). So it is `aria-disabled`, still reachable by keyboard, and names what
+ * it is when pressed.
  *
- * Founders, Creators, and Support are real links to real workspaces.
+ * Founders, Creators, Support, and Campaigns are real links to real workspaces.
  *
  * ── The environment chip never claims a mode it did not check ───────────────
  * `TEST MODE` is the single most consequential sentence this page could say,
@@ -241,9 +241,20 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
           >
             Founders
           </NavLink>
-          <button type="button" className="navlink" {...parked('tabs')}>
+          {/*
+            §26.1, §23.1 — the Campaigns hub, built 2026-08-15.
+
+            It is a read-only section: it summarises the five domains a campaign
+            spans and links into the workspaces that own them. Every campaign
+            decision stays where its rules live, which is why this tab adds no
+            control and its API is two GETs.
+          */}
+          <NavLink
+            to="/admin/campaigns"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
             Campaigns
-          </button>
+          </NavLink>
           {/*
             §26.1, §8 — the Creator workspace, built 2026-08-11.
 

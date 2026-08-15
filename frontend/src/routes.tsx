@@ -28,6 +28,8 @@ import { PostReview } from './features/admin/creators/PostReview.js';
 import { CreatorControls } from './features/admin/creators/CreatorControls.js';
 import { SupportQueue } from './features/admin/support/SupportQueue.js';
 import { SupportCase } from './features/admin/support/SupportCase.js';
+import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirectory.js';
+import { CampaignRecord } from './features/admin/campaigns/CampaignRecord.js';
 import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
@@ -217,9 +219,9 @@ const rootChildren: RouteObject[] = [
       // whose campaign was archived-and-restarted (§9's wrong-type path) has
       // more than one of each and is still one person.
       //
-      // The Admin panel's other sections — Today and Campaigns — are parked in
-      // the shell rather than routed here. A route with no surface is a claim
-      // that a surface exists (§1.4); the shell's parked control says what the
+      // The Admin panel's one remaining section — Today — is parked in the
+      // shell rather than routed here. A route with no surface is a claim that
+      // a surface exists (§1.4); the shell's parked control says what the
       // destination is instead.
       { path: 'founders', element: <FoundersList /> },
       { path: 'founders/:prospectId', element: <FounderWorkspace /> },
@@ -263,6 +265,21 @@ const rootChildren: RouteObject[] = [
       // is one an Admin cannot send to a colleague (DNA §5.12).
       { path: 'support', element: <SupportQueue /> },
       { path: 'support/:caseId', element: <SupportCase /> },
+      // §26.1, §23.1. The Campaigns hub, built 2026-08-15. Two addresses: every
+      // campaign, and one campaign.
+      //
+      // It is a READ. There is no create, edit, approve, launch, pause, or
+      // close route here and the API behind it is two GETs — every campaign
+      // decision already has a router another workspace owns, and a duplicate
+      // control would be a second door into rules those encode.
+      //
+      // The four tabs are a `?tab=` search param rather than path segments, for
+      // the reason the Support case and the Creator relationship panes are:
+      // they are four views of ONE record, and a bookmark to the Close tab
+      // should still be that campaign (DNA §5.12). The directory's filter is a
+      // search param for the same reason.
+      { path: 'campaigns', element: <CampaignsDirectory /> },
+      { path: 'campaigns/:campaignId', element: <CampaignRecord /> },
     ],
   },
   {

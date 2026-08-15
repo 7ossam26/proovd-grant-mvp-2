@@ -4465,3 +4465,669 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   .sup-item { grid-template-columns: minmax(0, 1fr); align-items: start; }
   .sup-facts--wide { grid-template-columns: minmax(0, 1fr); }
 }
+
+
+/* ════════════════════════════════════ PHASE 28 — the Campaigns Admin hub
+   (Spec §26.1, §23.1, §23.2, §18, §26.8), added 2026-08-15.
+
+   Built from the supplied Campaigns reference. Its palette is the proovd token
+   set already — brand green, dark green, mint, the accent yellow and blue — so
+   nothing here introduces a value; the reference's inline CSS is a visual guide
+   and was never copied. Its leftover `.topbar` / `.wordmark` / `.main-nav`
+   rules are deliberately ignored: this content mounts inside the Admin shell
+   PHASE 25 already owns.
+
+   The three conventions PHASE 25 set, and 26 and 27 restated, bind here too:
+
+     1. TOKENS ONLY. Read a mode slot or a token, never a raw value. px is
+        legal for hairlines, radii, and the 44px touch minimum (via --touch).
+
+     2. SCOPED OVERRIDES. Where proovd.css already owns a selector this section
+        does not redefine it. Everything new is prefixed .cmp-, and the pieces
+        that already exist — .filters/.filter-tag, .tablewrap/.table, .helper,
+        .grey, .kicker, .btn, .sr-only — are reused rather than restyled.
+
+     3. RESPONSIVE IS A CORRECTION. Each media rule below names the overflow
+        problem it answers. The pressure point here is real and new: the
+        directory's FIVE-column table is the widest layout in the Admin, and
+        the record's six-stage strip is the narrowest thing that must not
+        overlap. Both are answered below. Wide content scrolls inside its own
+        container; the page body never scrolls sideways (§33.11.1).
+   ═════════════════════════════════════════════════════════════════════════ */
+
+
+/* ─────────────────────────────────────────────────────── DIRECTORY: HERO
+
+   The hero and its count card. The count is a DERIVED number — how many
+   campaigns a named person owes the next step on — and the caption sits above
+   it rather than under, because the caption is what makes the number mean
+   anything (§20's rule that a metric ships with its definition). */
+.cmp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 24rem);
+  gap: var(--sp-32);
+  align-items: end;
+  margin-bottom: var(--sp-32);
+}
+.cmp-hero__checked {
+  margin: 0 0 var(--sp-8);
+  color: var(--grey);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.cmp-hero__lede { max-width: 42ch; margin: var(--sp-8) 0 0; }
+.cmp-hero__posture { max-width: 58ch; margin: var(--sp-12) 0 0; }
+
+.cmp-count {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-24);
+  min-height: 9rem;
+  padding: var(--sp-24);
+  background: var(--darker);
+  color: var(--mint);
+}
+.cmp-count > span {
+  color: var(--sage);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+.cmp-count strong {
+  display: block;
+  font-size: var(--fs-num);
+  font-weight: 500;
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+}
+.cmp-count b { font-size: 1rem; }
+
+/* ────────────────────────────────────────────────────── DIRECTORY: TOOLS */
+
+.cmp-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem);
+  gap: var(--sp-24);
+  align-items: center;
+  padding-top: var(--sp-24);
+  border-top: var(--bw) solid var(--brand);
+  margin-bottom: var(--sp-8);
+}
+/* The shared `.filters` carries a bottom margin for its own contexts; inside
+   this grid the row is already spaced by the grid gap. Scoped, not redefined. */
+.cmp-tools .filters { margin-bottom: 0; }
+.cmp-search { display: block; min-width: 0; }
+.cmp-search .input { width: 100%; }
+.cmp-filter-note { margin: 0 0 var(--sp-24); }
+
+/* ────────────────────────────────────────────────────── DIRECTORY: TABLE
+
+   Five columns — the widest table in the Admin. It scrolls inside `.tablewrap`
+   like every other one, and the min-width below is what makes the scroll happen
+   rather than the columns crushing into unreadable slivers. */
+.cmp-table { min-width: 62rem; }
+.cmp-table td { vertical-align: top; overflow-wrap: anywhere; }
+.cmp-row { cursor: pointer; }
+.cmp-row:hover { background: var(--grey-lightest); }
+
+.cmp-name { display: flex; align-items: flex-start; gap: var(--sp-12); min-width: 0; }
+.cmp-name__what { display: block; min-width: 0; }
+.cmp-name__link { position: relative; color: var(--darker); }
+.cmp-name__link b { font-size: 1.0625rem; font-weight: 900; }
+.cmp-name__link:hover { text-decoration: underline; }
+.cmp-name__what small,
+.cmp-blocker small,
+.cmp-when small {
+  display: block;
+  margin-top: var(--sp-4);
+  color: var(--grey);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.cmp-blocker strong,
+.cmp-when strong { font-weight: 700; }
+
+.cmp-mark {
+  flex: 0 0 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--accent-blue);
+  color: var(--darker);
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+/* ───────────────────────────────────────────────────────── THE STATE PILL
+
+   Four tones. The LABEL always says the §23.1 lifecycle state, so the pill
+   reads correctly in monochrome and to a screen reader — the tone is a second
+   signal and never the only one (§33.11, and DNA's rule that state is never
+   colour alone). */
+.cmp-pill {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: var(--sp-4) var(--sp-8);
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.cmp-pill--sm { font-size: 0.75rem; }
+.cmp-pill--risk    { background: var(--darker);        color: var(--mint); }
+.cmp-pill--waiting { background: var(--accent-yellow); color: var(--darker); }
+.cmp-pill--live {
+  border: var(--bw) solid var(--brand);
+  background: var(--brand-5);
+  color: var(--dark);
+}
+.cmp-pill--closed { background: var(--moss); color: var(--mint); }
+
+/* ──────────────────────────────────────────────────────── RECORD: HEADER
+
+   The dark band the reference gives the record. It bleeds to the shell gutter
+   the way PHASE 25's own detail header does, so the record reads as its own
+   place rather than a card on the list. */
+.cmp-crumb { margin: 0 0 var(--sp-16); }
+.cmp-crumb a { color: var(--dark); font-weight: 700; text-decoration: none; }
+.cmp-crumb a:hover { text-decoration: underline; }
+
+.cmp-head {
+  margin-inline: calc(var(--gutter) * -1);
+  padding: var(--sp-48) var(--gutter) 0;
+  background: var(--darker);
+  color: var(--mint);
+}
+.cmp-head__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-32);
+  align-items: start;
+}
+/* The brand rule down the left of the title block — the reference's own accent,
+   and the thing that makes the eyebrow read as a label rather than a stray
+   line. */
+.cmp-head__what {
+  padding-left: var(--sp-16);
+  border-left: 6px solid var(--brand);
+  min-width: 0;
+}
+.cmp-head__what .kicker { color: var(--brand); }
+.cmp-head__title {
+  max-width: 24ch;
+  margin: 0 0 var(--sp-12);
+  color: var(--white);
+  font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.25rem);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.cmp-head__who { margin: 0; color: var(--sage); }
+.cmp-head__posture {
+  max-width: 62ch;
+  margin: var(--sp-16) 0 0;
+  color: var(--sage);
+}
+.cmp-head__actions {
+  display: flex;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.cmp-head__nopublic { max-width: 30ch; margin: 0; color: var(--sage); text-align: right; }
+
+.cmp-head__facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--sp-16);
+  margin: var(--sp-48) 0 0;
+  border-top: 1px solid var(--moss);
+}
+.cmp-head__facts > div { min-width: 0; padding: var(--sp-24) 0; }
+.cmp-head__facts dt {
+  margin-bottom: var(--sp-8);
+  color: var(--sage);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cmp-head__facts dd {
+  margin: 0;
+  color: var(--mint);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* ────────────────────────────────────────────────────────── RECORD: TABS
+
+   Same rail treatment as PHASE 27's case tabs, on the dark band. It scrolls
+   inside itself at narrow widths; the padding/negative-margin pair keeps
+   `overflow-x: auto` from shaving the focus ring off a focused tab — PHASE 25's
+   `.topnav` note, which applies to every scrolling rail in this file. */
+.cmp-tabs {
+  display: flex;
+  margin-inline: calc(var(--gutter) * -1);
+  margin-bottom: var(--sp-48);
+  padding-inline: var(--gutter);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-bottom: var(--bw) solid var(--brand);
+  background: var(--darker);
+  scrollbar-width: none;
+}
+.cmp-tabs::-webkit-scrollbar { display: none; }
+.cmp-tab {
+  flex: 0 0 auto;
+  min-height: var(--touch);
+  padding: var(--sp-16);
+  border: none;
+  border-bottom: 4px solid transparent;
+  background: none;
+  color: var(--sage);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cmp-tab:hover { color: var(--mint); }
+.cmp-tab.is-active { color: var(--white); border-bottom-color: var(--brand); }
+
+.cmp-panel:focus { outline: none; }
+.cmp-panel:focus-visible { outline: var(--bw) solid var(--brand); outline-offset: 4px; }
+
+.cmp-checked { margin-top: var(--sp-48); color: var(--grey); }
+
+/* ───────────────────────────────────────────────── RECORD: THE GLANCE ROW
+
+   The blocker band and the quick facts. DNA §5.1 — one hero, and on a campaign
+   record the hero is the one thing standing in its way. */
+.cmp-glance {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(15rem, 0.8fr);
+  gap: var(--sp-48);
+  align-items: start;
+  margin-bottom: var(--sp-48);
+}
+.cmp-band { padding-left: var(--sp-16); border-left: 6px solid var(--brand); }
+.cmp-band .cmp-pill { margin-bottom: var(--sp-16); }
+.cmp-band__title {
+  max-width: 46ch;
+  margin: 0 0 var(--sp-12);
+  font-size: clamp(1.375rem, 1.1rem + 1.1vw, 2rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.cmp-band__body { max-width: 52ch; margin: 0 0 var(--sp-16); color: var(--grey); }
+.cmp-band__meta {
+  display: flex;
+  gap: var(--sp-32);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-16);
+}
+.cmp-band__meta span {
+  display: block;
+  color: var(--grey);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cmp-band__meta strong { display: block; margin-top: var(--sp-4); }
+.cmp-band__parked { max-width: 46ch; margin: 0; }
+
+.cmp-quick { padding: var(--sp-24); background: var(--stat-mint-bg); }
+.cmp-quick h3 { margin: 0 0 var(--sp-16); font-size: 1.25rem; }
+
+/* ─────────────────────────────────────────────────────────── FACT LISTS */
+
+.cmp-facts { margin: 0; }
+.cmp-facts > div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-top: 1px solid var(--brand);
+}
+.cmp-facts dt { color: var(--grey); font-size: 0.8125rem; font-weight: 700; }
+.cmp-facts dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* The note under a value that HAS one — §18's Day 8 rule, and the like. Not the
+   same thing as the grey `waitingOn` that REPLACES an absent value. */
+.cmp-fact__note {
+  display: block;
+  margin-top: var(--sp-4);
+  color: var(--grey);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+/* ──────────────────────────────────────────────────────────── SECTIONS */
+
+.cmp-section { margin-bottom: var(--sp-48); }
+.cmp-section__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-24);
+  align-items: end;
+  margin-bottom: var(--sp-16);
+}
+.cmp-section__title {
+  margin: 0;
+  font-size: clamp(1.25rem, 1.05rem + 0.8vw, 1.75rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.cmp-section__head .helper { max-width: 52ch; margin-top: var(--sp-8); }
+
+.cmp-two {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(18rem, 0.7fr);
+  gap: var(--sp-64);
+  align-items: start;
+}
+
+/* ──────────────────────────────────────────────── THE SIX-STAGE STRIP
+
+   Six equal columns with hairline dividers. The bar above each label is the
+   state marker, and it is never the only signal: the caption says what the
+   stage is waiting on, and an `.sr-only` word says complete / in progress /
+   not started. */
+.cmp-steps {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--bw) solid var(--brand);
+}
+.cmp-step {
+  min-height: 8.5rem;
+  padding: var(--sp-16) var(--sp-16) var(--sp-16) 0;
+  border-bottom: 1px solid var(--brand);
+}
+.cmp-step + .cmp-step { padding-left: var(--sp-16); border-left: 1px solid var(--brand); }
+.cmp-step__bar {
+  display: block;
+  width: 1.75rem;
+  height: 8px;
+  margin-bottom: var(--sp-24);
+  border: var(--bw) solid var(--brand);
+  background: var(--brand-5);
+}
+.cmp-step--done .cmp-step__bar { background: var(--brand); }
+.cmp-step--current { background: var(--stat-mint-bg); }
+.cmp-step strong { display: block; font-size: 0.9375rem; }
+.cmp-step small {
+  display: block;
+  margin-top: var(--sp-8);
+  color: var(--grey);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* ─────────────────────────────────────────────────────── THE LIVE METRICS
+
+   Three panels in one dark band. The third is type-dependent: an Idea campaign
+   shows Backers against its own §14.4 threshold with a bar, a Product campaign
+   shows the reserved subtotal with none. When no threshold is set there is no
+   bar at all and the note says why — a bar needs a denominator, and inventing
+   one would measure every Idea campaign against a number nobody agreed to. */
+.cmp-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: var(--darker);
+  color: var(--mint);
+}
+.cmp-metric {
+  min-height: 8rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-24);
+}
+.cmp-metric + .cmp-metric { border-left: 1px solid var(--moss); }
+.cmp-metric strong {
+  display: block;
+  color: var(--white);
+  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.75rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+.cmp-metric span { color: var(--sage); font-size: 0.875rem; }
+.cmp-metric__note { color: var(--sage); font-size: 0.8125rem; line-height: 1.4; }
+.cmp-progress {
+  height: 10px;
+  border: var(--bw) solid var(--brand);
+  background: var(--brand-5);
+}
+.cmp-progress i { display: block; height: 100%; background: var(--brand); }
+
+/* ──────────────────────────────────────────────────────── THE ROUTE NOTE */
+
+.cmp-route-note {
+  padding: var(--sp-24);
+  margin-bottom: var(--sp-24);
+  background: var(--accent-yellow);
+  color: var(--darker);
+}
+.cmp-route-note h3 { margin: 0 0 var(--sp-8); font-size: 1.125rem; }
+.cmp-route-note p { margin: 0; line-height: 1.5; }
+
+/* ────────────────────────────────────────────────────────── ADMIN LINKS
+
+   The routing list. A destination that does not exist is SHOWN and says why —
+   §1.4's honest option — with `aria-disabled` rather than `disabled`, so a
+   keyboard user meets the explanation a sighted user can see (§28.5). */
+.cmp-links { border-top: var(--bw) solid var(--brand); }
+.cmp-link {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-12);
+  min-height: var(--touch);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--brand);
+  color: var(--darker);
+  text-decoration: none;
+}
+.cmp-link:hover { background: var(--grey-lightest); }
+.cmp-link--off { opacity: 0.65; cursor: default; }
+.cmp-link--off:hover { background: none; }
+.cmp-link__mark {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--darker);
+  color: var(--mint);
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+.cmp-link__what { min-width: 0; }
+.cmp-link__what strong { display: block; font-size: 0.9375rem; }
+.cmp-link__what small {
+  display: block;
+  margin-top: var(--sp-4);
+  color: var(--grey);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+.cmp-link__go { color: var(--dark); font-size: 1.25rem; }
+
+/* ───────────────────────────────────────────────────────────── HISTORY
+
+   Composed across ten tables and stored in none (§26.8). Every row names the
+   admin page it came from, which is the question a hub exists to answer. */
+.cmp-events { margin: 0; padding: 0; list-style: none; border-top: var(--bw) solid var(--brand); }
+.cmp-event {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.3fr) minmax(0, 1fr) auto;
+  gap: var(--sp-24);
+  padding: var(--sp-24) 0;
+  border-bottom: 1px solid var(--brand);
+}
+.cmp-event time { color: var(--grey); font-size: 0.8125rem; }
+.cmp-event__what { min-width: 0; }
+.cmp-event__what strong { display: block; font-size: 1rem; }
+.cmp-event__what p {
+  margin: var(--sp-4) 0 0;
+  color: var(--grey);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.cmp-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  width: max-content;
+  padding: var(--sp-4) var(--sp-8);
+  border-radius: var(--radius);
+  background: var(--darker);
+  color: var(--mint);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════ PHASE 28 — RESPONSIVE ══ */
+
+/* <=1080px — the record's two-column layouts stop fitting. The glance row's
+   quick facts move BELOW the blocker band rather than beside it: the blocker is
+   the hero and the facts are what it is read against, so stacking keeps the
+   reading order right (DNA §5.1). The six-stage strip halves to three columns,
+   which is the reference's own first breakpoint. */
+@media (max-width: 1080px) {
+  .cmp-hero { grid-template-columns: minmax(0, 1fr); }
+  .cmp-count { min-height: 12rem; }
+  .cmp-glance,
+  .cmp-two { grid-template-columns: minmax(0, 1fr); gap: var(--sp-32); }
+  .cmp-head__top { grid-template-columns: minmax(0, 1fr); }
+  .cmp-head__actions { justify-content: flex-start; }
+  .cmp-head__nopublic { text-align: left; }
+  .cmp-head__facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cmp-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* The fourth stage starts a new row, so its left divider would be a stray
+     rule down the middle of the strip. */
+  .cmp-step:nth-child(4) { padding-left: 0; border-left: 0; }
+}
+
+/* <=900px — the five-column directory table is the widest layout in the Admin.
+   It keeps scrolling inside `.tablewrap` rather than collapsing into a stack:
+   an operator scanning for a blocker is comparing rows, and a stacked row makes
+   that impossible. What DOES change is the metric hero, whose three panels stop
+   fitting side by side, and the history row's three columns. */
+@media (max-width: 900px) {
+  .cmp-metrics { grid-template-columns: minmax(0, 1fr); }
+  .cmp-metric + .cmp-metric { border-top: 1px solid var(--moss); border-left: 0; }
+  .cmp-event { grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-8) var(--sp-16); }
+  .cmp-event__what { grid-column: 1 / -1; }
+  .cmp-tag { grid-column: 2; grid-row: 1; }
+}
+
+/* <=760px — the filter row and the search box stop fitting on one line, and the
+   record header's five facts stop fitting in three columns. The stage strip
+   halves again; at two columns the divider falls on every EVEN child. */
+@media (max-width: 760px) {
+  .cmp-tools { grid-template-columns: minmax(0, 1fr); }
+  .cmp-head { padding-top: var(--sp-32); }
+  .cmp-head__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cmp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cmp-step { min-height: 0; }
+  .cmp-step:nth-child(odd) { padding-left: 0; border-left: 0; }
+  .cmp-step:nth-child(even) { padding-left: var(--sp-16); border-left: 1px solid var(--brand); }
+}
+
+/* <=480px — the record actions stop fitting side by side, and a right-aligned
+   fact value in a one-column list is aligned to nothing. */
+@media (max-width: 480px) {
+  .cmp-head__facts { grid-template-columns: minmax(0, 1fr); }
+  .cmp-head__facts > div { padding-block: var(--sp-16); }
+  .cmp-head__actions .btn { width: 100%; justify-content: center; }
+  .cmp-facts > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+  .cmp-facts dd { text-align: left; }
+}
+
+
+/* ── PHASE 28 corrections, from the screenshot pass (2026-08-15) ──────────────
+
+   Three defects a rendered browser found and neither typecheck nor axe could:
+
+   1. THE STATUS PILL WAS INVISIBLE ON THE RECORD HEADER. `.cmp-pill--live` is
+      dark-green ink on a 5%-brand fill, which is correct on the near-white
+      directory and unreadable on the dark band the record header sits in — the
+      one place the pill is the page's own status. axe cannot catch it: the text
+      is present and the contrast is computed against the pill's own declared
+      background, not against the band showing through it. Only looking at the
+      page finds this, which is why §33.11 keeps contrast on the manual list.
+
+      Fixed by re-slotting all four tones inside `.cmp-head__facts` rather than
+      by changing the base pill, so the directory keeps the reference's palette.
+
+   2. THE TABLE'S COLUMNS WERE AUTO-SIZED. Left to the browser, `Teeb Founding
+      Launch` wrapped to three lines while the type column kept width it did not
+      need. The reference states the proportions (2.4 / 0.7 / 1.1 / 2 / 1.1) and
+      they are what make the blocker column readable, so they are declared.
+
+   3. THE ROW HAD NO ARROW. The whole row is a click target and the reference
+      ends each one with a `→`. Without it the row reads as static text.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.cmp-head__facts .cmp-pill--live {
+  border-color: var(--brand);
+  background: transparent;
+  color: var(--brand);
+}
+.cmp-head__facts .cmp-pill--waiting { background: var(--accent-yellow); color: var(--darker); }
+.cmp-head__facts .cmp-pill--risk { background: var(--mint); color: var(--darker); }
+.cmp-head__facts .cmp-pill--closed { background: var(--moss); color: var(--mint); }
+
+/* The reference's own column proportions, as percentages of the table's
+   `min-width`, plus the narrow arrow column the reference ends each row with.
+   `table-layout: fixed` is what makes them binding — without it the browser
+   re-derives widths from content and the declaration is advice. Six tracks
+   summing to 100: a seventh column, or a set that overruns, pushes the last one
+   off the end, which is how the arrow vanished on the first attempt. */
+.cmp-table { table-layout: fixed; }
+.cmp-table th:nth-child(1), .cmp-table td:nth-child(1) { width: 29%; }
+.cmp-table th:nth-child(2), .cmp-table td:nth-child(2) { width: 9%; }
+.cmp-table th:nth-child(3), .cmp-table td:nth-child(3) { width: 18%; }
+.cmp-table th:nth-child(4), .cmp-table td:nth-child(4) { width: 25%; }
+.cmp-table th:nth-child(5), .cmp-table td:nth-child(5) { width: 16%; }
+.cmp-table th:nth-child(6), .cmp-table td:nth-child(6) { width: 3%; }
+
+/* Inside a fixed-layout cell the pill's `width: max-content` spills over the
+   next column instead of being clipped by it. §23.1's labels are long by design
+   — "Changes requested by Proovd" is the whole state — and truncating a state
+   name is not an option on the column whose job is to say what the state is.
+   So it wraps. Only here: on the record header the pill sits alone. */
+.cmp-table .cmp-pill { max-width: 100%; white-space: normal; }
+
+/* The row arrow. `aria-hidden` in the markup — the campaign name is the real
+   link and announcing an arrow after it would be a second control to a screen
+   reader where there is one. */
+.cmp-row__go { color: var(--dark); font-size: 1.25rem; line-height: 1; }
+.cmp-table td:last-child { text-align: right; }
+
+/* The unavailable routing rows carry one short sentence now, so they no longer
+   tower over the built ones. Two lines is the ceiling a three-line explanation
+   was breaking. */
+.cmp-link__what small { max-width: 44ch; }
+
+@media (max-width: 760px) {
+  /* At this width the arrow column is the first thing worth losing: the whole
+     row is the control and an arrow pointing at the next row is worse than
+     none. The name link still carries the affordance. */
+  .cmp-row__go { display: none; }
+}

@@ -709,12 +709,13 @@ function composeContext(
   if (row.campaignId) {
     links.push({
       label: identity?.campaignName ? `Campaign · ${identity.campaignName}` : 'Campaign',
-      // The Campaigns workspace is not built yet, and §1.4 says which of the
-      // two honest options this is: the link is shown and says what is missing,
-      // rather than being hidden so the surface describes a smaller product.
-      href: null,
-      unavailableBecause:
-        'The Campaigns workspace is not built yet. The campaign facts above are read from its records.',
+      // This was shown-but-unavailable from 2026-08-13 until the Campaigns hub
+      // landed on 2026-08-15 — §1.4's honest option, naming what was missing
+      // rather than hiding the control so the surface described a smaller
+      // product. The shape was built so closing the gap would be a value
+      // change rather than a surface rewrite, and this is that change.
+      href: `/admin/campaigns/${row.campaignId}`,
+      unavailableBecause: null,
     });
   }
   if (row.associationId) {

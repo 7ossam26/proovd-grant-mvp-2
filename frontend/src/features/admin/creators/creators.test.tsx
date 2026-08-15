@@ -74,9 +74,9 @@ function installMotionRuntime(): void {
     toast: (message: string) => {
       toasts.push(message);
     },
-    buttonProgress: async (_element: HTMLElement, work: () => Promise<unknown>) => {
+    buttonProgress: async (_element: HTMLElement, work: Promise<unknown>) => {
       try {
-        await work();
+        await work;
       } catch {
         /* the real runtime restores the button and resolves */
       }
@@ -459,11 +459,16 @@ describe('§26.1 — Creators is a real section of the Admin shell now', () => {
     expect(creators.getAttribute('aria-disabled')).toBeNull();
     expect(creators.className).toContain('is-active');
 
-    // The two that genuinely do not exist are still parked and still say so.
-    for (const parkedName of ['Today', 'Campaigns']) {
+    // Campaigns became a real link on 2026-08-15. Today is the one section that
+    // genuinely does not exist, and it is still parked and still says so.
+    for (const parkedName of ['Today']) {
       const control = within(nav).getByRole('button', { name: parkedName });
       expect(control.getAttribute('aria-disabled')).toBe('true');
     }
+    expect(within(nav).getByRole('link', { name: 'Campaigns' })).toHaveAttribute(
+      'href',
+      '/admin/campaigns',
+    );
   });
 });
 
@@ -518,6 +523,51 @@ describe('§26.1, §8 — the directory', () => {
     // Two different facts, two different next actions (§27.1).
     expect(screen.getByRole('button', { name: /Clear Affiliate filters/i })).toBeTruthy();
     expect(screen.queryByText('No Affiliates yet')).toBeNull();
+  });
+
+  /**
+   * The search term is a position, and `?q=` is what carries it (2026-08-15).
+   *
+   * It was local state until the Campaigns hub linked a campaign's roster here.
+   * That workspace is keyed on the PERSON and a campaign has a roster, so the
+   * honest destination is this directory with the campaign name already
+   * searched — and `searchText` carries every campaign a Creator is on, which
+   * is why searching it works. Before this the parameter was accepted and
+   * dropped, so the link promised a pre-search and delivered an unfiltered list.
+   */
+  it('opens pre-searched from ?q=, which is how a campaign links its roster here', async () => {
+    serve(directoryRoutes());
+    await renderAdmin('/admin/creators?q=Teeb%20Founding%20Launch');
+
+    await waitFor(() => {
+      expect(screen.getByText('1 of 2 Affiliates')).toBeTruthy();
+    });
+    // Maya's `searchText` carries the campaign; Devon's does not.
+    expect(screen.getByRole('link', { name: 'Maya Johnson' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Devon Miles' })).toBeNull();
+    // The box shows the term, so the Admin can see and edit what narrowed it.
+    expect(screen.getByRole('searchbox')).toHaveValue('Teeb Founding Launch');
+  });
+
+  it('puts a typed search in the URL, and clears both axes in one act', async () => {
+    serve(directoryRoutes());
+    const view = await renderAdmin('/admin/creators?filter=verification');
+
+    await userEvent.type(screen.getByRole('searchbox'), 'nobody at all');
+    await waitFor(() => {
+      expect(view.router.state.location.search).toContain('q=nobody+at+all');
+    });
+
+    /*
+      One write, not two. Clearing the term and the filter in sequence would
+      each rebuild the params from the SAME closed-over snapshot, so the second
+      would restore what the first had just removed.
+    */
+    await userEvent.click(screen.getByRole('button', { name: /Clear Affiliate filters/i }));
+    await waitFor(() => {
+      expect(view.router.state.location.search).toBe('');
+    });
+    expect(screen.getByRole('searchbox')).toHaveValue('');
   });
 
   it('says nobody has been recruited when nobody has', async () => {

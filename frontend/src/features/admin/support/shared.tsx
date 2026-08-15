@@ -17,6 +17,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { Link as RouterLink } from 'react-router';
 import { cn } from '../../../components/cn.js';
 import type { SupportChipView, SupportDeadline, SupportRecordLink } from './api.js';
 
@@ -187,11 +188,16 @@ export function Consequence({ children }: { children: ReactNode }) {
  */
 export function RecordLink({ link }: { link: SupportRecordLink }) {
   if (link.href) {
+    /* A router link, not an anchor. Every destination this panel points at is
+       an in-app Admin address, and a full reload would drop the shell and the
+       Admin's position in it (DNA §5.12). It was an `<a>` while every
+       destination was `href: null` and nothing exercised the branch; the
+       Campaigns hub (2026-08-15) is the first real one. */
     return (
-      <a className="sup-link" href={link.href}>
+      <RouterLink className="sup-link" to={link.href}>
         {link.label}
         <span aria-hidden="true">→</span>
-      </a>
+      </RouterLink>
     );
   }
   return (

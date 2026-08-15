@@ -51,13 +51,41 @@ export function CreatorsDirectory() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<CreatorDirectoryRow[] | null>(null);
   const [loadError, setLoadError] = useState<AdminRequestError | null>(null);
-  const [query, setQuery] = useState('');
   const [params, setParams] = useSearchParams();
   const [addTrigger, setAddTrigger] = useState<HTMLElement | null>(null);
   const surface = useRef<HTMLDivElement>(null);
 
   const raw = params.get('filter') ?? 'all';
   const filter: CreatorDirectoryFilter = isCreatorDirectoryFilter(raw) ? raw : 'all';
+
+  /**
+   * The search term is in the URL, exactly as the filter is (2026-08-15).
+   *
+   * It was local state until the Campaigns hub needed to link a campaign's
+   * roster here. That workspace is keyed on the PERSON and a campaign has a
+   * roster rather than one Creator, so the honest destination is this directory
+   * with the campaign name already searched — and `searchText` carries every
+   * campaign a Creator is on, which is why searching it works.
+   *
+   * `?q=` was ignored before this, so that link promised a pre-search and
+   * delivered an unfiltered list. A parameter a surface accepts and drops is
+   * worse than one it never offered.
+   *
+   * It is also the same DNA §5.12 point this file already records for the
+   * filter: a searched directory is a position, and a position that vanishes on
+   * reload is one an Admin cannot send to a colleague.
+   */
+  const query = params.get('q') ?? '';
+  const setQuery = useCallback(
+    (next: string) => {
+      const updated = new URLSearchParams(params);
+      if (next.trim() === '') updated.delete('q');
+      else updated.set('q', next);
+      // `replace`, so typing does not fill the back stack with keystrokes.
+      setParams(updated, { replace: true });
+    },
+    [params, setParams],
+  );
 
   const load = useCallback(() => {
     setLoadError(null);
@@ -214,10 +242,14 @@ export function CreatorsDirectory() {
       ) : shown.length === 0 ? (
         <EmptyDirectory
           filtered={Boolean(query.trim()) || filter !== 'all'}
-          onClear={() => {
-            setQuery('');
-            chooseFilter('all');
-          }}
+          /*
+            One write, not two. Now that both the search and the filter live in
+            the URL, calling `setQuery('')` and `chooseFilter('all')` in sequence
+            would have each build its `URLSearchParams` from the SAME closed-over
+            `params` — so the second would land on top of the first and restore
+            the term it had just cleared. Clearing both in one call is the fix.
+          */
+          onClear={() => setParams(new URLSearchParams(), { replace: true })}
           onAdd={(event) => setAddTrigger(event.currentTarget)}
         />
       ) : (
