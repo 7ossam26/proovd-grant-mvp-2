@@ -139,8 +139,10 @@ const BUILT_LINKS = [
   link('money_admin', 'Money & Fulfillment', 'Listing fee paid', '$', null,
     'The money and fulfillment console is supplied separately.'),
   link('support_admin', 'Support Admin', 'Support cases: 1 open', 'S', '/admin/support', null),
-  link('tasks', 'Tasks', 'Work is recorded on the record it belongs to', 'T', null,
-    'There is no task queue. Proovd records work as cases, reviews, and decisions.'),
+  /* Built 2026-08-16: the destination is the record itself with `?tasks=new`,
+     which the shell reads to open the Tasks panel with this campaign chosen. */
+  link('tasks', 'Tasks', 'Write a task pointing at this campaign', 'T',
+    `/admin/campaigns/${LIVE_ID}?tasks=new`, null),
 ];
 
 function directoryView(): CampaignDirectoryView {
@@ -782,14 +784,19 @@ describe('the record', () => {
       '/admin/support',
     );
 
-    for (const label of ['Backer Admin', 'Money & Fulfillment', 'Tasks']) {
+    for (const label of ['Backer Admin', 'Money & Fulfillment']) {
       const row = screen.getByText(label).closest('.cmp-link');
       expect(row, `${label} row is missing`).not.toBeNull();
       expect(row).toHaveAttribute('aria-disabled', 'true');
       expect(row!.tagName).not.toBe('A');
     }
     expect(screen.getByText(/There is no Backer workspace/)).toBeInTheDocument();
-    expect(screen.getByText(/There is no task queue/)).toBeInTheDocument();
+    /* Built 2026-08-16: Tasks routes to this record with `?tasks=new`, which
+       the shell reads to open the panel with the campaign preselected. */
+    expect(screen.getByRole('link', { name: /Tasks/ })).toHaveAttribute(
+      'href',
+      `/admin/campaigns/${LIVE_ID}?tasks=new`,
+    );
   });
 
   /* ── The Live tab, in all three of its shapes ───────────────────────────── */

@@ -1519,4 +1519,22 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/admin\/me$/, body: adminIdentity },
   { match: /\/api\/admin\/founders\/[^/?]+(\?.*)?$/, body: founderWorkspace },
   { match: /\/api\/admin\/founders(\?.*)?$/, body: { founders: [founderRow] } },
+  /* The Tasks panel (2026-08-16) mounts inside AdminFrame, so EVERY Admin flow
+     performs this read the moment the shell renders. One list, nothing in it —
+     the launcher shows no badge and the sweep's flows are undisturbed. */
+  {
+    match: /\/api\/admin\/tasks$/,
+    body: {
+      lists: [
+        {
+          id: 'a0000000-0000-4000-8000-000000000001',
+          name: 'My tasks',
+          createdBy: 'admin-1',
+          createdByName: 'Alex Admin',
+          openCount: 0,
+        },
+      ],
+      tasks: [],
+    },
+  },
 ];

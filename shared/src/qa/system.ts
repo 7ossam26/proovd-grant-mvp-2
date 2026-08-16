@@ -671,6 +671,56 @@ export const UNGATED_ADMIN_WRITES = [
     reason:
       'Records that a person walked one Appendix C step and what they found. It changes no standing, moves no money, and cannot satisfy a §34 condition — the three writes that CAN (filing an answer, enabling the pilot, rolling it back) all take the gate. Requiring reauthentication to write down "I walked the Founder build and it worked" is the reflexive gating that stops a prompt meaning anything.',
   },
+  /*
+    The Admin Tasks panel (2026-08-16). Every write below is an operator's own
+    note: it moves no money, changes no configuration, enforces against nobody,
+    and decides no customer outcome — no customer can ever see a task. The one
+    capability that WOULD be sensitive, handing work to a named person, is
+    structurally absent: there is no assignee column, and assignment lives in
+    `support_cases` under its own rules.
+  */
+  {
+    route: 'POST /api/admin/tasks/lists',
+    specRef: '§26, §30',
+    reason:
+      'Creates a named list for the Admin team’s own notes. It reaches no customer, moves no money, changes no configuration, and hands work to nobody — there is no assignee anywhere in the feature.',
+  },
+  {
+    route: 'POST /api/admin/tasks/lists/:listId/archive',
+    specRef: '§26, §30',
+    reason:
+      'Hides an emptied note list from the panel. The rows survive, the archive records who and when, a list with open tasks refuses, and nothing about any customer, payment, or configuration is touched.',
+  },
+  {
+    route: 'POST /api/admin/tasks',
+    specRef: '§26, §30',
+    reason:
+      'Writes down a note the operator addressed to themselves, optionally pointing at a record. It sends nothing, schedules nothing, enforces nothing, and the reference is a pointer — the record it names is not written.',
+  },
+  {
+    route: 'PUT /api/admin/tasks/:taskId',
+    specRef: '§26, §30',
+    reason:
+      'Edits the operator’s own note — title, notes, due day, list, reference. The recorded author and creation time cannot be rewritten (trigger), and nothing outside the two task tables is written.',
+  },
+  {
+    route: 'POST /api/admin/tasks/:taskId/complete',
+    specRef: '§26, §30',
+    reason:
+      'Ticks a note off, recording who did it. No customer outcome follows from a task completing — no message, no state change, no release — so there is nothing for a stale session to do damage with.',
+  },
+  {
+    route: 'POST /api/admin/tasks/:taskId/reopen',
+    specRef: '§26, §30',
+    reason:
+      'Unticks a note that was ticked by mistake. The same act as completing it, in the other direction, with the same absence of any customer, money, or configuration consequence.',
+  },
+  {
+    route: 'DELETE /api/admin/tasks/:taskId',
+    specRef: '§26, §25.6, §30',
+    reason:
+      'Removes a note from view — softly. The row survives with who removed it and when, the app role cannot hard-delete (revoked), and a deleted task decides nothing anywhere else in the product.',
+  },
 ] as const;
 
 export type UngatedAdminWrite = (typeof UNGATED_ADMIN_WRITES)[number];

@@ -114,13 +114,12 @@ export const CAMPAIGN_DESTINATIONS: readonly CampaignDestination[] = [
     built: false,
     absentBecause: 'Money console not built yet — the amounts here come from its records.',
   },
-  {
-    key: 'tasks',
-    label: 'Tasks',
-    mark: 'T',
-    built: false,
-    absentBecause: 'No task queue — work is recorded on the record it belongs to.',
-  },
+  /* Built 2026-08-16. Not a queue: nobody is assigned, nothing is scheduled,
+     and no message is sent — the §30 reasoning that parked this entry ruled
+     out a queue that chases, and the panel that shipped is not one. The
+     destination opens the panel with this campaign preselected (`?tasks=new`),
+     because Tasks is a panel, not an address. */
+  { key: 'tasks', label: 'Tasks', mark: 'T', built: true },
 ];
 
 export type CampaignDestinationKey =

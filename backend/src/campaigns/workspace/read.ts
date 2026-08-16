@@ -288,7 +288,15 @@ export async function readCampaignRecord(
     `/admin/backers?view=backers&campaignId=${encodeURIComponent(campaign.id)}`,
   );
   const moneyLink = link('money_admin', moneyLine(entry), null);
-  const tasksLink = link('tasks', 'Work is recorded on the record it belongs to', null);
+  /* Built 2026-08-16. Tasks is a panel, not an address, so the honest deep
+     link is this campaign's own record with `?tasks=new` — the shell reads the
+     parameter and opens the panel with the campaign already chosen as the
+     reference, and `AdminLink` stays a plain router link. */
+  const tasksLink = link(
+    'tasks',
+    'Write a task pointing at this campaign',
+    `/admin/campaigns/${encodeURIComponent(campaign.id)}?tasks=new`,
+  );
 
   const launchLabel = formatInstant(campaign.campaignLiveAt) ?? 'Not set';
   const closeLabel = formatInstant(campaign.campaignCloseAt) ?? 'Not set';

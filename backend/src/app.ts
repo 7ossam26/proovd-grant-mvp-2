@@ -22,6 +22,7 @@ import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAdminCreatorsRouter } from './routes/admin-creators.js';
 import { createAdminCampaignsRouter } from './routes/admin-campaigns.js';
 import { createAdminBackersRouter } from './routes/admin-backers.js';
+import { createAdminTasksRouter } from './routes/admin-tasks.js';
 import { createAdminCloseRouter } from './routes/admin-close.js';
 import { createAffiliateInvitationRouter } from './routes/affiliate-invitation.js';
 import { createDraftRouter } from './routes/draft.js';
@@ -517,6 +518,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // what enforces it. `requireAdmin` refuses a Founder and a Creator by role
   // before any query runs.
   app.use(createAdminBackersRouter({ db, auth }));
+  // The Admin Tasks panel, built 2026-08-16. §26 names no task list and this
+  // adds none of §1 rule 6's seven inventions: a private note an operator
+  // writes to themselves, pointed at the record it belongs to. No assignee
+  // (that is `support_cases`), no notification key, no job, and a due date the
+  // server never interprets — §30 is why it is a note that waits rather than a
+  // queue that chases. `requireAdmin` on everything; every write is registered
+  // in §33.12.5's `UNGATED_ADMIN_WRITES` with the sensitive property it lacks.
+  app.use(createAdminTasksRouter({ db, auth }));
   // Phase 08b (§11, §33.2.1–33.2.3). The one route a Creator reaches with no
   // account. It takes a token, never an association id, so there is nothing in
   // the request to substitute — see `routes/affiliate-invitation.ts`.

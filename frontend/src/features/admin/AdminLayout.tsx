@@ -59,6 +59,7 @@ import {
   type AdminIdentity,
 } from './api.js';
 import { useParkedControl } from './founders/parked.js';
+import { TasksPanel } from './tasks/TasksPanel.js';
 
 type IdentityState =
   | { status: 'loading' }
@@ -326,6 +327,17 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
             Router owns the swap, so `is-active` is a constant here. */}
         <section className="view is-active">{children}</section>
       </main>
+
+      {/*
+        The Tasks panel, built 2026-08-16. A sibling of `main`, deliberately:
+        it floats on its own layer (850–899 band) and never takes part in the
+        page's layout, and mounting it here — inside `RequireRole`, inside
+        `MotionProvider`, above every route — is what makes it render on every
+        Admin address, on none outside `/admin`, and survive navigation
+        between sections. It is a note panel, not a queue: no assignee, no
+        schedule, no message (§30) — see `features/admin/tasks/TasksPanel.tsx`.
+      */}
+      <TasksPanel />
     </>
   );
 }

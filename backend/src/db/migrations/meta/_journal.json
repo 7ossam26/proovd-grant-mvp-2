@@ -323,6 +323,13 @@
       "when": 1786464000000,
       "tag": "0045_support_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1786550400000,
+      "tag": "0046_admin_tasks",
+      "breakpoints": true
     }
   ]
 }
