@@ -40,8 +40,10 @@ import {
   FOUNDER_DELETION_REQUESTED,
   FOUNDER_DELETION_REVIEWED,
   FOUNDER_FIELD_UPDATED,
+  FOUNDER_MEETING_NOTE_RECORDED,
   FOUNDER_OVERRIDE_CLEARED,
   FOUNDER_OVERRIDE_SET,
+  FOUNDER_RESEARCH_RECORDED,
   FOUNDER_SENDER_RECORDED,
   isFieldEditAuditValue,
 } from './audit-actions.js';
@@ -182,6 +184,8 @@ const AUDIT_ACTIONS: Record<string, AuditEntrySpec> = {
   [FOUNDER_ACCESS_RECORDED]: { category: 'enforcement', title: 'Founder access decision recorded' },
   [FOUNDER_DELETION_REQUESTED]: { category: 'account', title: 'Account closure requested' },
   [FOUNDER_DELETION_REVIEWED]: { category: 'account', title: 'Account closure request reviewed' },
+  [FOUNDER_MEETING_NOTE_RECORDED]: { category: 'admin', title: 'Meeting note recorded' },
+  [FOUNDER_RESEARCH_RECORDED]: { category: 'admin', title: 'Research recorded' },
 };
 
 /* ── The read ──────────────────────────────────────────────────────────────── */

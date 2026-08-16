@@ -20,7 +20,7 @@
  * Spec does not permit.
  */
 
-import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, date, index } from 'drizzle-orm/pg-core';
 import { founderProspects } from './invitations.js';
 import { user } from './auth.js';
 
@@ -142,6 +142,54 @@ export const founderDeletionRequests = pgTable(
  * is what §25.8 permits: retention obligations do not end because somebody
  * clicked a button.
  */
+/* ── founder_meeting_notes (§7, §25.6, §25.8, migration 0047) ───────────────*/
+
+/**
+ * Dated, attributed meeting notes on a prospect — the record behind the
+ * Founder workspace's "Add meeting note" (2026-08-16 rebuild). §7's "Admin
+ * notes and discovery evidence" as a sequence rather than one text column.
+ *
+ * Insert-only in the strong sense: the only UPDATE the grant and the 0047
+ * trigger permit is the §25.8 anonymising write (live shape → all-null shape,
+ * stamped, never back). A correction is a NEW note. The two-shape CHECK makes
+ * a half-anonymised or half-filled row unrepresentable.
+ *
+ * No `remind_at`, no recurrence, no job reads this table (§30) — the
+ * `relationship_touches` posture, asserted in information_schema by test.
+ */
+export const founderMeetingNotes = pgTable(
+  'founder_meeting_notes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    prospectId: uuid('prospect_id')
+      .notNull()
+      .references(() => founderProspects.id),
+
+    /** The reference dialog's five required facts; null only when anonymised. */
+    meetingDate: date('meeting_date'),
+    participants: text('participants'),
+    decisions: text('decisions'),
+    followUp: text('follow_up'),
+    sourceLink: text('source_link'),
+
+    /** The one genuinely optional field on the dialog. */
+    notes: text('notes'),
+
+    /** The author is the session, never the body. */
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+
+    /** Set by the §25.8 sweep when the prospect anonymises. Irreversible. */
+    anonymisedAt: timestamp('anonymised_at', { withTimezone: true }),
+  },
+  (t) => ({
+    prospectIdx: index('founder_meeting_notes_prospect_idx').on(t.prospectId, t.createdAt.desc()),
+  }),
+);
+
 export const founderDeletionReviews = pgTable(
   'founder_deletion_reviews',
   {

@@ -1,61 +1,76 @@
 /**
- * Admin → Founders — Spec §26.1, §7, DNA §5.2, §5.14.
+ * Admin → Founders — the directory (Spec §26.1, §7, DNA §5.2, §5.12, §5.14;
+ * rebuilt 2026-08-16 to the supplied reference).
  *
- * Every Founder Proovd has ever invited, one row each, and one gesture into the
- * workspace that holds the rest.
+ * Find any Founder, see what needs attention, and open the complete lifecycle
+ * record: six filter cards, search, Type and Owner filters, and the
+ * five-column table with its two action columns.
  *
- * ── A row is a PERSON, not a draft ──────────────────────────────────────────
- * The previous list keyed on `campaign_drafts.id`, so a Founder whose campaign
- * was archived-and-restarted (§9's wrong-type path) appeared twice with no
- * relationship between the rows. `founder_prospects` survives a restart, so the
- * row is the prospect and the address is `/admin/founders/:prospectId`.
+ * ── Every filter lives in the URL ───────────────────────────────────────────
+ * `?filter=`, `?q=`, `?type=`, `?owner=` — DNA §5.12, and the Campaigns hub's
+ * `?q=` lesson: a search in component state breaks every link that promises a
+ * pre-filtered list. The reset clears all four in ONE `setParams` call — two
+ * sequential writes each rebuild from the same closed-over snapshot and the
+ * second restores what the first removed.
  *
- * ── Density is licensed, staging is not repealed ────────────────────────────
- * §26 permits a dashboard here and nowhere else, so this is a table. DNA §5.14
- * still applies: eight columns answer who they are, how far they have got,
- * whether they can be paid, what they are running, and whether anything needs
- * doing — and everything else is one gesture away rather than in a fortieth
- * column nobody reads.
- *
- * ── The server resolved every cell, and this file resolves none ─────────────
- * `setup`, `account`, `paymentSetup`, and `attention` arrive as the words they
- * render. §26.2's override machinery needs a `prior_value` to compare against,
- * and a value the browser derived has none — so nothing here maps a status to a
- * label or decides whether a Founder needs attention.
+ * ── The server matched; this file only compares ─────────────────────────────
+ * Card membership (`row.filters`), the action cells, the type label, and the
+ * search text all arrive resolved. What happens here is equality against a
+ * register key and substring against the server's own `searchText` — layout,
+ * not derivation, so §26.2's `prior_value` stays meaningful.
  *
  * ── The row is clickable; the NAME is the control ───────────────────────────
  * A `<tr>` carrying `role="button"` breaks the table's required children and
- * fails axe, and a bare `tabindex` on a row is focusable without being
- * announced as anything. So the Founder's name is a real link — keyboard
- * reachable, announced, and Enter opens it — and the row's own click handler is
- * mouse convenience layered on top, which ignores presses that landed on a
- * control of their own.
+ * fails axe. The Founder's name is a real link — keyboard reachable,
+ * announced, Enter opens it — and the row's click handler is mouse convenience
+ * that ignores presses landing on a control of its own.
  */
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router';
 import {
-  ATTENTION_CHIP_LABEL,
-  NO_ACTIVE_CAMPAIGN_LABEL,
-  NO_ATTENTION_ROW_LABEL,
+  FOUNDER_DIRECTORY_FILTERS,
+  FOUNDER_TYPE_FILTERS,
+  type FounderDirectoryFilterKey,
+  type FounderTypeFilterKey,
 } from '@proovd/shared';
 import { Button, StatePanel } from '../../../components/index.js';
 import { useProovdMotion } from '../../../motion/MotionProvider.js';
 import { fetchFounders, AdminRequestError, type FounderListRow } from '../api.js';
 import { AddFounderDialog } from './dialogs/AddFounderDialog.js';
-import { useParkedControl } from './parked.js';
+
+const FILTER_KEYS = FOUNDER_DIRECTORY_FILTERS.map((f) => f.key) as readonly string[];
+const TYPE_KEYS = FOUNDER_TYPE_FILTERS.map((f) => f.key) as readonly string[];
 
 export function FoundersList() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<FounderListRow[] | null>(null);
   const [loadError, setLoadError] = useState<AdminRequestError | null>(null);
-  /**
-   * The element the add panel grows from (DNA §6.5), and the fact that it is
-   * open. One piece of state rather than two, because a dialog with no trigger
-   * has nowhere to grow from and a trigger with no dialog is not a state.
-   */
   const [addTrigger, setAddTrigger] = useState<HTMLElement | null>(null);
   const surface = useRef<HTMLDivElement>(null);
+
+  const [params, setParams] = useSearchParams();
+  const rawFilter = params.get('filter') ?? 'all';
+  const filter: FounderDirectoryFilterKey = FILTER_KEYS.includes(rawFilter)
+    ? (rawFilter as FounderDirectoryFilterKey)
+    : 'all';
+  const query = params.get('q') ?? '';
+  const rawType = params.get('type') ?? 'all';
+  const typeFilter: FounderTypeFilterKey = TYPE_KEYS.includes(rawType)
+    ? (rawType as FounderTypeFilterKey)
+    : 'all';
+  const owner = params.get('owner') ?? 'all';
+
+  /** One write per change; absent means default, so links stay short. */
+  const setParam = useCallback(
+    (key: string, value: string, defaultValue: string) => {
+      const next = new URLSearchParams(params);
+      if (value === defaultValue) next.delete(key);
+      else next.set(key, value);
+      setParams(next, { replace: true });
+    },
+    [params, setParams],
+  );
 
   const load = useCallback(() => {
     setLoadError(null);
@@ -70,7 +85,7 @@ export function FoundersList() {
                 status: 0,
                 title: 'Proovd could not be reached',
                 whatHappened:
-                  'The Founders list could not be read, and the failure carried no explanation.',
+                  'The Founders directory could not be read, and the failure carried no explanation.',
                 next: 'Try the read again. Nothing was changed by the attempt.',
               }),
         );
@@ -78,28 +93,53 @@ export function FoundersList() {
   }, []);
 
   useEffect(load, [load]);
-
-  // The headline reveal and the row rise are declarative recipes; this re-binds
-  // them when the list arrives, because the runtime attaches to the nodes that
-  // existed when it last ran and React has replaced them by then.
   useProovdMotion(surface, [rows]);
 
+  /** Counts are aggregation of the server's own membership answer. */
+  const counts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const key of FILTER_KEYS) map.set(key, 0);
+    for (const row of rows ?? []) {
+      for (const key of row.filters) map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [rows]);
+
+  const owners = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows ?? []) if (row.owner) set.add(row.owner);
+    return [...set].sort();
+  }, [rows]);
+
+  const shown = useMemo(() => {
+    if (!rows) return [];
+    const q = query.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (!row.filters.includes(filter)) return false;
+      if (q && !row.searchText.includes(q)) return false;
+      if (typeFilter !== 'all') {
+        const wanted =
+          typeFilter === 'idea' ? 'Idea' : typeFilter === 'product' ? 'Product' : 'Proposed';
+        if (row.typeLabel !== wanted) return false;
+      }
+      if (owner !== 'all' && row.owner !== owner) return false;
+      return true;
+    });
+  }, [rows, filter, query, typeFilter, owner]);
+
   return (
-    <div ref={surface}>
-      <div className="people-head">
+    <div ref={surface} className="fdir">
+      <div className="fdir-hero">
         <div>
-          <p className="kicker">Founders</p>
+          <p className="kicker">Founder operations</p>
           <h1 className="h2" data-reveal="headline">
-            Invited by hand. Managed from here.
+            All Founders
           </h1>
-          {rows ? (
-            <p className="grey">
-              {rows.length} {rows.length === 1 ? 'Founder' : 'Founders'}. Open one for the full
-              workspace — invitation, identity, campaigns, money, and history.
-            </p>
-          ) : null}
+          <p className="grey">
+            Find any Founder, see what needs attention, and open the complete lifecycle record.
+          </p>
         </div>
-        <Button onClick={(event) => setAddTrigger(event.currentTarget)}>Add founder</Button>
+        <Button onClick={(event) => setAddTrigger(event.currentTarget)}>Create Founder</Button>
       </div>
 
       {addTrigger ? (
@@ -107,10 +147,6 @@ export function FoundersList() {
           trigger={addTrigger}
           onClose={() => setAddTrigger(null)}
           onCreated={(prospectId) => {
-            // The done-moment is their workspace, not a row appearing in a
-            // table (DNA §5.4): the next thing an Admin does is compose the
-            // invitation. The list is refreshed behind it so a Back lands on a
-            // current page.
             load();
             void navigate(`/admin/founders/${prospectId}`);
           }}
@@ -122,7 +158,7 @@ export function FoundersList() {
           state={loadError.detail.title}
           whatHappened={
             loadError.detail.whatHappened ??
-            'The Founders list could not be read, so nothing on this page is current.'
+            'The Founders directory could not be read, so nothing on this page is current.'
           }
           next={loadError.detail.next ?? 'Try the read again. Nothing was changed by the attempt.'}
           owner="Proovd"
@@ -137,9 +173,9 @@ export function FoundersList() {
         />
       ) : !rows ? (
         <StatePanel
-          state="Reading the Founders list"
-          whatHappened="Proovd is reading every Founder, their setup stage, and what needs attention."
-          next="The table appears as soon as that comes back."
+          state="Reading the Founders directory"
+          whatHappened="Proovd is reading every Founder, their lifecycle, and both action columns."
+          next="The directory appears as soon as that comes back."
           owner="Proovd"
           nextUpdate="Within a few seconds"
           action="No action needed"
@@ -149,21 +185,109 @@ export function FoundersList() {
         <StatePanel
           state="No Founders yet"
           whatHappened="Nobody has been recorded from off-platform discovery, so there is nobody to invite."
-          next="Add a Founder when you have met one. Nothing is sent until you compose the invitation and send it."
+          next="Create a Founder when you have met one. Nothing is sent until you compose the invitation and send it."
           owner="You"
           nextUpdate="No update is pending"
           action={
-            <Button
-              tier="secondary"
-              onClick={(event) => setAddTrigger(event.currentTarget)}
-            >
-              Add founder
+            <Button tier="secondary" onClick={(event) => setAddTrigger(event.currentTarget)}>
+              Create Founder
             </Button>
           }
           reference="Admin · Founders"
         />
       ) : (
-        <FoundersTable rows={rows} />
+        <>
+          <div className="fdir-cards" role="group" aria-label="Directory filters">
+            {FOUNDER_DIRECTORY_FILTERS.map((card) => (
+              <button
+                key={card.key}
+                type="button"
+                className={filter === card.key ? 'fdir-card is-active' : 'fdir-card'}
+                aria-pressed={filter === card.key}
+                onClick={() => setParam('filter', card.key, 'all')}
+              >
+                <strong>{counts.get(card.key) ?? 0}</strong>
+                <span>{card.title}</span>
+                <small>{card.subtitle}</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="fdir-tools">
+            <label className="fdir-tool fdir-tool--search">
+              <span>Search</span>
+              <input
+                className="input"
+                type="search"
+                placeholder="Founder, email, business, or campaign"
+                value={query}
+                onChange={(event) => setParam('q', event.target.value, '')}
+              />
+            </label>
+            <label className="fdir-tool">
+              <span>Type</span>
+              <select
+                className="input"
+                value={typeFilter}
+                onChange={(event) => setParam('type', event.target.value, 'all')}
+              >
+                {FOUNDER_TYPE_FILTERS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="fdir-tool">
+              <span>Owner</span>
+              {/*
+                The values in use, not a closed list of people: the owner is
+                free text on the record (the 2026-08-16 decision), so this
+                filter matches the stored string and cannot answer "whose
+                Founders are these" beyond what was typed.
+              */}
+              <select
+                className="input"
+                value={owner}
+                onChange={(event) => setParam('owner', event.target.value, 'all')}
+              >
+                <option value="all">All owners</option>
+                {owners.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="fdir-shown grey" aria-live="polite">
+              {shown.length} shown
+            </p>
+          </div>
+
+          {shown.length === 0 ? (
+            <StatePanel
+              state="Nothing matches these filters"
+              whatHappened="Every Founder was read; none of them matches the current card, search, type, and owner together."
+              next="Clear the filters to see the complete directory again."
+              owner="You"
+              nextUpdate="No update is pending"
+              action={
+                <Button
+                  tier="secondary"
+                  onClick={() => {
+                    // One write clears everything (the ?q= lesson).
+                    setParams(new URLSearchParams(), { replace: true });
+                  }}
+                >
+                  Clear all filters
+                </Button>
+              }
+              reference="Admin · Founders"
+            />
+          ) : (
+            <FoundersTable rows={shown} />
+          )}
+        </>
       )}
     </div>
   );
@@ -171,15 +295,17 @@ export function FoundersList() {
 
 /* ── The table ─────────────────────────────────────────────────────────────── */
 
+/** Initials for the avatar square. Presentation of a name the server sent. */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? '';
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : (parts[0]?.[1] ?? '');
+  return `${first}${last}`.toUpperCase() || '·';
+}
+
 function FoundersTable({ rows }: { rows: FounderListRow[] }) {
   const navigate = useNavigate();
-  const parked = useParkedControl();
 
-  /**
-   * Mouse convenience only. A press that landed on the name link, or on the
-   * parked campaign control, has already been answered — opening the workspace
-   * on top of it would be two answers to one click.
-   */
   function openRow(event: MouseEvent<HTMLTableRowElement>, prospectId: string) {
     if ((event.target as HTMLElement).closest('a, button')) return;
     void navigate(`/admin/founders/${prospectId}`);
@@ -187,20 +313,17 @@ function FoundersTable({ rows }: { rows: FounderListRow[] }) {
 
   return (
     <div className="tablewrap">
-      <table className="table fdr-table">
+      <table className="table fdir-table">
         <caption className="admin-table__caption">
-          Setup stage, account standing, payment setup, current campaign, and what needs attention.
+          Type and lifecycle, the Admin and Founder action columns, and the internal owner.
         </caption>
         <thead>
           <tr>
             <th scope="col">Founder</th>
-            <th scope="col">Email</th>
-            <th scope="col">Setup</th>
-            <th scope="col">Account</th>
-            <th scope="col">Payment setup</th>
-            <th scope="col">Current campaign</th>
-            <th scope="col">Campaign status</th>
-            <th scope="col">Attention</th>
+            <th scope="col">Type / Lifecycle</th>
+            <th scope="col">Admin action</th>
+            <th scope="col">Founder action</th>
+            <th scope="col">Owner</th>
           </tr>
         </thead>
         <tbody>
@@ -212,40 +335,41 @@ function FoundersTable({ rows }: { rows: FounderListRow[] }) {
               onClick={(event) => openRow(event, row.prospectId)}
             >
               <td>
-                <RouterLink className="fdr-name" to={`/admin/founders/${row.prospectId}`}>
-                  <b>{row.legalName}</b>
-                </RouterLink>
-                <span className="fdr-sub">{row.productName}</span>
-              </td>
-              <td className="grey">{row.email}</td>
-              <td>
-                {row.setup.stage}
-                {row.setup.detail ? <span className="fdr-sub">{row.setup.detail}</span> : null}
-              </td>
-              <td>{row.account}</td>
-              <td>{row.paymentSetup}</td>
-              <td>
-                {row.currentCampaign ? (
-                  <button type="button" className="camp-link" {...parked('campaign')}>
-                    {row.currentCampaign.name}
-                  </button>
-                ) : (
-                  <span className="grey">{NO_ACTIVE_CAMPAIGN_LABEL}</span>
-                )}
-              </td>
-              <td className="grey">
-                {row.currentCampaign ? row.currentCampaign.status : 'Not running a campaign'}
+                <span className="fdir-who">
+                  <span className="fdir-avatar" aria-hidden="true">
+                    {initialsOf(row.legalName || row.preferredName)}
+                  </span>
+                  <span>
+                    <RouterLink className="fdr-name" to={`/admin/founders/${row.prospectId}`}>
+                      <b>{row.legalName || row.preferredName}</b>
+                    </RouterLink>
+                    <span className="fdr-sub">
+                      {[row.businessName ?? row.productName, row.email]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </span>
+                </span>
               </td>
               <td>
-                {row.attention.needed ? (
-                  <>
-                    <span className="att-chip">{ATTENTION_CHIP_LABEL}</span>
-                    <span className="fdr-sub att-note">{row.attention.text}</span>
-                  </>
-                ) : (
-                  <span className="grey">{NO_ATTENTION_ROW_LABEL}</span>
-                )}
+                <span className="fdir-type">{row.typeLabel}</span>
+                <span className="fdr-sub">{row.lifecycle}</span>
               </td>
+              <td>
+                <span className={row.adminAction.kind === 'due' ? 'fdir-due' : 'fdir-none'}>
+                  {row.adminAction.label}
+                </span>
+              </td>
+              <td>
+                <span
+                  className={
+                    row.founderAction.kind === 'due' ? 'fdir-due fdir-due--founder' : 'fdir-none'
+                  }
+                >
+                  {row.founderAction.label}
+                </span>
+              </td>
+              <td className="grey">{row.owner ?? 'Not recorded'}</td>
             </tr>
           ))}
         </tbody>

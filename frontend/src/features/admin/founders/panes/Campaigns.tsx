@@ -19,6 +19,7 @@
  */
 
 import { Button, Tag } from '../../../../components/index.js';
+import { Link as RouterLink } from 'react-router';
 import type { CampaignSummary, FounderWorkspaceDetail } from '../../api.js';
 import {
   Actions,
@@ -26,7 +27,6 @@ import {
   Expandable,
   Group,
   Missing,
-  ParkedButton,
   Row,
   SecTitle,
   type WorkspaceActions,
@@ -58,7 +58,11 @@ function CurrentCampaign({ campaign }: { campaign: CampaignSummary }) {
         {campaign.issue ? <Row label="Current issue">{campaign.issue}</Row> : null}
       </Group>
       <Actions>
-        <ParkedButton parkedKey="campaign">Open campaign</ParkedButton>
+        {/* A real route since 2026-08-16: the Campaigns workspace owns campaign
+            operations, and this record links into it rather than toasting. */}
+        <RouterLink className="btn btn--secondary" to={`/admin/campaigns/${campaign.campaignId}`}>
+          <span className="btn__label">Open campaign</span>
+        </RouterLink>
       </Actions>
       <Expandable label="Technical details">
         <p className="grey">
@@ -101,9 +105,12 @@ export function Campaigns({ detail, actions }: CampaignsProps) {
               <p className="grey">{campaign.lines.join(' · ')}</p>
             ) : null}
             <Actions>
-              <ParkedButton parkedKey="campaign" tier="tertiary">
-                View campaign
-              </ParkedButton>
+              <RouterLink
+                className="btn btn--tertiary"
+                to={`/admin/campaigns/${campaign.campaignId}`}
+              >
+                <span className="btn__label">View campaign</span>
+              </RouterLink>
             </Actions>
           </Block>
         ))

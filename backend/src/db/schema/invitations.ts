@@ -50,6 +50,7 @@ import {
   index,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { campaigns } from './domain.js';
 
 /**
@@ -74,6 +75,18 @@ export const founderProspects = pgTable(
   'founder_prospects',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+
+    /**
+     * The stable, quotable reference in the header of every Founder record —
+     * `F-` plus five glyphs of the no-O/0/I/1 alphabet, the `PVD-`/`D14-`
+     * precedent (migration 0047). The DATABASE mints it via the column
+     * default, so no creation path can produce a prospect without one; it is
+     * immutable by trigger, and it survives anonymisation because it names
+     * nobody — it is part of the §25.8 audit skeleton, not content.
+     */
+    recordReference: text('record_reference')
+      .notNull()
+      .default(sql`mint_founder_record_reference()`),
 
     /* ── Recipient identity (§7). All nullable: all anonymisable. ──────────*/
     legalName: text('legal_name'),

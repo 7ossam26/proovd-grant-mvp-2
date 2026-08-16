@@ -442,9 +442,14 @@ describe('§26.1 the workspace serves five panes composed from the records', () 
     const founder = await invited('panes');
     const detail = await workspaceOf(founder.prospectId);
 
+    // `discovery` and `campaignFacts` joined on 2026-08-16: the rebuilt
+    // Overview renders §7's discovery record and the current campaign's live
+    // facts, both composed server-side like everything else here.
     expect(Object.keys(detail).sort()).toEqual([
+      'campaignFacts',
       'campaigns',
       'details',
+      'discovery',
       'header',
       'history',
       'historyCounts',
@@ -1626,5 +1631,225 @@ describe('§26.2 what the record already knows is not re-keyable here', () => {
       .send({ value: 'daily', reason: 'they asked' })
       .expect(400);
     expect(res.body.whatHappened).toContain('summary');
+  });
+});
+
+/* ── 12. The directory and the record header (2026-08-16 rebuild) ──────────── */
+
+describe('the directory row and the record header feed the same kernels', () => {
+  async function rowOf(prospectId: string) {
+    const res = await request(h.app)
+      .get('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .expect(200);
+    const rows = (res.body as { founders: Array<Record<string, unknown>> }).founders;
+    const row = rows.find((r) => r['prospectId'] === prospectId);
+    expect(row, 'the person is missing from the directory').toBeTruthy();
+    return row as {
+      recordReference: string;
+      typeLabel: string;
+      lifecycle: string;
+      adminAction: { kind: string; label: string };
+      founderAction: { kind: string; label: string };
+      filters: string[];
+      searchText: string;
+      owner: string | null;
+    };
+  }
+
+  it('mints a permanent F- reference the database refuses to move', async () => {
+    const founder = await createFounder('dirref');
+    const row = await rowOf(founder.prospectId);
+
+    // The 0047 shape: F- plus five glyphs of the no-O/0/I/1 alphabet.
+    expect(row.recordReference).toMatch(/^F-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{5}$/);
+
+    // Immutable by trigger, not by convention — a hand-written UPDATE gets
+    // the same refusal a service would.
+    await expect(
+      h.pool.query(`UPDATE founder_prospects SET record_reference = 'F-AAAAA' WHERE id = $1`, [
+        founder.prospectId,
+      ]),
+    ).rejects.toThrow(/record reference is permanent/);
+
+    // And the record header renders the same reference the row carries.
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.header.recordReference).toBe(row.recordReference);
+  });
+
+  it('derives Proposed from the absence of a lock, and the type from its presence', async () => {
+    const founder = await invited('dirtype');
+    expect((await rowOf(founder.prospectId)).typeLabel).toBe('Proposed');
+
+    await completeVetting(founder.raw, 'pre_build', founder.draftId);
+    const locked = await rowOf(founder.prospectId);
+    expect(locked.typeLabel).toBe('Idea');
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.header.typeChip).toBe('Idea · locked');
+  });
+
+  it('composes the pre-claim lifecycle from the invitation record, not the status', async () => {
+    const founder = await createFounder('dirlife');
+    await compose(founder.draftId);
+    // Composed and unsent: the invite is a draft, Proovd owes the send, and
+    // the Founder has nothing to act on yet.
+    const drafted = await rowOf(founder.prospectId);
+    expect(drafted.lifecycle).toBe('Invite draft');
+    expect(drafted.adminAction).toEqual({ kind: 'due', label: 'Review and send the invite' });
+    expect(drafted.founderAction).toEqual({ kind: 'none', label: 'No access yet' });
+    expect(drafted.filters).toContain('pre_invite');
+    expect(drafted.filters).toContain('needs_admin');
+
+    await sendInvitation(founder);
+    const sent = await rowOf(founder.prospectId);
+    expect(sent.lifecycle).toBe('Invite sent');
+    expect(sent.founderAction).toEqual({
+      kind: 'due',
+      label: 'Accept the private invitation',
+    });
+    // §1.4: the quiet cell carries its reason, and the reason names who owns
+    // the next step.
+    expect(sent.adminAction.kind).toBe('none');
+    expect(sent.adminAction.label).toContain('No action —');
+    expect(sent.filters).toContain('invited');
+    expect(sent.filters).not.toContain('pre_invite');
+
+    // The search text is the one matcher: the reference is findable by it.
+    expect(sent.searchText).toContain(sent.recordReference.toLowerCase());
+  });
+
+  it('agrees with the record header about the lifecycle, from the same facts', async () => {
+    const founder = await invited('dirparity');
+    await completeVetting(founder.raw, 'pre_launch', founder.draftId);
+
+    const row = await rowOf(founder.prospectId);
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.header.lifecycle).toBe(row.lifecycle);
+    expect(detail.header.adminAction).toEqual(row.adminAction);
+    expect(detail.header.founderAction).toEqual(row.founderAction);
+  });
+});
+
+/* ── 13. Meeting notes and research (§7, migration 0047) ───────────────────── */
+
+describe('a meeting note is a record: five named facts, insert-only, anonymisable', () => {
+  const NOTE = {
+    meetingDate: '2026-08-14',
+    participants: 'Rowan, Ada',
+    decisions: 'Digital-only scope confirmed for the pilot.',
+    followUp: 'Send the Campaign kit link once the fee is paid.',
+    sourceLink: 'call · calendar invite 2026-08-14',
+  };
+
+  it('refuses each missing required fact by name, and records nothing', async () => {
+    const founder = await createFounder('note-refuse');
+
+    for (const missing of ['participants', 'decisions', 'followUp', 'sourceLink'] as const) {
+      const body: Record<string, string> = { ...NOTE };
+      delete body[missing];
+      await request(h.app)
+        .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+        .set('cookie', admin.cookie)
+        .send(body)
+        .expect(400);
+    }
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+      .set('cookie', admin.cookie)
+      .send({ ...NOTE, meetingDate: 'last Tuesday' })
+      .expect(400);
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.discovery.meetingNotes).toEqual([]);
+  });
+
+  it('records the note with its author from the session, and renders it on the record', async () => {
+    const founder = await createFounder('note-record');
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+      .set('cookie', admin.cookie)
+      .send({ ...NOTE, notes: 'High-touch pilot; keep payment language precise.' })
+      .expect(200);
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.discovery.meetingNotes).toHaveLength(1);
+    const note = detail.discovery.meetingNotes[0]!;
+    expect(note.participants).toBe(NOTE.participants);
+    expect(note.decisions).toBe(NOTE.decisions);
+    expect(note.followUp).toBe(NOTE.followUp);
+    expect(note.sourceLink).toBe(NOTE.sourceLink);
+    expect(note.notes).toBe('High-touch pilot; keep payment language precise.');
+
+    // §25.6: one audit row, in the same transaction.
+    const rows = await auditRows('founder.meeting_note_recorded', founder.prospectId);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('is insert-only: an edit is refused by the database, whatever calls it', async () => {
+    const founder = await createFounder('note-immutable');
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+      .set('cookie', admin.cookie)
+      .send(NOTE)
+      .expect(200);
+
+    await expect(
+      h.pool.query(
+        `UPDATE founder_meeting_notes SET participants = 'Somebody else' WHERE prospect_id = $1`,
+        [founder.prospectId],
+      ),
+    ).rejects.toThrow(/a correction is a new note/);
+  });
+
+  it('has no schedule-shaped column, and no job reads it (§30)', async () => {
+    const { rows } = await h.pool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'founder_meeting_notes'`,
+    );
+    const columns = rows.map((r) => r.column_name);
+    for (const absent of ['remind_at', 'notify_at', 'recurrence', 'next_meeting_at', 'snooze_until']) {
+      expect(columns, `${absent} must not exist`).not.toContain(absent);
+    }
+
+    const jobsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'jobs');
+    const scheduler = readFileSync(join(jobsDir, 'scheduler.ts'), 'utf8');
+    expect(scheduler).not.toContain('founder_meeting_notes');
+    expect(scheduler).not.toContain('founderMeetingNotes');
+  });
+});
+
+describe('a research entry appends to §7 discovery evidence', () => {
+  it('refuses a blank title or source, appends otherwise, and audits the append', async () => {
+    const founder = await createFounder('research');
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/research`)
+      .set('cookie', admin.cookie)
+      .send({ title: '', sourceLink: 'x' })
+      .expect(400);
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/research`)
+      .set('cookie', admin.cookie)
+      .send({ title: 'Audience sizing', sourceLink: '' })
+      .expect(400);
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/research`)
+      .set('cookie', admin.cookie)
+      .send({
+        title: 'Audience sizing',
+        findings: 'Roughly 40k relevant viewers across three channels.',
+        sourceLink: 'https://example.com/notes',
+      })
+      .expect(200);
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.discovery.research).toEqual([
+      'Audience sizing — Roughly 40k relevant viewers across three channels. (https://example.com/notes)',
+    ]);
+
+    const rows = await auditRows('founder.research_recorded', founder.prospectId);
+    expect(rows).toHaveLength(1);
   });
 });

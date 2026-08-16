@@ -517,6 +517,18 @@ export const UNGATED_ADMIN_WRITES = [
       'Records that the Founder ASKED to close their account, and its provenance. Phase 20b’s decision for the §29.1 disclosures, applied here: writing down what somebody told us decides nothing, and the retention obligations §25.8 names are unaffected by it. The review that follows decides an outcome and takes the gate.',
   },
   {
+    route: 'POST /api/admin/founders/:prospectId/meeting-notes',
+    specRef: '§7 (migration 0047)',
+    reason:
+      'Writes down an off-platform conversation — §7’s discovery record as a dated, attributed entry. It moves no money, changes no configuration, enforces against nobody, and reaches nobody; the row is insert-only and the only later write the database permits is the §25.8 anonymising one.',
+  },
+  {
+    route: 'POST /api/admin/founders/:prospectId/research',
+    specRef: '§7',
+    reason:
+      'Appends one research finding to §7’s discovery-evidence list — the same record the intake form writes, through the same shape. Internal working context that reaches nobody and decides nothing; the invitation it may inform is composed and sent under its own gates.',
+  },
+  {
     route: 'POST /api/admin/affiliates',
     specRef: '§8',
     reason: 'Creates a Creator prospect and its association. No money, no standing, no configuration.',

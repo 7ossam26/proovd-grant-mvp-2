@@ -40,18 +40,40 @@ import type {
   ProfileOverrideKey,
   FounderHistoryCategory,
   AttentionAction,
+  DirectoryActionCell,
+  FounderDirectoryFilterKey,
 } from './logic.js';
 
 /* ── List ───────────────────────────────────────────────────────────────────*/
 
-/** One row of the Founders table. Everything it shows, already resolved. */
+/** One row of the Founders directory. Everything it shows, already resolved. */
 export interface FounderListRow {
   /** `founder_prospects.id` — the person, stable across archive-and-restart. */
   prospectId: string;
+  /** The stable quotable reference (`F-…`, migration 0047). */
+  recordReference: string;
   legalName: string;
   preferredName: string;
   email: string;
   productName: string;
+  businessName: string | null;
+  /** `founder_prospects.internal_owner` — free text, the 2026-08-16 decision. */
+  owner: string | null;
+
+  /** `Idea` | `Product` | `Proposed` — Proposed is the absence of a §9 lock. */
+  typeLabel: string;
+  /** The composed lifecycle label (`Live · Day 6`, `Invite draft`, …). */
+  lifecycle: string;
+
+  /** The two action columns: who owes the next step, or why nobody does. */
+  adminAction: DirectoryActionCell;
+  founderAction: DirectoryActionCell;
+
+  /** Which directory filter cards this row belongs to. Server-derived. */
+  filters: FounderDirectoryFilterKey[];
+  /** Server-composed search text — one source, so the palette and the filter
+   *  can never disagree about what matches (the Creators-directory rule). */
+  searchText: string;
 
   setup: { stage: FounderSetupStage; detail: string | null };
   account: FounderAccountState;
@@ -82,6 +104,8 @@ export type FounderAttention =
 
 export interface FounderHeader {
   prospectId: string;
+  /** The stable quotable reference in the record's eyebrow (migration 0047). */
+  recordReference: string;
   legalName: string;
   preferredName: string;
   businessName: string | null;
@@ -94,6 +118,14 @@ export interface FounderHeader {
   country: string | null;
   /** Deterministic 1–14 sticker index, derived from the id so it never moves. */
   sticker: number;
+
+  /** `Idea · locked` | `Product · locked` | `Proposed` — the header chip. */
+  typeChip: string;
+  /** The composed lifecycle label, same derivation as the directory row. */
+  lifecycle: string;
+  /** The two action cells, same kernel as the directory row. */
+  adminAction: DirectoryActionCell;
+  founderAction: DirectoryActionCell;
 
   account: FounderAccountState;
   setup: { stage: FounderSetupStage; detail: string | null };
@@ -339,6 +371,66 @@ export interface FounderHistoryEntry {
   source: string;
 }
 
+/* ── Detail: Discovery & internal context (2026-08-16 rebuild) ─────────────*/
+
+/**
+ * §7's discovery record, rendered under the record's own field names.
+ *
+ * The reference's five prose boxes are its fixture's paraphrase of exactly
+ * these fields; the recorded §7 vocabulary wins (the reconciliation's call).
+ * Every editable row names the intake key `PUT …/prospect` accepts, so the
+ * edit dialog and the intake form write through one path.
+ */
+export interface DiscoveryView {
+  fields: {
+    /** The prospect-update key this row edits, or null for a derived value. */
+    key: string | null;
+    label: string;
+    value: string | null;
+    helper: string | null;
+  }[];
+  /** §7's evidence list plus `Add research` entries — one record, one shape. */
+  research: string[];
+  meetingNotes: MeetingNoteView[];
+}
+
+/** One recorded meeting note (migration 0047). Insert-only; never edited. */
+export interface MeetingNoteView {
+  id: string;
+  /** Already formatted for rendering. */
+  meetingDate: string;
+  participants: string;
+  decisions: string;
+  followUp: string;
+  sourceLink: string;
+  notes: string | null;
+  recordedBy: string;
+  recordedAt: string;
+}
+
+/**
+ * The current campaign's live facts for the Overview panel and the hero line.
+ *
+ * Null before a campaign is scheduled to be live — §16a's rule: the panel then
+ * names what it is waiting for rather than rendering zeros.
+ */
+export interface CampaignFactsView {
+  campaignId: string;
+  /** Day N since `campaign_live_at`, or null before launch. */
+  campaignDay: number | null;
+  liveAt: string | null;
+  closesAt: string | null;
+  /** When public discovery opened or opens (14b), or null. */
+  discoveryOpenedAt: string | null;
+  /** Count of currently-active reservations. Null before anything can exist. */
+  activeBackers: number | null;
+  /** The Idea threshold from the build, or null (Product has none). */
+  threshold: number | null;
+  activeAffiliates: number | null;
+  /** The §18 public page, only while one exists (live or later). */
+  publicUrl: string | null;
+}
+
 /* ── The whole detail ───────────────────────────────────────────────────────*/
 
 export interface FounderWorkspaceDetail {
@@ -347,6 +439,8 @@ export interface FounderWorkspaceDetail {
   details: DetailsPane;
   campaigns: CampaignsPane;
   money: MoneyPane;
+  discovery: DiscoveryView;
+  campaignFacts: CampaignFactsView | null;
   history: FounderHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;

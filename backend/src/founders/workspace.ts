@@ -32,16 +32,19 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 
 import type {
+  CampaignFactsView,
   CampaignSummary,
   CampaignsPane,
   DetailField,
   DetailsPane,
+  DiscoveryView,
   FounderAttention,
   FounderHeader,
   FounderListRow,
   FounderMenuAction,
   FounderWorkspaceDetail,
   InvitationView,
+  MeetingNoteView,
   MoneyPane,
   MoneySection,
   OverrideField,
@@ -75,6 +78,15 @@ import {
 } from './logic.js';
 import { actorName, daysUntil, formatDay, formatInstant, resolveActorNames } from './format.js';
 import { historyCountsOf, readFounderHistory } from './history.js';
+import {
+  actionCells,
+  campaignDayOf,
+  directoryFilters,
+  directoryTypeLabel,
+  lifecycleLabel,
+  typeChipLabel,
+  type DirectoryFacts,
+} from './directory.js';
 
 import { campaigns, campaignAffiliateAssociations, reservations } from '../db/schema/domain.js';
 import {
@@ -92,12 +104,18 @@ import { listingFeePayments, listingFeeRefunds } from '../db/schema/listing.js';
 import { highEffortClassifications } from '../db/schema/workspace.js';
 import { stripeConnectedAccounts } from '../db/schema/payments.js';
 import { campaignEnforcementActions } from '../db/schema/support.js';
-import { founderGhostBans, campaignFulfillment, type FounderGhostBan } from '../db/schema/fulfillment.js';
+import {
+  founderGhostBans,
+  campaignFulfillment,
+  day14EvidenceSubmissions,
+  type FounderGhostBan,
+} from '../db/schema/fulfillment.js';
 import { notificationDigestPreferences } from '../db/schema/digest.js';
 import {
   founderAccessActions,
   founderDeletionRequests,
   founderDeletionReviews,
+  founderMeetingNotes,
 } from '../db/schema/founder-workspace.js';
 
 import { previewInvitation, type InvitationContext } from '../invitations/service.js';
@@ -460,12 +478,20 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
 
   const draftIds = draftRows.map((row) => row.draft.id);
 
-  const sendCounts = draftIds.length
+  // Every send row rather than a count: the directory's pre-claim lifecycle
+  // needs the LATEST send's delivery confirmation (`notification_id` null is
+  // "recorded, not confirmed" — Phase 06b's state), and admin-scale data makes
+  // the reduce cheaper than a second grouped query.
+  const sendRows = draftIds.length
     ? await db
-        .select({ draftId: campaignInvitationSends.draftId, count: sql<number>`count(*)::int` })
+        .select({
+          draftId: campaignInvitationSends.draftId,
+          notificationId: campaignInvitationSends.notificationId,
+          sentAt: campaignInvitationSends.sentAt,
+        })
         .from(campaignInvitationSends)
         .where(inArray(campaignInvitationSends.draftId, draftIds))
-        .groupBy(campaignInvitationSends.draftId)
+        .orderBy(desc(campaignInvitationSends.sentAt))
     : [];
 
   const vettingRows = draftIds.length
@@ -488,6 +514,7 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
       legalName: founderClaimProfiles.legalName,
       preferredName: founderClaimProfiles.preferredName,
       email: founderClaimProfiles.email,
+      businessName: founderClaimProfiles.businessName,
     })
     .from(founderClaimProfiles)
     .where(inArray(founderClaimProfiles.prospectId, prospectIds));
@@ -533,13 +560,35 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
         )
     : [];
 
+  // Which day_14_review campaigns already hold a submitted receipt, so the
+  // Founder column stops asking for evidence somebody already sent (§1.4).
+  const day14CampaignIds = draftRows
+    .filter((row) => row.campaign.status === 'day_14_review')
+    .map((row) => row.campaign.id);
+  const day14Receipts = day14CampaignIds.length
+    ? await db
+        .select({ campaignId: day14EvidenceSubmissions.campaignId })
+        .from(day14EvidenceSubmissions)
+        .where(inArray(day14EvidenceSubmissions.campaignId, day14CampaignIds))
+    : [];
+  const day14Submitted = new Set(day14Receipts.map((row) => row.campaignId));
+
   const draftsByProspect = new Map<string, typeof draftRows>();
   for (const row of draftRows) {
     const list = draftsByProspect.get(row.draft.prospectId) ?? [];
     list.push(row);
     draftsByProspect.set(row.draft.prospectId, list);
   }
-  const sendCountByDraft = new Map(sendCounts.map((row) => [row.draftId, row.count]));
+  const sendsByDraft = new Map<string, { count: number; latestConfirmed: boolean }>();
+  for (const row of sendRows) {
+    const entry = sendsByDraft.get(row.draftId);
+    if (entry) {
+      entry.count += 1;
+    } else {
+      // Rows arrive newest-first, so the first row seen per draft IS the latest.
+      sendsByDraft.set(row.draftId, { count: 1, latestConfirmed: row.notificationId !== null });
+    }
+  }
   const vettingByDraft = new Map(vettingRows.map((row) => [row.draftId, row]));
   const claimByProspect = new Map(claims.map((row) => [row.prospectId, row]));
   const latestAccessByProspect = new Map<string, { action: string; reason: string }>();
@@ -583,14 +632,74 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
         ? await readFounderPaymentStatus(db, { campaignId: current.campaign.id, now })
         : null;
 
+    const attention = deriveAttention({
+      accountState,
+      preferredName,
+      standingDetail: access?.action === 'suspend' ? access.reason : null,
+      moneyBlocker: firstMoneyBlocker(paymentStatus),
+      campaignIssue: current ? await campaignIssueOf(db, current.campaign) : null,
+    });
+
+    const sends = draft ? (sendsByDraft.get(draft.draft.id) ?? null) : null;
+    const facts: DirectoryFacts = {
+      status: current ? (current.campaign.status as DirectoryFacts['status']) : null,
+      typeRaw: current?.campaign.type ?? null,
+      typeLocked: current?.campaign.typeLockedAt !== null && current !== null,
+      sends: sends?.count ?? 0,
+      latestSendConfirmed: sends ? sends.latestConfirmed : null,
+      vettingAnswered: answered,
+      claimed: accountUserId !== null,
+      liveAt: current?.campaign.campaignLiveAt ?? null,
+      accountState,
+      attention,
+      preferredName,
+      day14EvidenceSubmitted: current ? day14Submitted.has(current.campaign.id) : false,
+      now,
+    };
+
+    const { adminAction, founderAction } = actionCells(facts);
+    const typeLabel = directoryTypeLabel(facts);
+    const lifecycle = lifecycleLabel(facts);
+    const legalName = claim?.legalName ?? prospect.legalName ?? '';
+    const email = claim?.email ?? prospect.email ?? '';
+    const businessName = claim?.businessName ?? prospect.businessName ?? null;
+    const owner = prospect.internalOwner ?? null;
+    const campaignName = current ? campaignNameOf(current.title, prospect.productName) : null;
+
     rows.push({
       prospectId: prospect.id,
-      legalName: claim?.legalName ?? prospect.legalName ?? '',
+      recordReference: prospect.recordReference,
+      legalName,
       preferredName,
-      email: claim?.email ?? prospect.email ?? '',
+      email,
       productName: prospect.productName ?? '',
+      businessName,
+      owner,
+      typeLabel,
+      lifecycle,
+      adminAction,
+      founderAction,
+      filters: directoryFilters(facts, adminAction),
+      // One source for every match: the search box, the Type filter's text
+      // fallback, and a future palette all read this — the Creators-directory
+      // rule, so two matchers can never disagree.
+      searchText: [
+        legalName,
+        preferredName,
+        email,
+        businessName,
+        prospect.productName,
+        owner,
+        prospect.recordReference,
+        campaignName,
+        typeLabel,
+        lifecycle,
+      ]
+        .filter((part): part is string => Boolean(part))
+        .join(' ')
+        .toLowerCase(),
       setup: deriveSetupStage({
-        invitationSent: (draft ? (sendCountByDraft.get(draft.draft.id) ?? 0) : 0) > 0,
+        invitationSent: (sends?.count ?? 0) > 0,
         answered,
         total: VETTING_STEP_LABELS.length,
         signupComplete: accountUserId !== null,
@@ -600,17 +709,11 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
       currentCampaign: current
         ? {
             campaignId: current.campaign.id,
-            name: campaignNameOf(current.title, prospect.productName),
+            name: campaignName ?? '',
             status: campaignStatusLabel(current.campaign.status),
           }
         : null,
-      attention: deriveAttention({
-        accountState,
-        preferredName,
-        standingDetail: access?.action === 'suspend' ? access.reason : null,
-        moneyBlocker: firstMoneyBlocker(paymentStatus),
-        campaignIssue: current ? await campaignIssueOf(db, current.campaign) : null,
-      }),
+      attention,
     });
   }
 
@@ -689,7 +792,10 @@ export function deriveAttention(input: AttentionInput): FounderAttention {
     return {
       needed: true,
       text: input.campaignIssue,
-      action: { label: 'Open campaign', act: 'parked-campaign' },
+      // A real destination since 2026-08-16: the Campaigns workspace owns
+      // campaign operations, and the surface resolves the campaign id from
+      // the same payload this attention rides on.
+      action: { label: 'Open campaign', act: 'open-campaign' },
     };
   }
   return { needed: false };
@@ -760,8 +866,56 @@ export async function readFounderWorkspace(
     preferredName: ctx.identity.preferredName,
   });
 
+  // The record header feeds the SAME directory kernels the list feeds, from
+  // the same facts, so the row an Admin clicked and the record that opens can
+  // never disagree about the person's type, lifecycle, or who owes what.
+  const currentDraftSends = ctx.currentDraft
+    ? await db
+        .select({
+          notificationId: campaignInvitationSends.notificationId,
+        })
+        .from(campaignInvitationSends)
+        .where(eq(campaignInvitationSends.draftId, ctx.currentDraft.id))
+        .orderBy(desc(campaignInvitationSends.sentAt))
+    : [];
+  const day14Receipt =
+    ctx.currentCampaign?.campaign.status === 'day_14_review'
+      ? await db
+          .select({ id: day14EvidenceSubmissions.id })
+          .from(day14EvidenceSubmissions)
+          .where(eq(day14EvidenceSubmissions.campaignId, ctx.currentCampaign.campaign.id))
+          .limit(1)
+      : [];
+
+  const facts: DirectoryFacts = {
+    status: ctx.currentCampaign
+      ? (ctx.currentCampaign.campaign.status as DirectoryFacts['status'])
+      : null,
+    typeRaw: ctx.currentCampaign?.campaign.type ?? null,
+    typeLocked:
+      ctx.currentCampaign !== null && ctx.currentCampaign.campaign.typeLockedAt !== null,
+    sends: currentDraftSends.length,
+    latestSendConfirmed:
+      currentDraftSends.length > 0 ? currentDraftSends[0]!.notificationId !== null : null,
+    vettingAnswered: overview.vetting.progress
+      .slice(0, VETTING_STEP_LABELS.length)
+      .filter((step) => step.done).length,
+    claimed: ctx.accountUserId !== null,
+    liveAt: ctx.currentCampaign?.campaign.campaignLiveAt ?? null,
+    accountState: ctx.accountState,
+    attention,
+    preferredName: ctx.identity.preferredName,
+    day14EvidenceSubmitted: day14Receipt.length > 0,
+    now,
+  };
+  const { adminAction, founderAction } = actionCells(facts);
+
+  const discovery = await composeDiscovery(db, ctx);
+  const campaignFacts = await composeCampaignFacts(db, ctx, now);
+
   const header: FounderHeader = {
     prospectId,
+    recordReference: ctx.prospect.recordReference,
     legalName: ctx.identity.legalName,
     preferredName: ctx.identity.preferredName,
     businessName: ctx.identity.businessName,
@@ -772,6 +926,10 @@ export async function readFounderWorkspace(
     state: ctx.identity.state,
     country: ctx.identity.country,
     sticker: stickerFor(prospectId),
+    typeChip: typeChipLabel(facts),
+    lifecycle: lifecycleLabel(facts),
+    adminAction,
+    founderAction,
     account: ctx.accountState,
     setup: setupStageOf(ctx, overview),
     paymentSetup: money.setup.value,
@@ -792,8 +950,156 @@ export async function readFounderWorkspace(
     details,
     campaigns: campaignsPane,
     money,
+    discovery,
+    campaignFacts,
     history,
     historyCounts: historyCountsOf(history),
+  };
+}
+
+/* ── Discovery & internal context (§7, 2026-08-16 rebuild) ─────────────────── */
+
+/**
+ * §7's discovery record under the record's own field names, plus the meeting
+ * notes (migration 0047) and the research entries.
+ *
+ * The `key` on each row is the `PUT …/:draftId/prospect` key it edits, so this
+ * panel and the intake form write through one path. A null key is a derived
+ * value with no edit control.
+ */
+async function composeDiscovery(db: Database, ctx: FounderContext): Promise<DiscoveryView> {
+  const noteRows = await db
+    .select()
+    .from(founderMeetingNotes)
+    .where(eq(founderMeetingNotes.prospectId, ctx.prospect.id))
+    .orderBy(desc(founderMeetingNotes.createdAt));
+
+  const meetingNotes: MeetingNoteView[] = [];
+  for (const note of noteRows) {
+    // An anonymised note's content is gone (0047's two-shape CHECK); the
+    // prospect it belonged to is anonymised too, so the record view simply
+    // omits it rather than rendering a row of blanks.
+    if (note.anonymisedAt !== null) continue;
+    meetingNotes.push({
+      id: note.id,
+      meetingDate:
+        (note.meetingDate ? formatDay(new Date(`${note.meetingDate}T00:00:00Z`)) : null) ?? '',
+      participants: note.participants ?? '',
+      decisions: note.decisions ?? '',
+      followUp: note.followUp ?? '',
+      sourceLink: note.sourceLink ?? '',
+      notes: note.notes,
+      recordedBy: note.createdBy,
+      recordedAt: formatInstant(note.createdAt) ?? '',
+    });
+  }
+
+  const p = ctx.prospect;
+  const evidence = Array.isArray(p.discoveryEvidence)
+    ? (p.discoveryEvidence as unknown[]).filter((e): e is string => typeof e === 'string')
+    : [];
+
+  return {
+    fields: [
+      { key: 'invitationSource', label: 'Discovery source', value: p.invitationSource, helper: null },
+      { key: 'internalOwner', label: 'Internal owner', value: p.internalOwner, helper: null },
+      { key: 'launchFrame', label: 'Launch frame', value: p.launchFrame, helper: null },
+      { key: 'usAgeFit', label: 'US and 18+ fit', value: p.usAgeFit, helper: null },
+      {
+        key: 'deliveryFeasibility',
+        label: 'Delivery feasibility',
+        value: p.deliveryFeasibility,
+        helper: null,
+      },
+      {
+        key: 'compensationExpectations',
+        label: 'Compensation expectations',
+        value: p.compensationExpectations,
+        helper: null,
+      },
+      {
+        key: 'affiliateSourcingHypothesis',
+        label: 'Creator-sourcing hypothesis',
+        value: p.affiliateSourcingHypothesis,
+        helper: null,
+      },
+      {
+        key: 'adminNotes',
+        label: 'Internal notes',
+        value: p.adminNotes,
+        helper: 'Internal to Proovd. Never rendered to the Founder, never read by the §9 prefill.',
+      },
+      {
+        key: null,
+        label: 'Last contact',
+        value: p.lastContactAt ? formatInstant(p.lastContactAt) : null,
+        helper: 'A record, never a schedule (§30).',
+      },
+    ],
+    research: evidence,
+    meetingNotes,
+  };
+}
+
+/* ── Current-campaign facts (2026-08-16 rebuild) ───────────────────────────── */
+
+/** The public page exists from launch onward (§18); before that there is none. */
+function publicUrlOf(campaign: FounderCampaignRow['campaign']): string | null {
+  return campaign.campaignLiveAt !== null ? `/campaign/${campaign.id}` : null;
+}
+
+/**
+ * The Overview panel's live facts. Null when there is no current campaign;
+ * counts are null before the campaign could have any (§16a: not yet populated
+ * is not zero).
+ */
+async function composeCampaignFacts(
+  db: Database,
+  ctx: FounderContext,
+  now: Date,
+): Promise<CampaignFactsView | null> {
+  const row = ctx.currentCampaign;
+  if (!row) return null;
+  const campaign = row.campaign;
+  const launched = campaign.campaignLiveAt !== null;
+
+  let activeBackers: number | null = null;
+  let activeAffiliates: number | null = null;
+  if (launched) {
+    const [backerCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(reservations)
+      .where(
+        and(eq(reservations.campaignId, campaign.id), eq(reservations.status, 'reserved_active')),
+      );
+    activeBackers = backerCount?.count ?? 0;
+
+    const [affiliateCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(campaignAffiliateAssociations)
+      .where(
+        and(
+          eq(campaignAffiliateAssociations.campaignId, campaign.id),
+          eq(campaignAffiliateAssociations.status, 'active'),
+        ),
+      );
+    activeAffiliates = affiliateCount?.count ?? 0;
+  }
+
+  return {
+    campaignId: campaign.id,
+    campaignDay: campaignDayOf(campaign.campaignLiveAt, now),
+    liveAt: campaign.campaignLiveAt ? formatInstant(campaign.campaignLiveAt) : null,
+    closesAt: campaign.campaignCloseAt ? formatInstant(campaign.campaignCloseAt) : null,
+    discoveryOpenedAt: campaign.discoveryOpenedAt
+      ? formatInstant(campaign.discoveryOpenedAt)
+      : null,
+    activeBackers,
+    // The threshold is the Founder's own build value; an unset one stays null
+    // and the surface says so rather than inventing a denominator.
+    threshold: campaign.type === 'pre_build' ? (row.orderThreshold ?? null) : null,
+    activeAffiliates,
+    publicUrl: publicUrlOf(campaign),
   };
 }
 

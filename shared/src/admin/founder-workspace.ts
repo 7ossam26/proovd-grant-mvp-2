@@ -1,10 +1,11 @@
 /**
  * The Founder Admin workspace vocabulary — Spec §26.1, §26.2, §3.1, §7, §23.1.
  *
- * The workspace is one person seen five ways: Overview (how they arrived),
- * Details (who they are), Campaigns (what they are running), Money (what is
- * owed and what blocks it), and History (everything that happened). This file
- * owns the words all five use, so no surface invents a second name for a state
+ * The workspace is one person: a directory row, a record with eight sections
+ * (rebuilt 2026-08-16 to the supplied reference — Overview, Onboarding,
+ * Campaign, Affiliates, Backers & Demand, Money & Fulfillment, Support &
+ * Enforcement, History), and the dialogs that write against it. This file owns
+ * the words all of them use, so no surface invents a second name for a state
  * the product already has one for.
  *
  * ── Why a label register exists at all ──────────────────────────────────────
@@ -95,6 +96,250 @@ export function campaignStatusLabel(status: string): string {
 export function isCampaignStatus(value: string): value is CampaignStatus {
   return (CAMPAIGN_STATUSES as readonly string[]).includes(value);
 }
+
+/* ─────────────────────────────── The directory (2026-08-16 rebuild) ────── */
+
+/**
+ * The six filter cards across the top of the directory, in the reference's
+ * order and wording.
+ *
+ * Membership is the SERVER's answer — the Creators-workspace rule: two
+ * derivations of "needs Admin" is two answers waiting to disagree, and §26.2
+ * needs a `prior_value` to override against, which a browser-derived value
+ * does not have. The rules recorded here are documentation of what the backend
+ * derives, not something a surface re-computes:
+ *
+ *   all          every prospect.
+ *   needs_admin  the Admin action column is due (the same kernel as the row).
+ *   invited      an invitation send exists and no account claim does.
+ *   onboarding   claimed, and the current campaign has not reached `live`.
+ *   live         the current campaign is `live`.
+ *   pre_invite   no invitation send exists yet.
+ *
+ * The cards may overlap (a live campaign can need Admin), which is why they
+ * are filters rather than a partition.
+ */
+export const FOUNDER_DIRECTORY_FILTERS = [
+  { key: 'all', title: 'All Founders', subtitle: 'Complete directory' },
+  { key: 'needs_admin', title: 'Needs Admin', subtitle: 'Decisions and exceptions' },
+  { key: 'invited', title: 'Invited — not accepted', subtitle: 'Waiting for claim' },
+  { key: 'onboarding', title: 'Onboarding', subtitle: 'Claimed and moving' },
+  { key: 'live', title: 'Live', subtitle: 'Campaigns to watch' },
+  { key: 'pre_invite', title: 'Pre-invite', subtitle: 'Research ready' },
+] as const;
+
+export type FounderDirectoryFilterKey = (typeof FOUNDER_DIRECTORY_FILTERS)[number]['key'];
+
+export const FOUNDER_DIRECTORY_FILTER_KEYS = FOUNDER_DIRECTORY_FILTERS.map(
+  (f) => f.key,
+) as readonly FounderDirectoryFilterKey[];
+
+/**
+ * The directory's Type filter.
+ *
+ * `proposed` is the reference's word for a campaign whose type is not locked
+ * yet — the ABSENCE of a §9 decision, never a third type. §9 locks Idea or
+ * Product at submission and nothing else exists, so `Proposed` appears in this
+ * filter vocabulary and in the derived directory label, and in no type
+ * register anywhere: adding it to `CAMPAIGN_TYPE_LABELS` would mint the third
+ * type §9 forbids.
+ */
+export const FOUNDER_TYPE_FILTERS = [
+  { key: 'all', label: 'All types' },
+  { key: 'idea', label: 'Idea' },
+  { key: 'product', label: 'Product' },
+  { key: 'proposed', label: 'Proposed' },
+] as const;
+
+export type FounderTypeFilterKey = (typeof FOUNDER_TYPE_FILTERS)[number]['key'];
+
+/** The derived label for an unlocked type. Not a member of any type register. */
+export const PROPOSED_TYPE_LABEL = 'Proposed' as const;
+
+/**
+ * One cell of the directory's two action columns.
+ *
+ * The reference splits today's single attention chip into "who owes the next
+ * step" — an Admin column and a Founder column — and every no-action state
+ * carries its reason (§1.4: `No action — draft saved` beats a bare dash).
+ * `due` renders emphasised; `none` renders quiet. The label is always the
+ * whole sentence — the server composes it, the surface styles it.
+ */
+export type DirectoryActionKind = 'due' | 'none';
+
+export interface DirectoryActionCell {
+  readonly kind: DirectoryActionKind;
+  readonly label: string;
+}
+
+/** The Founder column's two fixed no-action words, from the reference. */
+export const WAITING_ON_PROOVD_LABEL = 'Waiting on Proovd' as const;
+export const NO_ACCESS_YET_LABEL = 'No access yet' as const;
+
+/**
+ * The Founder's own default next step, per §23.1 lifecycle state.
+ *
+ * Total over the 27 states so a 28th without a decision fails the build.
+ * `null` means the state asks nothing of the Founder — the cell then reads
+ * `Waiting on Proovd` when Admin owes the next step, or `No action needed`.
+ *
+ * These are DEFAULTS: the backend refines where a finer record answers better
+ * (an open Day 14 review with evidence already submitted stops asking for it;
+ * a §22.3 blocker names the exact secure action). Nothing here invents a
+ * deadline or a rule — every label names the act the state's own Spec section
+ * already asks of the Founder.
+ */
+export const FOUNDER_NEXT_STEP_LABELS = {
+  invited_draft: null, // derived from the invitation record, not the status
+  vetting_submitted: 'Complete the account claim',
+  account_claimed: 'Continue campaign setup',
+  stripe_onboarding_pending: 'Finish payment setup',
+  listing_fee_pending: 'Pay the listing fee',
+  affiliate_response_and_build: 'Finish the campaign build',
+  pending_review: null,
+  changes_required: 'Address the requested changes',
+  approved: null,
+  creator_prep: null,
+  creator_replacement: null,
+  refunded_no_creator: null,
+  live: null,
+  closed_pending_capture: null,
+  capture_retry_window: null,
+  closed_reconciling: null,
+  captured_pending_w9: 'Submit the W-9 securely',
+  single_payment_released: null,
+  first_payment_released: null,
+  day_14_review: 'Submit Day 14 progress evidence',
+  remaining_payment_released: null,
+  fulfilled: null,
+  closed_resolved: null,
+  ended_no_charge: null,
+  suspended: null,
+  killed: null,
+  banned_founder: null,
+} as const satisfies Record<CampaignStatus, string | null>;
+
+/* ───────────────────────── The record's sections (2026-08-16 rebuild) ──── */
+
+/**
+ * The eight sections of the Founder record and their sub-tabs, in the
+ * reference's order and wording.
+ *
+ * The section and sub-tab live in the URL (`?section=…&tab=…`, DNA §5.12) so
+ * a record state can be linked to. `built` records which sections this
+ * rebuild's Session A ships in their final shape — the others render the
+ * surface that currently owns their content, honestly labelled, until
+ * Sessions B and C replace them (§1.4: an interim that says what it is beats
+ * a mock of what it will be).
+ */
+export const FOUNDER_RECORD_SECTIONS = [
+  { key: 'overview', label: 'Overview', tabs: [] },
+  {
+    key: 'onboarding',
+    label: 'Onboarding',
+    tabs: [
+      { key: 'invite', label: 'Invite & Prefills' },
+      { key: 'eligibility', label: 'Eligibility' },
+      { key: 'optional', label: 'Optional Items' },
+      { key: 'stripe', label: 'Stripe & Listing Fee' },
+    ],
+  },
+  {
+    key: 'campaign',
+    label: 'Campaign',
+    tabs: [
+      { key: 'details', label: 'Details' },
+      { key: 'review', label: 'Review' },
+      { key: 'live', label: 'Live' },
+      { key: 'page', label: 'Page & Updates' },
+    ],
+  },
+  {
+    key: 'affiliates',
+    label: 'Affiliates',
+    tabs: [
+      { key: 'relationships', label: 'Relationships' },
+      { key: 'requests', label: 'Requests' },
+      { key: 'performance', label: 'Performance & Completion' },
+    ],
+  },
+  {
+    key: 'backers',
+    label: 'Backers & Demand',
+    tabs: [
+      { key: 'demand', label: 'Demand' },
+      { key: 'responses', label: 'Responses' },
+      { key: 'backers', label: 'Backers' },
+    ],
+  },
+  {
+    key: 'money',
+    label: 'Money & Fulfillment',
+    tabs: [
+      { key: 'close', label: 'Close' },
+      { key: 'payments', label: 'Payments' },
+      { key: 'fulfillment', label: 'Fulfillment' },
+      { key: 'refunds', label: 'Refunds & Recovery' },
+    ],
+  },
+  {
+    key: 'support',
+    label: 'Support & Enforcement',
+    tabs: [
+      { key: 'support', label: 'Support' },
+      { key: 'cancellation', label: 'Cancellation' },
+      { key: 'enforcement', label: 'Enforcement' },
+    ],
+  },
+  {
+    key: 'history',
+    label: 'History',
+    tabs: [
+      { key: 'timeline', label: 'Timeline' },
+      { key: 'communications', label: 'Communications' },
+    ],
+  },
+] as const;
+
+export type FounderRecordSectionKey = (typeof FOUNDER_RECORD_SECTIONS)[number]['key'];
+
+export const FOUNDER_RECORD_SECTION_KEYS = FOUNDER_RECORD_SECTIONS.map(
+  (s) => s.key,
+) as readonly FounderRecordSectionKey[];
+
+/* ─────────────────────────────── Meeting notes (§7, migration 0047) ────── */
+
+/**
+ * The meeting-note dialog's fields, in the reference's order.
+ *
+ * Five required facts and one optional body. The point of a meeting note is
+ * exactly the fields the reference requires — "Keep the decision,
+ * participants, follow-up, and source attached to this Founder" — so the
+ * service refuses a blank one by name and migration 0047's two-shape CHECK
+ * refuses it regardless.
+ */
+export const MEETING_NOTE_FIELDS = [
+  { key: 'meetingDate', label: 'Meeting date', required: true },
+  { key: 'participants', label: 'Participants', required: true },
+  { key: 'notes', label: 'Notes', required: false },
+  { key: 'decisions', label: 'Decisions', required: true },
+  { key: 'followUp', label: 'Follow-up', required: true },
+  { key: 'sourceLink', label: 'Source or link', required: true },
+] as const;
+
+export type MeetingNoteFieldKey = (typeof MEETING_NOTE_FIELDS)[number]['key'];
+
+/**
+ * The research dialog's fields (the reference's `Add research`). A research
+ * entry is a `discovery_evidence` line — §7's "Admin notes and discovery
+ * evidence" — composed as one stored string, so the intake's evidence list
+ * and this dialog stay one record with one shape.
+ */
+export const RESEARCH_ENTRY_FIELDS = [
+  { key: 'title', label: 'Research title', required: true },
+  { key: 'findings', label: 'Research findings', required: false },
+  { key: 'sourceLink', label: 'Source or link', required: true },
+] as const;
 
 /* ─────────────────────────────────────────────────────── Account standing */
 
@@ -503,11 +748,24 @@ export const HISTORY_AUDIT_NOTE =
  * §1.4: a control that claims a capability the product does not have is worse
  * than no control. Each message names what the destination IS, so an Admin
  * reading it learns where the work will live rather than that something broke.
+ *
+ * ── What LEFT this register on 2026-08-16, and why ──────────────────────────
+ * `campaign` — the Campaigns workspace was built 2026-08-15; the link is a
+ * real route to `/admin/campaigns/:id`. `support` — the Support workspace was
+ * built 2026-08-13; the link is a real route to `/admin/support` (unfiltered:
+ * the support queue takes no search parameter yet, and the link says so
+ * rather than promising a filter it cannot deliver). `tabs` — it was doing
+ * double duty for the shell's parked Today nav AND the Money pane's W-9
+ * action, and its sentence ("Parked while the Founder workspace is built")
+ * had been false since 2026-08-10. It is split into `today` and `w9Close`.
  */
 export const PARKED_MESSAGES = {
-  tabs: 'Parked while the Founder workspace is built.',
-  campaign: 'This opens the Campaign workspace — parked for now.',
-  support: 'The support console is parked for now.',
+  today:
+    'The Today overview is parked. Founders, Creators, Campaigns, Support, and Backers are the sections that exist.',
+  explorePanels:
+    'This opens the reservation ledger, money controls, and risk panels — their screens are not rebuilt yet; their APIs and §33 suites are live.',
+  w9Close:
+    'W-9 requests and decisions are close-operations work — that console is not rebuilt yet; the §22.3 services behind it are live.',
   creatorFit: 'The Creator-fit review queue is parked for now.',
   photo: 'Photo upload is parked for now.',
   stripeHosted: 'The Stripe-hosted page is parked for now.',
@@ -550,11 +808,18 @@ export const IDENTITY_CHECK_HELPER =
   'Identity verification is managed by Stripe. Proovd stores the verification ' +
   'status, not Stripe’s government ID documents.';
 
-/** The attention box's jump targets, so the surface cannot invent a sixth. */
+/**
+ * The attention box's jump targets, so the surface cannot invent a sixth.
+ *
+ * `open-campaign` replaced `parked-campaign` on 2026-08-16: the Campaigns
+ * workspace exists at `/admin/campaigns/:id`, so a campaign issue routes to
+ * the workspace that owns campaign operations rather than to a toast about
+ * one that did not exist yet.
+ */
 export const ATTENTION_ACTIONS = [
   'jump-access',
   'jump-overview',
   'jump-money',
-  'parked-campaign',
+  'open-campaign',
 ] as const;
 export type AttentionAction = (typeof ATTENTION_ACTIONS)[number];

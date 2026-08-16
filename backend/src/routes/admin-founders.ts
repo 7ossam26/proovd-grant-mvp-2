@@ -101,6 +101,8 @@ import {
 } from '../founders/workspace.js';
 import {
   addFounder,
+  addMeetingNote,
+  addResearchEntry,
   banFounder,
   clearInvitationOverride,
   recordAccessAction,
@@ -1011,6 +1013,81 @@ export function createAdminFoundersRouter({
       await sendWorkspace(res, req.params['prospectId'] as string);
     },
   );
+
+  /* ── Meeting notes and research (§7, migration 0047) ───────────────────── */
+
+  /**
+   * Both record internal working context — §7's "Admin notes and discovery
+   * evidence" — and neither takes the freshness gate: writing down what a
+   * conversation produced moves no money, changes no configuration, enforces
+   * against nobody, and reaches nobody. Both are in `UNGATED_ADMIN_WRITES`
+   * with that reason. The author is the session, never the body.
+   */
+  router.post(
+    `${ADMIN_FOUNDERS_PATH}/:prospectId/meeting-notes`,
+    admin,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await addMeetingNote(
+        mutations,
+        {
+          prospectId: req.params['prospectId'] as string,
+          meetingDate: str(body, 'meetingDate') ?? '',
+          participants: str(body, 'participants') ?? '',
+          decisions: str(body, 'decisions') ?? '',
+          followUp: str(body, 'followUp') ?? '',
+          sourceLink: str(body, 'sourceLink') ?? '',
+          notes: str(body, 'notes'),
+        },
+        whoOf(req),
+      );
+
+      if (!result.ok) {
+        if (result.code === 'not_found') {
+          notFound(res, 'No such Founder', result.message);
+          return;
+        }
+        if (result.code === 'invalid') {
+          badRequest(res, result.message, 'Nothing has been recorded.');
+          return;
+        }
+        refused(res, 'That note was not recorded', result.message);
+        return;
+      }
+
+      await sendWorkspace(res, req.params['prospectId'] as string);
+    },
+  );
+
+  router.post(`${ADMIN_FOUNDERS_PATH}/:prospectId/research`, admin, json, async (req, res) => {
+    const body = req.body as Record<string, unknown>;
+    const result = await addResearchEntry(
+      mutations,
+      {
+        prospectId: req.params['prospectId'] as string,
+        title: str(body, 'title') ?? '',
+        findings: str(body, 'findings'),
+        sourceLink: str(body, 'sourceLink') ?? '',
+      },
+      whoOf(req),
+    );
+
+    if (!result.ok) {
+      if (result.code === 'not_found') {
+        notFound(res, 'No such Founder', result.message);
+        return;
+      }
+      if (result.code === 'invalid') {
+        badRequest(res, result.message, 'Nothing has been recorded.');
+        return;
+      }
+      refused(res, 'That research was not recorded', result.message);
+      return;
+    }
+
+    await sendWorkspace(res, req.params['prospectId'] as string);
+  });
 
   /* ── §22.10 next-campaign readiness ────────────────────────────────────── */
 

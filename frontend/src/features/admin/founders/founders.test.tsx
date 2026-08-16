@@ -200,10 +200,19 @@ const identity: AdminIdentity = {
 function raeRow(): FounderListRow {
   return {
     prospectId: PROSPECT,
+    recordReference: 'F-7K3MQ',
     legalName: 'Rae Harlow',
     preferredName: 'Rae',
     email: 'rae@harlow.example',
     productName: PRODUCT,
+    businessName: 'Harlow Instruments LLC',
+    owner: 'Sam Okafor',
+    typeLabel: 'Product',
+    lifecycle: STATUS_LABEL,
+    adminAction: { kind: 'due', label: 'The W-9 has not been requested for this campaign yet.' },
+    founderAction: { kind: 'due', label: 'Finish the campaign build' },
+    filters: ['all', 'needs_admin', 'onboarding'],
+    searchText: 'rae harlow rae@harlow.example harlow instruments the bench lamp sam okafor',
     setup: { stage: 'Setup complete', detail: 'Answers submitted Aug 1, 2026' },
     account: 'Active',
     paymentSetup: 'Complete',
@@ -220,10 +229,19 @@ function raeRow(): FounderListRow {
 function quietRow(): FounderListRow {
   return {
     prospectId: QUIET_PROSPECT,
+    recordReference: 'F-9XW2H',
     legalName: 'Nils Aro',
     preferredName: 'Nils',
     email: 'nils@aro.example',
     productName: 'Field Notebook',
+    businessName: null,
+    owner: 'Mina Park',
+    typeLabel: 'Proposed',
+    lifecycle: 'Invite sent',
+    adminAction: { kind: 'none', label: 'No action — Nils owns the next step' },
+    founderAction: { kind: 'due', label: 'Accept the private invitation' },
+    filters: ['all', 'invited'],
+    searchText: 'nils aro nils@aro.example field notebook mina park',
     setup: { stage: 'Invite sent', detail: null },
     account: 'Not created yet',
     paymentSetup: 'Not started',
@@ -246,6 +264,14 @@ function workspaceFixture(): FounderWorkspaceDetail {
       state: 'NY',
       country: 'US',
       sticker: 7,
+      recordReference: 'F-7K3MQ',
+      typeChip: 'Product · locked',
+      lifecycle: STATUS_LABEL,
+      adminAction: {
+        kind: 'due',
+        label: 'The W-9 has not been requested for this campaign yet.',
+      },
+      founderAction: { kind: 'due', label: 'Finish the campaign build' },
       account: 'Active',
       setup: { stage: 'Setup complete', detail: null },
       paymentSetup: 'Complete',
@@ -505,6 +531,17 @@ function workspaceFixture(): FounderWorkspaceDetail {
         source: 'possible_creator_results',
       },
     ],
+    discovery: {
+      fields: [
+        { key: 'invitationSource', label: 'Discovery source', value: 'Proovd research', helper: null },
+        { key: 'internalOwner', label: 'Internal owner', value: 'Sam Okafor', helper: null },
+        { key: 'adminNotes', label: 'Internal notes', value: null, helper: null },
+        { key: null, label: 'Last contact', value: null, helper: 'A record, never a schedule (§30).' },
+      ],
+      research: [],
+      meetingNotes: [],
+    },
+    campaignFacts: null,
     historyCounts: {
       invite: 1,
       account: 0,
@@ -569,7 +606,7 @@ async function renderList(): Promise<Rendered> {
 
 async function renderWorkspace(): Promise<Rendered> {
   const view = await renderAdmin(`/admin/founders/${PROSPECT}`);
-  await screen.findByRole('tablist', { name: 'Founder workspace' });
+  await screen.findByRole('tablist', { name: 'Founder record sections' });
   return view;
 }
 
@@ -606,7 +643,23 @@ function controlsIn(root: HTMLElement): HTMLElement[] {
   ];
 }
 
-const PANE_LABELS = ['Overview', 'Details', 'Campaigns', 'Money', 'History'] as const;
+/**
+ * The eight sections of the 2026-08-16 rebuild, in the reference's order.
+ * `Affiliates` is the reference's own record vocabulary — the Creators
+ * workspace set the precedent on 2026-08-11: the shell says Creators, an
+ * Admin RECORD may say Affiliate, and §3.1's scope is what renders to
+ * Founders and Backers.
+ */
+const SECTION_LABELS = [
+  'Overview',
+  'Onboarding',
+  'Campaign',
+  'Affiliates',
+  'Backers & Demand',
+  'Money & Fulfillment',
+  'Support & Enforcement',
+  'History',
+] as const;
 
 async function openTab(user: ReturnType<typeof userEvent.setup>, label: string): Promise<void> {
   await user.click(screen.getByRole('tab', { name: label }));
@@ -704,7 +757,7 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
 
     await user.click(screen.getByRole('button', { name: 'Today' }));
 
-    expect(toastMessages()).toContain(PARKED_MESSAGES.tabs);
+    expect(toastMessages()).toContain(PARKED_MESSAGES.today);
     expect(router.state.location.pathname).toBe('/admin/founders');
   });
 
@@ -728,51 +781,42 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
 /* ── 2. The list ───────────────────────────────────────────────────────────── */
 
 describe('§26.1 — the Founders table', () => {
-  it('renders exactly the eight columns, in order', async () => {
+  it('renders exactly the five columns, in order', async () => {
+    // The 2026-08-16 rebuild: the reference's five-column directory. Setup,
+    // account, and payment facts moved into the record; the campaign cell
+    // became Type / Lifecycle; the attention chip became two action columns.
     await renderList();
     expect(
       screen.getAllByRole('columnheader').map((cell) => cell.textContent),
-    ).toEqual([
-      'Founder',
-      'Email',
-      'Setup',
-      'Account',
-      'Payment setup',
-      'Current campaign',
-      'Campaign status',
-      'Attention',
-    ]);
+    ).toEqual(['Founder', 'Type / Lifecycle', 'Admin action', 'Founder action', 'Owner']);
   });
 
-  it('shows the founder, setup, account, payment setup, campaign, and attention', async () => {
+  it('shows the founder with their business and email under the name', async () => {
     await renderList();
     const row = screen.getByRole('link', { name: 'Rae Harlow' }).closest('tr') as HTMLElement;
 
-    // The product sits under the name; the campaign is its own control in the
-    // sixth column, and both happen to be called the same thing here.
-    expect(row.querySelector('.fdr-sub')).toHaveTextContent(PRODUCT);
-    expect(within(row).getByText('rae@harlow.example')).toBeInTheDocument();
-    expect(within(row).getByText('Setup complete')).toBeInTheDocument();
-    expect(within(row).getByText('Answers submitted Aug 1, 2026')).toBeInTheDocument();
-    expect(within(row).getByText('Active')).toBeInTheDocument();
-    expect(within(row).getByText('Complete')).toBeInTheDocument();
-    expect(within(row).getByRole('button', { name: PRODUCT })).toBeInTheDocument();
-    expect(within(row).getByText(STATUS_LABEL)).toBeInTheDocument();
+    expect(row.querySelector('.fdr-sub')).toHaveTextContent(
+      'Harlow Instruments LLC · rae@harlow.example',
+    );
+    // The avatar square is decoration; the name is the control.
+    expect(row.querySelector('.fdir-avatar')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('chips only the row that needs attention, and names the other state', async () => {
+  it('emphasises a due action and names why the quiet cell is quiet', async () => {
+    // The single attention chip became two named action columns, and every
+    // no-action state carries its reason (§1.4: `No action — …` beats a blank
+    // cell that reads as missing data).
     await renderList();
     const rae = screen.getByRole('link', { name: 'Rae Harlow' }).closest('tr') as HTMLElement;
     const nils = screen.getByRole('link', { name: 'Nils Aro' }).closest('tr') as HTMLElement;
 
-    expect(within(rae).getByText(ATTENTION_CHIP_LABEL)).toBeInTheDocument();
-    expect(within(rae).getByText(/W-9 has not been requested/)).toBeInTheDocument();
-
-    // Not a blank cell: an empty attention column reads as missing data rather
-    // than as a done-moment (DNA §5.4).
-    expect(within(nils).queryByText(ATTENTION_CHIP_LABEL)).toBeNull();
-    expect(within(nils).getByText(NO_ATTENTION_ROW_LABEL)).toBeInTheDocument();
-    expect(within(nils).getByText(NO_ACTIVE_CAMPAIGN_LABEL)).toBeInTheDocument();
+    expect(within(rae).getByText(/W-9 has not been requested/)).toHaveClass('fdir-due');
+    expect(within(nils).getByText('No action — Nils owns the next step')).toHaveClass(
+      'fdir-none',
+    );
+    expect(within(nils).getByText('Accept the private invitation')).toHaveClass(
+      'fdir-due--founder',
+    );
   });
 
   it('opens the workspace when the row is clicked', async () => {
@@ -781,7 +825,7 @@ describe('§26.1 — the Founders table', () => {
     const row = screen.getByRole('link', { name: 'Rae Harlow' }).closest('tr') as HTMLElement;
 
     // A press on an ordinary cell, not on a control of its own.
-    await user.click(within(row).getByText('rae@harlow.example'));
+    await user.click(within(row).getByText('Sam Okafor'));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/admin/founders/${PROSPECT}`);
@@ -807,17 +851,22 @@ describe('§26.1 — the Founders table', () => {
     });
   });
 
-  it('answers the campaign link with what it is, and does not navigate', async () => {
-    const user = userEvent.setup();
-    const { router } = await renderList();
+  it('renders each row’s type chip, lifecycle, and both action columns', async () => {
+    // The 2026-08-16 rebuild: the campaign cell became the Type/Lifecycle
+    // column, and the single attention chip became two named action columns.
+    // The old assertion — that the campaign control toasts a parked message —
+    // consciously changed: the Campaigns workspace exists, and the record
+    // links into it from the workspace header instead.
+    await renderList();
     const row = screen.getByRole('link', { name: 'Rae Harlow' }).closest('tr') as HTMLElement;
 
-    await user.click(within(row).getByRole('button', { name: PRODUCT }));
-
-    expect(toastMessages()).toContain(PARKED_MESSAGES.campaign);
-    // Two answers to one press is the worst of both behaviours, which is why
-    // the parked handler stops the row's own click.
-    expect(router.state.location.pathname).toBe('/admin/founders');
+    expect(within(row).getByText('Product')).toBeInTheDocument();
+    expect(within(row).getByText(STATUS_LABEL)).toBeInTheDocument();
+    expect(
+      within(row).getByText('The W-9 has not been requested for this campaign yet.'),
+    ).toBeInTheDocument();
+    expect(within(row).getByText('Finish the campaign build')).toBeInTheDocument();
+    expect(within(row).getByText('Sam Okafor')).toBeInTheDocument();
   });
 });
 
@@ -850,7 +899,7 @@ describe('§27.1, §1.1 — loading, empty, and failure each answer for themselv
     hangOn(/\/api\/admin\/founders/, adminRoutes());
     const { container } = await renderAdmin('/admin/founders');
 
-    expect(await screen.findByText('Reading the Founders list')).toBeInTheDocument();
+    expect(await screen.findByText('Reading the Founders directory')).toBeInTheDocument();
     expect(unansweredQuestions(container)).toEqual([]);
     expect(screen.getAllByText('Admin · Founders').length).toBeGreaterThan(0);
   });
@@ -863,7 +912,7 @@ describe('§27.1, §1.1 — loading, empty, and failure each answer for themselv
     expect(screen.queryByRole('table')).toBeNull();
     // An empty list is a state somebody can act on, so the panel carries the
     // one action that changes it.
-    expect(screen.getAllByRole('button', { name: 'Add founder' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: 'Create Founder' }).length).toBeGreaterThan(0);
     expect(unansweredQuestions(container)).toEqual([]);
   });
 
@@ -901,7 +950,7 @@ describe('§27.1, §1.1 — loading, empty, and failure each answer for themselv
 
 /* ── 4. The workspace shell ────────────────────────────────────────────────── */
 
-describe('§26.1 — one person, five panes', () => {
+describe('§26.1 — one person, eight sections', () => {
   it('titles the page with the person and renders exactly one h1', async () => {
     const { container } = await renderWorkspace();
     const headings = [...container.querySelectorAll('h1')];
@@ -909,46 +958,61 @@ describe('§26.1 — one person, five panes', () => {
     expect(headings[0]).toHaveTextContent('Rae Harlow');
   });
 
-  it('renders the five tabs and switches between them', async () => {
+  it('renders the eight sections and switches between them', async () => {
     const user = userEvent.setup();
     await renderWorkspace();
 
-    const tablist = screen.getByRole('tablist', { name: 'Founder workspace' });
+    const tablist = screen.getByRole('tablist', { name: 'Founder record sections' });
     expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      ...PANE_LABELS,
+      ...SECTION_LABELS,
     ]);
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
-    expect(screen.getByRole('heading', { name: 'Invitation', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Founder summary', level: 2 })).toBeInTheDocument();
 
-    await openTab(user, 'Money');
+    // The invitation-and-setup record lives under Onboarding now (Session A's
+    // honest interim: the pane that owns the content, under the section that
+    // will hold its four tabs).
+    await openTab(user, 'Onboarding');
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-selected',
       'false',
     );
+    expect(screen.getByRole('heading', { name: 'Invitation', level: 2 })).toBeInTheDocument();
+
+    await openTab(user, 'Money & Fulfillment');
     expect(screen.getByRole('heading', { name: 'Payment setup', level: 2 })).toBeInTheDocument();
-    // Only the active pane is mounted — a hidden pane is still in the
+    // Only the active section is mounted — a hidden pane is still in the
     // accessibility tree and still runs its effects.
     expect(screen.queryByRole('heading', { name: 'Invitation', level: 2 })).toBeNull();
   });
 
-  it('shows the five header statuses and the attention the payload carried', async () => {
+  it('shows the record reference, both chips, the strip, and the decision card', async () => {
+    // The 2026-08-16 rebuild: the header's five-status grid became the
+    // reference's shape — the quotable reference in the eyebrow, the type and
+    // lifecycle chips, the Problem/Solution/Business strip — and the
+    // attention chip became the Overview's decision card, whose one primary
+    // is a routing verb.
     const { container } = await renderWorkspace();
-    const status = container.querySelector('.fstatus') as HTMLElement;
 
-    expect([...status.querySelectorAll('dt')].map((term) => term.textContent)).toEqual([
-      'Account',
-      'Founder setup',
-      'Payment setup',
-      'Current campaign',
-      'Campaign status',
+    expect(visibleText(container)).toContain('Founder record · F-7K3MQ');
+    expect(container.querySelector('.frec-chip--type')).toHaveTextContent('Product · locked');
+    expect(container.querySelector('.frec-chip--life')).toHaveTextContent(STATUS_LABEL);
+
+    const strip = container.querySelector('.frec-strip') as HTMLElement;
+    expect([...strip.querySelectorAll('dt')].map((term) => term.textContent)).toEqual([
+      'Problem',
+      'Solution',
+      'Business',
     ]);
-    expect(within(status).getByText(STATUS_LABEL)).toBeInTheDocument();
 
-    expect(screen.getByText(ATTENTION_CHIP_LABEL)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open the money record' })).toBeInTheDocument();
+    const decide = container.querySelector('.fov-decide') as HTMLElement;
+    expect(within(decide).getByText(/W-9 has not been requested/)).toBeInTheDocument();
+    expect(
+      within(decide).getByRole('button', { name: 'Open the money record' }),
+    ).toBeInTheDocument();
   });
 
   it('offers exactly the actions the payload permits, and nothing else', async () => {
@@ -960,7 +1024,7 @@ describe('§26.1 — one person, five panes', () => {
     serve(adminRoutes({ workspace: detail }));
 
     await renderWorkspace();
-    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('button', { name: 'Account actions' }));
 
     const menu = await screen.findByRole('menu');
     expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
@@ -987,7 +1051,10 @@ describe('§26.1 — one person, five panes', () => {
 
 describe('the setup answers are the Founder’s own, with legacy Competition preserved', () => {
   it('renders every answer with its provenance and no way to change any of them', async () => {
+    const user = userEvent.setup();
     const { container } = await renderWorkspace();
+    // The full invitation-and-setup record lives under Onboarding (Session A).
+    await openTab(user, 'Onboarding');
 
     const answerRows = [...container.querySelectorAll('.frow')].filter((row) =>
       row.querySelector('dd.fanswer'),
@@ -1021,9 +1088,10 @@ describe('the setup answers are the Founder’s own, with legacy Competition pre
 
 describe('§27.7, §30 — Proovd never chooses a summary frequency for somebody', () => {
   it('shows the preference read-only, with the reason it cannot be set here', async () => {
-    const user = userEvent.setup();
+    // The identity-and-preferences block sits inside the Overview since the
+    // 2026-08-16 rebuild (DNA §5.2's Explore: the full record one gesture
+    // below the summary), so no tab press is needed to reach it.
     const { container } = await renderWorkspace();
-    await openTab(user, 'Details');
 
     const row = rowFor(container, 'Activity summary');
     expect(within(row).getByText(SUMMARY_NOT_CHOSEN_LABEL)).toBeInTheDocument();
@@ -1048,6 +1116,7 @@ describe('§26.2 — an invitation may differ from the profile, and says so', ()
   it('labels the overridden value as custom and offers only its reset', async () => {
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
+    await openTab(user, 'Onboarding');
 
     await user.click(screen.getByRole('button', { name: 'View invitation details' }));
     const overridden = await waitFor(() => rowFor(container, 'Product'));
@@ -1069,6 +1138,7 @@ describe('§26.2 — an invitation may differ from the profile, and says so', ()
   it('labels an untouched value as auto-filled and offers only the change', async () => {
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
+    await openTab(user, 'Onboarding');
 
     await user.click(screen.getByRole('button', { name: 'View invitation details' }));
     const plain = await waitFor(() => rowFor(container, 'Recipient name'));
@@ -1094,7 +1164,7 @@ describe('§16a, §1.4 — not yet populated is never a zero', () => {
   it('names what the Founder-payments section is waiting for, and shows no amount', async () => {
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
-    await openTab(user, 'Money');
+    await openTab(user, 'Money & Fulfillment');
 
     expect(
       screen.getByText('The campaign has not closed, so no Founder payment exists to show.'),
@@ -1113,7 +1183,7 @@ describe('§16a, §1.4 — not yet populated is never a zero', () => {
   it('states the identity check as a status, with no document anywhere near it', async () => {
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
-    await openTab(user, 'Money');
+    await openTab(user, 'Money & Fulfillment');
 
     const row = rowFor(container, 'Identity check');
     expect(within(row).getByText('Verified by Stripe')).toBeInTheDocument();
@@ -1139,8 +1209,9 @@ describe('§25.6, §1.1 — a decision states itself, records a reason, and is r
   async function openSuspend(
     user: ReturnType<typeof userEvent.setup>,
   ): Promise<HTMLElement> {
+    // The standing block sits inside the Overview's full-record section since
+    // the 2026-08-16 rebuild; no tab press is needed to reach it.
     await renderWorkspace();
-    await openTab(user, 'Details');
     const trigger = screen.getByRole('button', { name: 'Suspend Founder access' });
     await user.click(trigger);
     await screen.findByRole('dialog');
@@ -1212,7 +1283,6 @@ describe('§25.6, §1.1 — a decision states itself, records a reason, and is r
     serve(routesWithAccess());
     const user = userEvent.setup();
     await renderWorkspace();
-    await openTab(user, 'Details');
     await user.click(screen.getByRole('button', { name: 'Permanently ban Founder' }));
 
     const dialog = await screen.findByRole('dialog');
@@ -1258,15 +1328,15 @@ describe('§33.11.1, §28.5 — the workspace is operable and announces its stru
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
 
-    for (const label of PANE_LABELS) {
+    for (const label of SECTION_LABELS) {
       if (label !== 'Overview') await openTab(user, label);
-      expect(await axe(container), `axe violation on the ${label} pane`).toHaveNoViolations();
+      expect(await axe(container), `axe violation on the ${label} section`).toHaveNoViolations();
     }
   });
 
   it('gives the tabs their roles, one stop in the tab order, and a labelled panel', async () => {
     await renderWorkspace();
-    const tablist = screen.getByRole('tablist', { name: 'Founder workspace' });
+    const tablist = screen.getByRole('tablist', { name: 'Founder record sections' });
     const tabs = within(tablist).getAllByRole('tab');
 
     // Roving tabindex: the selected tab is the one tab stop, the rest are
@@ -1293,8 +1363,11 @@ describe('§33.11.1, §28.5 — the workspace is operable and announces its stru
     screen.getByRole('tab', { name: 'Overview' }).focus();
 
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
-    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Details' }));
+    expect(screen.getByRole('tab', { name: 'Onboarding' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Onboarding' }));
 
     await user.keyboard('{End}');
     expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
@@ -1324,10 +1397,17 @@ describe('§33.11.1, §28.5 — the workspace is operable and announces its stru
  * §26.1's label register exists at all — so the fixture's lifecycle value is
  * `affiliate_response_and_build` and the panes must render its label instead.
  */
+/*
+ * `affiliate` left this list on 2026-08-16, consciously: the rebuilt record's
+ * section rail says `Affiliates`, which is the reference's own vocabulary and
+ * the Creators-workspace precedent (2026-08-11) -- the shell says Creators, an
+ * Admin RECORD may say Affiliate, and §3.1's scope is what renders to
+ * Founders and Backers. §3.2's terms stay: they are about honesty, not
+ * audience.
+ */
 const FORBIDDEN = [
   'pre_build',
   'pre_launch',
-  'affiliate',
   'reservation',
   'pledge',
   'escrow',
@@ -1349,16 +1429,16 @@ describe('§3.1, §3.2 — no internal name reaches the rendered surface', () =>
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
 
-    for (const label of PANE_LABELS) {
+    for (const label of SECTION_LABELS) {
       if (label !== 'Overview') await openTab(user, label);
-      expect(namingFailures(container), `internal name on the ${label} pane`).toEqual([]);
+      expect(namingFailures(container), `internal name on the ${label} section`).toEqual([]);
     }
   });
 
   it('renders the lifecycle label, and keeps the raw value behind the disclosure', async () => {
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
-    await openTab(user, 'Campaigns');
+    await openTab(user, 'Campaign');
 
     expect(within(container).getAllByText(STATUS_LABEL).length).toBeGreaterThan(0);
     expect(visibleText(container)).not.toContain(RAW_STATUS);

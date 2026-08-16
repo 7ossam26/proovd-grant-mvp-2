@@ -232,7 +232,7 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
         </span>
 
         <nav className="topnav" aria-label="Admin sections">
-          <button type="button" className="navlink" {...parked('tabs')}>
+          <button type="button" className="navlink" {...parked('today')}>
             Today
           </button>
           {/* The two sections that exist, and therefore the two real links. */}
@@ -312,7 +312,7 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
           <EnvironmentChip environment={identity.environment} />
           {/* Parked: the §26.5 ledger, money controls, and risk panels are
               their own workspaces and are supplied separately. */}
-          <Button tier="secondary" small {...parked('tabs')}>
+          <Button tier="secondary" small {...parked('explorePanels')}>
             Explore
           </Button>
           <span className="envmeta">{identity.name || identity.email}</span>

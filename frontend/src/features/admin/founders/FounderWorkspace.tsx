@@ -1,60 +1,34 @@
 /**
- * Admin → Founders → one person — Spec §26.1, §26.2, §27.1, DNA §5.2, §5.14.
+ * Admin → Founders → one person — Spec §26.1, §26.2, §27.1, DNA §5.2, §5.12,
+ * §5.14; rebuilt 2026-08-16 to the supplied reference.
  *
- * The whole of what Proovd knows about one Founder: a header that answers
- * "who is this and does anything need doing", and five panes behind it.
+ * The record is eight sections behind one header: Overview, Onboarding,
+ * Campaign, Affiliates, Backers & Demand, Money & Fulfillment, Support &
+ * Enforcement, History. The section lives in the URL (`?section=…`, DNA
+ * §5.12) so a record state can be linked to.
+ *
+ * ── Session A's honest interim ──────────────────────────────────────────────
+ * This rebuild ships in three sessions (the brief's own split). Session A
+ * builds the directory, this shell, and the Overview in their final shape.
+ * The other sections do not pretend: each renders the surface that currently
+ * owns its content — the invitation-and-vetting pane under Onboarding, the
+ * campaigns pane under Campaign, the money pane under Money & Fulfillment,
+ * the composed history under History — or, where no pane exists yet, a panel
+ * that names the workspace that owns the work TODAY with a real link into it
+ * (§1.4: an interim that says what it is beats a mock of what it will be).
+ * Sessions B and C replace them tab by tab; the section register in
+ * `@proovd/shared` already carries the sub-tab shape they will fill.
  *
  * ── This file composes; it decides nothing ──────────────────────────────────
- * Every word on the header, every status, every label, and — crucially — the
- * list of actions that are even offered arrives resolved from
- * `readFounderWorkspace`. `header.availableActions` is the server's answer to
- * "what is possible against this record", and the menu is built by walking it.
- * A client that decided for itself which actions to show would be a second
- * answer to that question, and the two would disagree the first time a record
- * moved between the read and the press. The server re-decides on the request
- * regardless (§1.1: a hidden menu item is not authorization).
- *
- * The one thing this file derives is a *lookup*: the product name for a dialog
- * kicker is read out of the Details pane's own field list, because the header
- * payload does not carry it. That is finding a value the server already sent,
- * not computing one.
+ * Every word — the header chips, the lifecycle, both action cells, the list
+ * of permitted menu actions — arrives resolved from `readFounderWorkspace`.
+ * The server re-decides on every request regardless (§1.1: a hidden menu item
+ * is not authorization).
  *
  * ── Nothing is ever patched locally ─────────────────────────────────────────
- * Every mutation ends in `refresh()`, which re-reads the whole workspace. The
- * cheaper move — merging the payload a mutation returned, or optimistically
- * flipping a status — is how a surface comes to show an outcome the server did
- * not record: a suspend that also closed a case, a field edit that also moved
- * `availableActions`, a send that also advanced the invitation state. Re-reading
- * costs one request and can never claim something that did not happen (§1.4).
- *
- * ── The tabs are hand-built, and that is not a rejection of the primitive ───
- * `components/Tabs.tsx` renders `.tabs > .tablist > .tab` with `.tab-underline`.
- * §26.1's stylesheet section defines `.tabs > .tabbtn` with `.tabline` and
- * `.tabpane`, which is different markup for a wider, denser surface. Rather
- * than widen a shared component for one caller or ship a second look, the ARIA
- * that primitive was carrying — tablist/tab/tabpanel, roving tabindex, arrow
- * keys, Home/End — is reproduced here explicitly, and the underline is moved by
- * the same `moveTabUnderline` tween the primitive uses. There is one motion,
- * two mounts, exactly as the confirm dialog stands beside `Modal`.
- *
- * Only the active pane is rendered. `.tabpane` is `display: none` when it is not
- * active, and a hidden pane is still in the accessibility tree, still runs its
- * effects, and still binds motion to nodes nobody can see. Unmounting is also
- * why `aria-controls` is set on the selected tab alone — pointing it at an id
- * that is not in the document is an ARIA reference to nothing.
- *
- * ── Two contract gaps, stated rather than papered over ──────────────────────
- * `confirmSpec('ban')` collects a reason and evidence; `banFounder` needs
- * §22.7's trigger and the customer notice as well. `confirmSpec('campapprove')`
- * collects nothing; `setNextCampaignReadiness` needs a reason. Neither is
- * invented here: a ban notice or an approval justification written by this file
- * would be words an Admin never typed sitting in an append-only record they may
- * later be asked to stand behind (§25.6, and `confirms.tsx`'s own reasoning for
- * why the deletion review has a required note instead of a fixed sentence). The
- * values are read from the dialog under the ids those fields would carry, so
- * the moment the registry gains them this file already forwards them; until
- * then the server refuses and names what is missing, which is what the Admin
- * reads.
+ * Every mutation ends in `refresh()`, which re-reads the whole workspace. A
+ * merged payload or an optimistic flip is how a surface comes to claim an
+ * outcome the server did not record (§1.4).
  */
 
 import {
@@ -66,23 +40,27 @@ import {
   useState,
   type KeyboardEvent,
 } from 'react';
-import { Link as RouterLink, useParams } from 'react-router';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
-  ATTENTION_CHIP_LABEL,
   FOUNDER_EDITABLE_FIELD_KEYS,
-  NO_ACTIVE_CAMPAIGN_LABEL,
+  FOUNDER_RECORD_SECTIONS,
+  MEETING_NOTE_FIELDS,
   NO_ATTENTION_LABEL,
   PROFILE_OVERRIDE_KEYS,
+  RESEARCH_ENTRY_FIELDS,
   type AttentionAction,
   type FounderEditableFieldKey,
+  type FounderRecordSectionKey,
   type ProfileOverrideKey,
 } from '@proovd/shared';
-import { Button, Menu, StatePanel, Sticker, useToast } from '../../../components/index.js';
+import { Button, Menu, StatePanel, useToast } from '../../../components/index.js';
 import { cn } from '../../../components/cn.js';
 import { moveTabUnderline } from '../../../components/anim.js';
 import { useProovdMotion } from '../../../motion/MotionProvider.js';
 import {
   AdminRequestError,
+  addMeetingNote,
+  addResearchEntry,
   banFounder,
   cancelInvite,
   clearInvitationOverride,
@@ -96,6 +74,7 @@ import {
   setInvitationOverride,
   setNextCampaignReadiness,
   updateFounderField,
+  updateProspect,
   type AdminError,
   type FounderMenuAction,
   type FounderWorkspaceDetail,
@@ -113,52 +92,40 @@ import {
   type DialogValues,
 } from './dialogs/index.js';
 import {
-  AttentionBox,
   NOT_PROVIDED,
-  ParkedButton,
-  useParkedToast,
   type AnswerEditRequest,
   type FieldEditRequest,
   type WorkspaceActions,
 } from './shared.js';
-import { useParkedControl } from './parked.js';
+import {
+  OverviewSection,
+  type DiscoveryEditRequest,
+} from './sections/OverviewSection.js';
 import { Overview } from './panes/Overview.js';
-import { Details } from './panes/Details.js';
 import { Campaigns } from './panes/Campaigns.js';
 import { Money } from './panes/Money.js';
 import { History } from './panes/History.js';
 
-/* ── The five panes ─────────────────────────────────────────────────────────*/
+/* ── Sections ───────────────────────────────────────────────────────────────*/
 
-const PANES = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'details', label: 'Details' },
-  { key: 'campaigns', label: 'Campaigns' },
-  { key: 'money', label: 'Money' },
-  { key: 'history', label: 'History' },
-] as const;
-
-type PaneKey = (typeof PANES)[number]['key'];
+const SECTION_KEYS = FOUNDER_RECORD_SECTIONS.map((s) => s.key) as readonly string[];
 
 /**
- * Where each attention action lands: the pane, and the section inside it.
+ * Where each attention action lands: the section, and the anchor inside it.
  *
- * A register rather than a switch, so the set of destinations is exactly
- * `ATTENTION_ACTIONS` and a sixth cannot be introduced by adding a branch. The
- * ids are the ones the panes anchor with `SecTitle id=…`, which carry
- * `tabIndex={-1}` for precisely this — scrolling moves the viewport and leaves
- * focus behind, which lands a keyboard user on a section they cannot read from.
+ * `open-campaign` is deliberately absent — it leaves the record entirely, to
+ * the Campaigns workspace, and is handled by navigation rather than a jump.
  */
 const ATTENTION_TARGETS: Record<
-  Exclude<AttentionAction, 'parked-campaign'>,
-  { pane: PaneKey; anchor: string }
+  Exclude<AttentionAction, 'open-campaign'>,
+  { section: FounderRecordSectionKey; anchor: string }
 > = {
-  'jump-access': { pane: 'details', anchor: 'sec-access' },
-  'jump-overview': { pane: 'overview', anchor: 'sec-matches' },
-  'jump-money': { pane: 'money', anchor: 'sec-paysetup' },
+  'jump-access': { section: 'overview', anchor: 'sec-access' },
+  'jump-overview': { section: 'onboarding', anchor: 'sec-matches' },
+  'jump-money': { section: 'money', anchor: 'sec-paysetup' },
 };
 
-/** The `•••` menu, in the reference's own wording. */
+/** The `Account actions` menu, in the reference's own wording. */
 const MENU_LABELS: Record<FounderMenuAction, string> = {
   edit: 'Edit Founder information',
   sendinvite: 'Send invite',
@@ -170,14 +137,6 @@ const MENU_LABELS: Record<FounderMenuAction, string> = {
   deletion: 'Review account deletion request',
 };
 
-/**
- * The one-line confirmation each decision earns once the server has recorded it.
- *
- * §27.1 asks for an immediate on-screen confirmation; the durable half is the
- * History pane and the notification the service sent. Every sentence here
- * states what the server answered and nothing more — none of them predicts a
- * consequence the response did not carry.
- */
 const CONFIRMED: Record<ConfirmKey, string> = {
   sendinvite: 'Invitation sent',
   newinvite: 'New invitation sent',
@@ -190,13 +149,6 @@ const CONFIRMED: Record<ConfirmKey, string> = {
   campunapprove: 'Next-campaign approval removed',
 };
 
-/*
- * The two ids `confirms.tsx` uses today, and the two it does not yet have.
- *
- * See the file header: these are read rather than invented so that adding the
- * controls to the registry is the only change needed, and so that nothing in
- * this file is capable of writing a ban notice on somebody's behalf.
- */
 const CONFIRM_REASON = 'm-reason';
 const CONFIRM_EVIDENCE = 'm-evidence';
 const CONFIRM_NOTE = 'm-note';
@@ -209,15 +161,6 @@ const CONFIRM_EXPLANATION = 'm-explanation';
 
 /* ── Client-side refusals ───────────────────────────────────────────────────*/
 
-/**
- * A refusal raised before a request is made.
- *
- * `AdminRequestError` is the shape the confirm dialog already renders, and the
- * failure it describes is genuinely a failure of the admin request — it just
- * did not get as far as the network. Answering §27.1's questions here matters
- * more than the class name: an Admin meeting this needs to know that nothing
- * changed and what to do instead.
- */
 function refuse(detail: Omit<AdminError, 'status'>): never {
   throw new AdminRequestError({ ...detail, status: 0 });
 }
@@ -236,38 +179,49 @@ type OpenDialog =
   | { kind: 'confirm'; key: ConfirmKey; trigger: HTMLElement | null }
   | { kind: 'field'; target: FieldEditRequest; trigger: HTMLElement | null }
   | { kind: 'answer'; target: AnswerEditRequest; trigger: HTMLElement | null }
+  | { kind: 'discovery'; target: DiscoveryEditRequest; trigger: HTMLElement | null }
+  | { kind: 'meetingnote'; trigger: HTMLElement | null }
+  | { kind: 'research'; trigger: HTMLElement | null }
   | { kind: 'preview'; trigger: HTMLElement | null };
 
 /* ── The surface ────────────────────────────────────────────────────────────*/
 
 export function FounderWorkspace() {
   const { prospectId } = useParams<{ prospectId: string }>();
+  const navigate = useNavigate();
 
   const [detail, setDetail] = useState<FounderWorkspaceDetail | null>(null);
   const [loadError, setLoadError] = useState<AdminRequestError | null>(null);
-  const [tab, setTab] = useState<PaneKey>('overview');
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
-  /** A section to reach once the pane holding it has committed. */
+  /** A section anchor to reach once the section holding it has committed. */
   const [jump, setJump] = useState<string | null>(null);
 
-  const toast = useToast();
-  const parkedToast = useParkedToast();
-  const parkedControl = useParkedControl();
+  /** The section lives in the URL, so a record state can be linked to. */
+  const [params, setParams] = useSearchParams();
+  const rawSection = params.get('section') ?? 'overview';
+  const section: FounderRecordSectionKey = SECTION_KEYS.includes(rawSection)
+    ? (rawSection as FounderRecordSectionKey)
+    : 'overview';
+  const setSection = useCallback(
+    (next: FounderRecordSectionKey) => {
+      const updated = new URLSearchParams(params);
+      if (next === 'overview') updated.delete('section');
+      else updated.set('section', next);
+      setParams(updated, { replace: true });
+    },
+    [params, setParams],
+  );
 
+  const toast = useToast();
   const uid = useId();
   const headerRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<HTMLDivElement>(null);
   const tablistRef = useRef<HTMLElement>(null);
   const underlineRef = useRef<HTMLSpanElement>(null);
-  const tabButtons = useRef<Partial<Record<PaneKey, HTMLButtonElement | null>>>({});
+  const tabButtons = useRef<Partial<Record<FounderRecordSectionKey, HTMLButtonElement | null>>>(
+    {},
+  );
   const underlineSettled = useRef(false);
-  /**
-   * The `•••` button, so a decision opened from the menu grows from it.
-   *
-   * Radix closes the menu before the dialog mounts, so the pressed *item* is
-   * gone by then; the trigger is still on screen and is what the Admin's eye is
-   * on, which is what DNA §6.5 is actually asking for.
-   */
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   const load = useCallback(() => {
@@ -293,14 +247,6 @@ export function FounderWorkspace() {
 
   useEffect(load, [load]);
 
-  /**
-   * Re-read after every mutation.
-   *
-   * It throws on failure rather than swallowing: a decision that was recorded
-   * and then could not be re-read leaves the surface showing the state from
-   * before it, and telling the Admin that is more useful than a stale page that
-   * looks current.
-   */
   const refresh = useCallback(async () => {
     if (!prospectId) return;
     setDetail(await fetchFounderWorkspace(prospectId));
@@ -308,13 +254,8 @@ export function FounderWorkspace() {
 
   /* ── Motion ───────────────────────────────────────────────────────────── */
 
-  // Two scopes on purpose. `data-reveal` has no idempotence guard in the
-  // runtime, so a single root re-bound on every tab press would replay the
-  // header's name reveal each time somebody looked at Money. The header re-binds
-  // when the record changes; the pane re-binds when the pane changes, which is
-  // what gives its buttons their hover and press.
   useProovdMotion(headerRef, [detail]);
-  useProovdMotion(paneRef, [detail, tab]);
+  useProovdMotion(paneRef, [detail, section]);
 
   const parkUnderline = useCallback((animate: boolean) => {
     const list = tablistRef.current;
@@ -326,7 +267,7 @@ export function FounderWorkspace() {
   useLayoutEffect(() => {
     parkUnderline(underlineSettled.current);
     if (detail) underlineSettled.current = true;
-  }, [tab, detail, parkUnderline]);
+  }, [section, detail, parkUnderline]);
 
   useEffect(() => {
     const onResize = () => parkUnderline(false);
@@ -336,10 +277,6 @@ export function FounderWorkspace() {
 
   /* ── The attention jump ───────────────────────────────────────────────── */
 
-  // Runs after the pane the anchor lives in has committed: setting the tab and
-  // the anchor in one event batches, so by the time this effect fires the
-  // section exists. Focus as well as scroll, and `preventScroll` so the two do
-  // not fight each other.
   useEffect(() => {
     if (!jump) return;
     setJump(null);
@@ -349,14 +286,28 @@ export function FounderWorkspace() {
     target.focus({ preventScroll: true });
   }, [jump]);
 
+  const runAttentionAction = useCallback(
+    (act: AttentionAction) => {
+      if (act === 'open-campaign') {
+        const campaignId = detail?.header.currentCampaign?.campaignId;
+        if (campaignId) void navigate(`/admin/campaigns/${campaignId}`);
+        return;
+      }
+      const destination = ATTENTION_TARGETS[act];
+      setSection(destination.section);
+      setJump(destination.anchor);
+    },
+    [detail, navigate, setSection],
+  );
+
   /* ── States ───────────────────────────────────────────────────────────── */
 
   if (!prospectId) {
     return (
       <StatePanel
         state="No Founder was named in this address"
-        whatHappened="This page is opened from the Founders list, and the address it was given carries no Founder."
-        next="Go back to the Founders list and open somebody from there."
+        whatHappened="This page is opened from the Founders directory, and the address it was given carries no Founder."
+        next="Go back to the directory and open somebody from there."
         owner="You"
         nextUpdate="No update is pending"
         action={
@@ -386,7 +337,7 @@ export function FounderWorkspace() {
           next={
             loadError.detail.next ??
             (missing
-              ? 'Go back to the Founders list and open the record from there.'
+              ? 'Go back to the Founders directory and open the record from there.'
               : 'Try the read again. Nothing was changed by the attempt.')
           }
           owner="Proovd"
@@ -416,7 +367,7 @@ export function FounderWorkspace() {
         <StatePanel
           state="Reading this Founder’s record"
           whatHappened="Proovd is reading the invitation, the identity record, the campaigns, the money, and the history."
-          next="The workspace appears as soon as that comes back."
+          next="The record appears as soon as that comes back."
           owner="Proovd"
           nextUpdate="Within a few seconds"
           action="No action needed"
@@ -446,6 +397,7 @@ export function FounderWorkspace() {
   };
 
   const kicker = `${header.legalName} · ${productName}`;
+  const vettingDraftId = detail.overview.vetting.draftId;
 
   /* ── What a pane may start ────────────────────────────────────────────── */
 
@@ -489,9 +441,6 @@ export function FounderWorkspace() {
 
   /* ── The decisions ────────────────────────────────────────────────────── */
 
-  // Arrow consts rather than function declarations: a declaration is hoisted,
-  // so TypeScript cannot carry the `!prospectId` guard above into it and every
-  // call would need a cast that asserts what the guard already proved.
   const runConfirm = async (key: ConfirmKey, values: DialogValues): Promise<void> => {
     const reason = values[CONFIRM_REASON] ?? '';
     const evidence = values[CONFIRM_EVIDENCE] ?? '';
@@ -537,11 +486,7 @@ export function FounderWorkspace() {
             next: 'Reload this page to see the current record.',
           });
         }
-        await recordDeletionReview(
-          prospectId,
-          requestId,
-          values[CONFIRM_NOTE] ?? '',
-        );
+        await recordDeletionReview(prospectId, requestId, values[CONFIRM_NOTE] ?? '');
         break;
       }
       case 'campapprove':
@@ -552,8 +497,6 @@ export function FounderWorkspace() {
         });
         break;
       case 'campunapprove':
-        // The removal's internal reason IS the criteria note — it is the
-        // judgement that was applied — and the Founder is told separately.
         await setNextCampaignReadiness(prospectId, {
           approved: false,
           criteriaNote: reason,
@@ -566,10 +509,7 @@ export function FounderWorkspace() {
     toast(CONFIRMED[key]);
   };
 
-  const runFieldEdit = async (
-    target: FieldEditRequest,
-    values: DialogValues,
-  ): Promise<void> => {
+  const runFieldEdit = async (target: FieldEditRequest, values: DialogValues): Promise<void> => {
     if (!isEditableFieldKey(target.key)) {
       refuse({
         error: 'unknown_field',
@@ -584,8 +524,6 @@ export function FounderWorkspace() {
 
     await updateFounderField(prospectId, target.key, {
       value: values[FIELD_EDIT_VALUE] ?? '',
-      // Absent keys write nothing; an empty reason is not the same as no reason
-      // being offered, and the server decides which fields require one.
       ...(reason ? { reason } : {}),
       ...(evidence ? { evidence } : {}),
     });
@@ -593,11 +531,49 @@ export function FounderWorkspace() {
     toast('Saved', { sub: `${target.label} updated.` });
   };
 
-  /** §9's prefill: the same write the intake form makes, from the workspace. */
   const runAnswerEdit = async (target: AnswerEditRequest, values: DialogValues) => {
     await prefillVettingAnswer(target.draftId, target.key, values[FIELD_EDIT_VALUE] ?? '');
     await refresh();
     toast('Saved', { sub: `${target.label} updated.` });
+  };
+
+  /** §7's discovery fields, written through the intake's own path. */
+  const runDiscoveryEdit = async (target: DiscoveryEditRequest, values: DialogValues) => {
+    if (!vettingDraftId) {
+      refuse({
+        error: 'no_draft',
+        title: 'This record has no draft to write against',
+        whatHappened:
+          'The discovery record lives on the invitation draft, and this Founder has none. Nothing was sent and nothing changed.',
+        next: 'Reload this page to see the current record.',
+      });
+    }
+    await updateProspect(vettingDraftId, { [target.key]: values[FIELD_EDIT_VALUE] ?? '' });
+    await refresh();
+    toast('Saved', { sub: `${target.label} updated.` });
+  };
+
+  const runMeetingNote = async (values: DialogValues) => {
+    await addMeetingNote(prospectId, {
+      meetingDate: values['meetingDate'] ?? '',
+      participants: values['participants'] ?? '',
+      decisions: values['decisions'] ?? '',
+      followUp: values['followUp'] ?? '',
+      sourceLink: values['sourceLink'] ?? '',
+      ...(values['notes'] ? { notes: values['notes'] } : {}),
+    });
+    await refresh();
+    toast('Meeting note recorded');
+  };
+
+  const runResearch = async (values: DialogValues) => {
+    await addResearchEntry(prospectId, {
+      title: values['title'] ?? '',
+      sourceLink: values['sourceLink'] ?? '',
+      ...(values['findings'] ? { findings: values['findings'] } : {}),
+    });
+    await refresh();
+    toast('Research recorded');
   };
 
   /* ── The menu ─────────────────────────────────────────────────────────── */
@@ -605,194 +581,154 @@ export function FounderWorkspace() {
   const menuItems = header.availableActions.map((action) => ({
     label: MENU_LABELS[action],
     onSelect: () => {
-      // `edit` is not a decision — it is a destination. §26.1's editable fields
-      // live on Details, so the menu takes the Admin there rather than opening
-      // a dialog that would have to ask which field they meant.
-      //
-      // Focus is deliberately not moved: Radix restores it to the `•••` trigger
-      // as the menu closes, which happens after this runs, so a `.focus()` here
-      // would be a call that always loses. The trigger sits directly above the
-      // tablist, so a keyboard user is one Tab from the pane that just opened.
       if (action === 'edit') {
-        setTab('details');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        // §26.1's editable fields live in the full-record block on Overview.
+        setSection('overview');
+        setJump('sec-identity');
         return;
       }
       setDialog({ kind: 'confirm', key: action, trigger: menuTriggerRef.current });
     },
   }));
 
-  /* ── Tabs ─────────────────────────────────────────────────────────────── */
+  /* ── The section nav ──────────────────────────────────────────────────── */
 
-  const tabDomId = (key: PaneKey) => `${uid}-tab-${key}`;
-  const paneDomId = (key: PaneKey) => `${uid}-pane-${key}`;
+  const tabDomId = (key: FounderRecordSectionKey) => `${uid}-tab-${key}`;
+  const paneDomId = (key: FounderRecordSectionKey) => `${uid}-pane-${key}`;
 
   function onTabKeys(event: KeyboardEvent<HTMLElement>) {
-    const current = PANES.findIndex((pane) => pane.key === tab);
+    const current = FOUNDER_RECORD_SECTIONS.findIndex((s) => s.key === section);
     let index = -1;
-    if (event.key === 'ArrowRight') index = (current + 1) % PANES.length;
-    else if (event.key === 'ArrowLeft') index = (current - 1 + PANES.length) % PANES.length;
+    if (event.key === 'ArrowRight') index = (current + 1) % FOUNDER_RECORD_SECTIONS.length;
+    else if (event.key === 'ArrowLeft')
+      index = (current - 1 + FOUNDER_RECORD_SECTIONS.length) % FOUNDER_RECORD_SECTIONS.length;
     else if (event.key === 'Home') index = 0;
-    else if (event.key === 'End') index = PANES.length - 1;
+    else if (event.key === 'End') index = FOUNDER_RECORD_SECTIONS.length - 1;
     if (index < 0) return;
 
-    const next = PANES[index];
+    const next = FOUNDER_RECORD_SECTIONS[index];
     if (!next) return;
     event.preventDefault();
-    setTab(next.key);
+    setSection(next.key);
     tabButtons.current[next.key]?.focus();
   }
 
   const attention = header.attention;
-  const attentionAction = attention.needed ? attention.action : null;
+  const publicUrl = detail.campaignFacts?.publicUrl ?? null;
+  const currentCampaignId = header.currentCampaign?.campaignId ?? null;
 
   return (
     <div>
       <BackToFounders />
 
       <div ref={headerRef}>
-        <header className="fhead">
+        <header className="fhead frec-head">
           <div className="fhead__id" data-scroll="rise">
-            <Sticker n={header.sticker} />
+            <span className="fdir-avatar fdir-avatar--lg" aria-hidden="true">
+              {initialsOf(header.legalName || header.preferredName)}
+            </span>
             <div>
+              <p className="kicker">Founder record · {header.recordReference}</p>
               <h1 className="h2" data-reveal="headline">
-                {header.legalName}
+                {header.legalName || header.preferredName}
               </h1>
-              <p className="fhead__line">
-                {header.businessName ? (
-                  <b>{header.businessName}</b>
-                ) : (
-                  <span className="grey">No legal business name recorded</span>
-                )}
-                {header.website ? ` · ${header.website}` : ''}
-              </p>
               <p className="fhead__line grey">
-                {header.phone
-                  ? `${header.email} · ${header.phone} · Phone not verified`
-                  : `${header.email} · No phone recorded`}
+                {[
+                  header.businessName ?? productName,
+                  header.email,
+                  header.phone ? `${header.phone} · Phone not verified` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </p>
-              <p className="fhead__line grey">{placeLine(header.state, header.country)}</p>
+              <p className="frec-chips">
+                <span className="frec-chip frec-chip--type">{header.typeChip}</span>
+                <span className="frec-chip frec-chip--life">{header.lifecycle}</span>
+              </p>
             </div>
           </div>
 
-          <dl className="fstatus" data-scroll="rise">
+          <div className="frec-actions" data-scroll="rise">
+            {publicUrl ? (
+              <a className="btn btn--secondary btn--sm" href={publicUrl} target="_blank" rel="noreferrer">
+                <span className="btn__label">View live campaign</span>
+              </a>
+            ) : null}
+            {currentCampaignId ? (
+              <RouterLink
+                className="btn btn--tertiary btn--sm"
+                to={`/admin/campaigns/${currentCampaignId}`}
+              >
+                <span className="btn__label">Open campaign record</span>
+              </RouterLink>
+            ) : null}
+            <RouterLink className="btn btn--tertiary btn--sm" to="/admin/support">
+              <span className="btn__label">View support cases</span>
+            </RouterLink>
+            <Menu
+              label="Account actions"
+              trigger={
+                <button
+                  ref={menuTriggerRef}
+                  type="button"
+                  className="btn btn--tertiary btn--sm"
+                >
+                  <span className="btn__label">Account actions</span>
+                </button>
+              }
+              items={menuItems}
+            />
+          </div>
+
+          {/* The reference's Problem / Solution / Business strip. Read-only
+              one-liners; the full answers with their provenance and controls
+              live on the Overview below. */}
+          <dl className="frec-strip" data-scroll="rise">
             <div>
-              <dt>Account</dt>
-              <dd>{header.account}</dd>
+              <dt>Problem</dt>
+              <dd>{answerLine(detail, 'problem')}</dd>
             </div>
             <div>
-              <dt>Founder setup</dt>
-              <dd>
-                {header.setup.stage}
-                {header.setup.detail ? <p className="helper">{header.setup.detail}</p> : null}
-              </dd>
+              <dt>Solution</dt>
+              <dd>{answerLine(detail, 'solution')}</dd>
             </div>
             <div>
-              <dt>Payment setup</dt>
-              <dd>{header.paymentSetup}</dd>
-            </div>
-            <div>
-              <dt>Current campaign</dt>
-              <dd>
-                {header.currentCampaign ? (
-                  <button type="button" className="camp-link" {...parkedControl('campaign')}>
-                    {header.currentCampaign.name}
-                  </button>
-                ) : (
-                  <span className="grey">{NO_ACTIVE_CAMPAIGN_LABEL}</span>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt>Campaign status</dt>
-              <dd>
-                {header.currentCampaign ? (
-                  header.currentCampaign.status
-                ) : (
-                  <span className="grey">Not running a campaign</span>
-                )}
-              </dd>
+              <dt>Business</dt>
+              <dd>{header.businessName ?? productName}</dd>
             </div>
           </dl>
 
-          <div className="fhead__side" data-scroll="rise">
-            {attention.needed ? (
-              <AttentionBox chip={ATTENTION_CHIP_LABEL}>
-                <p>{attention.text}</p>
-                {attentionAction ? (
-                  <Button
-                    tier="tertiary"
-                    onClick={() => {
-                      if (attentionAction.act === 'parked-campaign') {
-                        parkedToast('campaign');
-                        return;
-                      }
-                      const destination = ATTENTION_TARGETS[attentionAction.act];
-                      setTab(destination.pane);
-                      setJump(destination.anchor);
-                    }}
-                  >
-                    {attentionAction.label}
-                  </Button>
-                ) : null}
-              </AttentionBox>
-            ) : (
-              <p className="grey">
-                <b>{NO_ATTENTION_LABEL}</b>
-              </p>
-            )}
-
-            <div className="case-actions fhead__actions">
-              {/* Offered only when there is one. A primary action named after a
-                  destination that does not exist is worse than no action. */}
-              {header.currentCampaign ? (
-                <ParkedButton parkedKey="campaign" tier="primary" small>
-                  Open current campaign
-                </ParkedButton>
-              ) : null}
-              <ParkedButton parkedKey="support">View support cases</ParkedButton>
-              <Menu
-                label="More Founder actions"
-                trigger={
-                  <button
-                    ref={menuTriggerRef}
-                    type="button"
-                    className="btn btn--tertiary"
-                    aria-label="More actions"
-                  >
-                    <span className="btn__label">•••</span>
-                  </button>
-                }
-                items={menuItems}
-              />
-            </div>
-          </div>
+          <p className="frec-where" data-scroll="rise">
+            <span className="kicker">Where this Founder is now</span>
+            <b>{header.lifecycle}</b>
+            {!attention.needed ? <span className="grey"> · {NO_ATTENTION_LABEL}</span> : null}
+          </p>
         </header>
       </div>
 
       <nav
-        className="tabs"
+        className="tabs frec-tabs"
         ref={tablistRef}
         role="tablist"
-        aria-label="Founder workspace"
+        aria-label="Founder record sections"
         onKeyDown={onTabKeys}
       >
-        {PANES.map((pane) => (
+        {FOUNDER_RECORD_SECTIONS.map((s) => (
           <button
-            key={pane.key}
+            key={s.key}
             ref={(node) => {
-              tabButtons.current[pane.key] = node;
+              tabButtons.current[s.key] = node;
             }}
             type="button"
-            id={tabDomId(pane.key)}
-            className={cn('tabbtn', tab === pane.key && 'is-active')}
+            id={tabDomId(s.key)}
+            className={cn('tabbtn', section === s.key && 'is-active')}
             role="tab"
-            aria-selected={tab === pane.key}
-            {...(tab === pane.key ? { 'aria-controls': paneDomId(pane.key) } : {})}
-            tabIndex={tab === pane.key ? 0 : -1}
-            onClick={() => setTab(pane.key)}
+            aria-selected={section === s.key}
+            {...(section === s.key ? { 'aria-controls': paneDomId(s.key) } : {})}
+            tabIndex={section === s.key ? 0 : -1}
+            onClick={() => setSection(s.key)}
           >
-            {pane.label}
+            {s.label}
           </button>
         ))}
         <span ref={underlineRef} className="tabline" aria-hidden="true" />
@@ -801,16 +737,123 @@ export function FounderWorkspace() {
       <div
         ref={paneRef}
         className="tabpane is-active"
-        id={paneDomId(tab)}
+        id={paneDomId(section)}
         role="tabpanel"
-        aria-labelledby={tabDomId(tab)}
+        aria-labelledby={tabDomId(section)}
         tabIndex={0}
       >
-        {tab === 'overview' ? <Overview detail={detail} actions={actions} /> : null}
-        {tab === 'details' ? <Details detail={detail} actions={actions} /> : null}
-        {tab === 'campaigns' ? <Campaigns detail={detail} actions={actions} /> : null}
-        {tab === 'money' ? <Money detail={detail} /> : null}
-        {tab === 'history' ? <History detail={detail} /> : null}
+        {section === 'overview' ? (
+          <OverviewSection
+            detail={detail}
+            actions={actions}
+            onAttentionAction={(act) => runAttentionAction(act)}
+            onOpenHistory={() => setSection('history')}
+            onAddMeetingNote={(trigger) => setDialog({ kind: 'meetingnote', trigger })}
+            onAddResearch={(trigger) => setDialog({ kind: 'research', trigger })}
+            onEditDiscovery={(target, trigger) =>
+              setDialog({ kind: 'discovery', target, trigger })
+            }
+          />
+        ) : null}
+        {section === 'onboarding' ? (
+          <>
+            <InterimNote owns="the invitation, the prefills, the eligibility record, the §12 optional items, and Stripe with the listing fee">
+              The invitation and setup record below is complete and live; the four-tab shape
+              (Invite &amp; Prefills · Eligibility · Optional Items · Stripe &amp; Listing Fee)
+              arrives in the next build session.
+            </InterimNote>
+            <Overview detail={detail} actions={actions} />
+          </>
+        ) : null}
+        {section === 'campaign' ? (
+          <>
+            <InterimNote owns="campaign details, review, the live campaign, and the page with its updates">
+              The campaign record below is complete and live; campaign operations belong to the
+              Campaigns workspace.
+              {currentCampaignId ? (
+                <>
+                  {' '}
+                  <RouterLink to={`/admin/campaigns/${currentCampaignId}`}>
+                    Open this campaign in the Campaigns workspace
+                  </RouterLink>
+                  .
+                </>
+              ) : null}
+            </InterimNote>
+            <Campaigns detail={detail} actions={actions} />
+          </>
+        ) : null}
+        {section === 'affiliates' ? (
+          <StatePanel
+            state="Creator relationships live in the Creators workspace"
+            whatHappened="Every Creator relationship on this Founder’s campaign — terms, versions, readiness, performance, and enforcement — is operated from the Creators workspace, which owns the relationship end to end."
+            next="Open the Creators directory pre-searched with this campaign to see everyone on it. This section gains its three tabs (Relationships · Requests · Performance & Completion) in a later build session."
+            owner="Proovd"
+            nextUpdate="When the next build session lands"
+            action={
+              <RouterLink
+                className="btn btn--secondary"
+                to={
+                  header.currentCampaign
+                    ? `/admin/creators?q=${encodeURIComponent(header.currentCampaign.name)}`
+                    : '/admin/creators'
+                }
+              >
+                <span className="btn__label">Open Creators</span>
+              </RouterLink>
+            }
+            reference={`Admin · Founders · ${header.recordReference}`}
+          />
+        ) : null}
+        {section === 'backers' ? (
+          <StatePanel
+            state="Backer records live in the Backers workspace"
+            whatHappened="Every pre-order on this Founder’s campaign — demand, responses, and individual Backer context — is read from the Backers workspace and the pre-order ledger."
+            next="Open the Backers workspace filtered to this campaign. This section gains its three tabs (Demand · Responses · Backers) in a later build session."
+            owner="Proovd"
+            nextUpdate="When the next build session lands"
+            action={
+              <RouterLink
+                className="btn btn--secondary"
+                to={
+                  currentCampaignId
+                    ? `/admin/backers?view=backers&campaignId=${encodeURIComponent(currentCampaignId)}`
+                    : '/admin/backers'
+                }
+              >
+                <span className="btn__label">Open Backers</span>
+              </RouterLink>
+            }
+            reference={`Admin · Founders · ${header.recordReference}`}
+          />
+        ) : null}
+        {section === 'money' ? (
+          <>
+            <InterimNote owns="close, payments, fulfillment, and refunds with recovery">
+              The money record below is complete and live; the four-tab shape (Close · Payments ·
+              Fulfillment · Refunds &amp; Recovery) arrives in a later build session. Money
+              decisions stay with the close-operations queue — this record shows state and
+              routes there.
+            </InterimNote>
+            <Money detail={detail} />
+          </>
+        ) : null}
+        {section === 'support' ? (
+          <StatePanel
+            state="Support cases live in the Support workspace"
+            whatHappened="Every case on this Founder — its owner, its §27.8 response promise, and its thread — is operated from the Support workspace. Account-level standing (suspension, the ban record, any deletion request) is on this record’s Overview under the full-record block."
+            next="Open the Support workspace to see the queue. This section gains its three tabs (Support · Cancellation · Enforcement) in a later build session."
+            owner="Proovd"
+            nextUpdate="When the next build session lands"
+            action={
+              <RouterLink className="btn btn--secondary" to="/admin/support">
+                <span className="btn__label">Open Support</span>
+              </RouterLink>
+            }
+            reference={`Admin · Founders · ${header.recordReference}`}
+          />
+        ) : null}
+        {section === 'history' ? <History detail={detail} /> : null}
       </div>
 
       {dialog?.kind === 'confirm' ? (
@@ -844,8 +887,8 @@ export function FounderWorkspace() {
             body: (
               <p>
                 Prepared by Proovd from discovery (§9). It stops moving the moment{' '}
-                {header.preferredName} edits the answer themselves, and it locks when
-                they submit.
+                {header.preferredName} edits the answer themselves, and it locks when they
+                submit.
               </p>
             ),
             fields: [
@@ -865,6 +908,88 @@ export function FounderWorkspace() {
         />
       ) : null}
 
+      {dialog?.kind === 'discovery' ? (
+        <ConfirmDialog
+          spec={{
+            kicker,
+            title: `Edit — ${dialog.target.label}`,
+            body: (
+              <p>
+                §7’s discovery record — internal to Proovd, never rendered to the Founder, and
+                written through the same path the intake form uses.
+              </p>
+            ),
+            fields: [
+              {
+                id: FIELD_EDIT_VALUE,
+                label: dialog.target.label,
+                textarea: true,
+                value: dialog.target.value ?? '',
+                ...(dialog.target.helper ? { hint: dialog.target.helper } : {}),
+              },
+            ],
+            primary: 'Save change',
+          }}
+          trigger={dialog.trigger}
+          onSubmit={(values) => runDiscoveryEdit(dialog.target, values)}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+
+      {dialog?.kind === 'meetingnote' ? (
+        <ConfirmDialog
+          spec={{
+            kicker,
+            title: 'Add meeting note',
+            body: (
+              <p>
+                Keep the decision, participants, follow-up, and source attached to this Founder.
+                A note is a record: a correction later is a new note, never an edit.
+              </p>
+            ),
+            fields: MEETING_NOTE_FIELDS.map((field) => ({
+              id: field.key,
+              label: field.label,
+              required: field.required,
+              ...(field.key === 'meetingDate'
+                ? { inputType: 'date' as const }
+                : field.key === 'notes' || field.key === 'decisions'
+                  ? { textarea: true }
+                  : {}),
+            })),
+            primary: 'Record meeting note',
+          }}
+          trigger={dialog.trigger}
+          onSubmit={runMeetingNote}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+
+      {dialog?.kind === 'research' ? (
+        <ConfirmDialog
+          spec={{
+            kicker,
+            title: 'Add research',
+            body: (
+              <p>
+                One finding, appended to §7’s discovery-evidence list — the same record the
+                intake form writes.
+              </p>
+            ),
+            fields: RESEARCH_ENTRY_FIELDS.map((field) => ({
+              id: field.key,
+              label: field.label,
+              required: field.required,
+              ...(field.key === 'findings' ? { textarea: true } : {}),
+            })),
+            primary: 'Record research',
+          }}
+          trigger={dialog.trigger}
+          onSubmit={runResearch}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+
       {dialog?.kind === 'preview' ? (
         <InvitationPreviewDialog
           prospectId={prospectId}
@@ -880,31 +1005,38 @@ export function FounderWorkspace() {
 
 /* ── Pieces ─────────────────────────────────────────────────────────────────*/
 
-/**
- * The way back, named.
- *
- * A real link rather than a button that navigates: §33.11.4 refuses an
- * objectless label, and a destination that can be opened in a new tab or read
- * from the status bar is the honest form of "where does this go".
- */
 function BackToFounders() {
   return (
     <div className="crumb">
       <RouterLink className="btn btn--tertiary" to="/admin/founders">
-        <span className="btn__label">← Founders</span>
+        <span className="btn__label">← All Founders</span>
       </RouterLink>
     </div>
   );
 }
 
+/** Initials for the header avatar. Presentation of a name the server sent. */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? '';
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : (parts[0]?.[1] ?? '');
+  return `${first}${last}`.toUpperCase() || '·';
+}
+
+/** The first line of a §9 answer for the header strip, or its honest absence. */
+function answerLine(detail: FounderWorkspaceDetail, key: 'problem' | 'solution'): string {
+  const answer = detail.overview.vetting.answers.find((a) => a.key === key);
+  return answer?.text ?? 'Not answered yet';
+}
+
 /**
- * State and country, with the honest answer when neither is recorded.
- *
- * `null, null` is a real state for a prospect nobody has met twice, and
- * rendering it as a bare comma would read as a defect rather than as a blank
- * somebody can go and fill (§1.4).
+ * The Session A interim banner: what this section will hold, and what the
+ * content below it is TODAY. §1.4 — an interim that says what it is.
  */
-function placeLine(state: string | null, country: string | null): string {
-  const parts = [state, country].filter((part): part is string => Boolean(part));
-  return parts.length > 0 ? parts.join(', ') : 'Location not recorded yet';
+function InterimNote({ owns, children }: { owns: string; children: React.ReactNode }) {
+  return (
+    <p className="frec-interim helper">
+      <b>This section will hold {owns}.</b> {children}
+    </p>
+  );
 }

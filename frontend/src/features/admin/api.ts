@@ -39,6 +39,7 @@ import type {
   CampaignStatus,
   FounderAccessAction,
   FounderAccountState,
+  FounderDirectoryFilterKey,
   FounderEditableFieldKey,
   FounderHistoryCategory,
   FounderSetupStage,
@@ -185,14 +186,35 @@ export const signOut = (): Promise<unknown> =>
  * imports directly. There is one register; nothing here restates it.
  */
 
-/** One row of the Founders table. Everything it shows, already resolved. */
+/** One cell of the directory's two action columns. Server-composed. */
+export interface DirectoryActionCell {
+  kind: 'due' | 'none';
+  label: string;
+}
+
+/** One row of the Founders directory. Everything it shows, already resolved. */
 export interface FounderListRow {
   /** `founder_prospects.id` — the person, stable across archive-and-restart. */
   prospectId: string;
+  /** The stable quotable reference (`F-…`, migration 0047). */
+  recordReference: string;
   legalName: string;
   preferredName: string;
   email: string;
   productName: string;
+  businessName: string | null;
+  owner: string | null;
+
+  /** `Idea` | `Product` | `Proposed` — Proposed is the absence of a §9 lock. */
+  typeLabel: string;
+  /** The composed lifecycle label (`Live · Day 6`, `Invite draft`, …). */
+  lifecycle: string;
+  adminAction: DirectoryActionCell;
+  founderAction: DirectoryActionCell;
+  /** Which directory filter cards this row belongs to. Server-derived. */
+  filters: FounderDirectoryFilterKey[];
+  /** Server-composed search text — the one matcher every filter reads. */
+  searchText: string;
 
   setup: { stage: FounderSetupStage; detail: string | null };
   account: FounderAccountState;
@@ -221,6 +243,8 @@ export type FounderAttention =
 
 export interface FounderHeader {
   prospectId: string;
+  /** The stable quotable reference in the record's eyebrow (migration 0047). */
+  recordReference: string;
   legalName: string;
   preferredName: string;
   businessName: string | null;
@@ -233,6 +257,13 @@ export interface FounderHeader {
   country: string | null;
   /** Deterministic 1–14 sticker index, derived from the id so it never moves. */
   sticker: number;
+
+  /** `Idea · locked` | `Product · locked` | `Proposed` — the header chip. */
+  typeChip: string;
+  /** The composed lifecycle label, same derivation as the directory row. */
+  lifecycle: string;
+  adminAction: DirectoryActionCell;
+  founderAction: DirectoryActionCell;
 
   account: FounderAccountState;
   setup: { stage: FounderSetupStage; detail: string | null };
@@ -468,12 +499,53 @@ export interface FounderHistoryEntry {
   source: string;
 }
 
+/** One recorded meeting note (migration 0047). Insert-only; never edited. */
+export interface MeetingNoteView {
+  id: string;
+  meetingDate: string;
+  participants: string;
+  decisions: string;
+  followUp: string;
+  sourceLink: string;
+  notes: string | null;
+  recordedBy: string;
+  recordedAt: string;
+}
+
+/** §7's discovery record, the research entries, and the meeting notes. */
+export interface DiscoveryView {
+  fields: {
+    /** The prospect-update key this row edits, or null for a derived value. */
+    key: string | null;
+    label: string;
+    value: string | null;
+    helper: string | null;
+  }[];
+  research: string[];
+  meetingNotes: MeetingNoteView[];
+}
+
+/** The current campaign's live facts. Null counts = not yet populated (§16a). */
+export interface CampaignFactsView {
+  campaignId: string;
+  campaignDay: number | null;
+  liveAt: string | null;
+  closesAt: string | null;
+  discoveryOpenedAt: string | null;
+  activeBackers: number | null;
+  threshold: number | null;
+  activeAffiliates: number | null;
+  publicUrl: string | null;
+}
+
 export interface FounderWorkspaceDetail {
   header: FounderHeader;
   overview: OverviewPane;
   details: DetailsPane;
   campaigns: CampaignsPane;
   money: MoneyPane;
+  discovery: DiscoveryView;
+  campaignFacts: CampaignFactsView | null;
   history: FounderHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;
@@ -508,6 +580,35 @@ export const fetchFounders = (): Promise<{ founders: FounderListRow[] }> =>
 export const fetchFounderWorkspace = (
   prospectId: string,
 ): Promise<FounderWorkspaceDetail> => call(founderBase(prospectId));
+
+/** A new off-platform conversation, written down (migration 0047). */
+export const addMeetingNote = (
+  prospectId: string,
+  body: {
+    meetingDate: string;
+    participants: string;
+    decisions: string;
+    followUp: string;
+    sourceLink: string;
+    notes?: string;
+  },
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/meeting-notes`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+/** One research finding, appended to §7's discovery-evidence list. */
+export const addResearchEntry = (
+  prospectId: string,
+  body: { title: string; findings?: string; sourceLink: string },
+): Promise<FounderWorkspaceDetail> =>
+  call(`${founderBase(prospectId)}/research`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 
 /**
  * §7's first act: writing down somebody met off-platform.

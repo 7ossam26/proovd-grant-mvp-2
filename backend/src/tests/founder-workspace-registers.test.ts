@@ -26,6 +26,14 @@ import {
   FOUNDER_EDITABLE_FIELDS as SHARED_EDITABLE_FIELDS,
   FOUNDER_HISTORY_CATEGORIES as SHARED_HISTORY_CATEGORIES,
   ATTENTION_ACTIONS as SHARED_ATTENTION_ACTIONS,
+  FOUNDER_DIRECTORY_FILTERS as SHARED_DIRECTORY_FILTERS,
+  FOUNDER_TYPE_FILTERS as SHARED_TYPE_FILTERS,
+  FOUNDER_NEXT_STEP_LABELS as SHARED_NEXT_STEP_LABELS,
+  MEETING_NOTE_FIELDS as SHARED_MEETING_NOTE_FIELDS,
+  RESEARCH_ENTRY_FIELDS as SHARED_RESEARCH_FIELDS,
+  PROPOSED_TYPE_LABEL as SHARED_PROPOSED_LABEL,
+  WAITING_ON_PROOVD_LABEL as SHARED_WAITING_LABEL,
+  NO_ACCESS_YET_LABEL as SHARED_NO_ACCESS_LABEL,
   GHOST_BAN_TRIGGER_SUMMARY as SHARED_GHOST_BAN_SUMMARY,
   CREATOR_MATCH_CAVEAT as SHARED_MATCH_CAVEAT,
   CAMPAIGN_TYPE_LOCK_NOTE as SHARED_TYPE_LOCK_NOTE,
@@ -50,6 +58,14 @@ import {
   FOUNDER_EDITABLE_FIELDS,
   FOUNDER_HISTORY_CATEGORIES,
   ATTENTION_ACTIONS,
+  FOUNDER_DIRECTORY_FILTERS,
+  FOUNDER_TYPE_FILTERS,
+  FOUNDER_NEXT_STEP_LABELS,
+  MEETING_NOTE_FIELDS,
+  RESEARCH_ENTRY_FIELDS,
+  PROPOSED_TYPE_LABEL,
+  WAITING_ON_PROOVD_LABEL,
+  NO_ACCESS_YET_LABEL,
   GHOST_BAN_TRIGGER_SUMMARY,
   CREATOR_MATCH_CAVEAT,
   CAMPAIGN_TYPE_LOCK_NOTE,
@@ -119,6 +135,36 @@ describe('the Founder workspace registers do not drift', () => {
     expect([...INVITATION_STATES]).toEqual([...SHARED_INVITATION_STATES]);
     expect([...PROFILE_OVERRIDE_KEYS]).toEqual([...SHARED_OVERRIDE_KEYS]);
     expect([...ATTENTION_ACTIONS]).toEqual([...SHARED_ATTENTION_ACTIONS]);
+  });
+
+  it('agrees on the 2026-08-16 directory registers, entry for entry', () => {
+    expect(FOUNDER_DIRECTORY_FILTERS.map((f) => ({ ...f }))).toEqual(
+      SHARED_DIRECTORY_FILTERS.map((f) => ({ ...f })),
+    );
+    expect(FOUNDER_TYPE_FILTERS.map((f) => ({ ...f }))).toEqual(
+      SHARED_TYPE_FILTERS.map((f) => ({ ...f })),
+    );
+    expect(PROPOSED_TYPE_LABEL).toBe(SHARED_PROPOSED_LABEL);
+    expect(WAITING_ON_PROOVD_LABEL).toBe(SHARED_WAITING_LABEL);
+    expect(NO_ACCESS_YET_LABEL).toBe(SHARED_NO_ACCESS_LABEL);
+    expect({ ...FOUNDER_NEXT_STEP_LABELS }).toEqual({ ...SHARED_NEXT_STEP_LABELS });
+  });
+
+  it('keeps Proposed out of every type register — it is the absence of a lock (§9)', () => {
+    // The filter vocabulary carries it; the type registers must not, because
+    // a third member of CAMPAIGN_TYPE_LABELS would mint the third type §9
+    // forbids.
+    expect(Object.keys(CAMPAIGN_TYPE_LABELS)).toEqual(['pre_build', 'pre_launch']);
+    expect(Object.values(CAMPAIGN_TYPE_LABELS)).not.toContain(PROPOSED_TYPE_LABEL);
+  });
+
+  it('agrees on the meeting-note and research dialogs, field for field', () => {
+    expect(MEETING_NOTE_FIELDS.map((f) => ({ ...f }))).toEqual(
+      SHARED_MEETING_NOTE_FIELDS.map((f) => ({ ...f })),
+    );
+    expect(RESEARCH_ENTRY_FIELDS.map((f) => ({ ...f }))).toEqual(
+      SHARED_RESEARCH_FIELDS.map((f) => ({ ...f })),
+    );
   });
 
   it('agrees on the editable-field registry, key for key', () => {

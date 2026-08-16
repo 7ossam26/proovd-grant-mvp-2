@@ -262,9 +262,12 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
-  src/features/admin/    the Admin shell, Founders, Creators, configuration,
-                         prerequisites, the reservation and charge ledger, the
-                         money controls, and the risk inventory
+  src/features/admin/    the Admin shell and its workspaces, each built from a
+                         supplied reference after Phase 24: Founders (rebuilt
+                         2026-08-16 — the six-card directory with its two
+                         action columns, and the eight-section person record),
+                         Creators, Campaigns, Support, Backers, and the
+                         floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page
   src/surfaces/draft/    the Founder journey: vetting, result, account claim
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the

@@ -111,13 +111,13 @@ export function Money({ detail }: MoneyProps) {
         The W-9 request and reminder are §22.3 acts, and this workspace does not
         own them. The control still renders, because an Admin needs to know the
         next step exists — and it says it is parked rather than pretending to
-        send anything (§1.4). It is the generic message on purpose: the register
-        holds one sentence per destination, and a second written here is a
-        second version of it.
+        send anything (§1.4). `w9Close` names what the destination IS: the
+        close-operations console that owns §22.3's W-9 work, whose screens are
+        not rebuilt yet while its services are live.
       */}
       {money.w9.action ? (
         <Actions>
-          <ParkedButton parkedKey="tabs">{money.w9.action}</ParkedButton>
+          <ParkedButton parkedKey="w9Close">{money.w9.action}</ParkedButton>
         </Actions>
       ) : null}
 
