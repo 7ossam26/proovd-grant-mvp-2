@@ -740,7 +740,12 @@ describe('the record', () => {
       `/admin/backers?view=backers&campaignId=${campaignId}`,
     );
 
-    for (const key of ['money_admin', 'tasks']) {
+    /* Built 2026-08-16. Tasks is a panel, not an address: the destination is
+       this campaign's own record with `?tasks=new`, which the shell reads and
+       opens the panel with the campaign preselected. */
+    expect(byKey.get('tasks')!['href']).toBe(`/admin/campaigns/${campaignId}?tasks=new`);
+
+    for (const key of ['money_admin']) {
       const link = byKey.get(key)!;
       expect(link['href'], `${key} must not fabricate a destination`).toBeNull();
       expect(String(link['unavailableBecause']).length).toBeGreaterThan(40);

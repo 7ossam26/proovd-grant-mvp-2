@@ -1150,6 +1150,35 @@ there is no date field, no recurrence, no template, and no job that sends one. A
 second attempt is refused rather than quietly accepted: it is either a mistake or
 the beginning of the thing the rule forbids.
 
+## The Admin's own notes
+
+Admins can write down what they need to do, point each note at the record it
+belongs to — a Founder, a Creator relationship, a campaign, a Backer, a support
+case — and come back to it from anywhere in the Admin panel: a small floating
+panel, in the spirit of Google Tasks, that rides above every Admin screen
+without belonging to any of them.
+
+The Spec does not name this surface, and the build does not pretend it does.
+What keeps a private to-do list from quietly becoming product machinery is a
+set of refusals, each enforced rather than intended. There is no assignee —
+handing work to a named person is what support cases are for, with their owner,
+due time, and published response promise — and the column that would hold one
+does not exist. The due date is a day the author checks, never a moment
+anything fires: no schedule-shaped column exists, no notification could carry
+"your task is due", no background job reads the table, and the server never
+even interprets the stored date — the little late/today/future pill is computed
+in the browser against the reader's own calendar. The sentence that states this
+travels with the date field itself.
+
+Every list is shared and every note says who wrote it, so removing one is soft:
+the row survives with who removed it and when, and the database refuses a hard
+delete outright. A reference keeps the label it was written with — renaming a
+campaign later never rewrites somebody's note — while the destination is
+re-checked on every read, so a pointer at a record that no longer answers
+renders as a label with the reason, never a dead button. And the count on the
+launcher only ever goes down to zero, because nothing in the product can
+manufacture a task: every one was typed by a person.
+
 ## The Founder's live campaign
 
 Once a campaign is live the Founder gets one page, and it is a chronological

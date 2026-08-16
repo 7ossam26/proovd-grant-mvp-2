@@ -250,10 +250,15 @@ export const CAMPAIGN_DESTINATIONS = [
     key: 'tasks',
     label: 'Tasks',
     mark: 'T',
-    built: false,
-    /* §30 forbids a scheduled queue that chases anybody, so work is recorded on
-       the record it belongs to rather than in a queue of its own. */
-    absentBecause: 'No task queue — work is recorded on the record it belongs to.',
+    /* Built 2026-08-16. The old reasoning here was right and still is: §30
+       forbids a scheduled queue that chases anybody, and nothing built one.
+       What shipped is not a queue — nobody is assigned, nothing is scheduled,
+       and no message is sent; it is a note panel whose due date drives a
+       read-side pill and nothing else, with each of those absences asserted
+       by test. Tasks is a panel rather than an address, so the destination is
+       the campaign's own record with `?tasks=new`, which opens the panel with
+       this campaign already chosen as the reference. */
+    built: true,
   },
 ] as const satisfies readonly CampaignDestination[];
 

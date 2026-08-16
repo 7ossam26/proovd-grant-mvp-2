@@ -156,3 +156,9 @@ export * from './founder-workspace.js';
 // §29 enforcement action) and the §25.8 deletion ask. Added 2026-08-11 as a
 // recorded deviation; see the file header for what it deliberately excludes.
 export * from './creator-workspace.js';
+
+// The Admin Tasks panel (migration 0046, 2026-08-16): a shared, soft-deleting
+// note table pointed at existing records, with NO assignee and NO
+// schedule-shaped column — both absences asserted by test, because §30 is why
+// this is a note an Admin checks and never a queue that chases anybody.
+export * from './admin-tasks.js';
