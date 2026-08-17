@@ -57,6 +57,12 @@ export const SAMPLE_IDEA_CAMPAIGN: CampaignView = {
       ],
       delivery: 'March–April 2027',
       fulfillment: 'An email invitation with a redemption code for your account.',
+      badge: 'Lowest price',
+      // No limit, so the page renders no remaining line at all — never the word
+      // "unlimited", which would invent a scarcity signal the record has none of
+      // (§30). `remaining` is null in exactly the same case.
+      limitedQuantity: null,
+      remaining: null,
     },
     {
       sku: 'LOOP-YEAR',
@@ -69,6 +75,9 @@ export const SAMPLE_IDEA_CAMPAIGN: CampaignView = {
       ],
       delivery: 'March–April 2027',
       fulfillment: 'An email invitation with a redemption code for your account.',
+      badge: 'Best value',
+      limitedQuantity: null,
+      remaining: null,
     },
     {
       sku: 'LOOP-WORKSHOP',
@@ -82,6 +91,11 @@ export const SAMPLE_IDEA_CAMPAIGN: CampaignView = {
       delivery: 'April 2027',
       fulfillment:
         'The redemption code by email, then a scheduling link for the workshop.',
+      badge: null,
+      // A real limit, so the sample also exercises the remaining line and the
+      // sold-out state a live campaign reaches through `countActiveForReward`.
+      limitedQuantity: 40,
+      remaining: 12,
     },
   ],
   featuredRewardSku: 'LOOP-YEAR',
@@ -90,6 +104,73 @@ export const SAMPLE_IDEA_CAMPAIGN: CampaignView = {
   orderThreshold: 250,
   thresholdProgress: 168,
   momentum: null,
+  preorderCounts: { uniqueActiveBackers: 168, activeCount: 168 },
+
+  heroHeadline: 'Talk for two minutes.',
+  heroHeadlineAccent: 'Ship the update.',
+  founderPullQuote:
+    'I wrote the first version because I had missed four weekly updates in a row.',
+  platformLine:
+    'Proovd runs the pre-order. Sample Labs LLC builds and delivers Loopnote.',
+  demoContextLabel: 'A Thursday with Loopnote',
+  benefitsHeading: 'Why a voice note',
+  rewardsHeading: 'Choose your package',
+  updatesHeading: 'Build updates',
+  faqHeading: 'Questions people ask',
+
+  demoMoments: [
+    {
+      id: 'sample-idea-moment-1',
+      timeLabel: '9:40',
+      momentLabel: 'After standup',
+      stateWord: 'Captured',
+      headline: 'Two minutes of talking, filed against the right project.',
+      signalText: 'Grouped under Onboarding',
+      isAction: false,
+      actionLabel: null,
+    },
+    {
+      id: 'sample-idea-moment-2',
+      timeLabel: '15:05',
+      momentLabel: 'After a call',
+      stateWord: 'Added',
+      headline: 'The decision you just made goes in before you forget it.',
+      signalText: null,
+      isAction: true,
+      actionLabel: 'Record a note',
+    },
+    {
+      id: 'sample-idea-moment-3',
+      timeLabel: 'Friday',
+      momentLabel: 'The update',
+      stateWord: 'Written',
+      headline: 'The week reads back as something your team will finish.',
+      signalText: 'Draft ready to edit',
+      isAction: false,
+      actionLabel: null,
+    },
+  ],
+
+  benefitCards: [
+    {
+      id: 'sample-idea-card-1',
+      title: 'Nothing to write during the week',
+      footerWord: 'Spoken',
+      visualVariant: 'bars',
+    },
+    {
+      id: 'sample-idea-card-2',
+      title: 'Grouped by project, not by day',
+      footerWord: 'Sorted',
+      visualVariant: 'dots',
+    },
+    {
+      id: 'sample-idea-card-3',
+      title: 'You edit the draft, you send it',
+      footerWord: 'Yours',
+      visualVariant: 'check',
+    },
+  ],
 
   statementDescriptor: 'PROOVD SAMPLE LABS',
 
@@ -194,6 +275,9 @@ export const SAMPLE_PRODUCT_CAMPAIGN: CampaignView = {
       ],
       delivery: 'October 2026',
       fulfillment: 'A login invitation by email on the delivery date.',
+      badge: 'Lowest price',
+      limitedQuantity: null,
+      remaining: null,
     },
     {
       sku: 'FERN-TEAM',
@@ -206,6 +290,9 @@ export const SAMPLE_PRODUCT_CAMPAIGN: CampaignView = {
       ],
       delivery: 'October 2026',
       fulfillment: 'A login invitation by email on the delivery date.',
+      badge: 'For five',
+      limitedQuantity: null,
+      remaining: null,
     },
     {
       sku: 'FERN-WORKSHOP',
@@ -219,6 +306,11 @@ export const SAMPLE_PRODUCT_CAMPAIGN: CampaignView = {
       delivery: 'November 2026',
       fulfillment:
         'The login invitation by email, then a scheduling link for the workshop.',
+      badge: null,
+      // At its limit. §19 keeps a sold-out reward VISIBLE and unavailable rather
+      // than hiding it, so the sample shows the state a live campaign reaches.
+      limitedQuantity: 25,
+      remaining: 0,
     },
   ],
   featuredRewardSku: 'FERN-SOLO',
@@ -227,6 +319,73 @@ export const SAMPLE_PRODUCT_CAMPAIGN: CampaignView = {
   orderThreshold: null,
   thresholdProgress: null,
   momentum: { uniqueBackers: 312, unitsReserved: 418 },
+  preorderCounts: { uniqueActiveBackers: 312, activeCount: 418 },
+
+  heroHeadline: 'Write the release note once.',
+  heroHeadlineAccent: 'Everyone gets it.',
+  founderPullQuote:
+    'We shipped for two years and still had customers asking for things we had already built.',
+  platformLine:
+    'Proovd runs the pre-order. Sample Works LLC builds and delivers Fernpost.',
+  demoContextLabel: 'One release, three places',
+  benefitsHeading: 'What changes',
+  rewardsHeading: 'Choose your package',
+  updatesHeading: 'Build updates',
+  faqHeading: 'Questions people ask',
+
+  demoMoments: [
+    {
+      id: 'sample-product-moment-1',
+      timeLabel: '11:20',
+      momentLabel: 'You publish',
+      stateWord: 'Once',
+      headline: 'One release note, written the way you would write it anyway.',
+      signalText: 'Draft saved',
+      isAction: false,
+      actionLabel: null,
+    },
+    {
+      id: 'sample-product-moment-2',
+      timeLabel: '11:21',
+      momentLabel: 'It lands',
+      stateWord: 'Everywhere',
+      headline: 'The in-app notice, the email, and the public page all match.',
+      signalText: null,
+      isAction: true,
+      actionLabel: 'Send it',
+    },
+    {
+      id: 'sample-product-moment-3',
+      timeLabel: 'Next week',
+      momentLabel: 'You find out',
+      stateWord: 'Read',
+      headline: 'Which customers opened it, and which asked for it first.',
+      signalText: '61% of the workspaces that asked',
+      isAction: false,
+      actionLabel: null,
+    },
+  ],
+
+  benefitCards: [
+    {
+      id: 'sample-product-card-1',
+      title: 'Three surfaces, one source',
+      footerWord: 'Consistent',
+      visualVariant: 'check',
+    },
+    {
+      id: 'sample-product-card-2',
+      title: 'You see who actually read it',
+      footerWord: 'Measured',
+      visualVariant: 'bars',
+    },
+    {
+      id: 'sample-product-card-3',
+      title: 'Close the loop with the person who asked',
+      footerWord: 'Answered',
+      visualVariant: 'dots',
+    },
+  ],
 
   statementDescriptor: 'PROOVD SAMPLE WORKS',
 

@@ -23,7 +23,18 @@ import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { reviewNotifyDeps } from '../campaign/review-notifications.js';
 import { campaigns } from '../db/schema/domain.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
-import { readBuild, saveBuild, upsertRewardPackage, type BuildPatch } from '../campaign/service.js';
+import {
+  readBuild,
+  saveBuild,
+  upsertRewardPackage,
+  upsertFaq,
+  deleteFaq,
+  upsertDemoMoment,
+  deleteDemoMoment,
+  upsertBenefitCard,
+  deleteBenefitCard,
+  type BuildPatch,
+} from '../campaign/service.js';
 import { submitForReview, readReviewReadiness, readLatestReview } from '../campaign/review.js';
 import { buildCampaignPreview } from '../campaign/preview.js';
 import { listPendingReacceptances, decideReacceptance } from '../campaign/materiality.js';
@@ -83,6 +94,17 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
   const notFound = (res: express.Response) =>
     res.status(404).json({ error: 'not_found', whatHappened: 'That campaign could not be found.' });
 
+  /** The one refusal shape the content routes answer with (§1.1's failure state). */
+  const contentRefusal = (
+    res: express.Response,
+    refusal: { code: 'not_editable' | 'invalid_value'; message: string; next: string },
+  ) =>
+    res.status(refusal.code === 'not_editable' ? 409 : 422).json({
+      error: refusal.code,
+      whatHappened: refusal.message,
+      next: refusal.next,
+    });
+
   /* ── The build (§14.4) ──────────────────────────────────────────────────── */
 
   router.get('/api/founder/campaigns/:campaignId/build', founder, async (req, res) => {
@@ -94,9 +116,15 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
       build: serializeBuild(view.build),
       rewardPackages: view.rewardPackages.map(serializeReward),
       faqs: view.faqs,
+      demoMoments: view.demoMoments.map(serializeDemoMoment),
+      benefitCards: view.benefitCards.map(serializeBenefitCard),
       buildStatus: view.buildStatus,
       missing: view.missing,
       campaignStatus: campaign.status,
+      // §14.4's type-specific ingredients differ, so the surface has to know
+      // which set to render. Named the customer-facing way (§3.1): the internal
+      // `pre_build`/`pre_launch` must never reach a Founder.
+      model: campaign.campaignType === 'pre_build' ? 'idea' : 'product',
       reviewReadiness: readiness,
     });
   });
@@ -143,6 +171,7 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
         delivery: String(body['delivery'] ?? ''),
         limitedQuantity:
           typeof body['limitedQuantity'] === 'number' ? body['limitedQuantity'] : null,
+        badge: typeof body['badge'] === 'string' ? body['badge'] : null,
         sortOrder: typeof body['sortOrder'] === 'number' ? body['sortOrder'] : 0,
       },
       actor: actor(req),
@@ -157,6 +186,133 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
     }
     res.json({ package: serializeReward(result.package) });
   });
+
+  /* ── FAQs (§14.4) ───────────────────────────────────────────────────────── */
+  //
+  // `campaign_faqs` was readable and live-editable from Phase 12b and had no
+  // production writer: the §14.4 read shipped and the write never did. The
+  // rebuilt page makes the FAQ a full section, and a section a Founder cannot
+  // fill is a heading with nothing under it.
+
+  router.put('/api/founder/campaigns/:campaignId/build/faqs', founder, json, async (req, res) => {
+    const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+    if (!campaign) return notFound(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const result = await upsertFaq(db, { audit }, {
+      campaignId: campaign.campaignId,
+      campaignStatus: campaign.status,
+      ...(typeof body['faqId'] === 'string' ? { faqId: body['faqId'] } : {}),
+      faq: {
+        question: String(body['question'] ?? ''),
+        answer: String(body['answer'] ?? ''),
+        sortOrder: typeof body['sortOrder'] === 'number' ? body['sortOrder'] : 0,
+      },
+      actor: actor(req),
+    });
+    if (!result.ok) return contentRefusal(res, result);
+    res.json({ faq: result.faq });
+  });
+
+  router.delete('/api/founder/campaigns/:campaignId/build/faqs/:faqId', founder, async (req, res) => {
+    const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+    if (!campaign) return notFound(res);
+    const result = await deleteFaq(db, { audit }, {
+      campaignId: campaign.campaignId,
+      campaignStatus: campaign.status,
+      faqId: req.params['faqId'] as string,
+      actor: actor(req),
+    });
+    if (!result.ok) return contentRefusal(res, result);
+    res.json({ removed: true });
+  });
+
+  /* ── The demo stage and the benefit cards (campaign page v2) ────────────── */
+  //
+  // Optional presentation of the Founder's own product. No commercial rule: no
+  // price, no date, no threshold, no eligibility. A campaign with no rows
+  // renders no section rather than an empty one.
+
+  router.put('/api/founder/campaigns/:campaignId/build/demo-moments', founder, json, async (req, res) => {
+    const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+    if (!campaign) return notFound(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const result = await upsertDemoMoment(db, { audit }, {
+      campaignId: campaign.campaignId,
+      campaignStatus: campaign.status,
+      ...(typeof body['momentId'] === 'string' ? { momentId: body['momentId'] } : {}),
+      moment: {
+        timeLabel: String(body['timeLabel'] ?? ''),
+        momentLabel: String(body['momentLabel'] ?? ''),
+        stateWord: String(body['stateWord'] ?? ''),
+        headline: String(body['headline'] ?? ''),
+        signalText: typeof body['signalText'] === 'string' ? body['signalText'] : null,
+        isAction: body['isAction'] === true,
+        actionLabel: typeof body['actionLabel'] === 'string' ? body['actionLabel'] : null,
+        // Absent means "append", never 0. `(campaign_id, sort_order)` is
+        // UNIQUE, so defaulting here would make the SECOND moment a 23505 the
+        // Founder reads as the form having stopped working.
+        ...(typeof body['sortOrder'] === 'number' ? { sortOrder: body['sortOrder'] } : {}),
+      },
+      actor: actor(req),
+    });
+    if (!result.ok) return contentRefusal(res, result);
+    res.json({ moment: serializeDemoMoment(result.moment) });
+  });
+
+  router.delete(
+    '/api/founder/campaigns/:campaignId/build/demo-moments/:momentId',
+    founder,
+    async (req, res) => {
+      const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+      if (!campaign) return notFound(res);
+      const result = await deleteDemoMoment(db, { audit }, {
+        campaignId: campaign.campaignId,
+        campaignStatus: campaign.status,
+        momentId: req.params['momentId'] as string,
+        actor: actor(req),
+      });
+      if (!result.ok) return contentRefusal(res, result);
+      res.json({ removed: true });
+    },
+  );
+
+  router.put('/api/founder/campaigns/:campaignId/build/benefit-cards', founder, json, async (req, res) => {
+    const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+    if (!campaign) return notFound(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const result = await upsertBenefitCard(db, { audit }, {
+      campaignId: campaign.campaignId,
+      campaignStatus: campaign.status,
+      ...(typeof body['cardId'] === 'string' ? { cardId: body['cardId'] } : {}),
+      card: {
+        title: String(body['title'] ?? ''),
+        footerWord: String(body['footerWord'] ?? ''),
+        visualVariant: String(body['visualVariant'] ?? ''),
+        // Absent means "append" — see the demo moments above.
+        ...(typeof body['sortOrder'] === 'number' ? { sortOrder: body['sortOrder'] } : {}),
+      },
+      actor: actor(req),
+    });
+    if (!result.ok) return contentRefusal(res, result);
+    res.json({ card: serializeBenefitCard(result.card) });
+  });
+
+  router.delete(
+    '/api/founder/campaigns/:campaignId/build/benefit-cards/:cardId',
+    founder,
+    async (req, res) => {
+      const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+      if (!campaign) return notFound(res);
+      const result = await deleteBenefitCard(db, { audit }, {
+        campaignId: campaign.campaignId,
+        campaignStatus: campaign.status,
+        cardId: req.params['cardId'] as string,
+        actor: actor(req),
+      });
+      if (!result.ok) return contentRefusal(res, result);
+      res.json({ removed: true });
+    },
+  );
 
   /* ── Preview (§15) — collects no payment information ─────────────────────── */
 
@@ -238,6 +394,7 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
     if (!campaign) return notFound(res);
     const body = (req.body ?? {}) as Record<string, unknown>;
     const delivery = body['deliveryChange'] as { prior?: unknown; revised?: unknown } | undefined;
+    const metric = body['metric'] as { label?: unknown; value?: unknown } | undefined;
     const result = await postUpdate(db, { audit }, {
       campaignId: campaign.campaignId,
       author: actor(req),
@@ -248,6 +405,9 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
       ...(typeof body['videoUrl'] === 'string' ? { videoUrl: body['videoUrl'] } : {}),
       ...(delivery && typeof delivery.prior === 'string' && typeof delivery.revised === 'string'
         ? { deliveryChange: { prior: delivery.prior, revised: delivery.revised } }
+        : {}),
+      ...(metric && typeof metric.label === 'string' && typeof metric.value === 'string'
+        ? { metric: { label: metric.label, value: metric.value } }
         : {}),
     });
     if (result.status !== 'posted') {
@@ -379,6 +539,19 @@ function serializeBuild(build: import('../db/schema/build.js').CampaignBuild | n
     refundPolicySourceUrl: build.refundPolicySourceUrl,
     refundPolicyVersion: build.refundPolicyVersion,
     refundPolicyEffectiveDate: build.refundPolicyEffectiveDate,
+    // The rebuilt campaign page's own copy (0049). A column added to Drizzle
+    // and to `BuildPatch` but not to this list is one the Founder can write and
+    // never read back — the box empties on every reload.
+    heroHeadline: build.heroHeadline,
+    heroHeadlineAccent: build.heroHeadlineAccent,
+    heroSubheadline: build.heroSubheadline,
+    founderPullQuote: build.founderPullQuote,
+    platformLine: build.platformLine,
+    demoContextLabel: build.demoContextLabel,
+    benefitsHeading: build.benefitsHeading,
+    rewardsHeading: build.rewardsHeading,
+    updatesHeading: build.updatesHeading,
+    faqHeading: build.faqHeading,
   };
 }
 
@@ -392,7 +565,32 @@ function serializeReward(reward: import('../db/schema/build.js').CampaignRewardP
     fulfillmentCommitment: reward.fulfillmentCommitment,
     delivery: reward.delivery,
     limitedQuantity: reward.limitedQuantity,
+    badge: reward.badge,
     sortOrder: reward.sortOrder,
+  };
+}
+
+function serializeDemoMoment(moment: import('../db/schema/build.js').CampaignDemoMoment) {
+  return {
+    id: moment.id,
+    timeLabel: moment.timeLabel,
+    momentLabel: moment.momentLabel,
+    stateWord: moment.stateWord,
+    headline: moment.headline,
+    signalText: moment.signalText,
+    isAction: moment.isAction,
+    actionLabel: moment.actionLabel,
+    sortOrder: moment.sortOrder,
+  };
+}
+
+function serializeBenefitCard(card: import('../db/schema/build.js').CampaignBenefitCard) {
+  return {
+    id: card.id,
+    title: card.title,
+    footerWord: card.footerWord,
+    visualVariant: card.visualVariant,
+    sortOrder: card.sortOrder,
   };
 }
 

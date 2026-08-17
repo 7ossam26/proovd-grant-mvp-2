@@ -480,6 +480,18 @@ export interface BuildFields {
   refundPolicySourceUrl: string | null;
   refundPolicyVersion: string | null;
   refundPolicyEffectiveDate: string | null;
+  /* The rebuilt campaign page's own copy (0049). All optional — none of them is
+     in a `REQUIRED_*` register, so none can hold a build below `complete`. */
+  heroHeadline: string | null;
+  heroHeadlineAccent: string | null;
+  heroSubheadline: string | null;
+  founderPullQuote: string | null;
+  platformLine: string | null;
+  demoContextLabel: string | null;
+  benefitsHeading: string | null;
+  rewardsHeading: string | null;
+  updatesHeading: string | null;
+  faqHeading: string | null;
 }
 
 export interface RewardPackageView {
@@ -491,7 +503,34 @@ export interface RewardPackageView {
   fulfillmentCommitment: string;
   delivery: string;
   limitedQuantity: number | null;
+  badge: string | null;
   sortOrder: number;
+}
+
+export interface DemoMomentView {
+  id: string;
+  timeLabel: string;
+  momentLabel: string;
+  stateWord: string;
+  headline: string;
+  signalText: string | null;
+  isAction: boolean;
+  actionLabel: string | null;
+  sortOrder: number;
+}
+
+export interface BenefitCardView {
+  id: string;
+  title: string;
+  footerWord: string;
+  visualVariant: string;
+  sortOrder: number;
+}
+
+export interface FaqView {
+  id: string;
+  question: string;
+  answer: string;
 }
 
 export interface ReviewReadiness {
@@ -503,10 +542,14 @@ export interface ReviewReadiness {
 export interface BuildState {
   build: BuildFields | null;
   rewardPackages: RewardPackageView[];
-  faqs: Array<{ id: string; question: string; answer: string }>;
+  faqs: FaqView[];
+  demoMoments: DemoMomentView[];
+  benefitCards: BenefitCardView[];
   buildStatus: string;
   missing: string[];
   campaignStatus: string;
+  /** §14.4's type-specific ingredients differ, so the surface renders one set. */
+  model: 'idea' | 'product';
   reviewReadiness: ReviewReadiness;
 }
 
@@ -530,9 +573,67 @@ export const saveRewardPackage = (
     fulfillmentCommitment: string;
     delivery: string;
     limitedQuantity?: number | null;
+    badge?: string | null;
   },
 ): Promise<{ package: RewardPackageView }> =>
   call(`${base(campaignId)}/build/rewards`, { method: 'PUT', body: JSON.stringify(reward) });
+
+/* ── FAQs, the demo stage, and the benefit cards ─────────────────────────────
+ *
+ * `campaign_faqs` had no production writer until now: the §14.4 read shipped in
+ * Phase 12b and the write never did, so a Founder could see the section on
+ * their own preview and had nowhere to fill it.
+ */
+
+export const saveFaq = (
+  campaignId: string,
+  faq: { faqId?: string; question: string; answer: string; sortOrder?: number },
+): Promise<{ faq: FaqView }> =>
+  call(`${base(campaignId)}/build/faqs`, { method: 'PUT', body: JSON.stringify(faq) });
+
+export const removeFaq = (campaignId: string, faqId: string): Promise<{ removed: true }> =>
+  call(`${base(campaignId)}/build/faqs/${encodeURIComponent(faqId)}`, { method: 'DELETE' });
+
+export const saveDemoMoment = (
+  campaignId: string,
+  moment: {
+    momentId?: string;
+    timeLabel: string;
+    momentLabel: string;
+    stateWord: string;
+    headline: string;
+    signalText?: string | null;
+    isAction?: boolean;
+    actionLabel?: string | null;
+    sortOrder?: number;
+  },
+): Promise<{ moment: DemoMomentView }> =>
+  call(`${base(campaignId)}/build/demo-moments`, { method: 'PUT', body: JSON.stringify(moment) });
+
+export const removeDemoMoment = (
+  campaignId: string,
+  momentId: string,
+): Promise<{ removed: true }> =>
+  call(`${base(campaignId)}/build/demo-moments/${encodeURIComponent(momentId)}`, {
+    method: 'DELETE',
+  });
+
+export const saveBenefitCard = (
+  campaignId: string,
+  card: {
+    cardId?: string;
+    title: string;
+    footerWord: string;
+    visualVariant: string;
+    sortOrder?: number;
+  },
+): Promise<{ card: BenefitCardView }> =>
+  call(`${base(campaignId)}/build/benefit-cards`, { method: 'PUT', body: JSON.stringify(card) });
+
+export const removeBenefitCard = (campaignId: string, cardId: string): Promise<{ removed: true }> =>
+  call(`${base(campaignId)}/build/benefit-cards/${encodeURIComponent(cardId)}`, {
+    method: 'DELETE',
+  });
 
 export const submitForReview = (
   campaignId: string,
@@ -547,6 +648,7 @@ export interface CampaignPreview {
   opensAt: string | null;
   closesAt: string | null;
   rewards: Array<{
+    id: string;
     sku: string;
     title: string;
     priceCents: string;
@@ -554,6 +656,7 @@ export interface CampaignPreview {
     delivery: string;
     fulfillment: string;
     limitedQuantity: number | null;
+    badge: string | null;
   }>;
   featuredRewardSku: string | null;
   example: { rewardSubtotalCents: string; salesTaxCents: string; totalCents: string } | null;
@@ -571,6 +674,22 @@ export interface CampaignPreview {
   } | null;
   earlyProductDisclaimer: string | null;
   risksAndChallenges: string | null;
+  /* The rebuilt page's own copy (0049). The preview renders exactly what the
+     public page will, so it carries exactly what the public payload carries. */
+  heroHeadline: string | null;
+  heroHeadlineAccent: string | null;
+  founderPullQuote: string | null;
+  platformLine: string | null;
+  demoContextLabel: string | null;
+  benefitsHeading: string | null;
+  rewardsHeading: string | null;
+  updatesHeading: string | null;
+  faqHeading: string | null;
+  // The preview renders what a Backer will see, so these carry no `sortOrder`:
+  // the order IS the array, and a position a surface could disagree with the
+  // array about is a second answer to the same question.
+  demoMoments: Array<Omit<DemoMomentView, 'sortOrder'>>;
+  benefitCards: Array<Omit<BenefitCardView, 'sortOrder'>>;
   isPreview: true;
 }
 

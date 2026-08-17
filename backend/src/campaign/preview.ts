@@ -21,13 +21,39 @@ import { asc, eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { campaigns } from '../db/schema/domain.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
-import { campaignBuild, campaignRewardPackages, campaignFaqs } from '../db/schema/build.js';
+import {
+  campaignBuild,
+  campaignRewardPackages,
+  campaignFaqs,
+  campaignDemoMoments,
+  campaignBenefitCards,
+} from '../db/schema/build.js';
 import { computeCampaignDescriptor } from '../payments/descriptors.js';
 
 type Executor = Pick<Database, 'select'>;
 
 /** A representative example sales-tax rate for the preview only (basis points). */
 const EXAMPLE_TAX_BPS = 800n;
+
+/** One moment of the demo stage, as the page renders it. */
+export interface PreviewDemoMoment {
+  id: string;
+  timeLabel: string;
+  momentLabel: string;
+  stateWord: string;
+  headline: string;
+  signalText: string | null;
+  isAction: boolean;
+  actionLabel: string | null;
+}
+
+/** One benefit card. `visualVariant` is one of `bars` | `check` | `dots`. */
+export interface PreviewBenefitCard {
+  id: string;
+  title: string;
+  footerWord: string;
+  visualVariant: string;
+}
 
 /** The `CampaignView`-shaped preview payload. Dates are ISO strings. */
 export interface CampaignPreview {
@@ -38,6 +64,8 @@ export interface CampaignPreview {
   opensAt: string | null;
   closesAt: string | null;
   rewards: Array<{
+    /** The row's own id. The public page counts active pre-orders against it. */
+    id: string;
     sku: string;
     title: string;
     priceCents: string;
@@ -45,6 +73,7 @@ export interface CampaignPreview {
     delivery: string;
     fulfillment: string;
     limitedQuantity: number | null;
+    badge: string | null;
   }>;
   featuredRewardSku: string | null;
   /** Example checkout amounts, in cents, for the drawer preview. */
@@ -67,6 +96,20 @@ export interface CampaignPreview {
   } | null;
   earlyProductDisclaimer: string | null;
   risksAndChallenges: string | null;
+  /* ── The rebuilt page's own copy (0049) ──────────────────────────────────
+   * Every one of these is optional. A campaign with none renders the section
+   * it would have filled as absent, never as an empty heading (§1.4). */
+  heroHeadline: string | null;
+  heroHeadlineAccent: string | null;
+  founderPullQuote: string | null;
+  platformLine: string | null;
+  demoContextLabel: string | null;
+  benefitsHeading: string | null;
+  rewardsHeading: string | null;
+  updatesHeading: string | null;
+  faqHeading: string | null;
+  demoMoments: PreviewDemoMoment[];
+  benefitCards: PreviewBenefitCard[];
   /** Always true here: the surface renders read-only and mounts no payment field. */
   isPreview: true;
 }
@@ -110,6 +153,18 @@ export async function buildCampaignPreview(
     .where(eq(campaignFaqs.campaignId, campaign.campaignId))
     .orderBy(asc(campaignFaqs.sortOrder));
 
+  const demoRows = await db
+    .select()
+    .from(campaignDemoMoments)
+    .where(eq(campaignDemoMoments.campaignId, campaign.campaignId))
+    .orderBy(asc(campaignDemoMoments.sortOrder));
+
+  const benefitRows = await db
+    .select()
+    .from(campaignBenefitCards)
+    .where(eq(campaignBenefitCards.campaignId, campaign.campaignId))
+    .orderBy(asc(campaignBenefitCards.sortOrder));
+
   const featured = rewardRows[0] ?? null;
   const example = featured
     ? (() => {
@@ -131,7 +186,13 @@ export async function buildCampaignPreview(
   return {
     model: campaign.campaignType === 'pre_build' ? 'idea' : 'product',
     title: build?.title ?? 'Untitled campaign',
-    tagline: build?.brandPerception ?? '',
+    // The public tagline is `hero_subheadline` (0049), not `brand_perception`.
+    // That was a stand-in from Phase 12b and it was the wrong column in a way
+    // that mattered: §20 puts `brandPerception` in column ONE — a brand note
+    // the Founder may publish directly while live — so rendering it as the
+    // page's public promise line made an unreviewed field into a claim. The
+    // subheadline is column two, which is where a public claim belongs.
+    tagline: build?.heroSubheadline ?? '',
     founder: {
       legalName: build?.founderDisplayName ?? claim?.legalName ?? 'The Founder',
       entity,
@@ -141,6 +202,7 @@ export async function buildCampaignPreview(
     opensAt: build?.opensAt?.toISOString() ?? null,
     closesAt: build?.closesAt?.toISOString() ?? null,
     rewards: rewardRows.map((r) => ({
+      id: r.id,
       sku: r.sku,
       title: r.title,
       priceCents: r.priceCents.toString(),
@@ -148,6 +210,7 @@ export async function buildCampaignPreview(
       delivery: r.delivery,
       fulfillment: r.fulfillmentCommitment,
       limitedQuantity: r.limitedQuantity,
+      badge: r.badge,
     })),
     featuredRewardSku: featured?.sku ?? null,
     example,
@@ -173,6 +236,31 @@ export async function buildCampaignPreview(
         : null,
     earlyProductDisclaimer: build?.earlyProductDisclaimer ?? null,
     risksAndChallenges: build?.risksAndChallenges ?? null,
+    heroHeadline: build?.heroHeadline ?? null,
+    heroHeadlineAccent: build?.heroHeadlineAccent ?? null,
+    founderPullQuote: build?.founderPullQuote ?? null,
+    platformLine: build?.platformLine ?? null,
+    demoContextLabel: build?.demoContextLabel ?? null,
+    benefitsHeading: build?.benefitsHeading ?? null,
+    rewardsHeading: build?.rewardsHeading ?? null,
+    updatesHeading: build?.updatesHeading ?? null,
+    faqHeading: build?.faqHeading ?? null,
+    demoMoments: demoRows.map((m) => ({
+      id: m.id,
+      timeLabel: m.timeLabel,
+      momentLabel: m.momentLabel,
+      stateWord: m.stateWord,
+      headline: m.headline,
+      signalText: m.signalText,
+      isAction: m.isAction,
+      actionLabel: m.actionLabel,
+    })),
+    benefitCards: benefitRows.map((c) => ({
+      id: c.id,
+      title: c.title,
+      footerWord: c.footerWord,
+      visualVariant: c.visualVariant,
+    })),
     isPreview: true,
   };
 }

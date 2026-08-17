@@ -47,6 +47,13 @@ export interface PostUpdateInput {
   videoUrl?: string | undefined;
   /** §18: when the update announces a delivery change, both commitments together. */
   deliveryChange?: { prior: string; revised: string } | undefined;
+  /**
+   * The headline metric the rebuilt page renders above the body (0049). Both
+   * halves or neither — a 0049 CHECK, because a bare `86%` reads as nothing to
+   * a screen reader (the label IS its accessible name) and a label with no
+   * value is an empty promise.
+   */
+  metric?: { label: string; value: string } | undefined;
   now?: Date;
 }
 
@@ -124,6 +131,19 @@ export async function postUpdate(
     };
   }
 
+  // The 0049 CHECK refuses a half-filled metric regardless; refusing here first
+  // is what puts a sentence in front of the Founder rather than a constraint
+  // name. A blank half is an absent half — both empty is simply no metric.
+  const metricLabel = input.metric?.label.trim() ?? '';
+  const metricValue = input.metric?.value.trim() ?? '';
+  if (Boolean(metricLabel) !== Boolean(metricValue)) {
+    return {
+      status: 'invalid',
+      message:
+        'A headline number needs both the number and what it counts. On its own, a number reads as nothing.',
+    };
+  }
+
   const [update] = await db
     .insert(campaignUpdates)
     .values({
@@ -138,6 +158,8 @@ export async function postUpdate(
       isMaterialDeliveryChange: Boolean(material),
       priorCommitment: material ? material.prior.trim() : null,
       revisedCommitment: material ? material.revised.trim() : null,
+      metricLabel: metricLabel || null,
+      metricValue: metricValue || null,
     })
     .returning();
 
@@ -193,5 +215,7 @@ export function serializeUpdate(update: CampaignUpdate) {
     isMaterialDeliveryChange: update.isMaterialDeliveryChange,
     priorCommitment: update.priorCommitment,
     revisedCommitment: update.revisedCommitment,
+    metricLabel: update.metricLabel,
+    metricValue: update.metricValue,
   };
 }

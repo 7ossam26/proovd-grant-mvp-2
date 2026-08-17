@@ -30,6 +30,8 @@ import { campaigns, reservations } from '../db/schema/domain.js';
 import { campaignCloseBatches } from '../db/schema/close.js';
 import { campaignEnforcementActions } from '../db/schema/support.js';
 import { buildCampaignPreview } from './preview.js';
+import { countActiveForRewards } from '../reservations/preorder.js';
+import { readPreorderCounts } from '../live/counts.js';
 
 /**
  * §33.9.9's outcome-specific kinds (Phase 20b). The old four ('closed',
@@ -195,6 +197,38 @@ export interface PublicReward {
   contents: string[];
   delivery: string;
   fulfillment: string;
+  /** The reference's tier badge (0049). Null renders no chip, not an empty one. */
+  badge: string | null;
+  /**
+   * §14.4's own field, which this payload used to drop on the floor.
+   *
+   * Null means unlimited — and the page renders NO remaining line for it, never
+   * the word "unlimited" (§30: a scarcity signal invented where the record has
+   * none). `remaining` is null in exactly the same case.
+   */
+  limitedQuantity: number | null;
+  /** `limitedQuantity − active pre-orders`, floored at 0. Null when unlimited. */
+  remaining: number | null;
+}
+
+/** One moment of the demo stage (0049). Optional; an empty list renders nothing. */
+export interface PublicDemoMoment {
+  id: string;
+  timeLabel: string;
+  momentLabel: string;
+  stateWord: string;
+  headline: string;
+  signalText: string | null;
+  isAction: boolean;
+  actionLabel: string | null;
+}
+
+/** One benefit card (0049). `visualVariant` is `bars` | `check` | `dots`. */
+export interface PublicBenefitCard {
+  id: string;
+  title: string;
+  footerWord: string;
+  visualVariant: string;
 }
 
 export interface PublicCampaignPayload {
@@ -218,8 +252,43 @@ export interface PublicCampaignPayload {
     effectiveDate: string;
     text: string | null;
   } | null;
-  /** Comments arrive in Phase 14c (they need the Backer identity Phase 15 mints). */
+  /**
+   * Always false, and not a gap.
+   *
+   * The comment that used to sit here said comments "arrive in Phase 14c", and
+   * it went stale the moment 17b built the thread. §18 admits only a Backer
+   * holding a magic link, and nobody on the public page is authenticated — so
+   * the thread lives on `/backer/:token`, which is the only surface in the
+   * product where a Backer has an identity at all. The public page renders the
+   * §18 item-13 band and points there; it does not host a thread it could not
+   * attribute a single post to.
+   */
   commentsEnabled: boolean;
+
+  /* ── The rebuilt page's own copy and content (0049) ──────────────────────
+   * All optional. A null heading or an empty list renders no section — never
+   * an empty one, and never a placeholder (§1.4, §33.11.3). */
+  heroHeadline: string | null;
+  heroHeadlineAccent: string | null;
+  founderPullQuote: string | null;
+  platformLine: string | null;
+  demoContextLabel: string | null;
+  benefitsHeading: string | null;
+  rewardsHeading: string | null;
+  updatesHeading: string | null;
+  faqHeading: string | null;
+  demoMoments: PublicDemoMoment[];
+  benefitCards: PublicBenefitCard[];
+
+  /**
+   * §20's own composed counts, for the threshold panel and the "N people
+   * reserved" line (§21's threshold measure is `uniqueActiveBackers`, so this
+   * adds no second way of counting).
+   *
+   * §30: rendered only where a real record produced it. Zero pre-orders renders
+   * "Be the first" — never a fabricated number and never a rounded-up one.
+   */
+  preorderCounts: { uniqueActiveBackers: number; activeCount: number };
 }
 
 export interface PublicCampaign {
@@ -282,6 +351,19 @@ export async function buildPublicCampaign(
         }
       : null;
 
+  // "N left" on the page and the sold-out refusal at checkout must count the
+  // same thing, so both read `countActiveForRewards` — the one predicate. A
+  // page saying "3 left" over a different query from the one that refuses is a
+  // Backer told there is stock and then told there is not.
+  const takenByReward = await countActiveForRewards(
+    db,
+    preview.rewards.map((r) => r.id),
+  );
+
+  // §21's own threshold measure, composed from the append-only transition
+  // history (17a). No second counter, and nothing rounded (§30).
+  const counts = await readPreorderCounts(db, row.id);
+
   const payload: PublicCampaignPayload = {
     campaignId: row.id,
     model: preview.model,
@@ -290,14 +372,24 @@ export async function buildPublicCampaign(
     founder: preview.founder,
     opensAt: preview.opensAt,
     closesAt: preview.closesAt,
-    rewards: preview.rewards.map((r) => ({
-      sku: r.sku,
-      title: r.title,
-      priceCents: r.priceCents,
-      contents: r.contents,
-      delivery: r.delivery,
-      fulfillment: r.fulfillment,
-    })),
+    rewards: preview.rewards.map((r) => {
+      const taken = takenByReward.get(r.id) ?? 0;
+      return {
+        sku: r.sku,
+        title: r.title,
+        priceCents: r.priceCents,
+        contents: r.contents,
+        delivery: r.delivery,
+        fulfillment: r.fulfillment,
+        badge: r.badge,
+        limitedQuantity: r.limitedQuantity,
+        // Null when unlimited, so the surface has nothing to render rather than
+        // a number it would have to decide how to describe. Floored at 0: a
+        // negative remainder is unreachable through the atomic cap, and if one
+        // ever appeared "−2 left" would be the worst possible way to say it.
+        remaining: r.limitedQuantity === null ? null : Math.max(0, r.limitedQuantity - taken),
+      };
+    }),
     featuredRewardSku: preview.featuredRewardSku,
     orderThreshold: preview.orderThreshold,
     // §24.12/§33.9.13: the preview computes the one kernel's display value —
@@ -308,6 +400,21 @@ export async function buildPublicCampaign(
     refundSummary: refundSummary(preview.model, Boolean(founderRefundPolicy)),
     founderRefundPolicy,
     commentsEnabled: false,
+    heroHeadline: preview.heroHeadline,
+    heroHeadlineAccent: preview.heroHeadlineAccent,
+    founderPullQuote: preview.founderPullQuote,
+    platformLine: preview.platformLine,
+    demoContextLabel: preview.demoContextLabel,
+    benefitsHeading: preview.benefitsHeading,
+    rewardsHeading: preview.rewardsHeading,
+    updatesHeading: preview.updatesHeading,
+    faqHeading: preview.faqHeading,
+    demoMoments: preview.demoMoments,
+    benefitCards: preview.benefitCards,
+    preorderCounts: {
+      uniqueActiveBackers: counts.uniqueActiveBackers,
+      activeCount: counts.activeCount,
+    },
   };
 
   return {

@@ -73,6 +73,23 @@ export const campaignBuild = pgTable(
     refundPolicyVersion: text('refund_policy_version'),
     refundPolicyEffectiveDate: date('refund_policy_effective_date'),
 
+    /* ── The page's own copy (migration 0049, campaign page v2) ────────────
+     * §18 hands presentation to the DNA document by name, so the designed page
+     * needs copy §14.4 does not enumerate. Every one of these is OPTIONAL and
+     * none is in a `REQUIRED_*` register: a build must not stop completing
+     * because a campaign has no marketing headline. They carry no commercial
+     * rule — no price, no date, no threshold, no eligibility. */
+    heroHeadline: text('hero_headline'),
+    heroHeadlineAccent: text('hero_headline_accent'),
+    heroSubheadline: text('hero_subheadline'),
+    founderPullQuote: text('founder_pull_quote'),
+    platformLine: text('platform_line'),
+    demoContextLabel: text('demo_context_label'),
+    benefitsHeading: text('benefits_heading'),
+    rewardsHeading: text('rewards_heading'),
+    updatesHeading: text('updates_heading'),
+    faqHeading: text('faq_heading'),
+
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     updatedBy: text('updated_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -98,6 +115,13 @@ export const campaignRewardPackages = pgTable(
     fulfillmentCommitment: text('fulfillment_commitment').notNull(),
     delivery: text('delivery').notNull(),
     limitedQuantity: integer('limited_quantity'),
+    /**
+     * The reference's tier badge — `Lowest price`, `Best value`, `For five`
+     * (0049). Free text: §14.4 names no badge vocabulary and inventing one
+     * would be §1 rule 6. `requires_review` in the §20 register, because a
+     * badge sits beside a price and is where "Best value" becomes a claim.
+     */
+    badge: text('badge'),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -124,6 +148,82 @@ export const campaignFaqs = pgTable(
   },
   (t) => ({
     campaignIdx: index('campaign_faqs_campaign_idx').on(t.campaignId, t.sortOrder),
+  }),
+);
+
+/* ── campaign_demo_moments (campaign page v2, migration 0049) ──────────────── */
+
+/**
+ * The interactive demo stage: three moments of the Founder's own product.
+ *
+ * §14.4 does not name this and the brief that added it does not pretend it
+ * does. It is presentation of the Founder's product, the same class as "Hero
+ * preference" and "Product visuals and brand assets" which §14.4 *does* name,
+ * and it carries no commercial rule.
+ *
+ * A moment is a passive **signal** or one **action**, never both and never
+ * neither — a 0049 CHECK, because the two render differently and mean different
+ * things, and a row claiming both would render a card with a dead control on it.
+ *
+ * `timeLabel` is a clock face the Founder types (`8:15`), never an instant the
+ * product interprets. §27.1's timezone rule governs deadlines the product
+ * promises to people; this is copy inside a mockup of somebody else's app.
+ */
+export const campaignDemoMoments = pgTable(
+  'campaign_demo_moments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id),
+    sortOrder: integer('sort_order').notNull().default(0),
+    timeLabel: text('time_label').notNull(),
+    momentLabel: text('moment_label').notNull(),
+    stateWord: text('state_word').notNull(),
+    headline: text('headline').notNull(),
+    signalText: text('signal_text'),
+    isAction: boolean('is_action').notNull().default(false),
+    actionLabel: text('action_label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orderIdx: uniqueIndex('campaign_demo_moments_order_idx').on(t.campaignId, t.sortOrder),
+  }),
+);
+
+/* ── campaign_benefit_cards (campaign page v2, migration 0049) ─────────────── */
+
+/**
+ * The three benefit cards under the hero.
+ *
+ * The reference names its variants after one campaign's copy — `.timing-card`,
+ * `.tap-card`, `.streak-card` — and §30 lists streaks among the forbidden
+ * mechanics. More practically, a variant named for one Founder's product is
+ * unusable by the next. So the three treatments are named by SHAPE, and the
+ * list is closed by CHECK: a fourth value would render nothing at all, and a
+ * card with an empty visual is worse than one that was refused (§1.4).
+ */
+export const VISUAL_VARIANTS = ['bars', 'check', 'dots'] as const;
+export type VisualVariant = (typeof VISUAL_VARIANTS)[number];
+
+export const campaignBenefitCards = pgTable(
+  'campaign_benefit_cards',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id),
+    sortOrder: integer('sort_order').notNull().default(0),
+    title: text('title').notNull(),
+    footerWord: text('footer_word').notNull(),
+    /** One of `VISUAL_VARIANTS`. CHECKed in 0049. */
+    visualVariant: text('visual_variant').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orderIdx: uniqueIndex('campaign_benefit_cards_order_idx').on(t.campaignId, t.sortOrder),
   }),
 );
 
@@ -303,6 +403,8 @@ export const approvedCampaignSnapshots = pgTable(
 export type CampaignBuild = typeof campaignBuild.$inferSelect;
 export type CampaignRewardPackage = typeof campaignRewardPackages.$inferSelect;
 export type CampaignFaq = typeof campaignFaqs.$inferSelect;
+export type CampaignDemoMoment = typeof campaignDemoMoments.$inferSelect;
+export type CampaignBenefitCard = typeof campaignBenefitCards.$inferSelect;
 export type CampaignReadiness = typeof campaignReadiness.$inferSelect;
 export type AssociationReadiness = typeof associationReadiness.$inferSelect;
 export type CampaignReview = typeof campaignReviews.$inferSelect;

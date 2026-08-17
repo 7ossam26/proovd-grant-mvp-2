@@ -38,6 +38,14 @@ export const campaignUpdates = pgTable(
     isMaterialDeliveryChange: boolean('is_material_delivery_change').notNull().default(false),
     priorCommitment: text('prior_commitment'),
     revisedCommitment: text('revised_commitment'),
+    /**
+     * The headline metric the rebuilt page renders above an update's body
+     * (0049). Both halves or neither, CHECKed: a bare `86%` reads as nothing to
+     * a screen reader — the label IS its accessible name (§28.5) — and a label
+     * with no value is an empty promise (§1.4).
+     */
+    metricLabel: text('metric_label'),
+    metricValue: text('metric_value'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

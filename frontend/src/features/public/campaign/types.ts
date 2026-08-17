@@ -69,6 +69,46 @@ export interface RewardPackage {
   delivery: string;
   /** How the digital reward actually reaches the Backer (§31.4 Fulfillment). */
   fulfillment: string;
+  /** The tier badge — `Lowest price`, `Best value` (0049). Null renders none. */
+  badge?: string | null;
+  /**
+   * §14.4's own field, which the public payload used to drop.
+   *
+   * Null means unlimited, and the page renders NO remaining line for it — never
+   * the word "unlimited", which would be a scarcity signal invented where the
+   * record has none (§30). `remaining` is null in exactly the same case, and a
+   * `remaining` of 0 renders the reward visible and unavailable (§19), never
+   * hidden.
+   */
+  limitedQuantity?: number | null;
+  remaining?: number | null;
+}
+
+/**
+ * One moment of the interactive demo stage (campaign page v2).
+ *
+ * A moment is a passive **signal** or one **action**, never both — a database
+ * CHECK, because the two render differently and mean different things.
+ */
+export interface DemoMoment {
+  id: string;
+  timeLabel: string;
+  momentLabel: string;
+  stateWord: string;
+  headline: string;
+  signalText: string | null;
+  isAction: boolean;
+  actionLabel: string | null;
+}
+
+/** The three benefit-card treatments, named by shape rather than by copy (§30). */
+export type BenefitVisualVariant = 'bars' | 'check' | 'dots';
+
+export interface BenefitCard {
+  id: string;
+  title: string;
+  footerWord: string;
+  visualVariant: BenefitVisualVariant;
 }
 
 /** §18 item 2. */
@@ -170,6 +210,34 @@ export interface CampaignView {
   indexable?: boolean;
   /** §18 item 12 — the public updates. Absent on samples (which have none). */
   updates?: readonly CampaignUpdate[];
+
+  /* ── The rebuilt page's own copy and content (campaign page v2) ───────────
+   *
+   * Every one is optional, and absent means the section it would have filled
+   * does not render — never an empty heading and never a placeholder (§1.4,
+   * §33.11.3). That is also why they are `?`-optional rather than
+   * `| null`-required: the samples, the Founder preview, and the live page each
+   * carry what they have, and nothing has to invent a null to satisfy a type.
+   */
+  heroHeadline?: string | null;
+  heroHeadlineAccent?: string | null;
+  founderPullQuote?: string | null;
+  platformLine?: string | null;
+  demoContextLabel?: string | null;
+  benefitsHeading?: string | null;
+  rewardsHeading?: string | null;
+  updatesHeading?: string | null;
+  faqHeading?: string | null;
+  demoMoments?: readonly DemoMoment[];
+  benefitCards?: readonly BenefitCard[];
+  /**
+   * §20's composed pre-order counts, for the threshold panel and the "N people
+   * reserved" line.
+   *
+   * §30: rendered only where a real record produced it. Zero renders "Be the
+   * first" — never a fabricated number and never a rounded-up one.
+   */
+  preorderCounts?: { uniqueActiveBackers: number; activeCount: number } | null;
 }
 
 export function findReward(campaign: CampaignView, sku: string): RewardPackage {

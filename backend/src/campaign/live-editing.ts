@@ -36,7 +36,13 @@
 import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { campaigns } from '../db/schema/domain.js';
-import { campaignBuild, campaignFaqs, campaignRewardPackages } from '../db/schema/build.js';
+import {
+  campaignBuild,
+  campaignFaqs,
+  campaignRewardPackages,
+  campaignDemoMoments,
+  campaignBenefitCards,
+} from '../db/schema/build.js';
 import {
   campaignLiveEdits,
   campaignChangeRequests,
@@ -48,6 +54,7 @@ import { recordMaterialChange } from './materiality.js';
 import {
   tierFor,
   commitmentsIn,
+  commitmentCheckApplies,
   type EditSurface,
   type EditTier,
 } from './editing-logic.js';
@@ -55,13 +62,26 @@ import {
 /** §20 applies these rules from launch. Before launch the build save owns edits. */
 const LIVE_STATUSES = ['live'] as const;
 
-/** The columns each surface actually stores, so a field name maps to a table. */
+/**
+ * The columns each surface actually stores, so a field name maps to a table.
+ *
+ * Column one only. A `direct_versioned` build field missing from here makes
+ * `writeValue` throw by name rather than write nothing — the loud direction, so
+ * a register entry added without its column is a failing test rather than an
+ * edit that silently succeeds and changes nothing.
+ */
 const BUILD_COLUMNS: Record<string, string> = {
   communityUrl: 'community_url',
   brandPerception: 'brand_perception',
   brandVoice: 'brand_voice',
   heroPreference: 'hero_preference',
   founderProfileUrl: 'founder_profile_url',
+  // Campaign page v2 (0049): the section headings and the demo's context label.
+  demoContextLabel: 'demo_context_label',
+  benefitsHeading: 'benefits_heading',
+  rewardsHeading: 'rewards_heading',
+  updatesHeading: 'updates_heading',
+  faqHeading: 'faq_heading',
 };
 
 export type LiveEditOutcome =
@@ -70,8 +90,15 @@ export type LiveEditOutcome =
       ok: true;
       tier: 'requires_review';
       request: CampaignChangeRequest;
-      /** Named when an FAQ edit was redirected here by the §20 loophole check. */
-      redirectedBy: 'faq_commitment' | null;
+      /**
+       * Named when a column-one edit was redirected here by the §20 loophole
+       * check. `faq_commitment` is §20's own example; `field_commitment` is the
+       * same rule on one of the other column-one free-text fields — a section
+       * heading, a demo label. Two values rather than one because the message
+       * the Founder reads differs, and because collapsing them would lose which
+       * kind of loophole was closed.
+       */
+      redirectedBy: 'faq_commitment' | 'field_commitment' | null;
       commitments: string[];
     }
   | {
@@ -159,12 +186,20 @@ export async function applyLiveEdit(
     };
   }
 
-  /* ── The §20 FAQ loophole ────────────────────────────────────────────────── */
-  let redirectedBy: 'faq_commitment' | null = null;
+  /* ── The §20 loophole, on every column-one field it can reach ────────────── */
+  // §20 names the FAQ by example, not as the scope: a section heading reading
+  // "Shipping in March 2027" moves a delivery date exactly as an FAQ answer
+  // would. `commitmentCheckApplies` is the register's answer, so the exemptions
+  // (URLs, the closed shape vocabulary) each carry a written reason and a field
+  // added later is inside the check by default.
+  let redirectedBy: 'faq_commitment' | 'field_commitment' | null = null;
   let commitments: string[] = [];
-  if (definition.tier === 'direct_versioned' && input.surface === 'faq' && input.field === 'answer') {
+  if (commitmentCheckApplies(input.surface, input.field)) {
     commitments = commitmentsIn(String(input.value ?? ''));
-    if (commitments.length > 0) redirectedBy = 'faq_commitment';
+    if (commitments.length > 0) {
+      redirectedBy =
+        input.surface === 'faq' && input.field === 'answer' ? 'faq_commitment' : 'field_commitment';
+    }
   }
 
   const effectiveTier: EditTier =
@@ -180,7 +215,9 @@ export async function applyLiveEdit(
         message:
           redirectedBy === 'faq_commitment'
             ? `That answer states a ${commitments.join(' and a ')}, so it changes a promise rather than clarifying one. Tell us why you are changing it and a reviewer will look.`
-            : 'A change to this needs a reason a reviewer can read.',
+            : redirectedBy === 'field_commitment'
+              ? `${definition.label} normally publishes straight away, but this states a ${commitments.join(' and a ')} — which is a promise, wherever it is written. Tell us why you are changing it and a reviewer will look.`
+              : 'A change to this needs a reason a reviewer can read.',
         next: 'Nothing you typed was lost.',
       };
     }
@@ -206,7 +243,10 @@ export async function applyLiveEdit(
         targetId: input.campaignId,
         internalReason:
           `§20 column 2: ${input.surface}.${input.field} routed to review` +
-          (redirectedBy ? ` (FAQ commitment: ${commitments.join(', ')})` : '') +
+          // Name the kind accurately: the check now reaches every column-one
+          // field, so calling a heading's redirect a "FAQ commitment" would put
+          // a wrong fact in an insert-only record (§25.6).
+          (redirectedBy ? ` (${redirectedBy}: ${commitments.join(', ')})` : '') +
           `. Founder reason: ${reason}`,
         priorValue: current,
         newValue: input.value,
@@ -320,6 +360,18 @@ async function readCurrentValue(
     return typeof value === 'bigint' ? value.toString() : (value ?? null);
   }
 
+  if (input.surface === 'demo_moment' || input.surface === 'benefit_card') {
+    if (!input.targetId) return undefined;
+    const table = input.surface === 'demo_moment' ? campaignDemoMoments : campaignBenefitCards;
+    const [row] = await db
+      .select()
+      .from(table)
+      .where(and(eq(table.id, input.targetId), eq(table.campaignId, input.campaignId)))
+      .limit(1);
+    if (!row) return undefined;
+    return (row as unknown as Record<string, unknown>)[input.field] ?? null;
+  }
+
   if (input.surface === 'campaign') {
     const [row] = await db
       .select()
@@ -338,10 +390,12 @@ async function readCurrentValue(
 /**
  * Writes one column-one field.
  *
- * Only the two surfaces column one actually contains — a `build` field or an FAQ
- * row. There is no branch here for a reward package, a reservation, or an
- * agreement, because none of their fields is in column one, and a branch that
- * existed would be one a later change could reach.
+ * Only the surfaces column one actually contains — a `build` field, an FAQ row,
+ * and (campaign page v2) a demo moment or a benefit card. There is no branch
+ * here for a reservation or an agreement, because none of their fields is in
+ * column one, and a branch that existed would be one a later change could reach.
+ * A reward package has exactly one column-one field: none. Its `badge` is
+ * column two and arrives through `applyRequestedValue` instead.
  */
 async function writeValue(
   db: Executor,
@@ -377,6 +431,18 @@ async function writeValue(
       .where(
         and(eq(campaignFaqs.id, input.targetId), eq(campaignFaqs.campaignId, input.campaignId)),
       );
+    return;
+  }
+
+  if ((input.surface === 'demo_moment' || input.surface === 'benefit_card') && input.targetId) {
+    const table = input.surface === 'demo_moment' ? campaignDemoMoments : campaignBenefitCards;
+    await db
+      .update(table)
+      .set({
+        [input.field]: String(input.value ?? '').slice(0, 2_000),
+        updatedAt: new Date(),
+      } as never)
+      .where(and(eq(table.id, input.targetId), eq(table.campaignId, input.campaignId)));
     return;
   }
 
@@ -522,8 +588,15 @@ async function applyRequestedValue(
 
   if (request.surface === 'reward_package' && request.targetId) {
     const set: Record<string, unknown> = { updatedAt: new Date() };
+    // `badge` is the one nullable column here (0049). Removing a badge is a
+    // real edit, and `String(null)` would store an empty badge instead — a card
+    // that renders a blank chip rather than none.
     set[request.field] =
-      request.field === 'priceCents' ? BigInt(String(value)) : String(value ?? '');
+      request.field === 'priceCents'
+        ? BigInt(String(value))
+        : request.field === 'badge'
+          ? (value === null || value === '' ? null : String(value))
+          : String(value ?? '');
     await db
       .update(campaignRewardPackages)
       .set(set as never)
@@ -536,6 +609,18 @@ async function applyRequestedValue(
       .update(campaignFaqs)
       .set({ [request.field]: String(value ?? '') } as never)
       .where(eq(campaignFaqs.id, request.targetId));
+    return;
+  }
+
+  if ((request.surface === 'demo_moment' || request.surface === 'benefit_card') && request.targetId) {
+    const table = request.surface === 'demo_moment' ? campaignDemoMoments : campaignBenefitCards;
+    // `signalText` and `actionLabel` are the two nullable columns here, and the
+    // 0049 shape CHECK refuses a moment that is neither a signal nor an action
+    // — so clearing one is a real edit and `String(null)` would defeat it.
+    await db
+      .update(table)
+      .set({ [request.field]: value === null ? null : String(value), updatedAt: new Date() } as never)
+      .where(eq(table.id, request.targetId));
     return;
   }
 

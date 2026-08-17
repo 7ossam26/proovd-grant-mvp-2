@@ -65,6 +65,8 @@ import {
   EARNINGS_STATES,
   EARNINGS_STATE_LABELS,
   commitmentsIn,
+  commitmentCheckApplies,
+  COMMITMENT_CHECK_EXEMPT,
   commentsOpenFor,
   defaultCommentAuthorName,
   displayNameRefusal,
@@ -798,9 +800,41 @@ describe('§20 — an FAQ cannot silently change a promise locked elsewhere', ()
     }
   });
 
-  it('a question edit is not scanned — only the answer states promises', async () => {
+  /*
+   * Phase 17b scanned only the FAQ answer, on the reading that "only the answer
+   * states promises". That is an assertion about English, and it does not hold:
+   * a question rendered on the page can carry a date as easily as an answer can,
+   * and a Founder rewriting "When will I get it?" as "Will it arrive by March
+   * 2027?" has put a delivery claim on the public page without a reviewer seeing
+   * it — which is the loophole §20 names, reached through the other half of the
+   * same record. The check now runs on every column-one field that is not
+   * exempt by name, and `COMMITMENT_CHECK_EXEMPT` carries a written reason for
+   * each one that is (a URL, a closed shape vocabulary). Broad is the correct
+   * direction: a false positive costs a review, a false negative moves a date
+   * nobody accepted.
+   */
+  it('a question that states no promise still publishes directly', async () => {
     const fixture = await seedLiveCampaign('faqquestion');
     const outcome = await applyLiveEdit(h.db, { audit }, {
+      campaignId: fixture.campaignId,
+      campaignStatus: 'live',
+      surface: 'faq',
+      field: 'question',
+      targetId: fixture.faqId,
+      value: 'How do I change which reward I chose?',
+      actor: 'user:founder',
+    });
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) expect(outcome.tier).toBe('direct_versioned');
+  });
+
+  it('a question that states a delivery date goes to review, like the answer', async () => {
+    const fixture = await seedLiveCampaign('faqquestiondate');
+
+    // With no reason, the refusal is what tells the Founder a promise was
+    // detected — and it names the field rather than saying "that answer", which
+    // would be wrong on the question half of the same record.
+    const refused = await applyLiveEdit(h.db, { audit }, {
       campaignId: fixture.campaignId,
       campaignStatus: 'live',
       surface: 'faq',
@@ -809,8 +843,77 @@ describe('§20 — an FAQ cannot silently change a promise locked elsewhere', ()
       value: 'Will it arrive by March 2027?',
       actor: 'user:founder',
     });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) {
+      expect(refused.message).toContain('FAQ question');
+      expect(refused.message).toContain('delivery');
+      expect(refused.message).not.toContain('That answer states');
+    }
+
+    const outcome = await applyLiveEdit(h.db, { audit }, {
+      campaignId: fixture.campaignId,
+      campaignStatus: 'live',
+      surface: 'faq',
+      field: 'question',
+      targetId: fixture.faqId,
+      value: 'Will it arrive by March 2027?',
+      reason: 'Backers keep asking whether the window slipped.',
+      actor: 'user:founder',
+    });
     expect(outcome.ok).toBe(true);
-    if (outcome.ok) expect(outcome.tier).toBe('direct_versioned');
+    if (outcome.ok) {
+      expect(outcome.tier).toBe('requires_review');
+      // `field_commitment`, not `faq_commitment`: the two produce different
+      // messages, and collapsing them would lose which loophole was closed.
+      expect(outcome.redirectedBy).toBe('field_commitment');
+      expect(outcome.commitments).toContain('delivery');
+    }
+
+    // The value did not publish. §20's whole point is that the page is unchanged
+    // until a reviewer decides.
+    const [faq] = await h.db
+      .select()
+      .from(campaignFaqs)
+      .where(eq(campaignFaqs.id, fixture.faqId));
+    expect(faq?.question).not.toBe('Will it arrive by March 2027?');
+  });
+
+  it('a section heading is inside the same check, and a URL is exempt with a reason', async () => {
+    const fixture = await seedLiveCampaign('headingcommit');
+
+    const heading = await applyLiveEdit(h.db, { audit }, {
+      campaignId: fixture.campaignId,
+      campaignStatus: 'live',
+      surface: 'build',
+      field: 'rewardsHeading',
+      value: 'Choose your package — ships by March 2027',
+      reason: 'Making the shipping month easier to find.',
+      actor: 'user:founder',
+    });
+    expect(heading.ok).toBe(true);
+    if (heading.ok) {
+      expect(heading.tier).toBe('requires_review');
+      expect(heading.redirectedBy).toBe('field_commitment');
+    }
+
+    // A heading with no promise in it still publishes straight away — the check
+    // is about what the words say, not about which box they were typed into.
+    const plain = await applyLiveEdit(h.db, { audit }, {
+      campaignId: fixture.campaignId,
+      campaignStatus: 'live',
+      surface: 'build',
+      field: 'benefitsHeading',
+      value: 'Why this lamp',
+      actor: 'user:founder',
+    });
+    expect(plain.ok).toBe(true);
+    if (plain.ok) expect(plain.tier).toBe('direct_versioned');
+
+    // The two exempt build fields are URLs, and the reason is written down
+    // rather than being a silent hole in the check.
+    expect(COMMITMENT_CHECK_EXEMPT['build:communityUrl']).toBeTruthy();
+    expect(commitmentCheckApplies('build', 'communityUrl')).toBe(false);
+    expect(commitmentCheckApplies('faq', 'question')).toBe(true);
   });
 });
 

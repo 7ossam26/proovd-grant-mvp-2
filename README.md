@@ -164,6 +164,52 @@ outside the process — what Stripe approved, whether the tax registrations exis
 whether two people know they are on the hook. Those are recorded with a named
 verifier and evidence, and no code path can satisfy one by inference.
 
+## After the phases
+
+Work since Phase 24 is not numbered. Each piece is built from a supplied
+reference plus the decisions that reference cannot make for itself, and each is
+recorded in [CLAUDE.md](CLAUDE.md) with its date. The Admin panel's five
+workspaces and its floating task list came that way; the current one is the
+public campaign page.
+
+**The campaign page is being rebuilt in three sessions, and only the first has
+landed.** Spec §18 defines that page's *content* and hands presentation to the
+DNA document by name — "the DNA UX document controls presentation" — so a
+redesign is licensed and dropping one of its fourteen items is not. The
+reference drops four; they are placed rather than lost.
+
+The first session writes no public surface at all. It is the record: the columns
+and two small tables the designed page needs, the §20 live-editing tier for
+every one of them, and the authoring routes behind them. Three things it found
+are worth naming, because each had been true for a while and invisible:
+
+- **A build column wired everywhere except one list is a column no Founder can
+  write.** There is no schema validation on a build patch anywhere — the
+  assignment list inside the save function is the entire allowlist — so a new
+  field has to be added in five places, and the test drives a save and a read
+  and compares every value rather than trusting that it was.
+- **An Idea campaign could not be finished through the product.** Twelve of the
+  twenty-four build columns had no input on the Founder's own surface, four of
+  them required, so the page listed them under "still needed" with nowhere to
+  type them. No route or migration was missing; the whole gap was markup.
+- **Two numbers on the public page were hardcoded `null`.** The threshold
+  progress bar carried a comment saying it needed reservation counts from a
+  later phase. That phase shipped and the null stayed, so no real Idea campaign
+  has ever drawn the bar — on the largest section of the page being rebuilt.
+
+One rule was applied wider than it was written. Spec §20 stops an FAQ answer
+from quietly moving a delivery date, and it names the FAQ *by example*. This
+session added ten more directly-publishable text fields, and a section heading
+reading "Shipping in March 2027" moves a date exactly as an FAQ answer would —
+so the check now runs on all of them, and the three fields it does not run on
+are listed with the property that makes each one structurally unable to carry a
+promise. The default is that a new field is checked.
+
+The remaining two sessions build the page itself and the checkout modal. The
+modal is a restyle of an existing dialog and will not gain a card field: the
+reference has one because it has no backend, and Spec §34 gates live mode on
+sample pages mounting no payment field at all.
+
 ## Layout
 
 npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
@@ -290,8 +336,10 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          preparing Campaign kit
   src/surfaces/founder/  the campaign workspace: five optional items as a flow,
                          the fee preview, the helper resources, the listing
-                         payment with its Appendix A.5 consent, and the live
-                         campaign home — Glance, one action, Explore
+                         payment with its Appendix A.5 consent, the live
+                         campaign home — Glance, one action, Explore — and the
+                         campaign build, where every §14.4 ingredient finally
+                         has a box (twelve had none, four of them required)
   src/surfaces/notifications/ the digest preference and notification history,
                          one page for both roles and the Backer control
   src/surfaces/payouts/  Stripe onboarding for both roles, and where Stripe
@@ -1699,9 +1747,12 @@ unrelated suites.
   branch that manufactures a call to action (Spec §20, DNA §5.4).
 - **What a live edit is allowed to do is decided by the field, not by the
   editor.** Spec §20's three tiers are a register; a reviewed field has no
-  direct write path and an unchangeable one has no request path either. An FAQ
-  answer stating a date, price, or refund term routes to review, because
-  otherwise the FAQ is the unreviewed way to move every promise beside it.
+  direct write path and an unchangeable one has no request path either. Any
+  directly-publishable text stating a date, price, or refund term routes to
+  review — an FAQ answer is the Spec's example, not the scope, and a section
+  heading is the same loophole with a different name. The handful of fields
+  exempt from that check are listed with the property that makes each one
+  unable to carry a promise at all.
 - **A comment is what people read.** Its body and its author are fixed once
   posted; only the moderation decision may be written afterwards, and reporting
   one routes it to a person rather than hiding it (Spec §18).

@@ -57,16 +57,34 @@ function toCampaignView(res: LiveCampaignResponse): CampaignView | null {
       contents: r.contents,
       delivery: r.delivery,
       fulfillment: r.fulfillment,
+      badge: r.badge,
+      limitedQuantity: r.limitedQuantity,
+      remaining: r.remaining,
     })),
     featuredRewardSku,
     // Real tax is calculated at checkout for the Backer's address (Phase 15);
     // the real page renders no consent-with-amounts, so this is unused.
     sampleSalesTaxCents: 0n,
     orderThreshold: p.orderThreshold,
-    // Live threshold progress needs reservation counts (Phase 15); null renders
-    // the requirement without a count rather than a fabricated one.
-    thresholdProgress: null,
-    momentum: null,
+    // §21's own threshold measure — distinct Backers behind the active
+    // pre-orders — composed from the append-only transition history (17a).
+    //
+    // This was hardcoded `null` from Phase 14b with the comment "needs
+    // reservation counts (Phase 15)". Phase 15 shipped, and the null stayed:
+    // no real Idea campaign has ever drawn a progress bar, and the threshold
+    // panel is the largest single section of the rebuilt page.
+    thresholdProgress: p.model === 'idea' ? p.preorderCounts.uniqueActiveBackers : null,
+    // §18's Product hero: unique Backers and units reserved, never a public
+    // dollar gate. `activeCount` is units; `uniqueActiveBackers` is people, and
+    // they differ because a Product Backer may hold several transactions (§4.2).
+    // Null on an Idea campaign, which has the threshold panel instead.
+    momentum:
+      p.model === 'product'
+        ? {
+            uniqueBackers: p.preorderCounts.uniqueActiveBackers,
+            unitsReserved: p.preorderCounts.activeCount,
+          }
+        : null,
     statementDescriptor: p.statementDescriptor,
     story: p.story
       ? [{ heading: 'The story', paragraphs: p.story.split('\n\n').filter((s) => s.trim().length > 0) }]
@@ -81,6 +99,22 @@ function toCampaignView(res: LiveCampaignResponse): CampaignView | null {
     attribution: res.attribution,
     indexable: res.indexable,
     updates: res.updates,
+    // The rebuilt page's own copy. Absent means the section does not render.
+    heroHeadline: p.heroHeadline,
+    heroHeadlineAccent: p.heroHeadlineAccent,
+    founderPullQuote: p.founderPullQuote,
+    platformLine: p.platformLine,
+    demoContextLabel: p.demoContextLabel,
+    benefitsHeading: p.benefitsHeading,
+    rewardsHeading: p.rewardsHeading,
+    updatesHeading: p.updatesHeading,
+    faqHeading: p.faqHeading,
+    demoMoments: p.demoMoments,
+    benefitCards: p.benefitCards.map((c) => ({
+      ...c,
+      visualVariant: c.visualVariant as 'bars' | 'check' | 'dots',
+    })),
+    preorderCounts: p.preorderCounts,
   };
 }
 

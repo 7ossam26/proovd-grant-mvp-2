@@ -1,7 +1,7 @@
 /**
  * The §14.4/§15 pure decision logic, restated for the backend runtime.
  *
- * `shared/src/build/index.ts` is the register and the reference: the frontend
+ * `shared/src/campaign/index.ts` is the register and the reference: the frontend
  * imports it through Vite, and `src/tests/campaign-build.test.ts` drift-tests
  * this against it. The backend cannot import `@proovd/shared` at runtime
  * (rootDir; the production image ships only `backend/dist`), so the build

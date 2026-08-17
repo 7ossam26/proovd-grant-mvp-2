@@ -19,6 +19,8 @@ export const EDIT_SURFACES = [
   'reservation',
   'agreement',
   'campaign',
+  'demo_moment',
+  'benefit_card',
 ] as const;
 export type EditSurface = (typeof EDIT_SURFACES)[number];
 
@@ -89,6 +91,87 @@ export const EDITABLE_FIELDS: readonly EditableFieldDefinition[] = [
     surface: 'faq',
     reason:
       '§20 allows a non-material FAQ clarification directly — but an FAQ cannot silently change a promise locked elsewhere, so an answer that states a date, a price, or a refund term goes to review.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'demoContextLabel',
+    tier: 'direct_versioned',
+    label: 'Demo context label',
+    surface: 'build',
+    reason: 'A label above the demo. It names what follows and states no claim.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'benefitsHeading',
+    tier: 'direct_versioned',
+    label: 'Benefits heading',
+    surface: 'build',
+    reason: 'A section heading. It names what is below it and states no claim of its own.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'rewardsHeading',
+    tier: 'direct_versioned',
+    label: 'Rewards heading',
+    surface: 'build',
+    reason: 'A section heading. The rewards themselves are reviewed; the words above them are not.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'updatesHeading',
+    tier: 'direct_versioned',
+    label: 'Updates heading',
+    surface: 'build',
+    reason: 'A section heading. It names what is below it and states no claim of its own.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'faqHeading',
+    tier: 'direct_versioned',
+    label: 'FAQ heading',
+    surface: 'build',
+    reason: 'A section heading. It names what is below it and states no claim of its own.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'timeLabel',
+    tier: 'direct_versioned',
+    label: 'Demo moment time',
+    surface: 'demo_moment',
+    reason: 'A clock face inside a picture of your product. It promises nothing.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'momentLabel',
+    tier: 'direct_versioned',
+    label: 'Demo moment name',
+    surface: 'demo_moment',
+    reason: 'A label on one moment of the demo. It states no claim about the product.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'stateWord',
+    tier: 'direct_versioned',
+    label: 'Demo moment state',
+    surface: 'demo_moment',
+    reason: 'One word describing the state the demo is showing. It states no claim.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'footerWord',
+    tier: 'direct_versioned',
+    label: 'Benefit card footer word',
+    surface: 'benefit_card',
+    reason: 'One word under a benefit card, restating its own title.',
+    specRef: '§20 live editing, column 1',
+  },
+  {
+    field: 'visualVariant',
+    tier: 'direct_versioned',
+    label: 'Benefit card shape',
+    surface: 'benefit_card',
+    reason:
+      'Which of three shapes the card draws. It carries no text at all, so it cannot carry a promise.',
     specRef: '§20 live editing, column 1',
   },
 
@@ -239,6 +322,90 @@ export const EDITABLE_FIELDS: readonly EditableFieldDefinition[] = [
     reason: '§20 puts delivery promises behind review.',
     specRef: '§20 live editing, column 2',
   },
+  {
+    field: 'badge',
+    tier: 'requires_review',
+    label: 'Reward badge',
+    surface: 'reward_package',
+    reason:
+      '§20 puts rewards and prices behind review. A badge sits beside a price, which is exactly where "Best value" stops being decoration.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'heroHeadline',
+    tier: 'requires_review',
+    label: 'Hero headline',
+    surface: 'build',
+    reason:
+      '§20 puts claims behind review. This is the largest type on the page and the first thing anybody reads, which is exactly where a claim lives.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'heroHeadlineAccent',
+    tier: 'requires_review',
+    label: 'Hero headline, second line',
+    surface: 'build',
+    reason: '§20 puts claims behind review, and this is the emphasised half of the headline.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'heroSubheadline',
+    tier: 'requires_review',
+    label: 'Hero subheadline',
+    surface: 'build',
+    reason:
+      '§20 puts claims behind review. The line under the headline is where the promise is usually spelled out.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'founderPullQuote',
+    tier: 'requires_review',
+    label: 'Your pull quote',
+    surface: 'build',
+    reason: '§20 puts claims behind review, and a sentence in your own voice is a claim.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'platformLine',
+    tier: 'requires_review',
+    label: 'Where it will be available',
+    surface: 'build',
+    reason:
+      '§20 puts delivery promises behind review. Which platforms a Backer will get this on is a delivery promise.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'headline',
+    tier: 'requires_review',
+    label: 'Demo moment headline',
+    surface: 'demo_moment',
+    reason: '§20 puts claims behind review, and this sentence says what your product does.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'signalText',
+    tier: 'requires_review',
+    label: 'Demo moment signal',
+    surface: 'demo_moment',
+    reason: '§20 puts claims behind review, and this says what your product does at that moment.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'actionLabel',
+    tier: 'requires_review',
+    label: 'Demo moment action',
+    surface: 'demo_moment',
+    reason: '§20 puts claims behind review, and this says what your product asks a person to do.',
+    specRef: '§20 live editing, column 2',
+  },
+  {
+    field: 'title',
+    tier: 'requires_review',
+    label: 'Benefit card title',
+    surface: 'benefit_card',
+    reason: '§20 puts claims behind review. A benefit card states what your product does.',
+    specRef: '§20 live editing, column 2',
+  },
 
   /* Column 3 — cannot be changed directly at all. */
   {
@@ -372,6 +539,31 @@ export function commitmentsIn(text: string): CommitmentKind[] {
     found.add('delivery');
   }
   return [...found];
+}
+
+/**
+ * The column-one fields the §20 loophole check does NOT run on, and why.
+ *
+ * §20 names the FAQ by example, not as the scope. The rebuilt campaign page
+ * added ten more column-one free-text fields, and a section heading reading
+ * "Shipping in March 2027" moves a delivery date exactly as an FAQ answer would
+ * — so the default is that every column-one field is checked, and this names
+ * only what structurally cannot carry a promise a reader acts on.
+ */
+export const COMMITMENT_CHECK_EXEMPT: Readonly<Record<string, string>> = {
+  'build:communityUrl':
+    'A URL, not a sentence. The page renders link text, and a slug is not a statement a reader acts on — while a date-shaped path segment would trip the check on every correct edit.',
+  'build:founderProfileUrl':
+    'A URL, not a sentence. Same reason as the community link.',
+  'benefit_card:visualVariant':
+    'A closed vocabulary of three shapes. It carries no text at all, so there is nothing for a commitment to be written into.',
+};
+
+/** Whether the §20 loophole check runs on one column-one field (see shared). */
+export function commitmentCheckApplies(surface: EditSurface, field: string): boolean {
+  const definition = BY_KEY.get(`${surface}:${field}`);
+  if (!definition || definition.tier !== 'direct_versioned') return false;
+  return COMMITMENT_CHECK_EXEMPT[`${surface}:${field}`] === undefined;
 }
 
 /* ── §18's comment rules, restated ─────────────────────────────────────────── */

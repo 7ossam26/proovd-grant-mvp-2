@@ -344,6 +344,13 @@
       "when": 1786723200000,
       "tag": "0048_affiliate_workspace_records",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1786809600000,
+      "tag": "0049_campaign_page_v2",
+      "breakpoints": true
     }
   ]
 }

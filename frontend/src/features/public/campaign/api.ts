@@ -25,6 +25,11 @@ export interface PublicCampaignPayload {
     contents: string[];
     delivery: string;
     fulfillment: string;
+    badge: string | null;
+    /** §14.4's own field. Null means unlimited — and renders no line at all. */
+    limitedQuantity: number | null;
+    /** `limitedQuantity − active pre-orders`. Null when unlimited. */
+    remaining: number | null;
   }>;
   featuredRewardSku: string | null;
   orderThreshold: number | null;
@@ -39,6 +44,37 @@ export interface PublicCampaignPayload {
     text: string | null;
   } | null;
   commentsEnabled: boolean;
+
+  /* ── The rebuilt page's own copy and content (0049) ───────────────────────
+   * All optional. A null heading or an empty list renders no section — never
+   * an empty one and never a placeholder (§1.4). */
+  heroHeadline: string | null;
+  heroHeadlineAccent: string | null;
+  founderPullQuote: string | null;
+  platformLine: string | null;
+  demoContextLabel: string | null;
+  benefitsHeading: string | null;
+  rewardsHeading: string | null;
+  updatesHeading: string | null;
+  faqHeading: string | null;
+  demoMoments: Array<{
+    id: string;
+    timeLabel: string;
+    momentLabel: string;
+    stateWord: string;
+    headline: string;
+    signalText: string | null;
+    isAction: boolean;
+    actionLabel: string | null;
+  }>;
+  benefitCards: Array<{
+    id: string;
+    title: string;
+    footerWord: string;
+    visualVariant: string;
+  }>;
+  /** §20's composed counts. §30: rendered only where a real record produced one. */
+  preorderCounts: { uniqueActiveBackers: number; activeCount: number };
 }
 
 export interface LiveCampaignResponse {

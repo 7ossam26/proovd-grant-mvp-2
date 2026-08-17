@@ -17,7 +17,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { checkLiveMoneyPermitted } from '../live-mode/guard.js';
 import { reservations, reservationStatusHistory, type Reservation } from '../db/schema/domain.js';
@@ -150,12 +150,41 @@ export const OPERATIONAL_SHARING_DISCLOSURE =
   'information already shared cannot be retracted.';
 
 /** How many active reservations already hold a limited reward (§19 sold-out). */
+/**
+ * How many of each reward are actively held, keyed by reward package id.
+ *
+ * Exported because the public campaign page renders "N left" from it. The page
+ * and the refusal below MUST count the same thing: a page saying "3 left" over
+ * a different predicate from the one checkout refuses on is a Backer told there
+ * is stock and then told there is not. One query, two readers.
+ *
+ * A reward with no active pre-orders is absent from the map, not zero — the
+ * caller decides what absence means, and here it means "none taken".
+ */
+export async function countActiveForRewards(
+  db: Database,
+  rewardPackageIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (rewardPackageIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      id: reservations.rewardPackageId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(reservations)
+    .where(
+      and(
+        inArray(reservations.rewardPackageId, [...rewardPackageIds]),
+        eq(reservations.status, 'reserved_active'),
+      ),
+    )
+    .groupBy(reservations.rewardPackageId);
+  return new Map(rows.filter((r) => r.id !== null).map((r) => [r.id as string, Number(r.n)]));
+}
+
 async function countActiveForReward(db: Database, rewardPackageId: string): Promise<number> {
-  const result = await db.execute(sql`
-    SELECT count(*)::int AS n FROM reservations
-    WHERE reward_package_id = ${rewardPackageId} AND status = 'reserved_active'
-  `);
-  return Number((result.rows[0] as { n: number } | undefined)?.n ?? 0);
+  const counts = await countActiveForRewards(db, [rewardPackageId]);
+  return counts.get(rewardPackageId) ?? 0;
 }
 
 /** Reuses a Customer already created for this Backer identity, if any (§33.7.2). */
