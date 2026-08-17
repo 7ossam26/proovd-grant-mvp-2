@@ -22,7 +22,6 @@ import { CreateFounder } from './features/admin/founders/CreateFounder.js';
 import { FounderWorkspace } from './features/admin/founders/FounderWorkspace.js';
 import { CreatorsDirectory } from './features/admin/creators/CreatorsDirectory.js';
 import { CreatorRecord } from './features/admin/creators/CreatorRecord.js';
-import { CreatorProfile } from './features/admin/creators/CreatorProfile.js';
 import { CreatorHistory } from './features/admin/creators/CreatorHistory.js';
 import { CreatorRelationship } from './features/admin/creators/CreatorRelationship.js';
 import { PostReview } from './features/admin/creators/PostReview.js';
@@ -240,7 +239,6 @@ const rootChildren: RouteObject[] = [
       // surface are parked in the record until they are built.
       { path: 'creators', element: <CreatorsDirectory /> },
       { path: 'creators/:prospectId', element: <CreatorRecord /> },
-      { path: 'creators/:prospectId/profile', element: <CreatorProfile /> },
       { path: 'creators/:prospectId/history', element: <CreatorHistory /> },
       // §14–§18, §22.1. One campaign relationship, four panes of one object.
       // The pane is a search param rather than a path segment: it is a view of

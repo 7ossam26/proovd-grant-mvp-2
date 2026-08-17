@@ -546,6 +546,30 @@ export const UNGATED_ADMIN_WRITES = [
       'Records that the Creator ASKED to close their account, and its provenance. Phase 20b’s §29.1 decision applied to the other role: writing down what somebody told us decides nothing, and §25.8’s retention obligations are unaffected by it. The review that follows decides an outcome and takes the gate.',
   },
   {
+    route: 'POST /api/admin/creators/:prospectId/evidence/uploads',
+    specRef: '§5.3, §12 (migration 0048)',
+    reason:
+      'Presigns one evidence picture and records it `pending` — Phase 09a’s step 1, a courtesy the read-back re-decides. Recording research evidence reaches nobody, moves no money, and decides nothing: the §5.3 decision that reads it is the verification route, which takes the gate.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/evidence/uploads/:fileId/verify',
+    specRef: '§5.3, §12 (migration 0048)',
+    reason:
+      'Reads the uploaded object back and records what the bytes actually are — Phase 09a’s step 3, the objective check. It can only move a pending file to stored or rejected; nothing downstream changes until a gated human decision reads it.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/evidence/uploads/:fileId/remove',
+    specRef: '§5.3, §12 (migration 0048)',
+    reason:
+      'One-way removal of an evidence picture — the §12 correction that re-permits the same checksum. The row survives, the duplicate index stops counting it, and no eligibility, money, or standing reads it.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/stripe-refresh',
+    specRef: '§13 (Phase 10b)',
+    reason:
+      'Re-reads the connected account from the provider and updates the stored record — the Phase 10b reconciliation path a dropped webhook already has. It writes only what Stripe reports about Stripe’s own fact, reaches nobody, and moves no money.',
+  },
+  {
     route: 'PATCH /api/admin/affiliates/:associationId/prospect',
     specRef: '§8, §5.3',
     reason:

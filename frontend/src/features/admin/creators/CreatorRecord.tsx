@@ -73,6 +73,8 @@ import { useCreatorParked } from './parked.js';
 import { AssignCampaignDialog } from './dialogs/AssignCampaignDialog.js';
 import { DeletionRequestDialog } from './dialogs/DeletionRequestDialog.js';
 import { CreatorSearch } from './CreatorSearch.js';
+import { ProfileTabSection } from './sections/ProfileSections.js';
+import { AccountTabSection } from './sections/AccountSections.js';
 
 type OpenDialog =
   | { kind: 'assign'; trigger: HTMLElement | null }
@@ -96,13 +98,6 @@ const INTERIM: Record<
     note?: string;
   }
 > = {
-  'profile/profile': { session: 'B', owner: 'Profile & evidence', href: (p) => `/admin/creators/${p}/profile` },
-  'profile/audience': { session: 'B', owner: 'Profile & evidence', href: (p) => `/admin/creators/${p}/profile` },
-  'profile/verification': { session: 'B', owner: 'Profile & evidence', href: (p) => `/admin/creators/${p}/profile` },
-  'profile/context': { session: 'B', owner: 'Profile & evidence', href: (p) => `/admin/creators/${p}/profile` },
-  'account/eligibility': { session: 'B', owner: 'Profile & evidence', href: (p) => `/admin/creators/${p}/profile` },
-  'account/agreements': { session: 'B', owner: 'Profile & evidence', href: (p) => `/admin/creators/${p}/profile` },
-  'account/stripe': { session: 'B', owner: 'Profile & evidence', href: (p) => `/admin/creators/${p}/profile` },
   'campaigns/relationships': {
     session: 'C',
     owner: 'the campaign relationship surface',
@@ -475,6 +470,32 @@ export function CreatorRecord() {
             navigate={(to) => void navigate(to)}
             prospectId={header.prospectId}
           />
+        ) : tab === 'profile' ? (
+          <div className="cr-record">
+            {/* Every page owes one h1 (§33.11.2) — the tab's eyebrow pattern,
+                exactly as the reference draws each tab's own heading. */}
+            <header className="cr-tabhead">
+              <p className="kicker">{tabEyebrow(header.name, 'profile')}</p>
+              <h1 className="cr-tabhead__title">{section!.label}</h1>
+            </header>
+            <ProfileTabSection
+              sectionKey={section!.key}
+              detail={detail}
+              onDone={setDetail}
+            />
+          </div>
+        ) : tab === 'account' ? (
+          <div className="cr-record">
+            <header className="cr-tabhead">
+              <p className="kicker">{tabEyebrow(header.name, 'account')}</p>
+              <h1 className="cr-tabhead__title">{section!.label}</h1>
+            </header>
+            <AccountTabSection
+              sectionKey={section!.key}
+              detail={detail}
+              onDone={setDetail}
+            />
+          </div>
         ) : (
           <InterimSection
             name={header.name}
@@ -553,26 +574,35 @@ function OverviewTab({
     if (!attention) return null;
     const rel = attention.associationId;
     if (attention.owner === 'Admin') {
+      /*
+       * Session B: the person-level destinations are the rebuilt tabs, so a
+       * verification review opens Profile & Verification → Verification and
+       * an unsent invitation opens Account & Payout Setup → Account &
+       * Eligibility. The campaign-scoped destinations stay on the old
+       * addresses until Session C absorbs them.
+       */
+      const tabRoute: Record<string, { label: string; tab: AffiliateRecordTabKey; section: string }> = {
+        verification_due: { label: 'Review verification evidence', tab: 'profile', section: 'verification' },
+        invitation_unsent: { label: 'Review invitation delivery', tab: 'account', section: 'eligibility' },
+      };
+      const viaTab = tabRoute[attention.kind];
+      if (viaTab) {
+        return (
+          <Button onClick={() => onOpenTab(viaTab.tab, viaTab.section)}>{viaTab.label}</Button>
+        );
+      }
       const route: Record<string, { label: string; to: string }> = {
         post_review_due: {
           label: 'Review submitted post',
           to: rel
             ? `/admin/creators/${prospectId}/relationships/${rel}/review`
-            : `/admin/creators/${prospectId}/profile`,
-        },
-        verification_due: {
-          label: 'Review verification evidence',
-          to: `/admin/creators/${prospectId}/profile`,
-        },
-        invitation_unsent: {
-          label: 'Review invitation delivery',
-          to: `/admin/creators/${prospectId}/profile`,
+            : `/admin/creators/${prospectId}`,
         },
         earnings_decision_due: {
           label: 'Review successful completion',
           to: rel
             ? `/admin/creators/${prospectId}/relationships/${rel}?pane=money`
-            : `/admin/creators/${prospectId}/profile`,
+            : `/admin/creators/${prospectId}`,
         },
         account_suspended: {
           label: 'Review Admin decision',
@@ -587,7 +617,7 @@ function OverviewTab({
       };
       const target = route[attention.kind] ?? {
         label: 'Review Admin decision',
-        to: `/admin/creators/${prospectId}/profile`,
+        to: `/admin/creators/${prospectId}/controls`,
       };
       return <Button onClick={() => navigate(target.to)}>{target.label}</Button>;
     }

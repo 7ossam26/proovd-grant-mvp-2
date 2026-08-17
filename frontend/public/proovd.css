@@ -6628,11 +6628,14 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
    its own container at narrow widths; the page never scrolls sideways. */
 .cr-wtabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--sp-4);
-  overflow-x: auto;
-  scrollbar-width: none;
 }
-.cr-wtabs::-webkit-scrollbar { display: none; }
+/* Session B (2026-08-17): the rail WRAPS instead of scrolling. Session A
+   tightened the tabs until all eight fit at 1280, and the screenshot pass
+   caught the fix failing anyway — a vertical scrollbar eats ~17px and History
+   fell off the right edge with no affordance, invisible to jsdom and axe. A
+   second line is legible; a hidden tab is a missing tab. */
 .cr-wtabs__tab {
   appearance: none;
   border: 0;
@@ -6790,6 +6793,130 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   max-width: var(--measure);
 }
 
+/* ── Session B (2026-08-17): the person-level tabs in final shape ──────────
+   The tab heading (every page owes one h1, §33.11.2 — the interim pattern
+   kept), the per-metric decision rows, the evidence-picture list, the
+   invitation lifecycle facts with the `Opened` refusal rendered where the
+   value would be, and the per-campaign agreement rows. */
+.cr-tabhead {
+  max-width: var(--measure);
+  padding: var(--sp-8) 0 0;
+}
+.cr-tabhead__title {
+  margin: var(--sp-8) 0 var(--sp-16);
+  font-size: clamp(1.75rem, 4.5vw, 2.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 900;
+  color: var(--darker);
+}
+
+.cr-metriclist {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--grey-light);
+  margin: 0 0 var(--sp-24);
+}
+.cr-metricrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-metricrow__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.cr-metricrow__main strong {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--darker);
+}
+.cr-metricrow__main small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); }
+.cr-metricrow__main p { margin: 0; font-size: 0.9375rem; color: var(--dark); }
+
+.cr-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: 0 0 var(--sp-16);
+}
+.cr-file {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.cr-file > span { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-file strong { font-size: 0.9375rem; font-weight: 800; color: var(--darker); overflow-wrap: anywhere; }
+.cr-file small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); }
+.cr-file__rejected { color: var(--accent-ink, var(--darker)); }
+
+.cr-lifecycle {
+  margin: var(--sp-12) 0 0;
+  border-top: 1px solid var(--grey-light);
+  flex-basis: 100%;
+}
+.cr-lifecycle > div {
+  display: grid;
+  grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
+  gap: var(--sp-16);
+  align-items: baseline;
+  padding: var(--sp-8) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-lifecycle dt { font-size: 0.8125rem; font-weight: 750; color: var(--moss); }
+.cr-lifecycle dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--darker);
+  overflow-wrap: anywhere;
+}
+.cr-lifecycle__absent dd { font-weight: 600; color: var(--moss); }
+
+/* The eligibility section's invitation card: `.cr-inv` is a two-column GRID
+   (main + action), so the lifecycle dl must claim a full row of its own or it
+   lands in the name column and the two overprint — the screenshot pass is
+   what caught it. Name and action on row one, the lifecycle facts across the
+   whole width beneath. */
+.cr-inv--wide { grid-template-columns: minmax(0, 1fr) auto; }
+.cr-inv--wide .cr-lifecycle { grid-column: 1 / -1; grid-row: 2; }
+/* PHASE 26's own 760px rule stacks `.cr-inv` to one column; this variant
+   declares columns outside a media query and would override it, so it
+   restates the stack — the action wraps under the name, the facts follow. */
+@media (max-width: 760px) {
+  .cr-inv--wide { grid-template-columns: minmax(0, 1fr); }
+  .cr-inv--wide .cr-lifecycle { grid-row: auto; }
+}
+
+.cr-agreement-list {
+  display: flex;
+  flex-direction: column;
+  margin: var(--sp-16) 0 0;
+  border-top: 1px solid var(--grey-light);
+}
+.cr-agreement-list article {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-agreement-list article > span { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-agreement-list strong { font-size: 0.9375rem; font-weight: 800; color: var(--darker); }
+.cr-agreement-list small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); }
+.cr-agreement-list b { font-size: 0.875rem; font-weight: 800; color: var(--dark); white-space: nowrap; }
+
 /* ── PHASE 32 — RESPONSIVE ────────────────────────────────────────────────
    The switcher's two columns overlap under ~640px: stack them. The context
    strip's attention pill wraps under the name rather than truncating it. */
@@ -6798,4 +6925,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .cr-wnav__context { flex-wrap: wrap; }
   .cr-wnav__attention { margin-left: 0; white-space: normal; }
   .cr-interim__rel > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+  .cr-lifecycle > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+  .cr-metricrow { flex-direction: column; align-items: stretch; }
+  .cr-file { flex-direction: column; align-items: stretch; }
 }

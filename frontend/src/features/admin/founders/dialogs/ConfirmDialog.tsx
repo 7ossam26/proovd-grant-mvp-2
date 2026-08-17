@@ -44,6 +44,7 @@
  */
 
 import {
+  Fragment,
   useCallback,
   useId,
   useLayoutEffect,
@@ -206,6 +207,16 @@ export interface DialogField {
   value?: string;
   /** A quiet line under the label, when it changes what the Admin types. */
   hint?: ReactNode;
+  /**
+   * An OPEN list — a `<datalist>` on a free-text input, never a `<select>`.
+   *
+   * Added for the Affiliate quality tier (2026-08-17): §8 makes the tier
+   * assessment data and the reference's Tier A/B/C are offered as suggestions
+   * over the free-text column, because a closed list is the ordering the
+   * `affiliate_quality_tier_not_numeric` CHECK exists to keep out. Additive —
+   * a field without it renders exactly as before.
+   */
+  suggestions?: readonly string[];
 }
 
 /** Everything a decision dialog renders. Copy lives with the decision. */
@@ -311,45 +322,57 @@ export function ConfirmDialog({ spec, trigger, onSubmit, onClose }: ConfirmDialo
       {(close) => (
         <>
           {spec.fields.map((field) => (
-            <Field
-              key={field.id}
-              id={domId(field.id)}
-              label={field.label}
-              hint={field.hint}
-              error={invalid === field.id ? 'This field is required.' : undefined}
-            >
-              {field.select ? (
-                <select
-                  className="input"
-                  value={values[field.id] ?? ''}
-                  onChange={(event) => set(field.id, event.target.value)}
-                >
-                  {(field.options ?? []).map((option) => {
-                    const value = typeof option === 'string' ? option : option.value;
-                    const label = typeof option === 'string' ? option : option.label;
-                    return (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    );
-                  })}
-                </select>
-              ) : field.textarea ? (
-                <Textarea
-                  rows={3}
-                  placeholder={field.placeholder}
-                  value={values[field.id] ?? ''}
-                  onChange={(event) => set(field.id, event.target.value)}
-                />
-              ) : (
-                <Input
-                  type={field.inputType}
-                  placeholder={field.placeholder}
-                  value={values[field.id] ?? ''}
-                  onChange={(event) => set(field.id, event.target.value)}
-                />
-              )}
-            </Field>
+            // The datalist sits BESIDE the Field, not inside it: `Field`
+            // clones its only child to wire the label's htmlFor, and a
+            // fragment would swallow the id and orphan the label.
+            <Fragment key={field.id}>
+              <Field
+                id={domId(field.id)}
+                label={field.label}
+                hint={field.hint}
+                error={invalid === field.id ? 'This field is required.' : undefined}
+              >
+                {field.select ? (
+                  <select
+                    className="input"
+                    value={values[field.id] ?? ''}
+                    onChange={(event) => set(field.id, event.target.value)}
+                  >
+                    {(field.options ?? []).map((option) => {
+                      const value = typeof option === 'string' ? option : option.value;
+                      const label = typeof option === 'string' ? option : option.label;
+                      return (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                ) : field.textarea ? (
+                  <Textarea
+                    rows={3}
+                    placeholder={field.placeholder}
+                    value={values[field.id] ?? ''}
+                    onChange={(event) => set(field.id, event.target.value)}
+                  />
+                ) : (
+                  <Input
+                    type={field.inputType}
+                    placeholder={field.placeholder}
+                    value={values[field.id] ?? ''}
+                    onChange={(event) => set(field.id, event.target.value)}
+                    {...(field.suggestions ? { list: `${domId(field.id)}-list` } : {})}
+                  />
+                )}
+              </Field>
+              {field.suggestions ? (
+                <datalist id={`${domId(field.id)}-list`}>
+                  {field.suggestions.map((suggestion) => (
+                    <option key={suggestion} value={suggestion} />
+                  ))}
+                </datalist>
+              ) : null}
+            </Fragment>
           ))}
 
           {spec.reauth ? (

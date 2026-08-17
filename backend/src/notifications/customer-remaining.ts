@@ -33,9 +33,11 @@ import type { Database } from '../db/client.js';
 import { campaignAffiliateAssociations } from '../db/schema/domain.js';
 import { campaignBuild } from '../db/schema/build.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
+import { user } from '../db/schema/auth.js';
 import type { Notifier } from './send.js';
 import {
   FOUNDER_PASSWORD_RESET,
+  AFFILIATE_PASSWORD_RESET,
   AFFILIATE_DISCLOSURE_TRACKING_AVAILABLE,
 } from './events.js';
 import { renderPlainNotice } from './templates/plain.js';
@@ -76,6 +78,23 @@ export async function sendPasswordReset(
     throw new Error('Password-reset delivery is not configured: no notifier is available.');
   }
 
+  /*
+   * The key follows the ACCOUNT'S ROLE (Session B of the Affiliate rebuild,
+   * 2026-08-17). §27's registry prefixes every key with its audience and
+   * Phase 22c's history filters on that prefix — so an Affiliate's reset
+   * recorded under `founder_password_reset` would be invisible on their own
+   * notification history. One path, one template, the key chosen by who the
+   * account belongs to; an account this query cannot find keeps the Founder
+   * key, because Founder is the only role with a public sign-in surface.
+   */
+  const [account] = await deps.db
+    .select({ role: user.role })
+    .from(user)
+    .where(eq(user.email, input.email))
+    .limit(1);
+  const eventKey =
+    account?.role === 'affiliate' ? AFFILIATE_PASSWORD_RESET : FOUNDER_PASSWORD_RESET;
+
   const notice = await renderPlainNotice({
     subject: 'Reset your Proovd password',
     headline: 'Set a new password',
@@ -98,7 +117,7 @@ export async function sendPasswordReset(
   });
 
   await deps.notifier.send({
-    eventKey: FOUNDER_PASSWORD_RESET,
+    eventKey,
     entityType: 'password_reset_request',
     // Per REQUEST. Keying on the account would send the first reset and swallow
     // every later one, in the one flow where the person is already locked out.

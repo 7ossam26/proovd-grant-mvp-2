@@ -510,6 +510,16 @@ export const FOUNDER_ROSTER_UPDATE = 'founder_roster_update' as const;
  */
 export const INTERNAL_INVITATION_CLAIMED = 'internal_invitation_claimed' as const;
 export const FOUNDER_PASSWORD_RESET = 'founder_password_reset' as const;
+/*
+ * The Affiliate workspace rebuild, Session B (2026-08-17). The reset key is
+ * chosen by the account's ROLE inside the one reset path — an Affiliate's
+ * reset recorded under a `founder_*` key would be filtered off their own
+ * §27.7 history by the audience prefix, which is a delivery record hiding
+ * from the person it belongs to. The correction request is §11's right to
+ * correct prefilled public information, exercised as an ask.
+ */
+export const AFFILIATE_PASSWORD_RESET = 'affiliate_password_reset' as const;
+export const AFFILIATE_CORRECTION_REQUEST = 'affiliate_correction_request' as const;
 export const AFFILIATE_DISCLOSURE_TRACKING_AVAILABLE =
   'affiliate_disclosure_tracking_available' as const;
 
@@ -655,6 +665,8 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   INTERNAL_CAMPAIGN_SUBMITTED,
   INTERNAL_INVITATION_CLAIMED,
   FOUNDER_PASSWORD_RESET,
+  AFFILIATE_PASSWORD_RESET,
+  AFFILIATE_CORRECTION_REQUEST,
   AFFILIATE_DISCLOSURE_TRACKING_AVAILABLE,
   FOUNDER_MID_CAMPAIGN_CREATOR_PROPOSED,
   FOUNDER_MID_CAMPAIGN_CREATOR_ACCEPTED,

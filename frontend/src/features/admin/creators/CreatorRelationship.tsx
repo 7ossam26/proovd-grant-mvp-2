@@ -298,7 +298,11 @@ export function CreatorRelationship() {
               onOp={(next, trigger) => setOp({ op: next, trigger })}
               onGo={(to) => {
                 if (to === 'profile') {
-                  void navigate(`/admin/creators/${prospectId}/profile`);
+                  // Session B retired the `/profile` address: verification
+                  // review lives on the record's Profile & Verification tab.
+                  void navigate(
+                    `/admin/creators/${prospectId}?tab=profile&section=verification`,
+                  );
                   return;
                 }
                 if (to === 'review') {

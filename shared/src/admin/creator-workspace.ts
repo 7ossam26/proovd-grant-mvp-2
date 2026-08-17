@@ -785,6 +785,61 @@ export const PROPOSAL_ACCESS_IS_DERIVED =
 /** §3.1 note: the reference's "Red flags" label renders `sanctions_notes`. */
 export const RED_FLAGS_LABEL = 'Red flags' as const;
 
+/* ───────────────────────────── Account corrections and asks (Session B) */
+
+/**
+ * The Affiliate-supplied fields an Admin may correct, and the register the
+ * correction dialog offers — never a free-text field name, because a route
+ * accepting any string would happily record a correction of something that
+ * does not exist (16a's overridable-field reasoning, applied to the person's
+ * own confirmed record).
+ *
+ * The reference's dialog offers one combined "Location"; the record stores
+ * country and state/region separately, so the register offers the two columns
+ * that exist rather than one value two columns would have to be guessed from.
+ */
+export const AFFILIATE_ACCOUNT_CORRECTION_FIELDS = [
+  { key: 'name', label: 'Name' },
+  { key: 'username', label: 'Username' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone number · unverified' },
+  { key: 'country', label: 'Country' },
+  { key: 'state_region', label: 'State / region' },
+] as const;
+
+export type AffiliateAccountCorrectionField =
+  (typeof AFFILIATE_ACCOUNT_CORRECTION_FIELDS)[number]['key'];
+
+/** The correction dialog's own consequence line, kept from the reference. */
+export const CORRECTION_APPENDS_NEW_VALUE =
+  'This correction appends a new current value. The prior value, Admin actor, ' +
+  'reason and time remain in history.';
+
+/** The ask dialog's consequence: asking changes nothing (§11, §1.4). */
+export const CORRECTION_REQUEST_LEAVES_VALUE =
+  'The current value remains until the Affiliate supplies a correction.';
+
+/** The password-recovery confirm's consequence — §5.5, §28.1, verbatim shape. */
+export const PASSWORD_RECOVERY_CONSEQUENCE =
+  'The link is transactional, rate-limited and non-enumerating. No credential ' +
+  'value appears in history.';
+
+/**
+ * §29.8 is audience-wide, and the control on one person's record says so.
+ *
+ * The reference draws "Require current policy reacceptance" on one Affiliate's
+ * Agreements section, which reads as a per-person requirement. §29.8's
+ * requirement follows a MATERIAL POLICY UPDATE, which is inherently
+ * audience-wide — requiring one person to reaccept a text everyone else
+ * already holds would be an enforcement act wearing a policy word. The control
+ * therefore records the audience-wide requirement through the one §29.8
+ * route, and this sentence rides the dialog so nobody reads it as narrower.
+ */
+export const REACCEPTANCE_IS_AUDIENCE_WIDE =
+  'This records a §29.8 requirement for every Affiliate, not only this one — ' +
+  'a material policy update applies to the audience, and each person clears ' +
+  'it by accepting the published version.';
+
 /* ────────────────────────────────────────────────────────── Parked actions */
 
 /**
@@ -794,11 +849,16 @@ export const RED_FLAGS_LABEL = 'Red flags' as const;
  * than no control. Until 2026-08-17 each entry named a reference element with
  * no record behind it; the rebuild brief (docs/phases/admin-affiliate-
  * rebuild.md, decision 1) decided all nine ARE built — each through the
- * service that already owns its rule — so each message now names the record
- * that exists (migration 0048 where one was needed), the mechanism that will
- * serve it, and the session that ships the surface. An entry leaves this
- * register the moment its control works, and the register goes when the last
- * one does.
+ * service that already owns its rule — so each message names the record that
+ * exists (migration 0048 where one was needed), the mechanism that will serve
+ * it, and the session that ships the surface. An entry leaves this register
+ * the moment its control works, and the register goes when the last one does.
+ *
+ * Session B closed four: `stripeRefresh` (the live re-read through
+ * `reconcileAccount`), `evidenceUpload` (the Phase 09a presign path against
+ * `affiliate_evidence_files`), `passwordRecovery` (the one reset path plus
+ * `affiliate_password_reset`), and `requestCorrection`
+ * (`affiliate_correction_request`). The five left are Session C's.
  */
 export const CREATOR_PARKED_MESSAGES = {
   deliverableEvidence:
@@ -815,17 +875,6 @@ export const CREATOR_PARKED_MESSAGES = {
     'The payout reminder arrives with Session C, sending the existing §27 ' +
     'key for a Stripe requirement (affiliate_connected_account_info_required) ' +
     '— no new message is invented, and nothing sends from here yet.',
-  stripeRefresh:
-    'A live Stripe re-read arrives with Session B (the Phase 10b posture: a ' +
-    'vendor is a source of events, not truth). Until then this block shows ' +
-    'the status Stripe last reported, which is what the connected-account ' +
-    'record holds.',
-  evidenceUpload:
-    'Evidence picture upload arrives with Session B, through the Phase 09a ' +
-    'presign path — the bytes decide the format, and the 0048 file record ' +
-    'already refuses duplicates per live (prospect, checksum). While the R2 ' +
-    'bucket is unconfigured (Track A4) the surface says so instead of ' +
-    'offering a control that would fail.',
   kitVisuals:
     'The visual kit read arrives with Session C. §12 uploads go to an R2 ' +
     'bucket that is not configured in this deployment (Track A4), so there ' +
@@ -834,16 +883,6 @@ export const CREATOR_PARKED_MESSAGES = {
     'Support-case intake arrives with Session C, calling openSupportCase so ' +
     '§27.8’s business-day clock, the owner, the waiting party, and the ' +
     'four-fact handoff gate stay in one place. There is no second queue.',
-  passwordRecovery:
-    'The Admin-initiated recovery link arrives with Session B, through ' +
-    'sendResetPassword — the one reset path — and a new §27 key symmetric ' +
-    'with the Founder’s. §5.5’s public non-enumerating ask is ' +
-    'untouched.',
-  requestCorrection:
-    'Asking the Affiliate to correct their own record arrives with Session B ' +
-    'as a new §27 key (affiliate_correction_request): §11 gives the Creator ' +
-    'the right to correct prefilled public information, and a message asking ' +
-    'them to is within that right.',
 } as const;
 
 export type CreatorParkedKey = keyof typeof CREATOR_PARKED_MESSAGES;

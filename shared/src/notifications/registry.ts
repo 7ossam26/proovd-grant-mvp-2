@@ -267,6 +267,25 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.4',
     description: 'Campaign-specific invitation',
   },
+  /*
+   * The two 2026-08-17 additions (the Affiliate workspace rebuild, Session B).
+   * The reset is symmetric with `founder_password_reset` — §5.5's one reset
+   * path chooses the key by the account's role, so an Affiliate's reset lands
+   * in THEIR §27.7 history rather than being filed under a Founder key. The
+   * correction request is §11's right to correct prefilled public information,
+   * exercised as an ask: Proovd names the field or metric and what to check,
+   * and nothing about the record changes until the Affiliate answers.
+   */
+  affiliate_password_reset: {
+    audience: 'affiliate',
+    specRef: '§27.4',
+    description: 'Password reset',
+  },
+  affiliate_correction_request: {
+    audience: 'affiliate',
+    specRef: '§27.4',
+    description: 'Correction or evidence request on the Affiliate’s own record',
+  },
   affiliate_signup_confirmed: {
     audience: 'affiliate',
     specRef: '§27.4',

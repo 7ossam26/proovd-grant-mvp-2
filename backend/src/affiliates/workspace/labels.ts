@@ -228,6 +228,59 @@ export function subtypeLabel(subtype: string | null): string | null {
   return SUBTYPE_LABELS[subtype] ?? subtype;
 }
 
+/* ── Evidence categories, metrics, and correctable fields (Session B) ───────
+ *
+ * Restated from `shared/src/admin/creator-workspace.ts` (the `rootDir`
+ * constraint) and drift-tested in `creator-workspace-registers.test.ts`. The
+ * category keys are the 0048 `affiliate_evidence_files.category` CHECK; the
+ * metric keys are the `affiliate_evidence_verifications.metric` CHECK; the
+ * correction fields are the columns the account-correction route may write —
+ * never a free-text field name (16a's overridable-field reasoning).           */
+
+export const AFFILIATE_EVIDENCE_CATEGORIES: readonly { key: string; label: string }[] = [
+  { key: 'channel_permission', label: 'Channel ownership / permission' },
+  { key: 'sponsored_history', label: 'Sponsored-content history' },
+  { key: 'promotion_plan', label: 'Promotion / traffic plan' },
+  { key: 'similar_campaign_performance', label: 'Similar-campaign performance' },
+];
+
+export function evidenceCategoryKeys(): readonly string[] {
+  return AFFILIATE_EVIDENCE_CATEGORIES.map((c) => c.key);
+}
+
+export function evidenceCategoryLabel(key: string): string {
+  return AFFILIATE_EVIDENCE_CATEGORIES.find((c) => c.key === key)?.label ?? key;
+}
+
+export const AFFILIATE_EVIDENCE_METRICS: readonly { key: string; label: string }[] = [
+  { key: 'audience_size', label: 'Audience size' },
+  { key: 'engagement_rate', label: 'Engagement rate' },
+  { key: 'audience_demographics', label: 'Audience demographics' },
+  { key: 'channel_ownership', label: 'Channel ownership' },
+  { key: 'newsletter_permission_basis', label: 'Newsletter permission basis' },
+];
+
+export function evidenceMetricKeys(): readonly string[] {
+  return AFFILIATE_EVIDENCE_METRICS.map((m) => m.key);
+}
+
+export function evidenceMetricLabel(key: string): string {
+  return AFFILIATE_EVIDENCE_METRICS.find((m) => m.key === key)?.label ?? key;
+}
+
+export const AFFILIATE_ACCOUNT_CORRECTION_FIELDS: readonly { key: string; label: string }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'username', label: 'Username' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone number · unverified' },
+  { key: 'country', label: 'Country' },
+  { key: 'state_region', label: 'State / region' },
+];
+
+export function correctionFieldLabel(key: string): string | null {
+  return AFFILIATE_ACCOUNT_CORRECTION_FIELDS.find((f) => f.key === key)?.label ?? null;
+}
+
 /* ── History ────────────────────────────────────────────────────────────────*/
 
 export const CREATOR_HISTORY_CATEGORY_KEYS = [

@@ -64,7 +64,7 @@ become database defaults.
 | Quiet status line — verification + evidence count, payout + `Stripe-owned state`, `Inspect account details` | **exists** | Current `.cr-quiet`, with `Inspect account details` routing to Profile · Profile |
 | `Assign to another campaign` → assign modal (`Select campaign` / `Select Founder` placeholders, designation, required reason, `Create campaign relationship`) | **exists** | `AssignCampaignDialog` + `assignProspectToCampaign`, registered ungated in `UNGATED_ADMIN_WRITES` — unchanged |
 
-## 4. Profile & Verification (Session B)
+## 4. Profile & Verification (Session B — built)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -77,7 +77,7 @@ become database defaults.
 | `Tier A / B / C` as a closed dropdown | **§1.8 refused** | §8: the tier is assessment data, explicitly not a commission floor, and `affiliate_quality_tier_not_numeric` refuses a bare number. The three are offered as SUGGESTIONS over the same free-text column (`QUALITY_TIER_SUGGESTIONS`, register change); never an enum, and `QUALITY_TIER_HELPER` rides the control |
 | `Proposal access` fact + `Record tier and proposal access` control (`Standard proposal access` / `Proposal bidding restricted`) | **§1.8 refused** → derived | A stored eligibility flag is §1 rule 6 — and the one field a later phase could read to refuse a proposal automatically. DERIVED from §29's `restrict_bidding`/`demote` enforcement records (`PROPOSAL_ACCESS_LABELS`, register change); "changing" it records a §29 action with its five customer-facing statement fields. **No new column** (0048's header states the absence) |
 
-## 5. Account & Payout Setup (Session B)
+## 5. Account & Payout Setup (Session B — built)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -88,7 +88,7 @@ become database defaults.
 | `Record deletion request` (`Open obligations and seven-year retention review`) | **exists** | `recordCreatorDeletionRequest` + reviews, ungated, unchanged |
 | `Agreements` — Platform Terms, Affiliate AUP, `Current policy`, `Consent owner · Affiliate · exact version`, per-campaign IP/confidentiality/disclosure rows; `Require current policy reacceptance` | **exists** | `policy_consents` + `policy_versions` + the §29.8 reacceptance machinery (`POST /api/admin/policy-reacceptance`) |
 | `Stripe` — provider strip (state heading, `Connected account`, `Transfer capability`, `Requirements`, `Payout status`), provenance `Stripe supplied · read only`, NO edit control | **exists** | `composeProvider` — §13's stored status, never the documents. The absence of an edit route is the enforcement |
-| `Refresh Stripe status` | **extends → Session B** | Gap 4: re-reads the account via `retrieveAccount` and updates `stripe_connected_accounts` — the Phase 10b posture (a vendor is a source of events, not truth). Until built, the parked message says the block shows what Stripe last reported |
+| `Refresh Stripe status` | **extends → Session B** | Gap 4: re-reads the account via `retrieveAccount` and updates `stripe_connected_accounts` — the Phase 10b posture (a vendor is a source of events, not truth). Built in Session B: the control calls the route and the surface renders the re-read |
 
 ## 6. Campaigns (Session C for content; the switcher is Session A)
 
@@ -140,7 +140,7 @@ become database defaults.
 | `Timeline` — `Audit record` gist, six filter chips (All events / Account / Campaign / Evidence / Money / Policy), immutable event lines with actor | **exists** | `readCreatorHistory` + `CREATOR_HISTORY_CATEGORIES` — composed across fifteen tables, writes nothing, audit read through the allowlist |
 | `Communications` — `Delivery & idempotency`, `Delivered / recorded`, recipient/template/dedup facts, `No communication records` empty state | **extends → C** | The reference DERIVES this by regex over event titles — a mock, not a message store. Ours reads `notification_deliveries` (Phase 22c's history read, audience-prefixed), which is the real record of recipient, template, delivery state, and dedup key |
 
-## 11. The Add Affiliate flow (Session B for the evidence blocks)
+## 11. The Add Affiliate flow (Session B for the evidence blocks — the uploader is built; the Add-flow picture blocks reuse it when the flow is next touched)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -160,6 +160,57 @@ become database defaults.
 | The seed's `earningsAmount: 286` beside terms that do not produce it; `uploadedAt: "Now · Aug 11, 2026"` | fixture noise | The one waterfall is `shared/money`; every instant renders from a stored column |
 | Hardcoded SLA instants (`Today · 4:00 PM EDT`, `One business day · 5:00 PM EDT`, …) | mechanism replaced | Deadlines compute on the committed versioned calendar and are stored with it (§29.6, §27.8) |
 | `Formal response deadline · Tomorrow · fixed 72-hour window` | **exists** | `response_deadline_evaluations` + the stored §14.6 deadline — rendered from the record, never recomputed |
+
+## What Session B shipped (2026-08-17)
+
+The two person-level tabs in final shape, and the four gaps the brief assigned.
+Sections 4 and 5 above are the walk; every verdict there is now either built or
+recorded as refused. The re-walk found nothing Session A's pass had missed in
+those sections — the labels, the fallback words (`Not researched`, `Evidence
+needed`, `No available history`, `Not supplied`, `Pending claim`), and the
+provenance arrangement all matched what was extracted the first time.
+
+- **Profile & Verification** — the public-presence summary, the `Affiliate
+  profile` / `Audience & channel metrics` / `Audience verification` /
+  `Internal context & fit` sections with their provenance badges and the
+  research dialog's tier **datalist** (the §1.8 item 3 resolution as a
+  control: suggestions over free text, never a `<select>`). The Verification
+  section carries the five-metric decision trail (0048's
+  `affiliate_evidence_verifications`, latest per metric, absence rendered as
+  absence), the evidence-picture grid, and the whole-record §8 decision
+  unchanged. `Why this Affiliate fits` renders and edits (`campaign_fit` — the
+  reversal recorded in §4's table), `Red flags` labels `sanctions_notes`, and
+  proposal access renders as the §29-derived badge with
+  `PROPOSAL_ACCESS_IS_DERIVED` beside it.
+- **Account & Payout Setup** — `Account & eligibility` with the correction
+  dialog (register-constrained field, prior value in the option label, reason
+  required; the server reads the prior from the row under lock, §33.12.4) and
+  the §11 `Request Affiliate correction` ask; the invitation line with the
+  lifecycle facts rendered inline, the `Opened` step showing its refusal
+  sentence where the value would be; `Recovery & retention` with the real
+  password-recovery confirm; `Account agreements` with the per-campaign rows
+  and the §29.8 control — offered only while a published version exists to
+  cite, absent WITH the reason otherwise, and carrying
+  `REACCEPTANCE_IS_AUDIENCE_WIDE` (the walk's one new §1.8 finding: the
+  reference draws the control per-person, §29.8's requirement is a property of
+  a material policy update and is audience-wide); the Stripe strip with the
+  real `Refresh Stripe status`.
+- **The four gaps** — `stripeRefresh` (a route into Phase 10b's
+  `reconcileAccount`, ungated and registered), `evidenceUpload` (the Phase 09a
+  three steps against `affiliate_evidence_files`; images only, the bytes
+  decide, the 503 and the payload both name Track A4 while the bucket is
+  unconfigured), `passwordRecovery` (Better Auth's own
+  `requestPasswordReset` — one reset path — plus `affiliate_password_reset`,
+  chosen by the account's ROLE inside the one sender, so an Affiliate's reset
+  lands in their own §27.7 history), and `requestCorrection`
+  (`affiliate_correction_request`, one key for the field ask and the
+  metric-evidence ask, deduped on the recorded row so a deliberate second ask
+  is a second message). Both keys completed the five-part chain and the
+  §27 coverage partition holds.
+- **Retired** — the `/admin/creators/:prospectId/profile` address and
+  `CreatorProfile.tsx`, absorbed by the two tabs; the attention controls and
+  the relationship task that pointed there now open the tabs. Four entries
+  left `CREATOR_PARKED_MESSAGES`; the five that remain are Session C's.
 
 ## What Session A shipped
 

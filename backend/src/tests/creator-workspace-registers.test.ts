@@ -173,9 +173,21 @@ describe('the register carries what the Spec requires of it', () => {
     // ships the surface. §1.4 still governs: a control says what the
     // destination IS, and "coming in Session C" is a checkable claim where
     // "parked" was an open-ended one.
+    //
+    // Session B closed four (stripeRefresh, evidenceUpload, passwordRecovery,
+    // requestCorrection): their controls work, so their entries LEFT the
+    // register — the §1.4 failure in reverse is a parked message on a working
+    // control. Exactly the five Session C capabilities remain.
+    expect(Object.keys(CREATOR_PARKED_MESSAGES).sort()).toEqual([
+      'availability',
+      'caseIntake',
+      'deliverableEvidence',
+      'kitVisuals',
+      'payoutReminder',
+    ]);
     for (const [key, message] of Object.entries(CREATOR_PARKED_MESSAGES)) {
       expect(message.length, key).toBeGreaterThan(40);
-      expect(/Session [BC]\b/.test(message), key).toBe(true);
+      expect(/Session C\b/.test(message), key).toBe(true);
     }
   });
 
@@ -256,6 +268,36 @@ describe('the register carries what the Spec requires of it', () => {
     for (const step of ADD_AFFILIATE_STEPS) {
       expect(step.title.endsWith('?')).toBe(true);
     }
+  });
+
+  it('restates the Session B registers where the backend needs them at runtime', async () => {
+    // The categories are the 0048 file CHECK, the metrics the 0048
+    // verification CHECK, and the correction fields the columns the
+    // account-correction route may write — restated in labels.ts (the rootDir
+    // constraint) and drift-tested here like every other vocabulary.
+    const shared = await import('@proovd/shared');
+    const labels = await import('../affiliates/workspace/labels.js');
+    expect(labels.AFFILIATE_EVIDENCE_CATEGORIES).toEqual(
+      shared.AFFILIATE_EVIDENCE_CATEGORIES.map((c) => ({ key: c.key, label: c.label })),
+    );
+    expect(labels.AFFILIATE_EVIDENCE_METRICS).toEqual(
+      shared.AFFILIATE_EVIDENCE_METRICS.map((m) => ({ key: m.key, label: m.label })),
+    );
+    expect(labels.AFFILIATE_ACCOUNT_CORRECTION_FIELDS).toEqual(
+      shared.AFFILIATE_ACCOUNT_CORRECTION_FIELDS.map((f) => ({ key: f.key, label: f.label })),
+    );
+  });
+
+  it('pins the Session B sentences the surfaces render', async () => {
+    // Promises about how Proovd behaves are not a renderer's to reword (§7's
+    // NO_GUARANTEE_TEXT reasoning). The reacceptance sentence records the
+    // §1.8 resolution: §29.8 is audience-wide, and a control on one person's
+    // record must say so or be read as narrower.
+    const shared = await import('@proovd/shared');
+    expect(shared.CORRECTION_APPENDS_NEW_VALUE).toContain('prior value');
+    expect(shared.CORRECTION_REQUEST_LEAVES_VALUE).toContain('current value remains');
+    expect(shared.PASSWORD_RECOVERY_CONSEQUENCE).toContain('non-enumerating');
+    expect(shared.REACCEPTANCE_IS_AUDIENCE_WIDE).toContain('every Affiliate');
   });
 
   it('maps every audit action the workspace writes to a plain sentence', () => {

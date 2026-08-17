@@ -18,6 +18,7 @@
 
 import { and, desc, eq } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
+import type { Auth } from '../../auth/auth.js';
 import { auditEvents } from '../../db/schema/integrity.js';
 import { affiliateProspects } from '../../db/schema/affiliates.js';
 import { affiliateSignupProfiles } from '../../db/schema/affiliate-signup.js';
@@ -30,15 +31,21 @@ import { campaignAffiliateAssociations, campaigns, associationStatusHistory } fr
 import { campaignBuild } from '../../db/schema/build.js';
 import { trackingLinks } from '../../db/schema/decisions.js';
 import { campaignDrafts, founderProspects } from '../../db/schema/invitations.js';
+import { reconcileAccount, type OnboardingContext } from '../../payments/onboarding.js';
+import { sendCorrectionRequest, type AskDeps } from './asks.js';
 import {
   CREATOR_ACCESS_RECORDED,
+  CREATOR_ACCOUNT_CORRECTED,
   CREATOR_ASSIGNED_TO_CAMPAIGN,
+  CREATOR_CORRECTION_REQUESTED,
   CREATOR_DELETION_REQUESTED,
   CREATOR_DELETION_REVIEWED,
   CREATOR_LINK_PAUSED,
   CREATOR_LINK_REACTIVATED,
+  CREATOR_RECOVERY_SENT,
+  CREATOR_STRIPE_REFRESHED,
 } from './audit-actions.js';
-import { campaignNameOf, isCreatorAccessAction } from './labels.js';
+import { campaignNameOf, correctionFieldLabel, isCreatorAccessAction } from './labels.js';
 
 export interface CreatorMutationDeps {
   db: Database;
@@ -500,4 +507,276 @@ export async function setTrackingLinkPaused(
   });
 
   return { ok: true, associationId: input.associationId };
+}
+
+/* ── Correcting the Affiliate-supplied record (§25.6, §33.12.4 — Session B) ─*/
+
+/**
+ * The keys the correction register names. A register rather than a free-text
+ * field name, because a route accepting any string would happily record a
+ * correction of something that does not exist — and because the set decides
+ * which record is being corrected: these are the SIGNUP PROFILE's columns,
+ * the person's own confirmed facts, which is why the write refuses before a
+ * claim (the pre-claim record is Admin research, edited through the research
+ * route with its own provenance).
+ */
+const CORRECTION_COLUMNS = {
+  name: true,
+  username: true,
+  email: true,
+  phone: true,
+  country: true,
+  state_region: true,
+} as const;
+
+export async function correctAffiliateAccountField(
+  deps: CreatorMutationDeps,
+  input: {
+    prospectId: string;
+    field: string;
+    newValue: string | null;
+    reason: string | null;
+    who: ActorContext;
+  },
+): Promise<MutationResult<{ prospectId: string }>> {
+  const label = correctionFieldLabel(input.field);
+  if (!label || !(input.field in CORRECTION_COLUMNS)) {
+    return invalid('A correction names one of the recorded account fields.');
+  }
+  const reason = text(input.reason);
+  if (!reason) {
+    return invalid(
+      'Say why this correction is being recorded. The prior value, actor, reason and time all remain in history (§25.6).',
+    );
+  }
+  const newValue = text(input.newValue);
+  if (!newValue) {
+    return invalid('A correction records the corrected value — it never blanks a confirmed fact.');
+  }
+  if (input.field === 'email' && !newValue.includes('@')) {
+    return invalid('That does not read as an email address.');
+  }
+
+  const outcome = await deps.db.transaction(async (tx) => {
+    /*
+     * The prior value is read from the row UNDER LOCK inside the transaction
+     * that changes it (§33.12.4) — a caller that supplied both halves could
+     * supply a flattering pair.
+     */
+    const [profile] = await tx
+      .select()
+      .from(affiliateSignupProfiles)
+      .where(eq(affiliateSignupProfiles.prospectId, input.prospectId))
+      .for('update')
+      .limit(1);
+    if (!profile) {
+      return invalid(
+        'Nothing here has been confirmed by the Affiliate yet — before the claim, the account fields are Admin research, corrected through the research record.',
+      );
+    }
+
+    const property = {
+      name: 'legalName',
+      username: 'publicHandle',
+      email: 'email',
+      phone: 'phone',
+      country: 'country',
+      state_region: 'stateRegion',
+    }[input.field as keyof typeof CORRECTION_COLUMNS] as
+      | 'legalName'
+      | 'publicHandle'
+      | 'email'
+      | 'phone'
+      | 'country'
+      | 'stateRegion';
+    const prior = profile[property];
+
+    await tx
+      .update(affiliateSignupProfiles)
+      .set({ [property]: newValue })
+      .where(eq(affiliateSignupProfiles.prospectId, input.prospectId));
+
+    await tx.insert(auditEvents).values({
+      actor: input.who.actor,
+      mfaContext: input.who.mfaContext,
+      reauthContext: input.who.reauthContext,
+      targetType: 'affiliate_prospect',
+      targetId: input.prospectId,
+      action: CREATOR_ACCOUNT_CORRECTED,
+      internalReason: reason,
+      priorValue: { field: input.field, value: (prior as string | null) ?? null },
+      newValue: { field: input.field, value: newValue },
+    });
+
+    return { ok: true as const, prospectId: input.prospectId };
+  });
+
+  return outcome;
+}
+
+/* ── The §11 ask: request a correction from the Affiliate (Session B) ───────*/
+
+/**
+ * Records the ask as its §25.6 row, then sends `affiliate_correction_request`
+ * keyed on that row. The record commits first (08c's ordering); a transport
+ * refusal leaves the ask recorded and reports that nothing was sent (§1.4).
+ */
+export async function requestAffiliateCorrection(
+  deps: CreatorMutationDeps & { asks: Omit<AskDeps, 'db'> },
+  input: {
+    prospectId: string;
+    /** The field being asked about, in the words the surface showed. */
+    subjectLabel: string | null;
+    note: string | null;
+    who: ActorContext;
+  },
+): Promise<MutationResult<{ sent: boolean; sendReason: string | null }>> {
+  const subjectLabel = text(input.subjectLabel);
+  const note = text(input.note);
+  if (!subjectLabel) return invalid('Name the field the Affiliate should review.');
+  if (!note) return invalid('State the suspected issue and the evidence needed — the Affiliate reads this sentence.');
+
+  const [prospect] = await deps.db
+    .select({ id: affiliateProspects.id })
+    .from(affiliateProspects)
+    .where(eq(affiliateProspects.id, input.prospectId))
+    .limit(1);
+  if (!prospect) return notFound('There is no Affiliate at that address.');
+
+  const [row] = await deps.db
+    .insert(auditEvents)
+    .values({
+      actor: input.who.actor,
+      mfaContext: input.who.mfaContext,
+      reauthContext: input.who.reauthContext,
+      targetType: 'affiliate_prospect',
+      targetId: input.prospectId,
+      action: CREATOR_CORRECTION_REQUESTED,
+      internalReason: `${subjectLabel}: ${note}`,
+      priorValue: null,
+      newValue: { subject: subjectLabel },
+    })
+    .returning({ id: auditEvents.id });
+
+  const outcome = await sendCorrectionRequest(
+    { db: deps.db, ...deps.asks },
+    {
+      prospectId: input.prospectId,
+      subjectLabel,
+      note,
+      entityType: 'affiliate_correction_ask',
+      entityId: row!.id,
+    },
+  );
+
+  return { ok: true, sent: outcome.sent, sendReason: outcome.reason };
+}
+
+/* ── The Admin-initiated password recovery (§5.5 — Session B, gap 8) ────────*/
+
+/**
+ * Asks Better Auth to mint and deliver a reset link through the ONE reset
+ * path — `sendResetPassword`, which chooses `affiliate_password_reset` by the
+ * account's role. No second reset mechanism exists here: this route only asks
+ * for the same thing the person's own "forgot password" ask produces.
+ *
+ * Refuses when nobody has claimed the account: there is no password to reset,
+ * and §1.4 forbids implying a send that cannot happen. The raw link never
+ * appears anywhere in the response or the audit row (§28.1).
+ */
+export async function sendCreatorPasswordRecovery(
+  deps: CreatorMutationDeps & { auth: Auth },
+  input: { prospectId: string; who: ActorContext },
+): Promise<MutationResult<{ sent: true }>> {
+  const [prospect] = await deps.db
+    .select({ id: affiliateProspects.id })
+    .from(affiliateProspects)
+    .where(eq(affiliateProspects.id, input.prospectId))
+    .limit(1);
+  if (!prospect) return notFound('There is no Affiliate at that address.');
+
+  const [profile] = await deps.db
+    .select({
+      claimedUserId: affiliateSignupProfiles.claimedUserId,
+      email: affiliateSignupProfiles.email,
+    })
+    .from(affiliateSignupProfiles)
+    .where(eq(affiliateSignupProfiles.prospectId, input.prospectId))
+    .limit(1);
+  if (!profile?.claimedUserId || !profile.email) {
+    return invalid(
+      'Nobody has claimed this account yet, so there is no password to reset. The invitation link is how they get in.',
+    );
+  }
+
+  await deps.auth.api.requestPasswordReset({
+    body: { email: profile.email, redirectTo: '/reset-password' },
+  });
+
+  await deps.db.insert(auditEvents).values({
+    actor: input.who.actor,
+    mfaContext: input.who.mfaContext,
+    reauthContext: input.who.reauthContext,
+    targetType: 'affiliate_prospect',
+    targetId: input.prospectId,
+    action: CREATOR_RECOVERY_SENT,
+    internalReason:
+      'Admin-initiated password recovery. The link is transactional and appears nowhere at rest (§28.1).',
+    priorValue: null,
+    newValue: { requested: true },
+  });
+
+  return { ok: true, sent: true };
+}
+
+/* ── The live Stripe re-read (§13, Phase 10b — Session B, gap 4) ────────────*/
+
+/**
+ * Re-reads the connected account from the provider and updates the stored
+ * record — `reconcileAccount`, the Phase 10b reconciliation path, unchanged.
+ * A vendor is a source of events, not truth, and a state reachable only by
+ * webhook is a state a dropped delivery can strand somebody in.
+ */
+export async function refreshCreatorStripeAccount(
+  deps: CreatorMutationDeps & { onboarding: Omit<OnboardingContext, 'db'> | null },
+  input: { prospectId: string; who: ActorContext },
+): Promise<MutationResult<{ refreshed: true }>> {
+  if (!deps.onboarding) {
+    return invalid(
+      'This deployment has no Stripe client, so there is nothing to re-read. The block shows the status Stripe last reported.',
+    );
+  }
+
+  const [profile] = await deps.db
+    .select({ connectedAccountId: affiliateSignupProfiles.connectedAccountId })
+    .from(affiliateSignupProfiles)
+    .where(eq(affiliateSignupProfiles.prospectId, input.prospectId))
+    .limit(1);
+  if (!profile?.connectedAccountId) {
+    return invalid(
+      'This Affiliate has no connected account yet, so there is nothing to re-read.',
+    );
+  }
+
+  const view = await reconcileAccount(
+    { db: deps.db, ...deps.onboarding },
+    profile.connectedAccountId,
+  );
+  if (!view) {
+    return invalid('The stored connected-account record could not be found.');
+  }
+
+  await deps.db.insert(auditEvents).values({
+    actor: input.who.actor,
+    mfaContext: input.who.mfaContext,
+    reauthContext: input.who.reauthContext,
+    targetType: 'affiliate_prospect',
+    targetId: input.prospectId,
+    action: CREATOR_STRIPE_REFRESHED,
+    internalReason: 'Connected-account status re-read from the provider on request.',
+    priorValue: null,
+    newValue: { state: view.state },
+  });
+
+  return { ok: true, refreshed: true };
 }

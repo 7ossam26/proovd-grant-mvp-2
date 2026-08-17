@@ -23,6 +23,7 @@
 import {
   FOUNDER_NEVER_SEES_THIS,
   QUALITY_TIER_HELPER,
+  QUALITY_TIER_SUGGESTIONS,
 } from '@proovd/shared';
 import { ConfirmDialog, type DialogField, type DialogSpec } from '../../founders/dialogs/index.js';
 import {
@@ -83,6 +84,10 @@ export function ResearchDialog({
       ...(entry.textarea ? { textarea: true } : {}),
       ...(field.value !== null ? { value: field.value } : {}),
       ...(entry.hint ? { hint: entry.hint } : {}),
+      // The reference's Tier A/B/C, offered as SUGGESTIONS over the free-text
+      // column — a datalist, never a select (§1.8, resolved in the Spec's
+      // favour: a closed list is the ordering §8 forbids).
+      ...(field.key === 'tier' ? { suggestions: QUALITY_TIER_SUGGESTIONS } : {}),
     };
   });
 

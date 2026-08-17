@@ -47,6 +47,7 @@ import express from 'express';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import { requireAdmin, requireFreshSession } from '../auth/guards.js';
+import { createAuditWriter } from '../auth/audit.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import {
   listAssignableCampaigns,
@@ -56,16 +57,31 @@ import {
 import { readCreatorWorkspace } from '../affiliates/workspace/record.js';
 import { readCreatorRelationship } from '../affiliates/workspace/relationship.js';
 import { LINK_TEST_MARKER } from '../affiliates/roster-labels.js';
-import type { StripeModeValue } from '../payments/stripe-client.js';
+import type { StripeGateway, StripeModeValue } from '../payments/stripe-client.js';
+import type { ObjectStorage } from '../storage/object-storage.js';
+import { unconfiguredStorage } from '../storage/object-storage.js';
+import type { Notifier } from '../notifications/send.js';
 import {
   assignProspectToCampaign,
+  correctAffiliateAccountField,
   recordCreatorAccessAction,
   recordCreatorDeletionRequest,
   recordCreatorDeletionReview,
+  refreshCreatorStripeAccount,
+  requestAffiliateCorrection,
+  sendCreatorPasswordRecovery,
   setTrackingLinkPaused,
   type ActorContext,
   type MutationFailure,
 } from '../affiliates/workspace/mutations.js';
+import {
+  recordMetricDecision,
+  removeEvidenceFile,
+  requestEvidenceUpload,
+  verifyEvidenceUpload,
+  type EvidenceFailure,
+} from '../affiliates/workspace/evidence.js';
+import type { AskContext } from '../affiliates/workspace/asks.js';
 import { isCreatorHistoryCategory } from '../affiliates/workspace/labels.js';
 
 export const ADMIN_CREATORS_PATH = '/api/admin/creators';
@@ -83,6 +99,16 @@ export interface AdminCreatorsDeps {
    * so rather than reporting a thirteenth item as incomplete (§1.4, §32.2).
    */
   stripeMode?: StripeModeValue | undefined;
+  /**
+   * The gateway, for the §13 re-read (Session B's gap 4). Absent means the
+   * refresh control refuses with the reason rather than pretending (§1.4).
+   */
+  stripeGateway?: StripeGateway | undefined;
+  /** The evidence-picture store (gap 5). Unconfigured refuses honestly. */
+  storage?: ObjectStorage | undefined;
+  /** The §27 sender for the two Session B asks. Absent → recorded, not sent. */
+  notifier?: Notifier | undefined;
+  askContext?: AskContext | undefined;
 }
 
 /* ── Small shared shapes ────────────────────────────────────────────────────*/
@@ -162,11 +188,18 @@ export function createAdminCreatorsRouter({
   auth,
   appBaseUrl,
   stripeMode,
+  stripeGateway,
+  storage,
+  notifier,
+  askContext,
 }: AdminCreatorsDeps): Router {
   const router = Router();
   const admin = requireAdmin(auth);
   const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
   const json = express.json({ limit: '128kb' });
+  const evidenceStorage = storage ?? unconfiguredStorage;
+  const asks = { notifier, context: askContext };
+  const audit = createAuditWriter(db);
 
   /**
    * The whole record, re-read. Every mutation ends here — or on the same 404 a
@@ -174,12 +207,32 @@ export function createAdminCreatorsRouter({
    * removed between the write and the read.
    */
   async function sendWorkspace(res: Response, prospectId: string): Promise<void> {
-    const detail = await readCreatorWorkspace(db, prospectId);
+    const detail = await readCreatorWorkspace(db, prospectId, {
+      storageConfigured: evidenceStorage.configured,
+    });
     if (!detail) {
       notFound(res, 'Affiliate not found', 'There is no Affiliate at that address.');
       return;
     }
     res.json(detail);
+  }
+
+  /** Maps an evidence-module failure onto the response its code means. */
+  function evidenceFail(res: Response, result: EvidenceFailure, title: string): void {
+    if (result.code === 'not_found') {
+      notFound(res, 'Not found', result.message);
+      return;
+    }
+    if (result.code === 'storage_unavailable') {
+      res.status(503).json({
+        error: 'storage_unavailable',
+        title,
+        whatHappened: result.message,
+        next: 'Nothing has changed. The record itself is unaffected.',
+      });
+      return;
+    }
+    refused(res, title, result.message);
   }
 
   /* ── Reads ────────────────────────────────────────────────────────────── */
@@ -527,6 +580,285 @@ export function createAdminCreatorsRouter({
         );
         if (!result.ok) {
           fail(res, result, 'That review could not be recorded');
+          return;
+        }
+        await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── Evidence pictures (§5.3, §12 — Session B, gap 5) ─────────────────────*/
+
+  /**
+   * UNGATED, all three, and registered: recording research evidence reaches
+   * nobody and decides nothing — the §5.3 decision that reads it is the
+   * verification route, which takes the gate. The presign is Phase 09a's
+   * step 1 (a courtesy; the read-back decides), the verify is step 3, and the
+   * removal is the §12 correction that re-permits the same checksum.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/evidence/uploads`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const byteSize = typeof body['byteSize'] === 'number' ? body['byteSize'] : NaN;
+
+        const result = await requestEvidenceUpload(
+          { db, storage: evidenceStorage },
+          {
+            prospectId,
+            category: str(body, 'category') ?? '',
+            contentType: str(body, 'contentType') ?? '',
+            byteSize,
+            checksumSha256: str(body, 'checksumSha256') ?? '',
+            originalFilename: str(body, 'originalFilename'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          evidenceFail(res, result, 'That picture could not be attached');
+          return;
+        }
+        res.json({
+          fileId: result.fileId,
+          url: result.url,
+          requiredHeaders: result.requiredHeaders,
+          expiresAt: result.expiresAt.toISOString(),
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/evidence/uploads/:fileId/verify`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, fileId } = req.params as { prospectId: string; fileId: string };
+        const result = await verifyEvidenceUpload(
+          { db, storage: evidenceStorage },
+          { prospectId, fileId, who: whoOf(req) },
+        );
+        if (!result.ok) {
+          evidenceFail(res, result, 'That upload could not be verified');
+          return;
+        }
+        await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/evidence/uploads/:fileId/remove`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, fileId } = req.params as { prospectId: string; fileId: string };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await removeEvidenceFile(
+          { db },
+          { prospectId, fileId, reason: str(body, 'reason'), who: whoOf(req) },
+        );
+        if (!result.ok) {
+          evidenceFail(res, result, 'That picture could not be removed');
+          return;
+        }
+        await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── The per-metric decision, and the ask it may carry (Session B) ────────*/
+
+  /**
+   * GATED, for the whole-record verification's reason: it is the trail the
+   * §5.3 decision rests on, §33.12.4 wants the decider attributable, and a
+   * `more_evidence_needed` decision reaches a real person as the §11 ask.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/evidence/metric-decision`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await recordMetricDecision(
+          { db, asks },
+          {
+            prospectId,
+            metric: str(body, 'metric') ?? '',
+            decision: str(body, 'decision') ?? '',
+            detail: str(body, 'detail'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          evidenceFail(res, result, 'That decision could not be recorded');
+          return;
+        }
+        const detail = await readCreatorWorkspace(db, prospectId, {
+          storageConfigured: evidenceStorage.configured,
+        });
+        if (!detail) {
+          notFound(res, 'Affiliate not found', 'There is no Affiliate at that address.');
+          return;
+        }
+        // The ask's outcome rides beside the re-read: a decision recorded with
+        // nothing sent is a state the Admin must see, not infer (§1.4).
+        res.json({ detail, ask: { sent: result.sent, reason: result.sendReason } });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── Correcting the Affiliate-supplied record (Session B) ─────────────────*/
+
+  /**
+   * GATED: it rewrites the person's own confirmed facts — including the
+   * address every transactional message goes to — and §25.6 wants the actor
+   * on it to be somebody who authenticated recently. The prior value is read
+   * from the row under lock, never taken from the caller (§33.12.4).
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/account-correction`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await correctAffiliateAccountField(
+          { db },
+          {
+            prospectId,
+            field: str(body, 'field') ?? '',
+            newValue: str(body, 'newValue'),
+            reason: str(body, 'reason'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That correction could not be recorded');
+          return;
+        }
+        await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /**
+   * GATED: it reaches a real person. The ask is recorded first (§1.3) and the
+   * message dedups on that record; a transport refusal leaves the ask
+   * recorded and the response says nothing was sent.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/correction-request`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await requestAffiliateCorrection(
+          { db, asks },
+          {
+            prospectId,
+            subjectLabel: str(body, 'subjectLabel'),
+            note: str(body, 'note'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That request could not be sent');
+          return;
+        }
+        const detail = await readCreatorWorkspace(db, prospectId, {
+          storageConfigured: evidenceStorage.configured,
+        });
+        if (!detail) {
+          notFound(res, 'Affiliate not found', 'There is no Affiliate at that address.');
+          return;
+        }
+        res.json({ detail, ask: { sent: result.sent, reason: result.sendReason } });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── Password recovery (§5.5 — Session B, gap 8) ──────────────────────────*/
+
+  /**
+   * GATED: it reaches a real person's inbox with a credential-changing link.
+   * One reset path — Better Auth mints the token and the one sender chooses
+   * the key by role; this route only asks for the same thing the person's own
+   * "forgot password" produces, and refuses when nobody has claimed the
+   * account (§1.4: there is no password to reset).
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/password-recovery`,
+    admin,
+    fresh,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const result = await sendCreatorPasswordRecovery(
+          { db, auth },
+          { prospectId, who: whoOf(req) },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That recovery link could not be sent');
+          return;
+        }
+        await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── The live Stripe re-read (§13 — Session B, gap 4) ─────────────────────*/
+
+  /**
+   * UNGATED, and registered: it re-reads a fact the provider owns and updates
+   * the stored record through the Phase 10b reconciliation path — no money
+   * moves, nobody's standing changes, and nothing reaches the Affiliate.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/stripe-refresh`,
+    admin,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const result = await refreshCreatorStripeAccount(
+          {
+            db,
+            onboarding: stripeGateway ? { gateway: stripeGateway, audit } : null,
+          },
+          { prospectId, who: whoOf(req) },
+        );
+        if (!result.ok) {
+          fail(res, result, 'The Stripe status could not be re-read');
           return;
         }
         await sendWorkspace(res, prospectId);

@@ -271,11 +271,15 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          read-and-route sections from Campaign through
                          History's Timeline/Communications split),
                          Creators (its own rebuild to a second reference began
-                         2026-08-17 — Session A of three shipped the one-route
+                         2026-08-17 — Session A shipped the one-route
                          eight-tab record shell with the Selected-relationship
                          switcher, the Overview in final shape, and the six
-                         new record families of migration 0048; the walk is
-                         docs/phases/admin-affiliate-reconciliation.md),
+                         new record families of migration 0048; Session B the
+                         two person-level tabs in final shape with the
+                         evidence uploader, the per-metric trail, the
+                         corrections and asks, and the live Stripe re-read;
+                         the campaign-scoped tabs are Session C's, and the
+                         walk is docs/phases/admin-affiliate-reconciliation.md),
                          Campaigns, Support, Backers, and the
                          floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page

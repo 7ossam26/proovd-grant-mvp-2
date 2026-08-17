@@ -254,10 +254,66 @@ export interface CreatorInvitationView {
   /** Token facts only — never a value (§28.1). */
   hasLiveToken: boolean;
   claimedAt: string | null;
+  /*
+   * The lifecycle-modal facts (Session B). All stored instants or their
+   * honest absence — the `Opened` step has no field here on purpose, because
+   * there is no record it could render (the register carries the reason).
+   */
+  createdAt: string | null;
+  signupStartedAt: string | null;
+  tokenExpiresAt: string | null;
   sends: { at: string; by: string; to: string; status: string; confirmed: boolean }[];
   /** What §8's preview gate currently refuses, if anything. */
   unresolved: string[];
   canSend: boolean;
+}
+
+/* ── Evidence files and the per-metric trail (Session B) ────────────────────*/
+
+/** One evidence picture on the §5.3 research record (0048). */
+export interface EvidenceFileView {
+  id: string;
+  category: string;
+  categoryLabel: string;
+  filename: string | null;
+  /** `pending` | `stored` | `rejected` — the Phase 09a lifecycle. */
+  state: string;
+  rejection: string | null;
+  /** `1200 × 800` once the bytes were read; null before (§1.4). */
+  dimensions: string | null;
+  uploadedBy: string;
+  uploadedAt: string | null;
+}
+
+/** The latest decision per §5.3 metric, or its honest absence. */
+export interface MetricDecisionView {
+  metric: string;
+  label: string;
+  decision: string | null;
+  detail: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+}
+
+/** §29-derived proposal access — never a stored flag (0048's header). */
+export interface ProposalAccessView {
+  key: 'standard' | 'restricted';
+  label: string;
+  /** The enforcement record the answer derives from, when restricted. */
+  derivedFrom: string | null;
+}
+
+/** The Account-agreements block (§10, §29.8, §31.5). */
+export interface CreatorAgreementsView {
+  /** Latest accepted version per account-level document, or null pre-claim. */
+  terms: string | null;
+  aup: string | null;
+  /** `accepted` | `reacceptance_required` | `not_claimed`. */
+  policyState: string;
+  /** The published versions the §29.8 requirement dialog may cite. */
+  publishedVersions: { slug: string; version: string; title: string }[];
+  /** Per-campaign IP/commercial acceptance, one row per relationship. */
+  perCampaign: { associationId: string; campaignName: string; state: string }[];
 }
 
 export interface CreatorProfilePane {
@@ -265,6 +321,20 @@ export interface CreatorProfilePane {
   /** Account details (Affiliate supplied) and Channel details (Admin authored). */
   blocks: ProfileBlock[];
   verification: VerificationBlock;
+  /*
+   * The Session B additions: the evidence pictures with the honest
+   * unavailable state while R2 is Track A4, the per-metric decision trail,
+   * §29-derived proposal access, and the agreements block.
+   */
+  evidenceFiles: {
+    /** Whether an upload can be offered at all (storage configured). */
+    available: boolean;
+    waitingOn: string | null;
+    files: EvidenceFileView[];
+  };
+  metricDecisions: MetricDecisionView[];
+  proposalAccess: ProposalAccessView;
+  agreements: CreatorAgreementsView;
   provider: ProviderBlock;
   invitations: CreatorInvitationView[];
   /** Recovery, notifications, retention — §5.5, §27.2, §27.7, §25.8. */

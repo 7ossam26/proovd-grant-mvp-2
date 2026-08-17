@@ -20,6 +20,17 @@ export const CREATOR_DELETION_REVIEWED = 'creator.deletion_reviewed' as const;
 export const CREATOR_LINK_PAUSED = 'creator.link_paused' as const;
 export const CREATOR_LINK_REACTIVATED = 'creator.link_reactivated' as const;
 
+/* The Session B acts (2026-08-17): the evidence files, the per-metric trail,
+ * the account correction, the §11 ask, the Admin-initiated reset, and the
+ * Stripe re-read. */
+export const CREATOR_EVIDENCE_UPLOADED = 'creator.evidence_uploaded' as const;
+export const CREATOR_EVIDENCE_REMOVED = 'creator.evidence_removed' as const;
+export const CREATOR_METRIC_DECIDED = 'creator.metric_decision_recorded' as const;
+export const CREATOR_ACCOUNT_CORRECTED = 'creator.account_corrected' as const;
+export const CREATOR_CORRECTION_REQUESTED = 'creator.correction_requested' as const;
+export const CREATOR_RECOVERY_SENT = 'creator.password_recovery_sent' as const;
+export const CREATOR_STRIPE_REFRESHED = 'creator.stripe_status_refreshed' as const;
+
 /**
  * Every action `history.ts` will render, with the plain sentence it renders as.
  *
@@ -34,6 +45,13 @@ export const CREATOR_AUDIT_TITLES: Record<string, string> = {
   [CREATOR_DELETION_REVIEWED]: 'Deletion request reviewed',
   [CREATOR_LINK_PAUSED]: 'Affiliate link paused by Proovd',
   [CREATOR_LINK_REACTIVATED]: 'Affiliate link reactivated',
+  [CREATOR_EVIDENCE_UPLOADED]: 'Evidence picture added',
+  [CREATOR_EVIDENCE_REMOVED]: 'Evidence picture removed',
+  [CREATOR_METRIC_DECIDED]: 'Metric evidence decision recorded',
+  [CREATOR_ACCOUNT_CORRECTED]: 'Account information corrected',
+  [CREATOR_CORRECTION_REQUESTED]: 'Correction requested from the Affiliate',
+  [CREATOR_RECOVERY_SENT]: 'Password recovery link sent',
+  [CREATOR_STRIPE_REFRESHED]: 'Stripe status re-read from the provider',
   // The names the Phase 08–11 affiliate services actually write. A send is not
   // here because it is its own record (`affiliate_invitation_sends`), which the
   // composer reads directly — an audit row beside it would render the same
