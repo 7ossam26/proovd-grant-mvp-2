@@ -164,6 +164,17 @@ export interface CreatorRelationshipSummary {
   closesAt: string | null;
   /** True when this relationship is holding one of §2.2's three slots. */
   holdsSlot: boolean;
+
+  /*
+   * The three facts the Selected-relationship strip renders (2026-08-17
+   * rebuild). Composed labels, decided server-side like every other cell —
+   * `Accepted` / `Proposal pending` / `Not started`; the link's four states;
+   * the completion answer with `Not due before close` kept distinct from
+   * `Decision pending` (§16a: not yet populated is not zero).
+   */
+  agreement: string;
+  trackingLink: string;
+  completion: string;
 }
 
 /* ── Profile & evidence ─────────────────────────────────────────────────────*/

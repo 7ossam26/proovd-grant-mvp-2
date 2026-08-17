@@ -873,3 +873,251 @@ describe('§26.7 — account standing is an access decision, per request', () =>
     expect(detail.standing.disclosures).toHaveLength(0);
   });
 });
+
+/* ── Migration 0048: the six record families hold their own rules ─────────── */
+
+describe('§24.8, §22.4, §14.2 — the 0048 records refuse what their rules refuse', () => {
+  async function terminationSeed() {
+    const campaign = await createCampaign(`term-${randomUUID().slice(0, 6)}`);
+    const creator = await recruit(campaign.campaignId, `term-${randomUUID().slice(0, 6)}`);
+    return creator;
+  }
+
+  it('CHECK-matrixes the termination money treatment to its §24.8 cause', async () => {
+    const { associationId } = await terminationSeed();
+
+    // §33.9.3's most tempting wrong simplification, unrepresentable here too:
+    // a Founder-caused termination cannot record cancel_unpaid_invalid.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_termination_requests
+           (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+         VALUES ($1, 'Founder ended the campaign direction.', now(), 'founder_or_product',
+                 'cancel_unpaid_invalid', 'support case', now(), 'Ada Admin')`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/association_termination_requests_cause_matrix/);
+
+    // The same cause with a treatment its register row permits records fine.
+    await h.pool.query(
+      `INSERT INTO association_termination_requests
+         (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+       VALUES ($1, 'Founder ended the campaign direction.', now(), 'founder_or_product',
+               'earnings_remain', 'support case', now(), 'Ada Admin')`,
+      [associationId],
+    );
+  });
+
+  it('allows one open termination request per relationship, and the decision is write-once', async () => {
+    const { associationId } = await terminationSeed();
+    await h.pool.query(
+      `INSERT INTO association_termination_requests
+         (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+       VALUES ($1, 'Affiliate asked to end the partnership.', now(), 'proovd_or_system_error',
+               'not_attributed', 'email', now(), 'Ada Admin')`,
+      [associationId],
+    );
+
+    // A second ask while one waits is a duplicate, not a new decision.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_termination_requests
+           (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+         VALUES ($1, 'Second ask.', now(), 'proovd_or_system_error',
+                 'not_attributed', 'email', now(), 'Ada Admin')`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/association_termination_requests_one_open_idx/);
+
+    // The recorded ask is immutable even before the decision…
+    await expect(
+      h.pool.query(
+        `UPDATE association_termination_requests SET reason = 'Reworded.' WHERE association_id = $1`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/immutable/);
+
+    // …the decision arrives whole…
+    await expect(
+      h.pool.query(
+        `UPDATE association_termination_requests SET decision = 'declined' WHERE association_id = $1`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/association_termination_requests_decision_whole/);
+    await h.pool.query(
+      `UPDATE association_termination_requests
+         SET decision = 'declined', decision_note = 'The partnership continues.',
+             decided_by = 'Ada Admin', decided_at = now()
+       WHERE association_id = $1`,
+      [associationId],
+    );
+
+    // …and a decided request cannot be re-decided, whoever writes the SQL.
+    await expect(
+      h.pool.query(
+        `UPDATE association_termination_requests
+           SET decision = 'applied', decision_note = 'Changed my mind.',
+               decided_by = 'Ada Admin', decided_at = now()
+         WHERE association_id = $1`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/decided request cannot be changed/);
+  });
+
+  it('ties a deliverable waiver to its named recorder and reason, both ways', async () => {
+    const { associationId } = await terminationSeed();
+    const deliverable = await h.pool.query(
+      `INSERT INTO association_deliverables (association_id, title, source, created_by)
+       VALUES ($1, 'Launch post', 'Accepted agreement', 'Ada Admin') RETURNING id`,
+      [associationId],
+    );
+    const deliverableId = (deliverable.rows[0] as { id: string }).id;
+
+    // A waiver with no named recorder is a decision nobody made.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_deliverable_decisions (deliverable_id, outcome, findings, decided_by)
+         VALUES ($1, 'waived', 'Founder released the obligation.', 'Ada Admin')`,
+        [deliverableId],
+      ),
+    ).rejects.toThrow(/association_deliverable_decisions_waiver_coherent/);
+
+    // And a verified decision cannot smuggle waiver fields.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_deliverable_decisions
+           (deliverable_id, outcome, findings, waiver_recorded_by, waiver_reason, decided_by)
+         VALUES ($1, 'verified', 'The post is live and meets the terms.', 'Ada Admin', 'n/a', 'Ada Admin')`,
+        [deliverableId],
+      ),
+    ).rejects.toThrow(/association_deliverable_decisions_waiver_coherent/);
+
+    await h.pool.query(
+      `INSERT INTO association_deliverable_decisions
+         (deliverable_id, outcome, findings, waiver_recorded_by, waiver_reason, decided_by)
+       VALUES ($1, 'waived', 'Founder released the obligation.', 'Fiona Founder',
+               'Campaign pivoted; the post is no longer wanted.', 'Ada Admin')`,
+      [deliverableId],
+    );
+  });
+
+  it('refuses duplicate live evidence files and makes removal one-way', async () => {
+    const { prospectId } = await terminationSeed();
+    const checksum = randomUUID().replaceAll('-', '');
+    await h.pool.query(
+      `INSERT INTO affiliate_evidence_files
+         (prospect_id, category, storage_key, state, checksum_sha256, byte_size, content_type, uploaded_by)
+       VALUES ($1, 'channel_permission', $2, 'stored', $3, 1024, 'image/png', 'Ada Admin')`,
+      [prospectId, `affiliate-evidence/${prospectId}/${randomUUID()}`, checksum],
+    );
+
+    // §12's duplicate rule, rescoped to the person and enforced by the
+    // database rather than a SELECT a concurrent request could race past.
+    await expect(
+      h.pool.query(
+        `INSERT INTO affiliate_evidence_files
+           (prospect_id, category, storage_key, state, checksum_sha256, byte_size, content_type, uploaded_by)
+         VALUES ($1, 'sponsored_history', $2, 'stored', $3, 1024, 'image/png', 'Ada Admin')`,
+        [prospectId, `affiliate-evidence/${prospectId}/${randomUUID()}`, checksum],
+      ),
+    ).rejects.toThrow(/affiliate_evidence_files_duplicate_idx/);
+
+    await h.pool.query(
+      `UPDATE affiliate_evidence_files SET removed_at = now(), removed_by = 'Ada Admin'
+       WHERE prospect_id = $1`,
+      [prospectId],
+    );
+    // Removing frees the checksum for a correction…
+    await h.pool.query(
+      `INSERT INTO affiliate_evidence_files
+         (prospect_id, category, storage_key, state, checksum_sha256, byte_size, content_type, uploaded_by)
+       VALUES ($1, 'channel_permission', $2, 'stored', $3, 1024, 'image/png', 'Ada Admin')`,
+      [prospectId, `affiliate-evidence/${prospectId}/${randomUUID()}`, checksum],
+    );
+    // …and a removal can never be undone: an evidence file that can quietly
+    // come back is one whose absence nobody can rely on.
+    await expect(
+      h.pool.query(
+        `UPDATE affiliate_evidence_files SET removed_at = NULL, removed_by = NULL
+         WHERE prospect_id = $1 AND removed_at IS NOT NULL`,
+        [prospectId],
+      ),
+    ).rejects.toThrow(/removal cannot be undone/);
+  });
+
+  it('stores no proposal access, no acceptance, and no schedule anywhere in 0048', async () => {
+    // §1.8 item 4: the Standard/Restricted badge is derived from §29 records.
+    // The strongest form of "never stored" is a column that does not exist.
+    const proposalAccess = await h.pool.query(
+      `SELECT table_name, column_name FROM information_schema.columns
+       WHERE column_name LIKE '%proposal_access%'`,
+    );
+    expect(proposalAccess.rows).toHaveLength(0);
+
+    // Admin mediates and never agrees: the mediation note has no acceptance,
+    // outcome, or decision column a later phase could read as an answer.
+    const mediation = await h.pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'proposal_mediation_notes'
+         AND (column_name LIKE '%accept%' OR column_name LIKE '%outcome%' OR column_name LIKE '%decision%')`,
+    );
+    expect(mediation.rows).toHaveLength(0);
+
+    // §30: no schedule-shaped column on any of the six families, so there is
+    // nowhere to record a cadence and nothing a job could sweep.
+    const schedule = await h.pool.query(
+      `SELECT table_name, column_name FROM information_schema.columns
+       WHERE table_name IN ('affiliate_evidence_files', 'affiliate_evidence_verifications',
+                            'association_deliverables', 'association_deliverable_evidence',
+                            'association_deliverable_decisions', 'association_availability_verifications',
+                            'proposal_mediation_notes', 'association_termination_requests')
+         AND (column_name LIKE '%remind%' OR column_name LIKE '%recurrence%'
+              OR column_name LIKE '%next_send%' OR column_name LIKE '%cadence%'
+              OR column_name LIKE '%snooze%' OR column_name LIKE '%escalate%')`,
+    );
+    expect(schedule.rows).toHaveLength(0);
+  });
+
+  it('grants the app role exactly what each family permits', async () => {
+    const grants = await h.pool.query(
+      `SELECT table_name, privilege_type FROM information_schema.role_table_grants
+       WHERE grantee = 'proovd_app'
+         AND table_name IN ('affiliate_evidence_verifications', 'association_deliverables',
+                            'association_deliverable_evidence', 'association_deliverable_decisions',
+                            'association_availability_verifications', 'proposal_mediation_notes')`,
+    );
+    // Five insert-only families (plus the evidence receipts): SELECT and
+    // INSERT, never UPDATE or DELETE — a decision an Admin can rewrite
+    // afterwards is not the record it claims to be.
+    for (const row of grants.rows as { table_name: string; privilege_type: string }[]) {
+      expect(['SELECT', 'INSERT'], row.table_name).toContain(row.privilege_type);
+    }
+
+    // The termination request's UPDATE grant names the four decision columns
+    // and nothing else — the recorded ask is outside every grant.
+    const columnGrants = await h.pool.query(
+      `SELECT column_name FROM information_schema.role_column_grants
+       WHERE grantee = 'proovd_app' AND table_name = 'association_termination_requests'
+         AND privilege_type = 'UPDATE'
+       ORDER BY column_name`,
+    );
+    expect((columnGrants.rows as { column_name: string }[]).map((r) => r.column_name)).toEqual([
+      'decided_at',
+      'decided_by',
+      'decision',
+      'decision_note',
+    ]);
+  });
+
+  it('serves the three Selected-relationship facts from the record read', async () => {
+    const { prospectId } = await terminationSeed();
+    const detail = await readWorkspace(prospectId);
+    expect(detail.relationships).toHaveLength(1);
+    const rel = detail.relationships[0];
+    // A fresh prospect-state relationship: nothing agreed, no link minted, and
+    // completion is honestly "not due" rather than a zero (§16a).
+    expect(rel.agreement).toBe('Not started');
+    expect(rel.trackingLink).toBe('No Affiliate link yet');
+    expect(rel.completion).toBe('Not due before close');
+  });
+});

@@ -543,52 +543,307 @@ export const CAMPAIGN_IS_CHOSEN_NOT_TYPED =
   'Choose the campaign this invitation belongs to. The Founder follows from ' +
   'it — neither is free text.';
 
+/* ─────────────────────────────────────── The record: tabs and sections */
+
+/**
+ * The eight-tab, twenty-five-section record — the supplied reference's own
+ * `Vj`/`Gj` registers, verbatim (2026-08-17 rebuild, Session A).
+ *
+ * The `FOUNDER_RECORD_SECTIONS` shape: one route, view state in the URL
+ * (`?tab=` for the eight, `?section=` for the tab's sections, `?rel=` for the
+ * selected relationship), and the register is what the rail, the suite, and
+ * the reconciliation document all read — a section added to the surface and
+ * not here has no address, and one here with no surface fails the suite.
+ *
+ * `relationshipScoped` marks the three tabs the Selected-relationship
+ * switcher scopes (the reference renders the switcher on exactly these).
+ * Support & Enforcement reads the selection for its Relationship Requests
+ * section but does not carry the switcher — the reference's own arrangement.
+ */
+export const AFFILIATE_RECORD_TABS = [
+  { key: 'overview', label: 'Overview', relationshipScoped: false, sections: [] },
+  {
+    key: 'profile',
+    label: 'Profile & Verification',
+    relationshipScoped: false,
+    sections: [
+      { key: 'profile', label: 'Profile' },
+      { key: 'audience', label: 'Audience & Metrics' },
+      { key: 'verification', label: 'Verification' },
+      { key: 'context', label: 'Internal Context' },
+    ],
+  },
+  {
+    key: 'account',
+    label: 'Account & Payout Setup',
+    relationshipScoped: false,
+    sections: [
+      { key: 'eligibility', label: 'Account & Eligibility' },
+      { key: 'agreements', label: 'Agreements' },
+      { key: 'stripe', label: 'Stripe' },
+    ],
+  },
+  {
+    key: 'campaigns',
+    label: 'Campaigns',
+    relationshipScoped: true,
+    sections: [
+      { key: 'relationships', label: 'Relationships' },
+      { key: 'negotiations', label: 'Opportunities & Negotiations' },
+      { key: 'readiness', label: 'Readiness & Active' },
+      { key: 'completion', label: 'Completion & Work Again' },
+    ],
+  },
+  {
+    key: 'content',
+    label: 'Content & Compliance',
+    relationshipScoped: true,
+    sections: [
+      { key: 'posts', label: 'Posts' },
+      { key: 'deliverables', label: 'Deliverables' },
+      { key: 'disclosures', label: 'Agreements & Disclosures' },
+      { key: 'risk', label: 'Risk & Compliance' },
+    ],
+  },
+  {
+    key: 'performance',
+    label: 'Performance & Earnings',
+    relationshipScoped: true,
+    sections: [
+      { key: 'performance', label: 'Performance' },
+      { key: 'earnings', label: 'Earnings' },
+      { key: 'transfers', label: 'Transfers & Payouts' },
+      { key: 'adjustments', label: 'Adjustments' },
+    ],
+  },
+  {
+    key: 'support',
+    label: 'Support & Enforcement',
+    relationshipScoped: false,
+    sections: [
+      { key: 'support', label: 'Support' },
+      { key: 'requests', label: 'Relationship Requests' },
+      { key: 'enforcement', label: 'Enforcement' },
+      { key: 'appeals', label: 'Appeals' },
+    ],
+  },
+  {
+    key: 'history',
+    label: 'History',
+    relationshipScoped: false,
+    sections: [
+      { key: 'timeline', label: 'Timeline' },
+      { key: 'communications', label: 'Communications' },
+    ],
+  },
+] as const;
+
+export type AffiliateRecordTabKey = (typeof AFFILIATE_RECORD_TABS)[number]['key'];
+
+export const AFFILIATE_RECORD_TAB_KEYS = AFFILIATE_RECORD_TABS.map(
+  (t) => t.key,
+) as readonly AffiliateRecordTabKey[];
+
+export function affiliateRecordTab(key: string) {
+  return AFFILIATE_RECORD_TABS.find((t) => t.key === key);
+}
+
+/** The switcher's own two lines, pinned — the reference's organising rule. */
+export const SELECTED_RELATIONSHIP_LABEL = 'Selected relationship' as const;
+export const ACCOUNT_AND_CAMPAIGN_STATE_SEPARATE =
+  'Account data stays separate from campaign-specific state' as const;
+
+/* ──────────────────────────────────── Evidence categories and metrics */
+
+/**
+ * The reference's four research-evidence categories (its `Xj` register).
+ *
+ * These group the FILES on the §5.3 research record — orthogonal to the
+ * per-subtype evidence INPUTS in `affiliates/subtypes.ts`, which stay the
+ * text record `missingEvidence` reports against. The keys are the 0048
+ * `affiliate_evidence_files.category` CHECK, one for one.
+ */
+export const AFFILIATE_EVIDENCE_CATEGORIES = [
+  { key: 'channel_permission', label: 'Channel ownership / permission' },
+  { key: 'sponsored_history', label: 'Sponsored-content history' },
+  { key: 'promotion_plan', label: 'Promotion / traffic plan' },
+  { key: 'similar_campaign_performance', label: 'Similar-campaign performance' },
+] as const;
+
+export type AffiliateEvidenceCategory =
+  (typeof AFFILIATE_EVIDENCE_CATEGORIES)[number]['key'];
+
+/**
+ * What an evidence picture upload accepts, stated as the server enforces it.
+ *
+ * ── A §1.8 resolution, recorded ─────────────────────────────────────────────
+ * The reference's copy reads "PNG, JPG, WEBP or HEIC". HEIC is refused:
+ * browsers cannot render it, and a stored file nobody can review is not
+ * evidence. The sentence names what `ALLOWED_IMAGE_TYPES` actually accepts —
+ * and SVG stays excluded for 09a's reason (browsers execute it).
+ */
+export const EVIDENCE_PICTURES_ACCEPTED =
+  'PNG, JPG, WEBP or GIF · multiple pictures allowed' as const;
+
+/** The reference's own rule for category-scoped uploads, kept verbatim. */
+export const EVIDENCE_STAYS_WITH_ITS_ITEM =
+  'Pictures stay associated with the specific research item.' as const;
+
+/**
+ * The five per-metric verification decisions (the reference's evidence
+ * dialog), and the 0048 `affiliate_evidence_verifications.metric` CHECK.
+ *
+ * The whole-record `verification_status` stays the §8 decision the roster and
+ * §16 readiness read; these are the evidence trail beneath it, never a second
+ * answer to the same question.
+ */
+export const AFFILIATE_EVIDENCE_METRICS = [
+  { key: 'audience_size', label: 'Audience size' },
+  { key: 'engagement_rate', label: 'Engagement rate' },
+  { key: 'audience_demographics', label: 'Audience demographics' },
+  { key: 'channel_ownership', label: 'Channel ownership' },
+  { key: 'newsletter_permission_basis', label: 'Newsletter permission basis' },
+] as const;
+
+export type AffiliateEvidenceMetric = (typeof AFFILIATE_EVIDENCE_METRICS)[number]['key'];
+
+/* ─────────────────────────────────────── The invitation lifecycle steps */
+
+/**
+ * The nine steps the reference's `Review invitation lifecycle` modal renders,
+ * in its order — and the one that is deliberately not a recorded fact.
+ *
+ * ── The `Opened` refusal (§1.8), recorded where the step lives ──────────────
+ * §27 ships no tracking pixel. Phase 23b refused an email-open metric
+ * outright — a silent read receipt inside a transactional message — and
+ * recorded the refusal in §31.9's secondary set. So `opened` carries
+ * `absentBecause` and the surface renders the reason where the value would
+ * be, the way §31.9's entry states which half is missing rather than
+ * reporting the metric as available. The reference itself falls back to
+ * "Not supported / not recorded"; this register decides which of those two
+ * it is, permanently.
+ */
+export const INVITATION_LIFECYCLE_STEPS = [
+  { key: 'created', label: 'Created', absentBecause: null },
+  { key: 'sent', label: 'Sent', absentBecause: null },
+  { key: 'delivered', label: 'Delivered', absentBecause: null },
+  {
+    key: 'opened',
+    label: 'Opened',
+    absentBecause:
+      'Not recorded, deliberately. §27 ships no tracking pixel — an open ' +
+      'receipt inside a transactional message is a silent read receipt — so ' +
+      'there is no record this step could render.',
+  },
+  { key: 'signup_started', label: 'Signup started', absentBecause: null },
+  { key: 'claimed', label: 'Claimed', absentBecause: null },
+  { key: 'expiry', label: 'Expiry', absentBecause: null },
+  { key: 'delivery_failure', label: 'Delivery failure', absentBecause: null },
+  { key: 'token', label: 'Token', absentBecause: null },
+] as const;
+
+export type InvitationLifecycleStep = (typeof INVITATION_LIFECYCLE_STEPS)[number]['key'];
+
+/* ───────────────────────────────────── Tier suggestions, proposal access */
+
+/**
+ * The reference's Tier A/B/C, offered as SUGGESTIONS over the free-text
+ * column — never an enum (§1.8, resolved in the Spec's favour).
+ *
+ * §8 makes the tier assessment data, explicitly not a commission floor;
+ * `affiliate_quality_tier_not_numeric` refuses a bare number, and a closed
+ * list would be the ordering that constraint exists to keep out of the
+ * schema. A combobox may offer these three; typing anything else is legal.
+ */
+export const QUALITY_TIER_SUGGESTIONS = ['Tier A', 'Tier B', 'Tier C'] as const;
+
+/**
+ * Proposal access, DERIVED — never stored (§1.8 item most likely to be
+ * missed, resolved before any code).
+ *
+ * The reference shows Standard/Restricted with a control to set it. A stored
+ * eligibility flag is §1 rule 6 — and it would be the one field a later phase
+ * could read to refuse a proposal automatically. §29 already has
+ * `restrict_bidding` and `demote` among its seven actions, each carrying the
+ * five customer-facing statement fields and the five-business-day appeal; the
+ * badge reads the latest such enforcement record, and "changing proposal
+ * access" IS recording one. Migration 0048's header states the column's
+ * absence.
+ */
+export const PROPOSAL_ACCESS_LABELS = {
+  standard: 'Standard proposal access',
+  restricted: 'Proposal bidding restricted',
+} as const;
+
+export type ProposalAccessKey = keyof typeof PROPOSAL_ACCESS_LABELS;
+
+export const PROPOSAL_ACCESS_IS_DERIVED =
+  'Derived from §29 enforcement records (restrict bidding / demote), never ' +
+  'stored. Changing it records an enforcement action with its full customer ' +
+  'statement and appeal route.';
+
+/** §3.1 note: the reference's "Red flags" label renders `sanctions_notes`. */
+export const RED_FLAGS_LABEL = 'Red flags' as const;
+
 /* ────────────────────────────────────────────────────────── Parked actions */
 
 /**
- * The destinations the Creator workspace links to that are not built.
+ * The capabilities the rebuild has decided to build and not yet shipped.
  *
  * §1.4: a control that claims a capability the product does not have is worse
- * than no control. Each message names what the destination IS and what is
- * missing, so an Admin reading it learns where the work will live rather than
- * that something broke.
- *
- * This is the gap register. Every entry is a reference element with no record
- * behind it in this product — not a decision to do less, but the honest state
- * of a surface built against a prototype that stored everything in `useState`.
+ * than no control. Until 2026-08-17 each entry named a reference element with
+ * no record behind it; the rebuild brief (docs/phases/admin-affiliate-
+ * rebuild.md, decision 1) decided all nine ARE built — each through the
+ * service that already owns its rule — so each message now names the record
+ * that exists (migration 0048 where one was needed), the mechanism that will
+ * serve it, and the session that ships the surface. An entry leaves this
+ * register the moment its control works, and the register goes when the last
+ * one does.
  */
 export const CREATOR_PARKED_MESSAGES = {
   deliverableEvidence:
-    'Per-deliverable evidence is parked: the product records the first-post ' +
-    'submission and the §22.1 completion decision, and has no per-deliverable ' +
-    'evidence record to review against.',
+    'Deliverable evidence review arrives with the Content & Compliance ' +
+    'rebuild (Session C). The records exist as of migration 0048 — a ' +
+    'deliverable, its evidence receipts, and its decisions, insert-only in ' +
+    'the §22.4 idiom — and this surface does not yet write them.',
   availability:
-    'Content-availability verification is parked: no availability record ' +
-    'exists, and the Spec fixes no availability period to check against.',
+    'Content-availability verification arrives with the Content & Compliance ' +
+    'rebuild (Session C). The record exists as of migration 0048 and is ' +
+    'checked against the AGREED campaign availability period — a term both ' +
+    'parties accepted, stored verbatim on every check.',
   payoutReminder:
-    'The payout reminder is parked: §27 defines no reminder message for a ' +
-    'Stripe requirement, and sending an undefined one is not something this ' +
-    'surface will invent.',
+    'The payout reminder arrives with Session C, sending the existing §27 ' +
+    'key for a Stripe requirement (affiliate_connected_account_info_required) ' +
+    '— no new message is invented, and nothing sends from here yet.',
   stripeRefresh:
-    'A live Stripe read is parked. This page shows the status Stripe last ' +
-    'reported, which is what the connected-account record holds.',
+    'A live Stripe re-read arrives with Session B (the Phase 10b posture: a ' +
+    'vendor is a source of events, not truth). Until then this block shows ' +
+    'the status Stripe last reported, which is what the connected-account ' +
+    'record holds.',
   evidenceUpload:
-    'Evidence file upload is parked: verification evidence is recorded as ' +
-    'text against the §5.3 register, and there is no evidence file store.',
+    'Evidence picture upload arrives with Session B, through the Phase 09a ' +
+    'presign path — the bytes decide the format, and the 0048 file record ' +
+    'already refuses duplicates per live (prospect, checksum). While the R2 ' +
+    'bucket is unconfigured (Track A4) the surface says so instead of ' +
+    'offering a control that would fail.',
   kitVisuals:
-    'The visual kit is parked: §12 uploads go to an R2 bucket that is not ' +
-    'configured in this deployment, so there are no approved visuals to show. ' +
-    'Every kit read is still logged, and the log is on this page.',
+    'The visual kit read arrives with Session C. §12 uploads go to an R2 ' +
+    'bucket that is not configured in this deployment (Track A4), so there ' +
+    'are no approved visuals to show; every kit read is still logged.',
   caseIntake:
-    'Compliance and support case intake is parked until the Creator controls ' +
-    'surface is built.',
+    'Support-case intake arrives with Session C, calling openSupportCase so ' +
+    '§27.8’s business-day clock, the owner, the waiting party, and the ' +
+    'four-fact handoff gate stay in one place. There is no second queue.',
   passwordRecovery:
-    'Sending a recovery link from here is parked: §5.5 makes the reset an ask ' +
-    'the person makes, and the ask answers identically whether or not the ' +
-    'address exists.',
+    'The Admin-initiated recovery link arrives with Session B, through ' +
+    'sendResetPassword — the one reset path — and a new §27 key symmetric ' +
+    'with the Founder’s. §5.5’s public non-enumerating ask is ' +
+    'untouched.',
   requestCorrection:
-    'Asking the Affiliate to correct their own record is parked: §27 defines ' +
-    'no correction-request message.',
+    'Asking the Affiliate to correct their own record arrives with Session B ' +
+    'as a new §27 key (affiliate_correction_request): §11 gives the Creator ' +
+    'the right to correct prefilled public information, and a message asking ' +
+    'them to is within that right.',
 } as const;
 
 export type CreatorParkedKey = keyof typeof CREATOR_PARKED_MESSAGES;

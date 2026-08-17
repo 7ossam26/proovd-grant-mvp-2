@@ -164,13 +164,91 @@ describe('the register carries what the Spec requires of it', () => {
     expect('CREATOR_TIER_LEVELS' in shared).toBe(false);
   });
 
-  it('gives every parked control a sentence that names what is missing', () => {
+  it('gives every parked control a sentence that names what is coming, and when', () => {
+    // The contract changed with the 2026-08-17 rebuild, on purpose. The brief
+    // (docs/phases/admin-affiliate-rebuild.md, decision 1) decided all nine
+    // capabilities ARE built, each through the service that already owns its
+    // rule — so an entry no longer names a permanent gap, it names the record
+    // that exists, the mechanism that will serve it, and the SESSION that
+    // ships the surface. §1.4 still governs: a control says what the
+    // destination IS, and "coming in Session C" is a checkable claim where
+    // "parked" was an open-ended one.
     for (const [key, message] of Object.entries(CREATOR_PARKED_MESSAGES)) {
       expect(message.length, key).toBeGreaterThan(40);
-      // §1.4: a parked control says what the destination IS, not that something
-      // broke. Every message says "parked" and then why.
-      expect(message.toLowerCase(), key).toContain('parked');
+      expect(/Session [BC]\b/.test(message), key).toBe(true);
     }
+  });
+
+  it('renders eight tabs and twenty-five sections, the reference’s own registers', async () => {
+    // The 2026-08-17 rebuild's structural register (Session A). The counts are
+    // the walked reference's `Vj`/`Gj` exactly, and the three tabs the
+    // Selected-relationship switcher scopes are the three the reference
+    // renders it on.
+    const { AFFILIATE_RECORD_TABS } = await import('@proovd/shared');
+    expect(AFFILIATE_RECORD_TABS).toHaveLength(8);
+    const sectionCount = AFFILIATE_RECORD_TABS.reduce(
+      (n, tab) => n + tab.sections.length,
+      0,
+    );
+    expect(sectionCount).toBe(25);
+    expect(AFFILIATE_RECORD_TABS[0].key).toBe('overview');
+    expect(AFFILIATE_RECORD_TABS[0].sections).toHaveLength(0);
+    expect(
+      AFFILIATE_RECORD_TABS.filter((t) => t.relationshipScoped).map((t) => t.key),
+    ).toEqual(['campaigns', 'content', 'performance']);
+    // Keys are addresses (DNA §5.12), so they must be unique where they meet.
+    const tabKeys = AFFILIATE_RECORD_TABS.map((t) => t.key);
+    expect(new Set(tabKeys).size).toBe(tabKeys.length);
+    for (const tab of AFFILIATE_RECORD_TABS) {
+      const keys = tab.sections.map((s: { key: string }) => s.key);
+      expect(new Set(keys).size, tab.key).toBe(keys.length);
+    }
+  });
+
+  it('records the Opened step as a refusal with its reason, not a gap', async () => {
+    // §1.8: the reference draws an invitation `Opened` step; §27 ships no
+    // tracking pixel and Phase 23b refused an email-open metric outright. The
+    // register carries the refusal so a later session adding a pixel is a
+    // visible edit rather than a quiet one.
+    const { INVITATION_LIFECYCLE_STEPS } = await import('@proovd/shared');
+    expect(INVITATION_LIFECYCLE_STEPS).toHaveLength(9);
+    const opened = INVITATION_LIFECYCLE_STEPS.find((s) => s.key === 'opened')!;
+    expect(opened.absentBecause).toBeTruthy();
+    expect(opened.absentBecause).toContain('tracking pixel');
+    for (const step of INVITATION_LIFECYCLE_STEPS) {
+      if (step.key !== 'opened') expect(step.absentBecause, step.key).toBeNull();
+    }
+  });
+
+  it('derives proposal access from §29 and offers tiers only as suggestions', async () => {
+    const shared = await import('@proovd/shared');
+    // §1.8 item 4: no stored eligibility flag — the badge reads §29's
+    // restrict_bidding/demote records, both of which the enforcement register
+    // already carries.
+    expect(Object.keys(shared.PROPOSAL_ACCESS_LABELS)).toEqual(['standard', 'restricted']);
+    expect(shared.PROPOSAL_ACCESS_IS_DERIVED).toContain('§29');
+    expect([...shared.AFFILIATE_ENFORCEMENT_ACTIONS]).toContain('restrict_bidding');
+    expect([...shared.AFFILIATE_ENFORCEMENT_ACTIONS]).toContain('demote');
+    // §1.8 item 3: three suggestions over the free-text column, never an enum.
+    expect([...shared.QUALITY_TIER_SUGGESTIONS]).toEqual(['Tier A', 'Tier B', 'Tier C']);
+    expect('QUALITY_TIERS' in shared).toBe(false);
+  });
+
+  it('accepts what the server can inspect, and no HEIC', async () => {
+    // §1.8 item 5: the copy names what `ALLOWED_IMAGE_TYPES` accepts. HEIC is
+    // a file browsers cannot render; SVG stays excluded since 09a.
+    const { EVIDENCE_PICTURES_ACCEPTED, AFFILIATE_EVIDENCE_CATEGORIES } = await import(
+      '@proovd/shared'
+    );
+    expect(EVIDENCE_PICTURES_ACCEPTED).not.toContain('HEIC');
+    expect(EVIDENCE_PICTURES_ACCEPTED).toContain('PNG');
+    // The four file categories are the 0048 CHECK, one for one.
+    expect(AFFILIATE_EVIDENCE_CATEGORIES.map((c) => c.key)).toEqual([
+      'channel_permission',
+      'sponsored_history',
+      'promotion_plan',
+      'similar_campaign_performance',
+    ]);
   });
 
   it('names four steps in the Add Affiliate flow, each a question', () => {

@@ -6562,3 +6562,240 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   font-size: 0.875rem;
 }
 .fop-refusal b { color: var(--dark); }
+
+/* ════════════════════════════ PHASE 32 — the Affiliate workspace record shell
+   (Spec §26.1, §8, §14.2, DNA §5.12, §5.14), added 2026-08-17, Session A of
+   the Admin Affiliate rebuild (docs/phases/admin-affiliate-rebuild.md).
+
+   The eight-tab / twenty-five-section record: the workspace navigation that
+   sits above the identity band, the section rail beneath the tabs, the
+   Selected-relationship switcher, and the honest interim section. PHASE 26 is
+   edited in place where an existing family changed (verified 2026-08-17 that
+   no file outside features/admin/creators uses a .cr- class); this banner is
+   the genuinely NEW families only. PHASE 25's shared shell selectors are
+   untouched. Conventions unchanged: tokens only; px for hairlines, radii, and
+   the touch minimum; responsive rules are corrections that name their
+   overflow problem.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── The workspace navigation ─────────────────────────────────────────────
+   Context strip, the eight tabs, and the active tab's sections — in that
+   order, above everything, as the reference draws it. The strip is not a
+   heading: the identity band's h1 (Overview) or the section h1 (elsewhere)
+   names the page; this names the record the tabs belong to. */
+.cr-wnav {
+  margin: 0 0 var(--sp-32);
+  border-bottom: var(--bw) solid var(--brand);
+}
+.cr-wnav__context {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  min-height: 4.625rem;
+  padding: var(--sp-8) 0;
+}
+.cr-wnav__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cr-wnav__who strong {
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--darker);
+}
+.cr-wnav__who small {
+  font-size: 0.8125rem;
+  color: var(--moss);
+  overflow-wrap: anywhere;
+}
+.cr-wnav__attention {
+  margin-left: var(--sp-16);
+  padding: var(--sp-4) var(--sp-12);
+  background: var(--mint);
+  color: var(--dark);
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.cr-wnav__tools { margin-left: auto; }
+
+/* The eight tabs. A hand-built tablist (roving tabindex, Arrow/Home/End) —
+   §26.1's markup differs from components/Tabs.tsx, the position every Admin
+   workspace has recorded since the Founders rebuild. Horizontal scroll inside
+   its own container at narrow widths; the page never scrolls sideways. */
+.cr-wtabs {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cr-wtabs::-webkit-scrollbar { display: none; }
+.cr-wtabs__tab {
+  appearance: none;
+  border: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--touch);
+  /* Tight enough that all eight tabs fit the shell at 1280 — the screenshot
+     pass caught the last two hiding behind a scroll with no affordance. The
+     rail still scrolls below that width. */
+  padding: var(--sp-12) var(--sp-8);
+  border-bottom: 3px solid transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 750;
+  color: var(--moss);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cr-wtabs__tab:hover { color: var(--darker); }
+.cr-wtabs__tab.is-active {
+  color: var(--darker);
+  border-bottom-color: var(--brand);
+}
+.cr-wtabs__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  padding: 0 var(--sp-4);
+  background: var(--mint);
+  color: var(--dark);
+  border-radius: var(--radius);
+  font-size: 0.625rem;
+  font-weight: 900;
+}
+
+/* The active tab's sections — quieter than the tabs, same mechanics. */
+.cr-wsecs {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-top: 1px solid var(--grey-light);
+}
+.cr-wsecs::-webkit-scrollbar { display: none; }
+.cr-wsecs__sec {
+  appearance: none;
+  border: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: var(--sp-8) var(--sp-16);
+  border-bottom: 3px solid transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--moss);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cr-wsecs__sec:hover { color: var(--darker); }
+.cr-wsecs__sec.is-active {
+  color: var(--darker);
+  border-bottom-color: var(--brand);
+}
+
+/* ── The Selected-relationship switcher ───────────────────────────────────
+   Persistent across the three campaign-scoped tabs. The sentence beneath the
+   label is the reference's organising rule and is pinned in the register —
+   account data stays separate from campaign-specific state. */
+.cr-switcher {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(min(17.5rem, 100%), 26.25rem);
+  align-items: center;
+  gap: var(--sp-24);
+  margin: 0 0 var(--sp-32);
+  padding: var(--sp-16) var(--sp-24);
+  background: var(--mint);
+  border-radius: var(--radius);
+}
+.cr-switcher > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cr-switcher > span strong {
+  font-size: 0.875rem;
+  font-weight: 850;
+  color: var(--darker);
+}
+.cr-switcher > span small {
+  font-size: 0.6875rem;
+  color: var(--dark);
+}
+.cr-switcher__pick { display: block; min-width: 0; }
+.cr-switcher__pick select {
+  width: 100%;
+  min-height: var(--touch);
+  font-weight: 800;
+  border-color: var(--brand);
+}
+.cr-switcher > p.grey { margin: 0; }
+
+/* ── An un-rebuilt section, honestly labelled (§1.4) ──────────────────────
+   Real data first (the Selected-relationship strip), then the sentence naming
+   the surface that owns the content today and the session that replaces the
+   interim. */
+.cr-interim {
+  max-width: var(--measure);
+  padding: var(--sp-8) 0 var(--sp-48);
+}
+.cr-interim__title {
+  margin: var(--sp-8) 0 var(--sp-24);
+  font-size: clamp(1.75rem, 4.5vw, 2.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 900;
+  color: var(--darker);
+}
+.cr-interim__rel {
+  margin: 0 0 var(--sp-24);
+  border-top: 1px solid var(--grey-light);
+}
+.cr-interim__rel > div {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  gap: var(--sp-24);
+  align-items: baseline;
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-interim__rel dt {
+  font-size: 0.875rem;
+  font-weight: 750;
+  color: var(--moss);
+}
+.cr-interim__rel dd {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--darker);
+  overflow-wrap: anywhere;
+}
+.cr-interim__id {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.875rem;
+}
+.cr-interim__note {
+  margin: 0 0 var(--sp-16);
+  color: var(--moss);
+  max-width: var(--measure);
+}
+
+/* ── PHASE 32 — RESPONSIVE ────────────────────────────────────────────────
+   The switcher's two columns overlap under ~640px: stack them. The context
+   strip's attention pill wraps under the name rather than truncating it. */
+@media (max-width: 40rem) {
+  .cr-switcher { grid-template-columns: minmax(0, 1fr); }
+  .cr-wnav__context { flex-wrap: wrap; }
+  .cr-wnav__attention { margin-left: 0; white-space: normal; }
+  .cr-interim__rel > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+}

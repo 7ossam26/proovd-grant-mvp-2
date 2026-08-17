@@ -105,6 +105,10 @@ export interface CreatorRelationshipSummary {
   activatedAt: string | null;
   closesAt: string | null;
   holdsSlot: boolean;
+  /** The Selected-relationship strip's three composed facts (2026-08-17). */
+  agreement: string;
+  trackingLink: string;
+  completion: string;
 }
 
 export interface ProfileField {

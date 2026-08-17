@@ -251,6 +251,9 @@ function mayaDetail(
         activatedAt: 'Aug 10, 2026 · 9:00 AM UTC',
         closesAt: 'Aug 18, 2026 · 8:00 PM UTC',
         holdsSlot: true,
+        agreement: 'Accepted',
+        trackingLink: 'Affiliate link active',
+        completion: 'Not due before close',
       },
     ],
     profile: {
@@ -659,7 +662,13 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
     expect(screen.getByText('Active partnership')).toBeTruthy();
   });
 
-  it('opens the campaign relationship, which is a real destination now', async () => {
+  it('opens the campaign relationship by selecting it and scoping the Campaigns tab', async () => {
+    // Changed 2026-08-17 (rebuild Session A): the reference replaces the
+    // separate relationship address with the Selected-relationship switcher,
+    // so `View campaign relationship` now selects the relationship and opens
+    // Campaigns · Readiness & Active — the reference's own destination. The
+    // old address stays alive underneath (Session C absorbs it) and is what
+    // the interim section links onward to.
     serve(recordRoutes());
     const view = await renderAdmin(`/admin/creators/${PROSPECT}`);
 
@@ -667,13 +676,30 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
     expect(control.getAttribute('aria-disabled')).toBeNull();
     await userEvent.click(control);
     await waitFor(() => {
-      expect(view.router.state.location.pathname).toBe(
-        `/admin/creators/${PROSPECT}/relationships/${ASSOCIATION}`,
-      );
+      expect(view.router.state.location.pathname).toBe(`/admin/creators/${PROSPECT}`);
+      const params = new URLSearchParams(view.router.state.location.search);
+      expect(params.get('tab')).toBe('campaigns');
+      expect(params.get('section')).toBe('readiness');
+      expect(params.get('rel')).toBe(ASSOCIATION);
     });
+    // The switcher scopes the campaign-facing tabs, and its sentence is the
+    // organising rule, pinned.
+    expect(screen.getByText('Selected relationship')).toBeTruthy();
+    expect(
+      screen.getByText('Account data stays separate from campaign-specific state'),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('combobox', { name: 'Select campaign relationship' }),
+    ).toBeTruthy();
   });
 
-  it('offers no action for an item somebody else owns', async () => {
+  it('parks the Stripe-owned action instead of pretending it sends', async () => {
+    // Changed 2026-08-17 (rebuild Session A): the reference gives the
+    // Stripe-owned attention one control — `Send payout reminder` — and the
+    // rebuild decided to build it (gap 3, Session C, through the existing
+    // §27 key). Until it sends, the control is parked: `aria-disabled`, and
+    // pressing it explains itself rather than doing nothing (§1.4). It never
+    // navigates and never claims a send.
     const detail = mayaDetail();
     detail.header.attention = {
       needed: true,
@@ -689,10 +715,99 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
     // The label also appears in the facts strip, so the attention object is
     // found by its owner pill — the thing only it carries.
     const box = screen.getByText('Owner · Stripe').closest('section')!;
-    // §1.4: offering Proovd a button for somebody else's work claims a
-    // capability the product does not have.
-    expect(within(box).queryByRole('button')).toBeNull();
+    const control = within(box).getByRole('button', { name: /Send payout reminder/i });
+    expect(control.getAttribute('aria-disabled')).toBe('true');
     expect(within(box).getByRole('heading', { name: 'Stripe needs information' })).toBeTruthy();
+  });
+
+  it('offers no action at all for an Affiliate-owned item', async () => {
+    // §1.4 still holds where it always did: an Affiliate-owned wait is their
+    // move, and the reference renders no control for it either.
+    const detail = mayaDetail();
+    detail.header.attention = {
+      needed: true,
+      kind: 'invitation_unclaimed',
+      owner: 'Affiliate',
+      label: 'Invitation sent, not yet claimed',
+      detail: 'The invitation is live. The next move is Maya’s.',
+      associationId: null,
+    };
+    serve(recordRoutes(detail));
+    await renderAdmin(`/admin/creators/${PROSPECT}`);
+
+    const box = screen.getByText('Owner · Affiliate').closest('section')!;
+    expect(within(box).queryByRole('button')).toBeNull();
+  });
+});
+
+/* ── The record shell (rebuild Session A) ──────────────────────────────────── */
+
+describe('§26.1, DNA §5.12 — the eight-tab record shell', () => {
+  it('renders the eight tabs from the register, with the campaigns count', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}`);
+
+    const rail = screen.getByRole('tablist', {
+      name: 'Maya Johnson Affiliate record tabs',
+    });
+    const tabs = within(rail).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual([
+      'Overview',
+      'Profile & Verification',
+      'Account & Payout Setup',
+      'Campaigns1',
+      'Content & Compliance',
+      'Performance & Earnings',
+      'Support & Enforcement',
+      'History',
+    ]);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('holds the tab and section in the URL, and an interim section says what it is', async () => {
+    serve(recordRoutes());
+    const view = await renderAdmin(`/admin/creators/${PROSPECT}?tab=history`);
+
+    // History's sections render as their own rail; the first is the bare
+    // address, so no `section` param appears for Timeline.
+    const rail = screen.getByRole('tablist', { name: 'History sections' });
+    expect(within(rail).getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Timeline',
+      'Communications',
+    ]);
+
+    // The interim section owns the page title (one h1 per surface) and names
+    // the surface that holds the content today, with a real route to it.
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Timeline');
+    expect(screen.getByRole('button', { name: /Open the history surface/i })).toBeTruthy();
+
+    await userEvent.click(within(rail).getByRole('tab', { name: 'Communications' }));
+    await waitFor(() => {
+      const params = new URLSearchParams(view.router.state.location.search);
+      expect(params.get('section')).toBe('communications');
+    });
+    // A genuinely new read names the record that already exists rather than
+    // pointing at a surface that does not (§1.4).
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Communications');
+    expect(screen.queryByRole('button', { name: /^Open / })).toBeNull();
+  });
+
+  it('shows the Selected-relationship facts on a campaign-scoped interim section', async () => {
+    serve(recordRoutes());
+    await renderAdmin(
+      `/admin/creators/${PROSPECT}?tab=campaigns&section=readiness&rel=${ASSOCIATION}`,
+    );
+
+    // Real data on an interim surface: the strip renders the server-composed
+    // agreement, link, and completion facts for the selected relationship.
+    expect(screen.getByText('Relationship ID')).toBeTruthy();
+    expect(screen.getByText(ASSOCIATION)).toBeTruthy();
+    expect(screen.getByText('Agreement')).toBeTruthy();
+    expect(screen.getByText('Accepted')).toBeTruthy();
+    expect(screen.getByText('Tracking link')).toBeTruthy();
+    expect(screen.getByText('Affiliate link active')).toBeTruthy();
+    expect(screen.getByText('Completion state')).toBeTruthy();
+    expect(screen.getByText('Not due before close')).toBeTruthy();
   });
 });
 

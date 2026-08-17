@@ -44,6 +44,11 @@ import {
 } from '../../db/schema/enforcement.js';
 import { campaignAffiliateAssociations, campaigns } from '../../db/schema/domain.js';
 import { associationStatusHistory } from '../../db/schema/domain.js';
+import {
+  associationCompensationAgreements,
+  proposalVersions,
+  trackingLinks,
+} from '../../db/schema/decisions.js';
 import { stripeConnectedAccounts } from '../../db/schema/payments.js';
 import { notificationDigestPreferences } from '../../db/schema/digest.js';
 import { campaignBuild } from '../../db/schema/build.js';
@@ -176,6 +181,49 @@ export async function readCreatorWorkspace(
       : [];
   const campaignById = new Map(campaignRows.map((c) => [c.id, c]));
 
+  /*
+   * The three Selected-relationship facts (2026-08-17 rebuild): the agreement,
+   * the link, and the completion answer, batched like everything else. Three
+   * queries over the association ids, never a loop — and each label is decided
+   * HERE, so the switcher, the Overview card, and Session C's fact card can
+   * never disagree about what state a relationship is in.
+   */
+  const agreementRows =
+    associationIds.length > 0
+      ? await db
+          .select({ associationId: associationCompensationAgreements.associationId })
+          .from(associationCompensationAgreements)
+          .where(inArray(associationCompensationAgreements.associationId, associationIds))
+      : [];
+  const hasAgreement = new Set(agreementRows.map((r) => r.associationId));
+
+  const openProposalRows =
+    associationIds.length > 0
+      ? await db
+          .select({ associationId: proposalVersions.associationId })
+          .from(proposalVersions)
+          .where(
+            and(
+              inArray(proposalVersions.associationId, associationIds),
+              inArray(proposalVersions.state, ['awaiting_founder', 'awaiting_creator']),
+            ),
+          )
+      : [];
+  const hasOpenProposal = new Set(openProposalRows.map((r) => r.associationId));
+
+  const linkRows =
+    associationIds.length > 0
+      ? await db
+          .select({
+            associationId: trackingLinks.associationId,
+            active: trackingLinks.active,
+            pausedAt: trackingLinks.pausedAt,
+          })
+          .from(trackingLinks)
+          .where(inArray(trackingLinks.associationId, associationIds))
+      : [];
+  const linkByAssociation = new Map(linkRows.map((r) => [r.associationId, r]));
+
   const missing = prospect.subtype
     ? missingEvidence(
         prospect.subtype,
@@ -237,6 +285,22 @@ export async function readCreatorWorkspace(
 
   const relationships: CreatorRelationshipSummary[] = facts.associations.map((association) => {
     const campaign = campaignById.get(association.campaignId);
+    const link = linkByAssociation.get(association.associationId);
+
+    /*
+     * The completion answer keeps §16a's rule: "not due yet" and "the campaign
+     * closed and nobody has decided" are different facts, and only the second
+     * asks anything of an Admin. Terminal §23.4 states answer for themselves.
+     */
+    const completion =
+      association.status === 'successfully_completed'
+        ? 'Successfully completed'
+        : association.status === 'completion_disqualified'
+          ? 'Completion disqualified'
+          : campaign?.closeAt && campaign.closeAt.getTime() <= Date.now()
+            ? 'Decision pending'
+            : 'Not due before close';
+
     return {
       associationId: association.associationId,
       campaignId: association.campaignId,
@@ -251,6 +315,20 @@ export async function readCreatorWorkspace(
       activatedAt: formatInstant(activatedAt.get(association.associationId) ?? null),
       closesAt: formatInstant(campaign?.closeAt ?? null),
       holdsSlot: SLOT_OCCUPYING_STATUSES.includes(association.status),
+
+      agreement: hasAgreement.has(association.associationId)
+        ? 'Accepted'
+        : hasOpenProposal.has(association.associationId)
+          ? 'Proposal pending'
+          : 'Not started',
+      trackingLink: !link
+        ? 'No Affiliate link yet'
+        : link.pausedAt
+          ? 'Affiliate link paused'
+          : link.active
+            ? 'Affiliate link active'
+            : 'Affiliate link inactive',
+      completion,
     };
   });
 
