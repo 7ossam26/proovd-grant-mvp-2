@@ -1,12 +1,19 @@
 /**
- * The campaign-relationship surfaces, as a person meets them — Spec §14, §16,
- * §17, §18, §22.1, §24.3, §24.7, §26.1, §28.5, §33.11.
+ * The campaign-scoped tabs of the Affiliate record, as a person meets them —
+ * Spec §14, §16, §17, §18, §22.1, §24.3, §24.7, §24.8, §26.1, §28.5, §29,
+ * §33.11. Rewritten for Session C of the 2026-08-17 rebuild: the old
+ * relationship page and its four panes were absorbed into the record's
+ * Campaigns / Content & Compliance / Performance & Earnings tabs, addressed by
+ * `?tab=`, `?section=`, and `?rel=` — so every test here renders the RECORD
+ * and selects the relationship the way an Admin does.
  *
  * The composer's honesty is proved in
- * `backend/src/tests/creator-relationship.test.ts`. What is only checkable here
- * is what a person sees and can operate: that the rail is a real tablist, that
- * only the active pane is mounted, that Approve is not offered until the seven
- * §17 checks are marked, and that the four pinned sentences reach the screen.
+ * `backend/src/tests/creator-relationship.test.ts`. What is only checkable
+ * here is what a person sees and can operate: that the switcher scopes the
+ * tabs, that Approve is not offered until the seven §17 checks are marked,
+ * that the pinned sentences reach the screen — and that every control the
+ * reference draws and the Spec forbids renders its refusal sentence instead
+ * (`AFFILIATE_OPERATIONS_ABSENCES`).
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -16,16 +23,19 @@ import { axe } from 'jest-axe';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
   ADMIN_CANNOT_ACCEPT,
+  AFFILIATE_OPERATIONS_ABSENCES,
   ATTRIBUTION_FOOTNOTE,
-  CREATOR_PARKED_MESSAGES,
+  AVAILABILITY_TERM_IS_AGREED,
   FIRST_POST_RELEASES_ZERO,
   FIRST_POST_VERIFICATION_CHECKS,
   FIXED_PAYMENT_FUNDED_IS_NOT_PAID,
+  TERMINATION_DECIDES_NO_MONEY,
+  affiliateOperationsAbsence,
 } from '@proovd/shared';
 import { appRoutes } from '../../../routes.js';
 import { installQaServer, type StubRoute } from '../../qa/server.js';
 import type { AdminIdentity } from '../api.js';
-import type { CreatorRelationshipDetail } from './api.js';
+import type { CreatorRelationshipDetail, CreatorWorkspaceDetail } from './api.js';
 
 /* ── The recording motion runtime ──────────────────────────────────────────── */
 
@@ -55,6 +65,11 @@ function installMotionRuntime(): void {
     toast: (message: string) => {
       toasts.push(message);
     },
+    /*
+     * The PROMISE shape — the trap `support.test.tsx` records. A
+     * callback-shaped mock resolves before the work does, so every
+     * server-refusal assertion behind the hook passes for the wrong reason.
+     */
     buttonProgress: async (_element: HTMLElement, work: Promise<unknown>) => {
       try {
         await work;
@@ -118,7 +133,15 @@ function requestsTo(pattern: RegExp): RecordedRequest[] {
 const PROSPECT = 'prospect-maya';
 const ASSOCIATION = 'assoc-teeb';
 const SUBMISSION = 'sub-1';
-const BASE = `/admin/creators/${PROSPECT}/relationships/${ASSOCIATION}`;
+const RECORD = `/admin/creators/${PROSPECT}`;
+/** The §17 review keeps its own address — its decision is its own act. */
+const REVIEW = `${RECORD}/relationships/${ASSOCIATION}/review`;
+
+function at(tab: string, section?: string): string {
+  const params = new URLSearchParams({ tab, rel: ASSOCIATION });
+  if (section) params.set('section', section);
+  return `${RECORD}?${params.toString()}`;
+}
 
 function detail(
   patch: (draft: CreatorRelationshipDetail) => void = () => {},
@@ -275,15 +298,184 @@ function detail(
       },
       completion: null,
     },
+    deliverables: {
+      items: [
+        {
+          id: 'dlv-1',
+          title: 'Launch post on the approved channel',
+          source: 'Standard terms acceptance',
+          state: 'evidence_submitted',
+          stateLabel: 'Evidence submitted',
+          createdAt: 'Aug 10, 2026 · 9:00 AM UTC',
+          latestEvidence: {
+            id: 'ev-1',
+            reference: 'https://instagram.com/p/abc',
+            note: null,
+            submittedBy: 'user:admin-1',
+            submittedAt: 'Aug 11, 2026 · 9:00 AM UTC',
+          },
+          latestDecision: null,
+        },
+      ],
+      resolved: 0,
+      canRecord: true,
+      sourceLabel: 'Standard terms acceptance',
+    },
+    availability: {
+      term:
+        'Keep your promotional content available for the agreed campaign and availability period. Story-format content may follow the natural lifespan you agreed in advance. · Campaign close: Aug 18, 2026 · 8:00 PM UTC',
+      termSource: '§20 Creator obligations · the accepted campaign period',
+      checks: 0,
+      latest: null,
+    },
+    mediationNotes: [],
+    terminationRequests: { open: null, history: [] },
+    kitAssets: {
+      visualsAvailable: false,
+      waitingOn:
+        'The §12 object storage is not configured in this deployment (Track A4), so there are no stored visuals to show. The asset records below are what the campaign holds; every Creator kit read is still logged.',
+      files: [],
+    },
+    workAgain: [],
   };
   patch(draft);
   return draft;
 }
 
-function routes(value: CreatorRelationshipDetail = detail()): StubRoute[] {
+/** A complete workspace read — the record shell renders from it first. */
+function workspace(
+  patch: (draft: CreatorWorkspaceDetail) => void = () => {},
+): CreatorWorkspaceDetail {
+  const draft: CreatorWorkspaceDetail = {
+    header: {
+      prospectId: PROSPECT,
+      initials: 'MJ',
+      name: 'Maya Johnson',
+      handle: '@mayabuilds',
+      channelUrl: 'https://instagram.com/mayabuilds',
+      platform: 'instagram.com',
+      subtype: 'Social Creator',
+      niche: 'Productivity & creator tools',
+      location: 'United States · Texas',
+      verification: { state: 'verified', label: 'Verified', at: 'Jun 2, 2026', missing: [] },
+      slots: { used: 1, limit: 3, remaining: 2, atLimit: false },
+      payout: { state: 'requirements_due', label: 'Stripe needs information' },
+      account: 'Eligible',
+      attention: { needed: false },
+      openCases: 0,
+      availableActions: ['assign', 'suspend', 'deletion', 'verify'],
+    },
+    relationships: [
+      {
+        associationId: ASSOCIATION,
+        campaignId: 'camp-teeb',
+        campaignName: 'Teeb Founding Launch',
+        founderName: 'Teeb Labs LLC',
+        campaignType: 'Product Campaign',
+        campaignTypeRaw: 'pre_launch',
+        status: 'Active partnership',
+        statusRaw: 'active',
+        designation: 'Initial launch roster',
+        owner: 'System',
+        activatedAt: 'Aug 10, 2026 · 9:00 AM UTC',
+        closesAt: 'Aug 18, 2026 · 8:00 PM UTC',
+        holdsSlot: true,
+        agreement: 'Accepted',
+        trackingLink: 'Affiliate link active',
+        completion: 'Not due before close',
+      },
+    ],
+    profile: {
+      summary: {
+        handle: '@mayabuilds',
+        channelUrl: 'https://instagram.com/mayabuilds',
+        platform: 'instagram.com',
+      },
+      blocks: [
+        {
+          provenance: 'admin',
+          title: 'Channel details',
+          fields: [
+            {
+              key: 'conflicts',
+              label: 'Conflicts',
+              value: null,
+              helper: null,
+              emptyLabel: 'None recorded',
+            },
+            {
+              key: 'sanctions',
+              label: 'Red flags',
+              value: null,
+              helper: null,
+              emptyLabel: 'None recorded',
+            },
+          ],
+        },
+      ],
+      verification: {
+        state: 'verified',
+        label: 'Verified',
+        at: 'Jun 2, 2026 · 9:00 AM UTC',
+        by: 'Ada Admin',
+        metricLabel: 'Engagement rate',
+        metrics: [],
+        evidence: [],
+        missing: [],
+      },
+      evidenceFiles: { available: false, waitingOn: 'Track A4.', files: [] },
+      metricDecisions: [],
+      proposalAccess: { key: 'standard', label: 'Standard proposal access', derivedFrom: null },
+      agreements: {
+        terms: 'v2026.05',
+        aup: 'v2026.05',
+        policyState: 'accepted',
+        publishedVersions: [],
+        perCampaign: [
+          {
+            associationId: ASSOCIATION,
+            campaignName: 'Teeb Founding Launch',
+            state: 'Accepted',
+          },
+        ],
+      },
+      provider: {
+        populated: true,
+        waitingOn: null,
+        accountId: 'acct_1MAYA000000',
+        state: 'requirements_due',
+        label: 'Stripe needs information',
+        transferCapability: 'Blocked',
+        requirements: ['external_account'],
+        requirementsLabel: '1 outstanding',
+        lastUpdated: 'Aug 15, 2026 · 11:00 AM UTC',
+      },
+      invitations: [],
+      support: [],
+      deletionRequest: null,
+    },
+    standing: {
+      account: { state: 'Eligible', latest: null, history: [] },
+      enforcement: [],
+      disclosures: [],
+      policyReacceptanceOpen: false,
+      cases: [],
+    },
+    history: [],
+    historyCounts: {},
+    communications: [],
+  };
+  patch(draft);
+  return draft;
+}
+
+function routes(
+  value: CreatorRelationshipDetail = detail(),
+  ws: CreatorWorkspaceDetail = workspace(),
+): StubRoute[] {
   return [
     { match: /\/relationships\/[^/]+$/, body: value },
-    { match: /\/api\/admin\/creators\/[^/]+$/, body: { header: {}, relationships: [] } },
+    { match: /\/api\/admin\/creators\/[^/]+$/, body: ws },
   ];
 }
 
@@ -318,70 +510,53 @@ afterEach(() => {
   delete (window as unknown as { Proovd?: unknown }).Proovd;
 });
 
-/* ── The rail ──────────────────────────────────────────────────────────────── */
+/* ── The switcher and the scoped tabs ──────────────────────────────────────── */
 
-describe('§26.1, §28.5 — four panes of one object', () => {
-  it('is a real tablist, with only the active pane mounted', async () => {
+describe('§26.1, §28.5 — the campaign tabs render from the one relationship read', () => {
+  it('scopes the campaign tabs by the switcher, and the retired address redirects', async () => {
     serve(routes());
-    await renderAdmin(BASE);
+    const view = await renderAdmin(at('campaigns', 'readiness'));
 
-    const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent?.replace(/\d+$/, '').trim())).toEqual([
-      'Overview',
-      'Agreement',
-      'Content',
-      'Money',
-    ]);
+    // The Selected-relationship switcher is the scoping control.
+    expect(screen.getByText('Selected relationship')).toBeTruthy();
+    expect(
+      (screen.getByLabelText('Select campaign relationship') as HTMLSelectElement).value,
+    ).toBe(ASSOCIATION);
+    expect(screen.getByText('Affiliate link active')).toBeTruthy();
+    view.unmount();
 
-    // Roving tabindex: exactly one tab is reachable by Tab, and it is the one
-    // that is selected (§28.5).
-    expect(tabs.filter((tab) => tab.getAttribute('tabindex') === '0')).toHaveLength(1);
-    expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
-    // Only the active pane is mounted, so the Agreement pane's content is not
-    // in the document while Overview is showing.
-    expect(screen.queryByText(ADMIN_CANNOT_ACCEPT)).toBeNull();
-  });
-
-  it('moves between panes with the arrow keys, and carries the pane in the URL', async () => {
+    // The old sibling address still lands on the record it meant.
     serve(routes());
-    const view = await renderAdmin(BASE);
-
-    screen.getByRole('tab', { name: /Overview/ }).focus();
-    await userEvent.keyboard('{ArrowDown}');
-
+    const redirected = mount(`${RECORD}/relationships/${ASSOCIATION}`);
     await waitFor(() => {
-      expect(view.router.state.location.search).toContain('pane=agreement');
+      expect(redirected.router.state.location.pathname).toBe(RECORD);
     });
-    expect(await screen.findByText(ADMIN_CANNOT_ACCEPT)).toBeTruthy();
+    expect(redirected.router.state.location.search).toContain('tab=campaigns');
+    expect(redirected.router.state.location.search).toContain(`rel=${ASSOCIATION}`);
+    redirected.unmount();
   });
 
-  it('counts only a real waiting item on the rail', async () => {
+  it('renders the relationship fact card, and the reference’s edit control as its refusal', async () => {
     serve(routes());
-    const first = await renderAdmin(BASE);
-    // A submitted post is a task with a record behind it. A badge on every tab
-    // would be the widget grid §20 refuses.
-    expect(screen.getByLabelText('1 item waiting')).toBeTruthy();
-    first.unmount();
+    await renderAdmin(at('campaigns'));
 
-    serve(
-      routes(
-        detail((draft) => {
-          draft.content.submission!.status = 'passed';
-        }),
-      ),
-    );
-    const second = await renderAdmin(BASE);
-    expect(screen.queryByLabelText('1 item waiting')).toBeNull();
-    second.unmount();
+    expect(screen.getByText('Relationship ID')).toBeTruthy();
+    expect(screen.getByText(ASSOCIATION)).toBeTruthy();
+    // "Edit Admin-owned relationship data" is refused — the sentence renders
+    // where the control would have been (§1.8).
+    expect(
+      screen.getByText(affiliateOperationsAbsence('relationshipEdit').sentence),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Edit Admin-owned relationship data/i })).toBeNull();
   });
 });
 
-/* ── Overview ──────────────────────────────────────────────────────────────── */
+/* ── Readiness & Active (the old Overview pane) ────────────────────────────── */
 
-describe('§16, §18, §31.5 — the Overview', () => {
+describe('§16, §18, §31.5 — Readiness & Active', () => {
   it('renders the link, its activation, and the safe test', async () => {
     serve(routes());
-    await renderAdmin(BASE);
+    await renderAdmin(at('campaigns', 'readiness'));
 
     expect(screen.getByText('Affiliate link active')).toBeTruthy();
     expect(screen.getByText(/proovd_link_test=1/)).toBeTruthy();
@@ -390,7 +565,7 @@ describe('§16, §18, §31.5 — the Overview', () => {
 
   it('offers the §16 operations, none of which grants anything', async () => {
     serve(routes());
-    await renderAdmin(BASE);
+    await renderAdmin(at('campaigns', 'readiness'));
 
     await userEvent.click(screen.getByRole('button', { name: /Re-derive readiness/i }));
     const dialog = await screen.findByRole('dialog');
@@ -402,29 +577,43 @@ describe('§16, §18, §31.5 — the Overview', () => {
 
   it('offers the kit access log, and revocation only while access exists', async () => {
     serve([...routes(), { match: /access-log$/, body: { access: [] } }]);
-    await renderAdmin(BASE);
+    await renderAdmin(at('campaigns', 'readiness'));
 
     expect(screen.getByRole('button', { name: /View the access log/i })).toBeTruthy();
-    // Revealed and not revoked, so revocation is offered and a second reveal is
-    // not — §10's reveal is idempotent, but offering it again where it has
-    // already happened would claim there is something to do.
     expect(screen.getByRole('button', { name: /Revoke kit access/i })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Reveal the preparing campaign/i })).toBeNull();
   });
 
-  it('says the visual kit is unavailable because the bucket is not configured', async () => {
-    serve(routes());
-    await renderAdmin(BASE);
+  it('renders the visual kit as records with the honest Track A4 absence (gap 6)', async () => {
+    serve(
+      routes(
+        detail((draft) => {
+          draft.kitAssets.files = [
+            {
+              id: 'asset-1',
+              purpose: 'visual',
+              state: 'stored',
+              filename: 'hero.png',
+              dimensions: '1600 × 900',
+              approved: true,
+              removed: false,
+            },
+          ];
+        }),
+      ),
+    );
+    await renderAdmin(at('campaigns', 'readiness'));
 
-    const control = screen.getByRole('button', { name: /Open visual Campaign kit/i });
-    expect(control.getAttribute('aria-disabled')).toBe('true');
-    await userEvent.click(control);
-    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.kitVisuals);
+    // The kit read is real now: the campaign's own asset records, and the
+    // preview absence names Track A4 rather than a parked toast.
+    expect(screen.getByText('hero.png')).toBeTruthy();
+    expect(screen.getByText(/Track A4/)).toBeTruthy();
+    expect(screen.queryByText(/arrives with Session C/)).toBeNull();
   });
 
   it('states §16’s complete-or-not rule beside a checklist that is short', async () => {
     serve(routes());
-    await renderAdmin(BASE);
+    await renderAdmin(at('campaigns', 'readiness'));
 
     expect(screen.getByText('12 of 13')).toBeTruthy();
     expect(screen.getByText('Readiness incomplete')).toBeTruthy();
@@ -447,7 +636,7 @@ describe('§16, §18, §31.5 — the Overview', () => {
         }),
       ),
     );
-    await renderAdmin(BASE);
+    await renderAdmin(at('campaigns', 'readiness'));
 
     const card = screen.getByText('Proposal version 2 waiting').closest('section')!;
     expect(within(card).queryByRole('button')).toBeNull();
@@ -456,7 +645,7 @@ describe('§16, §18, §31.5 — the Overview', () => {
 
   it('pauses the link through a dialog that says what a pause is not', async () => {
     serve([...routes(), { match: /\/link$/, body: detail() }]);
-    await renderAdmin(BASE);
+    await renderAdmin(at('campaigns', 'readiness'));
 
     await userEvent.click(
       screen.getByRole('button', { name: /Affiliate link history & controls/i }),
@@ -477,12 +666,12 @@ describe('§16, §18, §31.5 — the Overview', () => {
   });
 });
 
-/* ── Agreement ─────────────────────────────────────────────────────────────── */
+/* ── Opportunities & Negotiations (the old Agreement pane) ─────────────────── */
 
-describe('§14.2, §14.3, §24.7 — the Agreement', () => {
-  it('pins the two sentences this pane must never be without', async () => {
+describe('§14.2, §14.3, §24.7 — Opportunities & Negotiations', () => {
+  it('pins the two sentences this section must never be without', async () => {
     serve(routes());
-    await renderAdmin(`${BASE}?pane=agreement`);
+    await renderAdmin(at('campaigns', 'negotiations'));
 
     expect(screen.getByText(ADMIN_CANNOT_ACCEPT)).toBeTruthy();
     expect(screen.getByText(FIXED_PAYMENT_FUNDED_IS_NOT_PAID)).toBeTruthy();
@@ -505,11 +694,11 @@ describe('§14.2, §14.3, §24.7 — the Agreement', () => {
         }),
       ),
     );
-    await renderAdmin(`${BASE}?pane=agreement`);
+    await renderAdmin(at('campaigns', 'negotiations'));
 
-    expect(screen.getByText('A fixed Creator payment is unavailable on Idea Campaigns')).toBeTruthy();
-    // The chain and the funded-is-not-paid sentence only appear where the fee
-    // can exist — on an Idea campaign there is nothing for them to describe.
+    expect(
+      screen.getByText('A fixed Creator payment is unavailable on Idea Campaigns'),
+    ).toBeTruthy();
     expect(screen.queryByText(FIXED_PAYMENT_FUNDED_IS_NOT_PAID)).toBeNull();
   });
 
@@ -546,52 +735,156 @@ describe('§14.2, §14.3, §24.7 — the Agreement', () => {
         }),
       ),
     );
-    await renderAdmin(`${BASE}?pane=agreement`);
+    await renderAdmin(at('campaigns', 'negotiations'));
 
-    // §14.2: Admin may reject a policy violation, on a version that is still
-    // open. A superseded one has nothing left to reject.
     expect(screen.getAllByRole('button', { name: /Reject for policy/i })).toHaveLength(1);
+  });
+
+  it('records a mediation note — an act with no acceptance to smuggle', async () => {
+    serve([...routes(), { match: /\/mediation-note$/, body: detail() }]);
+    await renderAdmin(at('campaigns', 'negotiations'));
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /Record proposal mediation note/i }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/cannot accept for either party/)).toBeTruthy();
+    await userEvent.type(
+      within(dialog).getByLabelText(/Mediation note/i),
+      'Clarified the tax exclusion.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /Record the note/i }));
+
+    await waitFor(() => {
+      expect(requestsTo(/\/mediation-note$/)).toHaveLength(1);
+    });
   });
 
   it('offers no accept control anywhere', async () => {
     serve(routes());
-    const view = await renderAdmin(`${BASE}?pane=agreement`);
+    const view = await renderAdmin(at('campaigns', 'negotiations'));
     for (const control of within(view.container).getAllByRole('button')) {
       expect(control.textContent?.toLowerCase()).not.toContain('accept');
     }
   });
 });
 
-/* ── Content ───────────────────────────────────────────────────────────────── */
+/* ── Completion & Work Again ───────────────────────────────────────────────── */
 
-describe('§17, §18 — the Content pane', () => {
+describe('§22.8, §22.9 — Completion & Work Again', () => {
+  it('reads §22.8’s criteria rather than asking an Admin to assert them', async () => {
+    serve([
+      ...routes(),
+      { match: /\/api\/admin\/completion\//, body: { findings: [], current: null } },
+    ]);
+    await renderAdmin(at('campaigns', 'completion'));
+
+    expect(
+      screen.getByText(/read from readiness, post verification, the §22.1 decision/i),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByText(/Sales performance is not a completion requirement/).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('renders the work-again record read-only, and the reissue as its refusal', async () => {
+    serve(
+      routes(
+        detail((draft) => {
+          draft.workAgain = [
+            {
+              id: 'wa-1',
+              status: 'requested',
+              message: 'We would love to work with you again on the next run.',
+              requestedAt: 'Aug 20, 2026 · 9:00 AM UTC',
+              respondedAt: null,
+              responseNote: null,
+            },
+          ];
+        }),
+      ),
+    );
+    await renderAdmin(at('campaigns', 'completion'));
+
+    expect(
+      screen.getByText('We would love to work with you again on the next run.'),
+    ).toBeTruthy();
+    // "Reissue work-again request" fabricates a Founder ask — refused (§1.8).
+    expect(
+      screen.getByText(affiliateOperationsAbsence('workAgainReissue').sentence),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Reissue work-again request/i })).toBeNull();
+  });
+});
+
+/* ── Content & Compliance ──────────────────────────────────────────────────── */
+
+describe('§17, §18, §22.4 idiom — Content & Compliance', () => {
   it('shows the public URL as the object, and offers the review', async () => {
     serve(routes());
-    await renderAdmin(`${BASE}?pane=content`);
+    await renderAdmin(at('content'));
 
     expect(screen.getByRole('link', { name: /instagram\.com\/p\/abc/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Review submitted post/i })).toBeTruthy();
   });
 
-  it('parks the two elements with no record, and says what is missing', async () => {
-    serve(routes());
-    await renderAdmin(`${BASE}?pane=content`);
+  it('operates the deliverable records — receipt, decision, and the waiver’s named recorder (gap 1)', async () => {
+    serve([...routes(), { match: /\/decision$/, body: detail() }]);
+    await renderAdmin(at('content', 'deliverables'));
 
-    const deliverables = screen.getByRole('button', { name: /Review deliverable evidence/i });
-    expect(deliverables.getAttribute('aria-disabled')).toBe('true');
-    await userEvent.click(deliverables);
-    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.deliverableEvidence);
+    // The record is real now: the row, its state, and its latest receipt.
+    expect(screen.getByText('Launch post on the approved channel')).toBeTruthy();
+    expect(screen.getByText(/Evidence submitted/)).toBeTruthy();
+    expect(screen.getByText('0 of 1 resolved')).toBeTruthy();
 
-    const availability = screen.getByRole('button', { name: /Verify content availability/i });
-    await userEvent.click(availability);
-    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.availability);
+    await userEvent.click(screen.getByRole('button', { name: /Review deliverable evidence/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Findings/)).toBeTruthy();
+    await userEvent.selectOptions(within(dialog).getByLabelText(/Decision/i), 'verified');
+    await userEvent.type(
+      within(dialog).getByLabelText(/Findings/i),
+      'The post is live and matches the agreed work.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /Record the decision/i }));
+
+    await waitFor(() => {
+      expect(requestsTo(/\/decision$/)).toHaveLength(1);
+    });
+    expect(requestsTo(/\/decision$/)[0]!.body).toContain('"outcome":"verified"');
+  });
+
+  it('verifies availability against the AGREED term, shown read-only (gap 2)', async () => {
+    serve([...routes(), { match: /\/availability$/, body: detail() }]);
+    await renderAdmin(at('content', 'deliverables'));
+
+    expect(screen.getByText('Agreed campaign availability period')).toBeTruthy();
+    expect(screen.getAllByText(AVAILABILITY_TERM_IS_AGREED).length).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getByRole('button', { name: /Verify content availability/i }));
+    const dialog = await screen.findByRole('dialog');
+    // The term is composed server-side and rendered — never an input.
+    expect(within(dialog).getByText(/available for the agreed campaign/)).toBeTruthy();
+    await userEvent.selectOptions(
+      within(dialog).getByLabelText(/Is the content available/i),
+      'yes',
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(/Evidence or check note/i),
+      'Checked the live post URL.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /Record the check/i }));
+
+    await waitFor(() => {
+      expect(requestsTo(/\/availability$/)).toHaveLength(1);
+    });
+    expect(requestsTo(/\/availability$/)[0]!.body).toContain('"available":true');
   });
 
   it('offers §29.6 only against a Creator §15 marked required for launch', async () => {
     serve(routes());
-    await renderAdmin(`${BASE}?pane=content`);
-    // Not required, nothing recorded — so no replacement clock to start.
+    const first = await renderAdmin(at('content'));
     expect(screen.queryByRole('button', { name: /Record a failure to post/i })).toBeNull();
+    first.unmount();
 
     serve(
       routes(
@@ -600,7 +893,7 @@ describe('§17, §18 — the Content pane', () => {
         }),
       ),
     );
-    const required = await renderAdmin(`${BASE}?pane=content`);
+    const required = await renderAdmin(at('content'));
     expect(screen.getByRole('button', { name: /Record a failure to post/i })).toBeTruthy();
     required.unmount();
   });
@@ -622,19 +915,20 @@ describe('§17, §18 — the Content pane', () => {
         }),
       ),
     );
-    await renderAdmin(`${BASE}?pane=content`);
+    await renderAdmin(at('content'));
 
     expect(screen.getByText('Replacement window open')).toBeTruthy();
     expect(screen.getByText(/us-federal\.v1/)).toBeTruthy();
     expect(screen.getByText(/non-resettable/)).toBeTruthy();
-    // The consequence of a lapse is stated, and stated as the sweep's — not as
-    // something this surface does.
     expect(screen.getByText(/the sweep does, at the deadline/)).toBeTruthy();
-    // Recording a second failure is not offered against an open window.
     expect(screen.queryByRole('button', { name: /Record a failure to post/i })).toBeNull();
     expect(screen.getByRole('button', { name: /Mark the replacement ready/i })).toBeTruthy();
   });
+});
 
+/* ── Performance & Earnings (the old Money pane) ───────────────────────────── */
+
+describe('§18, §22.1, §24.3, §24.4 — Performance & Earnings', () => {
   it('renders an em dash rather than 0% when there are no clicks', async () => {
     serve(
       routes(
@@ -650,18 +944,14 @@ describe('§17, §18 — the Content pane', () => {
         }),
       ),
     );
-    await renderAdmin(`${BASE}?pane=content`);
+    await renderAdmin(at('performance'));
     expect(screen.getByText('—')).toBeTruthy();
     expect(screen.queryByText('0%')).toBeNull();
   });
-});
 
-/* ── Money ─────────────────────────────────────────────────────────────────── */
-
-describe('§22.1, §24.3, §24.4 — the Money pane', () => {
   it('says an estimated hero is not US$0.00 earned', async () => {
     serve(routes());
-    await renderAdmin(`${BASE}?pane=money`);
+    await renderAdmin(at('performance', 'earnings'));
 
     expect(screen.getAllByText('Estimated').length).toBeGreaterThan(0);
     expect(screen.getByText(/This is not US\$0\.00 earned/)).toBeTruthy();
@@ -699,44 +989,120 @@ describe('§22.1, §24.3, §24.4 — the Money pane', () => {
         }),
       ),
     );
-    await renderAdmin(`${BASE}?pane=money`);
+    await renderAdmin(at('performance', 'earnings'));
 
     expect(screen.getByText(/Sales tax is excluded from every Creator percentage/)).toBeTruthy();
     expect(screen.getByText(/Earned plus returned equals the provisional total/)).toBeTruthy();
     expect(screen.getByText(/never Proovd revenue/)).toBeTruthy();
   });
 
-  it('reads §22.8’s criteria rather than asking an Admin to assert them', async () => {
-    serve([
-      ...routes(),
-      { match: /\/api\/admin\/completion\//, body: { findings: [], current: null } },
-    ]);
-    await renderAdmin(`${BASE}?pane=money`);
-
-    expect(
-      screen.getByText(/read from readiness, post verification, the §22.1 decision/i),
-    ).toBeTruthy();
-    // §22.8's own rule, where somebody would otherwise supply a sales figure.
-    expect(screen.getAllByText(/Sales performance is not a completion requirement/).length)
-      .toBeGreaterThan(0);
-  });
-
-  it('offers no Transfer control — the one Transfer is the close queue’s', async () => {
+  it('offers no Transfer control — the refusal sentence renders instead (§1.8)', async () => {
     serve(routes());
-    const view = await renderAdmin(`${BASE}?pane=money`);
+    const view = await renderAdmin(at('performance', 'transfers'));
+
+    expect(screen.getByText(affiliateOperationsAbsence('createTransfer').sentence)).toBeTruthy();
     for (const control of within(view.container).getAllByRole('button')) {
       expect(control.textContent?.toLowerCase()).not.toContain('create');
       expect(control.textContent?.toLowerCase()).not.toContain('transfer');
     }
   });
+
+  it('sends the payout reminder — the real §27 key, with its outcome reported (gap 3)', async () => {
+    serve([
+      ...routes(),
+      {
+        match: /\/payout-reminder$/,
+        body: { detail: workspace(), ask: { sent: true, reason: null } },
+      },
+    ]);
+    await renderAdmin(at('performance', 'transfers'));
+
+    await userEvent.click(screen.getByRole('button', { name: /Send payout reminder/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/message §27 already defines/)).toBeTruthy();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Send the reminder/i }));
+
+    await waitFor(() => {
+      expect(requestsTo(/\/payout-reminder$/)).toHaveLength(1);
+    });
+    expect(toasts).toContain('Payout reminder sent');
+  });
+
+  it('renders Adjustments as §24.8’s records with the free-form editor refused', async () => {
+    serve(routes());
+    await renderAdmin(at('performance', 'adjustments'));
+
+    expect(screen.getByText('Only Affiliate-caused invalidity')).toBeTruthy();
+    expect(screen.getByText(affiliateOperationsAbsence('adjustEarnings').sentence)).toBeTruthy();
+    expect(screen.getByText(affiliateOperationsAbsence('fixedOutcome').sentence)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /adjust earnings/i })).toBeNull();
+  });
 });
 
-/* ── The §17 review ────────────────────────────────────────────────────────── */
+/* ── The termination request (Support & Enforcement → Relationship Requests) ─ */
+
+describe('§29, §24.8 — the termination request decides no money', () => {
+  it('constrains the treatments to the chosen cause, and pins the consequence', async () => {
+    serve([...routes(), { match: /\/termination-request$/, body: detail() }]);
+    await renderAdmin(at('support', 'requests'));
+
+    expect(screen.getAllByText(TERMINATION_DECIDES_NO_MONEY).length).toBeGreaterThan(0);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /Record active termination request/i }),
+    );
+    const dialog = await screen.findByRole('dialog');
+
+    // The default cause (Founder or product) permits three treatments — the
+    // §24.8 matrix's own row — and the clawback pair is not among them.
+    const treatment = within(dialog).getByLabelText(/Money treatment/i) as HTMLSelectElement;
+    const options = [...treatment.options].map((option) => option.value);
+    expect(options).toContain('earnings_remain');
+    expect(options).not.toContain('cancel_unpaid_invalid');
+    expect(options).not.toContain('contractual_recovery');
+
+    await userEvent.selectOptions(treatment, 'earnings_remain');
+    await userEvent.type(
+      within(dialog).getByLabelText(/Why the partnership should end/i),
+      'The Creator asked to step away.',
+    );
+    await userEvent.type(within(dialog).getByLabelText(/Asked to take effect/i), '2026-08-20');
+    await userEvent.type(
+      within(dialog).getByLabelText(/How the ask reached us/i),
+      'Email, forwarded to support.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /Record the request/i }));
+
+    await waitFor(() => {
+      expect(requestsTo(/\/termination-request$/)).toHaveLength(1);
+    });
+    const body = JSON.parse(requestsTo(/\/termination-request$/)[0]!.body!) as {
+      cause: string;
+      moneyTreatment: string;
+    };
+    expect(body.cause).toBe('founder_or_product');
+    expect(body.moneyTreatment).toBe('earnings_remain');
+  });
+
+  it('renders the campaign suspend/kill and tier/access combos as refusals', async () => {
+    serve(routes());
+    await renderAdmin(at('support', 'enforcement'));
+
+    expect(
+      screen.getByText(affiliateOperationsAbsence('campaignSuspendKill').sentence),
+    ).toBeTruthy();
+    expect(screen.getByText(affiliateOperationsAbsence('tierAccessCombo').sentence)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Kill campaign/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Suspend campaign/i })).toBeNull();
+  });
+});
+
+/* ── The §17 review (its own address, unchanged) ───────────────────────────── */
 
 describe('§17, §33.4.7 — the first-post review', () => {
   it('offers all seven checks, and no approval until every one is marked', async () => {
     serve(routes());
-    await renderAdmin(`${BASE}/review`);
+    await renderAdmin(REVIEW);
 
     const checks = screen.getAllByRole('button', { pressed: false });
     expect(checks.length).toBeGreaterThanOrEqual(FIRST_POST_VERIFICATION_CHECKS.length);
@@ -752,13 +1118,13 @@ describe('§17, §33.4.7 — the first-post review', () => {
 
   it('pins the sentence that stops approval reading as a payment', async () => {
     serve(routes());
-    await renderAdmin(`${BASE}/review`);
+    await renderAdmin(REVIEW);
     expect(screen.getByText(FIRST_POST_RELEASES_ZERO)).toBeTruthy();
   });
 
   it('sends the decision to the submission, with the checklist keyed by check', async () => {
     serve([...routes(), { match: /\/verify$/, body: { verification: { outcome: 'passed' } } }]);
-    await renderAdmin(`${BASE}/review`);
+    await renderAdmin(REVIEW);
 
     for (const check of FIRST_POST_VERIFICATION_CHECKS) {
       await userEvent.click(screen.getByRole('button', { name: check.label }));
@@ -786,14 +1152,14 @@ describe('§17, §33.4.7 — the first-post review', () => {
         }),
       ),
     );
-    mount(`${BASE}/review`);
+    mount(REVIEW);
     expect(await screen.findByText('There is no post waiting for review')).toBeTruthy();
     expect(screen.getByText(/Post approved/)).toBeTruthy();
   });
 
   it('carries the failed checks into step two and warns about the pause', async () => {
     serve(routes());
-    await renderAdmin(`${BASE}/review`);
+    await renderAdmin(REVIEW);
 
     await userEvent.click(
       screen.getByRole('button', { name: FIRST_POST_VERIFICATION_CHECKS[0]!.label }),
@@ -802,50 +1168,89 @@ describe('§17, §33.4.7 — the first-post review', () => {
 
     expect(await screen.findByText('Request post edits')).toBeTruthy();
     expect(screen.getByText(/The Affiliate link pauses when this is sent/)).toBeTruthy();
-    // The correction is prefilled from what did not pass — and editable.
     const box = screen.getByLabelText(/Creator-facing correction/i) as HTMLTextAreaElement;
     expect(box.value).toContain(FIRST_POST_VERIFICATION_CHECKS[1]!.label);
     expect(box.value).not.toContain(FIRST_POST_VERIFICATION_CHECKS[0]!.label);
   });
 });
 
-/* ── Accessibility ─────────────────────────────────────────────────────────── */
+/* ── The refused-controls register, walked ─────────────────────────────────── */
 
-describe('§33.11.1 — every relationship surface is operable', () => {
-  it('has no axe violations on any pane, or on the review', async () => {
-    for (const path of [
-      BASE,
-      `${BASE}?pane=agreement`,
-      `${BASE}?pane=content`,
-      `${BASE}?pane=money`,
-      `${BASE}/review`,
-    ]) {
-      serve(routes());
-      const view = await renderAdmin(path);
-      const results = await axe(view.container);
-      expect(results.violations, `${path}: ${JSON.stringify(results.violations)}`).toHaveLength(0);
+describe('§1.8 — every refused control renders its sentence somewhere', () => {
+  it('walks AFFILIATE_OPERATIONS_ABSENCES across the rendered tabs', async () => {
+    // Each register entry's sentence must appear on at least one section, so
+    // re-adding the control means deleting the sentence that refuses it.
+    const addresses: Record<string, string> = {
+      createTransfer: at('performance', 'transfers'),
+      adjustEarnings: at('performance', 'adjustments'),
+      fixedOutcome: at('performance', 'adjustments'),
+      workAgainReissue: at('campaigns', 'completion'),
+      campaignSuspendKill: at('support', 'enforcement'),
+      tierAccessCombo: at('support', 'enforcement'),
+      relationshipEdit: at('campaigns'),
+    };
+    for (const entry of AFFILIATE_OPERATIONS_ABSENCES) {
+      expect(addresses[entry.key], entry.key).toBeTruthy();
+    }
+    for (const entry of AFFILIATE_OPERATIONS_ABSENCES) {
+      serve([
+        ...routes(),
+        { match: /\/api\/admin\/completion\//, body: { findings: [], current: null } },
+      ]);
+      const view = await renderAdmin(addresses[entry.key]!);
+      expect(screen.getAllByText(entry.sentence).length, entry.key).toBeGreaterThan(0);
       view.unmount();
     }
   }, 60_000);
+});
 
-  it('renders no internal enum value or retired term on any pane', async () => {
-    const banned = [
-      'pre_build',
-      'pre_launch',
-      'readiness_blocked',
-      'fixed payment',
-      'escrow',
-      'pledge',
-      'all-or-nothing pledge',
+/* ── Accessibility ─────────────────────────────────────────────────────────── */
+
+describe('§33.11.1 — every campaign-scoped surface is operable', () => {
+  it('has no axe violations on any section, or on the review', async () => {
+    const addresses = [
+      at('campaigns'),
+      at('campaigns', 'readiness'),
+      at('campaigns', 'negotiations'),
+      at('campaigns', 'completion'),
+      at('content'),
+      at('content', 'deliverables'),
+      at('content', 'disclosures'),
+      at('content', 'risk'),
+      at('performance'),
+      at('performance', 'earnings'),
+      at('performance', 'transfers'),
+      at('performance', 'adjustments'),
+      at('support', 'requests'),
+      REVIEW,
     ];
-    for (const path of [BASE, `${BASE}?pane=agreement`, `${BASE}?pane=content`, `${BASE}?pane=money`]) {
+    for (const address of addresses) {
+      serve([
+        ...routes(),
+        { match: /\/api\/admin\/completion\//, body: { findings: [], current: null } },
+      ]);
+      const view = await renderAdmin(address);
+      expect((await axe(view.container)).violations).toEqual([]);
+      view.unmount();
+    }
+  }, 120_000);
+
+  it('renders no internal enum value or retired term on any section', async () => {
+    const addresses = [
+      at('campaigns'),
+      at('campaigns', 'negotiations'),
+      at('content'),
+      at('performance', 'earnings'),
+      at('support', 'requests'),
+    ];
+    for (const address of addresses) {
       serve(routes());
-      const view = await renderAdmin(path);
-      const text = (view.container.textContent ?? '').toLowerCase();
-      for (const word of banned) {
-        expect(text, `${word} on ${path}`).not.toContain(word.toLowerCase());
+      const view = await renderAdmin(address);
+      const text = view.container.textContent ?? '';
+      for (const banned of ['pre_build', 'pre_launch', 'readiness_blocked', 'escrow', 'pledge']) {
+        expect(text, `${address} · ${banned}`).not.toContain(banned);
       }
       view.unmount();
     }
-  });
+  }, 60_000);
 });

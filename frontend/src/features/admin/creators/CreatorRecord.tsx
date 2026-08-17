@@ -54,7 +54,9 @@ import { cn } from '../../../components/cn.js';
 import { useProovdMotion } from '../../../motion/MotionProvider.js';
 import {
   fetchCreator,
+  fetchRelationship,
   AdminRequestError,
+  type CreatorRelationshipDetail,
   type CreatorRelationshipSummary,
   type CreatorWorkspaceDetail,
 } from './api.js';
@@ -69,12 +71,24 @@ import {
   payoutTone,
   verificationTone,
 } from './shared.js';
-import { useCreatorParked } from './parked.js';
 import { AssignCampaignDialog } from './dialogs/AssignCampaignDialog.js';
 import { DeletionRequestDialog } from './dialogs/DeletionRequestDialog.js';
+import {
+  RelationshipOpsDialog,
+  type RelationshipOp,
+} from './dialogs/RelationshipOpsDialog.js';
+import { LinkControlsDialog } from './dialogs/LinkControlsDialog.js';
 import { CreatorSearch } from './CreatorSearch.js';
 import { ProfileTabSection } from './sections/ProfileSections.js';
 import { AccountTabSection } from './sections/AccountSections.js';
+import { CampaignTabSection } from './sections/CampaignSections.js';
+import { ContentTabSection } from './sections/ContentSections.js';
+import {
+  PayoutReminderDialog,
+  PerformanceTabSection,
+} from './sections/PerformanceSections.js';
+import { SupportTabSection } from './sections/SupportSections.js';
+import { HistoryTabSection } from './sections/HistorySections.js';
 
 type OpenDialog =
   | { kind: 'assign'; trigger: HTMLElement | null }
@@ -82,110 +96,13 @@ type OpenDialog =
 
 type SectionDef = { readonly key: string; readonly label: string };
 
-/* ── The interim map: which surface owns each un-rebuilt section today ──────
- *
- * `session` names the session that replaces the interim; `href` is the real
- * route to the surface that currently owns the content, or null when the
- * content is genuinely new (the 0048 records with no surface yet), in which
- * case `note` says what exists and what is coming. Relationship-scoped hrefs
- * receive the selected association id and return null without one.            */
-const INTERIM: Record<
-  string,
-  {
-    session: 'B' | 'C';
-    owner: string | null;
-    href: (prospectId: string, rel: string | null) => string | null;
-    note?: string;
-  }
-> = {
-  'campaigns/relationships': {
-    session: 'C',
-    owner: 'the campaign relationship surface',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}` : null),
-  },
-  'campaigns/negotiations': {
-    session: 'C',
-    owner: 'the relationship Agreement pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=agreement` : null),
-  },
-  'campaigns/readiness': {
-    session: 'C',
-    owner: 'the relationship Overview pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=overview` : null),
-  },
-  'campaigns/completion': {
-    session: 'C',
-    owner: 'the relationship Money pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=money` : null),
-  },
-  'content/posts': {
-    session: 'C',
-    owner: 'the relationship Content pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=content` : null),
-  },
-  'content/deliverables': {
-    session: 'C',
-    owner: null,
-    href: () => null,
-    note:
-      'The deliverable, evidence, and decision records exist as of migration 0048, ' +
-      'insert-only in the §22.4 idiom. The review surface arrives with Session C; ' +
-      'nothing writes them yet.',
-  },
-  'content/disclosures': {
-    session: 'C',
-    owner: 'the relationship Overview pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=overview` : null),
-  },
-  'content/risk': { session: 'C', owner: 'Account controls', href: (p) => `/admin/creators/${p}/controls` },
-  'performance/performance': {
-    session: 'C',
-    owner: 'the relationship Content pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=content` : null),
-  },
-  'performance/earnings': {
-    session: 'C',
-    owner: 'the relationship Money pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=money` : null),
-  },
-  'performance/transfers': {
-    session: 'C',
-    owner: 'the relationship Money pane',
-    href: (p, rel) => (rel ? `/admin/creators/${p}/relationships/${rel}?pane=money` : null),
-  },
-  'performance/adjustments': {
-    session: 'C',
-    owner: null,
-    href: () => null,
-    note:
-      'Adjustments route into the §24.8 cause-allocation path — recorded causes, ' +
-      'preview, then execute — never a second earnings editor. The surface that ' +
-      'routes there arrives with Session C.',
-  },
-  'support/support': { session: 'C', owner: 'Account controls', href: (p) => `/admin/creators/${p}/controls` },
-  'support/requests': {
-    session: 'C',
-    owner: null,
-    href: () => null,
-    note:
-      'The active-termination-request record exists as of migration 0048, with its ' +
-      '§24.8 cause and money treatment CHECK-matrixed. The intake surface arrives ' +
-      'with Session C; it decides no money.',
-  },
-  'support/enforcement': { session: 'C', owner: 'Account controls', href: (p) => `/admin/creators/${p}/controls` },
-  'support/appeals': { session: 'C', owner: 'Account controls', href: (p) => `/admin/creators/${p}/controls` },
-  'history/timeline': { session: 'C', owner: 'the history surface', href: (p) => `/admin/creators/${p}/history` },
-  'history/communications': {
-    session: 'C',
-    owner: null,
-    href: () => null,
-    note:
-      'The record already exists: notification_deliveries holds recipient, template, ' +
-      'delivery state, and dedup key for every message. The read arrives with ' +
-      'Session C — the reference derives this list by regex over event titles, ' +
-      'which is a mock, not a message store.',
-  },
-};
+/** The tabs that render from the ONE relationship read (`?rel=` selects it). */
+const RELATIONSHIP_TABS: readonly AffiliateRecordTabKey[] = [
+  'campaigns',
+  'content',
+  'performance',
+  'support',
+];
 
 /* ── The reference's eyebrow per tab ────────────────────────────────────────*/
 function tabEyebrow(name: string, tab: AffiliateRecordTabKey): string {
@@ -205,7 +122,23 @@ export function CreatorRecord() {
   const [loadError, setLoadError] = useState<AdminRequestError | null>(null);
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const surface = useRef<HTMLDivElement>(null);
-  const parked = useCreatorParked();
+  /*
+   * The ONE relationship read behind the campaign-scoped tabs. Fetched when a
+   * relationship is selected and a tab that renders from it is open; every
+   * relationship mutation answers with this same re-read, so `setRelDetail`
+   * with a response is never a local patch.
+   */
+  const [relDetail, setRelDetail] = useState<CreatorRelationshipDetail | null>(null);
+  const [relError, setRelError] = useState<AdminRequestError | null>(null);
+  /* The relationship operations three sections share — one place decides what
+     is open, exactly as the old relationship page held it. */
+  const [op, setOp] = useState<{
+    op: RelationshipOp;
+    versionId?: string;
+    trigger: HTMLElement | null;
+  } | null>(null);
+  const [linkTrigger, setLinkTrigger] = useState<HTMLElement | null>(null);
+  const [payoutTrigger, setPayoutTrigger] = useState<HTMLElement | null>(null);
 
   /* ── View state, all of it in the URL (DNA §5.12) ─────────────────────────*/
   const rawTab = params.get('tab') ?? 'overview';
@@ -266,7 +199,49 @@ export function CreatorRecord() {
     void load();
   }, [load]);
 
-  useProovdMotion(surface, [detail, tab, section?.key]);
+  /* The selected relationship's id, derivable before the render guards so the
+     fetch hook below stays unconditional (a stale `?rel=` falls back to the
+     first relationship, exactly as the switcher renders it). */
+  const rawRelParam = params.get('rel');
+  const selectedRelId = detail
+    ? (
+        detail.relationships.find((r) => r.associationId === rawRelParam) ??
+        detail.relationships[0] ??
+        null
+      )?.associationId ?? null
+    : null;
+  const needsRel = RELATIONSHIP_TABS.includes(tab);
+
+  const loadRel = useCallback(
+    async (associationId: string) => {
+      setRelError(null);
+      try {
+        setRelDetail(await fetchRelationship(prospectId, associationId));
+      } catch (error: unknown) {
+        setRelError(
+          error instanceof AdminRequestError
+            ? error
+            : new AdminRequestError({
+                error: 'unreachable',
+                status: 0,
+                title: 'Proovd could not be reached',
+                whatHappened:
+                  'This campaign relationship could not be read, and the failure carried no explanation.',
+                next: 'Try the read again. Nothing was changed by the attempt.',
+              }),
+        );
+      }
+    },
+    [prospectId],
+  );
+
+  useEffect(() => {
+    if (!needsRel || !selectedRelId) return;
+    if (relDetail?.associationId === selectedRelId) return;
+    void loadRel(selectedRelId);
+  }, [needsRel, selectedRelId, relDetail, loadRel]);
+
+  useProovdMotion(surface, [detail, relDetail, tab, section?.key]);
 
   /* ── Roving tabindex for both rails (§28.5) ───────────────────────────────*/
   function railKeys(keys: readonly string[], active: string, choose: (key: string) => void) {
@@ -332,6 +307,17 @@ export function CreatorRecord() {
   const selectedRel =
     relationships.find((r) => r.associationId === rawRel) ?? relationships[0] ?? null;
 
+  const relReady =
+    relDetail !== null && relDetail.associationId === selectedRel?.associationId;
+
+  /* Every relationship mutation answers with the relationship re-read; the
+     workspace facts beside it (the switcher's composed labels, the attention)
+     refresh quietly so the two payloads cannot drift apart. */
+  const onRelChanged = (next: CreatorRelationshipDetail) => {
+    setRelDetail(next);
+    void load();
+  };
+
   const paneId = `cr-pane-${prospectId}`;
   const activeRailKey = section ? section.key : tab;
 
@@ -385,6 +371,11 @@ export function CreatorRecord() {
               {entry.label}
               {entry.key === 'campaigns' && relationships.length > 0 ? (
                 <span className="cr-wtabs__count">{relationships.length}</span>
+              ) : null}
+              {/* The support badge the reference draws — a real count of open
+                  §26.7 cases, deferred until gap 7 gave the record a read. */}
+              {entry.key === 'support' && header.openCases > 0 ? (
+                <span className="cr-wtabs__count">{header.openCases}</span>
               ) : null}
             </button>
           ))}
@@ -462,11 +453,11 @@ export function CreatorRecord() {
           <OverviewTab
             detail={detail}
             onOpenDialog={setDialog}
-            onOpenTab={(t, s) => setView(t, s)}
+            onOpenTab={(t, s, r) => setView(t, s, r)}
             onOpenRelationship={(associationId) =>
               setView('campaigns', 'readiness', associationId)
             }
-            parked={parked}
+            onPayoutReminder={(trigger) => setPayoutTrigger(trigger)}
             navigate={(to) => void navigate(to)}
             prospectId={header.prospectId}
           />
@@ -497,16 +488,96 @@ export function CreatorRecord() {
             />
           </div>
         ) : (
-          <InterimSection
-            name={header.name}
-            tab={tabDef.key}
-            tabLabel={tabDef.label}
-            section={section!}
-            prospectId={header.prospectId}
-            relationshipScoped={tabDef.relationshipScoped}
-            selectedRel={tabDef.relationshipScoped || tab === 'support' ? selectedRel : null}
-            navigate={(to) => void navigate(to)}
-          />
+          <div className="cr-record">
+            <header className="cr-tabhead">
+              <p className="kicker">{tabEyebrow(header.name, tab)}</p>
+              <h1 className="cr-tabhead__title">{section!.label}</h1>
+            </header>
+            {tab === 'history' ? (
+              <HistoryTabSection sectionKey={section!.key} detail={detail} />
+            ) : tab === 'support' ? (
+              <SupportTabSection
+                sectionKey={section!.key}
+                detail={detail}
+                selected={selectedRel}
+                rel={relReady ? relDetail : null}
+                onDone={setDetail}
+                onRel={onRelChanged}
+                onOpenTab={(t, s) => setView(t as AffiliateRecordTabKey, s)}
+                navigate={(to) => void navigate(to)}
+              />
+            ) : !selectedRel ? (
+              /* The switcher above already explains the empty state; the pane
+                 states the consequence rather than rendering against nothing. */
+              <p className="grey">
+                No campaign relationship yet, so there is nothing campaign-specific to show.
+              </p>
+            ) : relError ? (
+              <StatePanel
+                state={relError.detail.title}
+                whatHappened={
+                  relError.detail.whatHappened ??
+                  'This campaign relationship could not be read, so nothing on this section is current.'
+                }
+                next={
+                  relError.detail.next ??
+                  'Try the read again. Nothing was changed by the attempt.'
+                }
+                owner="Proovd"
+                nextUpdate="When you try again"
+                action={
+                  <Button tier="secondary" onClick={() => void loadRel(selectedRel.associationId)}>
+                    Try the read again
+                  </Button>
+                }
+                reference="Admin · Creators"
+                ring
+              />
+            ) : !relReady ? (
+              <StatePanel
+                state="Reading this campaign relationship"
+                whatHappened="Proovd is reading the terms, the link, the readiness checklist, the content, and the money."
+                next="The section appears as soon as that comes back."
+                owner="Proovd"
+                nextUpdate="Within a few seconds"
+                action="No action needed"
+                reference="Admin · Creators"
+              />
+            ) : tab === 'campaigns' ? (
+              <CampaignTabSection
+                sectionKey={section!.key}
+                detail={detail}
+                rel={relDetail!}
+                onSelectRel={(associationId) => setView(tab, section?.key, associationId)}
+                onOp={(nextOp, trigger, versionId) =>
+                  setOp({ op: nextOp, ...(versionId ? { versionId } : {}), trigger })
+                }
+                onLinkControls={setLinkTrigger}
+                onOpenTab={(t, s) => setView(t as AffiliateRecordTabKey, s)}
+                onRel={onRelChanged}
+                navigate={(to) => void navigate(to)}
+              />
+            ) : tab === 'content' ? (
+              <ContentTabSection
+                sectionKey={section!.key}
+                detail={detail}
+                rel={relDetail!}
+                onOp={(nextOp, trigger, versionId) =>
+                  setOp({ op: nextOp, ...(versionId ? { versionId } : {}), trigger })
+                }
+                onRel={onRelChanged}
+                onDone={setDetail}
+                navigate={(to) => void navigate(to)}
+              />
+            ) : (
+              <PerformanceTabSection
+                sectionKey={section!.key}
+                detail={detail}
+                rel={relDetail!}
+                onDone={setDetail}
+              />
+            )}
+          </div>
         )}
       </div>
 
@@ -535,6 +606,51 @@ export function CreatorRecord() {
           }}
         />
       ) : null}
+
+      {/* The relationship operations the campaign-scoped sections share — one
+          place decides what is open, and closing it applies the re-read. */}
+      {op && selectedRel && relDetail ? (
+        <RelationshipOpsDialog
+          op={op.op}
+          prospectId={header.prospectId}
+          associationId={selectedRel.associationId}
+          campaignId={relDetail.campaignId}
+          campaignName={relDetail.band.campaignName}
+          {...(op.versionId ? { versionId: op.versionId } : {})}
+          trigger={op.trigger}
+          onClose={() => setOp(null)}
+          onDone={(next) => {
+            onRelChanged(next);
+            setOp(null);
+          }}
+        />
+      ) : null}
+
+      {linkTrigger && relDetail?.overview.link ? (
+        <LinkControlsDialog
+          prospectId={header.prospectId}
+          associationId={relDetail.associationId}
+          link={relDetail.overview.link}
+          trigger={linkTrigger}
+          onClose={() => setLinkTrigger(null)}
+          onDone={(next) => {
+            onRelChanged(next);
+            setLinkTrigger(null);
+          }}
+        />
+      ) : null}
+
+      {payoutTrigger ? (
+        <PayoutReminderDialog
+          detail={detail}
+          trigger={payoutTrigger}
+          onClose={() => setPayoutTrigger(null)}
+          onDone={(next) => {
+            setDetail(next);
+            setPayoutTrigger(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -546,15 +662,15 @@ function OverviewTab({
   onOpenDialog,
   onOpenTab,
   onOpenRelationship,
-  parked,
+  onPayoutReminder,
   navigate,
   prospectId,
 }: {
   detail: CreatorWorkspaceDetail;
   onOpenDialog: (dialog: OpenDialog) => void;
-  onOpenTab: (tab: AffiliateRecordTabKey, section?: string) => void;
+  onOpenTab: (tab: AffiliateRecordTabKey, section?: string, rel?: string) => void;
   onOpenRelationship: (associationId: string) => void;
-  parked: ReturnType<typeof useCreatorParked>;
+  onPayoutReminder: (trigger: HTMLElement | null) => void;
   navigate: (to: string) => void;
   prospectId: string;
 }) {
@@ -591,49 +707,64 @@ function OverviewTab({
           <Button onClick={() => onOpenTab(viaTab.tab, viaTab.section)}>{viaTab.label}</Button>
         );
       }
-      const route: Record<string, { label: string; to: string }> = {
-        post_review_due: {
-          label: 'Review submitted post',
-          to: rel
-            ? `/admin/creators/${prospectId}/relationships/${rel}/review`
-            : `/admin/creators/${prospectId}`,
-        },
+      /*
+       * The review page keeps its own address (§17's decision is its own act);
+       * every other destination is a tab of this record — Session C absorbed
+       * the old `/controls` and `/relationships` addresses.
+       */
+      if (attention.kind === 'post_review_due' && rel) {
+        return (
+          <Button
+            onClick={() =>
+              navigate(`/admin/creators/${prospectId}/relationships/${rel}/review`)
+            }
+          >
+            Review submitted post
+          </Button>
+        );
+      }
+      const tabTarget: Record<
+        string,
+        { label: string; tab: AffiliateRecordTabKey; section: string }
+      > = {
         earnings_decision_due: {
           label: 'Review successful completion',
-          to: rel
-            ? `/admin/creators/${prospectId}/relationships/${rel}?pane=money`
-            : `/admin/creators/${prospectId}`,
+          tab: 'campaigns',
+          section: 'completion',
         },
         account_suspended: {
           label: 'Review Admin decision',
-          to: `/admin/creators/${prospectId}/controls`,
+          tab: 'support',
+          section: 'enforcement',
         },
         transfer_failed: {
           label: 'Review Admin decision',
-          to: rel
-            ? `/admin/creators/${prospectId}/relationships/${rel}?pane=money`
-            : `/admin/creators/${prospectId}/controls`,
+          tab: 'performance',
+          section: 'transfers',
         },
       };
-      const target = route[attention.kind] ?? {
+      const target = tabTarget[attention.kind] ?? {
         label: 'Review Admin decision',
-        to: `/admin/creators/${prospectId}/controls`,
+        tab: 'support' as AffiliateRecordTabKey,
+        section: 'enforcement',
       };
-      return <Button onClick={() => navigate(target.to)}>{target.label}</Button>;
+      return (
+        <Button onClick={() => onOpenTab(target.tab, target.section, rel ?? undefined)}>
+          {target.label}
+        </Button>
+      );
     }
     if (attention.owner === 'Founder' && rel) {
       return (
-        <Button
-          tier="secondary"
-          onClick={() => navigate(`/admin/creators/${prospectId}/relationships/${rel}?pane=agreement`)}
-        >
+        <Button tier="secondary" onClick={() => onOpenTab('campaigns', 'negotiations', rel)}>
           View commercial proposal
         </Button>
       );
     }
     if (attention.owner === 'Stripe') {
+      // Gap 3 — the real send, no longer parked.
       return (
-        <Button tier="secondary" {...parked('payoutReminder')}>
+        <Button tier="secondary" onClick={(event) => onPayoutReminder(event.currentTarget)}>
           Send payout reminder
         </Button>
       );
@@ -824,91 +955,5 @@ function OverviewTab({
         ) : null}
       </div>
     </>
-  );
-}
-
-/* ── An un-rebuilt section, honestly labelled (§1.4) ────────────────────────*/
-
-function InterimSection({
-  name,
-  tab,
-  tabLabel,
-  section,
-  prospectId,
-  relationshipScoped,
-  selectedRel,
-  navigate,
-}: {
-  name: string;
-  tab: AffiliateRecordTabKey;
-  tabLabel: string;
-  section: SectionDef;
-  prospectId: string;
-  relationshipScoped: boolean;
-  selectedRel: CreatorRelationshipSummary | null;
-  navigate: (to: string) => void;
-}) {
-  const entry = INTERIM[`${tab}/${section.key}`];
-  const href = entry?.href(prospectId, selectedRel?.associationId ?? null) ?? null;
-
-  return (
-    <section className="cr-interim">
-      <p className="kicker">{tabEyebrow(name, tab)}</p>
-      <h1 className="cr-interim__title">{section.label}</h1>
-
-      {/* The facts that already exist: the Selected-relationship strip, real
-          data on an interim surface rather than only a pointer. */}
-      {relationshipScoped && selectedRel ? (
-        <dl className="cr-interim__rel">
-          <div>
-            <dt>Relationship ID</dt>
-            <dd className="cr-interim__id">{selectedRel.associationId}</dd>
-          </div>
-          <div>
-            <dt>Designation</dt>
-            <dd>{selectedRel.designation}</dd>
-          </div>
-          <div>
-            <dt>Lifecycle state</dt>
-            <dd>{selectedRel.status}</dd>
-          </div>
-          <div>
-            <dt>Current owner</dt>
-            <dd>{selectedRel.owner}</dd>
-          </div>
-          <div>
-            <dt>Agreement</dt>
-            <dd>{selectedRel.agreement}</dd>
-          </div>
-          <div>
-            <dt>Tracking link</dt>
-            <dd>{selectedRel.trackingLink}</dd>
-          </div>
-          <div>
-            <dt>Completion state</dt>
-            <dd>{selectedRel.completion}</dd>
-          </div>
-        </dl>
-      ) : null}
-
-      {relationshipScoped && !selectedRel ? (
-        <p className="grey">
-          No campaign relationship yet, so there is nothing campaign-specific to show.
-        </p>
-      ) : null}
-
-      <p className="cr-interim__note">
-        {entry?.note ??
-          (href
-            ? `This section is rebuilt in Session ${entry?.session ?? 'C'} of the Affiliate workspace. Today its content lives on ${entry?.owner ?? 'its existing surface'}.`
-            : `This section is rebuilt in Session ${entry?.session ?? 'C'} of the Affiliate workspace.`)}
-      </p>
-
-      {href ? (
-        <Button tier="secondary" onClick={() => navigate(href)}>
-          Open {entry?.owner ?? 'the current surface'}
-        </Button>
-      ) : null}
-    </section>
   );
 }

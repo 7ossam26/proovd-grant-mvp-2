@@ -30,7 +30,7 @@
  * a number nobody has finalized.
  */
 
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { affiliateProspects } from '../../db/schema/affiliates.js';
 import { campaignAffiliateAssociations, campaigns, reservations } from '../../db/schema/domain.js';
@@ -56,14 +56,29 @@ import {
 } from '../../db/schema/earnings.js';
 import { trackingLinkClicks } from '../../db/schema/attribution.js';
 import { campaignKitAccess } from '../../db/schema/affiliates.js';
+import {
+  associationDeliverables,
+  associationDeliverableEvidence,
+  associationDeliverableDecisions,
+  associationAvailabilityVerifications,
+  proposalMediationNotes,
+  associationTerminationRequests,
+} from '../../db/schema/creator-workspace.js';
+import { midCampaignAdditions } from '../../db/schema/live-editing.js';
+import { workAgainRequests } from '../../db/schema/completion.js';
+import { campaignAssets } from '../../db/schema/workspace.js';
+import { CREATOR_OBLIGATIONS } from '../obligations.js';
+import { findRefundCause } from '../../refunds/logic.js';
 import { formatInstant } from '../../founders/format.js';
 import { gatherCreatorReadiness } from '../../creator-payment/readiness.js';
 import { deriveCreatorReadiness, READINESS_ITEMS } from '../../creator-payment/logic.js';
 import type { StripeModeValue } from '../../payments/stripe-client.js';
 import {
   adminAssociationStatusLabel,
+  affiliateTreatmentLabel,
   campaignNameOf,
   campaignTypeLabel,
+  deliverableStateLabel,
   rosterMembershipLabel,
   type AttentionOwner,
 } from './labels.js';
@@ -266,6 +281,100 @@ export interface MoneyPane {
   } | null;
 }
 
+/* ── The Session C blocks (migration 0048, §22.4 idiom) ────────────────────*/
+
+export interface DeliverableView {
+  id: string;
+  title: string;
+  /** The agreement record the title restates — never typed by the caller. */
+  source: string;
+  /** Derived: latest decision wins; a receipt with no answer is submitted. */
+  state: string;
+  stateLabel: string;
+  createdAt: string | null;
+  latestEvidence: {
+    id: string;
+    reference: string;
+    note: string | null;
+    submittedBy: string;
+    submittedAt: string | null;
+  } | null;
+  latestDecision: {
+    outcome: string;
+    findings: string;
+    waiverRecordedBy: string | null;
+    waiverReason: string | null;
+    decidedBy: string;
+    decidedAt: string | null;
+  } | null;
+}
+
+export interface DeliverablesBlock {
+  items: DeliverableView[];
+  /** Verified or waived — §22.8's "every deliverable verified or waived". */
+  resolved: number;
+  /** Whether an accepted agreement exists for a new deliverable to restate. */
+  canRecord: boolean;
+  /** The source label a new deliverable will carry, when one can be recorded. */
+  sourceLabel: string | null;
+}
+
+export interface AvailabilityBlock {
+  /** The agreed term, composed from records — never typed on this surface. */
+  term: string;
+  /** Which record supplied the term. */
+  termSource: string;
+  checks: number;
+  latest: {
+    available: boolean;
+    termChecked: string;
+    detail: string;
+    verifiedBy: string;
+    verifiedAt: string | null;
+  } | null;
+}
+
+export interface TerminationRequestView {
+  id: string;
+  reason: string;
+  effectiveAt: string | null;
+  cause: string;
+  causeLabel: string;
+  moneyTreatment: string;
+  treatmentLabel: string;
+  receivedVia: string;
+  requestedAt: string | null;
+  recordedBy: string;
+  decision: string | null;
+  decisionNote: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+}
+
+export interface KitAssetsBlock {
+  /** False while the §12 bucket is Track A4 — the honest absence renders. */
+  visualsAvailable: boolean;
+  waitingOn: string | null;
+  files: {
+    id: string;
+    purpose: string;
+    state: string;
+    filename: string | null;
+    dimensions: string | null;
+    approved: boolean;
+    removed: boolean;
+  }[];
+}
+
+export interface WorkAgainView {
+  id: string;
+  status: string;
+  message: string;
+  requestedAt: string | null;
+  respondedAt: string | null;
+  responseNote: string | null;
+}
+
 export interface CreatorRelationshipDetail {
   associationId: string;
   prospectId: string;
@@ -276,6 +385,18 @@ export interface CreatorRelationshipDetail {
   agreement: AgreementPane;
   content: ContentPane;
   money: MoneyPane;
+  /* The Session C blocks. Every one composes from records that already exist
+     (0048 and earlier); nothing here is a second answer to a question another
+     read already answers. */
+  deliverables: DeliverablesBlock;
+  availability: AvailabilityBlock;
+  mediationNotes: { note: string; createdBy: string; createdAt: string | null }[];
+  terminationRequests: {
+    open: TerminationRequestView | null;
+    history: TerminationRequestView[];
+  };
+  kitAssets: KitAssetsBlock;
+  workAgain: WorkAgainView[];
 }
 
 /* ── The composer ───────────────────────────────────────────────────────────*/
@@ -283,7 +404,17 @@ export interface CreatorRelationshipDetail {
 export async function readCreatorRelationship(
   db: Database,
   associationId: string,
-  options: { publicOrigin: string; linkTestMarker: string; stripeMode: StripeModeValue },
+  options: {
+    publicOrigin: string;
+    linkTestMarker: string;
+    stripeMode: StripeModeValue;
+    /**
+     * Whether the §12 bucket exists (Track A4). Absent reads as unconfigured,
+     * which renders the honest kit-visuals absence rather than a control that
+     * would fail (§1.4) — the record read takes the same option.
+     */
+    storageConfigured?: boolean;
+  },
 ): Promise<CreatorRelationshipDetail | null> {
   const [row] = await db
     .select({
@@ -343,6 +474,13 @@ export async function readCreatorRelationship(
     kitAccess,
     [rosterDecision],
     [launchFailureRow],
+    deliverableRows,
+    availabilityRows,
+    mediationRows,
+    terminationRows,
+    [midCampaign],
+    workAgainRows,
+    kitAssetRows,
   ] = await Promise.all([
     db
       .select({ occurredAt: associationStatusHistory.occurredAt })
@@ -435,7 +573,74 @@ export async function readCreatorRelationship(
       .from(requiredCreatorFailures)
       .where(eq(requiredCreatorFailures.failedAssociationId, associationId))
       .limit(1),
+    // The Session C records (0048). Each is association-scoped and insert-only.
+    db
+      .select()
+      .from(associationDeliverables)
+      .where(eq(associationDeliverables.associationId, associationId))
+      .orderBy(associationDeliverables.createdAt),
+    db
+      .select()
+      .from(associationAvailabilityVerifications)
+      .where(eq(associationAvailabilityVerifications.associationId, associationId))
+      .orderBy(desc(associationAvailabilityVerifications.verifiedAt)),
+    db
+      .select()
+      .from(proposalMediationNotes)
+      .where(eq(proposalMediationNotes.associationId, associationId))
+      .orderBy(desc(proposalMediationNotes.createdAt)),
+    db
+      .select()
+      .from(associationTerminationRequests)
+      .where(eq(associationTerminationRequests.associationId, associationId))
+      .orderBy(desc(associationTerminationRequests.requestedAt)),
+    // §20's frozen mid-campaign terms — the availability term for a Creator
+    // who joined mid-campaign is the sentence they actually accepted.
+    db
+      .select()
+      .from(midCampaignAdditions)
+      .where(eq(midCampaignAdditions.associationId, associationId))
+      .limit(1),
+    db
+      .select()
+      .from(workAgainRequests)
+      .where(eq(workAgainRequests.associationId, associationId))
+      .orderBy(desc(workAgainRequests.requestedAt)),
+    // The campaign's visual assets — metadata only. No display URL exists
+    // anywhere in the product; the port has no presigned GET to hand out.
+    db
+      .select({
+        id: campaignAssets.id,
+        purpose: campaignAssets.purpose,
+        state: campaignAssets.state,
+        originalFilename: campaignAssets.originalFilename,
+        width: campaignAssets.width,
+        height: campaignAssets.height,
+        approvedAt: campaignAssets.approvedAt,
+        removedAt: campaignAssets.removedAt,
+      })
+      .from(campaignAssets)
+      .where(eq(campaignAssets.campaignId, campaignId))
+      .orderBy(campaignAssets.createdAt),
   ]);
+
+  /* The evidence receipts and decisions need the deliverable ids, so they are
+     the one second round trip — batched with `inArray`, nothing in a loop. */
+  const deliverableIds = deliverableRows.map((row) => row.id);
+  const [evidenceRows, decisionRows] = deliverableIds.length
+    ? await Promise.all([
+        db
+          .select()
+          .from(associationDeliverableEvidence)
+          .where(inArray(associationDeliverableEvidence.deliverableId, deliverableIds))
+          .orderBy(desc(associationDeliverableEvidence.submittedAt)),
+        db
+          .select()
+          .from(associationDeliverableDecisions)
+          .where(inArray(associationDeliverableDecisions.deliverableId, deliverableIds))
+          .orderBy(desc(associationDeliverableDecisions.decidedAt)),
+      ])
+    : [[], []];
 
   const campaignName = campaignNameOf(row.campaignTitle, row.campaignProduct);
 
@@ -763,6 +968,135 @@ export async function readCreatorRelationship(
       : null,
   };
 
+  /* ── The Session C blocks ──────────────────────────────────────────────── */
+
+  const evidenceByDeliverable = new Map<string, (typeof evidenceRows)[number]>();
+  for (const receipt of evidenceRows) {
+    // Rows arrive newest-first; the first seen per deliverable is the latest.
+    if (!evidenceByDeliverable.has(receipt.deliverableId)) {
+      evidenceByDeliverable.set(receipt.deliverableId, receipt);
+    }
+  }
+  const decisionByDeliverable = new Map<string, (typeof decisionRows)[number]>();
+  for (const decision of decisionRows) {
+    if (!decisionByDeliverable.has(decision.deliverableId)) {
+      decisionByDeliverable.set(decision.deliverableId, decision);
+    }
+  }
+
+  const deliverableItems: DeliverableView[] = deliverableRows.map((item) => {
+    const latestEvidence = evidenceByDeliverable.get(item.id) ?? null;
+    const latestDecision = decisionByDeliverable.get(item.id) ?? null;
+    // Latest decision wins; a receipt the latest decision predates has been
+    // answered only if the decision came after it. Insert-only rows make the
+    // comparison a timestamp read, not a state machine.
+    const undecidedEvidence =
+      latestEvidence &&
+      (!latestDecision || latestDecision.decidedAt < latestEvidence.submittedAt);
+    const state = undecidedEvidence
+      ? 'evidence_submitted'
+      : latestDecision
+        ? latestDecision.outcome
+        : latestEvidence
+          ? 'evidence_submitted'
+          : 'pending';
+    return {
+      id: item.id,
+      title: item.title,
+      source: item.source,
+      state,
+      stateLabel: deliverableStateLabel(state),
+      createdAt: formatInstant(item.createdAt),
+      latestEvidence: latestEvidence
+        ? {
+            id: latestEvidence.id,
+            reference: latestEvidence.reference,
+            note: latestEvidence.note,
+            submittedBy: latestEvidence.submittedBy,
+            submittedAt: formatInstant(latestEvidence.submittedAt),
+          }
+        : null,
+      latestDecision: latestDecision
+        ? {
+            outcome: latestDecision.outcome,
+            findings: latestDecision.findings,
+            waiverRecordedBy: latestDecision.waiverRecordedBy,
+            waiverReason: latestDecision.waiverReason,
+            decidedBy: latestDecision.decidedBy,
+            decidedAt: formatInstant(latestDecision.decidedAt),
+          }
+        : null,
+    };
+  });
+
+  const deliverables: DeliverablesBlock = {
+    items: deliverableItems,
+    resolved: deliverableItems.filter(
+      (item) => item.state === 'verified' || item.state === 'waived',
+    ).length,
+    canRecord: Boolean(agreement) || Boolean(midCampaign),
+    sourceLabel: deliverableSourceLabel(agreement ?? null, Boolean(midCampaign)),
+  };
+
+  const availabilityTerm = availabilityTermOf(
+    midCampaign ?? null,
+    row.campaignCloseAt ?? null,
+  );
+  const latestAvailability = availabilityRows[0] ?? null;
+  const availability: AvailabilityBlock = {
+    term: availabilityTerm.term,
+    termSource: availabilityTerm.source,
+    checks: availabilityRows.length,
+    latest: latestAvailability
+      ? {
+          available: latestAvailability.available,
+          termChecked: latestAvailability.termChecked,
+          detail: latestAvailability.detail,
+          verifiedBy: latestAvailability.verifiedBy,
+          verifiedAt: formatInstant(latestAvailability.verifiedAt),
+        }
+      : null,
+  };
+
+  const terminationViews: TerminationRequestView[] = terminationRows.map((request) => ({
+    id: request.id,
+    reason: request.reason,
+    effectiveAt: formatInstant(request.effectiveAt),
+    cause: request.cause,
+    causeLabel: findRefundCause(request.cause)?.label ?? request.cause,
+    moneyTreatment: request.moneyTreatment,
+    treatmentLabel: affiliateTreatmentLabel(request.moneyTreatment),
+    receivedVia: request.receivedVia,
+    requestedAt: formatInstant(request.requestedAt),
+    recordedBy: request.recordedBy,
+    decision: request.decision,
+    decisionNote: request.decisionNote,
+    decidedBy: request.decidedBy,
+    decidedAt: formatInstant(request.decidedAt),
+  }));
+
+  const kitAssets: KitAssetsBlock = {
+    visualsAvailable: options.storageConfigured === true,
+    waitingOn:
+      options.storageConfigured === true
+        ? null
+        : 'The §12 object storage is not configured in this deployment (Track A4), ' +
+          'so there are no stored visuals to show. The asset records below are what ' +
+          'the campaign holds; every Creator kit read is still logged.',
+    files: kitAssetRows.map((asset) => ({
+      id: asset.id,
+      purpose: asset.purpose,
+      state: asset.state,
+      filename: asset.originalFilename,
+      dimensions:
+        asset.width !== null && asset.height !== null
+          ? `${asset.width} × ${asset.height}`
+          : null,
+      approved: asset.approvedAt !== null,
+      removed: asset.removedAt !== null,
+    })),
+  };
+
   return {
     associationId,
     prospectId: association.prospectId ?? association.affiliateId,
@@ -773,7 +1107,73 @@ export async function readCreatorRelationship(
     agreement: agreementPane,
     content,
     money,
+    deliverables,
+    availability,
+    mediationNotes: mediationRows.map((note) => ({
+      note: note.note,
+      createdBy: note.createdBy,
+      createdAt: formatInstant(note.createdAt),
+    })),
+    terminationRequests: {
+      open: terminationViews.find((request) => request.decision === null) ?? null,
+      history: terminationViews.filter((request) => request.decision !== null),
+    },
+    kitAssets,
+    workAgain: workAgainRows.map((request) => ({
+      id: request.id,
+      status: request.status,
+      message: request.message,
+      requestedAt: formatInstant(request.requestedAt),
+      respondedAt: formatInstant(request.respondedAt),
+      responseNote: request.responseNote,
+    })),
   };
+}
+
+/**
+ * The agreed availability term, READ from records — never typed on a surface.
+ *
+ * A mid-campaign Creator accepted the frozen remaining-time sentence
+ * (`mid_campaign_additions.adjusted_deliverables`, immutable by trigger), so
+ * that IS their term. Everyone else accepted §20's availability obligation
+ * over the campaign period, so the term is the register's own sentence beside
+ * the campaign's stored close anchor. The verification stores whichever it
+ * checked, verbatim, so a later vocabulary change cannot rewrite the record.
+ */
+export function availabilityTermOf(
+  midCampaign: { adjustedDeliverables: string } | null,
+  closesAt: Date | null,
+): { term: string; source: string } {
+  if (midCampaign) {
+    return {
+      term: midCampaign.adjustedDeliverables,
+      source: 'Mid-campaign addition terms, frozen at joining (§20)',
+    };
+  }
+  const obligation = CREATOR_OBLIGATIONS.find(
+    (entry) => entry.key === 'content_availability',
+  )!;
+  const close = formatInstant(closesAt);
+  return {
+    term: close ? `${obligation.statement} · Campaign close: ${close}` : obligation.statement,
+    source: '§20 Creator obligations · the accepted campaign period',
+  };
+}
+
+/**
+ * What a new deliverable's `source` will say — the agreement record it
+ * restates, derived from the records rather than the caller (0048's rule: a
+ * deliverable never invents a work item the Creator did not agree to).
+ */
+export function deliverableSourceLabel(
+  agreement: { source: string; proposalVersionId: string | null } | null,
+  midCampaign: boolean,
+): string | null {
+  if (midCampaign) return 'Mid-campaign addition terms';
+  if (!agreement) return null;
+  return agreement.source === 'proposal_version'
+    ? 'Accepted proposal version'
+    : 'Standard terms acceptance';
 }
 
 /* ── Small derivations ──────────────────────────────────────────────────────*/

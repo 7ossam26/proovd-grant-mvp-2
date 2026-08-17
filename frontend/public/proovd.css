@@ -3558,7 +3558,7 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   color: var(--mint);
   border-radius: var(--radius);
 }
-.cr-task h3 {
+.cr-task h2 {
   margin: var(--sp-8) 0 0;
   color: var(--white);
   font-size: clamp(1.25rem, 3vw, 1.875rem);
@@ -3674,7 +3674,7 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   color: var(--mint);
   border-radius: var(--radius);
 }
-.cr-post h3 {
+.cr-post h2 {
   margin: var(--sp-8) 0 0;
   color: var(--white);
   font-size: clamp(1.25rem, 3vw, 2rem);
@@ -6743,54 +6743,15 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
 }
 .cr-switcher > p.grey { margin: 0; }
 
-/* ── An un-rebuilt section, honestly labelled (§1.4) ──────────────────────
-   Real data first (the Selected-relationship strip), then the sentence naming
-   the surface that owns the content today and the session that replaces the
-   interim. */
-.cr-interim {
-  max-width: var(--measure);
-  padding: var(--sp-8) 0 var(--sp-48);
-}
-.cr-interim__title {
-  margin: var(--sp-8) 0 var(--sp-24);
-  font-size: clamp(1.75rem, 4.5vw, 2.75rem);
-  line-height: 1.02;
-  letter-spacing: -0.04em;
-  font-weight: 900;
-  color: var(--darker);
-}
-.cr-interim__rel {
-  margin: 0 0 var(--sp-24);
-  border-top: 1px solid var(--grey-light);
-}
-.cr-interim__rel > div {
-  display: grid;
-  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
-  gap: var(--sp-24);
-  align-items: baseline;
-  padding: var(--sp-12) 0;
-  border-bottom: 1px solid var(--grey-light);
-}
-.cr-interim__rel dt {
-  font-size: 0.875rem;
-  font-weight: 750;
-  color: var(--moss);
-}
-.cr-interim__rel dd {
-  margin: 0;
-  font-size: 1.0625rem;
-  font-weight: 700;
-  color: var(--darker);
-  overflow-wrap: anywhere;
-}
-.cr-interim__id {
+/* ── An identifier rendered as a value (Session C) ────────────────────────
+   The interim family this replaced is gone with the interim component; only
+   the id treatment survived it, because an association id is a value somebody
+   quotes on a support call. `cr-mono` is the monogram AVATAR square and is not
+   this — a browser pass is what told the two apart. */
+.cr-idval {
   font-family: var(--mono, ui-monospace, monospace);
   font-size: 0.875rem;
-}
-.cr-interim__note {
-  margin: 0 0 var(--sp-16);
-  color: var(--moss);
-  max-width: var(--measure);
+  overflow-wrap: anywhere;
 }
 
 /* ── Session B (2026-08-17): the person-level tabs in final shape ──────────
@@ -6917,6 +6878,53 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
 .cr-agreement-list small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); }
 .cr-agreement-list b { font-size: 0.875rem; font-weight: 800; color: var(--dark); white-space: nowrap; }
 
+/* ── PHASE 32 — SESSION C (2026-08-17): the campaign-scoped tabs ──────────
+   The relationship card grid (the Relationships section's second switching
+   affordance) and the deliverable rows (gap 1's §22.4-idiom list). Everything
+   else the campaign tabs render reuses the PHASE 26 families the old panes
+   wore — the sections absorbed the panes, and their clothes came with them. */
+.cr-relpick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  width: 100%;
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: 14px;
+  background: var(--white);
+  text-align: left;
+  cursor: pointer;
+}
+.cr-relpick.is-active {
+  border-color: var(--dark);
+  box-shadow: inset 0 0 0 1px var(--dark);
+}
+.cr-relpick:focus-visible { outline: 2px solid var(--dark); outline-offset: 2px; }
+
+/* `.cr-version` is `auto | 1fr | auto` and expects the version badge first.
+   The Session C rows (a mediation note, a case, an enforcement relationship,
+   a delivery record) have no badge, so `__main` fell into the AUTO column and
+   every trailing state or control sat hard against the label — at a different
+   x on every row, since it followed the text. Only a browser pass shows it. */
+.cr-version > .cr-version__main:first-child { grid-column: 1 / 3; }
+.cr-version > .cr-drow__acts { justify-self: end; }
+
+.cr-dlist { display: flex; flex-direction: column; }
+.cr-drow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-drow:last-child { border-bottom: 0; }
+.cr-drow__main { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-drow__main strong { font-size: 0.9375rem; font-weight: 800; color: var(--darker); }
+.cr-drow__main small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); overflow-wrap: anywhere; }
+.cr-drow__acts { display: flex; flex-wrap: wrap; gap: var(--sp-8); flex-shrink: 0; }
+
 /* ── PHASE 32 — RESPONSIVE ────────────────────────────────────────────────
    The switcher's two columns overlap under ~640px: stack them. The context
    strip's attention pill wraps under the name rather than truncating it. */
@@ -6924,8 +6932,9 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .cr-switcher { grid-template-columns: minmax(0, 1fr); }
   .cr-wnav__context { flex-wrap: wrap; }
   .cr-wnav__attention { margin-left: 0; white-space: normal; }
-  .cr-interim__rel > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
   .cr-lifecycle > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
   .cr-metricrow { flex-direction: column; align-items: stretch; }
   .cr-file { flex-direction: column; align-items: stretch; }
+  .cr-relpick { flex-direction: column; align-items: stretch; }
+  .cr-drow { flex-direction: column; align-items: stretch; }
 }

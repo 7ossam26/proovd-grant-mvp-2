@@ -24,7 +24,7 @@
  * somebody is paid, which is §26.8's timeline trap in a different phase.
  */
 
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, or } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import {
   affiliateProspects,
@@ -54,6 +54,8 @@ import {
   trackingLinks,
 } from '../../db/schema/decisions.js';
 import { stripeConnectedAccounts } from '../../db/schema/payments.js';
+import { supportCases } from '../../db/schema/support.js';
+import { notificationDeliveries } from '../../db/schema/integrity.js';
 import { notificationDigestPreferences } from '../../db/schema/digest.js';
 import { campaignBuild } from '../../db/schema/build.js';
 import { campaignDrafts, founderProspects } from '../../db/schema/invitations.js';
@@ -261,6 +263,45 @@ export async function readCreatorWorkspace(
     policyReacceptanceOpen: facts.policyReacceptanceOpen,
   });
 
+  /*
+   * The person's §26.7 cases (Session C). `support_cases` has no prospect
+   * column and needs none: a case is anchored on the requester's account or
+   * one of their associations, so the read matches both. Open work keeps the
+   * queue's own membership rule (`status <> 'resolved'`), and each row carries
+   * the Support-workspace address that operates it — this surface lists and
+   * routes, never resolves.
+   */
+  const caseConditions = [
+    ...(associationIds.length > 0 ? [inArray(supportCases.associationId, associationIds)] : []),
+    ...(facts.claimedUserId ? [eq(supportCases.requesterUserId, facts.claimedUserId)] : []),
+  ];
+  const caseRows =
+    caseConditions.length > 0
+      ? await db
+          .select({
+            id: supportCases.id,
+            reference: supportCases.reference,
+            topic: supportCases.topic,
+            subject: supportCases.subject,
+            status: supportCases.status,
+            createdAt: supportCases.createdAt,
+          })
+          .from(supportCases)
+          .where(caseConditions.length === 1 ? caseConditions[0] : or(...caseConditions))
+          .orderBy(desc(supportCases.createdAt))
+          .limit(50)
+      : [];
+  const cases = caseRows.map((row) => ({
+    id: row.id,
+    reference: row.reference,
+    topic: row.topic,
+    subject: row.subject,
+    status: row.status,
+    open: row.status !== 'resolved',
+    openedAt: formatInstant(row.createdAt),
+    href: `/admin/support/${row.id}`,
+  }));
+
   const header: CreatorHeader = {
     prospectId: prospect.id,
     initials: initialsOf(prospect.legalName, prospect.publicHandle),
@@ -291,6 +332,8 @@ export async function readCreatorWorkspace(
     account,
 
     attention,
+
+    openCases: cases.filter((entry) => entry.open).length,
 
     availableActions: availableActionsFor({
       account,
@@ -354,15 +397,52 @@ export async function readCreatorWorkspace(
     claimedUserId: facts.claimedUserId,
   });
 
-  const standing = await composeStanding(db, {
-    prospectId,
-    account,
-    associationIds,
-    associationCampaign: new Map(
-      facts.associations.map((a) => [a.associationId, a.campaignName]),
-    ),
-    policyReacceptanceOpen: facts.policyReacceptanceOpen,
-  });
+  const standing = {
+    ...(await composeStanding(db, {
+      prospectId,
+      account,
+      associationIds,
+      associationCampaign: new Map(
+        facts.associations.map((a) => [a.associationId, a.campaignName]),
+      ),
+      policyReacceptanceOpen: facts.policyReacceptanceOpen,
+    })),
+    cases,
+  };
+
+  /*
+   * The person's delivery record (Session C). Phase 22c's arrangement: the
+   * rows carry the §27 KEY and the label resolves in the browser from the
+   * shared registry; the audience prefix keeps `internal_*` and every other
+   * role's mail out of an Affiliate's list. Bounded and newest-first — the
+   * full history surface is `/admin/notifications`.
+   */
+  const addresses = [
+    ...new Set([profile?.email, prospect.email].filter((value): value is string => Boolean(value))),
+  ];
+  const communicationRows =
+    addresses.length > 0
+      ? await db
+          .select()
+          .from(notificationDeliveries)
+          .where(
+            and(
+              inArray(notificationDeliveries.target, addresses),
+              like(notificationDeliveries.eventKey, 'affiliate_%'),
+            ),
+          )
+          .orderBy(desc(notificationDeliveries.createdAt))
+          .limit(100)
+      : [];
+  const communications = communicationRows.map((row) => ({
+    eventKey: row.eventKey,
+    target: row.target,
+    entityType: row.entityType,
+    entityId: row.entityId,
+    confirmed: row.notificationId !== null,
+    at: formatInstant(row.createdAt),
+    occurredAt: row.createdAt.toISOString(),
+  }));
 
   const profilePane = await composeProfile(db, {
     prospect,
@@ -394,6 +474,7 @@ export async function readCreatorWorkspace(
     profile: profilePane,
     history,
     historyCounts: historyCountsOf(history),
+    communications,
   };
 }
 
@@ -1063,7 +1144,9 @@ async function composeStanding(
     associationCampaign: ReadonlyMap<string, string>;
     policyReacceptanceOpen: boolean;
   },
-): Promise<CreatorStandingPane> {
+  // The cases list is composed in the main body (it also feeds the header's
+  // Support-tab badge), so this returns everything else.
+): Promise<Omit<CreatorStandingPane, 'cases'>> {
   const accessRows = await db
     .select()
     .from(affiliateAccessActions)

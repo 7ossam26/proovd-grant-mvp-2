@@ -47,7 +47,7 @@ import {
   type CreatorWorkspaceDetail,
 } from '../api.js';
 import { FieldRow, Group, Note, ProvenanceBadge, Section, StateChip, payoutTone } from '../shared.js';
-import { useCreatorParked } from '../parked.js';
+import { PayoutReminderDialog } from './PerformanceSections.js';
 import { InvitationDialog } from '../dialogs/InvitationDialog.js';
 import { DeletionRequestDialog } from '../dialogs/DeletionRequestDialog.js';
 
@@ -70,7 +70,6 @@ export function AccountTabSection({
 }) {
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   const toast = useToast();
-  const parked = useCreatorParked();
   const { header, profile } = detail;
   const prospectId = header.prospectId;
 
@@ -420,9 +419,9 @@ export function AccountTabSection({
               Refresh Stripe status
             </Button>
             {profile.provider.state === 'requirements_due' ? (
-              <Button tier="tertiary" small {...parked('payoutReminder')}>
-                Send payout reminder
-              </Button>
+              // Gap 3 — the real send (Session C), shared with the Transfers
+              // section and the Overview attention.
+              <StripePayoutReminder detail={detail} onDone={onDone} />
             ) : null}
           </>
         }
@@ -469,6 +468,35 @@ export function AccountTabSection({
 }
 
 /* ── The invitation lifecycle facts, with the `Opened` refusal ──────────────*/
+
+/** The Stripe strip's reminder control — a trigger and the one shared dialog. */
+function StripePayoutReminder({
+  detail,
+  onDone,
+}: {
+  detail: CreatorWorkspaceDetail;
+  onDone: (next: CreatorWorkspaceDetail) => void;
+}) {
+  const [trigger, setTrigger] = useState<HTMLElement | null>(null);
+  return (
+    <>
+      <Button tier="tertiary" small onClick={(event) => setTrigger(event.currentTarget)}>
+        Send payout reminder
+      </Button>
+      {trigger ? (
+        <PayoutReminderDialog
+          detail={detail}
+          trigger={trigger}
+          onClose={() => setTrigger(null)}
+          onDone={(next) => {
+            onDone(next);
+            setTrigger(null);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
 
 function InvitationLifecycle({ invitation }: { invitation: CreatorInvitationView }) {
   const latest = invitation.sends[0] ?? null;

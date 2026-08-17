@@ -151,6 +151,8 @@ interface CaseIdentity {
   businessName: string | null;
   creatorName: string | null;
   creatorHandle: string | null;
+  /** The association's prospect id — the Creator-record address (Session C). */
+  creatorProspectId: string | null;
 }
 
 /**
@@ -203,6 +205,7 @@ async function resolveIdentities(
     ? await db
         .select({
           associationId: campaignAffiliateAssociations.id,
+          prospectId: campaignAffiliateAssociations.affiliateId,
           legalName: affiliateProspects.legalName,
           handle: affiliateProspects.publicHandle,
         })
@@ -249,6 +252,7 @@ async function resolveIdentities(
       businessName: campaign?.company ?? null,
       creatorName,
       creatorHandle,
+      creatorProspectId: association?.prospectId ?? null,
     });
   }
 
@@ -723,9 +727,20 @@ function composeContext(
       label: identity?.creatorName
         ? `Creator relationship · ${identity.creatorName}`
         : 'Creator relationship',
-      href: null,
-      unavailableBecause:
-        'Open this relationship from the Creators workspace — it is addressed by the Creator, not by the case.',
+      /*
+       * The relationship lives on the Creator record's campaign-scoped tabs
+       * (`?rel=` selects it — the Affiliate rebuild's Session C shape). The
+       * retired sibling address still redirects here, so either form lands;
+       * this composes the canonical one. Addressed through the association's
+       * PROSPECT id — `affiliate_id` holds it (the trap the workspace's own
+       * types document), resolved by `caseIdentity`'s association join.
+       */
+      href: identity?.creatorProspectId
+        ? `/admin/creators/${identity.creatorProspectId}?tab=campaigns&rel=${row.associationId}`
+        : null,
+      unavailableBecause: identity?.creatorProspectId
+        ? null
+        : 'The relationship record behind this case could not be resolved to a Creator.',
     });
   }
   if (row.reservationId) {

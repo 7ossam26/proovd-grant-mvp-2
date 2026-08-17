@@ -270,16 +270,18 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          compose, the Edit Founder sheet, and the six
                          read-and-route sections from Campaign through
                          History's Timeline/Communications split),
-                         Creators (its own rebuild to a second reference began
-                         2026-08-17 — Session A shipped the one-route
-                         eight-tab record shell with the Selected-relationship
-                         switcher, the Overview in final shape, and the six
-                         new record families of migration 0048; Session B the
-                         two person-level tabs in final shape with the
-                         evidence uploader, the per-metric trail, the
-                         corrections and asks, and the live Stripe re-read;
-                         the campaign-scoped tabs are Session C's, and the
-                         walk is docs/phases/admin-affiliate-reconciliation.md),
+                         Creators (rebuilt to a second reference 2026-08-17,
+                         complete in three sessions — the one-route eight-tab
+                         record shell with the Selected-relationship switcher
+                         and migration 0048's six record families, the two
+                         person-level tabs with the evidence uploader, the
+                         per-metric trail and the live Stripe re-read, and the
+                         four campaign-scoped tabs plus History: deliverables
+                         and availability checked against the AGREED term,
+                         the payout reminder that sends an existing message,
+                         case intake through the one queue, and the seven
+                         refused controls as a register; the walk is
+                         docs/phases/admin-affiliate-reconciliation.md),
                          Campaigns, Support, Backers, and the
                          floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page

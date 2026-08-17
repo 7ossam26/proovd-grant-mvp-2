@@ -81,6 +81,17 @@ import {
   verifyEvidenceUpload,
   type EvidenceFailure,
 } from '../affiliates/workspace/evidence.js';
+import {
+  decideDeliverable,
+  decideTerminationRequest,
+  openAffiliateSupportCase,
+  recordDeliverable,
+  recordDeliverableEvidence,
+  recordMediationNote,
+  recordTerminationRequest,
+  sendPayoutReminder,
+  verifyAvailability,
+} from '../affiliates/workspace/relationship-mutations.js';
 import type { AskContext } from '../affiliates/workspace/asks.js';
 import { isCreatorHistoryCategory } from '../affiliates/workspace/labels.js';
 
@@ -329,6 +340,7 @@ export function createAdminCreatorsRouter({
           publicOrigin: appBaseUrl,
           linkTestMarker: LINK_TEST_MARKER,
           stripeMode: stripeMode ?? 'test',
+          storageConfigured: evidenceStorage.configured,
         });
         if (!detail) {
           notFound(res, 'Relationship not found', 'There is no campaign relationship at that address.');
@@ -395,7 +407,12 @@ export function createAdminCreatorsRouter({
           fail(res, result, 'That link control could not be applied');
           return;
         }
-        await sendWorkspace(res, prospectId);
+        // The relationship re-read — the payload the link surface renders
+        // from, and what `api.ts` has always declared. (Until Session C this
+        // answered with the workspace read while the client type said
+        // relationship; the old page's test stubbed the response, which is
+        // exactly how a type lie survives.)
+        await sendRelationship(res, prospectId, associationId);
       } catch (error) {
         next(error);
       }
@@ -831,6 +848,365 @@ export function createAdminCreatorsRouter({
           return;
         }
         await sendWorkspace(res, prospectId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── The Session C relationship records (0048) ────────────────────────────*/
+
+  /**
+   * The relationship, re-read. Every relationship-scoped mutation ends here —
+   * the campaign tabs render from this read, so the answer is the state the
+   * write produced, never a local patch.
+   */
+  async function sendRelationship(
+    res: Response,
+    prospectId: string,
+    associationId: string,
+  ): Promise<void> {
+    const detail = await readCreatorRelationship(db, associationId, {
+      publicOrigin: appBaseUrl,
+      linkTestMarker: LINK_TEST_MARKER,
+      stripeMode: stripeMode ?? 'test',
+      storageConfigured: evidenceStorage.configured,
+    });
+    if (!detail || detail.prospectId !== prospectId) {
+      notFound(res, 'Relationship not found', 'There is no campaign relationship at that address.');
+      return;
+    }
+    res.json(detail);
+  }
+
+  /**
+   * UNGATED, and registered: recording an agreed work item and what was
+   * supplied against it are receipts — they reach nobody and decide nothing.
+   * The DECISION (verified / more evidence / the waiver) takes the gate, for
+   * the metric-decision route's reason: it is the trail §22.8's completion
+   * criterion reads, and §33.12.4 wants the decider attributable.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/deliverables`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId } = req.params as {
+          prospectId: string;
+          associationId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await recordDeliverable(
+          { db },
+          { prospectId, associationId, title: str(body, 'title'), who: whoOf(req) },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That deliverable could not be recorded');
+          return;
+        }
+        await sendRelationship(res, prospectId, associationId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/deliverables/:deliverableId/evidence`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId, deliverableId } = req.params as {
+          prospectId: string;
+          associationId: string;
+          deliverableId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await recordDeliverableEvidence(
+          { db },
+          {
+            prospectId,
+            associationId,
+            deliverableId,
+            reference: str(body, 'reference'),
+            note: str(body, 'note'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That evidence receipt could not be recorded');
+          return;
+        }
+        await sendRelationship(res, prospectId, associationId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/deliverables/:deliverableId/decision`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId, deliverableId } = req.params as {
+          prospectId: string;
+          associationId: string;
+          deliverableId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await decideDeliverable(
+          { db },
+          {
+            prospectId,
+            associationId,
+            deliverableId,
+            outcome: str(body, 'outcome') ?? '',
+            findings: str(body, 'findings'),
+            waiverRecordedBy: str(body, 'waiverRecordedBy'),
+            waiverReason: str(body, 'waiverReason'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That decision could not be recorded');
+          return;
+        }
+        await sendRelationship(res, prospectId, associationId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /**
+   * GATED: the availability check is a recorded judgement §22.8's completion
+   * criteria read, exactly as a deliverable decision is. The TERM is composed
+   * from records server-side — the body carries only the answer and the note.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/availability`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId } = req.params as {
+          prospectId: string;
+          associationId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await verifyAvailability(
+          { db },
+          {
+            prospectId,
+            associationId,
+            available: typeof body['available'] === 'boolean' ? (body['available'] as boolean) : null,
+            detail: str(body, 'detail'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That availability check could not be recorded');
+          return;
+        }
+        await sendRelationship(res, prospectId, associationId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /** UNGATED, and registered: what Admin told the parties. It decides nothing. */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/mediation-note`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId } = req.params as {
+          prospectId: string;
+          associationId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await recordMediationNote(
+          { db },
+          { prospectId, associationId, note: str(body, 'note'), who: whoOf(req) },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That mediation note could not be recorded');
+          return;
+        }
+        await sendRelationship(res, prospectId, associationId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /**
+   * UNGATED, and registered: recording that a party ASKED to end the
+   * partnership — the §29.1/deletion-request posture. The DECISION takes the
+   * gate: it is the answer somebody may be asked to stand behind, even though
+   * executing anything stays with the §29 and §24.8 machinery.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/termination-request`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId } = req.params as {
+          prospectId: string;
+          associationId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const effectiveAt = parseInstant(body['effectiveAt']);
+        const requestedAt = parseInstant(body['requestedAt']);
+        if (effectiveAt === 'invalid' || requestedAt === 'invalid') {
+          badRequest(res, 'A date could not be read.', 'Use a full date, or leave the request date blank to record now.');
+          return;
+        }
+        const result = await recordTerminationRequest(
+          { db },
+          {
+            prospectId,
+            associationId,
+            reason: str(body, 'reason'),
+            effectiveAt: effectiveAt ?? null,
+            cause: str(body, 'cause') ?? '',
+            moneyTreatment: str(body, 'moneyTreatment') ?? '',
+            receivedVia: str(body, 'receivedVia'),
+            requestedAt: requestedAt ?? null,
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That termination request could not be recorded');
+          return;
+        }
+        await sendRelationship(res, prospectId, associationId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/relationships/:associationId/termination-request/:requestId/decision`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId, associationId, requestId } = req.params as {
+          prospectId: string;
+          associationId: string;
+          requestId: string;
+        };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await decideTerminationRequest(
+          { db },
+          {
+            prospectId,
+            associationId,
+            requestId,
+            decision: str(body, 'decision') ?? '',
+            note: str(body, 'note'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That decision could not be recorded');
+          return;
+        }
+        await sendRelationship(res, prospectId, associationId);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── The payout reminder (§13, §27.4 — Session C, gap 3) ──────────────────*/
+
+  /**
+   * GATED: it reaches a real person. The ask is recorded first (§1.3), the
+   * send dedups on that record, and the send is the EXISTING §27 key — no new
+   * message is invented, and the words are the state-change sender's own.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/payout-reminder`,
+    admin,
+    fresh,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const result = await sendPayoutReminder(
+          { db, asks },
+          { prospectId, who: whoOf(req) },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That reminder could not be sent');
+          return;
+        }
+        const detail = await readCreatorWorkspace(db, prospectId, {
+          storageConfigured: evidenceStorage.configured,
+        });
+        if (!detail) {
+          notFound(res, 'Affiliate not found', 'There is no Affiliate at that address.');
+          return;
+        }
+        res.json({ detail, ask: { sent: result.sent, reason: result.sendReason } });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  /* ── Case intake (§26.7, §27.8 — Session C, gap 7) ────────────────────────*/
+
+  /**
+   * UNGATED, and registered — the Support workspace's own posture: opening a
+   * case records what somebody asked and starts the published clock; it moves
+   * no money and changes nobody's standing. The case is born through
+   * `openSupportCase`, so there is no second queue.
+   */
+  router.post(
+    `${ADMIN_CREATORS_PATH}/:prospectId/support-case`,
+    admin,
+    json,
+    async (req, res, next) => {
+      try {
+        const { prospectId } = req.params as { prospectId: string };
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const result = await openAffiliateSupportCase(
+          { db },
+          {
+            prospectId,
+            associationId: str(body, 'associationId'),
+            topic: str(body, 'topic') ?? '',
+            subject: str(body, 'subject'),
+            subcategory: str(body, 'subcategory'),
+            message: str(body, 'message'),
+            who: whoOf(req),
+          },
+        );
+        if (!result.ok) {
+          fail(res, result, 'That case could not be opened');
+          return;
+        }
+        const detail = await readCreatorWorkspace(db, prospectId, {
+          storageConfigured: evidenceStorage.configured,
+        });
+        if (!detail) {
+          notFound(res, 'Affiliate not found', 'There is no Affiliate at that address.');
+          return;
+        }
+        res.json({ detail, opened: { caseId: result.caseId, reference: result.reference } });
       } catch (error) {
         next(error);
       }

@@ -25,7 +25,15 @@ import {
   CREATOR_ATTENTION_KINDS as SHARED_ATTENTION,
   CREATOR_DIRECTORY_FILTER_KEYS as SHARED_FILTERS,
   CREATOR_HISTORY_CATEGORY_KEYS as SHARED_HISTORY,
-  CREATOR_PARKED_MESSAGES,
+  AFFILIATE_OPERATIONS_ABSENCES,
+  AFFILIATE_REFUND_TREATMENTS,
+  AFFILIATE_TREATMENT_LABELS as SHARED_TREATMENT_LABELS,
+  DELIVERABLE_OUTCOMES as SHARED_DELIVERABLE_OUTCOMES,
+  DELIVERABLE_STATE_LABELS as SHARED_DELIVERABLE_LABELS,
+  DELIVERABLE_RESTATES_AGREEMENT,
+  AVAILABILITY_TERM_IS_AGREED,
+  TERMINATION_DECIDES_NO_MONEY,
+  COMMUNICATIONS_ARE_THE_RECORD,
   PAYOUT_STATE_LABELS as SHARED_PAYOUT_LABELS,
   PROVENANCE_BADGES,
   SUBTYPE_METRIC_LABELS as SHARED_METRIC_LABELS,
@@ -41,6 +49,9 @@ import {
   ACTIVE_PARTNERSHIP_SLOT_LIMIT,
   ADMIN_ASSOCIATION_STATUS_LABELS,
   ADMIN_WORK_ATTENTION_KEYS,
+  AFFILIATE_TREATMENT_LABELS,
+  DELIVERABLE_OUTCOMES,
+  DELIVERABLE_STATE_LABELS,
   CREATOR_ACCESS_ACTIONS,
   CREATOR_ACCOUNT_STATES,
   CREATOR_ATTENTION_KINDS,
@@ -164,31 +175,61 @@ describe('the register carries what the Spec requires of it', () => {
     expect('CREATOR_TIER_LEVELS' in shared).toBe(false);
   });
 
-  it('gives every parked control a sentence that names what is coming, and when', () => {
-    // The contract changed with the 2026-08-17 rebuild, on purpose. The brief
-    // (docs/phases/admin-affiliate-rebuild.md, decision 1) decided all nine
-    // capabilities ARE built, each through the service that already owns its
-    // rule — so an entry no longer names a permanent gap, it names the record
-    // that exists, the mechanism that will serve it, and the SESSION that
-    // ships the surface. §1.4 still governs: a control says what the
-    // destination IS, and "coming in Session C" is a checkable claim where
-    // "parked" was an open-ended one.
-    //
-    // Session B closed four (stripeRefresh, evidenceUpload, passwordRecovery,
-    // requestCorrection): their controls work, so their entries LEFT the
-    // register — the §1.4 failure in reverse is a parked message on a working
-    // control. Exactly the five Session C capabilities remain.
-    expect(Object.keys(CREATOR_PARKED_MESSAGES).sort()).toEqual([
-      'availability',
-      'caseIntake',
-      'deliverableEvidence',
-      'kitVisuals',
-      'payoutReminder',
+  it('has no parked register left — the last gap closed and the register went with it', async () => {
+    // The brief's own rule (decision 1): an entry leaves the register the
+    // moment its control works, and the register goes when the last one does.
+    // Session C closed the final five (deliverableEvidence, availability,
+    // payoutReminder, kitVisuals, caseIntake), so CREATOR_PARKED_MESSAGES no
+    // longer exists — a parked message on a working control is the §1.4
+    // failure in reverse.
+    const shared = (await import('@proovd/shared')) as Record<string, unknown>;
+    expect(shared['CREATOR_PARKED_MESSAGES']).toBeUndefined();
+  });
+
+  it('renders a refusal sentence for every control the reference draws and the Spec forbids', () => {
+    // The Founders rebuild's OPERATIONS_ABSENCES precedent: re-adding one of
+    // these controls means deleting the sentence that says why it must not
+    // exist. Seven refused controls, each naming the rule and the real path.
+    expect(AFFILIATE_OPERATIONS_ABSENCES).toHaveLength(7);
+    const keys = AFFILIATE_OPERATIONS_ABSENCES.map((entry) => entry.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys.sort()).toEqual([
+      'adjustEarnings',
+      'campaignSuspendKill',
+      'createTransfer',
+      'fixedOutcome',
+      'relationshipEdit',
+      'tierAccessCombo',
+      'workAgainReissue',
     ]);
-    for (const [key, message] of Object.entries(CREATOR_PARKED_MESSAGES)) {
-      expect(message.length, key).toBeGreaterThan(40);
-      expect(/Session C\b/.test(message), key).toBe(true);
+    for (const entry of AFFILIATE_OPERATIONS_ABSENCES) {
+      expect(entry.control.length, entry.key).toBeGreaterThan(5);
+      expect(entry.sentence.length, entry.key).toBeGreaterThan(80);
     }
+    // The two that guard money name where the decision actually lives.
+    const transfer = AFFILIATE_OPERATIONS_ABSENCES.find((e) => e.key === 'createTransfer')!;
+    expect(transfer.sentence).toContain('close-operations queue');
+    const adjust = AFFILIATE_OPERATIONS_ABSENCES.find((e) => e.key === 'adjustEarnings')!;
+    expect(adjust.sentence).toContain('§24.8');
+  });
+
+  it('restates the Session C vocabulary where the backend needs it at runtime', () => {
+    // The deliverable decision vocabulary — 0048's CHECK, one for one.
+    expect([...DELIVERABLE_OUTCOMES]).toEqual([...SHARED_DELIVERABLE_OUTCOMES]);
+    expect(DELIVERABLE_STATE_LABELS).toEqual({ ...SHARED_DELIVERABLE_LABELS });
+    // §24.8's treatment labels are typed against the cause register's own
+    // vocabulary — a sixth treatment cannot gain a label without a rule.
+    expect(Object.keys(AFFILIATE_TREATMENT_LABELS).sort()).toEqual(
+      [...AFFILIATE_REFUND_TREATMENTS].sort(),
+    );
+    expect(AFFILIATE_TREATMENT_LABELS).toEqual({ ...SHARED_TREATMENT_LABELS });
+  });
+
+  it('pins the Session C sentences the surfaces render', () => {
+    expect(DELIVERABLE_RESTATES_AGREEMENT).toContain('restates');
+    expect(AVAILABILITY_TERM_IS_AGREED).toContain('never');
+    expect(TERMINATION_DECIDES_NO_MONEY).toContain('decides no money');
+    expect(COMMUNICATIONS_ARE_THE_RECORD).toContain('delivery record');
   });
 
   it('renders eight tabs and twenty-five sections, the reference’s own registers', async () => {

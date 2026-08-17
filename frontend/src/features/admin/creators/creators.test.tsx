@@ -30,9 +30,9 @@ import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
+  COMMUNICATIONS_ARE_THE_RECORD,
   CORRECTION_REQUEST_LEAVES_VALUE,
   CREATOR_NO_ATTENTION_LABEL,
-  CREATOR_PARKED_MESSAGES,
   CREATOR_SUSPENSION_IS_NOT_A_BAN,
   FOUNDER_NEVER_SEES_THIS,
   PASSWORD_RECOVERY_CONSEQUENCE,
@@ -46,6 +46,7 @@ import { installQaServer, type StubRoute } from '../../qa/server.js';
 import type { AdminIdentity } from '../api.js';
 import type {
   CreatorDirectoryRow,
+  CreatorRelationshipDetail,
   CreatorWorkspaceDetail,
 } from './api.js';
 
@@ -237,6 +238,7 @@ function mayaDetail(
         detail: '2 §5.3 evidence inputs outstanding for this subtype.',
         associationId: null,
       },
+      openCases: 0,
       availableActions: ['assign', 'verify', 'suspend', 'deletion'],
     },
     relationships: [
@@ -397,7 +399,9 @@ function mayaDetail(
       enforcement: [],
       disclosures: [],
       policyReacceptanceOpen: false,
+      cases: [],
     },
+    communications: [],
     history: [
       {
         category: 'account',
@@ -434,6 +438,103 @@ function recordRoutes(detail: CreatorWorkspaceDetail = mayaDetail()): StubRoute[
     { match: /\/api\/admin\/creators\/campaigns$/, body: { campaigns: [] } },
     { match: /\/api\/admin\/creators\/[^/]+$/, body: detail },
   ];
+}
+
+/**
+ * A minimal relationship read for the campaign-scoped tabs — only the blocks
+ * the tests here render. `relationship.test.tsx` owns the full fixture and the
+ * tab behaviour; this exists so the record shell's own tests can open a
+ * relationship-scoped section without duplicating it.
+ */
+function relStub(): CreatorRelationshipDetail {
+  return {
+    associationId: ASSOCIATION,
+    prospectId: PROSPECT,
+    campaignId: CAMPAIGN,
+    creatorName: 'Maya Johnson',
+    band: {
+      campaignName: 'Teeb Founding Launch',
+      campaignType: 'Product Campaign',
+      founderName: 'Teeb Labs LLC',
+      status: 'Active partnership',
+      statusRaw: 'active',
+      owner: 'System',
+      designation: 'Initial launch roster',
+      activatedAt: null,
+      closesAt: null,
+      responseDeadlineAt: null,
+    },
+    overview: {
+      tasks: [],
+      link: {
+        state: 'active',
+        label: 'Affiliate link active',
+        url: 'https://app.proovd.test/c/abc123',
+        code: 'abc123',
+        activatedAt: null,
+        pausedAt: null,
+        pausedReason: null,
+        testUrl: 'https://app.proovd.test/c/abc123?proovd_link_test=1',
+      },
+      readiness: null,
+      kit: {
+        revealedAt: null,
+        revokedAt: null,
+        revokedReason: null,
+        accessCount: 0,
+        lastAccessAt: null,
+      },
+    },
+    agreement: {
+      lockState: 'Accepted · locks at launch',
+      headlinePercent: '30%',
+      headlineRest: 'of the attributed captured pre-tax reward subtotal.',
+      bonus: null,
+      versions: [],
+      agreement: null,
+      fixedPayment: {
+        available: true,
+        rule: 'Optional · Product Campaigns only',
+        status: 'Not requested',
+        amount: null,
+        source: 'None requested',
+        fundedAt: null,
+        deadlineAt: null,
+      },
+    },
+    content: {
+      submission: null,
+      history: [],
+      launchFailure: { required: false, failure: null },
+      performance: { populated: false, waitingOn: 'Waiting on activation.', value: null },
+    },
+    money: {
+      headline: {
+        status: 'estimated',
+        label: 'Estimated',
+        amount: 'US$0.00',
+        owner: 'System owns capture and reconciliation after campaign close',
+      },
+      earnings: { populated: false, waitingOn: 'Waiting on close.', value: null },
+      transfer: { populated: false, waitingOn: 'Waiting on Day 3.', value: null },
+      completion: null,
+    },
+    deliverables: { items: [], resolved: 0, canRecord: false, sourceLabel: null },
+    availability: {
+      term: 'Keep your promotional content available for the agreed campaign and availability period.',
+      termSource: '§20 Creator obligations · the accepted campaign period',
+      checks: 0,
+      latest: null,
+    },
+    mediationNotes: [],
+    terminationRequests: { open: null, history: [] },
+    kitAssets: { visualsAvailable: false, waitingOn: 'Track A4.', files: [] },
+    workAgain: [],
+  };
+}
+
+function relRoutes(detail: CreatorWorkspaceDetail = mayaDetail()): StubRoute[] {
+  return [{ match: /\/relationships\/[^/]+$/, body: relStub() }, ...recordRoutes(detail)];
 }
 
 /* ── Rendering ─────────────────────────────────────────────────────────────── */
@@ -698,7 +799,7 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
     // Campaigns · Readiness & Active — the reference's own destination. The
     // old address stays alive underneath (Session C absorbs it) and is what
     // the interim section links onward to.
-    serve(recordRoutes());
+    serve(relRoutes());
     const view = await renderAdmin(`/admin/creators/${PROSPECT}`);
 
     const control = screen.getByRole('button', { name: /View campaign relationship/i });
@@ -720,15 +821,14 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
     expect(
       screen.getByRole('combobox', { name: 'Select campaign relationship' }),
     ).toBeTruthy();
+    // The section renders from the relationship read (Session C — no interim).
+    expect(await screen.findByText('Affiliate link active')).toBeTruthy();
   });
 
-  it('parks the Stripe-owned action instead of pretending it sends', async () => {
-    // Changed 2026-08-17 (rebuild Session A): the reference gives the
-    // Stripe-owned attention one control — `Send payout reminder` — and the
-    // rebuild decided to build it (gap 3, Session C, through the existing
-    // §27 key). Until it sends, the control is parked: `aria-disabled`, and
-    // pressing it explains itself rather than doing nothing (§1.4). It never
-    // navigates and never claims a send.
+  it('sends the payout reminder from the Stripe-owned attention — gap 3, closed', async () => {
+    // Session B parked this control; Session C wired it. The dialog is the
+    // real send: the EXISTING §27 key, the ask recorded first, the outcome
+    // reported beside the re-read — no new message invented.
     const detail = mayaDetail();
     detail.header.attention = {
       needed: true,
@@ -738,15 +838,27 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
       detail: 'Stripe is holding this account. Proovd cannot supply what it is asking for.',
       associationId: null,
     };
-    serve(recordRoutes(detail));
+    serve([
+      ...recordRoutes(detail),
+      {
+        match: /\/payout-reminder$/,
+        body: { detail: mayaDetail(), ask: { sent: true, reason: null } },
+      },
+    ]);
     await renderAdmin(`/admin/creators/${PROSPECT}`);
 
     // The label also appears in the facts strip, so the attention object is
     // found by its owner pill — the thing only it carries.
     const box = screen.getByText('Owner · Stripe').closest('section')!;
     const control = within(box).getByRole('button', { name: /Send payout reminder/i });
-    expect(control.getAttribute('aria-disabled')).toBe('true');
-    expect(within(box).getByRole('heading', { name: 'Stripe needs information' })).toBeTruthy();
+    expect(control.getAttribute('aria-disabled')).toBeNull();
+    await userEvent.click(control);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/message §27 already defines/)).toBeTruthy();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Send the reminder/i }));
+    await waitFor(() => {
+      expect(toasts).toContain('Payout reminder sent');
+    });
   });
 
   it('offers no action at all for an Affiliate-owned item', async () => {
@@ -793,7 +905,7 @@ describe('§26.1, DNA §5.12 — the eight-tab record shell', () => {
     expect(tabs[0].getAttribute('aria-selected')).toBe('true');
   });
 
-  it('holds the tab and section in the URL, and an interim section says what it is', async () => {
+  it('holds the tab and section in the URL, and History renders in final shape', async () => {
     serve(recordRoutes());
     const view = await renderAdmin(`/admin/creators/${PROSPECT}?tab=history`);
 
@@ -805,38 +917,70 @@ describe('§26.1, DNA §5.12 — the eight-tab record shell', () => {
       'Communications',
     ]);
 
-    // The interim section owns the page title (one h1 per surface) and names
-    // the surface that holds the content today, with a real route to it.
+    // Session C absorbed the old `/history` address: the timeline renders
+    // here in final shape, with no pointer to a retired surface.
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Timeline');
-    expect(screen.getByRole('button', { name: /Open the history surface/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Open the history surface/i })).toBeNull();
+    expect(screen.getByText('Prospect recorded')).toBeTruthy();
 
     await userEvent.click(within(rail).getByRole('tab', { name: 'Communications' }));
     await waitFor(() => {
       const params = new URLSearchParams(view.router.state.location.search);
       expect(params.get('section')).toBe('communications');
     });
-    // A genuinely new read names the record that already exists rather than
-    // pointing at a surface that does not (§1.4).
+    // Communications is the DELIVERY RECORD itself, and the pinned sentence
+    // says so — the reference derives its list by regex over event titles.
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Communications');
-    expect(screen.queryByRole('button', { name: /^Open / })).toBeNull();
+    expect(screen.getByText(COMMUNICATIONS_ARE_THE_RECORD)).toBeTruthy();
+    expect(screen.getByText('No communication records')).toBeTruthy();
   });
 
-  it('shows the Selected-relationship facts on a campaign-scoped interim section', async () => {
-    serve(recordRoutes());
-    await renderAdmin(
-      `/admin/creators/${PROSPECT}?tab=campaigns&section=readiness&rel=${ASSOCIATION}`,
-    );
+  it('renders a delivery row from the §27 key, with the registry label', async () => {
+    const detail = mayaDetail();
+    detail.communications = [
+      {
+        eventKey: 'affiliate_password_reset',
+        target: 'maya@example.com',
+        entityType: 'password_reset',
+        entityId: 'reset-1',
+        confirmed: false,
+        at: 'Aug 16, 2026 · 9:00 AM UTC',
+        occurredAt: '2026-08-16T09:00:00.000Z',
+      },
+    ];
+    serve(recordRoutes(detail));
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=history&section=communications`);
 
-    // Real data on an interim surface: the strip renders the server-composed
-    // agreement, link, and completion facts for the selected relationship.
+    // The backend returns the KEY; the label resolves from the shared registry
+    // in the browser (Phase 22c's rule — no fourth copy of the descriptions).
+    expect(screen.getByText('Password reset')).toBeTruthy();
+    // §1.4's two states: confirmed at the provider, or recorded-not-confirmed.
+    expect(screen.getByText('Recorded · not confirmed')).toBeTruthy();
+  });
+
+  it('shows the Selected-relationship fact card on the Campaigns tab', async () => {
+    serve(relRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=campaigns&rel=${ASSOCIATION}`);
+
+    // The fact card renders the relationship read's own composed facts.
     expect(screen.getByText('Relationship ID')).toBeTruthy();
     expect(screen.getByText(ASSOCIATION)).toBeTruthy();
     expect(screen.getByText('Agreement')).toBeTruthy();
-    expect(screen.getByText('Accepted')).toBeTruthy();
+    expect(screen.getByText('Accepted · locks at launch')).toBeTruthy();
     expect(screen.getByText('Tracking link')).toBeTruthy();
-    expect(screen.getByText('Affiliate link active')).toBeTruthy();
-    expect(screen.getByText('Completion state')).toBeTruthy();
-    expect(screen.getByText('Not due before close')).toBeTruthy();
+    expect(screen.getAllByText('Affiliate link active').length).toBeGreaterThan(0);
+  });
+
+  it('counts open cases on the Support tab — a real count, or no badge at all', async () => {
+    const detail = mayaDetail();
+    detail.header.openCases = 2;
+    serve(recordRoutes(detail));
+    await renderAdmin(`/admin/creators/${PROSPECT}`);
+
+    const rail = screen.getByRole('tablist', { name: 'Maya Johnson Affiliate record tabs' });
+    expect(within(rail).getByRole('tab', { name: /Support & Enforcement/ }).textContent).toBe(
+      'Support & Enforcement2',
+    );
   });
 });
 
@@ -1074,10 +1218,12 @@ describe('§5.3, §8, §11, §13 — the person-level tabs in final shape', () =
 
 describe('§26.8, §25.6 — the history is read-only and names its sources', () => {
   it('renders every entry with the table it came from', async () => {
+    // The retired `/history` address redirects into the History tab, so a
+    // bookmark minted before Session C still lands on the record it meant.
     serve(recordRoutes());
     await renderAdmin(`/admin/creators/${PROSPECT}/history`);
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('History');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Timeline');
     expect(screen.getByText('Prospect recorded')).toBeTruthy();
     expect(screen.getByText(/recorded in affiliate_prospects/)).toBeTruthy();
   });
@@ -1235,29 +1381,65 @@ describe('§26.7, §29 — the controls surface keeps the two scopes apart', () 
   });
 
   it('records a conflict and a self-pre-order as two separate certifications', async () => {
+    // The disclosures moved to Support & Enforcement → Relationship Requests
+    // (Session C), scoped to the selected relationship.
     serve([
-      ...recordRoutes(),
+      ...relRoutes(),
       { match: /self-preorder-disclosures$/, status: 201, body: { ok: true } },
     ]);
-    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=support&section=requests`);
 
-    await userEvent.click(screen.getByRole('button', { name: /Record self-pre-order/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Record a self-pre-order/i }));
     const dialog = await screen.findByRole('dialog');
     // §28.4 forbids bundling, so §29.2's two certifications are two answers.
     expect(within(dialog).getByLabelText(/Certified self-funded/i)).toBeTruthy();
     expect(within(dialog).getByLabelText(/Identity disclosed/i)).toBeTruthy();
   });
 
-  it('parks case intake and says the console owns it', async () => {
-    serve(recordRoutes());
-    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+  it('opens a support case through the one intake — gap 7, closed', async () => {
+    const opened = mayaDetail();
+    opened.header.openCases = 1;
+    opened.standing.cases = [
+      {
+        id: 'case-1',
+        reference: 'PVD-4K2MN-8XQ3F',
+        topic: 'account_access',
+        subject: 'Locked out after a password change',
+        status: 'open',
+        open: true,
+        openedAt: 'Aug 17, 2026 · 9:00 AM UTC',
+        href: '/admin/support/case-1',
+      },
+    ];
+    serve([
+      ...recordRoutes(),
+      {
+        match: /\/support-case$/,
+        body: { detail: opened, opened: { caseId: 'case-1', reference: 'PVD-4K2MN-8XQ3F' } },
+      },
+    ]);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=support`);
 
-    const control = screen.getByRole('button', {
-      name: /Record a compliance or support case/i,
-    });
-    expect(control.getAttribute('aria-disabled')).toBe('true');
-    await userEvent.click(control);
-    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.caseIntake);
+    await userEvent.click(screen.getByRole('button', { name: /Record a support case/i }));
+    const dialog = await screen.findByRole('dialog');
+    // §26.7's ten topics, one list — and the record-shaped kinds are named as
+    // their own records rather than case types.
+    expect(within(dialog).getByText(/not a case type/)).toBeTruthy();
+    await userEvent.selectOptions(
+      within(dialog).getByLabelText(/Case topic/i),
+      'account_access',
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(/What the Affiliate asked/i),
+      'I changed my password and now cannot sign in.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /Record the case/i }));
+
+    // The case appears in the list with the Support-workspace address that
+    // operates it, and the toast carries the §27.8 promise.
+    expect(await screen.findByText('Locked out after a password change')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Open in Support/i })).toBeTruthy();
+    expect(toasts.some((message) => message.includes('PVD-4K2MN-8XQ3F'))).toBe(true);
   });
 });
 
@@ -1355,8 +1537,11 @@ describe('§3.1, §3.2 — no internal name reaches the rendered surface', () =>
       `/admin/creators/${PROSPECT}?tab=account&section=stripe`,
       `/admin/creators/${PROSPECT}/history`,
       `/admin/creators/${PROSPECT}/controls`,
+      `/admin/creators/${PROSPECT}?tab=support`,
+      `/admin/creators/${PROSPECT}?tab=support&section=requests`,
+      `/admin/creators/${PROSPECT}?tab=history&section=communications`,
     ]) {
-      serve([...directoryRoutes(), ...recordRoutes()]);
+      serve([...directoryRoutes(), ...relRoutes()]);
       const view = await renderAdmin(path);
 
       const text = view.container.textContent ?? '';
@@ -1389,8 +1574,11 @@ describe('§33.11.1, §28.5 — every Creator surface is operable', () => {
       `/admin/creators/${PROSPECT}?tab=account&section=stripe`,
       `/admin/creators/${PROSPECT}/history`,
       `/admin/creators/${PROSPECT}/controls`,
+      `/admin/creators/${PROSPECT}?tab=support`,
+      `/admin/creators/${PROSPECT}?tab=support&section=requests`,
+      `/admin/creators/${PROSPECT}?tab=history&section=communications`,
     ]) {
-      serve([...directoryRoutes(), ...recordRoutes()]);
+      serve([...directoryRoutes(), ...relRoutes()]);
       const view = await renderAdmin(path);
       const results = await axe(view.container);
       expect(results.violations, `${path}: ${JSON.stringify(results.violations)}`).toHaveLength(0);
@@ -1404,8 +1592,10 @@ describe('§33.11.1, §28.5 — every Creator surface is operable', () => {
       `/admin/creators/${PROSPECT}`,
       `/admin/creators/${PROSPECT}?tab=profile`,
       `/admin/creators/${PROSPECT}?tab=account&section=stripe`,
+      `/admin/creators/${PROSPECT}?tab=campaigns&rel=${ASSOCIATION}`,
+      `/admin/creators/${PROSPECT}?tab=support`,
     ]) {
-      serve([...directoryRoutes(), ...recordRoutes()]);
+      serve([...directoryRoutes(), ...relRoutes()]);
       const view = await renderAdmin(path);
       expect(screen.getAllByRole('heading', { level: 1 }), path).toHaveLength(1);
       view.unmount();

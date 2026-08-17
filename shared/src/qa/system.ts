@@ -570,6 +570,38 @@ export const UNGATED_ADMIN_WRITES = [
       'Re-reads the connected account from the provider and updates the stored record — the Phase 10b reconciliation path a dropped webhook already has. It writes only what Stripe reports about Stripe’s own fact, reaches nobody, and moves no money.',
   },
   {
+    route: 'POST /api/admin/creators/:prospectId/relationships/:associationId/deliverables',
+    specRef: '§22.4 idiom (migration 0048)',
+    reason:
+      'Records one agreed work item, restating the accepted agreement — the source is computed from that record, never typed. A receipt that reaches nobody and decides nothing; the decision that reads it (verified / more evidence / waiver) takes the gate.',
+  },
+  {
+    route:
+      'POST /api/admin/creators/:prospectId/relationships/:associationId/deliverables/:deliverableId/evidence',
+    specRef: '§22.4 idiom (migration 0048)',
+    reason:
+      'Records what was supplied against a deliverable — an insert-only receipt in the §22.4 idiom, where a resubmission is a new row and the earlier one survives. It reaches nobody and decides nothing; the gated decision route is what answers it.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/relationships/:associationId/mediation-note',
+    specRef: '§14.2 (migration 0048)',
+    reason:
+      'Records what Admin told the parties during a negotiation. The table has no acceptance or outcome column — Admin mediates and never agrees — so there is structurally nothing here a later phase could read as either side’s answer.',
+  },
+  {
+    route:
+      'POST /api/admin/creators/:prospectId/relationships/:associationId/termination-request',
+    specRef: '§29, §24.8 (migration 0048)',
+    reason:
+      'Records that a party ASKED to end an active partnership, with its §24.8 classification — the §29.1-disclosure posture: writing down what somebody told us decides nothing. The record decides no money and ends nothing; the decision on it takes the gate, and executing anything stays with the §29 and §24.8 machinery.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/support-case',
+    specRef: '§26.7, §27.8',
+    reason:
+      'Opens a §26.7 case through openSupportCase — the Support workspace’s own ungated posture: it records what somebody asked and starts the published response clock, moves no money, and changes nobody’s standing. There is no second queue; the case is born in the one intake with its reference and calendar-computed promise.',
+  },
+  {
     route: 'PATCH /api/admin/affiliates/:associationId/prospect',
     specRef: '§8, §5.3',
     reason:

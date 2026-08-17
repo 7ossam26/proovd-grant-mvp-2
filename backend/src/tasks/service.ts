@@ -210,7 +210,7 @@ async function resolveOne(
     const who = row.handle?.trim() || row.legalName?.trim() || 'Creator';
     return {
       label: `${who} · ${titles.get(row.campaignId) ?? 'Untitled campaign'}`,
-      href: `/admin/creators/${row.prospectId}/relationships/${row.associationId}`,
+      href: `/admin/creators/${row.prospectId}?tab=campaigns&rel=${row.associationId}`,
     };
   }
 

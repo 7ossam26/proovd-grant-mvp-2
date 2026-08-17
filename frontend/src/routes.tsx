@@ -22,10 +22,7 @@ import { CreateFounder } from './features/admin/founders/CreateFounder.js';
 import { FounderWorkspace } from './features/admin/founders/FounderWorkspace.js';
 import { CreatorsDirectory } from './features/admin/creators/CreatorsDirectory.js';
 import { CreatorRecord } from './features/admin/creators/CreatorRecord.js';
-import { CreatorHistory } from './features/admin/creators/CreatorHistory.js';
-import { CreatorRelationship } from './features/admin/creators/CreatorRelationship.js';
 import { PostReview } from './features/admin/creators/PostReview.js';
-import { CreatorControls } from './features/admin/creators/CreatorControls.js';
 import { SupportQueue } from './features/admin/support/SupportQueue.js';
 import { SupportCase } from './features/admin/support/SupportCase.js';
 import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirectory.js';
@@ -68,6 +65,37 @@ import {
 function DraftResultRedirect() {
   const { token = '' } = useParams();
   return <Navigate to={`/draft/${encodeURIComponent(token)}/claim`} replace />;
+}
+
+/*
+ * The Affiliate record's retired sibling addresses (Session C, 2026-08-17).
+ * Each redirects into the tab that absorbed it, so a bookmark, a Support
+ * context link, or a Tasks reference minted before the rebuild still lands on
+ * the record it meant rather than a 404.
+ */
+function RelationshipRedirect() {
+  const { prospectId = '', associationId = '' } = useParams();
+  return (
+    <Navigate
+      to={`/admin/creators/${encodeURIComponent(prospectId)}?tab=campaigns&rel=${encodeURIComponent(associationId)}`}
+      replace
+    />
+  );
+}
+
+function HistoryRedirect() {
+  const { prospectId = '' } = useParams();
+  return <Navigate to={`/admin/creators/${encodeURIComponent(prospectId)}?tab=history`} replace />;
+}
+
+function ControlsRedirect() {
+  const { prospectId = '' } = useParams();
+  return (
+    <Navigate
+      to={`/admin/creators/${encodeURIComponent(prospectId)}?tab=support&section=enforcement`}
+      replace
+    />
+  );
 }
 
 /**
@@ -233,29 +261,27 @@ const rootChildren: RouteObject[] = [
       // campaigns is one person with two `campaign_affiliate_associations`
       // rows, and the deleted campaign-scoped screen could not say so.
       //
-      // Four addresses rather than one stateful page: DNA §5.12 requires
-      // position to survive interruption, and a URL is the cheapest durable
-      // position there is. The campaign-relationship view and the controls
-      // surface are parked in the record until they are built.
+      // One record address with the view in the URL (DNA §5.12): `?tab=` for
+      // the eight tabs, `?section=` for the tab's sections, `?rel=` for the
+      // selected relationship. Session C absorbed the old `/history`,
+      // `/controls`, and `/relationships/:associationId` sibling addresses
+      // into the tabs; the relationship address redirects so a bookmark, the
+      // Support workspace's context link, or a Tasks reference from before
+      // the rebuild still lands on the record it meant.
       { path: 'creators', element: <CreatorsDirectory /> },
       { path: 'creators/:prospectId', element: <CreatorRecord /> },
-      { path: 'creators/:prospectId/history', element: <CreatorHistory /> },
-      // §14–§18, §22.1. One campaign relationship, four panes of one object.
-      // The pane is a search param rather than a path segment: it is a view of
-      // the same record, and a bookmark to Money should still be that record.
       {
         path: 'creators/:prospectId/relationships/:associationId',
-        element: <CreatorRelationship />,
+        element: <RelationshipRedirect />,
       },
+      { path: 'creators/:prospectId/history', element: <HistoryRedirect /> },
+      { path: 'creators/:prospectId/controls', element: <ControlsRedirect /> },
       // §17's decision is its own address, because it is its own act — an
       // Admin part-way through seven checks who reloads gets the checks back.
       {
         path: 'creators/:prospectId/relationships/:associationId/review',
         element: <PostReview />,
       },
-      // §26.7, §29. Account standing and every recorded enforcement action, on
-      // the person's own address — the two scopes side by side and never merged.
-      { path: 'creators/:prospectId/controls', element: <CreatorControls /> },
       // §26.7, §26.8, §27.8. The Support workspace over the case domain Phase
       // 16b shipped. Two addresses: the queue, and one case.
       //

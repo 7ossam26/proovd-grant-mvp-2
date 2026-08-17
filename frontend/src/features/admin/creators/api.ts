@@ -88,6 +88,8 @@ export interface CreatorHeader {
   payout: { state: string | null; label: string };
   account: CreatorAccountState;
   attention: CreatorAttention;
+  /** Open §26.7 cases anchored on this person — the Support tab's badge. */
+  openCases: number;
   availableActions: CreatorMenuAction[];
 }
 
@@ -246,6 +248,30 @@ export interface CreatorWorkspaceDetail {
   standing: CreatorStandingPane;
   history: CreatorHistoryEntry[];
   historyCounts: Record<string, number>;
+  /** The person's delivery record — the §27 key resolves to a label from the
+      shared registry in the browser (Phase 22c's rule). */
+  communications: CreatorCommunicationView[];
+}
+
+export interface CreatorCommunicationView {
+  eventKey: string;
+  target: string;
+  entityType: string;
+  entityId: string;
+  confirmed: boolean;
+  at: string | null;
+  occurredAt: string;
+}
+
+export interface CreatorCaseView {
+  id: string;
+  reference: string;
+  topic: string;
+  subject: string | null;
+  status: string;
+  open: boolean;
+  openedAt: string | null;
+  href: string;
 }
 
 /* ── Person-scoped: /api/admin/creators ─────────────────────────────────────*/
@@ -701,6 +727,92 @@ export interface CreatorRelationshipDetail {
       deliverablesNote: string | null;
     } | null;
   };
+  /* The Session C blocks (migration 0048). */
+  deliverables: {
+    items: DeliverableView[];
+    resolved: number;
+    canRecord: boolean;
+    sourceLabel: string | null;
+  };
+  availability: {
+    term: string;
+    termSource: string;
+    checks: number;
+    latest: {
+      available: boolean;
+      termChecked: string;
+      detail: string;
+      verifiedBy: string;
+      verifiedAt: string | null;
+    } | null;
+  };
+  mediationNotes: { note: string; createdBy: string; createdAt: string | null }[];
+  terminationRequests: {
+    open: TerminationRequestView | null;
+    history: TerminationRequestView[];
+  };
+  kitAssets: {
+    visualsAvailable: boolean;
+    waitingOn: string | null;
+    files: {
+      id: string;
+      purpose: string;
+      state: string;
+      filename: string | null;
+      dimensions: string | null;
+      approved: boolean;
+      removed: boolean;
+    }[];
+  };
+  workAgain: {
+    id: string;
+    status: string;
+    message: string;
+    requestedAt: string | null;
+    respondedAt: string | null;
+    responseNote: string | null;
+  }[];
+}
+
+export interface DeliverableView {
+  id: string;
+  title: string;
+  source: string;
+  state: string;
+  stateLabel: string;
+  createdAt: string | null;
+  latestEvidence: {
+    id: string;
+    reference: string;
+    note: string | null;
+    submittedBy: string;
+    submittedAt: string | null;
+  } | null;
+  latestDecision: {
+    outcome: string;
+    findings: string;
+    waiverRecordedBy: string | null;
+    waiverReason: string | null;
+    decidedBy: string;
+    decidedAt: string | null;
+  } | null;
+}
+
+export interface TerminationRequestView {
+  id: string;
+  reason: string;
+  effectiveAt: string | null;
+  cause: string;
+  causeLabel: string;
+  moneyTreatment: string;
+  treatmentLabel: string;
+  receivedVia: string;
+  requestedAt: string | null;
+  recordedBy: string;
+  decision: string | null;
+  decisionNote: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
 }
 
 export function fetchRelationship(
@@ -800,6 +912,132 @@ export interface CreatorStandingPane {
     at: string;
   }[];
   policyReacceptanceOpen: boolean;
+  /** The person's §26.7 cases. Operating one stays the Support workspace's. */
+  cases: CreatorCaseView[];
+}
+
+/* ── The Session C relationship records (migration 0048) ───────────────────*/
+
+export function recordDeliverable(
+  prospectId: string,
+  associationId: string,
+  body: { title: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/deliverables`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function recordDeliverableEvidence(
+  prospectId: string,
+  associationId: string,
+  deliverableId: string,
+  body: { reference: string; note?: string | null },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/deliverables/${encodeURIComponent(deliverableId)}/evidence`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function decideDeliverable(
+  prospectId: string,
+  associationId: string,
+  deliverableId: string,
+  body: {
+    outcome: string;
+    findings: string;
+    waiverRecordedBy?: string | null;
+    waiverReason?: string | null;
+  },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/deliverables/${encodeURIComponent(deliverableId)}/decision`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/** The term is composed server-side from records; the body carries the answer. */
+export function verifyContentAvailability(
+  prospectId: string,
+  associationId: string,
+  body: { available: boolean; detail: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/availability`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function recordMediationNote(
+  prospectId: string,
+  associationId: string,
+  body: { note: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/mediation-note`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function recordTerminationRequest(
+  prospectId: string,
+  associationId: string,
+  body: {
+    reason: string;
+    effectiveAt: string;
+    cause: string;
+    moneyTreatment: string;
+    receivedVia: string;
+    requestedAt?: string | null;
+  },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/termination-request`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function decideTerminationRequest(
+  prospectId: string,
+  associationId: string,
+  requestId: string,
+  body: { decision: 'applied' | 'declined'; note: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/termination-request/${encodeURIComponent(requestId)}/decision`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/** Gap 3 — sends the existing §27 key; the outcome rides beside the re-read. */
+export function sendCreatorPayoutReminder(
+  prospectId: string,
+): Promise<{ detail: CreatorWorkspaceDetail; ask: { sent: boolean; reason: string | null } }> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/payout-reminder`, {
+    method: 'POST',
+  });
+}
+
+/** Gap 7 — opens the case through the ONE intake; no second queue exists. */
+export function openCreatorSupportCase(
+  prospectId: string,
+  body: {
+    topic: string;
+    message: string;
+    subject?: string | null;
+    subcategory?: string | null;
+    associationId?: string | null;
+  },
+): Promise<{
+  detail: CreatorWorkspaceDetail;
+  opened: { caseId: string; reference: string };
+}> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/support-case`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 /**

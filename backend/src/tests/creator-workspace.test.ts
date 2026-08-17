@@ -34,6 +34,7 @@ import { seedAdminReauthWindow } from '../settings/service.js';
 import { auditEvents } from '../db/schema/integrity.js';
 import { affiliateProspects } from '../db/schema/affiliates.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
+import { stripeConnectedAccounts } from '../db/schema/payments.js';
 import { campaignAffiliateAssociations } from '../db/schema/domain.js';
 import {
   affiliateDeletionRequests,
@@ -1567,5 +1568,187 @@ describe('§5.3, §11, §5.5, §13 — the Session B machine (metric trail, corr
     expect(invitation.createdAt).toBeTruthy();
     expect(invitation.claimedAt).toBeTruthy();
     expect(invitation.signupStartedAt).toBeNull();
+  });
+});
+
+/* ── Session C: the payout reminder, case intake, and communications ──────── */
+
+describe('§13, §26.7, §27 — the Session C person-level machine', () => {
+  async function claimedSeedC(label: string) {
+    const campaign = await createCampaign(label);
+    const { prospectId, associationId } = await recruit(campaign.campaignId, label);
+    const account = await seedUser(h, 'affiliate', `${label}-claimed`);
+    await h.db.insert(affiliateSignupProfiles).values({
+      prospectId,
+      associationId,
+      claimedUserId: account.id,
+      claimedAt: new Date(),
+      email: account.email,
+      publicHandle: '@claimed.handle',
+      legalName: 'Claimed Person',
+      updatedBy: 'user:test',
+    });
+    return { prospectId, associationId, account };
+  }
+
+  it('refuses a payout reminder unless Stripe genuinely has something outstanding', async () => {
+    const { prospectId } = await claimedSeedC('remind-none');
+
+    // No connected account at all — there is nothing to remind anyone about.
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', admin.cookie)
+      .expect(422);
+    expect((res.body as { whatHappened: string }).whatHappened).toContain('No payout account');
+  });
+
+  it('sends the EXISTING §27 key, records the ask first, and a second ask is a second message', async () => {
+    const { prospectId, account } = await claimedSeedC('remind');
+    const stripeAccountId = `acct_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    await h.db
+      .update(affiliateSignupProfiles)
+      .set({ payoutStatus: 'requirements_due', connectedAccountId: stripeAccountId })
+      .where(eq(affiliateSignupProfiles.prospectId, prospectId));
+    await h.db.insert(stripeConnectedAccounts).values({
+      stripeAccountId,
+      mode: 'test',
+      role: 'affiliate_recipient',
+      ownerUserId: account.id,
+      state: 'more_information_required',
+      requirementsPastDue: ['external_account'],
+      requirementsCurrentlyDue: ['individual.id_number'],
+    });
+
+    // GATED — it reaches a real person's inbox.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', staleAdmin.cookie)
+      .expect(403);
+
+    const before = h.sentEmails.messages.length;
+    const first = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect((first.body as { ask: { sent: boolean } }).ask.sent).toBe(true);
+
+    const sent = h.sentEmails.messages.slice(before).filter((m) => m.to === account.email);
+    expect(sent).toHaveLength(1);
+    // §13: the exact missing requirement, named — never "more information".
+    expect(sent[0]!.text).toContain('external_account');
+    expect(sent[0]!.subject).toContain('payout account');
+
+    // The delivery row carries the EXISTING key, deduped on the recorded ask —
+    // so a deliberate second ask is a second message (§7's resend rule).
+    const second = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect((second.body as { ask: { sent: boolean } }).ask.sent).toBe(true);
+
+    const deliveries = await h.pool.query(
+      `SELECT event_key, entity_type FROM notification_deliveries WHERE target = $1 AND event_key = 'affiliate_connected_account_info_required'`,
+      [account.email],
+    );
+    expect(deliveries.rows).toHaveLength(2);
+    expect(deliveries.rows[0].entity_type).toBe('affiliate_payout_reminder');
+  });
+
+  it('opens a §26.7 case through the ONE intake — born with its reference and calendar promise', async () => {
+    const campaign = await createCampaign('case-preclaim');
+    const { prospectId: unclaimed } = await recruit(campaign.campaignId, 'case-preclaim');
+
+    // Pre-claim there is no requester account to anchor a case on (§1.4).
+    await request(h.app)
+      .post(`/api/admin/creators/${unclaimed}/support-case`)
+      .set('cookie', admin.cookie)
+      .send({ topic: 'account_access', message: 'Cannot sign in.' })
+      .expect(422);
+
+    const { prospectId, associationId } = await claimedSeedC('case');
+
+    // A made-up topic is refused — §26.7's ten, one list.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/support-case`)
+      .set('cookie', admin.cookie)
+      .send({ topic: 'vibes', message: 'x' })
+      .expect(422);
+
+    // UNGATED — the Support workspace's own posture for opening a case.
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/support-case`)
+      .set('cookie', staleAdmin.cookie)
+      .send({
+        topic: 'account_access',
+        subject: 'Locked out after a password change',
+        subcategory: 'Password reset loop',
+        message: 'I changed my password and now cannot sign in at all.',
+        associationId,
+      })
+      .expect(200);
+    const body = res.body as {
+      detail: CreatorWorkspaceDetail;
+      opened: { caseId: string; reference: string };
+    };
+    expect(body.opened.reference).toMatch(/^PVD-/);
+
+    // No second queue: the case is a `support_cases` row with §27.8's
+    // business-day promise computed on the committed calendar.
+    const caseRow = await h.pool.query(
+      `SELECT reference, topic, subject, human_response_due_at, calendar_version, association_id
+         FROM support_cases WHERE id = $1`,
+      [body.opened.caseId],
+    );
+    expect(caseRow.rows).toHaveLength(1);
+    expect(caseRow.rows[0].human_response_due_at).not.toBeNull();
+    expect(caseRow.rows[0].calendar_version).toBeTruthy();
+    expect(caseRow.rows[0].association_id).toBe(associationId);
+    expect(caseRow.rows[0].subject).toBe('Locked out after a password change');
+
+    // The record read lists it, and the Support-tab badge counts the same rows.
+    expect(body.detail.standing.cases).toHaveLength(1);
+    expect(body.detail.standing.cases[0]!.open).toBe(true);
+    expect(body.detail.standing.cases[0]!.href).toBe(`/admin/support/${body.opened.caseId}`);
+    expect(body.detail.header.openCases).toBe(1);
+
+    // The absence that proves "no second queue": no affiliate-scoped case
+    // table exists anywhere in the schema.
+    const tables = await h.pool.query(
+      `SELECT table_name FROM information_schema.tables
+        WHERE table_name IN ('affiliate_cases', 'creator_cases', 'affiliate_support_cases')`,
+    );
+    expect(tables.rows).toHaveLength(0);
+  });
+
+  it('lists the delivery record for the person, audience-prefixed to affiliate_*', async () => {
+    const { prospectId, account } = await claimedSeedC('comms');
+
+    await h.pool.query(
+      `INSERT INTO notification_deliveries (event_key, target, entity_type, entity_id, notification_id)
+       VALUES
+         ('affiliate_campaign_invitation', $1, 'invitation_send', 'send-1', 'msg-1'),
+         ('affiliate_password_reset', $1, 'password_reset', 'reset-1', NULL),
+         ('internal_dispute_opened', $1, 'dispute', 'd-1', 'msg-2'),
+         ('founder_password_reset', $1, 'password_reset', 'reset-2', 'msg-3')`,
+      [account.email],
+    );
+
+    const res = await request(h.app)
+      .get(`/api/admin/creators/${prospectId}`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    const detail = res.body as CreatorWorkspaceDetail;
+    const keys = detail.communications.map((entry) => entry.eventKey).sort();
+    // The audience prefix keeps internal_* and every other role's mail out —
+    // Phase 22c's rule, applied to the Admin read of the same record.
+    expect(keys).toEqual(['affiliate_campaign_invitation', 'affiliate_password_reset']);
+
+    // §1.4's two states: confirmed at the provider, or recorded-not-confirmed.
+    const reset = detail.communications.find((e) => e.eventKey === 'affiliate_password_reset')!;
+    expect(reset.confirmed).toBe(false);
+    const invitation = detail.communications.find(
+      (e) => e.eventKey === 'affiliate_campaign_invitation',
+    )!;
+    expect(invitation.confirmed).toBe(true);
   });
 });

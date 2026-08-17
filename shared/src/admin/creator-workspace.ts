@@ -34,6 +34,7 @@
  */
 
 import { ASSOCIATION_STATUSES, type AssociationStatus } from '../states/association.js';
+import type { AffiliateRefundTreatment } from '../refunds/index.js';
 
 /* ──────────────────────────────────────────────────────── The directory */
 
@@ -840,52 +841,187 @@ export const REACCEPTANCE_IS_AUDIENCE_WIDE =
   'a material policy update applies to the audience, and each person clears ' +
   'it by accepting the published version.';
 
-/* ────────────────────────────────────────────────────────── Parked actions */
+/* ──────────────────────────── The refused controls (§1.8, Session C) */
 
 /**
- * The capabilities the rebuild has decided to build and not yet shipped.
+ * Controls the reference draws that the Spec forbids — each with the sentence
+ * the surface renders WHERE the control would have been, so re-adding one
+ * means deleting the sentence that says why it must not exist. The Founders
+ * rebuild's `OPERATIONS_ABSENCES` precedent, applied to the Affiliate record.
  *
- * §1.4: a control that claims a capability the product does not have is worse
- * than no control. Until 2026-08-17 each entry named a reference element with
- * no record behind it; the rebuild brief (docs/phases/admin-affiliate-
- * rebuild.md, decision 1) decided all nine ARE built — each through the
- * service that already owns its rule — so each message names the record that
- * exists (migration 0048 where one was needed), the mechanism that will serve
- * it, and the session that ships the surface. An entry leaves this register
- * the moment its control works, and the register goes when the last one does.
- *
- * Session B closed four: `stripeRefresh` (the live re-read through
- * `reconcileAccount`), `evidenceUpload` (the Phase 09a presign path against
- * `affiliate_evidence_files`), `passwordRecovery` (the one reset path plus
- * `affiliate_password_reset`), and `requestCorrection`
- * (`affiliate_correction_request`). The five left are Session C's.
+ * These are not gaps. A gap is a capability the product will gain; every entry
+ * here is a control whose existence would break a rule the product already
+ * enforces somewhere else, and the sentence names both the rule and the place
+ * the real decision lives. A suite test walks the rendered tabs and asserts
+ * every sentence appears.
  */
-export const CREATOR_PARKED_MESSAGES = {
-  deliverableEvidence:
-    'Deliverable evidence review arrives with the Content & Compliance ' +
-    'rebuild (Session C). The records exist as of migration 0048 — a ' +
-    'deliverable, its evidence receipts, and its decisions, insert-only in ' +
-    'the §22.4 idiom — and this surface does not yet write them.',
-  availability:
-    'Content-availability verification arrives with the Content & Compliance ' +
-    'rebuild (Session C). The record exists as of migration 0048 and is ' +
-    'checked against the AGREED campaign availability period — a term both ' +
-    'parties accepted, stored verbatim on every check.',
-  payoutReminder:
-    'The payout reminder arrives with Session C, sending the existing §27 ' +
-    'key for a Stripe requirement (affiliate_connected_account_info_required) ' +
-    '— no new message is invented, and nothing sends from here yet.',
-  kitVisuals:
-    'The visual kit read arrives with Session C. §12 uploads go to an R2 ' +
-    'bucket that is not configured in this deployment (Track A4), so there ' +
-    'are no approved visuals to show; every kit read is still logged.',
-  caseIntake:
-    'Support-case intake arrives with Session C, calling openSupportCase so ' +
-    '§27.8’s business-day clock, the owner, the waiting party, and the ' +
-    'four-fact handoff gate stay in one place. There is no second queue.',
+export const AFFILIATE_OPERATIONS_ABSENCES = [
+  {
+    key: 'createTransfer',
+    control: 'Create Affiliate Transfer',
+    sentence:
+      'The one Transfer per relationship is created from the close-operations ' +
+      'queue — decide, finalize, approve, then transfer, under the §11 tax ' +
+      'gate and the Day-3 anchor (§22.1). A create control here would be a ' +
+      'second path into a Transfer whose stable idempotency key exists to ' +
+      'guarantee there is exactly one.',
+  },
+  {
+    key: 'adjustEarnings',
+    control: 'Review or adjust earnings',
+    sentence:
+      'Finalized amounts are immutable by trigger, and every adjustment is a ' +
+      '§24.8 cause-classified case through the recorded preview-then-execute ' +
+      'path — never a number typed into a box. This surface shows the ' +
+      'recorded causes and recoveries; it cannot edit an amount.',
+  },
+  {
+    key: 'fixedOutcome',
+    control: 'Decide fixed Creator payment outcome',
+    sentence:
+      'The fixed payment’s disposition — paid with the Transfer, or returned ' +
+      'whole to the Founder — follows from the recorded §22.1 completion ' +
+      'outcome through its consequence matrix. Deciding it separately would ' +
+      'be a second door into a terminal money state.',
+  },
+  {
+    key: 'workAgainReissue',
+    control: 'Reissue work-again request',
+    sentence:
+      'A §22.9 work-again request is the Founder’s own ask, created from ' +
+      'their session. An Admin reissuing one would fabricate a party’s ask — ' +
+      'the same reason the Founders workspace refuses “Send work-again ' +
+      'request”. The recorded requests render below, read-only.',
+  },
+  {
+    key: 'campaignSuspendKill',
+    control: 'Suspend campaign / Kill campaign',
+    sentence:
+      'Suspending or killing a campaign is §26.7’s recorded decision against ' +
+      'the CAMPAIGN, with its complete pre- and post-capture effects — a ' +
+      'person’s record does not operate campaigns. The routes are mounted and ' +
+      'acceptance-tested; their console returns with the operations rebuild.',
+  },
+  {
+    key: 'tierAccessCombo',
+    control: 'Change internal tier or proposal access',
+    sentence:
+      'Two real paths, deliberately apart: the quality tier is free text on ' +
+      'the §8 research record (assessment data, never a commission floor), ' +
+      'and proposal access is DERIVED from §29 enforcement records — ' +
+      'restricting it is recording a restrict-bidding or demote action with ' +
+      'its full customer statement. A combined setter would mint the stored ' +
+      'eligibility flag §1 rule 6 forbids.',
+  },
+  {
+    key: 'relationshipEdit',
+    control: 'Edit Admin-owned relationship data',
+    sentence:
+      'The roster designation was recorded when the relationship was created ' +
+      'and decides which terms bound the Creator — a mid-campaign addition’s ' +
+      'remaining-time terms are frozen by trigger. Recruitment facts are ' +
+      'edited through the §8 research record, and a material campaign change ' +
+      'goes through §15’s classification machinery, never a free-form ' +
+      'reacceptance form.',
+  },
+] as const;
+
+export type AffiliateOperationsAbsenceKey =
+  (typeof AFFILIATE_OPERATIONS_ABSENCES)[number]['key'];
+
+export function affiliateOperationsAbsence(key: AffiliateOperationsAbsenceKey) {
+  return AFFILIATE_OPERATIONS_ABSENCES.find((a) => a.key === key)!;
+}
+
+/* ─────────────────────────── Deliverables and availability (Session C) */
+
+/**
+ * The five states a deliverable row can render, and the three the decision
+ * table admits (0048's `association_deliverable_decisions.outcome` CHECK).
+ *
+ * The two extra states are DERIVED, not stored: `pending` is a deliverable
+ * with no evidence and no decision, `evidence_submitted` one with a receipt
+ * the latest decision has not answered. Latest decision wins — the §22.3
+ * early-release idiom the whole 0048 family follows.
+ */
+export const DELIVERABLE_OUTCOMES = ['verified', 'more_evidence_needed', 'waived'] as const;
+export type DeliverableOutcome = (typeof DELIVERABLE_OUTCOMES)[number];
+
+export const DELIVERABLE_STATE_LABELS = {
+  pending: 'Waiting on Affiliate',
+  evidence_submitted: 'Evidence submitted',
+  verified: 'Verified',
+  more_evidence_needed: 'More evidence needed',
+  waived: 'Founder/Admin waiver',
 } as const;
 
-export type CreatorParkedKey = keyof typeof CREATOR_PARKED_MESSAGES;
+export type DeliverableStateKey = keyof typeof DELIVERABLE_STATE_LABELS;
+
+/**
+ * A deliverable RESTATES the accepted agreement; the availability term is READ
+ * from the records both parties accepted. Both sentences are pinned because
+ * each control would otherwise read as a place to invent a work item or a
+ * period the Spec does not state (§1 rule 6 — the reason both capabilities
+ * were parked before migration 0048 gave the AGREED term a record).
+ */
+export const DELIVERABLE_RESTATES_AGREEMENT =
+  'A deliverable restates what the accepted agreement already says — its ' +
+  'source names that record. It never invents a work item the Creator did ' +
+  'not agree to.';
+
+/*
+ * Placement-neutral on purpose: the sentence rides the term on the section
+ * (where it renders above the note) and inside the verify dialog (where it
+ * renders below), and a "the term below" that pointed the wrong way on one of
+ * them is the kind of thing only a browser pass catches.
+ */
+export const AVAILABILITY_TERM_IS_AGREED =
+  'The agreed term is read from the records both parties accepted — never ' +
+  'typed here. The check stores it verbatim, so a later change to the ' +
+  'agreement vocabulary cannot rewrite what was verified.';
+
+/* ─────────────────────────── Termination requests (§29, §24.8, Session C) */
+
+/**
+ * The pinned consequence line on the termination-request intake. The record
+ * preserves the ask — reason, effective time, §24.8 cause, money treatment —
+ * and its money treatment is CHECK-matrixed to the cause register's own
+ * matrix. What it does NOT do is the sentence, because the reference's dialog
+ * reads as an act that ends the partnership and moves the money.
+ */
+export const TERMINATION_DECIDES_NO_MONEY =
+  'Recording the request decides no money and ends nothing. Ending the ' +
+  'relationship is a §29 enforcement action with its own record, and any ' +
+  'money movement is the recorded §24.8 case path — this row is the reason ' +
+  'those acts will cite.';
+
+/**
+ * Human labels for §24.8's five affiliate treatments, typed against the cause
+ * register's own vocabulary so a sixth treatment cannot gain a label here
+ * without gaining a rule there first. The permitted set per cause stays the
+ * register's — this map only says the words.
+ */
+export const AFFILIATE_TREATMENT_LABELS: Readonly<Record<AffiliateRefundTreatment, string>> = {
+  not_attributed: 'Not attributed — no Affiliate earnings exist on it',
+  earnings_remain: 'Valid Affiliate earnings remain',
+  cancel_unfinalized: 'Cancel unfinalized earnings on the affected transactions',
+  cancel_unpaid_invalid: 'Cancel unpaid invalid earnings',
+  contractual_recovery: 'Contractual recovery of the invalid amount',
+};
+
+/* ─────────────────────────────── Communications (§27, Session C) */
+
+/**
+ * The History tab's Communications section renders `notification_deliveries`
+ * — the real record of recipient, event key, delivery state, and dedup
+ * entity. Pinned because the reference DERIVES its communications list by
+ * regex over event titles, which is a mock, and because a reader should know
+ * the list is the delivery record itself rather than an inference.
+ */
+export const COMMUNICATIONS_ARE_THE_RECORD =
+  'Transactional messages keep recipient, template, delivery state, and ' +
+  'deduplication key. This list is the delivery record itself — not an ' +
+  'inference from event titles.';
 
 /* ────────────────────────────────────────────── Copy the reference pins */
 

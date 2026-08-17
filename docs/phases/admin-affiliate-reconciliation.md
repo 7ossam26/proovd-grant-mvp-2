@@ -90,7 +90,7 @@ become database defaults.
 | `Stripe` — provider strip (state heading, `Connected account`, `Transfer capability`, `Requirements`, `Payout status`), provenance `Stripe supplied · read only`, NO edit control | **exists** | `composeProvider` — §13's stored status, never the documents. The absence of an edit route is the enforcement |
 | `Refresh Stripe status` | **extends → Session B** | Gap 4: re-reads the account via `retrieveAccount` and updates `stripe_connected_accounts` — the Phase 10b posture (a vendor is a source of events, not truth). Built in Session B: the control calls the route and the surface renders the re-read |
 
-## 6. Campaigns (Session C for content; the switcher is Session A)
+## 6. Campaigns (Session C — built)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -103,7 +103,7 @@ become database defaults.
 | `Readiness & Active` — attention banners, `Affiliate link` card (copy/safe-test/pause/reactivate/history), `Affiliate readiness` (checklist, `12 of 12`), `Campaign kit` card (`Private · campaign-scoped`, version, contents) | **exists** | `RelOverview`: readiness via `gatherCreatorReadiness` (derived, never stored), link controls via `setTrackingLinkPaused` (three columns and no more), kit via `campaign_kit_access` with every read logged |
 | `Completion & Work Again` — completion hero (`Completion state` eyebrow), decision card (Post / Availability / Earnings / Work again), `Review completion`, `Review work-again request` | **exists** + one new fact | Completion decisions and the §22.9 work-again records exist (`fetchCompletion`, `assignCompletion`, `work-again.ts`); the `Availability` fact is 0048's `association_availability_verifications` (gap 2), read against the ACCEPTED agreement's term — `Agreed campaign availability period`, which is what dissolves the old parked objection |
 
-## 7. Content & Compliance (Session C)
+## 7. Content & Compliance (Session C — built)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -113,7 +113,7 @@ become database defaults.
 | `Agreements & Disclosures` — `Exact campaign version`, per-campaign IP/confidentiality, FTC acknowledgment, `Disclosure placement · Hard to miss · before or with the endorsement`, approved disclosure text | **exists** | The §31.5 consents, the disclosure confirmation on readiness, the locked terms |
 | `Risk & Compliance` — open-case focus or `No open compliance case`, relationship risk facts (Account access, Link state, Conflicts, Red flags), `Record case` | **extends → C** | Gap 7: case intake calls `openSupportCase` — §27.8's clock, owner, waiting party, and handoff gate stay in one place; the reference's ten case kinds map onto §26.7's categories + free-text subcategory, the Support workspace's own reconciliation |
 
-## 8. Performance & Earnings (Session C)
+## 8. Performance & Earnings (Session C — built)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -122,7 +122,7 @@ become database defaults.
 | `Transfers & Payouts` — `Transfer is not payout`, the 8-state chain (Estimated → … → Reversed / recovery), Stripe block, `Provider identity and bank facts cannot be edited in Proovd.` | **exists** | `MONEY_CHAIN` + B.7 states. No money decision moves here: finalize/approve/the one Transfer stay the close queue's (§22.1), asserted by test |
 | `Adjustments` — `Cause-based correction`, `Recovery eligibility · Only Affiliate-caused invalidity`, `Original ledger · Preserved`, `Admin requirement · Reason, evidence, prior/new value`, `Review or adjust earnings`, `Decide fixed Creator payment outcome` | **exists** — route, do not rebuild | §24.8's `refund_cause_allocations` + `applyCauseBasedAffiliateAdjustment`; the surface routes into the refund-case path (20a preview-then-execute), never beside it. The fixed-payment outcome is §22.1's completion consequence, decided in the close queue |
 
-## 9. Support & Enforcement (Session C)
+## 9. Support & Enforcement (Session C — built)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -133,7 +133,7 @@ become database defaults.
 | `Appeals` — `Evidence, notice & decision`, the appeal route sentence, reason list (`Deceptive or unsupported claim`, `Metric manipulation or fraud`, `Host-rule violation`, `Provider or regulatory risk`, `Repeated invalid termination`), `Five business days`, `Appeal not available under policy` | **exists** | `affiliate_enforcement_appeals` + `decideAppeal`; the five-business-day window is computed on the committed calendar and stored |
 | Termination money treatments (`Preserve valid finalized commission…`, `Affiliate-caused invalidity · cancel unpaid invalid earnings`, `Founder-caused termination · preserve valid Affiliate earnings`, `Proovd error · correct without debiting unrelated Affiliate`) | **exists** as vocabulary | §24.8's cause register verbatim — the reference restates the built matrix. The termination request stores the classification; execution is 20a's |
 
-## 10. History (Session C)
+## 10. History (Session C — built)
 
 | Reference element | Verdict | Where / why |
 |---|---|---|
@@ -160,6 +160,51 @@ become database defaults.
 | The seed's `earningsAmount: 286` beside terms that do not produce it; `uploadedAt: "Now · Aug 11, 2026"` | fixture noise | The one waterfall is `shared/money`; every instant renders from a stored column |
 | Hardcoded SLA instants (`Today · 4:00 PM EDT`, `One business day · 5:00 PM EDT`, …) | mechanism replaced | Deadlines compute on the committed versioned calendar and are stored with it (§29.6, §27.8) |
 | `Formal response deadline · Tomorrow · fixed 72-hour window` | **exists** | `response_deadline_evaluations` + the stored §14.6 deadline — rendered from the record, never recomputed |
+
+## What Session C shipped (2026-08-17)
+
+The four campaign-scoped tabs and History in final shape, the five gaps the
+brief had left, and the retirement of the last three sibling addresses.
+Sections 6–10 above are the walk; every verdict there is now built or recorded
+as refused. **The rebuild is complete**, and `CREATOR_PARKED_MESSAGES` is gone
+with it — the register's own rule was that it goes when the last entry does.
+
+- **Campaigns** — Relationships (the card grid plus the Selected-relationship
+  fact card), Opportunities & Negotiations (the old Agreement pane absorbed,
+  plus the 0048 mediation note), Readiness & Active (the old Overview pane,
+  plus gap 6's kit-asset records with the Track A4 absence named), and
+  Completion & Work Again (the §22.8 criteria read, the §22.9 requests
+  read-only).
+- **Content & Compliance** — Posts (the old Content pane), Deliverables
+  (**gap 1**: the 0048 records finally written — record, receipt, decide, with
+  the waiver CHECK-tied to its named recorder), the availability line
+  (**gap 2**: checked against the AGREED term, composed server-side from the
+  frozen mid-campaign sentence or §20's own obligation and stored verbatim),
+  Agreements & Disclosures (the §20 register's real sentences, never the
+  reference's invented one-liner), and Risk & Compliance (**gap 7**'s intake).
+- **Performance & Earnings** — Performance, Earnings, Transfers & Payouts
+  (**gap 3**: the payout reminder sends the EXISTING §27 key, with the ask
+  recorded first and the outcome reported), and Adjustments (§24.8's records,
+  read-only).
+- **Support & Enforcement** — the old `/controls` surface absorbed, plus the
+  0048 termination request whose treatment options are constrained by the
+  chosen §24.8 cause's own register row.
+- **History** — Timeline (the composed feed, absorbed from `/history`) and
+  Communications (`notification_deliveries` itself — the reference derives its
+  list by regex over event titles, which is a mock).
+- **The §1.8 refusals became a register.** `AFFILIATE_OPERATIONS_ABSENCES`
+  names seven controls the reference draws that the Spec forbids, each with
+  the sentence the surface renders where the control would have been:
+  `Create Affiliate Transfer`, the free-form earnings adjuster, the
+  fixed-payment outcome, `Reissue work-again request`, campaign suspend/kill,
+  the combined tier/proposal-access setter, and `Edit Admin-owned relationship
+  data`. A suite test walks the register across the rendered tabs.
+- **Retired** — `/relationships/:associationId`, `/history`, and `/controls`,
+  each redirecting into the tab that absorbed it so a bookmark, a Support
+  context link, or a Tasks reference minted before the rebuild still lands.
+  `CreatorRelationship.tsx`, `CreatorControls.tsx`, `CreatorHistory.tsx`, the
+  four `panes/`, and `parked.ts` are deleted. The §17 review keeps its own
+  address, because its decision is its own act.
 
 ## What Session B shipped (2026-08-17)
 

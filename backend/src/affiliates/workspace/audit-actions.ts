@@ -31,6 +31,18 @@ export const CREATOR_CORRECTION_REQUESTED = 'creator.correction_requested' as co
 export const CREATOR_RECOVERY_SENT = 'creator.password_recovery_sent' as const;
 export const CREATOR_STRIPE_REFRESHED = 'creator.stripe_status_refreshed' as const;
 
+/* The Session C acts (2026-08-17): the 0048 relationship records, the payout
+ * reminder ask, and the §26.7 case intake. */
+export const CREATOR_DELIVERABLE_RECORDED = 'creator.deliverable_recorded' as const;
+export const CREATOR_DELIVERABLE_EVIDENCE = 'creator.deliverable_evidence_recorded' as const;
+export const CREATOR_DELIVERABLE_DECIDED = 'creator.deliverable_decision_recorded' as const;
+export const CREATOR_AVAILABILITY_VERIFIED = 'creator.availability_verified' as const;
+export const CREATOR_MEDIATION_NOTED = 'creator.mediation_note_recorded' as const;
+export const CREATOR_TERMINATION_REQUESTED = 'creator.termination_request_recorded' as const;
+export const CREATOR_TERMINATION_DECIDED = 'creator.termination_request_decided' as const;
+export const CREATOR_PAYOUT_REMINDED = 'creator.payout_reminder_sent' as const;
+export const CREATOR_CASE_OPENED = 'creator.support_case_opened' as const;
+
 /**
  * Every action `history.ts` will render, with the plain sentence it renders as.
  *
@@ -52,6 +64,15 @@ export const CREATOR_AUDIT_TITLES: Record<string, string> = {
   [CREATOR_CORRECTION_REQUESTED]: 'Correction requested from the Affiliate',
   [CREATOR_RECOVERY_SENT]: 'Password recovery link sent',
   [CREATOR_STRIPE_REFRESHED]: 'Stripe status re-read from the provider',
+  [CREATOR_DELIVERABLE_RECORDED]: 'Agreed deliverable recorded',
+  [CREATOR_DELIVERABLE_EVIDENCE]: 'Deliverable evidence receipt recorded',
+  [CREATOR_DELIVERABLE_DECIDED]: 'Deliverable decision recorded',
+  [CREATOR_AVAILABILITY_VERIFIED]: 'Content availability checked',
+  [CREATOR_MEDIATION_NOTED]: 'Proposal mediation note recorded',
+  [CREATOR_TERMINATION_REQUESTED]: 'Termination request recorded',
+  [CREATOR_TERMINATION_DECIDED]: 'Termination request decided',
+  [CREATOR_PAYOUT_REMINDED]: 'Payout reminder sent',
+  [CREATOR_CASE_OPENED]: 'Support case opened',
   // The names the Phase 08–11 affiliate services actually write. A send is not
   // here because it is its own record (`affiliate_invitation_sends`), which the
   // composer reads directly — an audit row beside it would render the same

@@ -25,8 +25,10 @@ import { createAdmin, type AdminSession } from './admin-session.js';
 import { seedAdminReauthWindow } from '../settings/service.js';
 
 import { auditEvents } from '../db/schema/integrity.js';
-import { trackingLinks } from '../db/schema/decisions.js';
+import { trackingLinks, associationCompensationAgreements } from '../db/schema/decisions.js';
 import { campaignAffiliateAssociations, campaigns } from '../db/schema/domain.js';
+import { associationTerminationRequests } from '../db/schema/creator-workspace.js';
+import { midCampaignAdditions } from '../db/schema/live-editing.js';
 import { CREATOR_LINK_PAUSED } from '../affiliates/workspace/audit-actions.js';
 import type { CreatorRelationshipDetail } from '../affiliates/workspace/relationship.js';
 
@@ -437,5 +439,320 @@ describe('§33.12.5 — the relationship routes hold the boundary', () => {
       .set('cookie', staleAdmin.cookie)
       .send({ action: 'pause', reason: 'Reviewing.' })
       .expect(403);
+  });
+});
+
+/* ── The Session C records (migration 0048), driven over real HTTP ────────── */
+
+describe('§22.4 idiom, §14.2, §24.8, §29 — the Session C relationship records', () => {
+  /** An accepted standard-terms agreement, so a deliverable has something to restate. */
+  async function acceptStandardTerms(associationId: string, campaignId: string) {
+    await h.db.insert(associationCompensationAgreements).values({
+      associationId,
+      campaignId,
+      source: 'standard_terms',
+      basePercent: 30,
+      bidIncreasePercent: 0,
+      totalPercent: 30,
+      affiliateAcceptedAt: new Date(),
+      founderAcceptedAt: new Date(),
+    });
+  }
+
+  it('refuses a deliverable with no accepted agreement to restate (§1 rule 6)', async () => {
+    const campaignId = await createCampaign('dlv-none');
+    const { prospectId, associationId } = await recruit(campaignId, 'dlv-none');
+
+    const before = await readRelationship(prospectId, associationId);
+    expect(before.deliverables.canRecord).toBe(false);
+    expect(before.deliverables.sourceLabel).toBeNull();
+
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/deliverables`)
+      .set('cookie', admin.cookie)
+      .send({ title: 'Launch post' })
+      .expect(422);
+    expect((res.body as { whatHappened: string }).whatHappened).toContain('nothing for a');
+  });
+
+  it('records, receipts, and decides a deliverable — the receipts ungated, the decision gated', async () => {
+    const campaignId = await createCampaign('dlv');
+    const { prospectId, associationId } = await recruit(campaignId, 'dlv');
+    await acceptStandardTerms(associationId, campaignId);
+
+    // Recording restates the agreement — UNGATED, so a stale session works,
+    // and the source is computed from the record, never the body.
+    const recorded = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/deliverables`)
+      .set('cookie', staleAdmin.cookie)
+      .send({ title: 'Launch post on the approved channel', source: 'A FORGED SOURCE' })
+      .expect(200);
+    const afterRecord = recorded.body as CreatorRelationshipDetail;
+    expect(afterRecord.deliverables.items).toHaveLength(1);
+    const deliverable = afterRecord.deliverables.items[0]!;
+    expect(deliverable.source).toBe('Standard terms acceptance');
+    expect(deliverable.state).toBe('pending');
+    expect(deliverable.stateLabel).toBe('Waiting on Affiliate');
+
+    // The evidence receipt — a new insert-only row, still ungated.
+    const receipted = await request(h.app)
+      .post(
+        `/api/admin/creators/${prospectId}/relationships/${associationId}/deliverables/${deliverable.id}/evidence`,
+      )
+      .set('cookie', staleAdmin.cookie)
+      .send({ reference: 'https://instagram.com/p/launch-post' })
+      .expect(200);
+    const afterReceipt = receipted.body as CreatorRelationshipDetail;
+    expect(afterReceipt.deliverables.items[0]!.state).toBe('evidence_submitted');
+
+    // The DECISION is the trail §22.8's completion criterion reads — gated.
+    await request(h.app)
+      .post(
+        `/api/admin/creators/${prospectId}/relationships/${associationId}/deliverables/${deliverable.id}/decision`,
+      )
+      .set('cookie', staleAdmin.cookie)
+      .send({ outcome: 'verified', findings: 'The post is live and matches the agreed work.' })
+      .expect(403);
+
+    const decided = await request(h.app)
+      .post(
+        `/api/admin/creators/${prospectId}/relationships/${associationId}/deliverables/${deliverable.id}/decision`,
+      )
+      .set('cookie', admin.cookie)
+      .send({ outcome: 'verified', findings: 'The post is live and matches the agreed work.' })
+      .expect(200);
+    const afterDecision = decided.body as CreatorRelationshipDetail;
+    expect(afterDecision.deliverables.items[0]!.state).toBe('verified');
+    expect(afterDecision.deliverables.resolved).toBe(1);
+  });
+
+  it('ties the waiver to its named recorder and reason, in both directions', async () => {
+    const campaignId = await createCampaign('dlv-waiver');
+    const { prospectId, associationId } = await recruit(campaignId, 'dlv-waiver');
+    await acceptStandardTerms(associationId, campaignId);
+
+    const recorded = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/deliverables`)
+      .set('cookie', admin.cookie)
+      .send({ title: 'Story-format follow-up' })
+      .expect(200);
+    const deliverableId = (recorded.body as CreatorRelationshipDetail).deliverables.items[0]!.id;
+    const decideUrl = `/api/admin/creators/${prospectId}/relationships/${associationId}/deliverables/${deliverableId}/decision`;
+
+    // A waiver with no named recorder is a decision nobody made.
+    const noName = await request(h.app)
+      .post(decideUrl)
+      .set('cookie', admin.cookie)
+      .send({ outcome: 'waived', findings: 'The Founder released this item.' })
+      .expect(422);
+    expect((noName.body as { whatHappened: string }).whatHappened).toContain('named person');
+
+    // A verified decision cannot smuggle one.
+    await request(h.app)
+      .post(decideUrl)
+      .set('cookie', admin.cookie)
+      .send({
+        outcome: 'verified',
+        findings: 'Fine.',
+        waiverRecordedBy: 'Ada Admin',
+        waiverReason: 'n/a',
+      })
+      .expect(422);
+
+    const waived = await request(h.app)
+      .post(decideUrl)
+      .set('cookie', admin.cookie)
+      .send({
+        outcome: 'waived',
+        findings: 'The Founder released this item after the format change.',
+        waiverRecordedBy: 'Founder — recorded by Ada Admin',
+        waiverReason: 'The story format replaced it, by agreement.',
+      })
+      .expect(200);
+    const item = (waived.body as CreatorRelationshipDetail).deliverables.items[0]!;
+    expect(item.state).toBe('waived');
+    expect(item.stateLabel).toBe('Founder/Admin waiver');
+    expect(item.latestDecision?.waiverRecordedBy).toContain('Ada Admin');
+  });
+
+  it('composes the availability term from records and stores it verbatim (gap 2)', async () => {
+    const campaignId = await createCampaign('avail');
+    const { prospectId, associationId } = await recruit(campaignId, 'avail');
+
+    const before = await readRelationship(prospectId, associationId);
+    // §20's own obligation sentence — the register's, never typed on a surface.
+    expect(before.availability.term).toContain(
+      'available for the agreed campaign and availability period',
+    );
+    expect(before.availability.latest).toBeNull();
+
+    // The check is a recorded judgement §22.8 reads — gated.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/availability`)
+      .set('cookie', staleAdmin.cookie)
+      .send({ available: true, detail: 'Checked the live post URL.' })
+      .expect(403);
+
+    const checked = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/availability`)
+      .set('cookie', admin.cookie)
+      .send({ available: true, detail: 'Checked the live post URL against the campaign period.' })
+      .expect(200);
+    const availability = (checked.body as CreatorRelationshipDetail).availability;
+    expect(availability.latest?.available).toBe(true);
+    expect(availability.latest?.termChecked).toBe(before.availability.term);
+    expect(availability.checks).toBe(1);
+  });
+
+  it('uses the frozen mid-campaign sentence as the term for a mid-campaign Creator', async () => {
+    const campaignId = await createCampaign('avail-mid');
+    const { prospectId, associationId } = await recruit(campaignId, 'avail-mid');
+    await h.db.insert(midCampaignAdditions).values({
+      associationId,
+      campaignId,
+      campaignCloseAt: new Date(Date.now() + 9 * 86_400_000),
+      remainingHours: 216,
+      adjustedDeliverables: 'One launch post within the remaining nine days.',
+      openedBy: 'user:test',
+    });
+
+    const detail = await readRelationship(prospectId, associationId);
+    expect(detail.availability.term).toBe('One launch post within the remaining nine days.');
+    expect(detail.availability.termSource).toContain('Mid-campaign');
+  });
+
+  it('records a mediation note, and the table has no acceptance column to write', async () => {
+    const campaignId = await createCampaign('mediate');
+    const { prospectId, associationId } = await recruit(campaignId, 'mediate');
+
+    // UNGATED — what Admin told the parties decides nothing.
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/mediation-note`)
+      .set('cookie', staleAdmin.cookie)
+      .send({ note: 'Clarified that the base percentage excludes sales tax.' })
+      .expect(200);
+    expect((res.body as CreatorRelationshipDetail).mediationNotes).toHaveLength(1);
+
+    // Admin mediates and never agrees — structurally: no column could hold an answer.
+    const { rows } = await h.pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'proposal_mediation_notes'`,
+    );
+    const columns = rows.map((row: { column_name: string }) => row.column_name);
+    for (const forbidden of ['acceptance', 'accepted', 'outcome', 'decision', 'decided_by']) {
+      expect(columns).not.toContain(forbidden);
+    }
+  });
+
+  it('refuses a money treatment the §24.8 cause does not permit — by name, and by CHECK', async () => {
+    const campaignId = await createCampaign('term-matrix');
+    const { prospectId, associationId } = await recruit(campaignId, 'term-matrix');
+
+    // §33.9.3's most tempting wrong simplification, unrepresentable here too.
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/termination-request`)
+      .set('cookie', admin.cookie)
+      .send({
+        reason: 'The Founder wants out.',
+        effectiveAt: new Date().toISOString(),
+        cause: 'founder_or_product',
+        moneyTreatment: 'cancel_unpaid_invalid',
+        receivedVia: 'Email from the Founder.',
+      })
+      .expect(422);
+    expect((res.body as { whatHappened: string }).whatHappened).toContain('§24.8');
+
+    // The database refuses regardless of the service.
+    await expect(
+      h.db.insert(associationTerminationRequests).values({
+        associationId,
+        reason: 'Hand-written.',
+        effectiveAt: new Date(),
+        cause: 'founder_or_product',
+        moneyTreatment: 'cancel_unpaid_invalid',
+        receivedVia: 'A script.',
+        requestedAt: new Date(),
+        recordedBy: 'user:test',
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('holds one open ask per relationship, and the decision is write-once', async () => {
+    const campaignId = await createCampaign('term');
+    const { prospectId, associationId } = await recruit(campaignId, 'term');
+    const url = `/api/admin/creators/${prospectId}/relationships/${associationId}/termination-request`;
+
+    // Recording the ask is UNGATED — the §29.1-disclosure posture.
+    const recorded = await request(h.app)
+      .post(url)
+      .set('cookie', staleAdmin.cookie)
+      .send({
+        reason: 'The Creator asked to step away for health reasons.',
+        effectiveAt: new Date().toISOString(),
+        cause: 'founder_or_product',
+        moneyTreatment: 'earnings_remain',
+        receivedVia: 'Email, forwarded to support.',
+      })
+      .expect(200);
+    const open = (recorded.body as CreatorRelationshipDetail).terminationRequests.open;
+    expect(open).not.toBeNull();
+    expect(open!.causeLabel).toBe('Founder or product caused');
+    expect(open!.treatmentLabel).toContain('earnings remain');
+
+    // A second ask while one waits is a duplicate, not a new decision.
+    const second = await request(h.app)
+      .post(url)
+      .set('cookie', admin.cookie)
+      .send({
+        reason: 'Asked again.',
+        effectiveAt: new Date().toISOString(),
+        cause: 'founder_or_product',
+        moneyTreatment: 'earnings_remain',
+        receivedVia: 'Email.',
+      })
+      .expect(422);
+    expect((second.body as { whatHappened: string }).whatHappened).toContain('already exists');
+
+    // The decision is gated, whole, and write-once.
+    const decisionUrl = `${url}/${open!.id}/decision`;
+    await request(h.app)
+      .post(decisionUrl)
+      .set('cookie', staleAdmin.cookie)
+      .send({ decision: 'declined', note: 'x' })
+      .expect(403);
+    const decided = await request(h.app)
+      .post(decisionUrl)
+      .set('cookie', admin.cookie)
+      .send({ decision: 'declined', note: 'The campaign closes in two days; nothing to end early.' })
+      .expect(200);
+    const after = (decided.body as CreatorRelationshipDetail).terminationRequests;
+    expect(after.open).toBeNull();
+    expect(after.history).toHaveLength(1);
+    expect(after.history[0]!.decision).toBe('declined');
+
+    const again = await request(h.app)
+      .post(decisionUrl)
+      .set('cookie', admin.cookie)
+      .send({ decision: 'applied', note: 'Changed my mind.' })
+      .expect(422);
+    expect((again.body as { whatHappened: string }).whatHappened).toContain('already decided');
+  });
+
+  it('answers the link control with the relationship re-read it always declared', async () => {
+    const campaignId = await createCampaign('link-shape');
+    const { prospectId, associationId } = await recruit(campaignId, 'link-shape');
+    await mintLink(associationId, campaignId, true);
+
+    // Until Session C this route answered with the WORKSPACE read while the
+    // client type said relationship — a type lie the old page's stubbed test
+    // never saw. The campaign tabs render this response, so the shape matters.
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/relationships/${associationId}/link`)
+      .set('cookie', admin.cookie)
+      .send({ action: 'pause', reason: 'Reviewing a report.' })
+      .expect(200);
+    const body = res.body as CreatorRelationshipDetail;
+    expect(body.associationId).toBe(associationId);
+    expect(body.overview.link?.state).toBe('paused');
+    expect(body.band.campaignName).toContain('link-shape');
   });
 });

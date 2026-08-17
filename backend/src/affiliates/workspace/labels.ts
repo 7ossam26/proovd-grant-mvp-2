@@ -281,6 +281,46 @@ export function correctionFieldLabel(key: string): string | null {
   return AFFILIATE_ACCOUNT_CORRECTION_FIELDS.find((f) => f.key === key)?.label ?? null;
 }
 
+/* ── Deliverables (Session C — the 0048 decision vocabulary) ────────────────*/
+
+/**
+ * The three outcomes 0048's decision CHECK admits, and the five states a
+ * deliverable row can render (`pending` and `evidence_submitted` are DERIVED —
+ * no evidence and no decision, or a receipt the latest decision has not
+ * answered). Latest decision wins.
+ */
+export const DELIVERABLE_OUTCOMES = ['verified', 'more_evidence_needed', 'waived'] as const;
+export type DeliverableOutcome = (typeof DELIVERABLE_OUTCOMES)[number];
+
+export const DELIVERABLE_STATE_LABELS: Record<string, string> = {
+  pending: 'Waiting on Affiliate',
+  evidence_submitted: 'Evidence submitted',
+  verified: 'Verified',
+  more_evidence_needed: 'More evidence needed',
+  waived: 'Founder/Admin waiver',
+};
+
+export function deliverableStateLabel(state: string): string {
+  return DELIVERABLE_STATE_LABELS[state] ?? state;
+}
+
+/**
+ * §24.8's five affiliate treatments, in the words the termination-request
+ * surface renders. The permitted set per cause is `refunds/logic.ts`'s
+ * register (the same matrix 0048 CHECKs); this map only says the words.
+ */
+export const AFFILIATE_TREATMENT_LABELS: Record<string, string> = {
+  not_attributed: 'Not attributed — no Affiliate earnings exist on it',
+  earnings_remain: 'Valid Affiliate earnings remain',
+  cancel_unfinalized: 'Cancel unfinalized earnings on the affected transactions',
+  cancel_unpaid_invalid: 'Cancel unpaid invalid earnings',
+  contractual_recovery: 'Contractual recovery of the invalid amount',
+};
+
+export function affiliateTreatmentLabel(key: string): string {
+  return AFFILIATE_TREATMENT_LABELS[key] ?? key;
+}
+
 /* ── History ────────────────────────────────────────────────────────────────*/
 
 export const CREATOR_HISTORY_CATEGORY_KEYS = [

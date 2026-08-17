@@ -133,6 +133,13 @@ export interface CreatorHeader {
 
   attention: CreatorAttention;
 
+  /**
+   * Open §26.7 cases anchored on this person — the Support tab's badge
+   * (Session C). Counted from the same rows the standing pane lists, so the
+   * badge and the list can never disagree.
+   */
+  openCases: number;
+
   /** Which menu actions this record's state actually permits. */
   availableActions: CreatorMenuAction[];
 }
@@ -408,6 +415,40 @@ export interface CreatorStandingPane {
   }[];
   /** §29.8: an outstanding requirement blocks every `/api/creator` call. */
   policyReacceptanceOpen: boolean;
+  /**
+   * The person's §26.7 cases (Session C) — anchored on their account or one of
+   * their associations, because `support_cases` has no prospect column and
+   * needs none. Operating a case stays the Support workspace's; each row
+   * carries the address that owns it.
+   */
+  cases: CreatorCaseView[];
+}
+
+export interface CreatorCaseView {
+  id: string;
+  /** The quotable `PVD-…` reference (§33.9.10). */
+  reference: string;
+  topic: string;
+  subject: string | null;
+  status: string;
+  /** Open work — `status <> 'resolved'`, the queue's own membership rule. */
+  open: boolean;
+  openedAt: string | null;
+  /** The Support workspace address that operates this case. */
+  href: string;
+}
+
+export interface CreatorCommunicationView {
+  /** The §27 key — the label resolves in the browser from the shared registry
+      (Phase 22c's rule: the backend returns the key, never a fourth copy). */
+  eventKey: string;
+  target: string;
+  entityType: string;
+  entityId: string;
+  /** Confirmed at the provider, or recorded-not-confirmed (§1.4's state). */
+  confirmed: boolean;
+  at: string | null;
+  occurredAt: string;
 }
 
 /* ── History ────────────────────────────────────────────────────────────────*/
@@ -436,4 +477,10 @@ export interface CreatorWorkspaceDetail {
   history: CreatorHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;
+  /**
+   * The person's `notification_deliveries` rows (Session C) — the real record
+   * of recipient, event key, delivery state, and dedup entity. Audience-
+   * prefixed to `affiliate_*`, newest first, bounded.
+   */
+  communications: CreatorCommunicationView[];
 }
