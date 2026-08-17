@@ -43,6 +43,7 @@ import type {
   FounderListRow,
   FounderMenuAction,
   FounderWorkspaceDetail,
+  EligibilityView,
   InvitationView,
   MeetingNoteView,
   MoneyPane,
@@ -97,7 +98,12 @@ import {
   type FounderProspect,
 } from '../db/schema/invitations.js';
 import { secureTokens } from '../db/schema/tokens.js';
-import { campaignVetting, founderClaimProfiles, type FounderClaimProfile } from '../db/schema/vetting.js';
+import {
+  campaignVetting,
+  founderClaimProfiles,
+  policyConsents,
+  type FounderClaimProfile,
+} from '../db/schema/vetting.js';
 import { account, user } from '../db/schema/auth.js';
 import { campaignBuild, campaignReviews, reviewFeedbackItems } from '../db/schema/build.js';
 import { listingFeePayments, listingFeeRefunds } from '../db/schema/listing.js';
@@ -911,6 +917,7 @@ export async function readFounderWorkspace(
   const { adminAction, founderAction } = actionCells(facts);
 
   const discovery = await composeDiscovery(db, ctx);
+  const eligibility = await composeEligibility(db, ctx, overview);
   const campaignFacts = await composeCampaignFacts(db, ctx, now);
 
   const header: FounderHeader = {
@@ -951,11 +958,100 @@ export async function readFounderWorkspace(
     campaigns: campaignsPane,
     money,
     discovery,
+    eligibility,
     campaignFacts,
     history,
     historyCounts: historyCountsOf(history),
   };
 }
+
+/* ── Eligibility (§10, §5, Session B 2026-08-17) ───────────────────────────── */
+
+/**
+ * The Eligibility tab's read-only facts: the claim, the recorded
+ * representations, and the `policy_consents` rows the claim wrote.
+ *
+ * Nothing here is derivable-by-Admin, and nothing is editable from the tab —
+ * that is the tab's whole point (`ELIGIBILITY_READ_ONLY_NOTE`). Three answers
+ * for every fact, not two: `null` means no claim profile exists yet, which is
+ * not "No" (§16a — a representation nobody has been asked for is not one that
+ * was declined). The 18+/US facts are the Founder's recorded REPRESENTATIONS
+ * (§10): the product derives no age from the DOB and never claims to have
+ * verified one, which is why `dobSupplied` reports presence and nothing else.
+ */
+async function composeEligibility(
+  db: Database,
+  ctx: FounderContext,
+  overview: OverviewPane,
+): Promise<EligibilityView> {
+  const claim = ctx.claim;
+
+  const consents = ctx.accountUserId
+    ? await db
+        .select({
+          slug: policyConsents.slug,
+          version: policyConsents.version,
+          acceptedAt: policyConsents.acceptedAt,
+        })
+        .from(policyConsents)
+        .where(
+          and(
+            eq(policyConsents.subjectType, 'user'),
+            eq(policyConsents.subjectId, ctx.accountUserId),
+          ),
+        )
+        .orderBy(desc(policyConsents.acceptedAt))
+    : [];
+
+  const location =
+    claim?.stateRegion || claim?.country
+      ? [claim?.stateRegion, claim?.country].filter(Boolean).join(' · ')
+      : null;
+
+  return {
+    claim: {
+      inviteClaimed: ctx.prospect.claimedAt !== null,
+      claimedAt: formatInstant(ctx.prospect.claimedAt),
+      accountCreatedAt: overview.accountCreatedAt,
+      completion: claim?.claimedAt ? 'Complete' : claim ? 'In progress' : 'Not started',
+      connectedRecord: ctx.prospect.recordReference,
+    },
+    facts: {
+      dobSupplied: claim ? claim.dateOfBirth !== null : null,
+      age18Plus: claim ? claim.representationAge18Plus : null,
+      usPerson: claim ? claim.representationUsPerson : null,
+      location,
+      sanctionsClear: claim ? claim.representationSanctions : null,
+    },
+    acknowledgements: consents.map((consent) => ({
+      label: POLICY_CONSENT_LABELS[consent.slug] ?? consent.slug,
+      version: consent.version,
+      acceptedAt: formatInstant(consent.acceptedAt) ?? consent.acceptedAt.toISOString(),
+    })),
+    // Two different absences, said apart (§1.4): a person who has not claimed
+    // has not been asked, while a completed claim with no consent rows cannot
+    // exist — the claim refuses while the policies are drafts, so the honest
+    // in-between is "the claim has not completed yet".
+    acknowledgementsAbsent:
+      consents.length > 0
+        ? null
+        : ctx.accountUserId === null
+          ? 'Recorded at the account claim. This Founder has not claimed an account yet.'
+          : 'The account claim has not completed yet, so no acceptance is recorded. A consent can cite only a published policy version.',
+  };
+}
+
+/**
+ * §3.1 labels for the consent slugs a Founder claim records. An unknown slug
+ * renders as itself — a new document should be visible, not hidden.
+ */
+const POLICY_CONSENT_LABELS: Record<string, string> = {
+  terms: 'Terms of Service',
+  'founder-aup': 'Founder Acceptable Use Policy',
+  privacy: 'Privacy Policy',
+  'affiliate-aup': 'Creator Acceptable Use Policy',
+  'ip-agreement': 'IP & Promotion Agreement',
+};
 
 /* ── Discovery & internal context (§7, 2026-08-16 rebuild) ─────────────────── */
 
@@ -1263,6 +1359,25 @@ async function composeOverview(
     canSend: preview !== null && !preview.blocked && ctx.prospect.claimedAt === null,
     history: invitationHistory(ctx, sends, openedAt, revokedAt, names),
     technical: tokenFacts(live, tokens.length),
+    facts: {
+      sendCount: sends.length,
+      tokenVersion: live?.version ?? tokens[0]?.version ?? null,
+      // A sentence, not an instant: the state is what an Admin acts on, and
+      // "Link inactive" covers expired, revoked, and claimed alike — which of
+      // those it was is the history's job to say (§28.1 keeps enumeration out
+      // of one-line summaries everywhere else; the same posture here).
+      expiration: live
+        ? live.expiresAt
+          ? `Live until ${formatInstant(live.expiresAt) ?? live.expiresAt.toISOString()}`
+          : 'Live'
+        : sends.length > 0
+          ? 'Link inactive'
+          : 'No link issued yet',
+      claimed: ctx.prospect.claimedAt
+        ? `Recorded ${formatInstant(ctx.prospect.claimedAt) ?? ''}`.trim()
+        : null,
+      revoked: revokedAt !== null,
+    },
   };
 
   const vetting = await composeVetting(db, ctx);

@@ -445,11 +445,14 @@ describe('§26.1 the workspace serves five panes composed from the records', () 
     // `discovery` and `campaignFacts` joined on 2026-08-16: the rebuilt
     // Overview renders §7's discovery record and the current campaign's live
     // facts, both composed server-side like everything else here.
+    // `eligibility` joined on 2026-08-17 (Session B): the Onboarding section's
+    // read-only claim and representation facts.
     expect(Object.keys(detail).sort()).toEqual([
       'campaignFacts',
       'campaigns',
       'details',
       'discovery',
+      'eligibility',
       'header',
       'history',
       'historyCounts',
@@ -1851,5 +1854,136 @@ describe('a research entry appends to §7 discovery evidence', () => {
 
     const rows = await auditRows('founder.research_recorded', founder.prospectId);
     expect(rows).toHaveLength(1);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   14 · Session B — the Onboarding payload: eligibility and invitation facts
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('the Eligibility view is read-only facts, three-valued (§10, §16a)', () => {
+  it('a pre-claim record answers null, which is not "No"', async () => {
+    const founder = await invited('elig-preclaim');
+    const detail = await workspaceOf(founder.prospectId);
+
+    // No claim profile exists: every fact is null — "nobody has been asked",
+    // never a declined representation (§16a's not-populated-is-not-zero).
+    expect(detail.eligibility.claim.inviteClaimed).toBe(false);
+    expect(detail.eligibility.claim.claimedAt).toBeNull();
+    expect(detail.eligibility.claim.completion).toBe('Not started');
+    expect(detail.eligibility.claim.connectedRecord).toMatch(/^F-/);
+    expect(detail.eligibility.facts).toEqual({
+      dobSupplied: null,
+      age18Plus: null,
+      usPerson: null,
+      location: null,
+      sanctionsClear: null,
+    });
+    expect(detail.eligibility.acknowledgements).toEqual([]);
+    // The absence names ITS case: not claimed, as distinct from mid-claim.
+    expect(detail.eligibility.acknowledgementsAbsent).toContain('has not claimed an account');
+  });
+
+  it('a claimed record reports the representations as recorded, and the DOB as presence only', async () => {
+    const founder = await invited('elig-claimed');
+    const account = await claimAccount(founder, 'elig-claimed');
+    await h.pool.query(
+      `UPDATE founder_claim_profiles
+          SET date_of_birth = '1990-04-23', date_of_birth_supplier = 'founder',
+              country = 'United States', country_supplier = 'founder',
+              state_region = 'Chicago, IL', state_region_supplier = 'founder',
+              representation_us_person = true, representation_age_18_plus = true,
+              representation_sanctions = true
+        WHERE prospect_id = $1`,
+      [founder.prospectId],
+    );
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.eligibility.claim.inviteClaimed).toBe(true);
+    expect(detail.eligibility.claim.completion).toBe('Complete');
+    expect(detail.eligibility.facts.dobSupplied).toBe(true);
+    expect(detail.eligibility.facts.age18Plus).toBe(true);
+    expect(detail.eligibility.facts.usPerson).toBe(true);
+    expect(detail.eligibility.facts.sanctionsClear).toBe(true);
+    expect(detail.eligibility.facts.location).toBe('Chicago, IL · United States');
+
+    // The DOB VALUE appears nowhere in the eligibility view — the tab reports
+    // presence and nothing more; the value lives behind the §25.6 field edit.
+    expect(JSON.stringify(detail.eligibility)).not.toContain('1990-04-23');
+
+    // No consent rows yet: the absence names the mid-claim case, because an
+    // account with zero consents can only be mid-claim in the real flow — the
+    // claim writes them atomically and refuses on draft policies.
+    expect(detail.eligibility.acknowledgementsAbsent).toContain('has not completed');
+    void account;
+  });
+
+  it('a recorded policy consent renders as an acknowledgement with version and instant', async () => {
+    const founder = await invited('elig-consent');
+    const account = await claimAccount(founder, 'elig-consent');
+
+    // Publication is one-way (§29.8's trigger) and this suite has its own
+    // database, so publishing here leaks into nothing else.
+    await h.pool.query(
+      `UPDATE policy_versions
+          SET status = 'published', effective_date = now(), published_at = now()
+        WHERE slug = 'terms'`,
+    );
+    const { rows } = await h.pool.query(
+      `SELECT id, version FROM policy_versions WHERE slug = 'terms' LIMIT 1`,
+    );
+    await h.pool.query(
+      `INSERT INTO policy_consents (subject_type, subject_id, policy_version_id, slug, version, accepted_via)
+       VALUES ('user', $1, $2, 'terms', $3, 'founder_account_claim')`,
+      [account.id, rows[0].id, rows[0].version],
+    );
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.eligibility.acknowledgements).toHaveLength(1);
+    expect(detail.eligibility.acknowledgements[0]).toMatchObject({
+      label: 'Terms of Service',
+      version: rows[0].version,
+    });
+    expect(detail.eligibility.acknowledgements[0]!.acceptedAt).toBeTruthy();
+    expect(detail.eligibility.acknowledgementsAbsent).toBeNull();
+  });
+});
+
+describe('the invitation record renders as facts, never a token value (§28.1)', () => {
+  it('a live link reports its version and window; a revoked one reports the state', async () => {
+    const founder = await invited('inv-facts');
+    let detail = await workspaceOf(founder.prospectId);
+
+    expect(detail.overview.invitation.facts.sendCount).toBe(1);
+    expect(detail.overview.invitation.facts.tokenVersion).toBe(1);
+    expect(detail.overview.invitation.facts.expiration).toMatch(/^Live until /);
+    expect(detail.overview.invitation.facts.claimed).toBeNull();
+    expect(detail.overview.invitation.facts.revoked).toBe(false);
+
+    // The facts block never carries the raw token (§28.1) — the only place the
+    // value exists is the delivered URL.
+    expect(JSON.stringify(detail.overview.invitation.facts)).not.toContain(founder.raw);
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/invitation/cancel`)
+      .set('cookie', admin.cookie)
+      .send({ reason: 'Recorded for the facts test.' })
+      .expect(200);
+
+    detail = await workspaceOf(founder.prospectId);
+    expect(detail.overview.invitation.facts.expiration).toBe('Link inactive');
+    expect(detail.overview.invitation.facts.revoked).toBe(true);
+  });
+
+  it('a prospect with no send yet says so', async () => {
+    const founder = await createFounder('inv-nosend');
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.overview.invitation.facts).toEqual({
+      sendCount: 0,
+      tokenVersion: null,
+      expiration: 'No link issued yet',
+      claimed: null,
+      revoked: false,
+    });
   });
 });

@@ -35,9 +35,11 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
   ATTENTION_CHIP_LABEL,
   CREATOR_MATCH_CAVEAT,
+  ELIGIBILITY_READ_ONLY_NOTE,
   IDENTITY_CHECK_HELPER,
   NO_ACTIVE_CAMPAIGN_LABEL,
   NO_ATTENTION_ROW_LABEL,
+  OPTIONAL_ITEM_CONTENT_IS_FOUNDERS,
   PARKED_MESSAGES,
   STATE_QUESTIONS,
   SUMMARY_IS_NOT_ADMIN_WRITABLE,
@@ -345,6 +347,13 @@ function workspaceFixture(): FounderWorkspaceDetail {
         ],
         technical:
           'Token version 1 · expires Aug 15, 2026. The link value itself is never stored.',
+        facts: {
+          sendCount: 1,
+          tokenVersion: 1,
+          expiration: 'Link inactive',
+          claimed: 'Recorded Aug 2, 2026 · 12:10 PM',
+          revoked: false,
+        },
       },
       vetting: {
         progress: [
@@ -540,6 +549,26 @@ function workspaceFixture(): FounderWorkspaceDetail {
       ],
       research: [],
       meetingNotes: [],
+    },
+    eligibility: {
+      claim: {
+        inviteClaimed: true,
+        claimedAt: 'Aug 2, 2026 · 12:10 PM',
+        accountCreatedAt: 'Aug 2, 2026 · 12:10 PM',
+        completion: 'Complete',
+        connectedRecord: 'F-7K3MQ',
+      },
+      facts: {
+        dobSupplied: true,
+        age18Plus: true,
+        usPerson: true,
+        location: 'NY · US',
+        sanctionsClear: true,
+      },
+      acknowledgements: [
+        { label: 'Terms of Service', version: 'v1.0', acceptedAt: 'Aug 2, 2026 · 12:10 PM' },
+      ],
+      acknowledgementsAbsent: null,
     },
     campaignFacts: null,
     historyCounts: {
@@ -911,8 +940,9 @@ describe('§27.1, §1.1 — loading, empty, and failure each answer for themselv
     expect(await screen.findByText('No Founders yet')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
     // An empty list is a state somebody can act on, so the panel carries the
-    // one action that changes it.
-    expect(screen.getAllByRole('button', { name: 'Create Founder' }).length).toBeGreaterThan(0);
+    // one action that changes it — a LINK since Session B: Create Founder is
+    // the five-step compose page, not a dialog.
+    expect(screen.getAllByRole('link', { name: 'Create Founder' }).length).toBeGreaterThan(0);
     expect(unansweredQuestions(container)).toEqual([]);
   });
 
@@ -1060,12 +1090,16 @@ describe('the setup answers are the Founder’s own, with legacy Competition pre
       row.querySelector('dd.fanswer'),
     ) as HTMLElement[];
 
+    // Session B's Invite & Prefills tab: Problem/Solution/views live on the
+    // prefills panel and the legacy Competition answer in its own panel, whose
+    // value row is labelled "Current text" under the "Competition" heading.
     expect(answerRows.map((row) => row.querySelector('dt')?.textContent)).toEqual([
       'Problem',
       'Solution',
       'Amount of views',
-      'Competition',
+      'Current text',
     ]);
+    expect(screen.getByRole('heading', { name: 'Competition' })).toBeInTheDocument();
 
     for (const row of answerRows) {
       const label = row.querySelector('dt')?.textContent;
@@ -1073,13 +1107,15 @@ describe('the setup answers are the Founder’s own, with legacy Competition pre
       // edit — which is why `FOUNDER_EDITABLE_FIELDS` has no entry for any of
       // them and this pane has nothing to offer. Competition is a legacy
       // answer: the simplified flow no longer asks it, and a recorded one
-      // still renders read-only.
+      // still renders read-only — with no edit and no "Record agreed
+      // correction" route, however the reference draws one.
       expect(controlsIn(row), `“${label}” offers a control`).toEqual([]);
     }
 
     expect(
       screen.queryByRole('button', { name: /^Edit (Problem|Solution|Competition|Amount of views)$/ }),
     ).toBeNull();
+    expect(screen.queryByText('Record agreed correction')).toBeNull();
     expect(screen.getByText('Originally prepared by Proovd · Last edited by Rae')).toBeInTheDocument();
   });
 });
@@ -1118,7 +1154,8 @@ describe('§26.2 — an invitation may differ from the profile, and says so', ()
     const { container } = await renderWorkspace();
     await openTab(user, 'Onboarding');
 
-    await user.click(screen.getByRole('button', { name: 'View invitation details' }));
+    // Session B: the overrides render directly on the Invite & Prefills tab —
+    // there is no longer a disclosure between the Admin and the recipient row.
     const overridden = await waitFor(() => rowFor(container, 'Product'));
 
     expect(within(overridden).getByText('The Bench Lamp (pilot batch)')).toBeInTheDocument();
@@ -1140,7 +1177,6 @@ describe('§26.2 — an invitation may differ from the profile, and says so', ()
     const { container } = await renderWorkspace();
     await openTab(user, 'Onboarding');
 
-    await user.click(screen.getByRole('button', { name: 'View invitation details' }));
     const plain = await waitFor(() => rowFor(container, 'Recipient name'));
 
     expect(
@@ -1447,5 +1483,409 @@ describe('§3.1, §3.2 — no internal name reaches the rendered surface', () =>
     // pane says it put it.
     await user.click(screen.getByRole('button', { name: 'Technical details' }));
     expect(await screen.findByText(RAW_STATUS)).toBeInTheDocument();
+  });
+});
+
+/* ── 17. Session B — the Onboarding section's four tabs ────────────────────── */
+
+/** The §12 admin read, as the Optional Items and Stripe tabs consume it. */
+function campaignWorkspaceFixture() {
+  const item = (key: string, complete: boolean, extra: Record<string, unknown> = {}) => ({
+    item: key,
+    complete,
+    completedAt: complete ? 'Aug 4, 2026 · 2:10 PM' : null,
+    decisionSource: complete ? 'evidence' : null,
+    rejections: complete ? [] : ['A story is saved and you have approved it for the public campaign page.'],
+    locked: false,
+    invalidated: { at: null, explanation: null },
+    invalidatedReason: null,
+    invalidatedBy: null,
+    evaluatedAt: 'Aug 4, 2026 · 2:10 PM',
+    evidence: {},
+    ...extra,
+  });
+  return {
+    workspace: {
+      campaignId: CAMPAIGN,
+      items: [
+        item('visuals', true),
+        item('branding', true),
+        item('interview', true),
+        item('story', true),
+        item('socials', false),
+      ],
+      fee: {
+        baseCents: '3500',
+        itemDiscountCents: '200',
+        completedItems: 4,
+        discountLines: [
+          { item: 'visuals', discountCents: '200' },
+          { item: 'branding', discountCents: '200' },
+          { item: 'interview', discountCents: '200' },
+          { item: 'story', discountCents: '200' },
+        ],
+        discountCents: '800',
+        subtotalCents: '2700',
+        calculatedAt: 'Aug 4, 2026 · 2:10 PM',
+        locked: false,
+        separateStreamNote:
+          'This is the one-off fee for listing your campaign, paid to Proovd. It is separate from the 5% Proovd keeps from what your campaign actually collects — that is charged later, only on money you receive, and it is not part of this total.',
+      },
+      highEffort: {
+        visualsCompleted: true,
+        brandingCompleted: true,
+        interviewScheduledOrConfirmed: true,
+        highEffort: true,
+        calculatedAt: 'Aug 4, 2026 · 2:10 PM',
+      },
+      assets: [
+        {
+          id: 'asset-1',
+          purpose: 'visual',
+          state: 'stored',
+          rejection: null,
+          approved: true,
+          removed: false,
+          filename: 'bench-lamp-hero.png',
+          contentType: 'image/png',
+        },
+      ],
+      socials: [
+        {
+          id: 'social-1',
+          url: 'https://example.com/@bench',
+          accessible: true,
+          rejection: null,
+          controlsConfirmedByFounder: true,
+          removed: false,
+        },
+      ],
+      interview: {
+        booking: {
+          id: 'booking-1',
+          status: 'confirmed',
+          scheduledAt: 'Aug 1, 2026 · 10:00 AM',
+          founderTimezone: 'America/Chicago',
+          meetingProvider: 'google_meet_label_free',
+          meetingLink: 'https://meet.example/xyz',
+          interviewer: 'Mina Park',
+        },
+      },
+    },
+  };
+}
+
+const CAMPAIGN_WORKSPACE_READ: StubRoute = {
+  match: /\/api\/admin\/campaigns\/[^/]+\/workspace$/,
+  method: 'GET',
+  body: campaignWorkspaceFixture(),
+};
+
+describe('Session B — the Onboarding section is four tabs behind one question each', () => {
+  it('renders the sub-tab rail, defaults to Invite & Prefills, and keeps the tab in the URL', async () => {
+    const user = userEvent.setup();
+    const view = await renderWorkspace();
+    await openTab(user, 'Onboarding');
+
+    const rail = screen.getByRole('tablist', { name: 'Onboarding record' });
+    expect(
+      within(rail)
+        .getAllByRole('tab')
+        .map((tab) => tab.textContent),
+    ).toEqual(['Invite & Prefills', 'Eligibility', 'Optional Items', 'Stripe & Listing Fee']);
+    expect(within(rail).getByRole('tab', { name: 'Invite & Prefills' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    // The pinned question leads the tab (ONBOARDING_TAB_COPY is the register).
+    expect(
+      screen.getByText('What did we send, and what did the Founder change?'),
+    ).toBeInTheDocument();
+
+    await user.click(within(rail).getByRole('tab', { name: 'Eligibility' }));
+    await waitFor(() => {
+      expect(view.router.state.location.search).toContain('tab=eligibility');
+    });
+    expect(screen.getByText('Did the Founder legitimately become eligible?')).toBeInTheDocument();
+  });
+
+  it('renders the invitation as rows of facts, never a token value (§28.1)', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderWorkspace();
+    await openTab(user, 'Onboarding');
+
+    expect(within(rowFor(container, 'Sends')).getByText('1')).toBeInTheDocument();
+    expect(within(rowFor(container, 'Version')).getByText('Invite v1')).toBeInTheDocument();
+    expect(within(rowFor(container, 'Link')).getByText('Link inactive')).toBeInTheDocument();
+    expect(
+      within(rowFor(container, 'Claimed')).getByText('Recorded Aug 2, 2026 · 12:10 PM'),
+    ).toBeInTheDocument();
+    expect(within(rowFor(container, 'Revoked')).getByText('No')).toBeInTheDocument();
+  });
+
+  it('the Eligibility tab is read-only, structurally — no input, no edit control', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderWorkspace();
+    await openTab(user, 'Onboarding');
+    await user.click(screen.getByRole('tab', { name: 'Eligibility' }));
+
+    await screen.findByText('Eligible — recorded at the account claim');
+
+    const pane = screen.getByRole('tabpanel', { name: 'Onboarding' });
+    // The rule is pinned AND enforced by absence: nothing on this tab can
+    // write. The two History buttons navigate; neither edits.
+    expect(within(pane).getByText(ELIGIBILITY_READ_ONLY_NOTE)).toBeInTheDocument();
+    expect(pane.querySelectorAll('input, select, textarea')).toHaveLength(0);
+    expect(within(pane).queryByRole('button', { name: /edit/i })).toBeNull();
+
+    // The representations render as what they are — recorded representations,
+    // never a verified age (§10) — and the DOB as presence only.
+    expect(within(rowFor(container, 'Date of birth')).getByText('Supplied')).toBeInTheDocument();
+    expect(visibleText(rowFor(container, '18 or older'))).toContain('Represented — 18+');
+    expect(
+      within(rowFor(container, 'Acknowledgement 1')).getByText(/Terms of Service v1\.0/),
+    ).toBeInTheDocument();
+  });
+
+  it('the Optional Items tab reads the §12 route and decides through its dialogs', async () => {
+    serve(adminRoutes({ before: [CAMPAIGN_WORKSPACE_READ] }));
+    const user = userEvent.setup();
+    await renderWorkspace();
+    await openTab(user, 'Onboarding');
+    await user.click(screen.getByRole('tab', { name: 'Optional Items' }));
+
+    // The hero is the fee record's own count over the register's five.
+    await screen.findByText('4 of 5 qualify');
+    expect(screen.getByRole('heading', { name: 'Story' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Socials' })).toBeInTheDocument();
+
+    // Track A4: no upload path exists, so no upload control renders — not a
+    // disabled one, none (§1.4).
+    expect(screen.queryByText('Add / replace')).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+
+    // §12's division of labour is pinned on the tab.
+    expect(screen.getByText(OPTIONAL_ITEM_CONTENT_IS_FOUNDERS)).toBeInTheDocument();
+
+    // Marking an item invalid demands both §12 sentences and posts to the
+    // §12 route — the same one the old admin surface drove.
+    serve([
+      {
+        match: /\/api\/admin\/campaigns\/[^/]+\/workspace\/items\/visuals\/invalidate$/,
+        method: 'POST',
+        body: campaignWorkspaceFixture(),
+      },
+      CAMPAIGN_WORKSPACE_READ,
+      ...adminRoutes(),
+    ]);
+    await user.click(screen.getAllByRole('button', { name: 'Mark invalid' })[0]!);
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Internal reason'), 'The file is a placeholder.');
+    await user.type(
+      within(dialog).getByLabelText('Explanation Rae will read'),
+      'The uploaded visual is a single-colour block, so it cannot count yet.',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Mark invalid' }));
+
+    await waitFor(() => {
+      const posts = requestsTo(/\/workspace\/items\/visuals\/invalidate$/);
+      expect(posts).toHaveLength(1);
+      expect(JSON.parse(posts[0]!.body ?? '{}')).toEqual({
+        reason: 'The file is a placeholder.',
+        explanation: 'The uploaded visual is a single-colour block, so it cannot count yet.',
+      });
+    });
+  });
+
+  it('the Stripe & Listing Fee tab answers from the money record and the provider dialog', async () => {
+    serve(adminRoutes({ before: [CAMPAIGN_WORKSPACE_READ] }));
+    const user = userEvent.setup();
+    const { container } = await renderWorkspace();
+    await openTab(user, 'Onboarding');
+    await user.click(screen.getByRole('tab', { name: 'Stripe & Listing Fee' }));
+
+    await screen.findByText('Can this Founder move into campaign work?');
+    expect(
+      within(rowFor(container, 'Connected account')).getByText('acct_test_harlow'),
+    ).toBeInTheDocument();
+
+    // The secure-status dialog is read-only provider facts (§13: the status
+    // and the identifiers, never the documents).
+    await user.click(screen.getByRole('button', { name: 'Open secure status' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Stripe requirements')).toBeInTheDocument();
+    expect(controlsIn(dialog).filter((el) => el.matches('input, select, textarea'))).toEqual([]);
+    await user.click(within(dialog).getByRole('button', { name: 'Done' }));
+
+    // The listing fee renders the payment row's own stored lines.
+    expect(screen.getByText('Base listing fee')).toBeInTheDocument();
+    expect(screen.getByText('Charged')).toBeInTheDocument();
+  });
+});
+
+/* ── 18. Session B — the Create Founder compose ────────────────────────────── */
+
+describe('Session B — Create Founder is a page: five steps, one checklist, two acts', () => {
+  it('renders the refused reference boxes as reasons, not inputs', async () => {
+    await renderAdmin('/admin/founders/new');
+
+    expect(screen.getByRole('heading', { name: 'Create Founder' })).toBeInTheDocument();
+
+    // The register is the contract: every refused box renders its reason and
+    // no input. A `Founder story` textarea reappearing here is the §1.8
+    // conflict the first build already paid for.
+    expect(screen.queryByLabelText(/Founder story/i)).toBeNull();
+    expect(screen.queryByLabelText(/Audience/i)).toBeNull();
+    expect(screen.queryByLabelText(/Business explanation/i)).toBeNull();
+    expect(screen.queryByLabelText(/Meeting notes/i)).toBeNull();
+    expect(screen.getByText(/No founder story box\./)).toBeInTheDocument();
+    expect(screen.getByText(/No visual asset uploads box\./)).toBeInTheDocument();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+
+    // Competition has NO box and NO absence note needing one — the checklist
+    // rail carries the §9 sentence instead.
+    expect(screen.queryByLabelText(/Competition/i)).toBeNull();
+    expect(
+      screen.getByText(/Competition stays Founder-written and is never prefilled here/),
+    ).toBeInTheDocument();
+  });
+
+  it('the checklist answers the form, and Create & send stays closed until it passes', async () => {
+    const user = userEvent.setup();
+    await renderAdmin('/admin/founders/new');
+
+    const send = screen.getByRole('button', { name: 'Create & send invitation' });
+    expect(send).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Founder name'), 'Noor Vance');
+    await user.type(screen.getByLabelText('Business name'), 'Vance Audio');
+    await user.type(screen.getByLabelText('Email'), 'noor@vance.example');
+    await user.type(screen.getByLabelText('US city and state'), 'Austin, TX');
+    await user.type(screen.getByLabelText('Discovery source'), 'Founder research');
+    await user.type(screen.getByLabelText('Internal owner'), 'Sam Okafor');
+    await user.type(screen.getByLabelText('What we know so far'), 'A modular synth pedal.');
+    await user.type(
+      screen.getByLabelText('Why we think they could be a fit'),
+      'Sells direct already.',
+    );
+    await user.type(screen.getByLabelText('Estimated time to get started'), 'About 20 minutes');
+
+    // All five lines flip; the rail stays a courtesy — the send route
+    // re-decides server-side and the page says so.
+    const rail = screen.getByRole('complementary', { name: 'Before you send' });
+    await waitFor(() => {
+      expect(within(rail).queryAllByText(/— not yet/)).toHaveLength(0);
+    });
+    expect(screen.getByRole('button', { name: 'Create & send invitation' })).toBeEnabled();
+  });
+
+  it('Create prospect writes the records through §7’s own routes and lands on the record', async () => {
+    const created = { prospectId: PROSPECT, campaignId: CAMPAIGN, draftId: 'draft-1' };
+    serve([
+      { match: /\/api\/admin\/founders$/, method: 'POST', body: created },
+      { match: /\/api\/admin\/founders\/draft-1\/prospect$/, method: 'PUT', body: { ok: true } },
+      {
+        match: /\/api\/admin\/founders\/[^/]+\/fields\/[^/]+$/,
+        method: 'PUT',
+        body: workspaceFixture(),
+      },
+      ...adminRoutes(),
+    ]);
+    const user = userEvent.setup();
+    const view = await renderAdmin('/admin/founders/new');
+
+    await user.type(screen.getByLabelText('Founder name'), 'Noor Vance');
+    await user.type(screen.getByLabelText('Business name'), 'Vance Audio');
+    await user.type(screen.getByLabelText('Email'), 'noor@vance.example');
+    await user.type(screen.getByLabelText('US city and state'), 'Austin, TX');
+    await user.click(screen.getByRole('button', { name: 'Create prospect' }));
+
+    await waitFor(() => {
+      expect(view.router.state.location.pathname).toBe(`/admin/founders/${PROSPECT}`);
+    });
+    expect(view.router.state.location.search).toContain('section=onboarding');
+
+    // The create carried the identity; the 0043 state field went through the
+    // person-keyed field route rather than a body key the route ignores.
+    const post = requestsTo(/\/api\/admin\/founders$/).find((r) => r.method === 'POST');
+    expect(JSON.parse(post?.body ?? '{}')).toMatchObject({
+      legalName: 'Noor Vance',
+      email: 'noor@vance.example',
+      productName: 'Vance Audio',
+    });
+    const fieldPuts = requestsTo(/\/fields\/state$/);
+    expect(fieldPuts).toHaveLength(1);
+    expect(JSON.parse(fieldPuts[0]!.body ?? '{}')).toEqual({ value: 'Austin, TX' });
+  });
+});
+
+/* ── 19. Session B — the Edit Founder sheet ────────────────────────────────── */
+
+describe('Session B — the Edit Founder sheet carries the editable core and nothing else', () => {
+  async function openSheet(user: ReturnType<typeof userEvent.setup>) {
+    await renderWorkspace();
+    await user.click(screen.getByRole('button', { name: 'Account actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit Founder information' }));
+    return await screen.findByRole('dialog', { name: 'Edit Founder' });
+  }
+
+  it('renders the profile fields and refuses the reference’s five (§9, §12, derived state)', async () => {
+    const user = userEvent.setup();
+    const sheet = await openSheet(user);
+
+    // The editable core: FOUNDER_EDITABLE_FIELDS' profile group.
+    expect(within(sheet).getByLabelText('Legal name')).toBeInTheDocument();
+    expect(within(sheet).getByLabelText('Phone')).toBeInTheDocument();
+    expect(within(sheet).getByLabelText('Legal business name')).toBeInTheDocument();
+
+    // The refusals, each an absence: the §9 answers and the Story have no
+    // editable key; the account status is derived from three records; the
+    // audience range is the Founder's own closed-list answer.
+    expect(within(sheet).queryByLabelText(/Problem/)).toBeNull();
+    expect(within(sheet).queryByLabelText(/Solution/)).toBeNull();
+    expect(within(sheet).queryByLabelText(/story/i)).toBeNull();
+    expect(within(sheet).queryByLabelText(/status/i)).toBeNull();
+    expect(within(sheet).queryByLabelText(/audience/i)).toBeNull();
+    expect(sheet.querySelectorAll('select')).toHaveLength(0);
+  });
+
+  it('writes only what changed, with the one reason, through the existing field route', async () => {
+    serve([
+      {
+        match: /\/api\/admin\/founders\/[^/]+\/fields\/[^/]+$/,
+        method: 'PUT',
+        body: workspaceFixture(),
+      },
+      ...adminRoutes(),
+    ]);
+    const user = userEvent.setup();
+    const sheet = await openSheet(user);
+
+    const phone = within(sheet).getByLabelText('Phone');
+    await user.clear(phone);
+    await user.type(phone, '+1 555 0199');
+
+    // Rae owns the account, so the sheet mirrors `editReasonRequired` and
+    // refuses before anything is sent.
+    await user.click(within(sheet).getByRole('button', { name: 'Save new version' }));
+    expect(await within(sheet).findByRole('alert')).toHaveTextContent(/stated reason/);
+    expect(requestsTo(/\/fields\//)).toHaveLength(0);
+
+    await user.type(
+      within(sheet).getByLabelText('Reason / context'),
+      'Rae asked support to correct the number.',
+    );
+    await user.click(within(sheet).getByRole('button', { name: 'Save new version' }));
+
+    await waitFor(() => {
+      const puts = requestsTo(/\/fields\//);
+      // ONE write: the one changed field, not the eleven on the sheet.
+      expect(puts).toHaveLength(1);
+      expect(puts[0]!.url).toContain('/fields/phone');
+      expect(JSON.parse(puts[0]!.body ?? '{}')).toEqual({
+        value: '+1 555 0199',
+        reason: 'Rae asked support to correct the number.',
+      });
+    });
   });
 });

@@ -322,6 +322,16 @@ export interface InvitationView {
   history: { at: string; title: string; body: string }[];
   /** Token facts only — never a value (§28.1). */
   technical: string;
+
+  /** The invitation record as rows (Session B). Never a token value (§28.1). */
+  facts: {
+    sendCount: number;
+    tokenVersion: number | null;
+    /** A sentence — "Live until …" | "Link inactive" | "No link issued yet". */
+    expiration: string;
+    claimed: string | null;
+    revoked: boolean;
+  };
 }
 
 export interface VettingView {
@@ -538,6 +548,30 @@ export interface CampaignFactsView {
   publicUrl: string | null;
 }
 
+/**
+ * The Eligibility tab's read-only facts (Session B). Mirrors
+ * `backend/src/founders/types.ts` name for name. `null` on a fact means no
+ * claim profile exists yet — not "No" (§16a).
+ */
+export interface EligibilityView {
+  claim: {
+    inviteClaimed: boolean;
+    claimedAt: string | null;
+    accountCreatedAt: string | null;
+    completion: string;
+    connectedRecord: string;
+  };
+  facts: {
+    dobSupplied: boolean | null;
+    age18Plus: boolean | null;
+    usPerson: boolean | null;
+    location: string | null;
+    sanctionsClear: boolean | null;
+  };
+  acknowledgements: { label: string; version: string; acceptedAt: string }[];
+  acknowledgementsAbsent: string | null;
+}
+
 export interface FounderWorkspaceDetail {
   header: FounderHeader;
   overview: OverviewPane;
@@ -545,6 +579,7 @@ export interface FounderWorkspaceDetail {
   campaigns: CampaignsPane;
   money: MoneyPane;
   discovery: DiscoveryView;
+  eligibility: EligibilityView;
   campaignFacts: CampaignFactsView | null;
   history: FounderHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
@@ -896,6 +931,165 @@ export const setNextCampaignReadiness = (
   call(`${founderBase(prospectId)}/next-campaign-readiness`, {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+
+/* ── The §12 optional items, read and decided (Session B) ─────────────────── */
+
+/*
+ * The Optional Items and Stripe & Listing Fee tabs read the §12 admin route
+ * directly — `/api/admin/campaigns/:campaignId/workspace` — which has been
+ * mounted and §33-tested since Phase 09a and screenless since 2026-08-10.
+ * Nothing here is a second door: invalidate/reinstate/override and the
+ * interview reconciliation are the same freshness-gated routes the old
+ * surface drove, and every response returns the re-read workspace.
+ */
+
+export interface CampaignWorkspaceItem {
+  item: string;
+  complete: boolean;
+  completedAt: string | null;
+  decisionSource: string | null;
+  rejections: string[];
+  /** §12's "before payment" lock. */
+  locked: boolean;
+  invalidated: { at: string | null; explanation: string | null };
+  /** Admin-only: the internal reason (§25.6's own column). */
+  invalidatedReason: string | null;
+  invalidatedBy: string | null;
+  evaluatedAt: string | null;
+  /** The evidence snapshot the decision rested on. Shape varies per item. */
+  evidence: unknown;
+}
+
+export interface CampaignWorkspaceFee {
+  baseCents: string;
+  itemDiscountCents: string;
+  completedItems: number;
+  discountLines: { item: string; discountCents: string }[];
+  discountCents: string;
+  subtotalCents: string;
+  calculatedAt: string | null;
+  locked: boolean;
+  separateStreamNote: string;
+}
+
+export interface CampaignWorkspaceBooking {
+  id: string;
+  status: string;
+  scheduledAt: string | null;
+  founderTimezone: string | null;
+  meetingProvider: string | null;
+  meetingLink: string | null;
+  interviewer: string | null;
+}
+
+export interface CampaignWorkspaceView {
+  campaignId: string;
+  items: CampaignWorkspaceItem[];
+  fee: CampaignWorkspaceFee | null;
+  highEffort: {
+    visualsCompleted: boolean;
+    brandingCompleted: boolean;
+    interviewScheduledOrConfirmed: boolean;
+    highEffort: boolean;
+    calculatedAt: string | null;
+  } | null;
+  assets: {
+    id: string;
+    purpose: string;
+    state: string;
+    rejection: string | null;
+    approved: boolean;
+    removed: boolean;
+    filename: string | null;
+    contentType: string;
+  }[];
+  socials: {
+    id: string;
+    url: string;
+    accessible: boolean | null;
+    rejection: string | null;
+    controlsConfirmedByFounder: boolean;
+    removed: boolean;
+  }[];
+  interview: {
+    booking: CampaignWorkspaceBooking | null;
+  };
+}
+
+export interface CampaignWorkspaceResponse {
+  workspace: CampaignWorkspaceView | null;
+  /** Why there is nothing: the Founder has not opened their workspace yet. */
+  whatHappened?: string;
+}
+
+const campaignWorkspaceBase = (campaignId: string) =>
+  `/api/admin/campaigns/${encodeURIComponent(campaignId)}/workspace`;
+
+export const fetchCampaignWorkspace = (
+  campaignId: string,
+): Promise<CampaignWorkspaceResponse> => call(campaignWorkspaceBase(campaignId));
+
+/** Re-runs every §12 rule against the stored content. Idempotent. */
+export const recheckCampaignWorkspace = (
+  campaignId: string,
+): Promise<CampaignWorkspaceResponse> =>
+  call(`${campaignWorkspaceBase(campaignId)}/recheck`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+/** §12 invalidation: an internal reason AND an explanation the Founder reads. */
+export const invalidateOptionalItem = (
+  campaignId: string,
+  item: string,
+  body: { reason: string; explanation: string },
+): Promise<CampaignWorkspaceResponse> =>
+  call(`${campaignWorkspaceBase(campaignId)}/items/${encodeURIComponent(item)}/invalidate`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const reinstateOptionalItem = (
+  campaignId: string,
+  item: string,
+  reason: string,
+): Promise<CampaignWorkspaceResponse> =>
+  call(`${campaignWorkspaceBase(campaignId)}/items/${encodeURIComponent(item)}/reinstate`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+/** §12's six-fact override: reason, Founder-readable explanation, evidence. */
+export const overrideOptionalItem = (
+  campaignId: string,
+  item: string,
+  body: { complete: boolean; reason: string; explanation: string; evidence: string },
+): Promise<CampaignWorkspaceResponse> =>
+  call(`${campaignWorkspaceBase(campaignId)}/items/${encodeURIComponent(item)}/override`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+/** Phase 09's reconciliation path — a person confirming, recorded as such. */
+export const confirmInterviewBooking = (
+  campaignId: string,
+  bookingId: string,
+  body: { meetingLink?: string; interviewer?: string },
+): Promise<CampaignWorkspaceResponse> =>
+  call(`${campaignWorkspaceBase(campaignId)}/interview/${encodeURIComponent(bookingId)}/confirm`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const cancelInterviewBooking = (
+  campaignId: string,
+  bookingId: string,
+  reason: string,
+): Promise<CampaignWorkspaceResponse> =>
+  call(`${campaignWorkspaceBase(campaignId)}/interview/${encodeURIComponent(bookingId)}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
   });
 
 /* ── The draft landing state (§7) — no account, no session ────────────────── */

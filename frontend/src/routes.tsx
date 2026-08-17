@@ -18,6 +18,7 @@ import { AdminSignIn } from './features/admin/AdminSignIn.js';
 import { RequireRole, RedirectIfAuthenticated } from './lib/routeGuards.js';
 import { roleHome } from './lib/session.js';
 import { FoundersList } from './features/admin/founders/FoundersList.js';
+import { CreateFounder } from './features/admin/founders/CreateFounder.js';
 import { FounderWorkspace } from './features/admin/founders/FounderWorkspace.js';
 import { CreatorsDirectory } from './features/admin/creators/CreatorsDirectory.js';
 import { CreatorRecord } from './features/admin/creators/CreatorRecord.js';
@@ -225,6 +226,8 @@ const rootChildren: RouteObject[] = [
       // a surface exists (§1.4); the shell's parked control says what the
       // destination is instead.
       { path: 'founders', element: <FoundersList /> },
+      // Static before dynamic — the router ranks it, but the order documents it.
+      { path: 'founders/new', element: <CreateFounder /> },
       { path: 'founders/:prospectId', element: <FounderWorkspace /> },
       // §26.1, §8. The Creator (Affiliate) workspace, keyed on the PERSON for
       // the same reason the Founder one is: a Creator recruited to two

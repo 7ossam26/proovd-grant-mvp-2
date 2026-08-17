@@ -6337,3 +6337,215 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .fdir-card:nth-last-child(-n + 2) { border-bottom: 1px solid var(--brand); }
   .fdir-card:last-child { border-bottom: 0; }
 }
+
+/* ═══════════════════════════════════════════ PHASE 31 — SESSION B (added 2026-08-17) ══
+   The Onboarding section's four tabs, the Create Founder compose page, and the
+   Edit Founder sheet. Same conventions as the banner above: tokens only, no
+   hex, no arbitrary spacing; scoped overrides rather than shell edits; the
+   responsive rules are corrections at the bottom, not a second design. The
+   sheet sits on the modal layer (950) over the shared .scrim (940). */
+
+/* ── The Onboarding sub-tab rail ── a second, quieter tablist under the
+   section tabs. Distinct from .tabbtn so restyling one cannot bend the shell
+   the other five workspaces share. */
+.fob-tabs {
+  display: flex;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--grey-light);
+  margin-bottom: var(--sp-24);
+  overflow-x: auto;
+}
+.fob-tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--moss);
+  font: inherit;
+  font-size: 0.875rem;
+  padding: var(--sp-8) var(--sp-12);
+  min-height: var(--touch);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fob-tab:hover { color: var(--dark); }
+.fob-tab.is-active {
+  color: var(--dark);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+
+/* ── The tab hero: eyebrow question, derived answer, pinned subtitle. */
+.fob-hero { margin-bottom: var(--sp-24); }
+.fob-hero .h3 { margin: var(--sp-4) 0; }
+
+/* ── A tab panel: the reference's bordered card. */
+.fob-panel {
+  border: 1px solid var(--brand);
+  padding: var(--sp-24);
+  margin-bottom: var(--sp-24);
+}
+.fob-panel .fsec__title:first-child { margin-top: 0; }
+
+/* The dark provider panel — the Stripe block, .fov-campaign's treatment. */
+.fob-panel--dark {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--mint);
+}
+.fob-panel--dark .fsec__title { color: var(--mint); }
+.fob-panel--dark .helper,
+.fob-panel--dark .grey { color: var(--sage); }
+.fob-panel--dark .fgroup dt { color: var(--sage); }
+.fob-panel--dark .fgroup dd { color: var(--mint); }
+.fob-panel--dark .fgroup dd b { color: var(--mint); }
+.fob-panel--dark .btn--tertiary { color: var(--mint); }
+
+/* ── The dark stat band on Optional Items. */
+.fob-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--dark);
+  color: var(--mint);
+  padding: var(--sp-16) var(--sp-24);
+  margin-bottom: var(--sp-24);
+  gap: var(--sp-16);
+}
+.fob-stats b { display: block; font-size: 1.5rem; }
+.fob-stats span { color: var(--sage); font-size: 0.8125rem; }
+
+.fob-pathset { display: inline-flex; gap: var(--sp-8); margin-left: var(--sp-8); }
+
+/* ── The Create Founder compose page. */
+.cf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-16);
+  margin-bottom: var(--sp-24);
+}
+
+.cf-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--sp-24);
+  align-items: start;
+}
+
+.cf-step {
+  border: 1px solid var(--brand);
+  padding: var(--sp-24);
+  margin-bottom: var(--sp-24);
+}
+.cf-step > header {
+  display: flex;
+  gap: var(--sp-12);
+  align-items: baseline;
+  margin-bottom: var(--sp-16);
+}
+.cf-step > header .h3 { margin: 0; }
+.cf-step > header p { margin: var(--sp-4) 0 0; }
+.cf-step__n {
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.cf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--sp-16);
+}
+
+.cf-absent { margin-top: var(--sp-12); }
+.cf-absent p { margin: 0 0 var(--sp-8); }
+
+/* The rail: the reference's dark "Before you send" card, sticky beside the
+   steps so the checklist answers while the Admin types. */
+.cf-rail { position: sticky; top: var(--sp-24); }
+.cf-check {
+  background: var(--dark);
+  color: var(--mint);
+  padding: var(--sp-24);
+}
+.cf-check .h3 { color: var(--mint); margin-top: 0; }
+.cf-check ul { list-style: none; margin: var(--sp-16) 0; padding: 0; }
+.cf-check li {
+  color: var(--sage);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--moss);
+}
+.cf-check li.is-done { color: var(--mint); }
+.cf-check li > span[aria-hidden] { display: inline-block; width: 1.2em; }
+.cf-check__note { color: var(--sage); font-size: 0.8125rem; }
+
+.cf-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-16);
+  border-top: 1px solid var(--grey-light);
+  padding-top: var(--sp-16);
+  margin-top: var(--sp-24);
+}
+.cf-foot__actions { margin-left: auto; display: flex; gap: var(--sp-8); }
+
+/* ── The Edit Founder sheet: the reference's dark right-hand "EDIT AND
+   VERSION" panel. Modal layer — it blocks the record while open. */
+.fsheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 92vw);
+  z-index: 950;
+  background: var(--dark);
+  color: var(--mint);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fsheet .kicker { color: var(--sage); }
+.fsheet .grey { color: var(--sage); }
+.fsheet .h2 { color: var(--mint); margin: var(--sp-4) 0; }
+.fsheet .helper { color: var(--sage); }
+.fsheet label { color: var(--mint); }
+.fsheet .field-error { color: var(--accent-yellow); }
+
+.fsheet__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  padding: var(--sp-24) var(--sp-24) var(--sp-12);
+}
+.fsheet__head .btn--tertiary { color: var(--mint); }
+.fsheet__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--sp-24);
+}
+.fsheet__body .input,
+.fsheet__body textarea.input {
+  background: var(--surface);
+}
+.fsheet__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-24) var(--sp-24);
+  border-top: 1px solid var(--moss);
+}
+.fsheet__foot .btn--tertiary { color: var(--mint); }
+
+/* ── Session B responsive corrections. */
+@media (max-width: 900px) {
+  .cf-layout { grid-template-columns: 1fr; }
+  .cf-rail { position: static; }
+  .cf-grid { grid-template-columns: 1fr; }
+  .fob-stats { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .cf-head { flex-direction: column; }
+  .cf-foot { flex-wrap: wrap; }
+  .cf-foot__actions { margin-left: 0; }
+}

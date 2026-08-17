@@ -1256,6 +1256,13 @@ const founderWorkspace: FounderWorkspaceDetail = {
       ],
       technical:
         'Token version 1 · expires Aug 15, 2026. The link value itself is never stored and cannot be shown again.',
+      facts: {
+        sendCount: 1,
+        tokenVersion: 1,
+        expiration: 'Link inactive',
+        claimed: 'Recorded Aug 2, 2026 · 12:10 PM',
+        revoked: false,
+      },
     },
     vetting: {
       progress: [
@@ -1457,6 +1464,31 @@ const founderWorkspace: FounderWorkspaceDetail = {
     ],
     research: [],
     meetingNotes: [],
+  },
+  eligibility: {
+    claim: {
+      inviteClaimed: true,
+      claimedAt: 'Aug 2, 2026 · 12:10 PM',
+      accountCreatedAt: 'Aug 2, 2026 · 12:10 PM',
+      completion: 'Complete',
+      connectedRecord: 'F-7K3MQ',
+    },
+    facts: {
+      dobSupplied: true,
+      age18Plus: true,
+      usPerson: true,
+      location: 'NY · US',
+      sanctionsClear: true,
+    },
+    acknowledgements: [
+      { label: 'Terms of Service', version: 'v1.0', acceptedAt: 'Aug 2, 2026 · 12:10 PM' },
+      {
+        label: 'Founder Acceptable Use Policy',
+        version: 'v1.0',
+        acceptedAt: 'Aug 2, 2026 · 12:10 PM',
+      },
+    ],
+    acknowledgementsAbsent: null,
   },
   campaignFacts: {
     campaignId: QA.campaignId,

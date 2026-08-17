@@ -16,6 +16,6 @@ export {
   type FieldEditContext,
   type FieldEditTarget,
 } from './fieldEdit.js';
-export { AddFounderDialog } from './AddFounderDialog.js';
+export { EditFounderSheet } from './EditFounderSheet.js';
 export { InvitationPreviewDialog } from './InvitationPreviewDialog.js';
 export { OverrideEdit } from './OverrideEdit.js';

@@ -45,6 +45,11 @@ import {
   invitationLinkIsLive as sharedLinkIsLive,
   overrideHelper as sharedOverrideHelper,
   editReasonRequired as sharedEditReasonRequired,
+  FOUNDER_RECORD_SECTIONS,
+  ONBOARDING_TAB_COPY,
+  ELIGIBILITY_READ_ONLY_NOTE,
+  CREATE_FOUNDER_CHECKLIST,
+  CREATE_FOUNDER_ABSENCES,
 } from '@proovd/shared';
 
 import {
@@ -339,5 +344,63 @@ describe('the derivations the workspace reads instead of storing', () => {
     // the whole Founder record down over a label.
     expect(campaignStatusLabel('live')).toBe('Live');
     expect(campaignStatusLabel('something_new')).toBe('something_new');
+  });
+});
+
+/* ══ Session B (2026-08-17): the Onboarding copy and the compose registers ══ */
+
+describe('the Onboarding tab copy covers exactly the section register’s tabs', () => {
+  it('has one question per Onboarding sub-tab, no more and no fewer', () => {
+    // Two registers describe the same four tabs — the section shape and the
+    // pinned copy — and this is the drift test between them.
+    const section = FOUNDER_RECORD_SECTIONS.find((s) => s.key === 'onboarding')!;
+    expect(Object.keys(ONBOARDING_TAB_COPY).sort()).toEqual(
+      section.tabs.map((t) => t.key).sort(),
+    );
+    for (const entry of Object.values(ONBOARDING_TAB_COPY)) {
+      expect(entry.question.length).toBeGreaterThan(10);
+      expect(entry.subtitle.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('names no dollar amount in the optional-items subtitle', () => {
+    // The per-item discount is a §6 setting; a number in pinned copy would be
+    // a hardcoded commercial value the settings surface could then contradict.
+    expect(ONBOARDING_TAB_COPY.optional.subtitle).not.toMatch(/\$\d/);
+  });
+
+  it('pins the Eligibility read-only rule with all five protected facts', () => {
+    for (const word of ['age', 'country', 'acceptance state', 'timestamp', 'version']) {
+      expect(ELIGIBILITY_READ_ONLY_NOTE).toContain(word);
+    }
+  });
+});
+
+describe('the Create Founder compose registers (Session B)', () => {
+  it('carries the reference’s five checklist lines', () => {
+    expect(CREATE_FOUNDER_CHECKLIST).toHaveLength(5);
+    expect(CREATE_FOUNDER_CHECKLIST[4]).toBe('Exact invitation is ready');
+  });
+
+  it('records every refused reference box with a real reason', () => {
+    // The register is the contract: a box named here has a recorded §1.8
+    // refusal, and re-adding one is a visible edit to this list rather than a
+    // quiet reintroduction.
+    const boxes = CREATE_FOUNDER_ABSENCES.map((entry) => entry.box);
+    expect(new Set(boxes).size).toBe(boxes.length);
+    for (const refused of [
+      'Founder story',
+      'Audience',
+      'Business explanation',
+      'Social links',
+      'Meeting notes',
+      'Visual asset uploads',
+      'Interview scheduling',
+    ]) {
+      expect(boxes).toContain(refused);
+    }
+    for (const entry of CREATE_FOUNDER_ABSENCES) {
+      expect(entry.reason.length).toBeGreaterThan(60);
+    }
   });
 });

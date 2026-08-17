@@ -170,3 +170,158 @@ with eight tabs; the old campaign-link-toasts-parked test became a real-navigati
 Suites after the build: backend founder-workspace 65/65 (56 + 9 new), registers 19/19
 (16 + 3 new), founder-invitation 51/51, frontend founders 36/36, §33.12.5 partition 20/20,
 §33.11 QA sweep 295/295, §33.11.3 bundle scan 15/15.
+
+---
+
+## Session B — the re-walk and the reconciliation (2026-08-17)
+
+Re-walked before building, as the brief requires: the four Onboarding sub-tabs, the
+Create Founder compose, the Edit Founder sheet, and every dialog they open
+(`ref-out/walkB/` holds the dumps). What the deep walk established that the first
+pass had not:
+
+- **The inline `EDIT` affordance is the VALUE.** Every editable row is one
+  `button.inline-edit` wrapping the value with `Edit` affixed; clicking anywhere on
+  it swaps the row to an input in place ("Click away to save · Esc cancels").
+- **`Edit prefills` and `Edit Founder` open the same treatment**: a dark right-hand
+  sheet titled `EDIT AND VERSION`, ending in a required `REASON / CONTEXT` textarea
+  and one `Save new version` action.
+- **The panel-footer `History` buttons NAVIGATE** — to the record's History section,
+  not a dialog. Read-and-route, the reference's own architecture again.
+- **`Open secure status` is a small read-only Explore dialog** of provider facts
+  (connected account, state, founder action, last update — Done).
+- **The interview `Cancel` demands a cancellation reason**; `Schedule / edit` is a
+  sheet over the booking's five fields plus the reason.
+- **The compose's `Create & send invitation` is disabled until its checklist
+  passes; `Create prospect` stays available** — a draft record is always
+  creatable, sending is the gated act. `Save draft` and `Create prospect` are the
+  same act wearing two labels (the prototype persists nothing).
+
+### Element map — Onboarding, against the records that exist
+
+| Reference element | Backing | Verdict |
+|---|---|---|
+| Invitation panel (recipient/sender/version/sent/expiration/claimed/revoked/resends) | `campaign_invitation_sends`, `secure_tokens`, overrides, `resolvedRecipient` | **Exists** — `InvitationView` gains a structured `facts` block (send count, token version, expiration, claimed, revoked) |
+| HEADLINE / BODY inline edits | §7's real message model is `whatWeUnderstood` / `whyInvited` / `expectedSetupTime` + fixed content | **Exists, richer** — the tab renders OUR §7 fields in the reference's arrangement; there is no headline/body pair to invent |
+| Prefill provenance ("original: Admin intake · unchanged") | `draft_field_edits`, claim-profile suppliers | **Exists** where the payload carries it (vetting answers); identity rows render supplier where available |
+| Competition block with `Edit` + `Record agreed correction` | removed 2026-08-10 (0042) | **§1.8 refusal, again** — legacy text renders read-only when present; no editor, no correction route, and the panel is absent when no legacy answer exists |
+| Eligibility (claim, DOB, 18+, US, acknowledgements) | `founder_claim_profiles` (dob/country/state/representations), `policy_consents`, `secure_tokens` | **Exists** — new `EligibilityView` composed in the workspace read. 18+/US are the Founder's recorded REPRESENTATIONS (§10), rendered as such, never "derived age". DOB renders presence only on this screen |
+| "No Admin control on this screen can change age, country…" | — | **Pinned** as `ELIGIBILITY_READ_ONLY_NOTE`; the suite asserts the tab renders no edit control |
+| Optional Items (five items, validity, discount, actions) | The §12 machine: `/api/admin/campaigns/:id/workspace` + recheck/invalidate/reinstate/override + interview confirm/cancel — all mounted since 09a, screenless since 2026-08-10 | **Exists** — the tab is the §12 admin surface reborn; no new route, no payload change (the tab fetches the §12 read directly) |
+| `Add / replace` upload, visual preview/download | Track A4 — `unconfiguredStorage` throws | **Parked** with the reason; no upload control renders |
+| `Edit story` / `Edit branding` / `Edit socials` | §12: content is the FOUNDER's; the decision is the server's | **§1.8 refusal** — content renders read-only; Admin's §12 acts are invalidate / reinstate / override-with-evidence, which are built |
+| `Mark confirmed` / `Cancel` on the interview | `confirmBooking` (admin_reconciliation) / `cancelBooking` | **Exists** — wired with the reason dialog |
+| Stripe panel + `Open secure status` | `MoneyPane.setup/stripe/identity` (the ONE §13 resolver) | **Exists** — dark panel + the Explore dialog over `requirements` |
+| Listing fee breakdown (base, five discounts, tax, total, status) | `listing_fee_payments.discountLines` (paid) / `listing_fee_calculations` via the §12 read (unpaid preview) | **Exists** — paid renders the payment row's own stored lines; unpaid renders the live preview with `SEPARATE_STREAM_NOTE` |
+| REMINDER DRIP row | the §6 listing clocks | **Omitted** — the pane shows payment status; the clock state is not in the payload and inventing a summary line is worse than absence (recorded) |
+
+### Create Founder — the five steps, box by box
+
+Steps 01/03/05 survive nearly whole; 02 and 04 are where the Spec has refused
+before and refuses again:
+
+- **01 Account & business** — name*, email*, business/product*, preferred name,
+  phone, website, US city/state (→ the 0043 `state` field), campaign type as an
+  OPTIONAL select defaulting to "Not decided yet" (the reference defaults to
+  `Idea`, which invents a §9 decision nobody made).
+- **02 Onboarding prefills** — Problem and Solution only (§9's two named
+  prefills). The reference's other four boxes are refused with their reasons
+  pinned in `CREATE_FOUNDER_ABSENCES`: BUSINESS EXPLANATION (no §9 record reads
+  it), AUDIENCE (`views_range` is the Founder's own closed-list choice with no
+  prefill path — 0042), FOUNDER STORY (§12: the Founder's approval IS the
+  completing act), SOCIAL LINKS (§12's social profiles are Founder workspace
+  content; what Admin finds is research → discovery evidence).
+- **03 Research & internal setup** — discovery source* (free text with the
+  reference's four values as datalist suggestions; §7 names no closed list),
+  internal owner* (free text + datalist of values in use — the Session A
+  decision), affiliate-fit notes (→ `affiliateSourcingHypothesis`), internal
+  notes (→ `adminNotes`), where-we-found-them and research source (→ composed
+  `discovery_evidence` entries). MEETING NOTES is refused here: a meeting note
+  is 0047's five-fact record, and a freeform box that silently degrades it to
+  prose is how the record stops being one — the record's own dialog is the path.
+- **04 Optional preparation** — renders three named absences and no input:
+  uploads are Track A4; branding evidence is the Founder's §12 workspace
+  content; the interview booking is created by the Founder's flow (Cal.com,
+  Track A4) and Admin's reconciliation path operates an EXISTING booking from
+  the record. A step of honest absences beats a step of dead boxes (§1.4).
+- **05 Invitation** — §7's real compose fields (what we understood / why
+  invited / expected setup time) with the two fixed promises read-only.
+  The reference's PERSONALIZED CONTEXT collapses into `whatWeUnderstood`; its
+  VIEWER/AFFILIATE COUNT boxes are refused — the §10 possible-creator count is
+  an Admin assessment recorded AFTER submission, and no §7 message content
+  carries an estimate (putting one in the invitation would read as the promise
+  §7 forbids).
+- **The checklist** is the reference's five lines, computed from form state as a
+  courtesy; the send route re-decides server-side (§1.1) and the rail says so.
+- **`Save draft` = `Create prospect`** (one act, both labels kept where the
+  reference puts them); "Changes save as you type" is refused pre-create — a
+  keystroke-created prospect is a worse record than an explicit one.
+- **`Create & send invitation`** creates, then sends through the same gated
+  route the record uses; a refusal lands the Admin on the record's Invite tab
+  with the server's own list of what is missing.
+
+### Edit Founder sheet — the editable core, and the refusals
+
+The sheet carries exactly `FOUNDER_EDITABLE_FIELDS`' profile group (11 fields)
+plus the required `REASON / CONTEXT` once the account is claimed
+(`editReasonRequired`, the server's own rule — the sheet mirrors it and the
+server re-decides). Only CHANGED fields are written, each through the existing
+`PUT /fields/:key` with the one reason. Refused from the reference's sheet:
+PROBLEM / SOLUTION / FOUNDER STORY textareas (the three standing refusals),
+FOUNDER / ACCOUNT STATUS select (the account state is derived from three
+records and stored in none — offering a picker would mint a stored status),
+POTENTIAL AUDIENCE (the Founder's own closed-list answer), and the socials
+repeater (no socials record exists on the prospect; §12's social profiles are
+the Founder's).
+
+### What Session B adds to the payload, and what it deliberately does not
+
+Two additions, both reads over records that exist: `InvitationView.facts` and
+`EligibilityView` (claim profile presence facts, representations, location,
+`policy_consents` acknowledgements — honestly empty while all eight policies
+are drafts and no claim can complete). No new table, no new route, no
+migration. The Optional Items and unpaid-fee reads reuse the §12 admin route
+untouched, so §33.12.5's partition is unchanged.
+
+---
+
+## Session B — built 2026-08-17
+
+Shipped: the Onboarding section's four sub-tabs in final shape
+(`sections/OnboardingSection.tsx`), the five-step Create Founder compose page
+(`CreateFounder.tsx` at `/admin/founders/new`), the Edit Founder sheet
+(`dialogs/EditFounderSheet.tsx`), the shared registers (`ONBOARDING_TAB_COPY`,
+`ELIGIBILITY_READ_ONLY_NOTE`, `OPTIONAL_ITEM_CONTENT_IS_FOUNDERS`,
+`CREATE_FOUNDER_CHECKLIST`, `CREATE_FOUNDER_ABSENCES`), and the two payload
+additions (`InvitationView.facts`, `EligibilityView`). **No route, no table, no
+migration** — every write drives a route the product already had, and
+§33.12.5's partition is untouched. `panes/Overview.tsx` and
+`dialogs/AddFounderDialog.tsx` are deleted, fully absorbed.
+
+**Decisions taken during the build, on top of the pre-build reconciliation:**
+
+12. The reference's inline click-away-to-save editing became dialog editing: a
+    blur-saves edit cannot carry the reason and evidence §25.6 requires on a
+    claimed record. The affordance stays a row-level Edit.
+13. The compose's campaign-type select defaults to "Not decided yet" — the
+    reference preselects `Idea`, which is a §9 decision nobody made.
+14. `Save draft` and `Create prospect` are one act wearing both labels: in the
+    real model, creating the prospect IS saving the draft, and "changes save
+    as you type" is refused (a keystroke-created prospect is a worse record).
+15. The §12 items render the Founder-voiced `completesWhen` sentences on the
+    Admin tab deliberately — the register's own contract is "three surfaces,
+    one sentence".
+16. The Eligibility hero avoids the reference's "system verified": the 18+/US
+    facts are recorded REPRESENTATIONS (§10), so the hero reads "Eligible —
+    recorded at the account claim" and each row names itself a representation.
+
+**Conscious test changes, each named in the file:** the empty directory's
+Create Founder action is a link; the §26.2 override tests lost their
+disclosure click (overrides render directly); the legacy Competition answer
+asserts as "Current text" under the "Competition" heading with `Record agreed
+correction` asserted absent; the payload-shape assertion gained `eligibility`.
+
+Suites after the build: backend founder-workspace 70/70 (65 + 5), registers
+24/24 (19 + 5), frontend founders 46/46 (36 + 10), §33.12.5 partition and
+§33.8.13 re-run green, §33.11 sweep + bundle scan 310/310. The 1280/320
+screenshot pass (four tabs, the compose, the sheet) found no visual defect.

@@ -264,8 +264,10 @@ frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
   src/features/admin/    the Admin shell and its workspaces, each built from a
                          supplied reference after Phase 24: Founders (rebuilt
-                         2026-08-16 — the six-card directory with its two
-                         action columns, and the eight-section person record),
+                         2026-08-16/17 — the six-card directory with its two
+                         action columns, the eight-section person record with
+                         Onboarding's four tabs, the five-step Create Founder
+                         compose, and the Edit Founder sheet),
                          Creators, Campaigns, Support, Backers, and the
                          floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page

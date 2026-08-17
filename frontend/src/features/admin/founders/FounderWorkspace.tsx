@@ -46,11 +46,13 @@ import {
   FOUNDER_RECORD_SECTIONS,
   MEETING_NOTE_FIELDS,
   NO_ATTENTION_LABEL,
+  ONBOARDING_TAB_COPY,
   PROFILE_OVERRIDE_KEYS,
   RESEARCH_ENTRY_FIELDS,
   type AttentionAction,
   type FounderEditableFieldKey,
   type FounderRecordSectionKey,
+  type OnboardingTabKey,
   type ProfileOverrideKey,
 } from '@proovd/shared';
 import { Button, Menu, StatePanel, useToast } from '../../../components/index.js';
@@ -82,6 +84,7 @@ import {
 import {
   ConfirmDialog,
   confirmSpec,
+  EditFounderSheet,
   fieldEditSpec,
   InvitationPreviewDialog,
   FIELD_EDIT_EVIDENCE,
@@ -101,7 +104,7 @@ import {
   OverviewSection,
   type DiscoveryEditRequest,
 } from './sections/OverviewSection.js';
-import { Overview } from './panes/Overview.js';
+import { OnboardingSection } from './sections/OnboardingSection.js';
 import { Campaigns } from './panes/Campaigns.js';
 import { Money } from './panes/Money.js';
 import { History } from './panes/History.js';
@@ -182,6 +185,7 @@ type OpenDialog =
   | { kind: 'discovery'; target: DiscoveryEditRequest; trigger: HTMLElement | null }
   | { kind: 'meetingnote'; trigger: HTMLElement | null }
   | { kind: 'research'; trigger: HTMLElement | null }
+  | { kind: 'editfounder'; trigger: HTMLElement | null }
   | { kind: 'preview'; trigger: HTMLElement | null };
 
 /* ── The surface ────────────────────────────────────────────────────────────*/
@@ -207,6 +211,24 @@ export function FounderWorkspace() {
       const updated = new URLSearchParams(params);
       if (next === 'overview') updated.delete('section');
       else updated.set('section', next);
+      // A section change is a navigation, so the sub-tab resets with it — a
+      // `tab` left behind would reopen a different section on its own tab.
+      updated.delete('tab');
+      setParams(updated, { replace: true });
+    },
+    [params, setParams],
+  );
+
+  /** The Onboarding sub-tab, in the URL beside the section (DNA §5.12). */
+  const rawTab = params.get('tab') ?? 'invite';
+  const onboardingTab: OnboardingTabKey =
+    rawTab in ONBOARDING_TAB_COPY ? (rawTab as OnboardingTabKey) : 'invite';
+  const setOnboardingTab = useCallback(
+    (next: OnboardingTabKey) => {
+      const updated = new URLSearchParams(params);
+      updated.set('section', 'onboarding');
+      if (next === 'invite') updated.delete('tab');
+      else updated.set('tab', next);
       setParams(updated, { replace: true });
     },
     [params, setParams],
@@ -582,9 +604,9 @@ export function FounderWorkspace() {
     label: MENU_LABELS[action],
     onSelect: () => {
       if (action === 'edit') {
-        // §26.1's editable fields live in the full-record block on Overview.
-        setSection('overview');
-        setJump('sec-identity');
+        // The Edit Founder sheet — the record's one bulk-edit surface
+        // (Session B). The per-row dialogs remain for single-field edits.
+        setDialog({ kind: 'editfounder', trigger: menuTriggerRef.current });
         return;
       }
       setDialog({ kind: 'confirm', key: action, trigger: menuTriggerRef.current });
@@ -756,14 +778,14 @@ export function FounderWorkspace() {
           />
         ) : null}
         {section === 'onboarding' ? (
-          <>
-            <InterimNote owns="the invitation, the prefills, the eligibility record, the §12 optional items, and Stripe with the listing fee">
-              The invitation and setup record below is complete and live; the four-tab shape
-              (Invite &amp; Prefills · Eligibility · Optional Items · Stripe &amp; Listing Fee)
-              arrives in the next build session.
-            </InterimNote>
-            <Overview detail={detail} actions={actions} />
-          </>
+          <OnboardingSection
+            detail={detail}
+            tab={onboardingTab}
+            onTab={setOnboardingTab}
+            actions={actions}
+            onOpenHistory={() => setSection('history')}
+            onEditFounder={(trigger) => setDialog({ kind: 'editfounder', trigger })}
+          />
         ) : null}
         {section === 'campaign' ? (
           <>
@@ -986,6 +1008,15 @@ export function FounderWorkspace() {
           }}
           trigger={dialog.trigger}
           onSubmit={runResearch}
+          onClose={() => setDialog(null)}
+        />
+      ) : null}
+
+      {dialog?.kind === 'editfounder' ? (
+        <EditFounderSheet
+          detail={detail}
+          trigger={dialog.trigger}
+          onSaved={refresh}
           onClose={() => setDialog(null)}
         />
       ) : null}

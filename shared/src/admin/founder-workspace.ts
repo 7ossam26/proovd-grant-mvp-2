@@ -307,6 +307,132 @@ export const FOUNDER_RECORD_SECTION_KEYS = FOUNDER_RECORD_SECTIONS.map(
   (s) => s.key,
 ) as readonly FounderRecordSectionKey[];
 
+/* ───────────────── The Onboarding section (Session B, 2026-08-17) ──────── */
+
+/**
+ * Each Onboarding sub-tab leads with a question and answers it with the
+ * record's state — the reference's own arrangement, wording pinned here so the
+ * surface cannot drift into a second phrasing of the same question.
+ *
+ * The optional-items subtitle deliberately names no amount: the per-item
+ * discount is a §6 setting (`optional_item_discount_cents`), so the number
+ * renders from the server's fee lines and never from copy.
+ */
+export const ONBOARDING_TAB_COPY = {
+  invite: {
+    question: 'What did we send, and what did the Founder change?',
+    subtitle: 'Invitation and prefills keep their sources, versions, and Founder corrections.',
+  },
+  eligibility: {
+    question: 'Did the Founder legitimately become eligible?',
+    subtitle: 'Admin can inspect these events but cannot fabricate or rewrite them.',
+  },
+  optional: {
+    question: 'Which optional work earned a legitimate fee discount?',
+    subtitle:
+      'Optional items never block onboarding completion. Each valid item reduces the listing fee before payment.',
+  },
+  stripe: {
+    question: 'Can this Founder move into campaign work?',
+    subtitle:
+      'Stripe remains provider-owned. The listing fee changes only through valid optional-item qualifications before payment.',
+  },
+} as const;
+
+export type OnboardingTabKey = keyof typeof ONBOARDING_TAB_COPY;
+
+/**
+ * The Eligibility tab's pinned rule — the reference's own sentence, kept
+ * because it is the strongest form of the §10 posture: age, location, the
+ * acceptance state, its timestamp, and its version are provider and system
+ * truth, and the tab renders no control that could change any of them. The
+ * suite asserts the absence, not just the sentence.
+ */
+export const ELIGIBILITY_READ_ONLY_NOTE =
+  'No Admin control on this screen can change age, country, acceptance state, timestamp, or version.';
+
+/**
+ * §12's division of labour, stated where an Admin looks for an edit control.
+ * The content belongs to the Founder; what Admin owns is the DECISION — an
+ * invalidation with an explanation the Founder can read, a reinstatement, or
+ * an evidence-backed override. There is no route that writes the Founder's
+ * workspace content, and the tab says so rather than offering dead controls.
+ */
+export const OPTIONAL_ITEM_CONTENT_IS_FOUNDERS =
+  'This content is the Founder’s own work. Admin decides validity — invalidate ' +
+  'with an explanation, reinstate, or override with evidence — but never ' +
+  'writes the content itself.';
+
+/* ──────────────── The Create Founder compose (Session B) ─────────────────── */
+
+/**
+ * The compose page's "Before you send" checklist, in the reference's order and
+ * wording. Computed from form state as a courtesy only — the send route
+ * re-decides every line server-side (§1.1), and the rail says so.
+ */
+export const CREATE_FOUNDER_CHECKLIST = [
+  'Founder and business are identified',
+  'Invitation email is valid',
+  'US location is recorded',
+  'One internal owner is assigned',
+  'Exact invitation is ready',
+] as const;
+
+/**
+ * The reference boxes the compose deliberately does not render, each with the
+ * rule that refuses it. A register rather than component copy so the absence
+ * is checkable — a later session re-adding one of these boxes fails a test
+ * that walks this list, instead of quietly reintroducing a §1.8 conflict the
+ * first build already paid for.
+ */
+export const CREATE_FOUNDER_ABSENCES = [
+  {
+    box: 'Business explanation',
+    reason:
+      'No §9 record reads a business explanation — the vetting answers are Problem, Solution, and the views range, and a prefill with no destination is a box that stores nothing.',
+  },
+  {
+    box: 'Audience',
+    reason:
+      'The audience answer is the Founder’s own choice from a closed list of four ranges (migration 0042). There is no prefill path, and free text would invent one.',
+  },
+  {
+    box: 'Founder story',
+    reason:
+      'The Story is a §12 optional item whose completing act is the Founder’s own approval. An Admin-written story would be Proovd’s content earning the Founder a discount.',
+  },
+  {
+    box: 'Social links',
+    reason:
+      '§12’s social profiles are Founder workspace content with their own control confirmation. What Admin finds in research belongs in discovery evidence.',
+  },
+  {
+    box: 'Meeting notes',
+    reason:
+      'A meeting note is a five-fact record (date, participants, decisions, follow-up, source — migration 0047). A freeform box here would degrade it to prose; the record’s own dialog is the path.',
+  },
+  {
+    box: 'Potential viewer and Affiliate counts',
+    reason:
+      'The §10 possible-Creator count is an Admin assessment recorded after the Founder submits, and no §7 invitation content carries an estimate — a number in the message would read as the promise §7 forbids.',
+  },
+  {
+    box: 'Visual asset uploads',
+    reason:
+      'Object storage is Track A4 and unconfigured — there is nowhere for a file to go, so no upload control renders anywhere in the product.',
+  },
+  {
+    box: 'Branding evidence',
+    reason:
+      'Branding is the Founder’s §12 workspace content, evaluated by the server against what they saved. Admin’s §12 acts are invalidate, reinstate, and override — on the record, not at intake.',
+  },
+  {
+    box: 'Interview scheduling',
+    reason:
+      'The booking record is created by the Founder’s own flow (§12, Track A4). Admin’s reconciliation path confirms or cancels an existing booking from the record’s Optional Items tab.',
+  },
+] as const;
+
 /* ─────────────────────────────── Meeting notes (§7, migration 0047) ────── */
 
 /**

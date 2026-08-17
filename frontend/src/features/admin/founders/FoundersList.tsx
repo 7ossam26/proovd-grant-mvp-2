@@ -37,7 +37,6 @@ import {
 import { Button, StatePanel } from '../../../components/index.js';
 import { useProovdMotion } from '../../../motion/MotionProvider.js';
 import { fetchFounders, AdminRequestError, type FounderListRow } from '../api.js';
-import { AddFounderDialog } from './dialogs/AddFounderDialog.js';
 
 const FILTER_KEYS = FOUNDER_DIRECTORY_FILTERS.map((f) => f.key) as readonly string[];
 const TYPE_KEYS = FOUNDER_TYPE_FILTERS.map((f) => f.key) as readonly string[];
@@ -46,7 +45,6 @@ export function FoundersList() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<FounderListRow[] | null>(null);
   const [loadError, setLoadError] = useState<AdminRequestError | null>(null);
-  const [addTrigger, setAddTrigger] = useState<HTMLElement | null>(null);
   const surface = useRef<HTMLDivElement>(null);
 
   const [params, setParams] = useSearchParams();
@@ -139,19 +137,11 @@ export function FoundersList() {
             Find any Founder, see what needs attention, and open the complete lifecycle record.
           </p>
         </div>
-        <Button onClick={(event) => setAddTrigger(event.currentTarget)}>Create Founder</Button>
+        {/* The five-step compose page (Session B) replaced the intake dialog. */}
+        <RouterLink className="btn btn--primary" to="/admin/founders/new">
+          <span className="btn__label">Create Founder</span>
+        </RouterLink>
       </div>
-
-      {addTrigger ? (
-        <AddFounderDialog
-          trigger={addTrigger}
-          onClose={() => setAddTrigger(null)}
-          onCreated={(prospectId) => {
-            load();
-            void navigate(`/admin/founders/${prospectId}`);
-          }}
-        />
-      ) : null}
 
       {loadError ? (
         <StatePanel
@@ -189,9 +179,9 @@ export function FoundersList() {
           owner="You"
           nextUpdate="No update is pending"
           action={
-            <Button tier="secondary" onClick={(event) => setAddTrigger(event.currentTarget)}>
-              Create Founder
-            </Button>
+            <RouterLink className="btn btn--secondary" to="/admin/founders/new">
+              <span className="btn__label">Create Founder</span>
+            </RouterLink>
           }
           reference="Admin · Founders"
         />

@@ -186,6 +186,25 @@ export interface InvitationView {
   history: { at: string; title: string; body: string }[];
   /** Token facts only — never a value (§28.1). */
   technical: string;
+
+  /**
+   * The invitation record as rows (Session B's Invite & Prefills tab).
+   *
+   * Structured facts beside the composed `technical` sentence, because the tab
+   * renders them as a definition list. `expiration` is a sentence rather than
+   * an instant: "Live until …", "Link inactive", or "No link issued yet" — the
+   * state, not a timestamp the surface would have to interpret (§1.4). Never a
+   * token value (§28.1).
+   */
+  facts: {
+    sendCount: number;
+    /** The live token's version, or the latest ever issued, or null. */
+    tokenVersion: number | null;
+    expiration: string;
+    /** "Recorded <when>" once the claim happened, else null. */
+    claimed: string | null;
+    revoked: boolean;
+  };
 }
 
 export interface VettingView {
@@ -433,6 +452,47 @@ export interface CampaignFactsView {
 
 /* ── The whole detail ───────────────────────────────────────────────────────*/
 
+/**
+ * The Eligibility tab (Session B) — §10's claim and the §5 representations,
+ * composed as read-only facts.
+ *
+ * Everything here is provider and system truth: the claim profile's own
+ * suppliers, the recorded representations, and the `policy_consents` rows the
+ * account claim wrote. There is deliberately no view of the DOB VALUE — the
+ * tab reports that one was supplied and nothing more; the value itself lives
+ * behind the profile edit with its §25.6 reason. The 18+/US answers are the
+ * Founder's recorded REPRESENTATIONS (§10), rendered as such — the product
+ * derives no age and never claims to have verified one.
+ */
+export interface EligibilityView {
+  claim: {
+    inviteClaimed: boolean;
+    /** Already formatted, or null while unclaimed. */
+    claimedAt: string | null;
+    accountCreatedAt: string | null;
+    /** 'Complete' | 'In progress' | 'Not started' — the claim profile's state. */
+    completion: string;
+    /** The stable `F-…` record reference the claim connected to. */
+    connectedRecord: string;
+  };
+  facts: {
+    /** null = no claim profile exists yet, which is not "No" (§16a). */
+    dobSupplied: boolean | null;
+    age18Plus: boolean | null;
+    usPerson: boolean | null;
+    /** "Chicago, IL · United States"-shaped, from the profile's own fields. */
+    location: string | null;
+    sanctionsClear: boolean | null;
+  };
+  /** The `policy_consents` rows the claim wrote. Empty while none exists. */
+  acknowledgements: { label: string; version: string; acceptedAt: string }[];
+  /**
+   * Why the acknowledgements list is empty, when it is — "the claim has not
+   * completed" and "the policies are still drafts" are different facts.
+   */
+  acknowledgementsAbsent: string | null;
+}
+
 export interface FounderWorkspaceDetail {
   header: FounderHeader;
   overview: OverviewPane;
@@ -440,6 +500,7 @@ export interface FounderWorkspaceDetail {
   campaigns: CampaignsPane;
   money: MoneyPane;
   discovery: DiscoveryView;
+  eligibility: EligibilityView;
   campaignFacts: CampaignFactsView | null;
   history: FounderHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
