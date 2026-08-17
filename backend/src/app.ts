@@ -492,7 +492,18 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       db,
       auth,
       appBaseUrl: config.invitationContext.appBaseUrl,
-      ...(config.stripeGateway ? { stripeMode: config.stripeGateway.mode } : {}),
+      ...(config.stripeGateway
+        ? { stripeMode: config.stripeGateway.mode, stripeGateway: config.stripeGateway }
+        : {}),
+      // Session B (2026-08-17): the evidence-picture store, and the §27 sender
+      // for the two asks. Both refuse honestly when unconfigured.
+      storage: config.objectStorage ?? unconfiguredStorage,
+      notifier,
+      askContext: {
+        appBaseUrl: config.invitationContext.appBaseUrl,
+        supportEmail: config.invitationContext.supportEmail,
+        fromAddress: config.invitationContext.fromAddress,
+      },
     }),
   );
   // The Campaigns Admin hub (§26.1), built 2026-08-15. Two GETs and nothing

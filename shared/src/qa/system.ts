@@ -517,6 +517,18 @@ export const UNGATED_ADMIN_WRITES = [
       'Records that the Founder ASKED to close their account, and its provenance. Phase 20b’s decision for the §29.1 disclosures, applied here: writing down what somebody told us decides nothing, and the retention obligations §25.8 names are unaffected by it. The review that follows decides an outcome and takes the gate.',
   },
   {
+    route: 'POST /api/admin/founders/:prospectId/meeting-notes',
+    specRef: '§7 (migration 0047)',
+    reason:
+      'Writes down an off-platform conversation — §7’s discovery record as a dated, attributed entry. It moves no money, changes no configuration, enforces against nobody, and reaches nobody; the row is insert-only and the only later write the database permits is the §25.8 anonymising one.',
+  },
+  {
+    route: 'POST /api/admin/founders/:prospectId/research',
+    specRef: '§7',
+    reason:
+      'Appends one research finding to §7’s discovery-evidence list — the same record the intake form writes, through the same shape. Internal working context that reaches nobody and decides nothing; the invitation it may inform is composed and sent under its own gates.',
+  },
+  {
     route: 'POST /api/admin/affiliates',
     specRef: '§8',
     reason: 'Creates a Creator prospect and its association. No money, no standing, no configuration.',
@@ -532,6 +544,62 @@ export const UNGATED_ADMIN_WRITES = [
     specRef: '§25.8',
     reason:
       'Records that the Creator ASKED to close their account, and its provenance. Phase 20b’s §29.1 decision applied to the other role: writing down what somebody told us decides nothing, and §25.8’s retention obligations are unaffected by it. The review that follows decides an outcome and takes the gate.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/evidence/uploads',
+    specRef: '§5.3, §12 (migration 0048)',
+    reason:
+      'Presigns one evidence picture and records it `pending` — Phase 09a’s step 1, a courtesy the read-back re-decides. Recording research evidence reaches nobody, moves no money, and decides nothing: the §5.3 decision that reads it is the verification route, which takes the gate.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/evidence/uploads/:fileId/verify',
+    specRef: '§5.3, §12 (migration 0048)',
+    reason:
+      'Reads the uploaded object back and records what the bytes actually are — Phase 09a’s step 3, the objective check. It can only move a pending file to stored or rejected; nothing downstream changes until a gated human decision reads it.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/evidence/uploads/:fileId/remove',
+    specRef: '§5.3, §12 (migration 0048)',
+    reason:
+      'One-way removal of an evidence picture — the §12 correction that re-permits the same checksum. The row survives, the duplicate index stops counting it, and no eligibility, money, or standing reads it.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/stripe-refresh',
+    specRef: '§13 (Phase 10b)',
+    reason:
+      'Re-reads the connected account from the provider and updates the stored record — the Phase 10b reconciliation path a dropped webhook already has. It writes only what Stripe reports about Stripe’s own fact, reaches nobody, and moves no money.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/relationships/:associationId/deliverables',
+    specRef: '§22.4 idiom (migration 0048)',
+    reason:
+      'Records one agreed work item, restating the accepted agreement — the source is computed from that record, never typed. A receipt that reaches nobody and decides nothing; the decision that reads it (verified / more evidence / waiver) takes the gate.',
+  },
+  {
+    route:
+      'POST /api/admin/creators/:prospectId/relationships/:associationId/deliverables/:deliverableId/evidence',
+    specRef: '§22.4 idiom (migration 0048)',
+    reason:
+      'Records what was supplied against a deliverable — an insert-only receipt in the §22.4 idiom, where a resubmission is a new row and the earlier one survives. It reaches nobody and decides nothing; the gated decision route is what answers it.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/relationships/:associationId/mediation-note',
+    specRef: '§14.2 (migration 0048)',
+    reason:
+      'Records what Admin told the parties during a negotiation. The table has no acceptance or outcome column — Admin mediates and never agrees — so there is structurally nothing here a later phase could read as either side’s answer.',
+  },
+  {
+    route:
+      'POST /api/admin/creators/:prospectId/relationships/:associationId/termination-request',
+    specRef: '§29, §24.8 (migration 0048)',
+    reason:
+      'Records that a party ASKED to end an active partnership, with its §24.8 classification — the §29.1-disclosure posture: writing down what somebody told us decides nothing. The record decides no money and ends nothing; the decision on it takes the gate, and executing anything stays with the §29 and §24.8 machinery.',
+  },
+  {
+    route: 'POST /api/admin/creators/:prospectId/support-case',
+    specRef: '§26.7, §27.8',
+    reason:
+      'Opens a §26.7 case through openSupportCase — the Support workspace’s own ungated posture: it records what somebody asked and starts the published response clock, moves no money, and changes nobody’s standing. There is no second queue; the case is born in the one intake with its reference and calendar-computed promise.',
   },
   {
     route: 'PATCH /api/admin/affiliates/:associationId/prospect',

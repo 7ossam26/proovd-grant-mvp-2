@@ -25,7 +25,15 @@ import {
   CREATOR_ATTENTION_KINDS as SHARED_ATTENTION,
   CREATOR_DIRECTORY_FILTER_KEYS as SHARED_FILTERS,
   CREATOR_HISTORY_CATEGORY_KEYS as SHARED_HISTORY,
-  CREATOR_PARKED_MESSAGES,
+  AFFILIATE_OPERATIONS_ABSENCES,
+  AFFILIATE_REFUND_TREATMENTS,
+  AFFILIATE_TREATMENT_LABELS as SHARED_TREATMENT_LABELS,
+  DELIVERABLE_OUTCOMES as SHARED_DELIVERABLE_OUTCOMES,
+  DELIVERABLE_STATE_LABELS as SHARED_DELIVERABLE_LABELS,
+  DELIVERABLE_RESTATES_AGREEMENT,
+  AVAILABILITY_TERM_IS_AGREED,
+  TERMINATION_DECIDES_NO_MONEY,
+  COMMUNICATIONS_ARE_THE_RECORD,
   PAYOUT_STATE_LABELS as SHARED_PAYOUT_LABELS,
   PROVENANCE_BADGES,
   SUBTYPE_METRIC_LABELS as SHARED_METRIC_LABELS,
@@ -41,6 +49,9 @@ import {
   ACTIVE_PARTNERSHIP_SLOT_LIMIT,
   ADMIN_ASSOCIATION_STATUS_LABELS,
   ADMIN_WORK_ATTENTION_KEYS,
+  AFFILIATE_TREATMENT_LABELS,
+  DELIVERABLE_OUTCOMES,
+  DELIVERABLE_STATE_LABELS,
   CREATOR_ACCESS_ACTIONS,
   CREATOR_ACCOUNT_STATES,
   CREATOR_ATTENTION_KINDS,
@@ -164,13 +175,133 @@ describe('the register carries what the Spec requires of it', () => {
     expect('CREATOR_TIER_LEVELS' in shared).toBe(false);
   });
 
-  it('gives every parked control a sentence that names what is missing', () => {
-    for (const [key, message] of Object.entries(CREATOR_PARKED_MESSAGES)) {
-      expect(message.length, key).toBeGreaterThan(40);
-      // §1.4: a parked control says what the destination IS, not that something
-      // broke. Every message says "parked" and then why.
-      expect(message.toLowerCase(), key).toContain('parked');
+  it('has no parked register left — the last gap closed and the register went with it', async () => {
+    // The brief's own rule (decision 1): an entry leaves the register the
+    // moment its control works, and the register goes when the last one does.
+    // Session C closed the final five (deliverableEvidence, availability,
+    // payoutReminder, kitVisuals, caseIntake), so CREATOR_PARKED_MESSAGES no
+    // longer exists — a parked message on a working control is the §1.4
+    // failure in reverse.
+    const shared = (await import('@proovd/shared')) as Record<string, unknown>;
+    expect(shared['CREATOR_PARKED_MESSAGES']).toBeUndefined();
+  });
+
+  it('renders a refusal sentence for every control the reference draws and the Spec forbids', () => {
+    // The Founders rebuild's OPERATIONS_ABSENCES precedent: re-adding one of
+    // these controls means deleting the sentence that says why it must not
+    // exist. Seven refused controls, each naming the rule and the real path.
+    expect(AFFILIATE_OPERATIONS_ABSENCES).toHaveLength(7);
+    const keys = AFFILIATE_OPERATIONS_ABSENCES.map((entry) => entry.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys.sort()).toEqual([
+      'adjustEarnings',
+      'campaignSuspendKill',
+      'createTransfer',
+      'fixedOutcome',
+      'relationshipEdit',
+      'tierAccessCombo',
+      'workAgainReissue',
+    ]);
+    for (const entry of AFFILIATE_OPERATIONS_ABSENCES) {
+      expect(entry.control.length, entry.key).toBeGreaterThan(5);
+      expect(entry.sentence.length, entry.key).toBeGreaterThan(80);
     }
+    // The two that guard money name where the decision actually lives.
+    const transfer = AFFILIATE_OPERATIONS_ABSENCES.find((e) => e.key === 'createTransfer')!;
+    expect(transfer.sentence).toContain('close-operations queue');
+    const adjust = AFFILIATE_OPERATIONS_ABSENCES.find((e) => e.key === 'adjustEarnings')!;
+    expect(adjust.sentence).toContain('§24.8');
+  });
+
+  it('restates the Session C vocabulary where the backend needs it at runtime', () => {
+    // The deliverable decision vocabulary — 0048's CHECK, one for one.
+    expect([...DELIVERABLE_OUTCOMES]).toEqual([...SHARED_DELIVERABLE_OUTCOMES]);
+    expect(DELIVERABLE_STATE_LABELS).toEqual({ ...SHARED_DELIVERABLE_LABELS });
+    // §24.8's treatment labels are typed against the cause register's own
+    // vocabulary — a sixth treatment cannot gain a label without a rule.
+    expect(Object.keys(AFFILIATE_TREATMENT_LABELS).sort()).toEqual(
+      [...AFFILIATE_REFUND_TREATMENTS].sort(),
+    );
+    expect(AFFILIATE_TREATMENT_LABELS).toEqual({ ...SHARED_TREATMENT_LABELS });
+  });
+
+  it('pins the Session C sentences the surfaces render', () => {
+    expect(DELIVERABLE_RESTATES_AGREEMENT).toContain('restates');
+    expect(AVAILABILITY_TERM_IS_AGREED).toContain('never');
+    expect(TERMINATION_DECIDES_NO_MONEY).toContain('decides no money');
+    expect(COMMUNICATIONS_ARE_THE_RECORD).toContain('delivery record');
+  });
+
+  it('renders eight tabs and twenty-five sections, the reference’s own registers', async () => {
+    // The 2026-08-17 rebuild's structural register (Session A). The counts are
+    // the walked reference's `Vj`/`Gj` exactly, and the three tabs the
+    // Selected-relationship switcher scopes are the three the reference
+    // renders it on.
+    const { AFFILIATE_RECORD_TABS } = await import('@proovd/shared');
+    expect(AFFILIATE_RECORD_TABS).toHaveLength(8);
+    const sectionCount = AFFILIATE_RECORD_TABS.reduce(
+      (n, tab) => n + tab.sections.length,
+      0,
+    );
+    expect(sectionCount).toBe(25);
+    expect(AFFILIATE_RECORD_TABS[0].key).toBe('overview');
+    expect(AFFILIATE_RECORD_TABS[0].sections).toHaveLength(0);
+    expect(
+      AFFILIATE_RECORD_TABS.filter((t) => t.relationshipScoped).map((t) => t.key),
+    ).toEqual(['campaigns', 'content', 'performance']);
+    // Keys are addresses (DNA §5.12), so they must be unique where they meet.
+    const tabKeys = AFFILIATE_RECORD_TABS.map((t) => t.key);
+    expect(new Set(tabKeys).size).toBe(tabKeys.length);
+    for (const tab of AFFILIATE_RECORD_TABS) {
+      const keys = tab.sections.map((s: { key: string }) => s.key);
+      expect(new Set(keys).size, tab.key).toBe(keys.length);
+    }
+  });
+
+  it('records the Opened step as a refusal with its reason, not a gap', async () => {
+    // §1.8: the reference draws an invitation `Opened` step; §27 ships no
+    // tracking pixel and Phase 23b refused an email-open metric outright. The
+    // register carries the refusal so a later session adding a pixel is a
+    // visible edit rather than a quiet one.
+    const { INVITATION_LIFECYCLE_STEPS } = await import('@proovd/shared');
+    expect(INVITATION_LIFECYCLE_STEPS).toHaveLength(9);
+    const opened = INVITATION_LIFECYCLE_STEPS.find((s) => s.key === 'opened')!;
+    expect(opened.absentBecause).toBeTruthy();
+    expect(opened.absentBecause).toContain('tracking pixel');
+    for (const step of INVITATION_LIFECYCLE_STEPS) {
+      if (step.key !== 'opened') expect(step.absentBecause, step.key).toBeNull();
+    }
+  });
+
+  it('derives proposal access from §29 and offers tiers only as suggestions', async () => {
+    const shared = await import('@proovd/shared');
+    // §1.8 item 4: no stored eligibility flag — the badge reads §29's
+    // restrict_bidding/demote records, both of which the enforcement register
+    // already carries.
+    expect(Object.keys(shared.PROPOSAL_ACCESS_LABELS)).toEqual(['standard', 'restricted']);
+    expect(shared.PROPOSAL_ACCESS_IS_DERIVED).toContain('§29');
+    expect([...shared.AFFILIATE_ENFORCEMENT_ACTIONS]).toContain('restrict_bidding');
+    expect([...shared.AFFILIATE_ENFORCEMENT_ACTIONS]).toContain('demote');
+    // §1.8 item 3: three suggestions over the free-text column, never an enum.
+    expect([...shared.QUALITY_TIER_SUGGESTIONS]).toEqual(['Tier A', 'Tier B', 'Tier C']);
+    expect('QUALITY_TIERS' in shared).toBe(false);
+  });
+
+  it('accepts what the server can inspect, and no HEIC', async () => {
+    // §1.8 item 5: the copy names what `ALLOWED_IMAGE_TYPES` accepts. HEIC is
+    // a file browsers cannot render; SVG stays excluded since 09a.
+    const { EVIDENCE_PICTURES_ACCEPTED, AFFILIATE_EVIDENCE_CATEGORIES } = await import(
+      '@proovd/shared'
+    );
+    expect(EVIDENCE_PICTURES_ACCEPTED).not.toContain('HEIC');
+    expect(EVIDENCE_PICTURES_ACCEPTED).toContain('PNG');
+    // The four file categories are the 0048 CHECK, one for one.
+    expect(AFFILIATE_EVIDENCE_CATEGORIES.map((c) => c.key)).toEqual([
+      'channel_permission',
+      'sponsored_history',
+      'promotion_plan',
+      'similar_campaign_performance',
+    ]);
   });
 
   it('names four steps in the Add Affiliate flow, each a question', () => {
@@ -178,6 +309,36 @@ describe('the register carries what the Spec requires of it', () => {
     for (const step of ADD_AFFILIATE_STEPS) {
       expect(step.title.endsWith('?')).toBe(true);
     }
+  });
+
+  it('restates the Session B registers where the backend needs them at runtime', async () => {
+    // The categories are the 0048 file CHECK, the metrics the 0048
+    // verification CHECK, and the correction fields the columns the
+    // account-correction route may write — restated in labels.ts (the rootDir
+    // constraint) and drift-tested here like every other vocabulary.
+    const shared = await import('@proovd/shared');
+    const labels = await import('../affiliates/workspace/labels.js');
+    expect(labels.AFFILIATE_EVIDENCE_CATEGORIES).toEqual(
+      shared.AFFILIATE_EVIDENCE_CATEGORIES.map((c) => ({ key: c.key, label: c.label })),
+    );
+    expect(labels.AFFILIATE_EVIDENCE_METRICS).toEqual(
+      shared.AFFILIATE_EVIDENCE_METRICS.map((m) => ({ key: m.key, label: m.label })),
+    );
+    expect(labels.AFFILIATE_ACCOUNT_CORRECTION_FIELDS).toEqual(
+      shared.AFFILIATE_ACCOUNT_CORRECTION_FIELDS.map((f) => ({ key: f.key, label: f.label })),
+    );
+  });
+
+  it('pins the Session B sentences the surfaces render', async () => {
+    // Promises about how Proovd behaves are not a renderer's to reword (§7's
+    // NO_GUARANTEE_TEXT reasoning). The reacceptance sentence records the
+    // §1.8 resolution: §29.8 is audience-wide, and a control on one person's
+    // record must say so or be read as narrower.
+    const shared = await import('@proovd/shared');
+    expect(shared.CORRECTION_APPENDS_NEW_VALUE).toContain('prior value');
+    expect(shared.CORRECTION_REQUEST_LEAVES_VALUE).toContain('current value remains');
+    expect(shared.PASSWORD_RECOVERY_CONSEQUENCE).toContain('non-enumerating');
+    expect(shared.REACCEPTANCE_IS_AUDIENCE_WIDE).toContain('every Affiliate');
   });
 
   it('maps every audit action the workspace writes to a plain sentence', () => {

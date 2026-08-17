@@ -55,6 +55,7 @@ import {
   founderAccessActions,
   founderDeletionRequests,
   founderDeletionReviews,
+  founderMeetingNotes,
 } from '../db/schema/founder-workspace.js';
 
 import {
@@ -70,8 +71,10 @@ import {
   FOUNDER_DELETION_REQUESTED,
   FOUNDER_DELETION_REVIEWED,
   FOUNDER_FIELD_UPDATED,
+  FOUNDER_MEETING_NOTE_RECORDED,
   FOUNDER_OVERRIDE_CLEARED,
   FOUNDER_OVERRIDE_SET,
+  FOUNDER_RESEARCH_RECORDED,
   FOUNDER_SENDER_RECORDED,
   type FieldEditAuditValue,
 } from './audit-actions.js';
@@ -1093,4 +1096,158 @@ export async function setNextCampaignReadiness(
     return result.code === 'not_found' ? notFound(result.message) : invalid(result.message);
   }
   return { ok: true, decisionId: result.decisionId, campaignId: closed.campaign.id };
+}
+
+/* ── Meeting notes and research (§7, migration 0047, 2026-08-16 rebuild) ───── */
+
+export type MeetingNoteResult = { ok: true; id: string } | MutationFailure;
+
+/**
+ * A new off-platform conversation, written down.
+ *
+ * Insert-only: there is no edit path anywhere — a correction is a new note,
+ * and 0047's trigger refuses every UPDATE except the §25.8 anonymising one.
+ * The five required facts are the reference dialog's own ("Keep the decision,
+ * participants, follow-up, and source attached to this Founder"), refused by
+ * name here and by the two-shape CHECK regardless. The author is the session,
+ * never the body.
+ */
+export async function addMeetingNote(
+  deps: FounderMutationDeps,
+  input: {
+    prospectId: string;
+    meetingDate: string;
+    participants: string;
+    decisions: string;
+    followUp: string;
+    sourceLink: string;
+    notes?: string | null;
+  },
+  who: ActorContext,
+): Promise<MeetingNoteResult> {
+  const { db } = deps;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.meetingDate.trim())) {
+    return invalid('The meeting date could not be read. Enter it as YYYY-MM-DD.');
+  }
+  const meetingDate = input.meetingDate.trim();
+  const participants = trimmedOrNull(input.participants);
+  const decisions = trimmedOrNull(input.decisions);
+  const followUp = trimmedOrNull(input.followUp);
+  const sourceLink = trimmedOrNull(input.sourceLink);
+  if (participants === null) return invalid('Record who was in the conversation.');
+  if (decisions === null) return invalid('Record what was decided — that is what a meeting note is for.');
+  if (followUp === null) return invalid('Record the follow-up, so the next session knows what was promised.');
+  if (sourceLink === null) {
+    return invalid('Record the source or link, so the note can be verified later.');
+  }
+
+  const ctx = await loadFounderContext(db, input.prospectId);
+  if (!ctx) return notFound('There is no Founder at that address.');
+  if (ctx.prospect.anonymisedAt) {
+    return refused(
+      'This prospect was anonymised after 30 calendar days without a claim. Its record is closed; create a new prospect to record new work.',
+    );
+  }
+
+  // ActorContext carries `user:<id>`; the FK column wants the bare Better Auth
+  // id. Strip the prefix rather than asking the route for a second value —
+  // one actor, two renderings.
+  const authorId = who.actor.startsWith('user:') ? who.actor.slice('user:'.length) : who.actor;
+
+  const id = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(founderMeetingNotes)
+      .values({
+        prospectId: ctx.prospect.id,
+        meetingDate,
+        participants,
+        decisions,
+        followUp,
+        sourceLink,
+        notes: trimmedOrNull(input.notes ?? null),
+        createdBy: authorId,
+      })
+      .returning({ id: founderMeetingNotes.id });
+
+    await tx.insert(auditEvents).values({
+      actor: who.actor,
+      mfaContext: who.mfaContext ?? null,
+      reauthContext: who.reauthContext ?? null,
+      targetType: 'founder_prospect',
+      targetId: ctx.prospect.id,
+      action: FOUNDER_MEETING_NOTE_RECORDED,
+      internalReason: `meeting note recorded for ${meetingDate}`,
+      customerExplanation: null,
+      newValue: { noteId: row!.id, meetingDate },
+    });
+
+    return row!.id;
+  });
+
+  return { ok: true, id };
+}
+
+export type ResearchEntryResult = { ok: true } | MutationFailure;
+
+/**
+ * A research finding, appended to §7's discovery-evidence list.
+ *
+ * One record, one shape: the intake's evidence list and this dialog write the
+ * same `discovery_evidence` array, so the entry is composed into one stored
+ * line rather than a second structure the intake could not read. The list is
+ * append-through-this-path only in practice; the prospect-update route can
+ * still replace it wholesale, and both write the same audit action family.
+ */
+export async function addResearchEntry(
+  deps: FounderMutationDeps,
+  input: { prospectId: string; title: string; findings?: string | null; sourceLink: string },
+  who: ActorContext,
+): Promise<ResearchEntryResult> {
+  const { db } = deps;
+
+  const title = trimmedOrNull(input.title);
+  const findings = trimmedOrNull(input.findings ?? null);
+  const sourceLink = trimmedOrNull(input.sourceLink);
+  if (title === null) return invalid('Name the research — a finding with no title cannot be found again.');
+  if (sourceLink === null) {
+    return invalid('Record the source or link, so the finding can be verified later.');
+  }
+
+  const ctx = await loadFounderContext(db, input.prospectId);
+  if (!ctx) return notFound('There is no Founder at that address.');
+  if (ctx.prospect.anonymisedAt) {
+    return refused(
+      'This prospect was anonymised after 30 calendar days without a claim. Its record is closed; create a new prospect to record new work.',
+    );
+  }
+
+  const entry = findings ? `${title} — ${findings} (${sourceLink})` : `${title} (${sourceLink})`;
+  const existing = Array.isArray(ctx.prospect.discoveryEvidence)
+    ? (ctx.prospect.discoveryEvidence as unknown[]).filter(
+        (e): e is string => typeof e === 'string',
+      )
+    : [];
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(founderProspects)
+      .set({ discoveryEvidence: [...existing, entry] })
+      .where(eq(founderProspects.id, ctx.prospect.id));
+
+    await tx.insert(auditEvents).values({
+      actor: who.actor,
+      mfaContext: who.mfaContext ?? null,
+      reauthContext: who.reauthContext ?? null,
+      targetType: 'founder_prospect',
+      targetId: ctx.prospect.id,
+      action: FOUNDER_RESEARCH_RECORDED,
+      internalReason: 'research entry appended to discovery evidence',
+      customerExplanation: null,
+      priorValue: { entries: existing.length },
+      newValue: { entries: existing.length + 1, title },
+    });
+  });
+
+  return { ok: true };
 }

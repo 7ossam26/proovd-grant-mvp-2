@@ -262,9 +262,28 @@ backend/    Express 5 + Drizzle + Postgres 16
   src/jobs/           pg-boss, on the same Postgres
 frontend/   React 19 + Vite, styled solely by proovd.css
   src/features/public/   the fourteen public routes, footer, sample campaigns
-  src/features/admin/    the Admin shell, Founders, Creators, configuration,
-                         prerequisites, the reservation and charge ledger, the
-                         money controls, and the risk inventory
+  src/features/admin/    the Admin shell and its workspaces, each built from a
+                         supplied reference after Phase 24: Founders (rebuilt
+                         2026-08-16/17 — the six-card directory with its two
+                         action columns, the eight-section person record with
+                         Onboarding's four tabs, the five-step Create Founder
+                         compose, the Edit Founder sheet, and the six
+                         read-and-route sections from Campaign through
+                         History's Timeline/Communications split),
+                         Creators (rebuilt to a second reference 2026-08-17,
+                         complete in three sessions — the one-route eight-tab
+                         record shell with the Selected-relationship switcher
+                         and migration 0048's six record families, the two
+                         person-level tabs with the evidence uploader, the
+                         per-metric trail and the live Stripe re-read, and the
+                         four campaign-scoped tabs plus History: deliverables
+                         and availability checked against the AGREED term,
+                         the payout reminder that sends an existing message,
+                         case intake through the one queue, and the seven
+                         refused controls as a register; the walk is
+                         docs/phases/admin-affiliate-reconciliation.md),
+                         Campaigns, Support, Backers, and the
+                         floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page
   src/surfaces/draft/    the Founder journey: vetting, result, account claim
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the

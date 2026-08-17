@@ -228,6 +228,99 @@ export function subtypeLabel(subtype: string | null): string | null {
   return SUBTYPE_LABELS[subtype] ?? subtype;
 }
 
+/* ── Evidence categories, metrics, and correctable fields (Session B) ───────
+ *
+ * Restated from `shared/src/admin/creator-workspace.ts` (the `rootDir`
+ * constraint) and drift-tested in `creator-workspace-registers.test.ts`. The
+ * category keys are the 0048 `affiliate_evidence_files.category` CHECK; the
+ * metric keys are the `affiliate_evidence_verifications.metric` CHECK; the
+ * correction fields are the columns the account-correction route may write —
+ * never a free-text field name (16a's overridable-field reasoning).           */
+
+export const AFFILIATE_EVIDENCE_CATEGORIES: readonly { key: string; label: string }[] = [
+  { key: 'channel_permission', label: 'Channel ownership / permission' },
+  { key: 'sponsored_history', label: 'Sponsored-content history' },
+  { key: 'promotion_plan', label: 'Promotion / traffic plan' },
+  { key: 'similar_campaign_performance', label: 'Similar-campaign performance' },
+];
+
+export function evidenceCategoryKeys(): readonly string[] {
+  return AFFILIATE_EVIDENCE_CATEGORIES.map((c) => c.key);
+}
+
+export function evidenceCategoryLabel(key: string): string {
+  return AFFILIATE_EVIDENCE_CATEGORIES.find((c) => c.key === key)?.label ?? key;
+}
+
+export const AFFILIATE_EVIDENCE_METRICS: readonly { key: string; label: string }[] = [
+  { key: 'audience_size', label: 'Audience size' },
+  { key: 'engagement_rate', label: 'Engagement rate' },
+  { key: 'audience_demographics', label: 'Audience demographics' },
+  { key: 'channel_ownership', label: 'Channel ownership' },
+  { key: 'newsletter_permission_basis', label: 'Newsletter permission basis' },
+];
+
+export function evidenceMetricKeys(): readonly string[] {
+  return AFFILIATE_EVIDENCE_METRICS.map((m) => m.key);
+}
+
+export function evidenceMetricLabel(key: string): string {
+  return AFFILIATE_EVIDENCE_METRICS.find((m) => m.key === key)?.label ?? key;
+}
+
+export const AFFILIATE_ACCOUNT_CORRECTION_FIELDS: readonly { key: string; label: string }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'username', label: 'Username' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone number · unverified' },
+  { key: 'country', label: 'Country' },
+  { key: 'state_region', label: 'State / region' },
+];
+
+export function correctionFieldLabel(key: string): string | null {
+  return AFFILIATE_ACCOUNT_CORRECTION_FIELDS.find((f) => f.key === key)?.label ?? null;
+}
+
+/* ── Deliverables (Session C — the 0048 decision vocabulary) ────────────────*/
+
+/**
+ * The three outcomes 0048's decision CHECK admits, and the five states a
+ * deliverable row can render (`pending` and `evidence_submitted` are DERIVED —
+ * no evidence and no decision, or a receipt the latest decision has not
+ * answered). Latest decision wins.
+ */
+export const DELIVERABLE_OUTCOMES = ['verified', 'more_evidence_needed', 'waived'] as const;
+export type DeliverableOutcome = (typeof DELIVERABLE_OUTCOMES)[number];
+
+export const DELIVERABLE_STATE_LABELS: Record<string, string> = {
+  pending: 'Waiting on Affiliate',
+  evidence_submitted: 'Evidence submitted',
+  verified: 'Verified',
+  more_evidence_needed: 'More evidence needed',
+  waived: 'Founder/Admin waiver',
+};
+
+export function deliverableStateLabel(state: string): string {
+  return DELIVERABLE_STATE_LABELS[state] ?? state;
+}
+
+/**
+ * §24.8's five affiliate treatments, in the words the termination-request
+ * surface renders. The permitted set per cause is `refunds/logic.ts`'s
+ * register (the same matrix 0048 CHECKs); this map only says the words.
+ */
+export const AFFILIATE_TREATMENT_LABELS: Record<string, string> = {
+  not_attributed: 'Not attributed — no Affiliate earnings exist on it',
+  earnings_remain: 'Valid Affiliate earnings remain',
+  cancel_unfinalized: 'Cancel unfinalized earnings on the affected transactions',
+  cancel_unpaid_invalid: 'Cancel unpaid invalid earnings',
+  contractual_recovery: 'Contractual recovery of the invalid amount',
+};
+
+export function affiliateTreatmentLabel(key: string): string {
+  return AFFILIATE_TREATMENT_LABELS[key] ?? key;
+}
+
 /* ── History ────────────────────────────────────────────────────────────────*/
 
 export const CREATOR_HISTORY_CATEGORY_KEYS = [

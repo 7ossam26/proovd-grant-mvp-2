@@ -133,6 +133,13 @@ export interface CreatorHeader {
 
   attention: CreatorAttention;
 
+  /**
+   * Open §26.7 cases anchored on this person — the Support tab's badge
+   * (Session C). Counted from the same rows the standing pane lists, so the
+   * badge and the list can never disagree.
+   */
+  openCases: number;
+
   /** Which menu actions this record's state actually permits. */
   availableActions: CreatorMenuAction[];
 }
@@ -164,6 +171,17 @@ export interface CreatorRelationshipSummary {
   closesAt: string | null;
   /** True when this relationship is holding one of §2.2's three slots. */
   holdsSlot: boolean;
+
+  /*
+   * The three facts the Selected-relationship strip renders (2026-08-17
+   * rebuild). Composed labels, decided server-side like every other cell —
+   * `Accepted` / `Proposal pending` / `Not started`; the link's four states;
+   * the completion answer with `Not due before close` kept distinct from
+   * `Decision pending` (§16a: not yet populated is not zero).
+   */
+  agreement: string;
+  trackingLink: string;
+  completion: string;
 }
 
 /* ── Profile & evidence ─────────────────────────────────────────────────────*/
@@ -243,10 +261,66 @@ export interface CreatorInvitationView {
   /** Token facts only — never a value (§28.1). */
   hasLiveToken: boolean;
   claimedAt: string | null;
+  /*
+   * The lifecycle-modal facts (Session B). All stored instants or their
+   * honest absence — the `Opened` step has no field here on purpose, because
+   * there is no record it could render (the register carries the reason).
+   */
+  createdAt: string | null;
+  signupStartedAt: string | null;
+  tokenExpiresAt: string | null;
   sends: { at: string; by: string; to: string; status: string; confirmed: boolean }[];
   /** What §8's preview gate currently refuses, if anything. */
   unresolved: string[];
   canSend: boolean;
+}
+
+/* ── Evidence files and the per-metric trail (Session B) ────────────────────*/
+
+/** One evidence picture on the §5.3 research record (0048). */
+export interface EvidenceFileView {
+  id: string;
+  category: string;
+  categoryLabel: string;
+  filename: string | null;
+  /** `pending` | `stored` | `rejected` — the Phase 09a lifecycle. */
+  state: string;
+  rejection: string | null;
+  /** `1200 × 800` once the bytes were read; null before (§1.4). */
+  dimensions: string | null;
+  uploadedBy: string;
+  uploadedAt: string | null;
+}
+
+/** The latest decision per §5.3 metric, or its honest absence. */
+export interface MetricDecisionView {
+  metric: string;
+  label: string;
+  decision: string | null;
+  detail: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+}
+
+/** §29-derived proposal access — never a stored flag (0048's header). */
+export interface ProposalAccessView {
+  key: 'standard' | 'restricted';
+  label: string;
+  /** The enforcement record the answer derives from, when restricted. */
+  derivedFrom: string | null;
+}
+
+/** The Account-agreements block (§10, §29.8, §31.5). */
+export interface CreatorAgreementsView {
+  /** Latest accepted version per account-level document, or null pre-claim. */
+  terms: string | null;
+  aup: string | null;
+  /** `accepted` | `reacceptance_required` | `not_claimed`. */
+  policyState: string;
+  /** The published versions the §29.8 requirement dialog may cite. */
+  publishedVersions: { slug: string; version: string; title: string }[];
+  /** Per-campaign IP/commercial acceptance, one row per relationship. */
+  perCampaign: { associationId: string; campaignName: string; state: string }[];
 }
 
 export interface CreatorProfilePane {
@@ -254,6 +328,20 @@ export interface CreatorProfilePane {
   /** Account details (Affiliate supplied) and Channel details (Admin authored). */
   blocks: ProfileBlock[];
   verification: VerificationBlock;
+  /*
+   * The Session B additions: the evidence pictures with the honest
+   * unavailable state while R2 is Track A4, the per-metric decision trail,
+   * §29-derived proposal access, and the agreements block.
+   */
+  evidenceFiles: {
+    /** Whether an upload can be offered at all (storage configured). */
+    available: boolean;
+    waitingOn: string | null;
+    files: EvidenceFileView[];
+  };
+  metricDecisions: MetricDecisionView[];
+  proposalAccess: ProposalAccessView;
+  agreements: CreatorAgreementsView;
   provider: ProviderBlock;
   invitations: CreatorInvitationView[];
   /** Recovery, notifications, retention — §5.5, §27.2, §27.7, §25.8. */
@@ -327,6 +415,40 @@ export interface CreatorStandingPane {
   }[];
   /** §29.8: an outstanding requirement blocks every `/api/creator` call. */
   policyReacceptanceOpen: boolean;
+  /**
+   * The person's §26.7 cases (Session C) — anchored on their account or one of
+   * their associations, because `support_cases` has no prospect column and
+   * needs none. Operating a case stays the Support workspace's; each row
+   * carries the address that owns it.
+   */
+  cases: CreatorCaseView[];
+}
+
+export interface CreatorCaseView {
+  id: string;
+  /** The quotable `PVD-…` reference (§33.9.10). */
+  reference: string;
+  topic: string;
+  subject: string | null;
+  status: string;
+  /** Open work — `status <> 'resolved'`, the queue's own membership rule. */
+  open: boolean;
+  openedAt: string | null;
+  /** The Support workspace address that operates this case. */
+  href: string;
+}
+
+export interface CreatorCommunicationView {
+  /** The §27 key — the label resolves in the browser from the shared registry
+      (Phase 22c's rule: the backend returns the key, never a fourth copy). */
+  eventKey: string;
+  target: string;
+  entityType: string;
+  entityId: string;
+  /** Confirmed at the provider, or recorded-not-confirmed (§1.4's state). */
+  confirmed: boolean;
+  at: string | null;
+  occurredAt: string;
 }
 
 /* ── History ────────────────────────────────────────────────────────────────*/
@@ -355,4 +477,10 @@ export interface CreatorWorkspaceDetail {
   history: CreatorHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;
+  /**
+   * The person's `notification_deliveries` rows (Session C) — the real record
+   * of recipient, event key, delivery state, and dedup entity. Audience-
+   * prefixed to `affiliate_*`, newest first, bounded.
+   */
+  communications: CreatorCommunicationView[];
 }

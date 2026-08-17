@@ -176,6 +176,77 @@ export async function notifyAccountStateChange(
   });
 }
 
+/**
+ * The Admin-initiated payout reminder (the Affiliate rebuild's gap 3).
+ *
+ * §27 defines no new reminder message; this SENDS THE SAME notice the state
+ * change already sends, under the same key — the copy object above is the one
+ * source of its words. What differs is the dedup entity: the state-change
+ * sender keys on `<account>:<state>` so a slip is announced once, and a
+ * deliberate Admin re-ask keys on the RECORDED ask (its audit row), so asking
+ * again is a second message and a replay of one ask is not (§7's resend rule,
+ * the Session B correction-request arrangement).
+ *
+ * The caller gates on the stored payout state before recording the ask —
+ * reminding somebody about nothing would be §1.4's failure — and reports the
+ * outcome beside the re-read rather than swallowing a transport refusal.
+ */
+export async function sendAffiliatePayoutReminder(
+  deps: Pick<AccountNotificationDeps, 'notifier' | 'context'>,
+  input: {
+    stripeAccountId: string;
+    email: string;
+    missingRequirements: readonly string[];
+    /** The recorded ask this send dedups on. */
+    entityId: string;
+  },
+): Promise<{ sent: boolean; reason: string | null }> {
+  if (!deps.notifier || !deps.context) {
+    return { sent: false, reason: 'No email transport is configured, so nothing was sent.' };
+  }
+
+  const copy = STATE_COPY.more_information_required;
+  const facts = [
+    { label: 'Status', value: copy.status },
+    { label: 'Who owns it', value: copy.owner },
+  ];
+  if (input.missingRequirements.length > 0) {
+    facts.push({
+      label: 'What Stripe still needs',
+      value: input.missingRequirements.join(', '),
+    });
+  }
+
+  const notice = await renderPlainNotice({
+    subject: `Action on your Proovd payout account — ${copy.status.toLowerCase()}`,
+    headline: copy.headline,
+    facts,
+    paragraphs: [
+      copy.next,
+      'Stripe collects and holds the identity, tax, and bank details for this account. Proovd never asks for them and never stores them.',
+    ],
+    action: { label: 'Open payout setup', url: `${deps.context.appBaseUrl}/payouts` },
+    reference: input.stripeAccountId,
+    supportEmail: deps.context.supportEmail,
+  });
+
+  const outcome = await deps.notifier.send({
+    eventKey: AFFILIATE_CONNECTED_ACCOUNT_INFO_REQUIRED,
+    entityType: 'affiliate_payout_reminder',
+    entityId: input.entityId,
+    to: input.email,
+    from: deps.context.fromAddress,
+    replyTo: deps.context.supportEmail,
+    ...notice,
+  });
+
+  if (outcome.status === 'sent') return { sent: true, reason: null };
+  if (outcome.status === 'duplicate') {
+    return { sent: false, reason: 'This ask was already sent — a replay is not a second message.' };
+  }
+  return { sent: false, reason: `The provider refused the send: ${outcome.reason}` };
+}
+
 /** The role and owner behind a Stripe account id, for the webhook path. */
 export async function findAccountOwner(
   db: Database,

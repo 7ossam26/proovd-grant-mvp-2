@@ -30,10 +30,13 @@ import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
+  COMMUNICATIONS_ARE_THE_RECORD,
+  CORRECTION_REQUEST_LEAVES_VALUE,
   CREATOR_NO_ATTENTION_LABEL,
-  CREATOR_PARKED_MESSAGES,
   CREATOR_SUSPENSION_IS_NOT_A_BAN,
   FOUNDER_NEVER_SEES_THIS,
+  PASSWORD_RECOVERY_CONSEQUENCE,
+  PROPOSAL_ACCESS_IS_DERIVED,
   PROSPECT_CREATES_NO_ACCOUNT,
   QUALITY_TIER_HELPER,
   VERIFICATION_IS_HUMAN,
@@ -43,6 +46,7 @@ import { installQaServer, type StubRoute } from '../../qa/server.js';
 import type { AdminIdentity } from '../api.js';
 import type {
   CreatorDirectoryRow,
+  CreatorRelationshipDetail,
   CreatorWorkspaceDetail,
 } from './api.js';
 
@@ -234,6 +238,7 @@ function mayaDetail(
         detail: '2 §5.3 evidence inputs outstanding for this subtype.',
         associationId: null,
       },
+      openCases: 0,
       availableActions: ['assign', 'verify', 'suspend', 'deletion'],
     },
     relationships: [
@@ -251,6 +256,9 @@ function mayaDetail(
         activatedAt: 'Aug 10, 2026 · 9:00 AM UTC',
         closesAt: 'Aug 18, 2026 · 8:00 PM UTC',
         holdsSlot: true,
+        agreement: 'Accepted',
+        trackingLink: 'Affiliate link active',
+        completion: 'Not due before close',
       },
     ],
     profile: {
@@ -321,6 +329,29 @@ function mayaDetail(
         ],
         missing: ['platform_analytics', 'audience_demographics'],
       },
+      evidenceFiles: {
+        available: false,
+        waitingOn:
+          'Evidence uploads are not available on this deployment yet — the object-storage bucket is Track A4. Files already on the record still render.',
+        files: [],
+      },
+      metricDecisions: [
+        { metric: 'audience_size', label: 'Audience size', decision: null, detail: null, decidedBy: null, decidedAt: null },
+        { metric: 'engagement_rate', label: 'Engagement rate', decision: 'more_evidence_needed', detail: 'Share a current analytics screenshot.', decidedBy: 'user:admin', decidedAt: 'Aug 3, 2026 · 9:00 AM UTC' },
+        { metric: 'audience_demographics', label: 'Audience demographics', decision: null, detail: null, decidedBy: null, decidedAt: null },
+        { metric: 'channel_ownership', label: 'Channel ownership', decision: null, detail: null, decidedBy: null, decidedAt: null },
+        { metric: 'newsletter_permission_basis', label: 'Newsletter permission basis', decision: null, detail: null, decidedBy: null, decidedAt: null },
+      ],
+      proposalAccess: { key: 'standard', label: 'Standard proposal access', derivedFrom: null },
+      agreements: {
+        terms: null,
+        aup: null,
+        policyState: 'accepted',
+        publishedVersions: [],
+        perCampaign: [
+          { associationId: ASSOCIATION, campaignName: 'Teeb Founding Launch', state: 'Accepted' },
+        ],
+      },
       provider: {
         populated: false,
         waitingOn: 'Nobody has claimed this account yet, so there is no connected account.',
@@ -341,6 +372,9 @@ function mayaDetail(
           lastSentAt: 'Aug 2, 2026 · 10:00 AM UTC',
           hasLiveToken: true,
           claimedAt: null,
+          createdAt: 'Aug 1, 2026 · 4:00 PM UTC',
+          signupStartedAt: null,
+          tokenExpiresAt: 'Aug 16, 2026 · 10:00 AM UTC',
           sends: [
             {
               at: 'Aug 2, 2026 · 10:00 AM UTC',
@@ -365,7 +399,9 @@ function mayaDetail(
       enforcement: [],
       disclosures: [],
       policyReacceptanceOpen: false,
+      cases: [],
     },
+    communications: [],
     history: [
       {
         category: 'account',
@@ -402,6 +438,103 @@ function recordRoutes(detail: CreatorWorkspaceDetail = mayaDetail()): StubRoute[
     { match: /\/api\/admin\/creators\/campaigns$/, body: { campaigns: [] } },
     { match: /\/api\/admin\/creators\/[^/]+$/, body: detail },
   ];
+}
+
+/**
+ * A minimal relationship read for the campaign-scoped tabs — only the blocks
+ * the tests here render. `relationship.test.tsx` owns the full fixture and the
+ * tab behaviour; this exists so the record shell's own tests can open a
+ * relationship-scoped section without duplicating it.
+ */
+function relStub(): CreatorRelationshipDetail {
+  return {
+    associationId: ASSOCIATION,
+    prospectId: PROSPECT,
+    campaignId: CAMPAIGN,
+    creatorName: 'Maya Johnson',
+    band: {
+      campaignName: 'Teeb Founding Launch',
+      campaignType: 'Product Campaign',
+      founderName: 'Teeb Labs LLC',
+      status: 'Active partnership',
+      statusRaw: 'active',
+      owner: 'System',
+      designation: 'Initial launch roster',
+      activatedAt: null,
+      closesAt: null,
+      responseDeadlineAt: null,
+    },
+    overview: {
+      tasks: [],
+      link: {
+        state: 'active',
+        label: 'Affiliate link active',
+        url: 'https://app.proovd.test/c/abc123',
+        code: 'abc123',
+        activatedAt: null,
+        pausedAt: null,
+        pausedReason: null,
+        testUrl: 'https://app.proovd.test/c/abc123?proovd_link_test=1',
+      },
+      readiness: null,
+      kit: {
+        revealedAt: null,
+        revokedAt: null,
+        revokedReason: null,
+        accessCount: 0,
+        lastAccessAt: null,
+      },
+    },
+    agreement: {
+      lockState: 'Accepted · locks at launch',
+      headlinePercent: '30%',
+      headlineRest: 'of the attributed captured pre-tax reward subtotal.',
+      bonus: null,
+      versions: [],
+      agreement: null,
+      fixedPayment: {
+        available: true,
+        rule: 'Optional · Product Campaigns only',
+        status: 'Not requested',
+        amount: null,
+        source: 'None requested',
+        fundedAt: null,
+        deadlineAt: null,
+      },
+    },
+    content: {
+      submission: null,
+      history: [],
+      launchFailure: { required: false, failure: null },
+      performance: { populated: false, waitingOn: 'Waiting on activation.', value: null },
+    },
+    money: {
+      headline: {
+        status: 'estimated',
+        label: 'Estimated',
+        amount: 'US$0.00',
+        owner: 'System owns capture and reconciliation after campaign close',
+      },
+      earnings: { populated: false, waitingOn: 'Waiting on close.', value: null },
+      transfer: { populated: false, waitingOn: 'Waiting on Day 3.', value: null },
+      completion: null,
+    },
+    deliverables: { items: [], resolved: 0, canRecord: false, sourceLabel: null },
+    availability: {
+      term: 'Keep your promotional content available for the agreed campaign and availability period.',
+      termSource: '§20 Creator obligations · the accepted campaign period',
+      checks: 0,
+      latest: null,
+    },
+    mediationNotes: [],
+    terminationRequests: { open: null, history: [] },
+    kitAssets: { visualsAvailable: false, waitingOn: 'Track A4.', files: [] },
+    workAgain: [],
+  };
+}
+
+function relRoutes(detail: CreatorWorkspaceDetail = mayaDetail()): StubRoute[] {
+  return [{ match: /\/relationships\/[^/]+$/, body: relStub() }, ...recordRoutes(detail)];
 }
 
 /* ── Rendering ─────────────────────────────────────────────────────────────── */
@@ -659,21 +792,43 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
     expect(screen.getByText('Active partnership')).toBeTruthy();
   });
 
-  it('opens the campaign relationship, which is a real destination now', async () => {
-    serve(recordRoutes());
+  it('opens the campaign relationship by selecting it and scoping the Campaigns tab', async () => {
+    // Changed 2026-08-17 (rebuild Session A): the reference replaces the
+    // separate relationship address with the Selected-relationship switcher,
+    // so `View campaign relationship` now selects the relationship and opens
+    // Campaigns · Readiness & Active — the reference's own destination. The
+    // old address stays alive underneath (Session C absorbs it) and is what
+    // the interim section links onward to.
+    serve(relRoutes());
     const view = await renderAdmin(`/admin/creators/${PROSPECT}`);
 
     const control = screen.getByRole('button', { name: /View campaign relationship/i });
     expect(control.getAttribute('aria-disabled')).toBeNull();
     await userEvent.click(control);
     await waitFor(() => {
-      expect(view.router.state.location.pathname).toBe(
-        `/admin/creators/${PROSPECT}/relationships/${ASSOCIATION}`,
-      );
+      expect(view.router.state.location.pathname).toBe(`/admin/creators/${PROSPECT}`);
+      const params = new URLSearchParams(view.router.state.location.search);
+      expect(params.get('tab')).toBe('campaigns');
+      expect(params.get('section')).toBe('readiness');
+      expect(params.get('rel')).toBe(ASSOCIATION);
     });
+    // The switcher scopes the campaign-facing tabs, and its sentence is the
+    // organising rule, pinned.
+    expect(screen.getByText('Selected relationship')).toBeTruthy();
+    expect(
+      screen.getByText('Account data stays separate from campaign-specific state'),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('combobox', { name: 'Select campaign relationship' }),
+    ).toBeTruthy();
+    // The section renders from the relationship read (Session C — no interim).
+    expect(await screen.findByText('Affiliate link active')).toBeTruthy();
   });
 
-  it('offers no action for an item somebody else owns', async () => {
+  it('sends the payout reminder from the Stripe-owned attention — gap 3, closed', async () => {
+    // Session B parked this control; Session C wired it. The dialog is the
+    // real send: the EXISTING §27 key, the ask recorded first, the outcome
+    // reported beside the re-read — no new message invented.
     const detail = mayaDetail();
     detail.header.attention = {
       needed: true,
@@ -683,35 +838,176 @@ describe('§26.1, §2.2, §11 — the Affiliate record', () => {
       detail: 'Stripe is holding this account. Proovd cannot supply what it is asking for.',
       associationId: null,
     };
-    serve(recordRoutes(detail));
+    serve([
+      ...recordRoutes(detail),
+      {
+        match: /\/payout-reminder$/,
+        body: { detail: mayaDetail(), ask: { sent: true, reason: null } },
+      },
+    ]);
     await renderAdmin(`/admin/creators/${PROSPECT}`);
 
     // The label also appears in the facts strip, so the attention object is
     // found by its owner pill — the thing only it carries.
     const box = screen.getByText('Owner · Stripe').closest('section')!;
-    // §1.4: offering Proovd a button for somebody else's work claims a
-    // capability the product does not have.
+    const control = within(box).getByRole('button', { name: /Send payout reminder/i });
+    expect(control.getAttribute('aria-disabled')).toBeNull();
+    await userEvent.click(control);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/message §27 already defines/)).toBeTruthy();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Send the reminder/i }));
+    await waitFor(() => {
+      expect(toasts).toContain('Payout reminder sent');
+    });
+  });
+
+  it('offers no action at all for an Affiliate-owned item', async () => {
+    // §1.4 still holds where it always did: an Affiliate-owned wait is their
+    // move, and the reference renders no control for it either.
+    const detail = mayaDetail();
+    detail.header.attention = {
+      needed: true,
+      kind: 'invitation_unclaimed',
+      owner: 'Affiliate',
+      label: 'Invitation sent, not yet claimed',
+      detail: 'The invitation is live. The next move is Maya’s.',
+      associationId: null,
+    };
+    serve(recordRoutes(detail));
+    await renderAdmin(`/admin/creators/${PROSPECT}`);
+
+    const box = screen.getByText('Owner · Affiliate').closest('section')!;
     expect(within(box).queryByRole('button')).toBeNull();
-    expect(within(box).getByRole('heading', { name: 'Stripe needs information' })).toBeTruthy();
   });
 });
 
-/* ── Profile & evidence ────────────────────────────────────────────────────── */
+/* ── The record shell (rebuild Session A) ──────────────────────────────────── */
 
-describe('§5.3, §8, §11, §13 — profile and evidence', () => {
-  it('labels every block with who supplied it', async () => {
+describe('§26.1, DNA §5.12 — the eight-tab record shell', () => {
+  it('renders the eight tabs from the register, with the campaigns count', async () => {
     serve(recordRoutes());
-    await renderAdmin(`/admin/creators/${PROSPECT}/profile`);
+    await renderAdmin(`/admin/creators/${PROSPECT}`);
 
-    expect(screen.getByText('Affiliate supplied')).toBeTruthy();
-    expect(screen.getAllByText('Admin researched / authored').length).toBeGreaterThan(0);
-    expect(screen.getByText('Evidence + Admin decision')).toBeTruthy();
-    expect(screen.getByText('Stripe supplied · read only')).toBeTruthy();
+    const rail = screen.getByRole('tablist', {
+      name: 'Maya Johnson Affiliate record tabs',
+    });
+    const tabs = within(rail).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual([
+      'Overview',
+      'Profile & Verification',
+      'Account & Payout Setup',
+      'Campaigns1',
+      'Content & Compliance',
+      'Performance & Earnings',
+      'Support & Enforcement',
+      'History',
+    ]);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('holds the tab and section in the URL, and History renders in final shape', async () => {
+    serve(recordRoutes());
+    const view = await renderAdmin(`/admin/creators/${PROSPECT}?tab=history`);
+
+    // History's sections render as their own rail; the first is the bare
+    // address, so no `section` param appears for Timeline.
+    const rail = screen.getByRole('tablist', { name: 'History sections' });
+    expect(within(rail).getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Timeline',
+      'Communications',
+    ]);
+
+    // Session C absorbed the old `/history` address: the timeline renders
+    // here in final shape, with no pointer to a retired surface.
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Timeline');
+    expect(screen.queryByRole('button', { name: /Open the history surface/i })).toBeNull();
+    expect(screen.getByText('Prospect recorded')).toBeTruthy();
+
+    await userEvent.click(within(rail).getByRole('tab', { name: 'Communications' }));
+    await waitFor(() => {
+      const params = new URLSearchParams(view.router.state.location.search);
+      expect(params.get('section')).toBe('communications');
+    });
+    // Communications is the DELIVERY RECORD itself, and the pinned sentence
+    // says so — the reference derives its list by regex over event titles.
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Communications');
+    expect(screen.getByText(COMMUNICATIONS_ARE_THE_RECORD)).toBeTruthy();
+    expect(screen.getByText('No communication records')).toBeTruthy();
+  });
+
+  it('renders a delivery row from the §27 key, with the registry label', async () => {
+    const detail = mayaDetail();
+    detail.communications = [
+      {
+        eventKey: 'affiliate_password_reset',
+        target: 'maya@example.com',
+        entityType: 'password_reset',
+        entityId: 'reset-1',
+        confirmed: false,
+        at: 'Aug 16, 2026 · 9:00 AM UTC',
+        occurredAt: '2026-08-16T09:00:00.000Z',
+      },
+    ];
+    serve(recordRoutes(detail));
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=history&section=communications`);
+
+    // The backend returns the KEY; the label resolves from the shared registry
+    // in the browser (Phase 22c's rule — no fourth copy of the descriptions).
+    expect(screen.getByText('Password reset')).toBeTruthy();
+    // §1.4's two states: confirmed at the provider, or recorded-not-confirmed.
+    expect(screen.getByText('Recorded · not confirmed')).toBeTruthy();
+  });
+
+  it('shows the Selected-relationship fact card on the Campaigns tab', async () => {
+    serve(relRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=campaigns&rel=${ASSOCIATION}`);
+
+    // The fact card renders the relationship read's own composed facts.
+    expect(screen.getByText('Relationship ID')).toBeTruthy();
+    expect(screen.getByText(ASSOCIATION)).toBeTruthy();
+    expect(screen.getByText('Agreement')).toBeTruthy();
+    expect(screen.getByText('Accepted · locks at launch')).toBeTruthy();
+    expect(screen.getByText('Tracking link')).toBeTruthy();
+    expect(screen.getAllByText('Affiliate link active').length).toBeGreaterThan(0);
+  });
+
+  it('counts open cases on the Support tab — a real count, or no badge at all', async () => {
+    const detail = mayaDetail();
+    detail.header.openCases = 2;
+    serve(recordRoutes(detail));
+    await renderAdmin(`/admin/creators/${PROSPECT}`);
+
+    const rail = screen.getByRole('tablist', { name: 'Maya Johnson Affiliate record tabs' });
+    expect(within(rail).getByRole('tab', { name: /Support & Enforcement/ }).textContent).toBe(
+      'Support & Enforcement2',
+    );
+  });
+});
+
+/* ── Profile & Verification and Account & Payout Setup (Session B) ─────────── */
+
+describe('§5.3, §8, §11, §13 — the person-level tabs in final shape', () => {
+  it('labels every section with who supplied it, on the tab that renders it', async () => {
+    // The four provenance badges live on four sections now (Session B): the
+    // research on Profile, the evidence decision on Verification, the
+    // confirmed record on Account & Eligibility, and the provider on Stripe.
+    const expectations: [string, string][] = [
+      [`/admin/creators/${PROSPECT}?tab=profile`, 'Admin researched / authored'],
+      [`/admin/creators/${PROSPECT}?tab=profile&section=verification`, 'Evidence + Admin decision'],
+      [`/admin/creators/${PROSPECT}?tab=account`, 'Affiliate supplied'],
+      [`/admin/creators/${PROSPECT}?tab=account&section=stripe`, 'Stripe supplied · read only'],
+    ];
+    for (const [path, badge] of expectations) {
+      serve(recordRoutes());
+      const view = await renderAdmin(path);
+      expect(screen.getAllByText(badge).length, path).toBeGreaterThan(0);
+      view.unmount();
+    }
   });
 
   it('uses "Name" and "Username", never the retired labels', async () => {
     serve(recordRoutes());
-    const view = await renderAdmin(`/admin/creators/${PROSPECT}/profile`);
+    const view = await renderAdmin(`/admin/creators/${PROSPECT}?tab=account`);
 
     expect(screen.getByText('Name')).toBeTruthy();
     expect(screen.getByText('Username')).toBeTruthy();
@@ -720,32 +1016,53 @@ describe('§5.3, §8, §11, §13 — profile and evidence', () => {
     expect(text).not.toContain('Public identity');
   });
 
-  it('states §8’s tier rule and §11’s boundary where they can be breached', async () => {
+  it('states §8’s tier rule, the derived proposal access, and §11’s boundary on Internal Context', async () => {
     serve(recordRoutes());
-    await renderAdmin(`/admin/creators/${PROSPECT}/profile`);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=profile&section=context`);
 
     expect(screen.getAllByText(QUALITY_TIER_HELPER).length).toBeGreaterThan(0);
-    expect(screen.getByText(FOUNDER_NEVER_SEES_THIS)).toBeTruthy();
+    expect(screen.getAllByText(FOUNDER_NEVER_SEES_THIS).length).toBeGreaterThan(0);
+    // §29-derived, never stored: the badge renders and the sentence says where
+    // a change is recorded (0048's header states the column's absence).
+    expect(screen.getByText('Standard proposal access')).toBeTruthy();
+    expect(screen.getByText(PROPOSAL_ACCESS_IS_DERIVED)).toBeTruthy();
+    // The reference's "Why this Affiliate fits" control returns — the column
+    // (`campaign_fit`) never left.
+    expect(screen.getByText('Why this Affiliate fits')).toBeTruthy();
   });
 
-  it('offers no control at all on the Stripe block’s values', async () => {
-    serve(recordRoutes());
-    await renderAdmin(`/admin/creators/${PROSPECT}/profile`);
+  it('re-reads the Stripe status through the real refresh, and still offers no edit control', async () => {
+    // The Session A parked control now works (gap 4): the button posts to the
+    // reconciliation route and the surface renders the re-read, never a local
+    // patch. This assertion consciously replaced the parked one.
+    serve([
+      ...recordRoutes(),
+      {
+        match: /\/api\/admin\/creators\/[^/]+\/stripe-refresh$/,
+        body: mayaDetail(),
+      },
+    ]);
+    const view = await renderAdmin(`/admin/creators/${PROSPECT}?tab=account&section=stripe`);
 
     // §16a: not yet populated is not zero — the block says what it waits on.
-    expect(
-      screen.getByText(/Nobody has claimed this account yet/),
-    ).toBeTruthy();
-    // The refresh control is parked, because a live provider read is not built.
+    expect(screen.getByText(/Nobody has claimed this account yet/)).toBeTruthy();
+
     const refresh = screen.getByRole('button', { name: /Refresh Stripe status/i });
-    expect(refresh.getAttribute('aria-disabled')).toBe('true');
+    expect(refresh.getAttribute('aria-disabled')).not.toBe('true');
     await userEvent.click(refresh);
-    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.stripeRefresh);
+    await waitFor(() => {
+      expect(requestsTo(/\/stripe-refresh$/)).toHaveLength(1);
+    });
+
+    // §13: no input anywhere on the provider block — the absence is the
+    // enforcement, and the refresh only re-reads the provider's own fact.
+    const inputs = view.container.querySelectorAll('input, textarea');
+    expect(inputs.length).toBe(0);
   });
 
   it('shows an outstanding §5.3 input as a gap to fill, not as an error', async () => {
     serve(recordRoutes());
-    await renderAdmin(`/admin/creators/${PROSPECT}/profile`);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=profile&section=verification`);
 
     expect(screen.getByText('Platform analytics')).toBeTruthy();
     expect(screen.getByText('82,412 as of May 31')).toBeTruthy();
@@ -753,14 +1070,14 @@ describe('§5.3, §8, §11, §13 — profile and evidence', () => {
     expect(screen.getByText(VERIFICATION_IS_HUMAN)).toBeTruthy();
   });
 
-  it('records a verification decision and re-reads rather than patching locally', async () => {
+  it('records the whole-record verification and re-reads rather than patching locally', async () => {
     serve([
       ...recordRoutes(),
       { match: /\/api\/admin\/affiliates\/[^/]+\/verification$/, body: { ok: true } },
     ]);
-    await renderAdmin(`/admin/creators/${PROSPECT}/profile`);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=profile&section=verification`);
 
-    await userEvent.click(screen.getByRole('button', { name: /Record verification decision/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Verify audience evidence/i }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.selectOptions(within(dialog).getByLabelText(/Decision/i), 'in_review');
     await userEvent.type(within(dialog).getByLabelText(/Recorded by/i), 'Sam Okafor');
@@ -775,16 +1092,138 @@ describe('§5.3, §8, §11, §13 — profile and evidence', () => {
       expect(requestsTo(/\/api\/admin\/creators\/prospect-maya$/).length).toBeGreaterThan(1);
     });
   });
+
+  it('records a per-metric decision through the 0048 trail, and reports an unsent ask (§1.4)', async () => {
+    serve([
+      ...recordRoutes(),
+      {
+        match: /\/api\/admin\/creators\/[^/]+\/evidence\/metric-decision$/,
+        body: {
+          detail: mayaDetail(),
+          ask: { sent: false, reason: 'No email transport is configured, so the ask was recorded and nothing was sent.' },
+        },
+      },
+    ]);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=profile&section=verification`);
+
+    // The five metrics each carry their latest decision or its honest absence.
+    expect(screen.getAllByText('No decision recorded yet').length).toBeGreaterThan(0);
+    expect(screen.getByText('Share a current analytics screenshot.')).toBeTruthy();
+
+    const rows = screen.getAllByRole('button', { name: /Record metric decision/i });
+    await userEvent.click(rows[0]);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(
+      within(dialog).getByLabelText(/Detail/i),
+      'Analytics screenshot matches the recorded audience size.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /Record decision/i }));
+
+    await waitFor(() => {
+      expect(requestsTo(/\/evidence\/metric-decision$/)).toHaveLength(1);
+    });
+    // Recorded with nothing sent is a STATE the Admin must see, not infer.
+    await waitFor(() => {
+      expect(toasts.some((t) => t.includes('Recorded — nothing was sent'))).toBe(true);
+    });
+  });
+
+  it('renders the honest unavailable state while the evidence bucket is Track A4', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=profile&section=verification`);
+
+    // §1.4: no dead upload control — the sentence names what it waits on, and
+    // the control appears only when storage is configured.
+    expect(screen.queryByRole('button', { name: /Upload Admin research evidence/i })).toBeNull();
+    expect(screen.getByText(/object-storage bucket is Track A4/)).toBeTruthy();
+  });
+
+  it('sends the §11 correction request and shows the recorded-not-sent state', async () => {
+    serve([
+      ...recordRoutes(),
+      {
+        match: /\/api\/admin\/creators\/[^/]+\/correction-request$/,
+        body: {
+          detail: mayaDetail(),
+          ask: { sent: false, reason: 'No email transport is configured, so the ask was recorded and nothing was sent.' },
+        },
+      },
+    ]);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=account`);
+
+    await userEvent.click(screen.getByRole('button', { name: /Request Affiliate correction/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(CORRECTION_REQUEST_LEAVES_VALUE)).toBeTruthy();
+    await userEvent.type(
+      within(dialog).getByLabelText(/What should be checked/i),
+      'The handle appears to have changed on the platform.',
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /Send Affiliate correction request/i }),
+    );
+
+    await waitFor(() => {
+      expect(requestsTo(/\/correction-request$/)).toHaveLength(1);
+    });
+    await waitFor(() => {
+      expect(toasts.some((t) => t.includes('Recorded — nothing was sent'))).toBe(true);
+    });
+  });
+
+  it('sends the recovery link through the one reset path, with its consequence stated', async () => {
+    serve([
+      ...recordRoutes(),
+      { match: /\/api\/admin\/creators\/[^/]+\/password-recovery$/, body: mayaDetail() },
+    ]);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=account`);
+
+    await userEvent.click(screen.getByRole('button', { name: /Send password recovery link/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(PASSWORD_RECOVERY_CONSEQUENCE)).toBeTruthy();
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: /Send password recovery link/i }),
+    );
+
+    await waitFor(() => {
+      expect(requestsTo(/\/password-recovery$/)).toHaveLength(1);
+    });
+  });
+
+  it('renders the invitation lifecycle with the `Opened` refusal, never a bare absence', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=account`);
+
+    // The register's own reason, where the value would be — §27 ships no
+    // tracking pixel, and the step says so rather than "Not recorded".
+    expect(screen.getByText('Opened')).toBeTruthy();
+    expect(screen.getByText(/ships no tracking pixel/)).toBeTruthy();
+    // The recorded facts render beside it.
+    expect(screen.getByText('Aug 16, 2026 · 10:00 AM UTC')).toBeTruthy();
+    expect(screen.getByText('Scoped to one Affiliate and campaign')).toBeTruthy();
+  });
+
+  it('withholds the §29.8 control while no policy version is published, with the reason', async () => {
+    serve(recordRoutes());
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=account&section=agreements`);
+
+    // §31.4: a requirement may cite only a published version, and every
+    // document is draft today — so the control is absent WITH its reason.
+    expect(screen.queryByRole('button', { name: /Require current policy reacceptance/i })).toBeNull();
+    expect(screen.getByText(/legal review/)).toBeTruthy();
+    expect(screen.getByText('Consent owner')).toBeTruthy();
+  });
 });
 
 /* ── The history ───────────────────────────────────────────────────────────── */
 
 describe('§26.8, §25.6 — the history is read-only and names its sources', () => {
   it('renders every entry with the table it came from', async () => {
+    // The retired `/history` address redirects into the History tab, so a
+    // bookmark minted before Session C still lands on the record it meant.
     serve(recordRoutes());
     await renderAdmin(`/admin/creators/${PROSPECT}/history`);
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('History');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Timeline');
     expect(screen.getByText('Prospect recorded')).toBeTruthy();
     expect(screen.getByText(/recorded in affiliate_prospects/)).toBeTruthy();
   });
@@ -942,29 +1381,65 @@ describe('§26.7, §29 — the controls surface keeps the two scopes apart', () 
   });
 
   it('records a conflict and a self-pre-order as two separate certifications', async () => {
+    // The disclosures moved to Support & Enforcement → Relationship Requests
+    // (Session C), scoped to the selected relationship.
     serve([
-      ...recordRoutes(),
+      ...relRoutes(),
       { match: /self-preorder-disclosures$/, status: 201, body: { ok: true } },
     ]);
-    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=support&section=requests`);
 
-    await userEvent.click(screen.getByRole('button', { name: /Record self-pre-order/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Record a self-pre-order/i }));
     const dialog = await screen.findByRole('dialog');
     // §28.4 forbids bundling, so §29.2's two certifications are two answers.
     expect(within(dialog).getByLabelText(/Certified self-funded/i)).toBeTruthy();
     expect(within(dialog).getByLabelText(/Identity disclosed/i)).toBeTruthy();
   });
 
-  it('parks case intake and says the console owns it', async () => {
-    serve(recordRoutes());
-    await renderAdmin(`/admin/creators/${PROSPECT}/controls`);
+  it('opens a support case through the one intake — gap 7, closed', async () => {
+    const opened = mayaDetail();
+    opened.header.openCases = 1;
+    opened.standing.cases = [
+      {
+        id: 'case-1',
+        reference: 'PVD-4K2MN-8XQ3F',
+        topic: 'account_access',
+        subject: 'Locked out after a password change',
+        status: 'open',
+        open: true,
+        openedAt: 'Aug 17, 2026 · 9:00 AM UTC',
+        href: '/admin/support/case-1',
+      },
+    ];
+    serve([
+      ...recordRoutes(),
+      {
+        match: /\/support-case$/,
+        body: { detail: opened, opened: { caseId: 'case-1', reference: 'PVD-4K2MN-8XQ3F' } },
+      },
+    ]);
+    await renderAdmin(`/admin/creators/${PROSPECT}?tab=support`);
 
-    const control = screen.getByRole('button', {
-      name: /Record a compliance or support case/i,
-    });
-    expect(control.getAttribute('aria-disabled')).toBe('true');
-    await userEvent.click(control);
-    expect(toasts).toContain(CREATOR_PARKED_MESSAGES.caseIntake);
+    await userEvent.click(screen.getByRole('button', { name: /Record a support case/i }));
+    const dialog = await screen.findByRole('dialog');
+    // §26.7's ten topics, one list — and the record-shaped kinds are named as
+    // their own records rather than case types.
+    expect(within(dialog).getByText(/not a case type/)).toBeTruthy();
+    await userEvent.selectOptions(
+      within(dialog).getByLabelText(/Case topic/i),
+      'account_access',
+    );
+    await userEvent.type(
+      within(dialog).getByLabelText(/What the Affiliate asked/i),
+      'I changed my password and now cannot sign in.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: /Record the case/i }));
+
+    // The case appears in the list with the Support-workspace address that
+    // operates it, and the toast carries the §27.8 promise.
+    expect(await screen.findByText('Locked out after a password change')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Open in Support/i })).toBeTruthy();
+    expect(toasts.some((message) => message.includes('PVD-4K2MN-8XQ3F'))).toBe(true);
   });
 });
 
@@ -1054,11 +1529,19 @@ describe('§3.1, §3.2 — no internal name reaches the rendered surface', () =>
     for (const path of [
       '/admin/creators',
       `/admin/creators/${PROSPECT}`,
-      `/admin/creators/${PROSPECT}/profile`,
+      `/admin/creators/${PROSPECT}?tab=profile`,
+      `/admin/creators/${PROSPECT}?tab=profile&section=verification`,
+      `/admin/creators/${PROSPECT}?tab=profile&section=context`,
+      `/admin/creators/${PROSPECT}?tab=account`,
+      `/admin/creators/${PROSPECT}?tab=account&section=agreements`,
+      `/admin/creators/${PROSPECT}?tab=account&section=stripe`,
       `/admin/creators/${PROSPECT}/history`,
       `/admin/creators/${PROSPECT}/controls`,
+      `/admin/creators/${PROSPECT}?tab=support`,
+      `/admin/creators/${PROSPECT}?tab=support&section=requests`,
+      `/admin/creators/${PROSPECT}?tab=history&section=communications`,
     ]) {
-      serve([...directoryRoutes(), ...recordRoutes()]);
+      serve([...directoryRoutes(), ...relRoutes()]);
       const view = await renderAdmin(path);
 
       const text = view.container.textContent ?? '';
@@ -1081,15 +1564,21 @@ describe('§3.1, §3.2 — no internal name reaches the rendered surface', () =>
 /* ── Accessibility ─────────────────────────────────────────────────────────── */
 
 describe('§33.11.1, §28.5 — every Creator surface is operable', () => {
-  it('has no axe violations on the directory, the record, the profile, or the history', async () => {
+  it('has no axe violations on the directory, the record, the person-level tabs, or the history', async () => {
     for (const path of [
       '/admin/creators',
       `/admin/creators/${PROSPECT}`,
-      `/admin/creators/${PROSPECT}/profile`,
+      `/admin/creators/${PROSPECT}?tab=profile`,
+      `/admin/creators/${PROSPECT}?tab=profile&section=verification`,
+      `/admin/creators/${PROSPECT}?tab=account`,
+      `/admin/creators/${PROSPECT}?tab=account&section=stripe`,
       `/admin/creators/${PROSPECT}/history`,
       `/admin/creators/${PROSPECT}/controls`,
+      `/admin/creators/${PROSPECT}?tab=support`,
+      `/admin/creators/${PROSPECT}?tab=support&section=requests`,
+      `/admin/creators/${PROSPECT}?tab=history&section=communications`,
     ]) {
-      serve([...directoryRoutes(), ...recordRoutes()]);
+      serve([...directoryRoutes(), ...relRoutes()]);
       const view = await renderAdmin(path);
       const results = await axe(view.container);
       expect(results.violations, `${path}: ${JSON.stringify(results.violations)}`).toHaveLength(0);
@@ -1101,9 +1590,12 @@ describe('§33.11.1, §28.5 — every Creator surface is operable', () => {
     for (const path of [
       '/admin/creators',
       `/admin/creators/${PROSPECT}`,
-      `/admin/creators/${PROSPECT}/profile`,
+      `/admin/creators/${PROSPECT}?tab=profile`,
+      `/admin/creators/${PROSPECT}?tab=account&section=stripe`,
+      `/admin/creators/${PROSPECT}?tab=campaigns&rel=${ASSOCIATION}`,
+      `/admin/creators/${PROSPECT}?tab=support`,
     ]) {
-      serve([...directoryRoutes(), ...recordRoutes()]);
+      serve([...directoryRoutes(), ...relRoutes()]);
       const view = await renderAdmin(path);
       expect(screen.getAllByRole('heading', { level: 1 }), path).toHaveLength(1);
       view.unmount();

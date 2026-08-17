@@ -40,18 +40,40 @@ import type {
   ProfileOverrideKey,
   FounderHistoryCategory,
   AttentionAction,
+  DirectoryActionCell,
+  FounderDirectoryFilterKey,
 } from './logic.js';
 
 /* ── List ───────────────────────────────────────────────────────────────────*/
 
-/** One row of the Founders table. Everything it shows, already resolved. */
+/** One row of the Founders directory. Everything it shows, already resolved. */
 export interface FounderListRow {
   /** `founder_prospects.id` — the person, stable across archive-and-restart. */
   prospectId: string;
+  /** The stable quotable reference (`F-…`, migration 0047). */
+  recordReference: string;
   legalName: string;
   preferredName: string;
   email: string;
   productName: string;
+  businessName: string | null;
+  /** `founder_prospects.internal_owner` — free text, the 2026-08-16 decision. */
+  owner: string | null;
+
+  /** `Idea` | `Product` | `Proposed` — Proposed is the absence of a §9 lock. */
+  typeLabel: string;
+  /** The composed lifecycle label (`Live · Day 6`, `Invite draft`, …). */
+  lifecycle: string;
+
+  /** The two action columns: who owes the next step, or why nobody does. */
+  adminAction: DirectoryActionCell;
+  founderAction: DirectoryActionCell;
+
+  /** Which directory filter cards this row belongs to. Server-derived. */
+  filters: FounderDirectoryFilterKey[];
+  /** Server-composed search text — one source, so the palette and the filter
+   *  can never disagree about what matches (the Creators-directory rule). */
+  searchText: string;
 
   setup: { stage: FounderSetupStage; detail: string | null };
   account: FounderAccountState;
@@ -82,6 +104,8 @@ export type FounderAttention =
 
 export interface FounderHeader {
   prospectId: string;
+  /** The stable quotable reference in the record's eyebrow (migration 0047). */
+  recordReference: string;
   legalName: string;
   preferredName: string;
   businessName: string | null;
@@ -94,6 +118,14 @@ export interface FounderHeader {
   country: string | null;
   /** Deterministic 1–14 sticker index, derived from the id so it never moves. */
   sticker: number;
+
+  /** `Idea · locked` | `Product · locked` | `Proposed` — the header chip. */
+  typeChip: string;
+  /** The composed lifecycle label, same derivation as the directory row. */
+  lifecycle: string;
+  /** The two action cells, same kernel as the directory row. */
+  adminAction: DirectoryActionCell;
+  founderAction: DirectoryActionCell;
 
   account: FounderAccountState;
   setup: { stage: FounderSetupStage; detail: string | null };
@@ -154,6 +186,25 @@ export interface InvitationView {
   history: { at: string; title: string; body: string }[];
   /** Token facts only — never a value (§28.1). */
   technical: string;
+
+  /**
+   * The invitation record as rows (Session B's Invite & Prefills tab).
+   *
+   * Structured facts beside the composed `technical` sentence, because the tab
+   * renders them as a definition list. `expiration` is a sentence rather than
+   * an instant: "Live until …", "Link inactive", or "No link issued yet" — the
+   * state, not a timestamp the surface would have to interpret (§1.4). Never a
+   * token value (§28.1).
+   */
+  facts: {
+    sendCount: number;
+    /** The live token's version, or the latest ever issued, or null. */
+    tokenVersion: number | null;
+    expiration: string;
+    /** "Recorded <when>" once the claim happened, else null. */
+    claimed: string | null;
+    revoked: boolean;
+  };
 }
 
 export interface VettingView {
@@ -339,6 +390,333 @@ export interface FounderHistoryEntry {
   source: string;
 }
 
+/* ── Detail: Discovery & internal context (2026-08-16 rebuild) ─────────────*/
+
+/**
+ * §7's discovery record, rendered under the record's own field names.
+ *
+ * The reference's five prose boxes are its fixture's paraphrase of exactly
+ * these fields; the recorded §7 vocabulary wins (the reconciliation's call).
+ * Every editable row names the intake key `PUT …/prospect` accepts, so the
+ * edit dialog and the intake form write through one path.
+ */
+export interface DiscoveryView {
+  fields: {
+    /** The prospect-update key this row edits, or null for a derived value. */
+    key: string | null;
+    label: string;
+    value: string | null;
+    helper: string | null;
+  }[];
+  /** §7's evidence list plus `Add research` entries — one record, one shape. */
+  research: string[];
+  meetingNotes: MeetingNoteView[];
+}
+
+/** One recorded meeting note (migration 0047). Insert-only; never edited. */
+export interface MeetingNoteView {
+  id: string;
+  /** Already formatted for rendering. */
+  meetingDate: string;
+  participants: string;
+  decisions: string;
+  followUp: string;
+  sourceLink: string;
+  notes: string | null;
+  recordedBy: string;
+  recordedAt: string;
+}
+
+/**
+ * The current campaign's live facts for the Overview panel and the hero line.
+ *
+ * Null before a campaign is scheduled to be live — §16a's rule: the panel then
+ * names what it is waiting for rather than rendering zeros.
+ */
+export interface CampaignFactsView {
+  campaignId: string;
+  /** Day N since `campaign_live_at`, or null before launch. */
+  campaignDay: number | null;
+  liveAt: string | null;
+  closesAt: string | null;
+  /** When public discovery opened or opens (14b), or null. */
+  discoveryOpenedAt: string | null;
+  /** Count of currently-active reservations. Null before anything can exist. */
+  activeBackers: number | null;
+  /** The Idea threshold from the build, or null (Product has none). */
+  threshold: number | null;
+  activeAffiliates: number | null;
+  /** The §18 public page, only while one exists (live or later). */
+  publicUrl: string | null;
+}
+
+/**
+ * The Eligibility tab (Session B) — §10's claim and the §5 representations,
+ * composed as read-only facts.
+ *
+ * Everything here is provider and system truth: the claim profile's own
+ * suppliers, the recorded representations, and the `policy_consents` rows the
+ * account claim wrote. There is deliberately no view of the DOB VALUE — the
+ * tab reports that one was supplied and nothing more; the value itself lives
+ * behind the profile edit with its §25.6 reason. The 18+/US answers are the
+ * Founder's recorded REPRESENTATIONS (§10), rendered as such — the product
+ * derives no age and never claims to have verified one.
+ */
+export interface EligibilityView {
+  claim: {
+    inviteClaimed: boolean;
+    /** Already formatted, or null while unclaimed. */
+    claimedAt: string | null;
+    accountCreatedAt: string | null;
+    /** 'Complete' | 'In progress' | 'Not started' — the claim profile's state. */
+    completion: string;
+    /** The stable `F-…` record reference the claim connected to. */
+    connectedRecord: string;
+  };
+  facts: {
+    /** null = no claim profile exists yet, which is not "No" (§16a). */
+    dobSupplied: boolean | null;
+    age18Plus: boolean | null;
+    usPerson: boolean | null;
+    /** "Chicago, IL · United States"-shaped, from the profile's own fields. */
+    location: string | null;
+    sanctionsClear: boolean | null;
+  };
+  /** The `policy_consents` rows the claim wrote. Empty while none exists. */
+  acknowledgements: { label: string; version: string; acceptedAt: string }[];
+  /**
+   * Why the acknowledgements list is empty, when it is — "the claim has not
+   * completed" and "the policies are still drafts" are different facts.
+   */
+  acknowledgementsAbsent: string | null;
+}
+
+/* ── Detail: the operations sections (Session C, 2026-08-17) ───────────────*/
+
+/** One labelled fact row on an operations panel. `null` renders as absent. */
+export interface OpsFact {
+  label: string;
+  value: string | null;
+}
+
+/**
+ * The read-and-route sections' composed state — Campaign, Affiliates,
+ * Backers & Demand, Money & Fulfillment, Support & Enforcement.
+ *
+ * Everything here is READ from records other workspaces own; nothing in the
+ * module that composes it writes, and the §33.12.5 partition is untouched
+ * because there is no new route behind it. Lists are bounded samples with
+ * counts — the full list lives in the workspace that owns it, which is the
+ * reference's own shape (three comments and a "View all").
+ */
+export interface OperationsView {
+  campaignId: string;
+  campaignName: string;
+  /** 'Idea' | 'Product' (§3.1), or 'Proposed' while the §9 lock has not run. */
+  typeLabel: string;
+  statusLabel: string;
+
+  /** Campaign → Details: the §14.4 build content, read-only. */
+  content: {
+    fields: OpsFact[];
+    rewards: { title: string; price: string; contents: string | null; delivery: string | null }[];
+    faqs: { question: string; answer: string }[];
+  };
+
+  /** Campaign → Review: §15's decision state — never a second place to make it. */
+  review: {
+    buildStatus: string | null;
+    rosterReadiness: string | null;
+    rounds: { round: number; outcome: string; submittedAt: string; decidedAt: string | null }[];
+    /** The latest round's recorded feedback, grouped as §15 groups it. */
+    feedback: { group: string; text: string }[];
+    approvedAt: string | null;
+  };
+
+  /** Campaign → Live: system-derived performance, read-only. */
+  live: {
+    isLive: boolean;
+    liveAt: string | null;
+    campaignDay: number | null;
+    closesAt: string | null;
+    /** The discovery state as a sentence (Days 1–7 vs open, §18). */
+    discovery: string;
+    publicUrl: string | null;
+    created: number;
+    active: number;
+    canceled: number;
+    validClicks: number;
+    /** null over zero clicks — never 0% (§16a). */
+    conversion: string | null;
+    /** Active reservations' pre-tax subtotal, formatted. Null when none. */
+    reservedSubtotal: string | null;
+    updatesCount: number;
+    commentsCount: number;
+    /** Idea only, and only when the build set a threshold. */
+    threshold: { required: number; active: number; remaining: number; state: string } | null;
+  };
+
+  /** Campaign → Page & Updates. */
+  page: {
+    updates: {
+      title: string;
+      audience: string;
+      publishedAt: string;
+      body: string;
+      materialChange: boolean;
+    }[];
+    updatesCount: number;
+    comments: { author: string; body: string; postedAt: string; state: string }[];
+    commentsCount: number;
+    openFlags: number;
+  };
+
+  /** Affiliates → Relationships: one row per association, linking out. */
+  roster: {
+    associationId: string;
+    prospectId: string;
+    name: string;
+    handle: string | null;
+    statusLabel: string;
+    /** '35% locked' | '34% proposed on v3 · not locked' | 'No proposal yet'. */
+    terms: string;
+    launchRequired: boolean | null;
+    backers: number;
+    validClicks: number;
+    completion: string | null;
+    workAgain: string | null;
+  }[];
+  rosterCounts: { total: number; backersBroughtIn: number; validClicks: number };
+
+  /** Affiliates → Requests: §22.9's work-again requests, read-only. */
+  workAgain: {
+    creatorName: string;
+    requestedAt: string;
+    status: string;
+    message: string | null;
+    respondedAt: string | null;
+    responseNote: string | null;
+  }[];
+
+  /** Backers & Demand → Demand: the attribution split. */
+  demand: { split: { label: string; clicks: number; backers: number }[] };
+
+  /** Backers & Demand → Responses: §19 survey answers under consent labels. */
+  responses: {
+    total: number;
+    rows: {
+      backer: string;
+      reward: string;
+      status: string;
+      why: string | null;
+      recommend: number | null;
+      consent: string;
+    }[];
+  };
+
+  /** Backers & Demand → Backers: numbers only, matching the reference. */
+  backerRows: {
+    total: number;
+    rows: {
+      backer: string;
+      reward: string;
+      createdAt: string;
+      status: string;
+      attribution: string;
+      caseRef: string | null;
+      caseId: string | null;
+    }[];
+  };
+
+  /** Money & Fulfillment → Close. */
+  close: {
+    scheduledClose: string | null;
+    batch: {
+      status: string;
+      startedAt: string;
+      completedAt: string | null;
+      outcome: string;
+      thresholdDecidedAt: string | null;
+    } | null;
+    finalActive: number | null;
+    canceledExcluded: number | null;
+    captureState: string;
+    retryWindow: string | null;
+    reconciliation: string;
+    resultsPreparedAt: string | null;
+    idea: { threshold: number | null; finalActive: number | null; state: string } | null;
+  };
+
+  /** Money & Fulfillment → Fulfillment: the ONE §22.5 resolver's output. */
+  fulfillment: {
+    available: boolean;
+    waitingOn: string | null;
+    mechanism: string | null;
+    deliveredAt: string | null;
+    obligations: { label: string; state: string; dueAt: string | null }[];
+    commitments: { sequence: number; month: string; original: boolean; text: string }[];
+    day14: { state: string; dueAt: string | null } | null;
+  };
+
+  /** Money & Fulfillment → Refunds & Recovery: counts from the records. */
+  refunds: {
+    openRefunds: number;
+    totalRefunds: number;
+    openDisputes: number;
+    totalDisputes: number;
+    recoveryRecords: number;
+  };
+
+  /** Support & Enforcement → Support: this record's cases, linking out. */
+  supportCases: {
+    caseId: string;
+    reference: string;
+    subject: string | null;
+    status: string;
+    owner: string;
+    due: string | null;
+  }[];
+
+  /** Support & Enforcement → Cancellation: §31.6 state, read-only. */
+  cancellation: {
+    state: string;
+    kind: string | null;
+    requestedAt: string | null;
+    decidedAt: string | null;
+    customerExplanation: string | null;
+  } | null;
+
+  /** Support & Enforcement → Enforcement: recorded actions, read-only. */
+  enforcement: {
+    campaignActions: {
+      action: string;
+      phase: string;
+      occurredAt: string;
+      category: string;
+      customerExplanation: string;
+    }[];
+  };
+}
+
+/**
+ * History → Communications: the `notification_deliveries` rows for this
+ * Founder's address. The row carries the §27 registry KEY — the label
+ * resolves in the browser from the shared registry (22c's rule; a fourth
+ * copy of 123 descriptions would drift). Bounded, newest first.
+ */
+export interface CommunicationRow {
+  eventKey: string;
+  target: string;
+  at: string;
+  /** 'Delivered' once the provider confirmed; 'Recorded' while claimed only. */
+  state: string;
+}
+
+export interface CommunicationsView {
+  total: number;
+  rows: CommunicationRow[];
+}
+
 /* ── The whole detail ───────────────────────────────────────────────────────*/
 
 export interface FounderWorkspaceDetail {
@@ -347,6 +725,12 @@ export interface FounderWorkspaceDetail {
   details: DetailsPane;
   campaigns: CampaignsPane;
   money: MoneyPane;
+  discovery: DiscoveryView;
+  eligibility: EligibilityView;
+  campaignFacts: CampaignFactsView | null;
+  /** Session C: the read-and-route sections' state. Null with no campaign. */
+  operations: OperationsView | null;
+  communications: CommunicationsView;
   history: FounderHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;

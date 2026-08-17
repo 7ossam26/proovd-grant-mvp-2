@@ -26,6 +26,18 @@ import {
   FOUNDER_EDITABLE_FIELDS as SHARED_EDITABLE_FIELDS,
   FOUNDER_HISTORY_CATEGORIES as SHARED_HISTORY_CATEGORIES,
   ATTENTION_ACTIONS as SHARED_ATTENTION_ACTIONS,
+  FOUNDER_DIRECTORY_FILTERS as SHARED_DIRECTORY_FILTERS,
+  FOUNDER_TYPE_FILTERS as SHARED_TYPE_FILTERS,
+  FOUNDER_NEXT_STEP_LABELS as SHARED_NEXT_STEP_LABELS,
+  MEETING_NOTE_FIELDS as SHARED_MEETING_NOTE_FIELDS,
+  RESEARCH_ENTRY_FIELDS as SHARED_RESEARCH_FIELDS,
+  PROPOSED_TYPE_LABEL as SHARED_PROPOSED_LABEL,
+  OPERATIONS_TAB_COPY,
+  OPERATIONS_ABSENCES,
+  MEDIATED_REQUESTS_ABSENT,
+  COMMENTS_NEVER_REWRITTEN,
+  WAITING_ON_PROOVD_LABEL as SHARED_WAITING_LABEL,
+  NO_ACCESS_YET_LABEL as SHARED_NO_ACCESS_LABEL,
   GHOST_BAN_TRIGGER_SUMMARY as SHARED_GHOST_BAN_SUMMARY,
   CREATOR_MATCH_CAVEAT as SHARED_MATCH_CAVEAT,
   CAMPAIGN_TYPE_LOCK_NOTE as SHARED_TYPE_LOCK_NOTE,
@@ -37,6 +49,11 @@ import {
   invitationLinkIsLive as sharedLinkIsLive,
   overrideHelper as sharedOverrideHelper,
   editReasonRequired as sharedEditReasonRequired,
+  FOUNDER_RECORD_SECTIONS,
+  ONBOARDING_TAB_COPY,
+  ELIGIBILITY_READ_ONLY_NOTE,
+  CREATE_FOUNDER_CHECKLIST,
+  CREATE_FOUNDER_ABSENCES,
 } from '@proovd/shared';
 
 import {
@@ -50,6 +67,14 @@ import {
   FOUNDER_EDITABLE_FIELDS,
   FOUNDER_HISTORY_CATEGORIES,
   ATTENTION_ACTIONS,
+  FOUNDER_DIRECTORY_FILTERS,
+  FOUNDER_TYPE_FILTERS,
+  FOUNDER_NEXT_STEP_LABELS,
+  MEETING_NOTE_FIELDS,
+  RESEARCH_ENTRY_FIELDS,
+  PROPOSED_TYPE_LABEL,
+  WAITING_ON_PROOVD_LABEL,
+  NO_ACCESS_YET_LABEL,
   GHOST_BAN_TRIGGER_SUMMARY,
   CREATOR_MATCH_CAVEAT,
   CAMPAIGN_TYPE_LOCK_NOTE,
@@ -119,6 +144,36 @@ describe('the Founder workspace registers do not drift', () => {
     expect([...INVITATION_STATES]).toEqual([...SHARED_INVITATION_STATES]);
     expect([...PROFILE_OVERRIDE_KEYS]).toEqual([...SHARED_OVERRIDE_KEYS]);
     expect([...ATTENTION_ACTIONS]).toEqual([...SHARED_ATTENTION_ACTIONS]);
+  });
+
+  it('agrees on the 2026-08-16 directory registers, entry for entry', () => {
+    expect(FOUNDER_DIRECTORY_FILTERS.map((f) => ({ ...f }))).toEqual(
+      SHARED_DIRECTORY_FILTERS.map((f) => ({ ...f })),
+    );
+    expect(FOUNDER_TYPE_FILTERS.map((f) => ({ ...f }))).toEqual(
+      SHARED_TYPE_FILTERS.map((f) => ({ ...f })),
+    );
+    expect(PROPOSED_TYPE_LABEL).toBe(SHARED_PROPOSED_LABEL);
+    expect(WAITING_ON_PROOVD_LABEL).toBe(SHARED_WAITING_LABEL);
+    expect(NO_ACCESS_YET_LABEL).toBe(SHARED_NO_ACCESS_LABEL);
+    expect({ ...FOUNDER_NEXT_STEP_LABELS }).toEqual({ ...SHARED_NEXT_STEP_LABELS });
+  });
+
+  it('keeps Proposed out of every type register — it is the absence of a lock (§9)', () => {
+    // The filter vocabulary carries it; the type registers must not, because
+    // a third member of CAMPAIGN_TYPE_LABELS would mint the third type §9
+    // forbids.
+    expect(Object.keys(CAMPAIGN_TYPE_LABELS)).toEqual(['pre_build', 'pre_launch']);
+    expect(Object.values(CAMPAIGN_TYPE_LABELS)).not.toContain(PROPOSED_TYPE_LABEL);
+  });
+
+  it('agrees on the meeting-note and research dialogs, field for field', () => {
+    expect(MEETING_NOTE_FIELDS.map((f) => ({ ...f }))).toEqual(
+      SHARED_MEETING_NOTE_FIELDS.map((f) => ({ ...f })),
+    );
+    expect(RESEARCH_ENTRY_FIELDS.map((f) => ({ ...f }))).toEqual(
+      SHARED_RESEARCH_FIELDS.map((f) => ({ ...f })),
+    );
   });
 
   it('agrees on the editable-field registry, key for key', () => {
@@ -293,5 +348,120 @@ describe('the derivations the workspace reads instead of storing', () => {
     // the whole Founder record down over a label.
     expect(campaignStatusLabel('live')).toBe('Live');
     expect(campaignStatusLabel('something_new')).toBe('something_new');
+  });
+});
+
+/* ══ Session B (2026-08-17): the Onboarding copy and the compose registers ══ */
+
+describe('the Onboarding tab copy covers exactly the section register’s tabs', () => {
+  it('has one question per Onboarding sub-tab, no more and no fewer', () => {
+    // Two registers describe the same four tabs — the section shape and the
+    // pinned copy — and this is the drift test between them.
+    const section = FOUNDER_RECORD_SECTIONS.find((s) => s.key === 'onboarding')!;
+    expect(Object.keys(ONBOARDING_TAB_COPY).sort()).toEqual(
+      section.tabs.map((t) => t.key).sort(),
+    );
+    for (const entry of Object.values(ONBOARDING_TAB_COPY)) {
+      expect(entry.question.length).toBeGreaterThan(10);
+      expect(entry.subtitle.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('names no dollar amount in the optional-items subtitle', () => {
+    // The per-item discount is a §6 setting; a number in pinned copy would be
+    // a hardcoded commercial value the settings surface could then contradict.
+    expect(ONBOARDING_TAB_COPY.optional.subtitle).not.toMatch(/\$\d/);
+  });
+
+  it('pins the Eligibility read-only rule with all five protected facts', () => {
+    for (const word of ['age', 'country', 'acceptance state', 'timestamp', 'version']) {
+      expect(ELIGIBILITY_READ_ONLY_NOTE).toContain(word);
+    }
+  });
+});
+
+describe('the Create Founder compose registers (Session B)', () => {
+  it('carries the reference’s five checklist lines', () => {
+    expect(CREATE_FOUNDER_CHECKLIST).toHaveLength(5);
+    expect(CREATE_FOUNDER_CHECKLIST[4]).toBe('Exact invitation is ready');
+  });
+
+  it('records every refused reference box with a real reason', () => {
+    // The register is the contract: a box named here has a recorded §1.8
+    // refusal, and re-adding one is a visible edit to this list rather than a
+    // quiet reintroduction.
+    const boxes = CREATE_FOUNDER_ABSENCES.map((entry) => entry.box);
+    expect(new Set(boxes).size).toBe(boxes.length);
+    for (const refused of [
+      'Founder story',
+      'Audience',
+      'Business explanation',
+      'Social links',
+      'Meeting notes',
+      'Visual asset uploads',
+      'Interview scheduling',
+    ]) {
+      expect(boxes).toContain(refused);
+    }
+    for (const entry of CREATE_FOUNDER_ABSENCES) {
+      expect(entry.reason.length).toBeGreaterThan(60);
+    }
+  });
+});
+
+describe('the operations registers (Session C)', () => {
+  it('has one question per operations sub-tab, congruent with the section register in both directions', () => {
+    // Two registers describe the same tabs — the section shape and the pinned
+    // copy — and this is the drift test between them, run over every section
+    // the copy register claims to cover.
+    for (const [sectionKey, tabs] of Object.entries(OPERATIONS_TAB_COPY)) {
+      const section = FOUNDER_RECORD_SECTIONS.find((s) => s.key === sectionKey);
+      expect(section, `OPERATIONS_TAB_COPY names unknown section ${sectionKey}`).toBeDefined();
+      expect(Object.keys(tabs).sort()).toEqual(section!.tabs.map((t) => t.key).sort());
+      for (const entry of Object.values(tabs)) {
+        expect(entry.question.length).toBeGreaterThan(10);
+        expect(entry.subtitle.length).toBeGreaterThan(10);
+      }
+    }
+    // And the copy register covers every section that HAS tabs, except
+    // Onboarding, whose copy is Session B's own register.
+    const tabbed = FOUNDER_RECORD_SECTIONS.filter(
+      (s) => s.tabs.length > 0 && s.key !== 'onboarding',
+    ).map((s) => s.key);
+    expect(Object.keys(OPERATIONS_TAB_COPY).sort()).toEqual([...tabbed].sort());
+  });
+
+  it('refuses each reference control once, with a reason that argues', () => {
+    const controls = OPERATIONS_ABSENCES.map((a) => a.control);
+    expect(new Set(controls).size).toBe(controls.length);
+    for (const entry of OPERATIONS_ABSENCES) {
+      expect(entry.reason.length, entry.control).toBeGreaterThan(60);
+    }
+    // The brief's two named Session C decisions are in the register by name.
+    expect(controls).toContain('Send warning');
+    expect(controls.some((c) => c.includes('work-again'))).toBe(true);
+  });
+
+  it('keeps the stricter-than-§3.1 vocabulary out of every pinned sentence', () => {
+    // The Founders suite scans rendered panes; this catches the copy at the
+    // register, before a surface exists to render it. `reservation` caught
+    // the reference's own demand subtitle during the build.
+    const texts: string[] = [MEDIATED_REQUESTS_ABSENT, COMMENTS_NEVER_REWRITTEN];
+    for (const tabs of Object.values(OPERATIONS_TAB_COPY)) {
+      for (const entry of Object.values(tabs)) {
+        texts.push(entry.question, entry.subtitle);
+      }
+    }
+    for (const entry of OPERATIONS_ABSENCES) texts.push(entry.control, entry.reason);
+    for (const text of texts) {
+      expect(text.toLowerCase()).not.toMatch(/\breservations?\b/);
+      expect(text.toLowerCase()).not.toMatch(/\bpre_build\b|\bpre_launch\b/);
+    }
+  });
+
+  it('pins the mediated-request absence naming both refused records and the real pathway', () => {
+    for (const word of ['meeting', 'end-partnership', 'support', 'work-again']) {
+      expect(MEDIATED_REQUESTS_ABSENT.toLowerCase()).toContain(word);
+    }
   });
 });

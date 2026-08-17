@@ -3558,7 +3558,7 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   color: var(--mint);
   border-radius: var(--radius);
 }
-.cr-task h3 {
+.cr-task h2 {
   margin: var(--sp-8) 0 0;
   color: var(--white);
   font-size: clamp(1.25rem, 3vw, 1.875rem);
@@ -3674,7 +3674,7 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
   color: var(--mint);
   border-radius: var(--radius);
 }
-.cr-post h3 {
+.cr-post h2 {
   margin: var(--sp-8) 0 0;
   color: var(--white);
   font-size: clamp(1.25rem, 3vw, 2rem);
@@ -6074,4 +6074,867 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .tsk-head { padding-inline: var(--sp-16); }
   .tsk-foot { padding-inline: var(--sp-16); }
   .tsk-body--form { padding: var(--sp-16); }
+}
+
+/* ════════════════════════════ PHASE 31 — the Founder Admin workspace rebuilt
+   (Spec §26.1, §7, §9, §23.1; DNA §5.2, §5.12, §5.14), added 2026-08-16.
+
+   Built from the supplied Founder Admin reference — a compiled React bundle
+   whose readable CSS was the authority on spacing, colour, and type. Its
+   palette maps onto the token set exactly: its --brand IS --brand, its
+   --canvas is --white, its --forest/--dark are --dark, its --night/--ink are
+   --darker, its --light is --mint, its --muted is --moss, its --green-5 is
+   --brand-5. Nothing below carries a raw value.
+
+   PHASE 25's Founders-specific rules are NOT rewritten in place: the shell
+   selectors (.views, .tabbtn, .tabline, .tabpane, .table, .fdr-row, .fhead,
+   .fgroup, .tl) are five workspaces' shared chrome and stay untouched. What
+   this section adds is the rebuilt directory (.fdir-*), the record header's
+   new pieces (.frec-*), and the new Overview (.fov-*), all reading the same
+   slots.
+
+   The three conventions PHASE 25 set, and 26-30 restated, bind here too:
+
+     1. TOKENS ONLY. Read a mode slot or a token, never a raw value. px is
+        legal for hairlines, radii, and the 44px touch minimum (via --touch).
+
+     2. SCOPED OVERRIDES. Everything new is prefixed .fdir-, .frec-, or
+        .fov-, and the pieces that already exist — .kicker, .grey, .helper,
+        .btn, .input, .tabs, .table, .fdr-row, .fgroup — are reused rather
+        than restyled.
+
+     3. RESPONSIVE IS A CORRECTION. Each media rule names the overflow
+        problem it answers. The six filter cards and the five-column table
+        are the two pressure points; both collapse rather than clip, and the
+        page body never scrolls sideways (§33.11.1).
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────── THE DIRECTORY */
+
+.fdir-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--sp-32);
+  margin-bottom: var(--sp-48);
+}
+.fdir-hero .grey { max-width: 34rem; }
+
+/* The six filter cards: one bordered strip, counts leading (DNA §5.4 — a
+   finite set with the number first). The active card earns the brand tint. */
+.fdir-cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border: 2px solid var(--brand);
+  background: var(--white);
+  margin-bottom: var(--sp-32);
+}
+.fdir-card {
+  min-height: var(--touch);
+  border: 0;
+  border-right: 1px solid var(--brand);
+  background: transparent;
+  padding: var(--sp-16);
+  text-align: left;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  cursor: pointer;
+}
+.fdir-card:last-child { border-right: 0; }
+.fdir-card.is-active { background: var(--brand-5); box-shadow: inset 0 3px 0 var(--brand); }
+.fdir-card strong { font-size: 1.75rem; font-weight: 500; }
+.fdir-card span { font-weight: 700; font-size: 0.875rem; }
+.fdir-card small { color: var(--moss); }
+
+.fdir-tools {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) 11rem 12rem auto;
+  gap: var(--sp-16);
+  align-items: end;
+  margin-bottom: var(--sp-16);
+}
+.fdir-tool { display: grid; gap: var(--sp-8); }
+.fdir-tool > span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.fdir-shown { margin: 0 0 var(--sp-8); white-space: nowrap; }
+
+/* The table reads PHASE 25's .table/.fdr-row rules; what is new is the
+   who-cell's avatar pairing and the two action columns' emphasis. */
+.fdir-who {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-12);
+  align-items: center;
+}
+.fdir-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  background: var(--mint);
+  color: var(--darker);
+  border: 2px solid var(--brand);
+  font-weight: 700;
+  font-size: 0.875rem;
+  flex: 0 0 auto;
+}
+.fdir-avatar--lg { width: 4rem; height: 4rem; font-size: 1.25rem; }
+.fdir-type { display: block; font-weight: 700; }
+.fdir-due { font-weight: 700; color: var(--darker); }
+.fdir-due--founder { color: var(--dark); }
+.fdir-none { color: var(--moss); }
+
+/* ─────────────────────────────────────────────────── THE RECORD HEADER */
+
+/* PHASE 25's .fhead is a three-column grid shaped for the old header (identity
+   · status grid · attention side). The rebuilt header stacks — identity, then
+   the action row, then the strip, then the where-band — so the record's
+   header opts out of that grid rather than squeezing four new children into
+   three old columns. Scoped override; .fhead itself is untouched. */
+.frec-head { display: block; }
+
+.frec-chips { display: flex; gap: var(--sp-8); flex-wrap: wrap; margin-top: var(--sp-8); }
+.frec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: var(--sp-4) var(--sp-8);
+}
+.frec-chip--type { background: var(--dark); color: var(--mint); }
+.frec-chip--life { border: 2px solid var(--brand); color: var(--dark); background: var(--brand-5); }
+
+.frec-actions {
+  display: flex;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  align-items: center;
+  margin: var(--sp-16) 0;
+}
+
+/* The Problem / Solution / Business strip: three quiet definition columns. */
+.frec-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-24);
+  margin: var(--sp-16) 0 0;
+  padding-top: var(--sp-16);
+  border-top: 1px solid var(--grey-light);
+}
+.frec-strip dt {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--dark);
+}
+.frec-strip dd { margin: var(--sp-4) 0 0; color: var(--moss); }
+
+.frec-where {
+  margin: var(--sp-16) 0 0;
+  padding: var(--sp-12) 0;
+  border-top: 2px solid var(--brand);
+  display: flex;
+  gap: var(--sp-12);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.frec-where .kicker { margin: 0; }
+
+.frec-interim {
+  border: 1px solid var(--grey-light);
+  background: var(--grey-lightest);
+  padding: var(--sp-12) var(--sp-16);
+  margin-bottom: var(--sp-24);
+}
+
+/* ─────────────────────────────────────────────────────── THE OVERVIEW */
+
+.fov-hero { margin: var(--sp-24) 0 var(--sp-32); }
+.fov-hero .h3 { max-width: 40ch; }
+.fov-hero__body { color: var(--moss); max-width: 60ch; }
+.fov-hero__facts { font-weight: 700; margin-top: var(--sp-8); }
+.fov-hero__facts .helper { display: inline; font-weight: 400; }
+
+/* The decision card: the reference's brand-bordered band with the heavy left
+   edge. One primary routing verb, never an executing one. */
+.fov-decide {
+  border: 2px solid var(--brand);
+  border-left-width: 6px;
+  background: var(--white);
+  padding: var(--sp-24);
+  margin-bottom: var(--sp-48);
+}
+.fov-decide h3 { margin: var(--sp-8) 0; }
+.fov-decide .grey { max-width: 60ch; }
+
+/* The current-campaign panel: the one dark card on the Overview, exactly as
+   the reference draws it. The row primitives keep their markup; only the
+   palette flips, which is why every override is scoped here. */
+.fov-campaign {
+  background: var(--dark);
+  color: var(--mint);
+  padding: var(--sp-24);
+  margin: var(--sp-32) 0;
+}
+.fov-campaign .fsec__title { color: var(--mint); }
+.fov-campaign .helper,
+.fov-campaign .grey { color: var(--sage); }
+.fov-campaign .fgroup dt { color: var(--sage); }
+/* The values flip too — the row primitive's dd inherits the page ink, which
+   is near-black-green and vanishes on the dark fill (the Campaigns hub's
+   invisible-pill lesson: contrast against the band showing through). */
+.fov-campaign .fgroup dd { color: var(--mint); }
+.fov-campaign .fgroup dd b { color: var(--mint); }
+.fov-campaign .fdir-due { color: var(--brand); }
+.fov-campaign .fdir-due--founder { color: var(--mint); }
+.fov-campaign .btn--tertiary { color: var(--mint); }
+
+.fov-research { margin: 0; padding-left: 1.1em; }
+.fov-research li { margin-bottom: var(--sp-4); }
+
+.fov-note {
+  border: 1px solid var(--grey-light);
+  padding: var(--sp-16);
+  margin-bottom: var(--sp-12);
+}
+.fov-note .kicker { margin-bottom: var(--sp-4); }
+.fov-note p { margin: 0 0 var(--sp-4); }
+
+.fov-next {
+  border: 2px solid var(--brand);
+  background: var(--brand-5);
+  padding: var(--sp-24);
+  margin: var(--sp-48) 0;
+}
+.fov-next h3 { margin: var(--sp-8) 0; }
+
+/* ══════════════════════════════════════════════ PHASE 31 — RESPONSIVE ══ */
+
+/* Six cards cannot fit six across a narrow viewport; they stack in twos and
+   then singly rather than shrinking their counts into illegibility. */
+@media (max-width: 900px) {
+  .fdir-cards { grid-template-columns: repeat(2, 1fr); }
+  .fdir-card { border-bottom: 1px solid var(--brand); }
+  .fdir-card:nth-child(2n) { border-right: 0; }
+  .fdir-card:nth-last-child(-n + 2) { border-bottom: 0; }
+  .fdir-tools { grid-template-columns: 1fr; }
+  .fdir-hero { grid-template-columns: 1fr; align-items: start; }
+  .frec-strip { grid-template-columns: 1fr; }
+}
+
+/* At 320px a two-up card still clips its subtitle; one column, and the last
+   pair's borders re-close so the strip ends on a clean edge. */
+@media (max-width: 480px) {
+  .fdir-cards { grid-template-columns: 1fr; }
+  .fdir-card { border-right: 0; }
+  .fdir-card:nth-last-child(-n + 2) { border-bottom: 1px solid var(--brand); }
+  .fdir-card:last-child { border-bottom: 0; }
+}
+
+/* ═══════════════════════════════════════════ PHASE 31 — SESSION B (added 2026-08-17) ══
+   The Onboarding section's four tabs, the Create Founder compose page, and the
+   Edit Founder sheet. Same conventions as the banner above: tokens only, no
+   hex, no arbitrary spacing; scoped overrides rather than shell edits; the
+   responsive rules are corrections at the bottom, not a second design. The
+   sheet sits on the modal layer (950) over the shared .scrim (940). */
+
+/* ── The Onboarding sub-tab rail ── a second, quieter tablist under the
+   section tabs. Distinct from .tabbtn so restyling one cannot bend the shell
+   the other five workspaces share. */
+.fob-tabs {
+  display: flex;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--grey-light);
+  margin-bottom: var(--sp-24);
+  overflow-x: auto;
+}
+.fob-tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--moss);
+  font: inherit;
+  font-size: 0.875rem;
+  padding: var(--sp-8) var(--sp-12);
+  min-height: var(--touch);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fob-tab:hover { color: var(--dark); }
+.fob-tab.is-active {
+  color: var(--dark);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+
+/* ── The tab hero: eyebrow question, derived answer, pinned subtitle. */
+.fob-hero { margin-bottom: var(--sp-24); }
+.fob-hero .h3 { margin: var(--sp-4) 0; }
+
+/* ── A tab panel: the reference's bordered card. */
+.fob-panel {
+  border: 1px solid var(--brand);
+  padding: var(--sp-24);
+  margin-bottom: var(--sp-24);
+}
+.fob-panel .fsec__title:first-child { margin-top: 0; }
+
+/* The dark provider panel — the Stripe block, .fov-campaign's treatment. */
+.fob-panel--dark {
+  background: var(--dark);
+  border-color: var(--dark);
+  color: var(--mint);
+}
+.fob-panel--dark .fsec__title { color: var(--mint); }
+.fob-panel--dark .helper,
+.fob-panel--dark .grey { color: var(--sage); }
+.fob-panel--dark .fgroup dt { color: var(--sage); }
+.fob-panel--dark .fgroup dd { color: var(--mint); }
+.fob-panel--dark .fgroup dd b { color: var(--mint); }
+.fob-panel--dark .btn--tertiary { color: var(--mint); }
+
+/* ── The dark stat band on Optional Items. */
+.fob-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--dark);
+  color: var(--mint);
+  padding: var(--sp-16) var(--sp-24);
+  margin-bottom: var(--sp-24);
+  gap: var(--sp-16);
+}
+.fob-stats b { display: block; font-size: 1.5rem; }
+.fob-stats span { color: var(--sage); font-size: 0.8125rem; }
+
+.fob-pathset { display: inline-flex; gap: var(--sp-8); margin-left: var(--sp-8); }
+
+/* ── The Create Founder compose page. */
+.cf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-16);
+  margin-bottom: var(--sp-24);
+}
+
+.cf-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--sp-24);
+  align-items: start;
+}
+
+.cf-step {
+  border: 1px solid var(--brand);
+  padding: var(--sp-24);
+  margin-bottom: var(--sp-24);
+}
+.cf-step > header {
+  display: flex;
+  gap: var(--sp-12);
+  align-items: baseline;
+  margin-bottom: var(--sp-16);
+}
+.cf-step > header .h3 { margin: 0; }
+.cf-step > header p { margin: var(--sp-4) 0 0; }
+.cf-step__n {
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.cf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--sp-16);
+}
+
+.cf-absent { margin-top: var(--sp-12); }
+.cf-absent p { margin: 0 0 var(--sp-8); }
+
+/* The rail: the reference's dark "Before you send" card, sticky beside the
+   steps so the checklist answers while the Admin types. */
+.cf-rail { position: sticky; top: var(--sp-24); }
+.cf-check {
+  background: var(--dark);
+  color: var(--mint);
+  padding: var(--sp-24);
+}
+.cf-check .h3 { color: var(--mint); margin-top: 0; }
+.cf-check ul { list-style: none; margin: var(--sp-16) 0; padding: 0; }
+.cf-check li {
+  color: var(--sage);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--moss);
+}
+.cf-check li.is-done { color: var(--mint); }
+.cf-check li > span[aria-hidden] { display: inline-block; width: 1.2em; }
+.cf-check__note { color: var(--sage); font-size: 0.8125rem; }
+
+.cf-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-16);
+  border-top: 1px solid var(--grey-light);
+  padding-top: var(--sp-16);
+  margin-top: var(--sp-24);
+}
+.cf-foot__actions { margin-left: auto; display: flex; gap: var(--sp-8); }
+
+/* ── The Edit Founder sheet: the reference's dark right-hand "EDIT AND
+   VERSION" panel. Modal layer — it blocks the record while open. */
+.fsheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(440px, 92vw);
+  z-index: 950;
+  background: var(--dark);
+  color: var(--mint);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fsheet .kicker { color: var(--sage); }
+.fsheet .grey { color: var(--sage); }
+.fsheet .h2 { color: var(--mint); margin: var(--sp-4) 0; }
+.fsheet .helper { color: var(--sage); }
+.fsheet label { color: var(--mint); }
+.fsheet .field-error { color: var(--accent-yellow); }
+
+.fsheet__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-12);
+  padding: var(--sp-24) var(--sp-24) var(--sp-12);
+}
+.fsheet__head .btn--tertiary { color: var(--mint); }
+.fsheet__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--sp-24);
+}
+.fsheet__body .input,
+.fsheet__body textarea.input {
+  background: var(--surface);
+}
+.fsheet__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-8);
+  padding: var(--sp-12) var(--sp-24) var(--sp-24);
+  border-top: 1px solid var(--moss);
+}
+.fsheet__foot .btn--tertiary { color: var(--mint); }
+
+/* ── Session B responsive corrections. */
+@media (max-width: 900px) {
+  .cf-layout { grid-template-columns: 1fr; }
+  .cf-rail { position: static; }
+  .cf-grid { grid-template-columns: 1fr; }
+  .fob-stats { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .cf-head { flex-direction: column; }
+  .cf-foot { flex-wrap: wrap; }
+  .cf-foot__actions { margin-left: 0; }
+}
+
+/* ── Session C (added 2026-08-17): the read-and-route sections. Everything
+   else on these tabs reuses the Session B vocabulary (.fob-tabs, .fob-hero,
+   .fob-panel, .fob-stats) and the shell's own .filters/.att-box — the one new
+   thing a refusal sentence needed was its own quiet treatment. */
+.fop-refusal {
+  margin-top: var(--sp-16);
+  padding: var(--sp-12) var(--sp-16);
+  border-left: 3px solid var(--moss);
+  color: var(--ink-50);
+  font-size: 0.875rem;
+}
+.fop-refusal b { color: var(--dark); }
+
+/* ════════════════════════════ PHASE 32 — the Affiliate workspace record shell
+   (Spec §26.1, §8, §14.2, DNA §5.12, §5.14), added 2026-08-17, Session A of
+   the Admin Affiliate rebuild (docs/phases/admin-affiliate-rebuild.md).
+
+   The eight-tab / twenty-five-section record: the workspace navigation that
+   sits above the identity band, the section rail beneath the tabs, the
+   Selected-relationship switcher, and the honest interim section. PHASE 26 is
+   edited in place where an existing family changed (verified 2026-08-17 that
+   no file outside features/admin/creators uses a .cr- class); this banner is
+   the genuinely NEW families only. PHASE 25's shared shell selectors are
+   untouched. Conventions unchanged: tokens only; px for hairlines, radii, and
+   the touch minimum; responsive rules are corrections that name their
+   overflow problem.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── The workspace navigation ─────────────────────────────────────────────
+   Context strip, the eight tabs, and the active tab's sections — in that
+   order, above everything, as the reference draws it. The strip is not a
+   heading: the identity band's h1 (Overview) or the section h1 (elsewhere)
+   names the page; this names the record the tabs belong to. */
+.cr-wnav {
+  margin: 0 0 var(--sp-32);
+  border-bottom: var(--bw) solid var(--brand);
+}
+.cr-wnav__context {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  min-height: 4.625rem;
+  padding: var(--sp-8) 0;
+}
+.cr-wnav__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cr-wnav__who strong {
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--darker);
+}
+.cr-wnav__who small {
+  font-size: 0.8125rem;
+  color: var(--moss);
+  overflow-wrap: anywhere;
+}
+.cr-wnav__attention {
+  margin-left: var(--sp-16);
+  padding: var(--sp-4) var(--sp-12);
+  background: var(--mint);
+  color: var(--dark);
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.cr-wnav__tools { margin-left: auto; }
+
+/* The eight tabs. A hand-built tablist (roving tabindex, Arrow/Home/End) —
+   §26.1's markup differs from components/Tabs.tsx, the position every Admin
+   workspace has recorded since the Founders rebuild. Horizontal scroll inside
+   its own container at narrow widths; the page never scrolls sideways. */
+.cr-wtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+}
+/* Session B (2026-08-17): the rail WRAPS instead of scrolling. Session A
+   tightened the tabs until all eight fit at 1280, and the screenshot pass
+   caught the fix failing anyway — a vertical scrollbar eats ~17px and History
+   fell off the right edge with no affordance, invisible to jsdom and axe. A
+   second line is legible; a hidden tab is a missing tab. */
+.cr-wtabs__tab {
+  appearance: none;
+  border: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-height: var(--touch);
+  /* Tight enough that all eight tabs fit the shell at 1280 — the screenshot
+     pass caught the last two hiding behind a scroll with no affordance. The
+     rail still scrolls below that width. */
+  padding: var(--sp-12) var(--sp-8);
+  border-bottom: 3px solid transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 750;
+  color: var(--moss);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cr-wtabs__tab:hover { color: var(--darker); }
+.cr-wtabs__tab.is-active {
+  color: var(--darker);
+  border-bottom-color: var(--brand);
+}
+.cr-wtabs__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  padding: 0 var(--sp-4);
+  background: var(--mint);
+  color: var(--dark);
+  border-radius: var(--radius);
+  font-size: 0.625rem;
+  font-weight: 900;
+}
+
+/* The active tab's sections — quieter than the tabs, same mechanics. */
+.cr-wsecs {
+  display: flex;
+  gap: var(--sp-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-top: 1px solid var(--grey-light);
+}
+.cr-wsecs::-webkit-scrollbar { display: none; }
+.cr-wsecs__sec {
+  appearance: none;
+  border: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  padding: var(--sp-8) var(--sp-16);
+  border-bottom: 3px solid transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--moss);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cr-wsecs__sec:hover { color: var(--darker); }
+.cr-wsecs__sec.is-active {
+  color: var(--darker);
+  border-bottom-color: var(--brand);
+}
+
+/* ── The Selected-relationship switcher ───────────────────────────────────
+   Persistent across the three campaign-scoped tabs. The sentence beneath the
+   label is the reference's organising rule and is pinned in the register —
+   account data stays separate from campaign-specific state. */
+.cr-switcher {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(min(17.5rem, 100%), 26.25rem);
+  align-items: center;
+  gap: var(--sp-24);
+  margin: 0 0 var(--sp-32);
+  padding: var(--sp-16) var(--sp-24);
+  background: var(--mint);
+  border-radius: var(--radius);
+}
+.cr-switcher > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cr-switcher > span strong {
+  font-size: 0.875rem;
+  font-weight: 850;
+  color: var(--darker);
+}
+.cr-switcher > span small {
+  font-size: 0.6875rem;
+  color: var(--dark);
+}
+.cr-switcher__pick { display: block; min-width: 0; }
+.cr-switcher__pick select {
+  width: 100%;
+  min-height: var(--touch);
+  font-weight: 800;
+  border-color: var(--brand);
+}
+.cr-switcher > p.grey { margin: 0; }
+
+/* ── An identifier rendered as a value (Session C) ────────────────────────
+   The interim family this replaced is gone with the interim component; only
+   the id treatment survived it, because an association id is a value somebody
+   quotes on a support call. `cr-mono` is the monogram AVATAR square and is not
+   this — a browser pass is what told the two apart. */
+.cr-idval {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+/* ── Session B (2026-08-17): the person-level tabs in final shape ──────────
+   The tab heading (every page owes one h1, §33.11.2 — the interim pattern
+   kept), the per-metric decision rows, the evidence-picture list, the
+   invitation lifecycle facts with the `Opened` refusal rendered where the
+   value would be, and the per-campaign agreement rows. */
+.cr-tabhead {
+  max-width: var(--measure);
+  padding: var(--sp-8) 0 0;
+}
+.cr-tabhead__title {
+  margin: var(--sp-8) 0 var(--sp-16);
+  font-size: clamp(1.75rem, 4.5vw, 2.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 900;
+  color: var(--darker);
+}
+
+.cr-metriclist {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--grey-light);
+  margin: 0 0 var(--sp-24);
+}
+.cr-metricrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-metricrow__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.cr-metricrow__main strong {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--darker);
+}
+.cr-metricrow__main small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); }
+.cr-metricrow__main p { margin: 0; font-size: 0.9375rem; color: var(--dark); }
+
+.cr-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  margin: 0 0 var(--sp-16);
+}
+.cr-file {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.cr-file > span { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-file strong { font-size: 0.9375rem; font-weight: 800; color: var(--darker); overflow-wrap: anywhere; }
+.cr-file small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); }
+.cr-file__rejected { color: var(--accent-ink, var(--darker)); }
+
+.cr-lifecycle {
+  margin: var(--sp-12) 0 0;
+  border-top: 1px solid var(--grey-light);
+  flex-basis: 100%;
+}
+.cr-lifecycle > div {
+  display: grid;
+  grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
+  gap: var(--sp-16);
+  align-items: baseline;
+  padding: var(--sp-8) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-lifecycle dt { font-size: 0.8125rem; font-weight: 750; color: var(--moss); }
+.cr-lifecycle dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--darker);
+  overflow-wrap: anywhere;
+}
+.cr-lifecycle__absent dd { font-weight: 600; color: var(--moss); }
+
+/* The eligibility section's invitation card: `.cr-inv` is a two-column GRID
+   (main + action), so the lifecycle dl must claim a full row of its own or it
+   lands in the name column and the two overprint — the screenshot pass is
+   what caught it. Name and action on row one, the lifecycle facts across the
+   whole width beneath. */
+.cr-inv--wide { grid-template-columns: minmax(0, 1fr) auto; }
+.cr-inv--wide .cr-lifecycle { grid-column: 1 / -1; grid-row: 2; }
+/* PHASE 26's own 760px rule stacks `.cr-inv` to one column; this variant
+   declares columns outside a media query and would override it, so it
+   restates the stack — the action wraps under the name, the facts follow. */
+@media (max-width: 760px) {
+  .cr-inv--wide { grid-template-columns: minmax(0, 1fr); }
+  .cr-inv--wide .cr-lifecycle { grid-row: auto; }
+}
+
+.cr-agreement-list {
+  display: flex;
+  flex-direction: column;
+  margin: var(--sp-16) 0 0;
+  border-top: 1px solid var(--grey-light);
+}
+.cr-agreement-list article {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-agreement-list article > span { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-agreement-list strong { font-size: 0.9375rem; font-weight: 800; color: var(--darker); }
+.cr-agreement-list small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); }
+.cr-agreement-list b { font-size: 0.875rem; font-weight: 800; color: var(--dark); white-space: nowrap; }
+
+/* ── PHASE 32 — SESSION C (2026-08-17): the campaign-scoped tabs ──────────
+   The relationship card grid (the Relationships section's second switching
+   affordance) and the deliverable rows (gap 1's §22.4-idiom list). Everything
+   else the campaign tabs render reuses the PHASE 26 families the old panes
+   wore — the sections absorbed the panes, and their clothes came with them. */
+.cr-relpick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  width: 100%;
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: 14px;
+  background: var(--white);
+  text-align: left;
+  cursor: pointer;
+}
+.cr-relpick.is-active {
+  border-color: var(--dark);
+  box-shadow: inset 0 0 0 1px var(--dark);
+}
+.cr-relpick:focus-visible { outline: 2px solid var(--dark); outline-offset: 2px; }
+
+/* `.cr-version` is `auto | 1fr | auto` and expects the version badge first.
+   The Session C rows (a mediation note, a case, an enforcement relationship,
+   a delivery record) have no badge, so `__main` fell into the AUTO column and
+   every trailing state or control sat hard against the label — at a different
+   x on every row, since it followed the text. Only a browser pass shows it. */
+.cr-version > .cr-version__main:first-child { grid-column: 1 / 3; }
+.cr-version > .cr-drow__acts { justify-self: end; }
+
+.cr-dlist { display: flex; flex-direction: column; }
+.cr-drow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) 0;
+  border-bottom: 1px solid var(--grey-light);
+}
+.cr-drow:last-child { border-bottom: 0; }
+.cr-drow__main { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.cr-drow__main strong { font-size: 0.9375rem; font-weight: 800; color: var(--darker); }
+.cr-drow__main small { font-size: 0.8125rem; font-weight: 700; color: var(--moss); overflow-wrap: anywhere; }
+.cr-drow__acts { display: flex; flex-wrap: wrap; gap: var(--sp-8); flex-shrink: 0; }
+
+/* ── PHASE 32 — RESPONSIVE ────────────────────────────────────────────────
+   The switcher's two columns overlap under ~640px: stack them. The context
+   strip's attention pill wraps under the name rather than truncating it. */
+@media (max-width: 40rem) {
+  .cr-switcher { grid-template-columns: minmax(0, 1fr); }
+  .cr-wnav__context { flex-wrap: wrap; }
+  .cr-wnav__attention { margin-left: 0; white-space: normal; }
+  .cr-lifecycle > div { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+  .cr-metricrow { flex-direction: column; align-items: stretch; }
+  .cr-file { flex-direction: column; align-items: stretch; }
+  .cr-relpick { flex-direction: column; align-items: stretch; }
+  .cr-drow { flex-direction: column; align-items: stretch; }
 }

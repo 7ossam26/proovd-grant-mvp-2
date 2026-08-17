@@ -34,10 +34,13 @@ import { seedAdminReauthWindow } from '../settings/service.js';
 import { auditEvents } from '../db/schema/integrity.js';
 import { affiliateProspects } from '../db/schema/affiliates.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
+import { stripeConnectedAccounts } from '../db/schema/payments.js';
 import { campaignAffiliateAssociations } from '../db/schema/domain.js';
 import {
   affiliateDeletionRequests,
   affiliateDeletionReviews,
+  affiliateEvidenceFiles,
+  affiliateEvidenceVerifications,
 } from '../db/schema/creator-workspace.js';
 import {
   CREATOR_ASSIGNED_TO_CAMPAIGN,
@@ -871,5 +874,881 @@ describe('§26.7 — account standing is an access decision, per request', () =>
     // exists to prevent.
     expect(detail.standing.enforcement).toHaveLength(0);
     expect(detail.standing.disclosures).toHaveLength(0);
+  });
+});
+
+/* ── Migration 0048: the six record families hold their own rules ─────────── */
+
+describe('§24.8, §22.4, §14.2 — the 0048 records refuse what their rules refuse', () => {
+  async function terminationSeed() {
+    const campaign = await createCampaign(`term-${randomUUID().slice(0, 6)}`);
+    const creator = await recruit(campaign.campaignId, `term-${randomUUID().slice(0, 6)}`);
+    return creator;
+  }
+
+  it('CHECK-matrixes the termination money treatment to its §24.8 cause', async () => {
+    const { associationId } = await terminationSeed();
+
+    // §33.9.3's most tempting wrong simplification, unrepresentable here too:
+    // a Founder-caused termination cannot record cancel_unpaid_invalid.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_termination_requests
+           (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+         VALUES ($1, 'Founder ended the campaign direction.', now(), 'founder_or_product',
+                 'cancel_unpaid_invalid', 'support case', now(), 'Ada Admin')`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/association_termination_requests_cause_matrix/);
+
+    // The same cause with a treatment its register row permits records fine.
+    await h.pool.query(
+      `INSERT INTO association_termination_requests
+         (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+       VALUES ($1, 'Founder ended the campaign direction.', now(), 'founder_or_product',
+               'earnings_remain', 'support case', now(), 'Ada Admin')`,
+      [associationId],
+    );
+  });
+
+  it('allows one open termination request per relationship, and the decision is write-once', async () => {
+    const { associationId } = await terminationSeed();
+    await h.pool.query(
+      `INSERT INTO association_termination_requests
+         (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+       VALUES ($1, 'Affiliate asked to end the partnership.', now(), 'proovd_or_system_error',
+               'not_attributed', 'email', now(), 'Ada Admin')`,
+      [associationId],
+    );
+
+    // A second ask while one waits is a duplicate, not a new decision.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_termination_requests
+           (association_id, reason, effective_at, cause, money_treatment, received_via, requested_at, recorded_by)
+         VALUES ($1, 'Second ask.', now(), 'proovd_or_system_error',
+                 'not_attributed', 'email', now(), 'Ada Admin')`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/association_termination_requests_one_open_idx/);
+
+    // The recorded ask is immutable even before the decision…
+    await expect(
+      h.pool.query(
+        `UPDATE association_termination_requests SET reason = 'Reworded.' WHERE association_id = $1`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/immutable/);
+
+    // …the decision arrives whole…
+    await expect(
+      h.pool.query(
+        `UPDATE association_termination_requests SET decision = 'declined' WHERE association_id = $1`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/association_termination_requests_decision_whole/);
+    await h.pool.query(
+      `UPDATE association_termination_requests
+         SET decision = 'declined', decision_note = 'The partnership continues.',
+             decided_by = 'Ada Admin', decided_at = now()
+       WHERE association_id = $1`,
+      [associationId],
+    );
+
+    // …and a decided request cannot be re-decided, whoever writes the SQL.
+    await expect(
+      h.pool.query(
+        `UPDATE association_termination_requests
+           SET decision = 'applied', decision_note = 'Changed my mind.',
+               decided_by = 'Ada Admin', decided_at = now()
+         WHERE association_id = $1`,
+        [associationId],
+      ),
+    ).rejects.toThrow(/decided request cannot be changed/);
+  });
+
+  it('ties a deliverable waiver to its named recorder and reason, both ways', async () => {
+    const { associationId } = await terminationSeed();
+    const deliverable = await h.pool.query(
+      `INSERT INTO association_deliverables (association_id, title, source, created_by)
+       VALUES ($1, 'Launch post', 'Accepted agreement', 'Ada Admin') RETURNING id`,
+      [associationId],
+    );
+    const deliverableId = (deliverable.rows[0] as { id: string }).id;
+
+    // A waiver with no named recorder is a decision nobody made.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_deliverable_decisions (deliverable_id, outcome, findings, decided_by)
+         VALUES ($1, 'waived', 'Founder released the obligation.', 'Ada Admin')`,
+        [deliverableId],
+      ),
+    ).rejects.toThrow(/association_deliverable_decisions_waiver_coherent/);
+
+    // And a verified decision cannot smuggle waiver fields.
+    await expect(
+      h.pool.query(
+        `INSERT INTO association_deliverable_decisions
+           (deliverable_id, outcome, findings, waiver_recorded_by, waiver_reason, decided_by)
+         VALUES ($1, 'verified', 'The post is live and meets the terms.', 'Ada Admin', 'n/a', 'Ada Admin')`,
+        [deliverableId],
+      ),
+    ).rejects.toThrow(/association_deliverable_decisions_waiver_coherent/);
+
+    await h.pool.query(
+      `INSERT INTO association_deliverable_decisions
+         (deliverable_id, outcome, findings, waiver_recorded_by, waiver_reason, decided_by)
+       VALUES ($1, 'waived', 'Founder released the obligation.', 'Fiona Founder',
+               'Campaign pivoted; the post is no longer wanted.', 'Ada Admin')`,
+      [deliverableId],
+    );
+  });
+
+  it('refuses duplicate live evidence files and makes removal one-way', async () => {
+    const { prospectId } = await terminationSeed();
+    const checksum = randomUUID().replaceAll('-', '');
+    await h.pool.query(
+      `INSERT INTO affiliate_evidence_files
+         (prospect_id, category, storage_key, state, checksum_sha256, byte_size, content_type, uploaded_by)
+       VALUES ($1, 'channel_permission', $2, 'stored', $3, 1024, 'image/png', 'Ada Admin')`,
+      [prospectId, `affiliate-evidence/${prospectId}/${randomUUID()}`, checksum],
+    );
+
+    // §12's duplicate rule, rescoped to the person and enforced by the
+    // database rather than a SELECT a concurrent request could race past.
+    await expect(
+      h.pool.query(
+        `INSERT INTO affiliate_evidence_files
+           (prospect_id, category, storage_key, state, checksum_sha256, byte_size, content_type, uploaded_by)
+         VALUES ($1, 'sponsored_history', $2, 'stored', $3, 1024, 'image/png', 'Ada Admin')`,
+        [prospectId, `affiliate-evidence/${prospectId}/${randomUUID()}`, checksum],
+      ),
+    ).rejects.toThrow(/affiliate_evidence_files_duplicate_idx/);
+
+    await h.pool.query(
+      `UPDATE affiliate_evidence_files SET removed_at = now(), removed_by = 'Ada Admin'
+       WHERE prospect_id = $1`,
+      [prospectId],
+    );
+    // Removing frees the checksum for a correction…
+    await h.pool.query(
+      `INSERT INTO affiliate_evidence_files
+         (prospect_id, category, storage_key, state, checksum_sha256, byte_size, content_type, uploaded_by)
+       VALUES ($1, 'channel_permission', $2, 'stored', $3, 1024, 'image/png', 'Ada Admin')`,
+      [prospectId, `affiliate-evidence/${prospectId}/${randomUUID()}`, checksum],
+    );
+    // …and a removal can never be undone: an evidence file that can quietly
+    // come back is one whose absence nobody can rely on.
+    await expect(
+      h.pool.query(
+        `UPDATE affiliate_evidence_files SET removed_at = NULL, removed_by = NULL
+         WHERE prospect_id = $1 AND removed_at IS NOT NULL`,
+        [prospectId],
+      ),
+    ).rejects.toThrow(/removal cannot be undone/);
+  });
+
+  it('stores no proposal access, no acceptance, and no schedule anywhere in 0048', async () => {
+    // §1.8 item 4: the Standard/Restricted badge is derived from §29 records.
+    // The strongest form of "never stored" is a column that does not exist.
+    const proposalAccess = await h.pool.query(
+      `SELECT table_name, column_name FROM information_schema.columns
+       WHERE column_name LIKE '%proposal_access%'`,
+    );
+    expect(proposalAccess.rows).toHaveLength(0);
+
+    // Admin mediates and never agrees: the mediation note has no acceptance,
+    // outcome, or decision column a later phase could read as an answer.
+    const mediation = await h.pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name = 'proposal_mediation_notes'
+         AND (column_name LIKE '%accept%' OR column_name LIKE '%outcome%' OR column_name LIKE '%decision%')`,
+    );
+    expect(mediation.rows).toHaveLength(0);
+
+    // §30: no schedule-shaped column on any of the six families, so there is
+    // nowhere to record a cadence and nothing a job could sweep.
+    const schedule = await h.pool.query(
+      `SELECT table_name, column_name FROM information_schema.columns
+       WHERE table_name IN ('affiliate_evidence_files', 'affiliate_evidence_verifications',
+                            'association_deliverables', 'association_deliverable_evidence',
+                            'association_deliverable_decisions', 'association_availability_verifications',
+                            'proposal_mediation_notes', 'association_termination_requests')
+         AND (column_name LIKE '%remind%' OR column_name LIKE '%recurrence%'
+              OR column_name LIKE '%next_send%' OR column_name LIKE '%cadence%'
+              OR column_name LIKE '%snooze%' OR column_name LIKE '%escalate%')`,
+    );
+    expect(schedule.rows).toHaveLength(0);
+  });
+
+  it('grants the app role exactly what each family permits', async () => {
+    const grants = await h.pool.query(
+      `SELECT table_name, privilege_type FROM information_schema.role_table_grants
+       WHERE grantee = 'proovd_app'
+         AND table_name IN ('affiliate_evidence_verifications', 'association_deliverables',
+                            'association_deliverable_evidence', 'association_deliverable_decisions',
+                            'association_availability_verifications', 'proposal_mediation_notes')`,
+    );
+    // Five insert-only families (plus the evidence receipts): SELECT and
+    // INSERT, never UPDATE or DELETE — a decision an Admin can rewrite
+    // afterwards is not the record it claims to be.
+    for (const row of grants.rows as { table_name: string; privilege_type: string }[]) {
+      expect(['SELECT', 'INSERT'], row.table_name).toContain(row.privilege_type);
+    }
+
+    // The termination request's UPDATE grant names the four decision columns
+    // and nothing else — the recorded ask is outside every grant.
+    const columnGrants = await h.pool.query(
+      `SELECT column_name FROM information_schema.role_column_grants
+       WHERE grantee = 'proovd_app' AND table_name = 'association_termination_requests'
+         AND privilege_type = 'UPDATE'
+       ORDER BY column_name`,
+    );
+    expect((columnGrants.rows as { column_name: string }[]).map((r) => r.column_name)).toEqual([
+      'decided_at',
+      'decided_by',
+      'decision',
+      'decision_note',
+    ]);
+  });
+
+  it('serves the three Selected-relationship facts from the record read', async () => {
+    const { prospectId } = await terminationSeed();
+    const detail = await readWorkspace(prospectId);
+    expect(detail.relationships).toHaveLength(1);
+    const rel = detail.relationships[0];
+    // A fresh prospect-state relationship: nothing agreed, no link minted, and
+    // completion is honestly "not due" rather than a zero (§16a).
+    expect(rel.agreement).toBe('Not started');
+    expect(rel.trackingLink).toBe('No Affiliate link yet');
+    expect(rel.completion).toBe('Not due before close');
+  });
+});
+
+/* ── Session B: the person-level writes, and what they refuse ─────────────── */
+
+describe('§5.3, §11, §5.5, §13 — the Session B machine (metric trail, corrections, asks, re-read)', () => {
+  async function claimedSeed(label: string) {
+    const campaign = await createCampaign(label);
+    const { prospectId, associationId } = await recruit(campaign.campaignId, label);
+    const account = await seedUser(h, 'affiliate', `${label}-claimed`);
+    await h.db.insert(affiliateSignupProfiles).values({
+      prospectId,
+      associationId,
+      claimedUserId: account.id,
+      claimedAt: new Date(),
+      email: account.email,
+      publicHandle: '@claimed.handle',
+      legalName: 'Claimed Person',
+      updatedBy: 'user:test',
+    });
+    return { prospectId, associationId, account };
+  }
+
+  it('records a per-metric decision on the 0048 trail, and a request sends the §11 ask', async () => {
+    const campaign = await createCampaign('metrics');
+    const { prospectId } = await recruit(campaign.campaignId, 'metrics');
+
+    // GATED: a stale session is refused before anything records (§33.12.4).
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/evidence/metric-decision`)
+      .set('cookie', staleAdmin.cookie)
+      .send({ metric: 'audience_size', decision: 'verified', detail: 'x' })
+      .expect(403);
+
+    // A made-up metric and a blank detail are refused by name.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/evidence/metric-decision`)
+      .set('cookie', admin.cookie)
+      .send({ metric: 'vibes', decision: 'verified', detail: 'Looks good.' })
+      .expect(422);
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/evidence/metric-decision`)
+      .set('cookie', admin.cookie)
+      .send({ metric: 'audience_size', decision: 'verified', detail: '   ' })
+      .expect(422);
+
+    // Verified records the trail and sends nothing.
+    const before = h.sentEmails.messages.length;
+    const verified = await request(h.app)
+      .post(`${'/api/admin/creators/'}${prospectId}/evidence/metric-decision`)
+      .set('cookie', admin.cookie)
+      .send({
+        metric: 'audience_size',
+        decision: 'verified',
+        detail: 'Analytics screenshot matches the recorded audience size.',
+      })
+      .expect(200);
+    expect((verified.body as { ask: { sent: boolean } }).ask.sent).toBe(false);
+    expect(h.sentEmails.messages.length).toBe(before);
+
+    // More-evidence-needed records AND sends, deduped on the recorded row —
+    // and the message carries the Admin's exact ask.
+    const asked = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/evidence/metric-decision`)
+      .set('cookie', admin.cookie)
+      .send({
+        metric: 'engagement_rate',
+        decision: 'more_evidence_needed',
+        detail: 'Share a current analytics screenshot for the channel, taken this month.',
+      })
+      .expect(200);
+    expect((asked.body as { ask: { sent: boolean } }).ask.sent).toBe(true);
+    const sent = h.sentEmails.messages.at(-1)!;
+    expect(sent.subject).toContain('review one detail');
+    expect(sent.text).toContain('taken this month');
+
+    const rows = await h.db
+      .select()
+      .from(affiliateEvidenceVerifications)
+      .where(eq(affiliateEvidenceVerifications.prospectId, prospectId));
+    expect(rows).toHaveLength(2);
+
+    // The record read composes the latest decision per metric, in register
+    // order, with the undecided three as their honest absence (§16a).
+    const detail = await readWorkspace(prospectId);
+    expect(detail.profile.metricDecisions).toHaveLength(5);
+    const audience = detail.profile.metricDecisions.find((m) => m.metric === 'audience_size')!;
+    expect(audience.decision).toBe('verified');
+    expect(
+      detail.profile.metricDecisions.filter((m) => m.decision === null),
+    ).toHaveLength(3);
+  });
+
+  it('corrects a confirmed account field with the prior read from the row, and refuses pre-claim', async () => {
+    const campaign = await createCampaign('correct');
+    const { prospectId } = await recruit(campaign.campaignId, 'correct');
+
+    // Pre-claim: nothing here has been confirmed by the Affiliate, so the
+    // correction route refuses and points at the research record.
+    const preClaim = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/account-correction`)
+      .set('cookie', admin.cookie)
+      .send({ field: 'username', newValue: '@new.handle', reason: 'Handle changed.' })
+      .expect(422);
+    expect((preClaim.body as { whatHappened: string }).whatHappened).toContain('research record');
+
+    const { prospectId: claimedId } = await claimedSeed('correct-claimed');
+
+    // A field outside the register, and a blank reason, are refused.
+    await request(h.app)
+      .post(`/api/admin/creators/${claimedId}/account-correction`)
+      .set('cookie', admin.cookie)
+      .send({ field: 'quality_tier', newValue: 'Tier A', reason: 'No.' })
+      .expect(422);
+    await request(h.app)
+      .post(`/api/admin/creators/${claimedId}/account-correction`)
+      .set('cookie', admin.cookie)
+      .send({ field: 'username', newValue: '@corrected.handle', reason: '  ' })
+      .expect(422);
+
+    await request(h.app)
+      .post(`/api/admin/creators/${claimedId}/account-correction`)
+      .set('cookie', admin.cookie)
+      .send({
+        field: 'username',
+        newValue: '@corrected.handle',
+        reason: 'The platform handle changed and the Affiliate confirmed the new one by email.',
+      })
+      .expect(200);
+
+    // §33.12.4: the audit's before/after is the ROW's answer, not the caller's.
+    const audits = await h.db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(eq(auditEvents.targetId, claimedId), eq(auditEvents.action, 'creator.account_corrected')),
+      );
+    expect(audits).toHaveLength(1);
+    expect(audits[0].priorValue).toEqual({ field: 'username', value: '@claimed.handle' });
+    expect(audits[0].newValue).toEqual({ field: 'username', value: '@corrected.handle' });
+
+    const [profile] = await h.db
+      .select({ publicHandle: affiliateSignupProfiles.publicHandle })
+      .from(affiliateSignupProfiles)
+      .where(eq(affiliateSignupProfiles.prospectId, claimedId));
+    expect(profile.publicHandle).toBe('@corrected.handle');
+  });
+
+  it('records the field-level §11 ask and sends it keyed on the recorded row', async () => {
+    const { prospectId } = await claimedSeed('ask');
+
+    const before = h.sentEmails.messages.length;
+    const first = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/correction-request`)
+      .set('cookie', admin.cookie)
+      .send({
+        subjectLabel: 'Username · @claimed.handle',
+        note: 'The handle appears to have changed on the platform — confirm the current one.',
+      })
+      .expect(200);
+    expect((first.body as { ask: { sent: boolean } }).ask.sent).toBe(true);
+    expect(h.sentEmails.messages.length).toBe(before + 1);
+    const message = h.sentEmails.messages.at(-1)!;
+    expect(message.text).toContain('current value stays until you supply a correction');
+
+    // A second deliberate ask is a second message (§7's resend rule): each ask
+    // is its own recorded row, so the dedup key never swallows it.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/correction-request`)
+      .set('cookie', admin.cookie)
+      .send({ subjectLabel: 'Email · old@example.com', note: 'Bounced twice this week.' })
+      .expect(200);
+    expect(h.sentEmails.messages.length).toBe(before + 2);
+
+    // A blank note is refused — the Affiliate reads that sentence.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/correction-request`)
+      .set('cookie', admin.cookie)
+      .send({ subjectLabel: 'Email', note: '   ' })
+      .expect(422);
+  });
+
+  it('asks for recovery through the ONE reset path, and refuses when nobody claimed', async () => {
+    const campaign = await createCampaign('recovery');
+    const { prospectId } = await recruit(campaign.campaignId, 'recovery');
+
+    // §1.4: there is no password to reset before the claim.
+    const refused = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/password-recovery`)
+      .set('cookie', admin.cookie)
+      .expect(422);
+    expect((refused.body as { whatHappened: string }).whatHappened).toContain('claimed');
+
+    const { prospectId: claimedId, account } = await claimedSeed('recovery-claimed');
+    const before = h.resetLinks.length;
+    await request(h.app)
+      .post(`/api/admin/creators/${claimedId}/password-recovery`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+
+    // The link came out of Better Auth's own reset flow — the harness captures
+    // what `sendResetPassword` was handed, which is the ONE path §5.5 has.
+    expect(h.resetLinks.length).toBe(before + 1);
+    expect(h.resetLinks.at(-1)!.email).toBe(account.email);
+
+    // The raw link appears nowhere in the audit record (§28.1).
+    const audits = await h.db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.targetId, claimedId),
+          eq(auditEvents.action, 'creator.password_recovery_sent'),
+        ),
+      );
+    expect(audits).toHaveLength(1);
+    expect(JSON.stringify(audits[0])).not.toContain(h.resetLinks.at(-1)!.url);
+  });
+
+  it('chooses the §27 key by the account role inside the one reset sender', async () => {
+    // The five-part chain's sender, driven directly: an Affiliate's reset is
+    // recorded under THEIR audience key, because Phase 22c's history filters
+    // on the prefix and a reset filed under `founder_*` would be invisible on
+    // the person's own notification history.
+    const { sendPasswordReset } = await import('../notifications/customer-remaining.js');
+    const { createNotifier } = await import('../notifications/send.js');
+    const captured: string[] = [];
+    const notifier = createNotifier({
+      db: h.db,
+      transport: {
+        async send() {
+          return { providerId: `probe-${captured.length}` };
+        },
+      },
+      audit: async () => {},
+    });
+
+    const affiliateAccount = await seedUser(h, 'affiliate', 'reset-key-affiliate');
+    await sendPasswordReset(
+      {
+        db: h.db,
+        notifier,
+        context: { appBaseUrl: 'http://localhost', supportEmail: 's@x.co', fromAddress: 'f@x.co' },
+        authSecret: 'test-secret-for-reset-ids',
+      },
+      { email: affiliateAccount.email, name: null, url: 'http://localhost/reset/affiliate-probe' },
+    );
+    const founderAccount = await seedUser(h, 'founder', 'reset-key-founder');
+    await sendPasswordReset(
+      {
+        db: h.db,
+        notifier,
+        context: { appBaseUrl: 'http://localhost', supportEmail: 's@x.co', fromAddress: 'f@x.co' },
+        authSecret: 'test-secret-for-reset-ids',
+      },
+      { email: founderAccount.email, name: null, url: 'http://localhost/reset/founder-probe' },
+    );
+
+    const deliveries = await h.pool.query(
+      `SELECT event_key, target FROM notification_deliveries WHERE target IN ($1, $2)`,
+      [affiliateAccount.email, founderAccount.email],
+    );
+    const byTarget = new Map(
+      (deliveries.rows as { event_key: string; target: string }[]).map((r) => [r.target, r.event_key]),
+    );
+    expect(byTarget.get(affiliateAccount.email)).toBe('affiliate_password_reset');
+    expect(byTarget.get(founderAccount.email)).toBe('founder_password_reset');
+  });
+
+  it('refuses an evidence presign honestly while storage is unconfigured, over HTTP', async () => {
+    const campaign = await createCampaign('evidence-503');
+    const { prospectId } = await recruit(campaign.campaignId, 'evidence-503');
+
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/evidence/uploads`)
+      .set('cookie', admin.cookie)
+      .send({
+        category: 'channel_permission',
+        contentType: 'image/png',
+        byteSize: 1024,
+        checksumSha256: 'a'.repeat(64),
+      })
+      .expect(503);
+    expect((res.body as { whatHappened: string }).whatHappened).toContain('Track A4');
+    // The read says the same thing, so the surface never offers a dead control.
+    const detail = await readWorkspace(prospectId);
+    expect(detail.profile.evidenceFiles.available).toBe(false);
+    expect(detail.profile.evidenceFiles.waitingOn).toContain('Track A4');
+  });
+
+  it('runs the Phase 09a three steps against the 0048 file record, and the bytes decide', async () => {
+    const campaign = await createCampaign('evidence-bytes');
+    const { prospectId } = await recruit(campaign.campaignId, 'evidence-bytes');
+    const { createMemoryStorage } = await import('../storage/object-storage.js');
+    const { requestEvidenceUpload, verifyEvidenceUpload, removeEvidenceFile } = await import(
+      '../affiliates/workspace/evidence.js'
+    );
+    const storage = createMemoryStorage();
+    const who = { actor: 'user:test-admin', mfaContext: 'test', reauthContext: 'test' };
+
+    // A real 400×1 PNG-shaped payload is more than this needs: the memory
+    // storage returns whatever was put, and `inspectMedia` decides from the
+    // bytes — so a payload that is NOT a PNG under a PNG declaration must land
+    // `rejected`, which is exactly step 3's job.
+    const notAPng = Buffer.from('<html>this is not an image</html>');
+    const { createHash } = await import('node:crypto');
+    const checksum = createHash('sha256').update(notAPng).digest('hex');
+
+    const presigned = await requestEvidenceUpload(
+      { db: h.db, storage },
+      {
+        prospectId,
+        category: 'channel_permission',
+        contentType: 'image/png',
+        byteSize: notAPng.byteLength,
+        checksumSha256: checksum,
+        originalFilename: 'analytics.png',
+        who,
+      },
+    );
+    if (!presigned.ok) throw new Error(presigned.message);
+
+    const [fileRow] = await h.db
+      .select()
+      .from(affiliateEvidenceFiles)
+      .where(eq(affiliateEvidenceFiles.id, presigned.fileId));
+    expect(fileRow.state).toBe('pending');
+    // The key derives from ids and a UUID — never from the filename.
+    expect(fileRow.storageKey).not.toContain('analytics');
+
+    storage.put(fileRow.storageKey, 'image/png', notAPng);
+    const verified = await verifyEvidenceUpload(
+      { db: h.db, storage },
+      { prospectId, fileId: presigned.fileId, who },
+    );
+    if (!verified.ok) throw new Error(verified.message);
+    expect(verified.state).toBe('rejected');
+    expect(verified.rejection).toBe('file_unreadable');
+
+    // The same checksum is refused while the first row is live…
+    const duplicate = await requestEvidenceUpload(
+      { db: h.db, storage },
+      {
+        prospectId,
+        category: 'channel_permission',
+        contentType: 'image/png',
+        byteSize: notAPng.byteLength,
+        checksumSha256: checksum,
+        originalFilename: 'again.png',
+        who,
+      },
+    );
+    expect(duplicate.ok).toBe(false);
+    if (!duplicate.ok) expect(duplicate.code).toBe('duplicate');
+
+    // …and permitted again after a one-way removal — a correction, not a
+    // duplicate (the §12 arrangement).
+    const removed = await removeEvidenceFile(
+      { db: h.db },
+      { prospectId, fileId: presigned.fileId, reason: 'Wrong screenshot.', who },
+    );
+    expect(removed.ok).toBe(true);
+    const again = await requestEvidenceUpload(
+      { db: h.db, storage },
+      {
+        prospectId,
+        category: 'channel_permission',
+        contentType: 'image/png',
+        byteSize: notAPng.byteLength,
+        checksumSha256: checksum,
+        originalFilename: 'corrected.png',
+        who,
+      },
+    );
+    expect(again.ok).toBe(true);
+  });
+
+  it('re-reads the provider or refuses with the reason, and stays ungated', async () => {
+    const { prospectId } = await claimedSeed('stripe-refresh');
+
+    // The harness deliberately wires no Stripe client, so the refusal names
+    // exactly that (§1.4 — the block shows what the provider last reported).
+    // A STALE session gets the same 422, not a 403: the route is ungated and
+    // registered, because it writes only what Stripe reports about Stripe's
+    // own fact. With a gateway configured, `reconcileAccount` is Phase 10b's
+    // own reconciliation path, proved by `stripe-onboarding.test.ts`.
+    const stale = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/stripe-refresh`)
+      .set('cookie', staleAdmin.cookie)
+      .expect(422);
+    expect((stale.body as { whatHappened: string }).whatHappened).toContain('no Stripe client');
+  });
+
+  it('derives proposal access from §29, and an overturned appeal lifts it', async () => {
+    const campaign = await createCampaign('access-derive');
+    const { prospectId, associationId } = await recruit(campaign.campaignId, 'access-derive');
+
+    const before = await readWorkspace(prospectId);
+    expect(before.profile.proposalAccess.key).toBe('standard');
+
+    // A §29 restrict_bidding action, recorded with its five statement fields.
+    await request(h.app)
+      .post(`/api/admin/associations/${associationId}/enforcement`)
+      .set('cookie', admin.cookie)
+      .send({
+        actionKind: 'restrict_bidding',
+        reasonCategory: 'aup_breach',
+        internalReason: 'Repeated policy-invalid proposals.',
+        evidenceAndBehavior: 'Three proposals above the §14.3 ceiling in one week.',
+        ruleViolated: 'Proposals must fit the accepted compensation matrix.',
+        immediateEffect: 'New proposal bids are restricted on this campaign.',
+        correctionPath: 'Submit proposals within the stated matrix.',
+        humanRoute: 'Reply to this notice to reach a person.',
+      })
+      .expect(201);
+
+    const restricted = await readWorkspace(prospectId);
+    expect(restricted.profile.proposalAccess.key).toBe('restricted');
+    expect(restricted.profile.proposalAccess.derivedFrom).toContain('Restrict bidding');
+
+    // No column stores it — the badge is a read over §29's records (0048's
+    // header states the absence).
+    const columns = await h.pool.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_name IN ('affiliate_prospects', 'affiliate_signup_profiles')
+         AND column_name LIKE '%proposal_access%'`,
+    );
+    expect(columns.rows).toHaveLength(0);
+  });
+
+  it('serves the agreements block and the invitation lifecycle facts from stored records', async () => {
+    const { prospectId } = await claimedSeed('agreements');
+    const detail = await readWorkspace(prospectId);
+
+    // Every §31.4 document is draft, so there is nothing a §29.8 requirement
+    // could cite — the payload says so by carrying no published versions.
+    expect(detail.profile.agreements.publishedVersions).toHaveLength(0);
+    expect(detail.profile.agreements.policyState).toBe('accepted');
+    expect(detail.profile.agreements.perCampaign).toHaveLength(1);
+
+    // The lifecycle facts are stored instants or their honest absence; the
+    // claim instant is the signup profile's own record.
+    const invitation = detail.profile.invitations[0];
+    expect(invitation.createdAt).toBeTruthy();
+    expect(invitation.claimedAt).toBeTruthy();
+    expect(invitation.signupStartedAt).toBeNull();
+  });
+});
+
+/* ── Session C: the payout reminder, case intake, and communications ──────── */
+
+describe('§13, §26.7, §27 — the Session C person-level machine', () => {
+  async function claimedSeedC(label: string) {
+    const campaign = await createCampaign(label);
+    const { prospectId, associationId } = await recruit(campaign.campaignId, label);
+    const account = await seedUser(h, 'affiliate', `${label}-claimed`);
+    await h.db.insert(affiliateSignupProfiles).values({
+      prospectId,
+      associationId,
+      claimedUserId: account.id,
+      claimedAt: new Date(),
+      email: account.email,
+      publicHandle: '@claimed.handle',
+      legalName: 'Claimed Person',
+      updatedBy: 'user:test',
+    });
+    return { prospectId, associationId, account };
+  }
+
+  it('refuses a payout reminder unless Stripe genuinely has something outstanding', async () => {
+    const { prospectId } = await claimedSeedC('remind-none');
+
+    // No connected account at all — there is nothing to remind anyone about.
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', admin.cookie)
+      .expect(422);
+    expect((res.body as { whatHappened: string }).whatHappened).toContain('No payout account');
+  });
+
+  it('sends the EXISTING §27 key, records the ask first, and a second ask is a second message', async () => {
+    const { prospectId, account } = await claimedSeedC('remind');
+    const stripeAccountId = `acct_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+    await h.db
+      .update(affiliateSignupProfiles)
+      .set({ payoutStatus: 'requirements_due', connectedAccountId: stripeAccountId })
+      .where(eq(affiliateSignupProfiles.prospectId, prospectId));
+    await h.db.insert(stripeConnectedAccounts).values({
+      stripeAccountId,
+      mode: 'test',
+      role: 'affiliate_recipient',
+      ownerUserId: account.id,
+      state: 'more_information_required',
+      requirementsPastDue: ['external_account'],
+      requirementsCurrentlyDue: ['individual.id_number'],
+    });
+
+    // GATED — it reaches a real person's inbox.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', staleAdmin.cookie)
+      .expect(403);
+
+    const before = h.sentEmails.messages.length;
+    const first = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect((first.body as { ask: { sent: boolean } }).ask.sent).toBe(true);
+
+    const sent = h.sentEmails.messages.slice(before).filter((m) => m.to === account.email);
+    expect(sent).toHaveLength(1);
+    // §13: the exact missing requirement, named — never "more information".
+    expect(sent[0]!.text).toContain('external_account');
+    expect(sent[0]!.subject).toContain('payout account');
+
+    // The delivery row carries the EXISTING key, deduped on the recorded ask —
+    // so a deliberate second ask is a second message (§7's resend rule).
+    const second = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/payout-reminder`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect((second.body as { ask: { sent: boolean } }).ask.sent).toBe(true);
+
+    const deliveries = await h.pool.query(
+      `SELECT event_key, entity_type FROM notification_deliveries WHERE target = $1 AND event_key = 'affiliate_connected_account_info_required'`,
+      [account.email],
+    );
+    expect(deliveries.rows).toHaveLength(2);
+    expect(deliveries.rows[0].entity_type).toBe('affiliate_payout_reminder');
+  });
+
+  it('opens a §26.7 case through the ONE intake — born with its reference and calendar promise', async () => {
+    const campaign = await createCampaign('case-preclaim');
+    const { prospectId: unclaimed } = await recruit(campaign.campaignId, 'case-preclaim');
+
+    // Pre-claim there is no requester account to anchor a case on (§1.4).
+    await request(h.app)
+      .post(`/api/admin/creators/${unclaimed}/support-case`)
+      .set('cookie', admin.cookie)
+      .send({ topic: 'account_access', message: 'Cannot sign in.' })
+      .expect(422);
+
+    const { prospectId, associationId } = await claimedSeedC('case');
+
+    // A made-up topic is refused — §26.7's ten, one list.
+    await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/support-case`)
+      .set('cookie', admin.cookie)
+      .send({ topic: 'vibes', message: 'x' })
+      .expect(422);
+
+    // UNGATED — the Support workspace's own posture for opening a case.
+    const res = await request(h.app)
+      .post(`/api/admin/creators/${prospectId}/support-case`)
+      .set('cookie', staleAdmin.cookie)
+      .send({
+        topic: 'account_access',
+        subject: 'Locked out after a password change',
+        subcategory: 'Password reset loop',
+        message: 'I changed my password and now cannot sign in at all.',
+        associationId,
+      })
+      .expect(200);
+    const body = res.body as {
+      detail: CreatorWorkspaceDetail;
+      opened: { caseId: string; reference: string };
+    };
+    expect(body.opened.reference).toMatch(/^PVD-/);
+
+    // No second queue: the case is a `support_cases` row with §27.8's
+    // business-day promise computed on the committed calendar.
+    const caseRow = await h.pool.query(
+      `SELECT reference, topic, subject, human_response_due_at, calendar_version, association_id
+         FROM support_cases WHERE id = $1`,
+      [body.opened.caseId],
+    );
+    expect(caseRow.rows).toHaveLength(1);
+    expect(caseRow.rows[0].human_response_due_at).not.toBeNull();
+    expect(caseRow.rows[0].calendar_version).toBeTruthy();
+    expect(caseRow.rows[0].association_id).toBe(associationId);
+    expect(caseRow.rows[0].subject).toBe('Locked out after a password change');
+
+    // The record read lists it, and the Support-tab badge counts the same rows.
+    expect(body.detail.standing.cases).toHaveLength(1);
+    expect(body.detail.standing.cases[0]!.open).toBe(true);
+    expect(body.detail.standing.cases[0]!.href).toBe(`/admin/support/${body.opened.caseId}`);
+    expect(body.detail.header.openCases).toBe(1);
+
+    // The absence that proves "no second queue": no affiliate-scoped case
+    // table exists anywhere in the schema.
+    const tables = await h.pool.query(
+      `SELECT table_name FROM information_schema.tables
+        WHERE table_name IN ('affiliate_cases', 'creator_cases', 'affiliate_support_cases')`,
+    );
+    expect(tables.rows).toHaveLength(0);
+  });
+
+  it('lists the delivery record for the person, audience-prefixed to affiliate_*', async () => {
+    const { prospectId, account } = await claimedSeedC('comms');
+
+    await h.pool.query(
+      `INSERT INTO notification_deliveries (event_key, target, entity_type, entity_id, notification_id)
+       VALUES
+         ('affiliate_campaign_invitation', $1, 'invitation_send', 'send-1', 'msg-1'),
+         ('affiliate_password_reset', $1, 'password_reset', 'reset-1', NULL),
+         ('internal_dispute_opened', $1, 'dispute', 'd-1', 'msg-2'),
+         ('founder_password_reset', $1, 'password_reset', 'reset-2', 'msg-3')`,
+      [account.email],
+    );
+
+    const res = await request(h.app)
+      .get(`/api/admin/creators/${prospectId}`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    const detail = res.body as CreatorWorkspaceDetail;
+    const keys = detail.communications.map((entry) => entry.eventKey).sort();
+    // The audience prefix keeps internal_* and every other role's mail out —
+    // Phase 22c's rule, applied to the Admin read of the same record.
+    expect(keys).toEqual(['affiliate_campaign_invitation', 'affiliate_password_reset']);
+
+    // §1.4's two states: confirmed at the provider, or recorded-not-confirmed.
+    const reset = detail.communications.find((e) => e.eventKey === 'affiliate_password_reset')!;
+    expect(reset.confirmed).toBe(false);
+    const invitation = detail.communications.find(
+      (e) => e.eventKey === 'affiliate_campaign_invitation',
+    )!;
+    expect(invitation.confirmed).toBe(true);
   });
 });

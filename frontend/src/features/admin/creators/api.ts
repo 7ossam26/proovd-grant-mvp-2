@@ -88,6 +88,8 @@ export interface CreatorHeader {
   payout: { state: string | null; label: string };
   account: CreatorAccountState;
   attention: CreatorAttention;
+  /** Open §26.7 cases anchored on this person — the Support tab's badge. */
+  openCases: number;
   availableActions: CreatorMenuAction[];
 }
 
@@ -105,6 +107,10 @@ export interface CreatorRelationshipSummary {
   activatedAt: string | null;
   closesAt: string | null;
   holdsSlot: boolean;
+  /** The Selected-relationship strip's three composed facts (2026-08-17). */
+  agreement: string;
+  trackingLink: string;
+  completion: string;
 }
 
 export interface ProfileField {
@@ -161,15 +167,57 @@ export interface CreatorInvitationView {
   lastSentAt: string | null;
   hasLiveToken: boolean;
   claimedAt: string | null;
+  createdAt: string | null;
+  signupStartedAt: string | null;
+  tokenExpiresAt: string | null;
   sends: { at: string; by: string; to: string; status: string; confirmed: boolean }[];
   unresolved: string[];
   canSend: boolean;
+}
+
+export interface EvidenceFileView {
+  id: string;
+  category: string;
+  categoryLabel: string;
+  filename: string | null;
+  state: string;
+  rejection: string | null;
+  dimensions: string | null;
+  uploadedBy: string;
+  uploadedAt: string | null;
+}
+
+export interface MetricDecisionView {
+  metric: string;
+  label: string;
+  decision: string | null;
+  detail: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
+}
+
+export interface ProposalAccessView {
+  key: 'standard' | 'restricted';
+  label: string;
+  derivedFrom: string | null;
+}
+
+export interface CreatorAgreementsView {
+  terms: string | null;
+  aup: string | null;
+  policyState: string;
+  publishedVersions: { slug: string; version: string; title: string }[];
+  perCampaign: { associationId: string; campaignName: string; state: string }[];
 }
 
 export interface CreatorProfilePane {
   summary: { handle: string | null; channelUrl: string | null; platform: string | null };
   blocks: ProfileBlock[];
   verification: VerificationBlock;
+  evidenceFiles: { available: boolean; waitingOn: string | null; files: EvidenceFileView[] };
+  metricDecisions: MetricDecisionView[];
+  proposalAccess: ProposalAccessView;
+  agreements: CreatorAgreementsView;
   provider: ProviderBlock;
   invitations: CreatorInvitationView[];
   support: ProfileField[];
@@ -200,6 +248,30 @@ export interface CreatorWorkspaceDetail {
   standing: CreatorStandingPane;
   history: CreatorHistoryEntry[];
   historyCounts: Record<string, number>;
+  /** The person's delivery record — the §27 key resolves to a label from the
+      shared registry in the browser (Phase 22c's rule). */
+  communications: CreatorCommunicationView[];
+}
+
+export interface CreatorCommunicationView {
+  eventKey: string;
+  target: string;
+  entityType: string;
+  entityId: string;
+  confirmed: boolean;
+  at: string | null;
+  occurredAt: string;
+}
+
+export interface CreatorCaseView {
+  id: string;
+  reference: string;
+  topic: string;
+  subject: string | null;
+  status: string;
+  open: boolean;
+  openedAt: string | null;
+  href: string;
 }
 
 /* ── Person-scoped: /api/admin/creators ─────────────────────────────────────*/
@@ -248,6 +320,106 @@ export function recordDeletionReview(
     `/api/admin/creators/${encodeURIComponent(prospectId)}/deletion-request/${encodeURIComponent(requestId)}/reviews`,
     { method: 'POST', body: JSON.stringify(body) },
   );
+}
+
+/* ── Session B: evidence, corrections, asks, and the Stripe re-read ─────────*/
+
+/** The re-read plus the ask's outcome — recorded-but-not-sent is a state. */
+export interface AskOutcome {
+  detail: CreatorWorkspaceDetail;
+  ask: { sent: boolean; reason: string | null };
+}
+
+export function requestEvidenceUpload(
+  prospectId: string,
+  body: {
+    category: string;
+    contentType: string;
+    byteSize: number;
+    checksumSha256: string;
+    originalFilename?: string | null;
+  },
+): Promise<{ fileId: string; url: string; requiredHeaders: Record<string, string>; expiresAt: string }> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/evidence/uploads`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function verifyEvidenceUpload(
+  prospectId: string,
+  fileId: string,
+): Promise<CreatorWorkspaceDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/evidence/uploads/${encodeURIComponent(fileId)}/verify`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+}
+
+export function removeEvidenceFile(
+  prospectId: string,
+  fileId: string,
+  reason?: string | null,
+): Promise<CreatorWorkspaceDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/evidence/uploads/${encodeURIComponent(fileId)}/remove`,
+    { method: 'POST', body: JSON.stringify({ reason: reason ?? null }) },
+  );
+}
+
+export function recordMetricDecision(
+  prospectId: string,
+  body: { metric: string; decision: 'verified' | 'more_evidence_needed'; detail: string },
+): Promise<AskOutcome> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/evidence/metric-decision`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function correctAccountField(
+  prospectId: string,
+  body: { field: string; newValue: string; reason: string },
+): Promise<CreatorWorkspaceDetail> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/account-correction`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function requestCorrection(
+  prospectId: string,
+  body: { subjectLabel: string; note: string },
+): Promise<AskOutcome> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/correction-request`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function sendPasswordRecovery(prospectId: string): Promise<CreatorWorkspaceDetail> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/password-recovery`, {
+    method: 'POST',
+  });
+}
+
+export function refreshStripeStatus(prospectId: string): Promise<CreatorWorkspaceDetail> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/stripe-refresh`, {
+    method: 'POST',
+  });
+}
+
+/** §29.8's audience-wide requirement — the one route, unchanged. */
+export function requirePolicyReacceptance(body: {
+  slug: string;
+  version: string;
+  audience: 'affiliate';
+  reason: string;
+}): Promise<unknown> {
+  return call('/api/admin/policy-reacceptance', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 /* ── Relationship-scoped: /api/admin/affiliates ─────────────────────────────*/
@@ -555,6 +727,92 @@ export interface CreatorRelationshipDetail {
       deliverablesNote: string | null;
     } | null;
   };
+  /* The Session C blocks (migration 0048). */
+  deliverables: {
+    items: DeliverableView[];
+    resolved: number;
+    canRecord: boolean;
+    sourceLabel: string | null;
+  };
+  availability: {
+    term: string;
+    termSource: string;
+    checks: number;
+    latest: {
+      available: boolean;
+      termChecked: string;
+      detail: string;
+      verifiedBy: string;
+      verifiedAt: string | null;
+    } | null;
+  };
+  mediationNotes: { note: string; createdBy: string; createdAt: string | null }[];
+  terminationRequests: {
+    open: TerminationRequestView | null;
+    history: TerminationRequestView[];
+  };
+  kitAssets: {
+    visualsAvailable: boolean;
+    waitingOn: string | null;
+    files: {
+      id: string;
+      purpose: string;
+      state: string;
+      filename: string | null;
+      dimensions: string | null;
+      approved: boolean;
+      removed: boolean;
+    }[];
+  };
+  workAgain: {
+    id: string;
+    status: string;
+    message: string;
+    requestedAt: string | null;
+    respondedAt: string | null;
+    responseNote: string | null;
+  }[];
+}
+
+export interface DeliverableView {
+  id: string;
+  title: string;
+  source: string;
+  state: string;
+  stateLabel: string;
+  createdAt: string | null;
+  latestEvidence: {
+    id: string;
+    reference: string;
+    note: string | null;
+    submittedBy: string;
+    submittedAt: string | null;
+  } | null;
+  latestDecision: {
+    outcome: string;
+    findings: string;
+    waiverRecordedBy: string | null;
+    waiverReason: string | null;
+    decidedBy: string;
+    decidedAt: string | null;
+  } | null;
+}
+
+export interface TerminationRequestView {
+  id: string;
+  reason: string;
+  effectiveAt: string | null;
+  cause: string;
+  causeLabel: string;
+  moneyTreatment: string;
+  treatmentLabel: string;
+  receivedVia: string;
+  requestedAt: string | null;
+  recordedBy: string;
+  decision: string | null;
+  decisionNote: string | null;
+  decidedBy: string | null;
+  decidedAt: string | null;
 }
 
 export function fetchRelationship(
@@ -654,6 +912,132 @@ export interface CreatorStandingPane {
     at: string;
   }[];
   policyReacceptanceOpen: boolean;
+  /** The person's §26.7 cases. Operating one stays the Support workspace's. */
+  cases: CreatorCaseView[];
+}
+
+/* ── The Session C relationship records (migration 0048) ───────────────────*/
+
+export function recordDeliverable(
+  prospectId: string,
+  associationId: string,
+  body: { title: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/deliverables`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function recordDeliverableEvidence(
+  prospectId: string,
+  associationId: string,
+  deliverableId: string,
+  body: { reference: string; note?: string | null },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/deliverables/${encodeURIComponent(deliverableId)}/evidence`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function decideDeliverable(
+  prospectId: string,
+  associationId: string,
+  deliverableId: string,
+  body: {
+    outcome: string;
+    findings: string;
+    waiverRecordedBy?: string | null;
+    waiverReason?: string | null;
+  },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/deliverables/${encodeURIComponent(deliverableId)}/decision`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/** The term is composed server-side from records; the body carries the answer. */
+export function verifyContentAvailability(
+  prospectId: string,
+  associationId: string,
+  body: { available: boolean; detail: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/availability`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function recordMediationNote(
+  prospectId: string,
+  associationId: string,
+  body: { note: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/mediation-note`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function recordTerminationRequest(
+  prospectId: string,
+  associationId: string,
+  body: {
+    reason: string;
+    effectiveAt: string;
+    cause: string;
+    moneyTreatment: string;
+    receivedVia: string;
+    requestedAt?: string | null;
+  },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/termination-request`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function decideTerminationRequest(
+  prospectId: string,
+  associationId: string,
+  requestId: string,
+  body: { decision: 'applied' | 'declined'; note: string },
+): Promise<CreatorRelationshipDetail> {
+  return call(
+    `/api/admin/creators/${encodeURIComponent(prospectId)}/relationships/${encodeURIComponent(associationId)}/termination-request/${encodeURIComponent(requestId)}/decision`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+/** Gap 3 — sends the existing §27 key; the outcome rides beside the re-read. */
+export function sendCreatorPayoutReminder(
+  prospectId: string,
+): Promise<{ detail: CreatorWorkspaceDetail; ask: { sent: boolean; reason: string | null } }> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/payout-reminder`, {
+    method: 'POST',
+  });
+}
+
+/** Gap 7 — opens the case through the ONE intake; no second queue exists. */
+export function openCreatorSupportCase(
+  prospectId: string,
+  body: {
+    topic: string;
+    message: string;
+    subject?: string | null;
+    subcategory?: string | null;
+    associationId?: string | null;
+  },
+): Promise<{
+  detail: CreatorWorkspaceDetail;
+  opened: { caseId: string; reference: string };
+}> {
+  return call(`/api/admin/creators/${encodeURIComponent(prospectId)}/support-case`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 /**

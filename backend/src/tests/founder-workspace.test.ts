@@ -41,6 +41,7 @@ import {
   campaignInvitationSends,
   founderProspects,
 } from '../db/schema/invitations.js';
+import { campaignCancellations } from '../db/schema/listing.js';
 import { campaigns } from '../db/schema/domain.js';
 import { founderGhostBans } from '../db/schema/fulfillment.js';
 import {
@@ -442,13 +443,25 @@ describe('§26.1 the workspace serves five panes composed from the records', () 
     const founder = await invited('panes');
     const detail = await workspaceOf(founder.prospectId);
 
+    // `discovery` and `campaignFacts` joined on 2026-08-16: the rebuilt
+    // Overview renders §7's discovery record and the current campaign's live
+    // facts, both composed server-side like everything else here.
+    // `eligibility` joined on 2026-08-17 (Session B): the Onboarding section's
+    // read-only claim and representation facts.
+    // `operations` and `communications` joined on 2026-08-17 (Session C): the
+    // read-and-route sections' composed state and the delivery record.
     expect(Object.keys(detail).sort()).toEqual([
+      'campaignFacts',
       'campaigns',
+      'communications',
       'details',
+      'discovery',
+      'eligibility',
       'header',
       'history',
       'historyCounts',
       'money',
+      'operations',
       'overview',
     ]);
 
@@ -1626,5 +1639,438 @@ describe('§26.2 what the record already knows is not re-keyable here', () => {
       .send({ value: 'daily', reason: 'they asked' })
       .expect(400);
     expect(res.body.whatHappened).toContain('summary');
+  });
+});
+
+/* ── 12. The directory and the record header (2026-08-16 rebuild) ──────────── */
+
+describe('the directory row and the record header feed the same kernels', () => {
+  async function rowOf(prospectId: string) {
+    const res = await request(h.app)
+      .get('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .expect(200);
+    const rows = (res.body as { founders: Array<Record<string, unknown>> }).founders;
+    const row = rows.find((r) => r['prospectId'] === prospectId);
+    expect(row, 'the person is missing from the directory').toBeTruthy();
+    return row as {
+      recordReference: string;
+      typeLabel: string;
+      lifecycle: string;
+      adminAction: { kind: string; label: string };
+      founderAction: { kind: string; label: string };
+      filters: string[];
+      searchText: string;
+      owner: string | null;
+    };
+  }
+
+  it('mints a permanent F- reference the database refuses to move', async () => {
+    const founder = await createFounder('dirref');
+    const row = await rowOf(founder.prospectId);
+
+    // The 0047 shape: F- plus five glyphs of the no-O/0/I/1 alphabet.
+    expect(row.recordReference).toMatch(/^F-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{5}$/);
+
+    // Immutable by trigger, not by convention — a hand-written UPDATE gets
+    // the same refusal a service would.
+    await expect(
+      h.pool.query(`UPDATE founder_prospects SET record_reference = 'F-AAAAA' WHERE id = $1`, [
+        founder.prospectId,
+      ]),
+    ).rejects.toThrow(/record reference is permanent/);
+
+    // And the record header renders the same reference the row carries.
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.header.recordReference).toBe(row.recordReference);
+  });
+
+  it('derives Proposed from the absence of a lock, and the type from its presence', async () => {
+    const founder = await invited('dirtype');
+    expect((await rowOf(founder.prospectId)).typeLabel).toBe('Proposed');
+
+    await completeVetting(founder.raw, 'pre_build', founder.draftId);
+    const locked = await rowOf(founder.prospectId);
+    expect(locked.typeLabel).toBe('Idea');
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.header.typeChip).toBe('Idea · locked');
+  });
+
+  it('composes the pre-claim lifecycle from the invitation record, not the status', async () => {
+    const founder = await createFounder('dirlife');
+    await compose(founder.draftId);
+    // Composed and unsent: the invite is a draft, Proovd owes the send, and
+    // the Founder has nothing to act on yet.
+    const drafted = await rowOf(founder.prospectId);
+    expect(drafted.lifecycle).toBe('Invite draft');
+    expect(drafted.adminAction).toEqual({ kind: 'due', label: 'Review and send the invite' });
+    expect(drafted.founderAction).toEqual({ kind: 'none', label: 'No access yet' });
+    expect(drafted.filters).toContain('pre_invite');
+    expect(drafted.filters).toContain('needs_admin');
+
+    await sendInvitation(founder);
+    const sent = await rowOf(founder.prospectId);
+    expect(sent.lifecycle).toBe('Invite sent');
+    expect(sent.founderAction).toEqual({
+      kind: 'due',
+      label: 'Accept the private invitation',
+    });
+    // §1.4: the quiet cell carries its reason, and the reason names who owns
+    // the next step.
+    expect(sent.adminAction.kind).toBe('none');
+    expect(sent.adminAction.label).toContain('No action —');
+    expect(sent.filters).toContain('invited');
+    expect(sent.filters).not.toContain('pre_invite');
+
+    // The search text is the one matcher: the reference is findable by it.
+    expect(sent.searchText).toContain(sent.recordReference.toLowerCase());
+  });
+
+  it('agrees with the record header about the lifecycle, from the same facts', async () => {
+    const founder = await invited('dirparity');
+    await completeVetting(founder.raw, 'pre_launch', founder.draftId);
+
+    const row = await rowOf(founder.prospectId);
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.header.lifecycle).toBe(row.lifecycle);
+    expect(detail.header.adminAction).toEqual(row.adminAction);
+    expect(detail.header.founderAction).toEqual(row.founderAction);
+  });
+});
+
+/* ── 13. Meeting notes and research (§7, migration 0047) ───────────────────── */
+
+describe('a meeting note is a record: five named facts, insert-only, anonymisable', () => {
+  const NOTE = {
+    meetingDate: '2026-08-14',
+    participants: 'Rowan, Ada',
+    decisions: 'Digital-only scope confirmed for the pilot.',
+    followUp: 'Send the Campaign kit link once the fee is paid.',
+    sourceLink: 'call · calendar invite 2026-08-14',
+  };
+
+  it('refuses each missing required fact by name, and records nothing', async () => {
+    const founder = await createFounder('note-refuse');
+
+    for (const missing of ['participants', 'decisions', 'followUp', 'sourceLink'] as const) {
+      const body: Record<string, string> = { ...NOTE };
+      delete body[missing];
+      await request(h.app)
+        .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+        .set('cookie', admin.cookie)
+        .send(body)
+        .expect(400);
+    }
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+      .set('cookie', admin.cookie)
+      .send({ ...NOTE, meetingDate: 'last Tuesday' })
+      .expect(400);
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.discovery.meetingNotes).toEqual([]);
+  });
+
+  it('records the note with its author from the session, and renders it on the record', async () => {
+    const founder = await createFounder('note-record');
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+      .set('cookie', admin.cookie)
+      .send({ ...NOTE, notes: 'High-touch pilot; keep payment language precise.' })
+      .expect(200);
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.discovery.meetingNotes).toHaveLength(1);
+    const note = detail.discovery.meetingNotes[0]!;
+    expect(note.participants).toBe(NOTE.participants);
+    expect(note.decisions).toBe(NOTE.decisions);
+    expect(note.followUp).toBe(NOTE.followUp);
+    expect(note.sourceLink).toBe(NOTE.sourceLink);
+    expect(note.notes).toBe('High-touch pilot; keep payment language precise.');
+
+    // §25.6: one audit row, in the same transaction.
+    const rows = await auditRows('founder.meeting_note_recorded', founder.prospectId);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('is insert-only: an edit is refused by the database, whatever calls it', async () => {
+    const founder = await createFounder('note-immutable');
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/meeting-notes`)
+      .set('cookie', admin.cookie)
+      .send(NOTE)
+      .expect(200);
+
+    await expect(
+      h.pool.query(
+        `UPDATE founder_meeting_notes SET participants = 'Somebody else' WHERE prospect_id = $1`,
+        [founder.prospectId],
+      ),
+    ).rejects.toThrow(/a correction is a new note/);
+  });
+
+  it('has no schedule-shaped column, and no job reads it (§30)', async () => {
+    const { rows } = await h.pool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'founder_meeting_notes'`,
+    );
+    const columns = rows.map((r) => r.column_name);
+    for (const absent of ['remind_at', 'notify_at', 'recurrence', 'next_meeting_at', 'snooze_until']) {
+      expect(columns, `${absent} must not exist`).not.toContain(absent);
+    }
+
+    const jobsDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'jobs');
+    const scheduler = readFileSync(join(jobsDir, 'scheduler.ts'), 'utf8');
+    expect(scheduler).not.toContain('founder_meeting_notes');
+    expect(scheduler).not.toContain('founderMeetingNotes');
+  });
+});
+
+describe('a research entry appends to §7 discovery evidence', () => {
+  it('refuses a blank title or source, appends otherwise, and audits the append', async () => {
+    const founder = await createFounder('research');
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/research`)
+      .set('cookie', admin.cookie)
+      .send({ title: '', sourceLink: 'x' })
+      .expect(400);
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/research`)
+      .set('cookie', admin.cookie)
+      .send({ title: 'Audience sizing', sourceLink: '' })
+      .expect(400);
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/research`)
+      .set('cookie', admin.cookie)
+      .send({
+        title: 'Audience sizing',
+        findings: 'Roughly 40k relevant viewers across three channels.',
+        sourceLink: 'https://example.com/notes',
+      })
+      .expect(200);
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.discovery.research).toEqual([
+      'Audience sizing — Roughly 40k relevant viewers across three channels. (https://example.com/notes)',
+    ]);
+
+    const rows = await auditRows('founder.research_recorded', founder.prospectId);
+    expect(rows).toHaveLength(1);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   14 · Session B — the Onboarding payload: eligibility and invitation facts
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('the Eligibility view is read-only facts, three-valued (§10, §16a)', () => {
+  it('a pre-claim record answers null, which is not "No"', async () => {
+    const founder = await invited('elig-preclaim');
+    const detail = await workspaceOf(founder.prospectId);
+
+    // No claim profile exists: every fact is null — "nobody has been asked",
+    // never a declined representation (§16a's not-populated-is-not-zero).
+    expect(detail.eligibility.claim.inviteClaimed).toBe(false);
+    expect(detail.eligibility.claim.claimedAt).toBeNull();
+    expect(detail.eligibility.claim.completion).toBe('Not started');
+    expect(detail.eligibility.claim.connectedRecord).toMatch(/^F-/);
+    expect(detail.eligibility.facts).toEqual({
+      dobSupplied: null,
+      age18Plus: null,
+      usPerson: null,
+      location: null,
+      sanctionsClear: null,
+    });
+    expect(detail.eligibility.acknowledgements).toEqual([]);
+    // The absence names ITS case: not claimed, as distinct from mid-claim.
+    expect(detail.eligibility.acknowledgementsAbsent).toContain('has not claimed an account');
+  });
+
+  it('a claimed record reports the representations as recorded, and the DOB as presence only', async () => {
+    const founder = await invited('elig-claimed');
+    const account = await claimAccount(founder, 'elig-claimed');
+    await h.pool.query(
+      `UPDATE founder_claim_profiles
+          SET date_of_birth = '1990-04-23', date_of_birth_supplier = 'founder',
+              country = 'United States', country_supplier = 'founder',
+              state_region = 'Chicago, IL', state_region_supplier = 'founder',
+              representation_us_person = true, representation_age_18_plus = true,
+              representation_sanctions = true
+        WHERE prospect_id = $1`,
+      [founder.prospectId],
+    );
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.eligibility.claim.inviteClaimed).toBe(true);
+    expect(detail.eligibility.claim.completion).toBe('Complete');
+    expect(detail.eligibility.facts.dobSupplied).toBe(true);
+    expect(detail.eligibility.facts.age18Plus).toBe(true);
+    expect(detail.eligibility.facts.usPerson).toBe(true);
+    expect(detail.eligibility.facts.sanctionsClear).toBe(true);
+    expect(detail.eligibility.facts.location).toBe('Chicago, IL · United States');
+
+    // The DOB VALUE appears nowhere in the eligibility view — the tab reports
+    // presence and nothing more; the value lives behind the §25.6 field edit.
+    expect(JSON.stringify(detail.eligibility)).not.toContain('1990-04-23');
+
+    // No consent rows yet: the absence names the mid-claim case, because an
+    // account with zero consents can only be mid-claim in the real flow — the
+    // claim writes them atomically and refuses on draft policies.
+    expect(detail.eligibility.acknowledgementsAbsent).toContain('has not completed');
+    void account;
+  });
+
+  it('a recorded policy consent renders as an acknowledgement with version and instant', async () => {
+    const founder = await invited('elig-consent');
+    const account = await claimAccount(founder, 'elig-consent');
+
+    // Publication is one-way (§29.8's trigger) and this suite has its own
+    // database, so publishing here leaks into nothing else.
+    await h.pool.query(
+      `UPDATE policy_versions
+          SET status = 'published', effective_date = now(), published_at = now()
+        WHERE slug = 'terms'`,
+    );
+    const { rows } = await h.pool.query(
+      `SELECT id, version FROM policy_versions WHERE slug = 'terms' LIMIT 1`,
+    );
+    await h.pool.query(
+      `INSERT INTO policy_consents (subject_type, subject_id, policy_version_id, slug, version, accepted_via)
+       VALUES ('user', $1, $2, 'terms', $3, 'founder_account_claim')`,
+      [account.id, rows[0].id, rows[0].version],
+    );
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.eligibility.acknowledgements).toHaveLength(1);
+    expect(detail.eligibility.acknowledgements[0]).toMatchObject({
+      label: 'Terms of Service',
+      version: rows[0].version,
+    });
+    expect(detail.eligibility.acknowledgements[0]!.acceptedAt).toBeTruthy();
+    expect(detail.eligibility.acknowledgementsAbsent).toBeNull();
+  });
+});
+
+describe('the invitation record renders as facts, never a token value (§28.1)', () => {
+  it('a live link reports its version and window; a revoked one reports the state', async () => {
+    const founder = await invited('inv-facts');
+    let detail = await workspaceOf(founder.prospectId);
+
+    expect(detail.overview.invitation.facts.sendCount).toBe(1);
+    expect(detail.overview.invitation.facts.tokenVersion).toBe(1);
+    expect(detail.overview.invitation.facts.expiration).toMatch(/^Live until /);
+    expect(detail.overview.invitation.facts.claimed).toBeNull();
+    expect(detail.overview.invitation.facts.revoked).toBe(false);
+
+    // The facts block never carries the raw token (§28.1) — the only place the
+    // value exists is the delivered URL.
+    expect(JSON.stringify(detail.overview.invitation.facts)).not.toContain(founder.raw);
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/invitation/cancel`)
+      .set('cookie', admin.cookie)
+      .send({ reason: 'Recorded for the facts test.' })
+      .expect(200);
+
+    detail = await workspaceOf(founder.prospectId);
+    expect(detail.overview.invitation.facts.expiration).toBe('Link inactive');
+    expect(detail.overview.invitation.facts.revoked).toBe(true);
+  });
+
+  it('a prospect with no send yet says so', async () => {
+    const founder = await createFounder('inv-nosend');
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.overview.invitation.facts).toEqual({
+      sendCount: 0,
+      tokenVersion: null,
+      expiration: 'No link issued yet',
+      claimed: null,
+      revoked: false,
+    });
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session C — the operations view composes, and it owns nothing
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('the operations view is honest state, composed (§16a, §26.8)', () => {
+  it('renders a fresh campaign with named absences, never campaign-shaped zeros', async () => {
+    const founder = await invited('ops-fresh');
+    const detail = await workspaceOf(founder.prospectId);
+    const ops = detail.operations;
+    expect(ops, 'every prospect intake creates a campaign, so operations composes').toBeTruthy();
+
+    // Nothing exists yet, and each fact says so in its own vocabulary.
+    expect(ops!.live.created).toBe(0);
+    expect(ops!.live.conversion, 'a conversion over zero clicks is null, never 0%').toBeNull();
+    expect(ops!.live.reservedSubtotal).toBeNull();
+    expect(ops!.close.captureState).toBe('Not due — the campaign has not closed');
+    expect(ops!.close.batch).toBeNull();
+    expect(ops!.fulfillment.available).toBe(false);
+    expect(ops!.fulfillment.waitingOn).toBeTruthy();
+    expect(ops!.refunds.totalRefunds).toBe(0);
+    expect(ops!.cancellation).toBeNull();
+    expect(ops!.enforcement.campaignActions).toEqual([]);
+    expect(ops!.roster).toEqual([]);
+    expect(ops!.workAgain).toEqual([]);
+
+    // The build has no row yet, so every content field is an absent VALUE the
+    // surface renders as its own state — not a blank string.
+    const title = ops!.content.fields.find((f) => f.label === 'Title');
+    expect(title).toBeDefined();
+    expect(title!.value).toBeNull();
+  });
+
+  it('writes nothing: the composer has no insert, update, or delete in it', async () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, '../founders/operations.ts'), 'utf8');
+    for (const write of ['.insert(', '.update(', '.delete(']) {
+      expect(source, `operations.ts must not call ${write}`).not.toContain(write);
+    }
+  });
+
+  it('keeps the §31.6 internal reason out of the payload (§25.6)', async () => {
+    const founder = await invited('ops-cancellation');
+    const internalReason = 'internal-only wording that must never render';
+    await h.db.insert(campaignCancellations).values({
+      campaignId: founder.campaignId,
+      kind: 'admin_review',
+      status: 'pending',
+      requestedBy: 'founder',
+      requestedAt: new Date(),
+      internalReason,
+      customerExplanation: 'We are reviewing your cancellation request.',
+    });
+
+    const detail = await workspaceOf(founder.prospectId);
+    const cancellation = detail.operations!.cancellation;
+    expect(cancellation).toBeTruthy();
+    expect(cancellation!.state).toBe('Pending decision');
+    expect(cancellation!.customerExplanation).toBe('We are reviewing your cancellation request.');
+    // §25.6 keeps the two columns apart; the payload carries only the one a
+    // customer could be read.
+    expect(JSON.stringify(detail.operations)).not.toContain(internalReason);
+  });
+});
+
+describe('communications lists what was sent, by key, never by body (§27, 22c)', () => {
+  it('carries the delivery record for the invitation the send produced', async () => {
+    const founder = await invited('comms-send');
+    const detail = await workspaceOf(founder.prospectId);
+
+    expect(detail.communications.total).toBeGreaterThanOrEqual(1);
+    const row = detail.communications.rows.find((r) => r.eventKey === 'founder_invitation');
+    expect(row, 'the send recorded a founder_invitation delivery').toBeTruthy();
+    expect(row!.target).toBe(founder.email);
+    expect(row!.state).toBe('Delivered');
+
+    // The row is the KEY and the delivery facts — no body, no subject, no
+    // rendered copy. The label resolves in the browser from the shared
+    // registry (22c's rule: a fourth copy of the descriptions would drift).
+    expect(Object.keys(row!).sort()).toEqual(['at', 'eventKey', 'state', 'target']);
   });
 });

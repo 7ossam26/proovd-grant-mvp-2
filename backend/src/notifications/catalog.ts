@@ -992,6 +992,51 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       supportEmail: SUPPORT,
     }),
 
+  /* ── The Affiliate workspace rebuild, Session B (2026-08-17) ──────────────
+   * The reset is the SAME render the Founder key uses — one path chooses the
+   * key by the account's role, so the two entries pointing at one shape is
+   * the truth rather than a shortcut. The correction request is §11's right
+   * to correct prefilled public information, exercised as an ask.            */
+  affiliate_password_reset: () =>
+    renderPlainNotice({
+      subject: 'Reset your Proovd password',
+      headline: 'Set a new password',
+      facts: [
+        { label: 'Account', value: 'mira@example.com' },
+        { label: 'Who owns it', value: 'You' },
+        {
+          label: 'If this was not you',
+          value: 'Nothing has changed. You can ignore this and your password stays as it is.',
+        },
+      ],
+      action: { label: 'Set a new password', url: `${APP}/reset/opaque-token` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  affiliate_correction_request: () =>
+    renderPlainNotice({
+      subject: 'Please review one detail on your Proovd record',
+      headline: 'One thing to check on your record',
+      facts: [
+        { label: 'What to review', value: 'Audience size' },
+        {
+          label: 'What we ask',
+          value: 'Share a current analytics screenshot for the channel, taken this month.',
+        },
+        {
+          label: 'What has changed',
+          value: 'Nothing. The current value stays until you supply a correction.',
+        },
+      ],
+      paragraphs: [
+        'Proovd keeps a record of your public channel and audience so campaigns can be matched honestly. You have the right to correct anything on it.',
+        'Reply to this message with the correction or the evidence, and a person will record it.',
+      ],
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
 
 
   affiliate_disclosure_tracking_available: () =>

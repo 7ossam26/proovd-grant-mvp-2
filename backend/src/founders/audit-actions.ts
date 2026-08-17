@@ -31,6 +31,10 @@ export const FOUNDER_ACCESS_RECORDED = 'founder.access_action_recorded' as const
 export const FOUNDER_DELETION_REQUESTED = 'founder.deletion_requested' as const;
 export const FOUNDER_DELETION_REVIEWED = 'founder.deletion_reviewed' as const;
 
+/** §7's discovery record grew an entry: a meeting note (0047) or research. */
+export const FOUNDER_MEETING_NOTE_RECORDED = 'founder.meeting_note_recorded' as const;
+export const FOUNDER_RESEARCH_RECORDED = 'founder.research_recorded' as const;
+
 /**
  * What a field edit stores on both sides of the audit row.
  *

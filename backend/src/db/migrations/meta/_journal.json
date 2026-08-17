@@ -330,6 +330,20 @@
       "when": 1786550400000,
       "tag": "0046_admin_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1786636800000,
+      "tag": "0047_founder_record_reference_and_meeting_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1786723200000,
+      "tag": "0048_affiliate_workspace_records",
+      "breakpoints": true
     }
   ]
 }

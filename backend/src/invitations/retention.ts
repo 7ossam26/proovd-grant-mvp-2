@@ -53,6 +53,7 @@ import {
   founderClaimProfiles,
   draftFieldEdits,
 } from '../db/schema/vetting.js';
+import { founderMeetingNotes } from '../db/schema/founder-workspace.js';
 import { auditEvents } from '../db/schema/integrity.js';
 
 /** §7 and §25.8 both state 30 calendar days. Not a business-day count. */
@@ -218,6 +219,29 @@ export async function anonymiseDraft(
 
     const prospectAnonymised = remaining.length === 0;
     if (prospectAnonymised) {
+      // Meeting notes record what was discussed with a person, so their
+      // content goes with the rest (migration 0047's two-shape CHECK: every
+      // content column nulls together, and the trigger refuses any other
+      // update). The row survives as the §25.8 audit skeleton — a meeting was
+      // recorded, by whom, when — the `draft_field_edits` arrangement.
+      await tx
+        .update(founderMeetingNotes)
+        .set({
+          meetingDate: null,
+          participants: null,
+          decisions: null,
+          followUp: null,
+          sourceLink: null,
+          notes: null,
+          anonymisedAt: now,
+        })
+        .where(
+          and(
+            eq(founderMeetingNotes.prospectId, due.prospectId),
+            isNull(founderMeetingNotes.anonymisedAt),
+          ),
+        );
+
       await tx
         .update(founderProspects)
         .set({

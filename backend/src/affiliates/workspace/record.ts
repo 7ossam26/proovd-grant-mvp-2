@@ -24,7 +24,7 @@
  * somebody is paid, which is §26.8's timeline trap in a different phase.
  */
 
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, or } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import {
   affiliateProspects,
@@ -35,7 +35,11 @@ import {
   affiliateAccessActions,
   affiliateDeletionRequests,
   affiliateDeletionReviews,
+  affiliateEvidenceFiles,
+  affiliateEvidenceVerifications,
 } from '../../db/schema/creator-workspace.js';
+import { policyConsents } from '../../db/schema/vetting.js';
+import { policyVersions } from '../../db/schema/policies.js';
 import {
   affiliateEnforcementActions,
   affiliateEnforcementAppeals,
@@ -44,7 +48,14 @@ import {
 } from '../../db/schema/enforcement.js';
 import { campaignAffiliateAssociations, campaigns } from '../../db/schema/domain.js';
 import { associationStatusHistory } from '../../db/schema/domain.js';
+import {
+  associationCompensationAgreements,
+  proposalVersions,
+  trackingLinks,
+} from '../../db/schema/decisions.js';
 import { stripeConnectedAccounts } from '../../db/schema/payments.js';
+import { supportCases } from '../../db/schema/support.js';
+import { notificationDeliveries } from '../../db/schema/integrity.js';
 import { notificationDigestPreferences } from '../../db/schema/digest.js';
 import { campaignBuild } from '../../db/schema/build.js';
 import { campaignDrafts, founderProspects } from '../../db/schema/invitations.js';
@@ -70,12 +81,14 @@ import type {
 import type { CreatorAccountState } from './labels.js';
 import {
   ACTIVE_PARTNERSHIP_SLOT_LIMIT,
+  AFFILIATE_EVIDENCE_METRICS,
   SLOT_OCCUPYING_STATUSES,
   adminAssociationStatusLabel,
   campaignNameOf,
   campaignTypeLabel,
   channelUrlOf,
   deriveCreatorAccountState,
+  evidenceCategoryLabel,
   initialsOf,
   payoutStateLabel,
   platformOf,
@@ -113,6 +126,15 @@ function field(
 export async function readCreatorWorkspace(
   db: Database,
   prospectId: string,
+  options: {
+    /**
+     * Whether an evidence upload can be offered at all. The route passes the
+     * storage port's own answer; absent (older callers, tests that do not
+     * care) reads as unconfigured, which renders the honest Track A4 state
+     * rather than a control that would fail (§1.4).
+     */
+    storageConfigured?: boolean;
+  } = {},
 ): Promise<CreatorWorkspaceDetail | null> {
   const [prospect] = await db
     .select()
@@ -176,6 +198,49 @@ export async function readCreatorWorkspace(
       : [];
   const campaignById = new Map(campaignRows.map((c) => [c.id, c]));
 
+  /*
+   * The three Selected-relationship facts (2026-08-17 rebuild): the agreement,
+   * the link, and the completion answer, batched like everything else. Three
+   * queries over the association ids, never a loop — and each label is decided
+   * HERE, so the switcher, the Overview card, and Session C's fact card can
+   * never disagree about what state a relationship is in.
+   */
+  const agreementRows =
+    associationIds.length > 0
+      ? await db
+          .select({ associationId: associationCompensationAgreements.associationId })
+          .from(associationCompensationAgreements)
+          .where(inArray(associationCompensationAgreements.associationId, associationIds))
+      : [];
+  const hasAgreement = new Set(agreementRows.map((r) => r.associationId));
+
+  const openProposalRows =
+    associationIds.length > 0
+      ? await db
+          .select({ associationId: proposalVersions.associationId })
+          .from(proposalVersions)
+          .where(
+            and(
+              inArray(proposalVersions.associationId, associationIds),
+              inArray(proposalVersions.state, ['awaiting_founder', 'awaiting_creator']),
+            ),
+          )
+      : [];
+  const hasOpenProposal = new Set(openProposalRows.map((r) => r.associationId));
+
+  const linkRows =
+    associationIds.length > 0
+      ? await db
+          .select({
+            associationId: trackingLinks.associationId,
+            active: trackingLinks.active,
+            pausedAt: trackingLinks.pausedAt,
+          })
+          .from(trackingLinks)
+          .where(inArray(trackingLinks.associationId, associationIds))
+      : [];
+  const linkByAssociation = new Map(linkRows.map((r) => [r.associationId, r]));
+
   const missing = prospect.subtype
     ? missingEvidence(
         prospect.subtype,
@@ -197,6 +262,45 @@ export async function readCreatorWorkspace(
     latestAccessAction: facts.latestAccessAction,
     policyReacceptanceOpen: facts.policyReacceptanceOpen,
   });
+
+  /*
+   * The person's §26.7 cases (Session C). `support_cases` has no prospect
+   * column and needs none: a case is anchored on the requester's account or
+   * one of their associations, so the read matches both. Open work keeps the
+   * queue's own membership rule (`status <> 'resolved'`), and each row carries
+   * the Support-workspace address that operates it — this surface lists and
+   * routes, never resolves.
+   */
+  const caseConditions = [
+    ...(associationIds.length > 0 ? [inArray(supportCases.associationId, associationIds)] : []),
+    ...(facts.claimedUserId ? [eq(supportCases.requesterUserId, facts.claimedUserId)] : []),
+  ];
+  const caseRows =
+    caseConditions.length > 0
+      ? await db
+          .select({
+            id: supportCases.id,
+            reference: supportCases.reference,
+            topic: supportCases.topic,
+            subject: supportCases.subject,
+            status: supportCases.status,
+            createdAt: supportCases.createdAt,
+          })
+          .from(supportCases)
+          .where(caseConditions.length === 1 ? caseConditions[0] : or(...caseConditions))
+          .orderBy(desc(supportCases.createdAt))
+          .limit(50)
+      : [];
+  const cases = caseRows.map((row) => ({
+    id: row.id,
+    reference: row.reference,
+    topic: row.topic,
+    subject: row.subject,
+    status: row.status,
+    open: row.status !== 'resolved',
+    openedAt: formatInstant(row.createdAt),
+    href: `/admin/support/${row.id}`,
+  }));
 
   const header: CreatorHeader = {
     prospectId: prospect.id,
@@ -229,6 +333,8 @@ export async function readCreatorWorkspace(
 
     attention,
 
+    openCases: cases.filter((entry) => entry.open).length,
+
     availableActions: availableActionsFor({
       account,
       verificationState: prospect.verificationStatus,
@@ -237,6 +343,22 @@ export async function readCreatorWorkspace(
 
   const relationships: CreatorRelationshipSummary[] = facts.associations.map((association) => {
     const campaign = campaignById.get(association.campaignId);
+    const link = linkByAssociation.get(association.associationId);
+
+    /*
+     * The completion answer keeps §16a's rule: "not due yet" and "the campaign
+     * closed and nobody has decided" are different facts, and only the second
+     * asks anything of an Admin. Terminal §23.4 states answer for themselves.
+     */
+    const completion =
+      association.status === 'successfully_completed'
+        ? 'Successfully completed'
+        : association.status === 'completion_disqualified'
+          ? 'Completion disqualified'
+          : campaign?.closeAt && campaign.closeAt.getTime() <= Date.now()
+            ? 'Decision pending'
+            : 'Not due before close';
+
     return {
       associationId: association.associationId,
       campaignId: association.campaignId,
@@ -251,6 +373,20 @@ export async function readCreatorWorkspace(
       activatedAt: formatInstant(activatedAt.get(association.associationId) ?? null),
       closesAt: formatInstant(campaign?.closeAt ?? null),
       holdsSlot: SLOT_OCCUPYING_STATUSES.includes(association.status),
+
+      agreement: hasAgreement.has(association.associationId)
+        ? 'Accepted'
+        : hasOpenProposal.has(association.associationId)
+          ? 'Proposal pending'
+          : 'Not started',
+      trackingLink: !link
+        ? 'No Affiliate link yet'
+        : link.pausedAt
+          ? 'Affiliate link paused'
+          : link.active
+            ? 'Affiliate link active'
+            : 'Affiliate link inactive',
+      completion,
     };
   });
 
@@ -261,10 +397,8 @@ export async function readCreatorWorkspace(
     claimedUserId: facts.claimedUserId,
   });
 
-  return {
-    header,
-    relationships,
-    standing: await composeStanding(db, {
+  const standing = {
+    ...(await composeStanding(db, {
       prospectId,
       account,
       associationIds,
@@ -272,16 +406,103 @@ export async function readCreatorWorkspace(
         facts.associations.map((a) => [a.associationId, a.campaignName]),
       ),
       policyReacceptanceOpen: facts.policyReacceptanceOpen,
-    }),
-    profile: await composeProfile(db, {
-      prospect,
-      profile: profile ?? null,
-      facts,
-      missing,
-      associationIds,
-    }),
+    })),
+    cases,
+  };
+
+  /*
+   * The person's delivery record (Session C). Phase 22c's arrangement: the
+   * rows carry the §27 KEY and the label resolves in the browser from the
+   * shared registry; the audience prefix keeps `internal_*` and every other
+   * role's mail out of an Affiliate's list. Bounded and newest-first — the
+   * full history surface is `/admin/notifications`.
+   */
+  const addresses = [
+    ...new Set([profile?.email, prospect.email].filter((value): value is string => Boolean(value))),
+  ];
+  const communicationRows =
+    addresses.length > 0
+      ? await db
+          .select()
+          .from(notificationDeliveries)
+          .where(
+            and(
+              inArray(notificationDeliveries.target, addresses),
+              like(notificationDeliveries.eventKey, 'affiliate_%'),
+            ),
+          )
+          .orderBy(desc(notificationDeliveries.createdAt))
+          .limit(100)
+      : [];
+  const communications = communicationRows.map((row) => ({
+    eventKey: row.eventKey,
+    target: row.target,
+    entityType: row.entityType,
+    entityId: row.entityId,
+    confirmed: row.notificationId !== null,
+    at: formatInstant(row.createdAt),
+    occurredAt: row.createdAt.toISOString(),
+  }));
+
+  const profilePane = await composeProfile(db, {
+    prospect,
+    profile: profile ?? null,
+    facts,
+    missing,
+    associationIds,
+    storageConfigured: options.storageConfigured ?? false,
+    // The relationship rows the agreements block lists — the same composed
+    // `agreement` label the switcher renders, so the two cannot disagree.
+    relationshipAgreements: relationships.map((r) => ({
+      associationId: r.associationId,
+      campaignName: r.campaignName,
+      state: r.agreement,
+    })),
+    /*
+     * §29-derived proposal access (0048's header states the column's
+     * absence). Restricted while a `restrict_bidding` or `demote` enforcement
+     * record stands un-overturned; the record it derives from is named so the
+     * badge is checkable from the payload.
+     */
+    proposalAccess: deriveProposalAccess(standing),
+  });
+
+  return {
+    header,
+    relationships,
+    standing,
+    profile: profilePane,
     history,
     historyCounts: historyCountsOf(history),
+    communications,
+  };
+}
+
+/**
+ * §29's `restrict_bidding`/`demote`, read as the Standard/Restricted badge.
+ *
+ * An appeal decided `overturned` lifts the restriction it appealed; anything
+ * else — no appeal, an open appeal, an upheld one — leaves it standing,
+ * because a restriction under appeal is still a restriction (§29.4's action
+ * takes effect when recorded, and the appeal is the recorded path out).
+ */
+function deriveProposalAccess(standing: CreatorStandingPane): {
+  key: 'standard' | 'restricted';
+  label: string;
+  derivedFrom: string | null;
+} {
+  const restricting = standing.enforcement.find(
+    (row) =>
+      (row.actionKind === 'restrict_bidding' || row.actionKind === 'demote') &&
+      row.appeal?.decision !== 'overturned',
+  );
+  if (!restricting) {
+    return { key: 'standard', label: 'Standard proposal access', derivedFrom: null };
+  }
+  return {
+    key: 'restricted',
+    label: 'Proposal bidding restricted',
+    derivedFrom: `${restricting.actionKind === 'demote' ? 'Demote' : 'Restrict bidding'} · ${restricting.campaignName} · ${restricting.at}`,
   };
 }
 
@@ -378,6 +599,9 @@ async function composeProfile(
       : never;
     missing: readonly string[];
     associationIds: readonly string[];
+    storageConfigured: boolean;
+    relationshipAgreements: { associationId: string; campaignName: string; state: string }[];
+    proposalAccess: CreatorProfilePane['proposalAccess'];
   },
 ): Promise<CreatorProfilePane> {
   const { prospect, profile, facts, missing, associationIds } = input;
@@ -516,6 +740,98 @@ async function composeProfile(
     missing: [...missing],
   };
 
+  /* ── Evidence pictures, and the per-metric trail (Session B, 0048) ────────*/
+
+  const fileRows = await db
+    .select()
+    .from(affiliateEvidenceFiles)
+    .where(eq(affiliateEvidenceFiles.prospectId, prospect.id))
+    .orderBy(desc(affiliateEvidenceFiles.uploadedAt));
+
+  const evidenceFiles = {
+    available: input.storageConfigured,
+    waitingOn: input.storageConfigured
+      ? null
+      : 'Evidence uploads are not available on this deployment yet — the object-storage bucket is Track A4. Files already on the record still render.',
+    files: fileRows
+      .filter((row) => row.removedAt === null)
+      .map((row) => ({
+        id: row.id,
+        category: row.category,
+        categoryLabel: evidenceCategoryLabel(row.category),
+        filename: row.originalFilename,
+        state: row.state,
+        rejection: row.rejection,
+        dimensions: row.width && row.height ? `${row.width} × ${row.height}` : null,
+        uploadedBy: row.uploadedBy,
+        uploadedAt: formatInstant(row.uploadedAt),
+      })),
+  };
+
+  const decisionRows = await db
+    .select()
+    .from(affiliateEvidenceVerifications)
+    .where(eq(affiliateEvidenceVerifications.prospectId, prospect.id))
+    .orderBy(desc(affiliateEvidenceVerifications.decidedAt));
+
+  // One row per metric in register order, latest decision or its honest
+  // absence — a metric nobody has decided renders as exactly that (§16a).
+  const metricDecisions = AFFILIATE_EVIDENCE_METRICS.map((metric) => {
+    const latest = decisionRows.find((row) => row.metric === metric.key);
+    return {
+      metric: metric.key,
+      label: metric.label,
+      decision: latest?.decision ?? null,
+      detail: latest?.detail ?? null,
+      decidedBy: latest?.decidedBy ?? null,
+      decidedAt: formatInstant(latest?.decidedAt ?? null),
+    };
+  });
+
+  /* ── The agreements block (§10, §29.8, §31.5) ─────────────────────────────*/
+
+  const consentRows = facts.claimedUserId
+    ? await db
+        .select({ slug: policyConsents.slug, version: policyConsents.version })
+        .from(policyConsents)
+        .where(
+          and(
+            eq(policyConsents.subjectType, 'user'),
+            eq(policyConsents.subjectId, facts.claimedUserId),
+          ),
+        )
+        .orderBy(desc(policyConsents.acceptedAt))
+    : [];
+
+  const latestConsent = (slug: string): string | null =>
+    consentRows.find((row) => row.slug === slug)?.version ?? null;
+
+  const publishedRows = await db
+    .select({
+      slug: policyVersions.slug,
+      version: policyVersions.version,
+      title: policyVersions.title,
+    })
+    .from(policyVersions)
+    .where(
+      and(
+        eq(policyVersions.status, 'published'),
+        inArray(policyVersions.slug, ['terms', 'affiliate-aup']),
+      ),
+    );
+
+  const agreements = {
+    terms: latestConsent('terms'),
+    aup: latestConsent('affiliate-aup'),
+    policyState: !facts.claimed
+      ? 'not_claimed'
+      : facts.policyReacceptanceOpen
+        ? 'reacceptance_required'
+        : 'accepted',
+    publishedVersions: publishedRows,
+    perCampaign: input.relationshipAgreements,
+  };
+
   /* ── Stripe — read only, from the stored record ───────────────────────────*/
   const provider = await composeProvider(db, facts);
 
@@ -590,6 +906,10 @@ async function composeProfile(
     },
     blocks: [accountBlock, researchBlock],
     verification,
+    evidenceFiles,
+    metricDecisions,
+    proposalAccess: input.proposalAccess,
+    agreements,
     provider,
     invitations,
     support,
@@ -698,6 +1018,7 @@ async function composeInvitations(
       reviewedPresence: campaignAffiliateAssociations.reviewedPresence,
       senderName: campaignAffiliateAssociations.senderName,
       senderEmail: campaignAffiliateAssociations.senderEmail,
+      recruitedAt: campaignAffiliateAssociations.recruitedAt,
     })
     .from(campaignAffiliateAssociations)
     .innerJoin(campaigns, eq(campaignAffiliateAssociations.campaignId, campaigns.id))
@@ -711,6 +1032,38 @@ async function composeInvitations(
     .from(affiliateInvitationSends)
     .where(inArray(affiliateInvitationSends.associationId, [...associationIds]))
     .orderBy(desc(affiliateInvitationSends.sentAt));
+
+  /* The lifecycle-modal facts (Session B): when signup started, read from the
+   * §23.4 history rather than re-derived, and when the claim landed, read from
+   * the signup profile — the record the claim wrote. */
+  const signupStartedRows = await db
+    .select({
+      associationId: associationStatusHistory.associationId,
+      occurredAt: associationStatusHistory.occurredAt,
+    })
+    .from(associationStatusHistory)
+    .where(
+      and(
+        inArray(associationStatusHistory.associationId, [...associationIds]),
+        eq(associationStatusHistory.toStatus, 'signup_started'),
+      ),
+    )
+    .orderBy(associationStatusHistory.occurredAt);
+  const signupStartedAt = new Map<string, Date>();
+  for (const row of signupStartedRows) {
+    if (!signupStartedAt.has(row.associationId)) signupStartedAt.set(row.associationId, row.occurredAt);
+  }
+
+  const profileRows = await db
+    .select({
+      associationId: affiliateSignupProfiles.associationId,
+      claimedAt: affiliateSignupProfiles.claimedAt,
+    })
+    .from(affiliateSignupProfiles)
+    .where(inArray(affiliateSignupProfiles.associationId, [...associationIds]));
+  const claimedAtByAssociation = new Map(
+    profileRows.map((row) => [row.associationId, row.claimedAt]),
+  );
 
   const names = await resolveActorNames(
     db,
@@ -740,7 +1093,10 @@ async function composeInvitations(
       stateLabel: invitationStateLabel(association.invitationStatus),
       lastSentAt: formatInstant(latest?.sentAt ?? null),
       hasLiveToken: association.invitationStatus === 'sent',
-      claimedAt: null,
+      claimedAt: formatInstant(claimedAtByAssociation.get(association.associationId) ?? null),
+      createdAt: formatInstant(association.recruitedAt),
+      signupStartedAt: formatInstant(signupStartedAt.get(association.associationId) ?? null),
+      tokenExpiresAt: formatInstant(latest?.tokenExpiresAt ?? null),
       sends: mine.map((send) => ({
         at: formatInstant(send.sentAt) ?? '',
         by: actorName(names, send.sentBy) ?? send.senderName,
@@ -788,7 +1144,9 @@ async function composeStanding(
     associationCampaign: ReadonlyMap<string, string>;
     policyReacceptanceOpen: boolean;
   },
-): Promise<CreatorStandingPane> {
+  // The cases list is composed in the main body (it also feeds the header's
+  // Support-tab badge), so this returns everything else.
+): Promise<Omit<CreatorStandingPane, 'cases'>> {
   const accessRows = await db
     .select()
     .from(affiliateAccessActions)

@@ -341,13 +341,108 @@ export function isFounderHistoryCategory(v: string): v is FounderHistoryCategory
 
 /* ── Attention (§20-style ranking, one act) ─────────────────────────────────*/
 
+/**
+ * `open-campaign` replaced `parked-campaign` on 2026-08-16 — the Campaigns
+ * workspace exists, so a campaign issue routes to it.
+ */
 export const ATTENTION_ACTIONS = [
   'jump-access',
   'jump-overview',
   'jump-money',
-  'parked-campaign',
+  'open-campaign',
 ] as const;
 export type AttentionAction = (typeof ATTENTION_ACTIONS)[number];
+
+/* ── The directory (2026-08-16 rebuild) ─────────────────────────────────────*/
+
+export const FOUNDER_DIRECTORY_FILTERS = [
+  { key: 'all', title: 'All Founders', subtitle: 'Complete directory' },
+  { key: 'needs_admin', title: 'Needs Admin', subtitle: 'Decisions and exceptions' },
+  { key: 'invited', title: 'Invited — not accepted', subtitle: 'Waiting for claim' },
+  { key: 'onboarding', title: 'Onboarding', subtitle: 'Claimed and moving' },
+  { key: 'live', title: 'Live', subtitle: 'Campaigns to watch' },
+  { key: 'pre_invite', title: 'Pre-invite', subtitle: 'Research ready' },
+] as const;
+
+export type FounderDirectoryFilterKey = (typeof FOUNDER_DIRECTORY_FILTERS)[number]['key'];
+
+export const FOUNDER_TYPE_FILTERS = [
+  { key: 'all', label: 'All types' },
+  { key: 'idea', label: 'Idea' },
+  { key: 'product', label: 'Product' },
+  { key: 'proposed', label: 'Proposed' },
+] as const;
+
+export type FounderTypeFilterKey = (typeof FOUNDER_TYPE_FILTERS)[number]['key'];
+
+/**
+ * The derived label for a campaign whose §9 type is not locked yet. The
+ * ABSENCE of a decision, never a third type — it appears in the filter
+ * vocabulary and the derived directory label, and in no type register.
+ */
+export const PROPOSED_TYPE_LABEL = 'Proposed';
+
+export type DirectoryActionKind = 'due' | 'none';
+
+export interface DirectoryActionCell {
+  readonly kind: DirectoryActionKind;
+  readonly label: string;
+}
+
+export const WAITING_ON_PROOVD_LABEL = 'Waiting on Proovd';
+export const NO_ACCESS_YET_LABEL = 'No access yet';
+
+/**
+ * The Founder's own default next step per lifecycle state. Restated from
+ * shared and drift-tested; see the shared register for the reasoning. The
+ * composition refines these where a finer record answers better.
+ */
+export const FOUNDER_NEXT_STEP_LABELS: Record<CampaignStatus, string | null> = {
+  invited_draft: null,
+  vetting_submitted: 'Complete the account claim',
+  account_claimed: 'Continue campaign setup',
+  stripe_onboarding_pending: 'Finish payment setup',
+  listing_fee_pending: 'Pay the listing fee',
+  affiliate_response_and_build: 'Finish the campaign build',
+  pending_review: null,
+  changes_required: 'Address the requested changes',
+  approved: null,
+  creator_prep: null,
+  creator_replacement: null,
+  refunded_no_creator: null,
+  live: null,
+  closed_pending_capture: null,
+  capture_retry_window: null,
+  closed_reconciling: null,
+  captured_pending_w9: 'Submit the W-9 securely',
+  single_payment_released: null,
+  first_payment_released: null,
+  day_14_review: 'Submit Day 14 progress evidence',
+  remaining_payment_released: null,
+  fulfilled: null,
+  closed_resolved: null,
+  ended_no_charge: null,
+  suspended: null,
+  killed: null,
+  banned_founder: null,
+};
+
+/* ── Meeting notes and research entries (§7, migration 0047) ────────────────*/
+
+export const MEETING_NOTE_FIELDS = [
+  { key: 'meetingDate', label: 'Meeting date', required: true },
+  { key: 'participants', label: 'Participants', required: true },
+  { key: 'notes', label: 'Notes', required: false },
+  { key: 'decisions', label: 'Decisions', required: true },
+  { key: 'followUp', label: 'Follow-up', required: true },
+  { key: 'sourceLink', label: 'Source or link', required: true },
+] as const;
+
+export const RESEARCH_ENTRY_FIELDS = [
+  { key: 'title', label: 'Research title', required: true },
+  { key: 'findings', label: 'Research findings', required: false },
+  { key: 'sourceLink', label: 'Source or link', required: true },
+] as const;
 
 /* ── Copy the API sends with a payload ──────────────────────────────────────*/
 

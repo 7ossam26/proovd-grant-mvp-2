@@ -119,7 +119,7 @@ export function PostReview() {
         ...(outcome === 'rejected' ? { enforcementReason: correction } : {}),
       });
       void navigate(
-        `/admin/creators/${prospectId}/relationships/${associationId}?pane=content`,
+        `/admin/creators/${prospectId}?tab=content&rel=${associationId}`,
       );
     } catch (error: unknown) {
       // The server's refusal is what an Admin reads, verbatim.
@@ -187,7 +187,7 @@ export function PostReview() {
             tier="secondary"
             onClick={() =>
               void navigate(
-                `/admin/creators/${prospectId}/relationships/${associationId}?pane=content`,
+                `/admin/creators/${prospectId}?tab=content&rel=${associationId}`,
               )
             }
           >
@@ -204,7 +204,7 @@ export function PostReview() {
       <header className="cr-context">
         <RouterLink
           className="crumb"
-          to={`/admin/creators/${prospectId}/relationships/${associationId}?pane=content`}
+          to={`/admin/creators/${prospectId}?tab=content&rel=${associationId}`}
         >
           ← Back to {detail.band.campaignName}
         </RouterLink>

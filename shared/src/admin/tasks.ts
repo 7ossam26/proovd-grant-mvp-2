@@ -59,7 +59,9 @@ export const TASK_REFERENCE_KIND_LABELS: Readonly<Record<TaskReferenceKind, stri
  */
 export const TASK_REFERENCE_ADDRESS_PATTERNS: Readonly<Record<TaskReferenceKind, string>> = {
   founder: '/admin/founders/:prospectId',
-  creator_relationship: '/admin/creators/:prospectId/relationships/:associationId',
+  // The `?rel=` shape — the Affiliate rebuild's Session C address. The retired
+  // sibling address still redirects, so references minted before it survive.
+  creator_relationship: '/admin/creators/:prospectId?tab=campaigns&rel=:associationId',
   campaign: '/admin/campaigns/:campaignId',
   backer: '/admin/backers?view=backers&campaignId=:campaignId',
   support_case: '/admin/support/:caseId',
