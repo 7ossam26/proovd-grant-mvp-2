@@ -32,6 +32,10 @@ import {
   MEETING_NOTE_FIELDS as SHARED_MEETING_NOTE_FIELDS,
   RESEARCH_ENTRY_FIELDS as SHARED_RESEARCH_FIELDS,
   PROPOSED_TYPE_LABEL as SHARED_PROPOSED_LABEL,
+  OPERATIONS_TAB_COPY,
+  OPERATIONS_ABSENCES,
+  MEDIATED_REQUESTS_ABSENT,
+  COMMENTS_NEVER_REWRITTEN,
   WAITING_ON_PROOVD_LABEL as SHARED_WAITING_LABEL,
   NO_ACCESS_YET_LABEL as SHARED_NO_ACCESS_LABEL,
   GHOST_BAN_TRIGGER_SUMMARY as SHARED_GHOST_BAN_SUMMARY,
@@ -401,6 +405,63 @@ describe('the Create Founder compose registers (Session B)', () => {
     }
     for (const entry of CREATE_FOUNDER_ABSENCES) {
       expect(entry.reason.length).toBeGreaterThan(60);
+    }
+  });
+});
+
+describe('the operations registers (Session C)', () => {
+  it('has one question per operations sub-tab, congruent with the section register in both directions', () => {
+    // Two registers describe the same tabs — the section shape and the pinned
+    // copy — and this is the drift test between them, run over every section
+    // the copy register claims to cover.
+    for (const [sectionKey, tabs] of Object.entries(OPERATIONS_TAB_COPY)) {
+      const section = FOUNDER_RECORD_SECTIONS.find((s) => s.key === sectionKey);
+      expect(section, `OPERATIONS_TAB_COPY names unknown section ${sectionKey}`).toBeDefined();
+      expect(Object.keys(tabs).sort()).toEqual(section!.tabs.map((t) => t.key).sort());
+      for (const entry of Object.values(tabs)) {
+        expect(entry.question.length).toBeGreaterThan(10);
+        expect(entry.subtitle.length).toBeGreaterThan(10);
+      }
+    }
+    // And the copy register covers every section that HAS tabs, except
+    // Onboarding, whose copy is Session B's own register.
+    const tabbed = FOUNDER_RECORD_SECTIONS.filter(
+      (s) => s.tabs.length > 0 && s.key !== 'onboarding',
+    ).map((s) => s.key);
+    expect(Object.keys(OPERATIONS_TAB_COPY).sort()).toEqual([...tabbed].sort());
+  });
+
+  it('refuses each reference control once, with a reason that argues', () => {
+    const controls = OPERATIONS_ABSENCES.map((a) => a.control);
+    expect(new Set(controls).size).toBe(controls.length);
+    for (const entry of OPERATIONS_ABSENCES) {
+      expect(entry.reason.length, entry.control).toBeGreaterThan(60);
+    }
+    // The brief's two named Session C decisions are in the register by name.
+    expect(controls).toContain('Send warning');
+    expect(controls.some((c) => c.includes('work-again'))).toBe(true);
+  });
+
+  it('keeps the stricter-than-§3.1 vocabulary out of every pinned sentence', () => {
+    // The Founders suite scans rendered panes; this catches the copy at the
+    // register, before a surface exists to render it. `reservation` caught
+    // the reference's own demand subtitle during the build.
+    const texts: string[] = [MEDIATED_REQUESTS_ABSENT, COMMENTS_NEVER_REWRITTEN];
+    for (const tabs of Object.values(OPERATIONS_TAB_COPY)) {
+      for (const entry of Object.values(tabs)) {
+        texts.push(entry.question, entry.subtitle);
+      }
+    }
+    for (const entry of OPERATIONS_ABSENCES) texts.push(entry.control, entry.reason);
+    for (const text of texts) {
+      expect(text.toLowerCase()).not.toMatch(/\breservations?\b/);
+      expect(text.toLowerCase()).not.toMatch(/\bpre_build\b|\bpre_launch\b/);
+    }
+  });
+
+  it('pins the mediated-request absence naming both refused records and the real pathway', () => {
+    for (const word of ['meeting', 'end-partnership', 'support', 'work-again']) {
+      expect(MEDIATED_REQUESTS_ABSENT.toLowerCase()).toContain(word);
     }
   });
 });

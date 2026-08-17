@@ -450,8 +450,6 @@ export interface CampaignFactsView {
   publicUrl: string | null;
 }
 
-/* ── The whole detail ───────────────────────────────────────────────────────*/
-
 /**
  * The Eligibility tab (Session B) — §10's claim and the §5 representations,
  * composed as read-only facts.
@@ -493,6 +491,234 @@ export interface EligibilityView {
   acknowledgementsAbsent: string | null;
 }
 
+/* ── Detail: the operations sections (Session C, 2026-08-17) ───────────────*/
+
+/** One labelled fact row on an operations panel. `null` renders as absent. */
+export interface OpsFact {
+  label: string;
+  value: string | null;
+}
+
+/**
+ * The read-and-route sections' composed state — Campaign, Affiliates,
+ * Backers & Demand, Money & Fulfillment, Support & Enforcement.
+ *
+ * Everything here is READ from records other workspaces own; nothing in the
+ * module that composes it writes, and the §33.12.5 partition is untouched
+ * because there is no new route behind it. Lists are bounded samples with
+ * counts — the full list lives in the workspace that owns it, which is the
+ * reference's own shape (three comments and a "View all").
+ */
+export interface OperationsView {
+  campaignId: string;
+  campaignName: string;
+  /** 'Idea' | 'Product' (§3.1), or 'Proposed' while the §9 lock has not run. */
+  typeLabel: string;
+  statusLabel: string;
+
+  /** Campaign → Details: the §14.4 build content, read-only. */
+  content: {
+    fields: OpsFact[];
+    rewards: { title: string; price: string; contents: string | null; delivery: string | null }[];
+    faqs: { question: string; answer: string }[];
+  };
+
+  /** Campaign → Review: §15's decision state — never a second place to make it. */
+  review: {
+    buildStatus: string | null;
+    rosterReadiness: string | null;
+    rounds: { round: number; outcome: string; submittedAt: string; decidedAt: string | null }[];
+    /** The latest round's recorded feedback, grouped as §15 groups it. */
+    feedback: { group: string; text: string }[];
+    approvedAt: string | null;
+  };
+
+  /** Campaign → Live: system-derived performance, read-only. */
+  live: {
+    isLive: boolean;
+    liveAt: string | null;
+    campaignDay: number | null;
+    closesAt: string | null;
+    /** The discovery state as a sentence (Days 1–7 vs open, §18). */
+    discovery: string;
+    publicUrl: string | null;
+    created: number;
+    active: number;
+    canceled: number;
+    validClicks: number;
+    /** null over zero clicks — never 0% (§16a). */
+    conversion: string | null;
+    /** Active reservations' pre-tax subtotal, formatted. Null when none. */
+    reservedSubtotal: string | null;
+    updatesCount: number;
+    commentsCount: number;
+    /** Idea only, and only when the build set a threshold. */
+    threshold: { required: number; active: number; remaining: number; state: string } | null;
+  };
+
+  /** Campaign → Page & Updates. */
+  page: {
+    updates: {
+      title: string;
+      audience: string;
+      publishedAt: string;
+      body: string;
+      materialChange: boolean;
+    }[];
+    updatesCount: number;
+    comments: { author: string; body: string; postedAt: string; state: string }[];
+    commentsCount: number;
+    openFlags: number;
+  };
+
+  /** Affiliates → Relationships: one row per association, linking out. */
+  roster: {
+    associationId: string;
+    prospectId: string;
+    name: string;
+    handle: string | null;
+    statusLabel: string;
+    /** '35% locked' | '34% proposed on v3 · not locked' | 'No proposal yet'. */
+    terms: string;
+    launchRequired: boolean | null;
+    backers: number;
+    validClicks: number;
+    completion: string | null;
+    workAgain: string | null;
+  }[];
+  rosterCounts: { total: number; backersBroughtIn: number; validClicks: number };
+
+  /** Affiliates → Requests: §22.9's work-again requests, read-only. */
+  workAgain: {
+    creatorName: string;
+    requestedAt: string;
+    status: string;
+    message: string | null;
+    respondedAt: string | null;
+    responseNote: string | null;
+  }[];
+
+  /** Backers & Demand → Demand: the attribution split. */
+  demand: { split: { label: string; clicks: number; backers: number }[] };
+
+  /** Backers & Demand → Responses: §19 survey answers under consent labels. */
+  responses: {
+    total: number;
+    rows: {
+      backer: string;
+      reward: string;
+      status: string;
+      why: string | null;
+      recommend: number | null;
+      consent: string;
+    }[];
+  };
+
+  /** Backers & Demand → Backers: numbers only, matching the reference. */
+  backerRows: {
+    total: number;
+    rows: {
+      backer: string;
+      reward: string;
+      createdAt: string;
+      status: string;
+      attribution: string;
+      caseRef: string | null;
+      caseId: string | null;
+    }[];
+  };
+
+  /** Money & Fulfillment → Close. */
+  close: {
+    scheduledClose: string | null;
+    batch: {
+      status: string;
+      startedAt: string;
+      completedAt: string | null;
+      outcome: string;
+      thresholdDecidedAt: string | null;
+    } | null;
+    finalActive: number | null;
+    canceledExcluded: number | null;
+    captureState: string;
+    retryWindow: string | null;
+    reconciliation: string;
+    resultsPreparedAt: string | null;
+    idea: { threshold: number | null; finalActive: number | null; state: string } | null;
+  };
+
+  /** Money & Fulfillment → Fulfillment: the ONE §22.5 resolver's output. */
+  fulfillment: {
+    available: boolean;
+    waitingOn: string | null;
+    mechanism: string | null;
+    deliveredAt: string | null;
+    obligations: { label: string; state: string; dueAt: string | null }[];
+    commitments: { sequence: number; month: string; original: boolean; text: string }[];
+    day14: { state: string; dueAt: string | null } | null;
+  };
+
+  /** Money & Fulfillment → Refunds & Recovery: counts from the records. */
+  refunds: {
+    openRefunds: number;
+    totalRefunds: number;
+    openDisputes: number;
+    totalDisputes: number;
+    recoveryRecords: number;
+  };
+
+  /** Support & Enforcement → Support: this record's cases, linking out. */
+  supportCases: {
+    caseId: string;
+    reference: string;
+    subject: string | null;
+    status: string;
+    owner: string;
+    due: string | null;
+  }[];
+
+  /** Support & Enforcement → Cancellation: §31.6 state, read-only. */
+  cancellation: {
+    state: string;
+    kind: string | null;
+    requestedAt: string | null;
+    decidedAt: string | null;
+    customerExplanation: string | null;
+  } | null;
+
+  /** Support & Enforcement → Enforcement: recorded actions, read-only. */
+  enforcement: {
+    campaignActions: {
+      action: string;
+      phase: string;
+      occurredAt: string;
+      category: string;
+      customerExplanation: string;
+    }[];
+  };
+}
+
+/**
+ * History → Communications: the `notification_deliveries` rows for this
+ * Founder's address. The row carries the §27 registry KEY — the label
+ * resolves in the browser from the shared registry (22c's rule; a fourth
+ * copy of 123 descriptions would drift). Bounded, newest first.
+ */
+export interface CommunicationRow {
+  eventKey: string;
+  target: string;
+  at: string;
+  /** 'Delivered' once the provider confirmed; 'Recorded' while claimed only. */
+  state: string;
+}
+
+export interface CommunicationsView {
+  total: number;
+  rows: CommunicationRow[];
+}
+
+/* ── The whole detail ───────────────────────────────────────────────────────*/
+
 export interface FounderWorkspaceDetail {
   header: FounderHeader;
   overview: OverviewPane;
@@ -502,6 +728,9 @@ export interface FounderWorkspaceDetail {
   discovery: DiscoveryView;
   eligibility: EligibilityView;
   campaignFacts: CampaignFactsView | null;
+  /** Session C: the read-and-route sections' state. Null with no campaign. */
+  operations: OperationsView | null;
+  communications: CommunicationsView;
   history: FounderHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;

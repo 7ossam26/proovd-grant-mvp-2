@@ -47,6 +47,7 @@ import {
   MEETING_NOTE_FIELDS,
   NO_ATTENTION_LABEL,
   ONBOARDING_TAB_COPY,
+  OPERATIONS_TAB_COPY,
   PROFILE_OVERRIDE_KEYS,
   RESEARCH_ENTRY_FIELDS,
   type AttentionAction,
@@ -105,9 +106,20 @@ import {
   type DiscoveryEditRequest,
 } from './sections/OverviewSection.js';
 import { OnboardingSection } from './sections/OnboardingSection.js';
-import { Campaigns } from './panes/Campaigns.js';
-import { Money } from './panes/Money.js';
-import { History } from './panes/History.js';
+import {
+  AffiliatesSection,
+  BackersSection,
+  CampaignSection,
+  HistorySection,
+  MoneySection,
+  SupportSection,
+  type AffiliatesTabKey,
+  type BackersTabKey,
+  type CampaignTabKey,
+  type HistoryTabKey,
+  type MoneyTabKey,
+  type SupportTabKey,
+} from './sections/OperationsSections.js';
 
 /* ── Sections ───────────────────────────────────────────────────────────────*/
 
@@ -228,6 +240,32 @@ export function FounderWorkspace() {
       const updated = new URLSearchParams(params);
       updated.set('section', 'onboarding');
       if (next === 'invite') updated.delete('tab');
+      else updated.set('tab', next);
+      setParams(updated, { replace: true });
+    },
+    [params, setParams],
+  );
+
+  /**
+   * The operations sections' sub-tabs, same mechanism (Session C): the tab
+   * lives in the URL beside the section, validated against the section's own
+   * register keys, and the first tab is the address with no `tab` at all.
+   */
+  const operationsTab = useCallback(
+    <S extends keyof typeof OPERATIONS_TAB_COPY>(sectionKey: S) => {
+      const keys = Object.keys(OPERATIONS_TAB_COPY[sectionKey]);
+      const raw = params.get('tab') ?? keys[0]!;
+      return (keys.includes(raw) ? raw : keys[0]!) as keyof (typeof OPERATIONS_TAB_COPY)[S] &
+        string;
+    },
+    [params],
+  );
+  const setOperationsTab = useCallback(
+    (sectionKey: keyof typeof OPERATIONS_TAB_COPY) => (next: string) => {
+      const keys = Object.keys(OPERATIONS_TAB_COPY[sectionKey]);
+      const updated = new URLSearchParams(params);
+      updated.set('section', sectionKey);
+      if (next === keys[0]) updated.delete('tab');
       else updated.set('tab', next);
       setParams(updated, { replace: true });
     },
@@ -788,94 +826,49 @@ export function FounderWorkspace() {
           />
         ) : null}
         {section === 'campaign' ? (
-          <>
-            <InterimNote owns="campaign details, review, the live campaign, and the page with its updates">
-              The campaign record below is complete and live; campaign operations belong to the
-              Campaigns workspace.
-              {currentCampaignId ? (
-                <>
-                  {' '}
-                  <RouterLink to={`/admin/campaigns/${currentCampaignId}`}>
-                    Open this campaign in the Campaigns workspace
-                  </RouterLink>
-                  .
-                </>
-              ) : null}
-            </InterimNote>
-            <Campaigns detail={detail} actions={actions} />
-          </>
+          <CampaignSection
+            detail={detail}
+            tab={operationsTab('campaign') as CampaignTabKey}
+            onTab={setOperationsTab('campaign') as (next: CampaignTabKey) => void}
+            actions={actions}
+          />
         ) : null}
         {section === 'affiliates' ? (
-          <StatePanel
-            state="Creator relationships live in the Creators workspace"
-            whatHappened="Every Creator relationship on this Founder’s campaign — terms, versions, readiness, performance, and enforcement — is operated from the Creators workspace, which owns the relationship end to end."
-            next="Open the Creators directory pre-searched with this campaign to see everyone on it. This section gains its three tabs (Relationships · Requests · Performance & Completion) in a later build session."
-            owner="Proovd"
-            nextUpdate="When the next build session lands"
-            action={
-              <RouterLink
-                className="btn btn--secondary"
-                to={
-                  header.currentCampaign
-                    ? `/admin/creators?q=${encodeURIComponent(header.currentCampaign.name)}`
-                    : '/admin/creators'
-                }
-              >
-                <span className="btn__label">Open Creators</span>
-              </RouterLink>
-            }
-            reference={`Admin · Founders · ${header.recordReference}`}
+          <AffiliatesSection
+            detail={detail}
+            tab={operationsTab('affiliates') as AffiliatesTabKey}
+            onTab={setOperationsTab('affiliates') as (next: AffiliatesTabKey) => void}
           />
         ) : null}
         {section === 'backers' ? (
-          <StatePanel
-            state="Backer records live in the Backers workspace"
-            whatHappened="Every pre-order on this Founder’s campaign — demand, responses, and individual Backer context — is read from the Backers workspace and the pre-order ledger."
-            next="Open the Backers workspace filtered to this campaign. This section gains its three tabs (Demand · Responses · Backers) in a later build session."
-            owner="Proovd"
-            nextUpdate="When the next build session lands"
-            action={
-              <RouterLink
-                className="btn btn--secondary"
-                to={
-                  currentCampaignId
-                    ? `/admin/backers?view=backers&campaignId=${encodeURIComponent(currentCampaignId)}`
-                    : '/admin/backers'
-                }
-              >
-                <span className="btn__label">Open Backers</span>
-              </RouterLink>
-            }
-            reference={`Admin · Founders · ${header.recordReference}`}
+          <BackersSection
+            detail={detail}
+            tab={operationsTab('backers') as BackersTabKey}
+            onTab={setOperationsTab('backers') as (next: BackersTabKey) => void}
           />
         ) : null}
         {section === 'money' ? (
-          <>
-            <InterimNote owns="close, payments, fulfillment, and refunds with recovery">
-              The money record below is complete and live; the four-tab shape (Close · Payments ·
-              Fulfillment · Refunds &amp; Recovery) arrives in a later build session. Money
-              decisions stay with the close-operations queue — this record shows state and
-              routes there.
-            </InterimNote>
-            <Money detail={detail} />
-          </>
-        ) : null}
-        {section === 'support' ? (
-          <StatePanel
-            state="Support cases live in the Support workspace"
-            whatHappened="Every case on this Founder — its owner, its §27.8 response promise, and its thread — is operated from the Support workspace. Account-level standing (suspension, the ban record, any deletion request) is on this record’s Overview under the full-record block."
-            next="Open the Support workspace to see the queue. This section gains its three tabs (Support · Cancellation · Enforcement) in a later build session."
-            owner="Proovd"
-            nextUpdate="When the next build session lands"
-            action={
-              <RouterLink className="btn btn--secondary" to="/admin/support">
-                <span className="btn__label">Open Support</span>
-              </RouterLink>
-            }
-            reference={`Admin · Founders · ${header.recordReference}`}
+          <MoneySection
+            detail={detail}
+            tab={operationsTab('money') as MoneyTabKey}
+            onTab={setOperationsTab('money') as (next: MoneyTabKey) => void}
           />
         ) : null}
-        {section === 'history' ? <History detail={detail} /> : null}
+        {section === 'support' ? (
+          <SupportSection
+            detail={detail}
+            tab={operationsTab('support') as SupportTabKey}
+            onTab={setOperationsTab('support') as (next: SupportTabKey) => void}
+          />
+        ) : null}
+        {section === 'history' ? (
+          <HistorySection
+            detail={detail}
+            tab={operationsTab('history') as HistoryTabKey}
+            onTab={setOperationsTab('history') as (next: HistoryTabKey) => void}
+            onAddNote={(trigger) => setDialog({ kind: 'meetingnote', trigger })}
+          />
+        ) : null}
       </div>
 
       {dialog?.kind === 'confirm' ? (
@@ -1064,10 +1057,3 @@ function answerLine(detail: FounderWorkspaceDetail, key: 'problem' | 'solution')
  * The Session A interim banner: what this section will hold, and what the
  * content below it is TODAY. §1.4 — an interim that says what it is.
  */
-function InterimNote({ owns, children }: { owns: string; children: React.ReactNode }) {
-  return (
-    <p className="frec-interim helper">
-      <b>This section will hold {owns}.</b> {children}
-    </p>
-  );
-}

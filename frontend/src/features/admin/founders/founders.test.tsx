@@ -34,11 +34,15 @@ import { axe } from 'jest-axe';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
   ATTENTION_CHIP_LABEL,
+  COMMENTS_NEVER_REWRITTEN,
   CREATOR_MATCH_CAVEAT,
   ELIGIBILITY_READ_ONLY_NOTE,
   IDENTITY_CHECK_HELPER,
+  MEDIATED_REQUESTS_ABSENT,
   NO_ACTIVE_CAMPAIGN_LABEL,
   NO_ATTENTION_ROW_LABEL,
+  NOTIFICATION_EVENTS,
+  OPERATIONS_ABSENCES,
   OPTIONAL_ITEM_CONTENT_IS_FOUNDERS,
   PARKED_MESSAGES,
   STATE_QUESTIONS,
@@ -571,6 +575,18 @@ function workspaceFixture(): FounderWorkspaceDetail {
       acknowledgementsAbsent: null,
     },
     campaignFacts: null,
+    operations: operationsFixture(),
+    communications: {
+      total: 1,
+      rows: [
+        {
+          eventKey: 'founder_invitation',
+          target: 'rae@harlow.example',
+          at: 'Jul 22, 2026 · 3:10 PM UTC',
+          state: 'Delivered',
+        },
+      ],
+    },
     historyCounts: {
       invite: 1,
       account: 0,
@@ -580,6 +596,199 @@ function workspaceFixture(): FounderWorkspaceDetail {
       admin: 1,
       enforcement: 0,
     },
+  };
+}
+
+/** Session C: the read-and-route sections' composed state, one live campaign. */
+function operationsFixture(): NonNullable<FounderWorkspaceDetail['operations']> {
+  return {
+    campaignId: CAMPAIGN,
+    campaignName: PRODUCT,
+    typeLabel: 'Product',
+    statusLabel: STATUS_LABEL,
+    content: {
+      fields: [
+        { label: 'Title', value: PRODUCT },
+        { label: 'Dates', value: 'Aug 7, 2026 → Aug 20, 2026' },
+        { label: 'Brand voice', value: 'Direct, calm, specific.' },
+        { label: 'Delivery window', value: 'November 2026' },
+        { label: 'Risks / challenges', value: null },
+      ],
+      rewards: [
+        {
+          title: 'Founding access',
+          price: 'US$28.00',
+          contents: 'Early digital access',
+          delivery: 'November 2026',
+        },
+      ],
+      faqs: [{ question: 'Can I cancel?', answer: 'Yes, at any time before close.' }],
+    },
+    review: {
+      buildStatus: 'in_progress',
+      rosterReadiness: 'forming',
+      rounds: [
+        {
+          round: 1,
+          outcome: 'pending',
+          submittedAt: 'Aug 1, 2026 · 9:00 AM UTC',
+          decidedAt: null,
+        },
+      ],
+      feedback: [{ group: 'required', text: 'Name the delivery month in the story.' }],
+      approvedAt: null,
+    },
+    live: {
+      isLive: true,
+      liveAt: 'Aug 7, 2026 · 4:00 PM UTC',
+      campaignDay: 6,
+      closesAt: 'Aug 20, 2026',
+      discovery: 'Known links only',
+      publicUrl: `/campaign/${CAMPAIGN}`,
+      created: 110,
+      active: 105,
+      canceled: 5,
+      validClicks: 2835,
+      conversion: '3.7%',
+      reservedSubtotal: 'US$2,856.00',
+      updatesCount: 2,
+      commentsCount: 3,
+      threshold: null,
+    },
+    page: {
+      updates: [
+        {
+          title: 'Week one: what we learned',
+          audience: 'Public',
+          publishedAt: 'Aug 12, 2026 · 12:40 PM UTC',
+          body: '105 people have reserved.',
+          materialChange: false,
+        },
+      ],
+      updatesCount: 2,
+      comments: [
+        {
+          author: 'Backer 427',
+          body: 'Would a browser extension be in the first release?',
+          postedAt: 'Aug 12, 2026 · 1:00 PM UTC',
+          state: 'Visible',
+        },
+      ],
+      commentsCount: 3,
+      openFlags: 1,
+    },
+    roster: [
+      {
+        associationId: 'assoc-1',
+        prospectId: 'creator-prospect-1',
+        name: 'Open Field Notes',
+        handle: 'openfieldnotes',
+        statusLabel: 'Active',
+        terms: '35% locked',
+        launchRequired: true,
+        backers: 41,
+        validClicks: 1758,
+        completion: null,
+        workAgain: null,
+      },
+      {
+        associationId: 'assoc-2',
+        prospectId: 'creator-prospect-2',
+        name: 'Verde Notes Review',
+        handle: 'verdenotesreview',
+        statusLabel: 'Formal decision open',
+        terms: '34% proposed on v3 · not locked',
+        launchRequired: false,
+        backers: 18,
+        validClicks: 621,
+        completion: null,
+        workAgain: null,
+      },
+    ],
+    rosterCounts: { total: 2, backersBroughtIn: 59, validClicks: 2835 },
+    workAgain: [
+      {
+        creatorName: 'Open Field Notes',
+        requestedAt: 'Aug 12, 2026 · 9:00 AM UTC',
+        status: 'Requested — awaiting the Creator',
+        message: 'We would love to work with you again on the next run.',
+        respondedAt: null,
+        responseNote: null,
+      },
+    ],
+    demand: {
+      split: [
+        { label: 'Affiliate traffic', clicks: 2835, backers: 59 },
+        { label: 'Direct & organic', clicks: 0, backers: 46 },
+      ],
+    },
+    responses: {
+      total: 82,
+      rows: [
+        {
+          backer: 'Backer 427',
+          reward: 'Founding access',
+          status: 'Active',
+          why: 'I need a calmer place for unfinished research threads.',
+          recommend: 4,
+          consent: 'Aggregate only',
+        },
+      ],
+    },
+    backerRows: {
+      total: 110,
+      rows: [
+        {
+          backer: 'Backer 427',
+          reward: 'Founding access',
+          createdAt: 'Aug 12, 2026',
+          status: 'reserved active',
+          attribution: '@openfieldnotes',
+          caseRef: 'PVD-24680-13579',
+          caseId: 'case-1',
+        },
+      ],
+    },
+    close: {
+      scheduledClose: 'Aug 20, 2026',
+      batch: null,
+      finalActive: null,
+      canceledExcluded: null,
+      captureState: 'Not due — the campaign has not closed',
+      retryWindow: null,
+      reconciliation: 'Waiting for close',
+      resultsPreparedAt: null,
+      idea: null,
+    },
+    fulfillment: {
+      available: false,
+      waitingOn:
+        'Delivery evidence, the Day-14 review, and missed-commitment records exist only after the lifecycle reaches fulfillment.',
+      mechanism: null,
+      deliveredAt: null,
+      obligations: [],
+      commitments: [],
+      day14: null,
+    },
+    refunds: {
+      openRefunds: 0,
+      totalRefunds: 0,
+      openDisputes: 0,
+      totalDisputes: 0,
+      recoveryRecords: 0,
+    },
+    supportCases: [
+      {
+        caseId: 'case-1',
+        reference: 'PVD-24680-13579',
+        subject: 'Backer asks about workshop schedule',
+        status: 'Waiting on Founder',
+        owner: 'Proovd',
+        due: 'Aug 13, 2026 · 4:00 PM UTC',
+      },
+    ],
+    cancellation: null,
+    enforcement: { campaignActions: [] },
   };
 }
 
@@ -1012,8 +1221,11 @@ describe('§26.1 — one person, eight sections', () => {
     );
     expect(screen.getByRole('heading', { name: 'Invitation', level: 2 })).toBeInTheDocument();
 
+    // Session C: the Money section is the four-tab shape, opening on Close.
+    // (This assertion consciously changed from the old pane's 'Payment setup'
+    // heading — payment setup lives on Onboarding → Stripe & Listing Fee now.)
     await openTab(user, 'Money & Fulfillment');
-    expect(screen.getByRole('heading', { name: 'Payment setup', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Campaign close', level: 2 })).toBeInTheDocument();
     // Only the active section is mounted — a hidden pane is still in the
     // accessibility tree and still runs its effects.
     expect(screen.queryByRole('heading', { name: 'Invitation', level: 2 })).toBeNull();
@@ -1198,12 +1410,17 @@ describe('§26.2 — an invitation may differ from the profile, and says so', ()
 
 describe('§16a, §1.4 — not yet populated is never a zero', () => {
   it('names what the Founder-payments section is waiting for, and shows no amount', async () => {
+    // Session C: the waiting sentence lives on Money & Fulfillment → Payments
+    // now, and the listing amounts moved to Onboarding → Stripe & Listing Fee
+    // in Session B — so this test navigates to the tab and no longer asserts
+    // a listing line on the same pane.
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
     await openTab(user, 'Money & Fulfillment');
+    await user.click(screen.getByRole('tab', { name: 'Payments' }));
 
     expect(
-      screen.getByText('The campaign has not closed, so no Founder payment exists to show.'),
+      await screen.findByText('The campaign has not closed, so no Founder payment exists to show.'),
     ).toBeInTheDocument();
 
     // Every ledger column in this product defaults to 0, so a naive pane says
@@ -1211,23 +1428,31 @@ describe('§16a, §1.4 — not yet populated is never a zero', () => {
     // from one that captured nothing.
     const text = visibleText(container);
     expect(text).not.toContain('US$0.00');
-    // The real amounts elsewhere on the pane still render, so this is the
-    // absent section being silent rather than the whole pane.
-    expect(text).toContain('US$37.56');
+    // The W-9 state still renders beside it, so this is the absent section
+    // being silent rather than the whole tab.
+    expect(screen.getByRole('heading', { name: 'W-9', level: 2 })).toBeInTheDocument();
   });
 
   it('states the identity check as a status, with no document anywhere near it', async () => {
+    // Session C: the identity row lives on Onboarding → Stripe & Listing Fee
+    // (it moved there with payment setup in Session B; the old Money pane that
+    // duplicated it is deleted). The claim is unchanged: a status, no document,
+    // and no control that collects a provider-held field.
+    serve(adminRoutes({ before: [CAMPAIGN_WORKSPACE_READ] }));
     const user = userEvent.setup();
     const { container } = await renderWorkspace();
-    await openTab(user, 'Money & Fulfillment');
+    await openTab(user, 'Onboarding');
+    await user.click(screen.getByRole('tab', { name: 'Stripe & Listing Fee' }));
 
-    const row = rowFor(container, 'Identity check');
+    const row = await waitFor(() => rowFor(container, 'Identity check'));
     expect(within(row).getByText('Verified by Stripe')).toBeInTheDocument();
     expect(within(row).getByText(IDENTITY_CHECK_HELPER)).toBeInTheDocument();
-    // Nothing on this pane moves money or collects a provider-held field.
-    expect(screen.getByRole('tabpanel').querySelectorAll('input, select, textarea')).toHaveLength(
-      0,
-    );
+    // Nothing on this tab moves money or collects a provider-held field.
+    expect(
+      screen
+        .getAllByRole('tabpanel')
+        .flatMap((panel) => [...panel.querySelectorAll('input, select, textarea')]),
+    ).toHaveLength(0);
   });
 });
 
@@ -1887,5 +2112,211 @@ describe('Session B — the Edit Founder sheet carries the editable core and not
         reason: 'Rae asked support to correct the number.',
       });
     });
+  });
+});
+
+/* ── 18. Session C — the read-and-route sections ───────────────────────────── */
+
+describe('Session C — the six read-and-route sections', () => {
+  it('Campaign is four tabs; Details renders the build read-only with the raw value behind the disclosure', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderWorkspace();
+    await openTab(user, 'Campaign');
+
+    const rail = screen.getByRole('tablist', { name: 'Campaign record' });
+    expect(within(rail).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Details',
+      'Review',
+      'Live',
+      'Page & Updates',
+    ]);
+
+    // The build content renders as facts — and there is no per-field Edit.
+    const row = rowFor(container, 'Delivery window');
+    expect(within(row).getByText('November 2026')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit campaign' })).toBeNull();
+  });
+
+  it('Review renders rounds and feedback, and refuses the decision controls by register', async () => {
+    const user = userEvent.setup();
+    await renderWorkspace();
+    await openTab(user, 'Campaign');
+    await user.click(screen.getByRole('tab', { name: 'Review' }));
+
+    expect(await screen.findByText('Round 1')).toBeInTheDocument();
+    expect(screen.getByText('Name the delivery month in the story.')).toBeInTheDocument();
+
+    // The reference draws Approve campaign / Return changes / Mark reviewed.
+    // None mounts; the register's sentence renders where they would have been.
+    expect(screen.queryByRole('button', { name: 'Approve campaign' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Return changes' })).toBeNull();
+    const entry = OPERATIONS_ABSENCES.find(
+      (absence) => absence.control === 'Mark reviewed / Approve campaign / Return changes',
+    );
+    expect(entry).toBeDefined();
+    expect(screen.getByText(entry!.reason)).toBeInTheDocument();
+  });
+
+  it('Affiliates renders the roster linking into the Creators workspace, and Admin never agrees', async () => {
+    const user = userEvent.setup();
+    await renderWorkspace();
+    await openTab(user, 'Affiliates');
+
+    // The relationship rows link out — the Creators workspace owns them.
+    const open = screen.getAllByRole('link', { name: 'Open relationship' });
+    expect(open[0]).toHaveAttribute(
+      'href',
+      '/admin/creators/creator-prospect-1/relationships/assoc-1',
+    );
+    expect(screen.getByText('35% locked')).toBeInTheDocument();
+    expect(screen.getByText('34% proposed on v3 · not locked')).toBeInTheDocument();
+
+    // §14.2: no control records a party's decision, and no control sets a bonus.
+    expect(screen.queryByRole('button', { name: /Record Founder acceptance/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Set bonus/ })).toBeNull();
+  });
+
+  it('Requests renders the work-again record read-only and names the mediated-request absence', async () => {
+    const user = userEvent.setup();
+    await renderWorkspace();
+    await openTab(user, 'Affiliates');
+    await user.click(screen.getByRole('tab', { name: 'Requests' }));
+
+    expect(await screen.findByText('Requested — awaiting the Creator')).toBeInTheDocument();
+    expect(screen.getByText(MEDIATED_REQUESTS_ABSENT)).toBeInTheDocument();
+    // §22.9: the ask is the Founder's own; Admin cannot send one.
+    expect(screen.queryByRole('button', { name: /work-again/i })).toBeNull();
+  });
+
+  it('Demand splits attribution honestly and does not invent drop-off reasons', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderWorkspace();
+    await openTab(user, 'Backers & Demand');
+
+    const split = rowFor(container, 'Affiliate traffic');
+    expect(within(split).getByText('2835 valid clicks · 59 Backers')).toBeInTheDocument();
+    expect(screen.getByText(/No cancellation-reason record exists/)).toBeInTheDocument();
+  });
+
+  it('Backers rows carry numbers only and route to the Backers workspace and the case', async () => {
+    const user = userEvent.setup();
+    await renderWorkspace();
+    await openTab(user, 'Backers & Demand');
+    await user.click(screen.getByRole('tab', { name: 'Backers' }));
+
+    expect(await screen.findByText('Backer 427')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'PVD-24680-13579' })).toHaveAttribute(
+      'href',
+      '/admin/support/case-1',
+    );
+    expect(screen.getByRole('link', { name: 'Open Backers workspace' })).toHaveAttribute(
+      'href',
+      `/admin/backers?view=backers&campaignId=${CAMPAIGN}`,
+    );
+  });
+
+  it('Money opens on Close with honest not-due states, and Payments refuses the money decisions', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderWorkspace();
+    await openTab(user, 'Money & Fulfillment');
+
+    expect(
+      within(rowFor(container, 'Capture state')).getByText(
+        'Not due — the campaign has not closed',
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Payments' }));
+    const approve = OPERATIONS_ABSENCES.find(
+      (absence) => absence.control === 'Approve, hold, or release a Founder payment',
+    );
+    expect(await screen.findByText(approve!.reason)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Approve/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /reminder/i })).toBeNull();
+  });
+
+  it('Support cases link to their own record, and Enforcement refuses the campaign-scoped controls', async () => {
+    const user = userEvent.setup();
+    await renderWorkspace();
+    await openTab(user, 'Support & Enforcement');
+
+    expect(await screen.findByText('PVD-24680-13579')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open support case' })).toHaveAttribute(
+      'href',
+      '/admin/support/case-1',
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Enforcement' }));
+    expect(await screen.findByText('Not banned')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Suspend campaign' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Kill campaign' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Send warning' })).toBeNull();
+  });
+
+  it('History is Timeline and Communications, with the label resolved from the registry', async () => {
+    const user = userEvent.setup();
+    await renderWorkspace();
+    await openTab(user, 'History');
+
+    // Timeline keeps the chips and offers the record's ONE note write.
+    expect(screen.getByRole('button', { name: 'Add internal note' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Communications' }));
+    // 22c's rule: the payload carries the key; the label resolves here.
+    expect(
+      await screen.findByText(NOTIFICATION_EVENTS.founder_invitation.description),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Compose/ })).toBeNull();
+  });
+
+  it('every register refusal renders somewhere across the section tabs', async () => {
+    // The Create Founder arrangement, applied to operations: each refused
+    // control's sentence must be ON a surface, so re-adding the control means
+    // deleting the sentence that says why it must not exist.
+    const user = userEvent.setup();
+    await renderWorkspace();
+
+    const walk: [string, string | null][] = [
+      ['Campaign', null],
+      ['Campaign', 'Review'],
+      ['Affiliates', null],
+      ['Affiliates', 'Performance & Completion'],
+      ['Backers & Demand', 'Responses'],
+      ['Money & Fulfillment', 'Payments'],
+      ['Money & Fulfillment', 'Fulfillment'],
+      ['Support & Enforcement', 'Enforcement'],
+      ['History', null],
+      ['History', 'Communications'],
+    ];
+    const seen = new Set<string>();
+    for (const [section, tab] of walk) {
+      await openTab(user, section!);
+      if (tab) await user.click(screen.getByRole('tab', { name: tab }));
+      await waitFor(() => {
+        expect(screen.getAllByRole('tabpanel').length).toBeGreaterThan(0);
+      });
+      for (const absence of OPERATIONS_ABSENCES) {
+        if (screen.queryByText(absence.reason)) seen.add(absence.control);
+      }
+    }
+    const missing = OPERATIONS_ABSENCES.map((absence) => absence.control).filter(
+      (control) => !seen.has(control),
+    );
+    expect(missing, 'register refusals with no rendered sentence').toEqual([]);
+  });
+
+  it('the no-campaign state renders the honest absence, not a campaign-shaped zero', async () => {
+    const workspace = workspaceFixture();
+    workspace.operations = null;
+    serve(adminRoutes({ workspace }));
+    const user = userEvent.setup();
+    const { container } = await renderWorkspace();
+    await openTab(user, 'Campaign');
+
+    expect(screen.getByText('Campaign unavailable')).toBeInTheDocument();
+    expect(within(rowFor(container, 'Campaign')).getByText('Not created')).toBeInTheDocument();
+    // No count renders as a zero for a campaign that does not exist.
+    expect(visibleText(container)).not.toContain('0 active');
   });
 });

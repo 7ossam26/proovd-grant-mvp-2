@@ -79,6 +79,7 @@ import {
 } from './logic.js';
 import { actorName, daysUntil, formatDay, formatInstant, resolveActorNames } from './format.js';
 import { historyCountsOf, readFounderHistory } from './history.js';
+import { composeCommunications, composeOperations } from './operations.js';
 import {
   actionCells,
   campaignDayOf,
@@ -919,6 +920,8 @@ export async function readFounderWorkspace(
   const discovery = await composeDiscovery(db, ctx);
   const eligibility = await composeEligibility(db, ctx, overview);
   const campaignFacts = await composeCampaignFacts(db, ctx, now);
+  const operations = await composeOperations(db, ctx, now);
+  const communications = await composeCommunications(db, ctx);
 
   const header: FounderHeader = {
     prospectId,
@@ -960,6 +963,8 @@ export async function readFounderWorkspace(
     discovery,
     eligibility,
     campaignFacts,
+    operations,
+    communications,
     history,
     historyCounts: historyCountsOf(history),
   };

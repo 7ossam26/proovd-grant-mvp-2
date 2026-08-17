@@ -949,3 +949,208 @@ export const ATTENTION_ACTIONS = [
   'open-campaign',
 ] as const;
 export type AttentionAction = (typeof ATTENTION_ACTIONS)[number];
+
+/* ─────────── The operations sections (Session C, 2026-08-17) ───────────── */
+
+/**
+ * Each read-and-route sub-tab leads with a question and answers it with the
+ * record's state — the Onboarding arrangement (Session B), extended to the
+ * five operations sections and History. The wording is the reference's own,
+ * pinned here so the surface cannot drift into a second phrasing.
+ *
+ * The Money section deliberately shares ONE question across Payments,
+ * Fulfillment, and Refunds & Recovery — the reference renders the same
+ * eyebrow on all three, because before close they are one answer ("nothing
+ * is due yet") and after close they are three views of one decision queue.
+ */
+export const OPERATIONS_TAB_COPY = {
+  campaign: {
+    details: {
+      question: 'What exactly will Backers and Affiliates accept?',
+      subtitle:
+        'Every field renders from the recorded build; corrections run through the live-editing door, never through this page.',
+    },
+    review: {
+      question: 'What still prevents approval?',
+      subtitle:
+        'Review rounds, roster readiness, and recorded feedback — the state of the review decision, not a second place to make it.',
+    },
+    live: {
+      question: 'What changed in the live campaign?',
+      subtitle: 'System-derived performance is read-only.',
+    },
+    page: {
+      question: 'What are Backers seeing and what changed?',
+      subtitle:
+        'The public page, Founder updates, and the comment thread stay attached to the published version.',
+    },
+  },
+  affiliates: {
+    relationships: {
+      question: 'What is waiting on whom?',
+      subtitle:
+        'Both sides must accept the same version before terms lock. Each relationship is operated from its own record.',
+    },
+    requests: {
+      question: 'Which mediated request needs resolution?',
+      subtitle:
+        'The one mediated ask this product records is the work-again request; everything else arrives through support.',
+    },
+    performance: {
+      question: 'How are Affiliates affecting this campaign?',
+      subtitle:
+        'Ranked by Backers brought in. Deep Affiliate analytics live in the Affiliate record.',
+    },
+  },
+  backers: {
+    demand: {
+      question: 'Where is demand actually coming from?',
+      /*
+       * The reference writes "…tracking and reservation events". The Founders
+       * suite scans every rendered pane against a stricter-than-§3.1 list that
+       * has forbidden `reservation` since Session A, and the scan caught the
+       * reference's own wording — so the pinned sentence says pre-order.
+       */
+      subtitle: 'Generated from valid tracking and pre-order events.',
+    },
+    responses: {
+      question: 'What are Backers telling this Founder?',
+      subtitle:
+        'Original answers remain immutable; what may leave this screen respects the Backer’s own consent.',
+    },
+    backers: {
+      question: 'Which Backer record needs support or payment context?',
+      subtitle: 'Checkout responses and provider payment results are read-only.',
+    },
+  },
+  money: {
+    close: {
+      question: 'Is this campaign ready to close cleanly?',
+      subtitle:
+        'System counts cannot be rewritten. Admin reviews eligibility and exact exceptions.',
+    },
+    payments: {
+      question: 'What money or fulfillment decision is due?',
+      subtitle: 'No Admin action can fabricate a post-close or provider outcome.',
+    },
+    fulfillment: {
+      question: 'What money or fulfillment decision is due?',
+      subtitle: 'Original and revised commitments remain visible together.',
+    },
+    refunds: {
+      question: 'What money or fulfillment decision is due?',
+      subtitle: 'Cases appear only from real charge, dispute, support, or enforcement events.',
+    },
+  },
+  support: {
+    support: {
+      question: 'Which promise to a customer is due next?',
+      subtitle: 'One owner, one due time, full campaign and payment context.',
+    },
+    cancellation: {
+      question: 'Is there a Founder cancellation request?',
+      subtitle: 'No request, decision, or financial consequence is fabricated.',
+    },
+    enforcement: {
+      question: 'Is this Founder or campaign safe to continue?',
+      subtitle: 'Sensitive actions are audited and never shown as a vague block.',
+    },
+  },
+  history: {
+    timeline: {
+      question: 'How did this Founder reach the current state?',
+      subtitle:
+        'Existing events are immutable; Admin may add contextual notes without rewriting them.',
+    },
+    communications: {
+      question: 'What did Proovd send — and what happened next?',
+      subtitle:
+        'Already-sent messages are immutable. Every message here was sent by the event that owns it.',
+    },
+  },
+} as const;
+
+export type OperationsSectionKey = keyof typeof OPERATIONS_TAB_COPY;
+
+/**
+ * What the reference draws on the operations sections and this record refuses
+ * to mount, each with the rule — the `CREATE_FOUNDER_ABSENCES` arrangement.
+ * The surface renders the refusals as sentences where the reference put
+ * controls, so a later session re-adding one fails the register walk.
+ */
+export const OPERATIONS_ABSENCES = [
+  {
+    control: 'Edit a campaign field from this record',
+    reason:
+      'Campaign content changes run through §20’s one live-editing door, where the field’s own tier decides direct publish, review, or refusal — a per-field edit here would be a second door, and for never-direct fields a door that must not exist.',
+  },
+  {
+    control: 'Mark reviewed / Approve campaign / Return changes',
+    reason:
+      '§15’s review is round-based with grouped feedback; no per-field reviewed record exists to write, and approval is a freshness-gated decision on the review routes, whose Admin console is not built yet.',
+  },
+  {
+    control: 'Record a proposal acceptance, counter, or decline for either side',
+    reason:
+      'A §14.2 decision belongs to the side that makes it, through its own signed-in surface — Admin mediates and never agrees, and the one Admin move on a version (rejection) lives on the Creator relationship record.',
+  },
+  {
+    control: 'Set a Creator bonus',
+    reason:
+      'A §14.3 bonus is proposed and accepted inside a proposal version’s bilateral lock; an Admin writing one directly would invent a commercial term nobody accepted.',
+  },
+  {
+    control: 'Send a work-again request',
+    reason:
+      '§22.9’s request is the Founder’s own ask, recorded from the Founder’s session — an Admin control here would fabricate a Founder’s ask and a Creator would act on it.',
+  },
+  {
+    control: 'Send a W-9 reminder',
+    reason:
+      '§27 names no manual W-9 reminder message — the due notices are sweep-sent on the recorded schedule, and a button that sends an unregistered message is the failure the notification register exists to prevent.',
+  },
+  {
+    control: 'Approve, hold, or release a Founder payment',
+    reason:
+      '§22.3’s money decisions belong to the close-operations queue with its own gates and evidence — a release control on a person’s record would be a second door into money, and that queue’s Admin console is not built yet.',
+  },
+  {
+    control: 'Decide a Day-14 review or a fulfillment evidence request',
+    reason:
+      '§22.4 and §22.5 decisions are recorded through the fulfillment services with their own consequence matrices; this record renders their one resolver and the decision console is not built yet.',
+  },
+  {
+    control: 'Suspend or kill the campaign from this record',
+    reason:
+      'Campaign-scoped enforcement is §26.7’s recorded decision with its complete pre/post-capture effects — it is operated where those rules live, and account-level suspension and the ban already have their gated controls in this record’s header.',
+  },
+  {
+    control: 'Send warning',
+    reason:
+      'No §27 notification key names a warning message, and a send the registry does not know about is the §1.4 failure — enforcement that reaches a person is a recorded action with its own notices.',
+  },
+  {
+    control: 'Compose a Founder message',
+    reason:
+      'The product’s manual-send surfaces are the two invitation gates; every other message is sent by the event that owns it, and a general compose control would send messages §27 does not name.',
+  },
+  {
+    control: 'Export the audit trail or the response dataset',
+    reason:
+      '§25.7’s one register-driven export is the §26.5 ledger’s, where what is withheld is named before the button is pressed — an export whose columns this record chose would be a limit the requester can widen.',
+  },
+] as const;
+
+/**
+ * The Requests tab's pinned absence — the brief's named Session C decision.
+ * No meeting or end-partnership record was built, because no Founder-facing
+ * surface can create one (§30 defers direct Founder–Creator messaging, and
+ * §16's no-nudge posture is why §20's surfaces offer no ask-to-meet). A table
+ * nobody can populate is §1.4's key-with-no-sender wearing a schema.
+ */
+export const MEDIATED_REQUESTS_ABSENT =
+  'No meeting or end-partnership record exists — a Founder’s ask to meet a Creator or to end a partnership arrives through support and lives on the case. The one mediated ask this product records is the work-again request.';
+
+/** §18/§20: moderation decides visibility; nobody edits another user's words. */
+export const COMMENTS_NEVER_REWRITTEN =
+  'Admin never rewrites another user’s comment — a flag is decided, and a removal names who and why while the row survives.';

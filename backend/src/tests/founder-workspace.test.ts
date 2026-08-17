@@ -41,6 +41,7 @@ import {
   campaignInvitationSends,
   founderProspects,
 } from '../db/schema/invitations.js';
+import { campaignCancellations } from '../db/schema/listing.js';
 import { campaigns } from '../db/schema/domain.js';
 import { founderGhostBans } from '../db/schema/fulfillment.js';
 import {
@@ -447,9 +448,12 @@ describe('§26.1 the workspace serves five panes composed from the records', () 
     // facts, both composed server-side like everything else here.
     // `eligibility` joined on 2026-08-17 (Session B): the Onboarding section's
     // read-only claim and representation facts.
+    // `operations` and `communications` joined on 2026-08-17 (Session C): the
+    // read-and-route sections' composed state and the delivery record.
     expect(Object.keys(detail).sort()).toEqual([
       'campaignFacts',
       'campaigns',
+      'communications',
       'details',
       'discovery',
       'eligibility',
@@ -457,6 +461,7 @@ describe('§26.1 the workspace serves five panes composed from the records', () 
       'history',
       'historyCounts',
       'money',
+      'operations',
       'overview',
     ]);
 
@@ -1985,5 +1990,87 @@ describe('the invitation record renders as facts, never a token value (§28.1)',
       claimed: null,
       revoked: false,
     });
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session C — the operations view composes, and it owns nothing
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('the operations view is honest state, composed (§16a, §26.8)', () => {
+  it('renders a fresh campaign with named absences, never campaign-shaped zeros', async () => {
+    const founder = await invited('ops-fresh');
+    const detail = await workspaceOf(founder.prospectId);
+    const ops = detail.operations;
+    expect(ops, 'every prospect intake creates a campaign, so operations composes').toBeTruthy();
+
+    // Nothing exists yet, and each fact says so in its own vocabulary.
+    expect(ops!.live.created).toBe(0);
+    expect(ops!.live.conversion, 'a conversion over zero clicks is null, never 0%').toBeNull();
+    expect(ops!.live.reservedSubtotal).toBeNull();
+    expect(ops!.close.captureState).toBe('Not due — the campaign has not closed');
+    expect(ops!.close.batch).toBeNull();
+    expect(ops!.fulfillment.available).toBe(false);
+    expect(ops!.fulfillment.waitingOn).toBeTruthy();
+    expect(ops!.refunds.totalRefunds).toBe(0);
+    expect(ops!.cancellation).toBeNull();
+    expect(ops!.enforcement.campaignActions).toEqual([]);
+    expect(ops!.roster).toEqual([]);
+    expect(ops!.workAgain).toEqual([]);
+
+    // The build has no row yet, so every content field is an absent VALUE the
+    // surface renders as its own state — not a blank string.
+    const title = ops!.content.fields.find((f) => f.label === 'Title');
+    expect(title).toBeDefined();
+    expect(title!.value).toBeNull();
+  });
+
+  it('writes nothing: the composer has no insert, update, or delete in it', async () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(join(here, '../founders/operations.ts'), 'utf8');
+    for (const write of ['.insert(', '.update(', '.delete(']) {
+      expect(source, `operations.ts must not call ${write}`).not.toContain(write);
+    }
+  });
+
+  it('keeps the §31.6 internal reason out of the payload (§25.6)', async () => {
+    const founder = await invited('ops-cancellation');
+    const internalReason = 'internal-only wording that must never render';
+    await h.db.insert(campaignCancellations).values({
+      campaignId: founder.campaignId,
+      kind: 'admin_review',
+      status: 'pending',
+      requestedBy: 'founder',
+      requestedAt: new Date(),
+      internalReason,
+      customerExplanation: 'We are reviewing your cancellation request.',
+    });
+
+    const detail = await workspaceOf(founder.prospectId);
+    const cancellation = detail.operations!.cancellation;
+    expect(cancellation).toBeTruthy();
+    expect(cancellation!.state).toBe('Pending decision');
+    expect(cancellation!.customerExplanation).toBe('We are reviewing your cancellation request.');
+    // §25.6 keeps the two columns apart; the payload carries only the one a
+    // customer could be read.
+    expect(JSON.stringify(detail.operations)).not.toContain(internalReason);
+  });
+});
+
+describe('communications lists what was sent, by key, never by body (§27, 22c)', () => {
+  it('carries the delivery record for the invitation the send produced', async () => {
+    const founder = await invited('comms-send');
+    const detail = await workspaceOf(founder.prospectId);
+
+    expect(detail.communications.total).toBeGreaterThanOrEqual(1);
+    const row = detail.communications.rows.find((r) => r.eventKey === 'founder_invitation');
+    expect(row, 'the send recorded a founder_invitation delivery').toBeTruthy();
+    expect(row!.target).toBe(founder.email);
+    expect(row!.state).toBe('Delivered');
+
+    // The row is the KEY and the delivery facts — no body, no subject, no
+    // rendered copy. The label resolves in the browser from the shared
+    // registry (22c's rule: a fourth copy of the descriptions would drift).
+    expect(Object.keys(row!).sort()).toEqual(['at', 'eventKey', 'state', 'target']);
   });
 });

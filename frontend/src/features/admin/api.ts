@@ -572,6 +572,179 @@ export interface EligibilityView {
   acknowledgementsAbsent: string | null;
 }
 
+/* ── The operations sections (Session C, 2026-08-17) ───────────────────────*/
+
+export interface OpsFact {
+  label: string;
+  value: string | null;
+}
+
+/** The read-and-route sections' composed state. Mirrors `founders/types.ts`. */
+export interface OperationsView {
+  campaignId: string;
+  campaignName: string;
+  typeLabel: string;
+  statusLabel: string;
+  content: {
+    fields: OpsFact[];
+    rewards: { title: string; price: string; contents: string | null; delivery: string | null }[];
+    faqs: { question: string; answer: string }[];
+  };
+  review: {
+    buildStatus: string | null;
+    rosterReadiness: string | null;
+    rounds: { round: number; outcome: string; submittedAt: string; decidedAt: string | null }[];
+    feedback: { group: string; text: string }[];
+    approvedAt: string | null;
+  };
+  live: {
+    isLive: boolean;
+    liveAt: string | null;
+    campaignDay: number | null;
+    closesAt: string | null;
+    discovery: string;
+    publicUrl: string | null;
+    created: number;
+    active: number;
+    canceled: number;
+    validClicks: number;
+    conversion: string | null;
+    reservedSubtotal: string | null;
+    updatesCount: number;
+    commentsCount: number;
+    threshold: { required: number; active: number; remaining: number; state: string } | null;
+  };
+  page: {
+    updates: {
+      title: string;
+      audience: string;
+      publishedAt: string;
+      body: string;
+      materialChange: boolean;
+    }[];
+    updatesCount: number;
+    comments: { author: string; body: string; postedAt: string; state: string }[];
+    commentsCount: number;
+    openFlags: number;
+  };
+  roster: {
+    associationId: string;
+    prospectId: string;
+    name: string;
+    handle: string | null;
+    statusLabel: string;
+    terms: string;
+    launchRequired: boolean | null;
+    backers: number;
+    validClicks: number;
+    completion: string | null;
+    workAgain: string | null;
+  }[];
+  rosterCounts: { total: number; backersBroughtIn: number; validClicks: number };
+  workAgain: {
+    creatorName: string;
+    requestedAt: string;
+    status: string;
+    message: string | null;
+    respondedAt: string | null;
+    responseNote: string | null;
+  }[];
+  demand: { split: { label: string; clicks: number; backers: number }[] };
+  responses: {
+    total: number;
+    rows: {
+      backer: string;
+      reward: string;
+      status: string;
+      why: string | null;
+      recommend: number | null;
+      consent: string;
+    }[];
+  };
+  backerRows: {
+    total: number;
+    rows: {
+      backer: string;
+      reward: string;
+      createdAt: string;
+      status: string;
+      attribution: string;
+      caseRef: string | null;
+      caseId: string | null;
+    }[];
+  };
+  close: {
+    scheduledClose: string | null;
+    batch: {
+      status: string;
+      startedAt: string;
+      completedAt: string | null;
+      outcome: string;
+      thresholdDecidedAt: string | null;
+    } | null;
+    finalActive: number | null;
+    canceledExcluded: number | null;
+    captureState: string;
+    retryWindow: string | null;
+    reconciliation: string;
+    resultsPreparedAt: string | null;
+    idea: { threshold: number | null; finalActive: number | null; state: string } | null;
+  };
+  fulfillment: {
+    available: boolean;
+    waitingOn: string | null;
+    mechanism: string | null;
+    deliveredAt: string | null;
+    obligations: { label: string; state: string; dueAt: string | null }[];
+    commitments: { sequence: number; month: string; original: boolean; text: string }[];
+    day14: { state: string; dueAt: string | null } | null;
+  };
+  refunds: {
+    openRefunds: number;
+    totalRefunds: number;
+    openDisputes: number;
+    totalDisputes: number;
+    recoveryRecords: number;
+  };
+  supportCases: {
+    caseId: string;
+    reference: string;
+    subject: string | null;
+    status: string;
+    owner: string;
+    due: string | null;
+  }[];
+  cancellation: {
+    state: string;
+    kind: string | null;
+    requestedAt: string | null;
+    decidedAt: string | null;
+    customerExplanation: string | null;
+  } | null;
+  enforcement: {
+    campaignActions: {
+      action: string;
+      phase: string;
+      occurredAt: string;
+      category: string;
+      customerExplanation: string;
+    }[];
+  };
+}
+
+export interface CommunicationRow {
+  /** The §27 registry key — the label resolves here from the shared registry. */
+  eventKey: string;
+  target: string;
+  at: string;
+  state: string;
+}
+
+export interface CommunicationsView {
+  total: number;
+  rows: CommunicationRow[];
+}
+
 export interface FounderWorkspaceDetail {
   header: FounderHeader;
   overview: OverviewPane;
@@ -581,6 +754,9 @@ export interface FounderWorkspaceDetail {
   discovery: DiscoveryView;
   eligibility: EligibilityView;
   campaignFacts: CampaignFactsView | null;
+  /** Session C: the read-and-route sections' state. Null with no campaign. */
+  operations: OperationsView | null;
+  communications: CommunicationsView;
   history: FounderHistoryEntry[];
   /** Counts per chip, so a zero-count filter can be hidden without a scan. */
   historyCounts: Record<string, number>;

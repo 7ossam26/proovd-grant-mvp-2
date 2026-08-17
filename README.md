@@ -267,7 +267,9 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          2026-08-16/17 — the six-card directory with its two
                          action columns, the eight-section person record with
                          Onboarding's four tabs, the five-step Create Founder
-                         compose, and the Edit Founder sheet),
+                         compose, the Edit Founder sheet, and the six
+                         read-and-route sections from Campaign through
+                         History's Timeline/Communications split),
                          Creators, Campaigns, Support, Backers, and the
                          floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page

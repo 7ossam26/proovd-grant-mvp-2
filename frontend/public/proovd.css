@@ -6549,3 +6549,16 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .cf-foot { flex-wrap: wrap; }
   .cf-foot__actions { margin-left: 0; }
 }
+
+/* ── Session C (added 2026-08-17): the read-and-route sections. Everything
+   else on these tabs reuses the Session B vocabulary (.fob-tabs, .fob-hero,
+   .fob-panel, .fob-stats) and the shell's own .filters/.att-box — the one new
+   thing a refusal sentence needed was its own quiet treatment. */
+.fop-refusal {
+  margin-top: var(--sp-16);
+  padding: var(--sp-12) var(--sp-16);
+  border-left: 3px solid var(--moss);
+  color: var(--ink-50);
+  font-size: 0.875rem;
+}
+.fop-refusal b { color: var(--dark); }
