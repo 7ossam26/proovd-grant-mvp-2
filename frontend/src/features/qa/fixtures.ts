@@ -95,7 +95,7 @@ const draftLanding: DraftLanding = {
   lastContactAt: new Date(Date.now() - 3 * 60_000).toISOString(),
   reference: 'PVD-QA100-QA200',
   processSummary: [
-    'You answer three questions about the problem, your solution, and the views your content gets.',
+    'You answer three questions about the problem, your solution, and how you are positioned.',
     'A person at Proovd reads them and decides whether to continue.',
     'If it continues, you build the campaign page and pay the listing fee.',
   ],
@@ -109,6 +109,10 @@ const vetting: VettingState = {
   selectedType: 'pre_launch',
   problem: 'Hobby electronics benches are lit by ceiling lights that cast a shadow over the board.',
   solution: 'A clamp lamp with a 96 CRI head and a magnetic arm that holds its position.',
+  competition:
+    'Ceiling lights and phone torches, mostly. The lamps sold for this cost four times as much and still cast a shadow across the board.',
+  // Retired from collection on 2026-08-18. Kept on the fixture because a record
+  // onboarded before then still carries one, and the Admin read still shows it.
   views: '10k_100k',
   provenance: {
     problem: {
@@ -125,11 +129,20 @@ const vetting: VettingState = {
       firstEditedAt: '2026-08-01T09:25:00.000Z',
       lastEditedAt: '2026-08-01T09:41:00.000Z',
     },
+    // Never anything else: there are no `competition_prefilled_*` columns and
+    // §9 states twice that there never will be (§33.1.5).
+    competition: {
+      supplier: 'founder',
+      prefilledText: null,
+      prefilledAt: null,
+      firstEditedAt: '2026-08-01T09:31:00.000Z',
+      lastEditedAt: '2026-08-01T09:44:00.000Z',
+    },
   },
   lastSavedAt: '2026-08-01T09:42:00.000Z',
   resumeStep: null,
   submittedAt: null,
-  completeness: { problem: true, solution: true, views: true },
+  completeness: { problem: true, solution: true, competition: true },
   campaignStatus: 'vetting_in_progress',
   lockedType: null,
   typeLockedAt: null,

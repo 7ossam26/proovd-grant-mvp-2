@@ -169,8 +169,8 @@ verifier and evidence, and no code path can satisfy one by inference.
 Work since Phase 24 is not numbered. Each piece is built from a supplied
 reference plus the decisions that reference cannot make for itself, and each is
 recorded in [CLAUDE.md](CLAUDE.md) with its date. The Admin panel's five
-workspaces and its floating task list came that way; the current one is the
-public campaign page.
+workspaces, its floating task list, and the public campaign page came that way;
+the current one is the Founder's own onboarding.
 
 **The campaign page was rebuilt in three sessions, all of which have landed.** Spec §18 defines that page's *content* and hands presentation to the
 DNA document by name — "the DNA UX document controls presentation" — so a
@@ -290,6 +290,65 @@ including receipts and deadlines that nobody may opt out of. The header does
 not ship; the summary already carries its own unsubscribe as its single action.
 If deliverability later requires it, it attaches to the non-transactional
 messages alone, as its own decision with its own test.
+
+### The Founder's onboarding, being rebuilt
+
+The path a Founder walks from opening a pre-filled invitation to a live
+campaign becomes twenty-six full-screen steps with no app chrome. It is six
+sessions; the first has landed. The walk that scopes the rest is
+[docs/phases/founder-reconciliation](docs/phases/founder-flow-reconciliation.md),
+and the brief is [docs/phases/founder-flow-v2.md](docs/phases/founder-flow-v2.md).
+
+**The first session writes no screen. It is the record — and four of its five
+changes are the Spec being restored rather than departed from.** In August a
+product decision had simplified the vetting flow: the Founder stopped choosing
+their own campaign path, the positioning question was dropped and replaced with
+one about audience size, and the relevance signal stopped being a screen. That
+was recorded at the time as a deliberate deviation, not a defect. The same kind
+of decision has now withdrawn it, so all four go back to what Spec §9 and §10
+describe. The audience-size question retires from being *asked* only — the
+answers people already gave are still theirs, still stored, and still shown to
+Admin, and a campaign onboarded after the change says the question was never
+asked rather than showing a blank.
+
+One of those returns cost more than a register change, and the reason is worth
+recording. While the Founder had no campaign-path screen, a saved position on
+that step was mapped to the first question — correct at the time. With the
+screen back, that mapping silently resumes a Founder one step past where they
+stopped, so where a Founder can *be* is now a different list from what they
+*answer*.
+
+**The order the reference draws is wrong in three places, and code that already
+exists refuses each one.** The five bonus answers upload files and book a call,
+which needs an account; the reference asks for them before the account exists.
+The listing-fee screen is drawn before payout setup, but the fee cannot be paid
+until payout setup is complete, so as drawn it offers a payment the server
+declines. And the relevance signal is drawn late, where the Spec puts it before
+the account. All three moved, and each move is written down as a move so a
+later reader can see it was decided rather than missed.
+
+**Walking the prototype rather than reading it found three things the brief had
+not.** The most serious: the order-threshold screen collects a dollar amount
+with a $500 minimum, and an Idea campaign's threshold is a *number of Backers*,
+not money — with no minimum the product has ever agreed to. The other two are a
+third place the internal word for Creators reaches a Founder, and a second
+"in review" screen that approves a person rather than a campaign.
+
+**One genuinely new record was added, and it is a deliberate exception.** The
+reference asks the Founder, during onboarding, whether they would fund an
+optional fixed payment to a Creator. Under the Spec that payment is the
+Creator's to request and both sides accept one version of it, so an answer given
+before any Creator exists has no place in that negotiation. It is built by
+explicit product direction and it binds nothing — enforced by what the table
+cannot hold: no amount, no percentage, and no reference to a proposal. It also
+cannot exist at all for an Idea campaign, which the Spec forbids the payment on,
+and the database refuses it two independent ways.
+
+Three parts of the flow cannot be completed in the current environment, and none
+of them is stubbed: the eight policy documents are still in legal review so the
+account step refuses in the open and says why, and file storage and the
+scheduling provider are both unconfigured so the upload and interview steps
+render a named absence rather than a dead control.
 
 ## Layout
 
@@ -412,7 +471,8 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          Campaigns, Support, Backers, and the
                          floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page
-  src/surfaces/draft/    the Founder journey: vetting, result, account claim
+  src/surfaces/draft/    the Founder journey: vetting, the relevance signal,
+                         account claim
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
                          preparing Campaign kit
   src/surfaces/founder/  the campaign workspace: five optional items as a flow,
@@ -645,6 +705,10 @@ identical page.
 The Founder journey is four questions, a result, and an account — Spec §9 and
 §10 — and the whole of it happens behind the invitation link, with no session
 and no account until the very last step.
+
+Between 10 and 18 August 2026 it was briefly three questions with the campaign
+path set by Admin, by a product decision recorded as a deviation at the time.
+That decision has been withdrawn and this section describes the flow again.
 
 **The campaign type locks permanently at submission, and there is no migration
 path.** Idea Campaign or Product Campaign decides whether there is an order

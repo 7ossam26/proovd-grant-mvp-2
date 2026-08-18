@@ -170,7 +170,9 @@ async function completeVetting(
   type: 'pre_build' | 'pre_launch',
   draftId: string,
 ): Promise<void> {
-  // Admin's step in the simplified flow: the campaign path, set on the draft.
+  // Admin's discovery answer for the campaign path — it stays beside the
+  // Founder's own (§9 step 1, reverted 2026-08-18), and this exercises it,
+  // because a workspace test is exactly where Admin's route belongs.
   await request(h.app)
     .put(`/api/admin/founders/${draftId}/campaign-path`)
     .set('cookie', admin.cookie)
@@ -182,7 +184,7 @@ async function completeVetting(
     .expect(200);
   await request(h.app)
     .patch(`/api/draft/${raw}/vetting`)
-    .send({ views: '10k_100k' })
+    .send({ competition: VETTING_ANSWERS.competition })
     .expect(200);
   await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(201);
 }

@@ -1,21 +1,30 @@
 /**
- * The vetting and account-claim suite — §33.1.4 through §33.1.9, adjusted for
- * the simplified flow (2026-08-10, product direction).
+ * The vetting and account-claim suite — §33.1.4 through §33.1.9.
  *
- * The recorded deviation, stated once: the Founder now answers THREE questions
- * — Problem, Solution, and the amount of views — the campaign path is set by
- * Admin on the draft and still locks permanently at submission, Competition is
- * no longer collected (its guarantees survive for existing records), and the
- * possible-creator result no longer gates the account claim.
+ * ── The 2026-08-10 deviation was WITHDRAWN on 2026-08-18 ───────────────────
+ * Four things reverted to §9 and §10 as written, and every test below that
+ * moved was moved BACK rather than forward: the Founder chooses their own
+ * campaign path again, Positioning is the third required answer, §10's result
+ * has a Founder-facing route again, and the amount of views is retired from
+ * collection.
  *
- * What each §33.1 item means under that deviation:
+ * The one thing that did NOT revert with them is the §10 GATE. §10 orders the
+ * result before account creation and says nothing about blocking one; the
+ * 2026-08-10 change removed the gate and this reversion deliberately leaves it
+ * removed. `§33.1.6 … is a record, not a gate` therefore still passes for the
+ * reason it always did.
  *
- *   33.1.4  Problem/Solution/Views order, progress, autosave, restore, and
- *           provenance work.
- *   33.1.5  Competition cannot be prefilled — the column guarantees survive
- *           even though the flow no longer asks the question.
- *   33.1.6  The possible-creator result remains an Admin-recorded assessment;
- *           it never renders a promise and NO LONGER blocks the claim.
+ * What each §33.1 item means:
+ *
+ *   33.1.4  Path/Problem/Solution/Positioning order, progress, autosave,
+ *           restore, and provenance work.
+ *   33.1.5  Competition cannot be prefilled — and now that it is collected
+ *           again, the guarantee is load-bearing rather than dormant. Every
+ *           test in that block passed UNCHANGED across the reversion, which is
+ *           the point: the guarantee was structural, not a property of the
+ *           question being absent.
+ *   33.1.6  The possible-creator result is an Admin-recorded assessment that
+ *           renders no promise and blocks nothing.
  *   33.1.7  Type locks at submission; wrong type archives and restarts without
  *           migrating agreements/payments/consents.
  *   33.1.8  No SMS OTP exists.
@@ -143,10 +152,17 @@ const ANSWERS = {
     'Clinics lose two or three appointments a week to late cancellations and the slot just goes empty.',
   solution:
     'When a slot frees up we text the waitlist in order and the first person to answer takes it.',
-  views: '10k_100k',
+  competition:
+    'Mostly a receptionist calling down a paper list, plus two scheduling suites that charge per seat and do not text at all.',
 };
 
-/** Admin's half of the simplified flow: the campaign path, set on the draft. */
+/**
+ * Admin's discovery answer for the campaign path.
+ *
+ * It STAYS beside the Founder's own choice (§9 step 1 reverted on 2026-08-18):
+ * this is how a path is set from a discovery call, and the Founder's screen
+ * arrives pre-selected from it.
+ */
 function setPath(draftId: string, type: 'pre_build' | 'pre_launch') {
   return request(h.app)
     .put(`/api/admin/founders/${draftId}/campaign-path`)
@@ -154,16 +170,26 @@ function setPath(draftId: string, type: 'pre_build' | 'pre_launch') {
     .send({ campaignPath: type });
 }
 
-/** Sets the path, fills in all three answers, and submits. */
+/**
+ * The whole §9 sequence as a Founder walks it: the path and all three answers
+ * through the DRAFT token, then submit.
+ *
+ * It deliberately does not call `setPath`. The Founder's own route is the one
+ * every downstream test should be exercising, and a helper that quietly used
+ * Admin's would leave the reverted path untested in fifty places.
+ */
 async function completeVetting(
   invited: Invited,
   type: 'pre_build' | 'pre_launch' = 'pre_launch',
 ): Promise<Record<string, unknown>> {
-  await setPath(invited.draftId, type).expect(200);
   const raw = invited.raw;
+  await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ selectedType: type }).expect(200);
   await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: ANSWERS.problem }).expect(200);
   await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ solution: ANSWERS.solution }).expect(200);
-  await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
+  await request(h.app)
+    .patch(`/api/draft/${raw}/vetting`)
+    .send({ competition: ANSWERS.competition })
+    .expect(200);
 
   const res = await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(201);
   return res.body;
@@ -239,17 +265,19 @@ const stripComments = (source: string): string =>
    The shared register and the backend restatement agree
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('the simplified sequence is stated once', () => {
+describe('the §9 sequence is stated once', () => {
   it('matches the shared register exactly, in order', () => {
     expect([...BACKEND_VETTING_STEPS]).toEqual([...VETTING_STEP_IDS]);
     expect([...VETTING_ANSWER_STEPS]).toEqual([...VETTING_ANSWER_STEP_IDS]);
   });
 
-  it('restates the views ranges exactly', () => {
+  // Retired from collection, still restated: stored answers are read on the
+  // Admin workspace and the two registers must not drift apart while they are.
+  it('restates the views ranges exactly, though nothing collects one any more', () => {
     expect([...VIEWS_RANGES]).toEqual([...VIEWS_RANGE_IDS]);
   });
 
-  it('offers exactly the two campaign paths §4 defines, to Admin', () => {
+  it('offers exactly the two campaign paths §4 defines, to the Founder and to Admin', () => {
     expect(CAMPAIGN_PATH_CHOICES.map((c) => c.type).sort()).toEqual([...CAMPAIGN_TYPES].sort());
   });
 
@@ -278,12 +306,15 @@ describe('§33.1.4 the vetting sequence', () => {
     expect(res.body.selectedType).toBeNull();
     expect(res.body.problem).toBeNull();
     expect(res.body.solution).toBeNull();
+    expect(res.body.competition).toBeNull();
+    // Retired from collection, so it opens null and stays null — but it is
+    // still READ, because a record from before the retirement carries one.
     expect(res.body.views).toBeNull();
     expect(res.body.submittedAt).toBeNull();
     expect(res.body.completeness).toEqual({
       problem: false,
       solution: false,
-      views: false,
+      competition: false,
     });
   });
 
@@ -300,25 +331,53 @@ describe('§33.1.4 the vetting sequence', () => {
     expect(first.body.completeness.problem).toBe(true);
   });
 
-  it('saves the views range and refuses one that is not in the register', async () => {
-    const { raw } = await invite('views');
+  // DELIBERATELY INVERTED (2026-08-18). This tested the amount-of-views answer,
+  // which §9 never asked for and which is retired from collection. What it
+  // tests now is the answer that took its place in the sequence.
+  it('saves the Positioning answer, always as the Founder’s own words', async () => {
+    const { raw } = await invite('positioning');
 
     const saved = await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ views: ANSWERS.views })
+      .send({ competition: ANSWERS.competition })
       .expect(200);
-    expect(saved.body.views).toBe(ANSWERS.views);
-    expect(saved.body.completeness.views).toBe(true);
+    expect(saved.body.competition).toBe(ANSWERS.competition);
+    expect(saved.body.completeness.competition).toBe(true);
+    // §9, twice, and §33.1.5: never `proovd`, whatever wrote it.
+    expect(saved.body.provenance.competition.supplier).toBe('founder');
+    // There is no prefill snapshot to carry, and no column that could hold one.
+    expect(saved.body.provenance.competition.prefilledText).toBeNull();
+  });
+
+  // DELIBERATELY INVERTED (2026-08-18). §9 step 1 is the Founder's again.
+  it('saves the campaign path from the Founder’s own route, and refuses a third value', async () => {
+    const { raw } = await invite('founder-path');
+
+    const saved = await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ selectedType: 'pre_build' })
+      .expect(200);
+    expect(saved.body.selectedType).toBe('pre_build');
+    // Nothing is locked yet — the lock is at submission (§9, §33.1.7), which
+    // is what makes the flow's own Back button safe.
+    expect(saved.body.lockedType).toBeNull();
+    expect(saved.body.typeLockedAt).toBeNull();
+
+    // Changing their mind is ordinary, and is what the Back button does.
+    const changed = await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ selectedType: 'pre_launch' })
+      .expect(200);
+    expect(changed.body.selectedType).toBe('pre_launch');
 
     const refused = await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ views: 'a-billion' })
+      .send({ selectedType: 'pre_something_else' })
       .expect(422);
-    expect(refused.body.whatHappened).toMatch(/not one of the view ranges/i);
+    expect(refused.body.whatHappened).toMatch(/not one of the two campaign paths/i);
 
-    // The refusal changed nothing.
     const after = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
-    expect(after.body.views).toBe(ANSWERS.views);
+    expect(after.body.selectedType).toBe('pre_launch');
   });
 
   it('restores the latest saved draft on a later visit (§9, DNA §5.12)', async () => {
@@ -344,7 +403,10 @@ describe('§33.1.4 the vetting sequence', () => {
 
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: ANSWERS.problem }).expect(200);
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ solution: ANSWERS.solution }).expect(200);
-    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
+    await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ competition: ANSWERS.competition })
+      .expect(200);
 
     // Back to step 1, and change it.
     const after = await request(h.app)
@@ -354,7 +416,7 @@ describe('§33.1.4 the vetting sequence', () => {
 
     expect(after.body.problem).toBe('A different problem statement entirely.');
     expect(after.body.solution).toBe(ANSWERS.solution);
-    expect(after.body.views).toBe(ANSWERS.views);
+    expect(after.body.competition).toBe(ANSWERS.competition);
   });
 
   it('a save that carries one field does not clear the others', async () => {
@@ -370,7 +432,7 @@ describe('§33.1.4 the vetting sequence', () => {
 
     const after = await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ resumeStep: 'views' })
+      .send({ resumeStep: 'competition' })
       .expect(200);
 
     expect(after.body.problem).toBe(ANSWERS.problem);
@@ -437,7 +499,16 @@ describe('§33.1.4 the vetting sequence', () => {
       .send({ problem: 'Our draft.' })
       .expect(200);
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: 'Their draft.' }).expect(200);
-    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
+    await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ competition: ANSWERS.competition })
+      .expect(200);
+    // Admin's discovery answer, then the Founder's own. Both recorded.
+    await setPath(draftId, 'pre_build').expect(200);
+    await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ selectedType: 'pre_launch' })
+      .expect(200);
 
     const rows = await h.db
       .select()
@@ -451,52 +522,85 @@ describe('§33.1.4 the vetting sequence', () => {
       true,
     );
 
-    // The views answer earns a history row like every other answer.
-    const viewsEdits = rows.filter((r) => r.field === 'views_range');
-    expect(viewsEdits.some((r) => r.supplier === 'founder' && r.newValue === ANSWERS.views)).toBe(
+    // Positioning earns a history row like every other answer, and its supplier
+    // is `founder` because the trigger hard-codes it rather than reading a
+    // column somebody could set (§9, §33.1.5).
+    const positioning = rows.filter((r) => r.field === 'competition_text');
+    expect(
+      positioning.some((r) => r.supplier === 'founder' && r.newValue === ANSWERS.competition),
+    ).toBe(true);
+
+    // The campaign path has two suppliers again (0052). A history row claiming
+    // Proovd chose what the Founder chose would be a provenance record that is
+    // simply untrue, so the supplier is derived from the ACTOR — and the actor
+    // for anything a draft-token holder does is `draft:<id>`.
+    const pathEdits = rows.filter((r) => r.field === 'selected_type');
+    expect(pathEdits.some((r) => r.supplier === 'proovd' && r.newValue === 'pre_build')).toBe(true);
+    expect(pathEdits.some((r) => r.supplier === 'founder' && r.newValue === 'pre_launch')).toBe(
       true,
     );
   });
 
   it('refuses to submit while an answer is missing, and names which', async () => {
     const invited = await invite('incomplete');
-    await setPath(invited.draftId, 'pre_build').expect(200);
+    await request(h.app)
+      .patch(`/api/draft/${invited.raw}/vetting`)
+      .send({ selectedType: 'pre_build' })
+      .expect(200);
 
     const res = await request(h.app)
       .post(`/api/draft/${invited.raw}/vetting/submit`)
       .send({})
       .expect(422);
-    expect(res.body.missing).toEqual(['problem', 'solution', 'views']);
+    expect(res.body.missing).toEqual(['problem', 'solution', 'competition']);
     // Nothing was locked on the way to refusing.
     const state = await request(h.app).get(`/api/draft/${invited.raw}/vetting`).expect(200);
     expect(state.body.lockedType).toBeNull();
   });
 
-  it('refuses to submit while Admin has not set the campaign path, and owns the wait', async () => {
+  // DELIBERATELY INVERTED (2026-08-18). It used to assert that the refusal
+  // owned the wait — correct while the path was Admin's alone. It is the
+  // Founder's step again, so the refusal names the screen they have not
+  // answered rather than telling them to wait for us. §27.1 works both ways:
+  // an owner is named either way, and naming the wrong one is the failure.
+  it('refuses to submit with no campaign path, and names it as the Founder step', async () => {
     const { raw } = await invite('no-path');
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ problem: ANSWERS.problem }).expect(200);
     await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ solution: ANSWERS.solution }).expect(200);
-    await request(h.app).patch(`/api/draft/${raw}/vetting`).send({ views: ANSWERS.views }).expect(200);
+    await request(h.app)
+      .patch(`/api/draft/${raw}/vetting`)
+      .send({ competition: ANSWERS.competition })
+      .expect(200);
 
     const res = await request(h.app).post(`/api/draft/${raw}/vetting/submit`).send({}).expect(422);
-    // §27.1: the wait is Proovd's, and the message says so rather than blaming
-    // the Founder for a step that is not theirs.
-    expect(res.body.whatHappened).toMatch(/on our side/i);
+    expect(res.body.whatHappened).toMatch(/not chosen a campaign path/i);
+    expect(res.body.missing).toEqual(['campaign_path']);
 
     const state = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
     expect(state.body.submittedAt).toBeNull();
     expect(state.body.lockedType).toBeNull();
   });
 
-  it('the campaign path is not writable through the Founder route', async () => {
-    const { raw } = await invite('path-founder');
+  // DELIBERATELY INVERTED (2026-08-18). It IS writable again — §9 step 1.
+  it('the campaign path is writable by the Founder, and Admin supplies a pre-selection', async () => {
+    const invited = await invite('path-founder');
+
+    // Admin's discovery answer arrives first; the Founder's screen is
+    // pre-selected from it.
+    await setPath(invited.draftId, 'pre_build').expect(200);
+    const preselected = await request(h.app)
+      .get(`/api/draft/${invited.raw}/vetting`)
+      .expect(200);
+    expect(preselected.body.selectedType).toBe('pre_build');
+
+    // And the Founder's own answer supersedes it.
     await request(h.app)
-      .patch(`/api/draft/${raw}/vetting`)
+      .patch(`/api/draft/${invited.raw}/vetting`)
       .send({ selectedType: 'pre_launch' })
       .expect(200);
 
-    const state = await request(h.app).get(`/api/draft/${raw}/vetting`).expect(200);
-    expect(state.body.selectedType).toBeNull();
+    const state = await request(h.app).get(`/api/draft/${invited.raw}/vetting`).expect(200);
+    expect(state.body.selectedType).toBe('pre_launch');
   });
 
   it('grants no access to anything but this draft', async () => {
@@ -517,7 +621,7 @@ describe('§33.1.4 the vetting sequence', () => {
    The Admin campaign path (simplified flow)
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('the campaign path is Admin’s, and stays changeable until submission', () => {
+describe('Admin’s campaign path stays, and stays changeable until submission', () => {
   it('is set on the draft and rendered read-only to the Founder', async () => {
     const invited = await invite('path-set');
     await setPath(invited.draftId, 'pre_build').expect(200);
@@ -624,18 +728,26 @@ describe('§33.1.5 Competition cannot be prefilled (the guarantees outlive the q
     expect(row!.competitionSupplier).toBeNull();
   });
 
-  it('the Founder route no longer accepts a competition answer either', async () => {
-    const { draftId, raw } = await invite('no-founder-competition');
+  // DELIBERATELY INVERTED (2026-08-18). It IS collected again — §9 step 4 —
+  // and the point of §33.1.5 is that the never-prefill guarantee holds while
+  // the question is being asked, which is when it matters.
+  it('the Founder route accepts a competition answer, always as the Founder’s', async () => {
+    const { draftId, raw } = await invite('founder-competition');
     await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ competition: 'A competition answer the flow no longer asks for.' })
+      .send({ competition: 'Two scheduling suites that charge per seat and do not text.' })
       .expect(200);
 
     const [row] = await h.db
       .select()
       .from(campaignVetting)
       .where(eq(campaignVetting.draftId, draftId));
-    expect(row!.competitionText).toBeNull();
+    expect(row!.competitionText).toBe(
+      'Two scheduling suites that charge per seat and do not text.',
+    );
+    // Never derived from a comparison against a prefill, because there is no
+    // prefill to compare against and no column that could hold one.
+    expect(row!.competitionSupplier).toBe('founder');
   });
 
   it('the database refuses to record it as Proovd’s, even by direct statement', async () => {
@@ -666,14 +778,59 @@ describe('§33.1.5 Competition cannot be prefilled (the guarantees outlive the q
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   §33.1.6 — the possible-creator result no longer gates anything
+   §33.1.6 — the possible-creator result renders again, and still gates nothing
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('§33.1.6 the possible-creator result is a record, not a gate', () => {
-  it('the founder-facing result route is gone', async () => {
+  // DELIBERATELY INVERTED (2026-08-18). §10's screen is back, so its read is
+  // back with it. What did NOT come back is the GATE — see
+  // `the claim opens without any recorded result`, which is unchanged.
+  it('the founder-facing result route renders a recorded, positive result', async () => {
     const invited = await invite('signal-route');
     await completeVetting(invited);
-    await request(h.app).get(`/api/draft/${invited.raw}/creator-signal`).expect(404);
+    await recordSignal(invited.campaignId, 7).expect(201);
+
+    const res = await request(h.app)
+      .get(`/api/draft/${invited.raw}/creator-signal`)
+      .expect(200);
+    expect(res.body.status).toBe('available');
+    expect(res.body.count).toBe(7);
+    // §10, §11: the basis is Admin's own justification for the number and never
+    // reaches a Founder, and nothing here names a Creator.
+    expect(res.body.basis).toBeUndefined();
+    expect(JSON.stringify(res.body)).not.toMatch(/recruited channels/i);
+  });
+
+  // §10: "the result must not be zero; a zero result routes to Admin before the
+  // Founder proceeds." Zero and unrecorded are therefore the SAME answer, and
+  // the comparison is of the whole serialized body — a field that differed
+  // between them would tell a Founder a number §10 says they must not see.
+  it('renders a zero result and an unrecorded one identically, byte for byte', async () => {
+    const zero = await invite('signal-zero');
+    await completeVetting(zero);
+    await recordSignal(zero.campaignId, 0, 'nothing recruited in this niche yet').expect(201);
+
+    const unrecorded = await invite('signal-none');
+    await completeVetting(unrecorded);
+
+    const withZero = await request(h.app)
+      .get(`/api/draft/${zero.raw}/creator-signal`)
+      .expect(200);
+    const withNothing = await request(h.app)
+      .get(`/api/draft/${unrecorded.raw}/creator-signal`)
+      .expect(200);
+
+    expect(JSON.stringify(withZero.body)).toBe(JSON.stringify(withNothing.body));
+    expect(withZero.body.status).toBe('with_admin');
+    expect(withZero.body.count).toBeNull();
+  });
+
+  it('is not open before the answers are submitted', async () => {
+    const invited = await invite('signal-early');
+    const res = await request(h.app)
+      .get(`/api/draft/${invited.raw}/creator-signal`)
+      .expect(409);
+    expect(res.body.error).toBe('vetting_not_submitted');
   });
 
   it('Admin can still record the assessment, and a zero is recordable', async () => {
@@ -816,6 +973,7 @@ describe('§33.1.7 the campaign type locks at vetting', () => {
       .where(eq(campaignVetting.campaignId, replacement));
     expect(freshVetting!.selectedType).toBeNull();
     expect(freshVetting!.problemText).toBeNull();
+    expect(freshVetting!.competitionText).toBeNull();
     expect(freshVetting!.solutionText).toBeNull();
     expect(freshVetting!.viewsRange).toBeNull();
 
@@ -991,7 +1149,7 @@ describe('§33.1.9 the account claim', () => {
       .from(campaignVetting)
       .where(eq(campaignVetting.draftId, draftId));
     expect(vetting!.problemText).toBe(ANSWERS.problem);
-    expect(vetting!.viewsRange).toBe(ANSWERS.views);
+    expect(vetting!.competitionText).toBe(ANSWERS.competition);
 
     // The prospect is now an account — which is also what takes it out of the
     // §25.8 sweep, twice over.
@@ -1190,7 +1348,7 @@ describe('the retention sweep covers the vetting record and the claim profile', 
     const { raw, draftId } = await invite('sweep');
     await request(h.app)
       .patch(`/api/draft/${raw}/vetting`)
-      .send({ problem: ANSWERS.problem, views: ANSWERS.views })
+      .send({ problem: ANSWERS.problem, competition: ANSWERS.competition })
       .expect(200);
     await request(h.app).patch(`/api/draft/${raw}/claim`).send(CLAIM_FIELDS).expect(200);
 

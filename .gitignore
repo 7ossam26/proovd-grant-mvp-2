@@ -30,3 +30,7 @@ desktop.ini
 # Referenced woff2 live in frontend/public/fonts/; docs/fonts/ holds spare statics.
 frontend/public/fonts/*.woff2
 docs/fonts/
+# Same rule for the fonts shipped inside a supplied design reference: the bundle
+# is kept on disk so the prototype runs standalone, but the binaries are not ours
+# to redistribute. Delete the folder and re-copy from the bundle if it goes missing.
+docs/design-refrence/**/fonts/

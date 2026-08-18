@@ -212,3 +212,64 @@ export const creatorPaymentFundingAttempts = pgTable(
 
 export type CreatorPaymentAllocation = typeof creatorPaymentAllocations.$inferSelect;
 export type CreatorPaymentFundingAttempt = typeof creatorPaymentFundingAttempts.$inferSelect;
+
+/* ── The Founder's fixed-payment openness (Founder Flow v2, migration 0052) ── */
+
+/**
+ * Whether the Founder is open to funding an optional fixed Creator payment.
+ *
+ * **A recorded deviation from §1 rule 6, by explicit product direction
+ * (2026-08-18).** §16 makes the fixed payment the CREATOR's request, accepted
+ * bilaterally through one proposal version (§14.2), and not the default model.
+ * A Founder answering a pay-model question during onboarding — before the
+ * listing fee is paid and before any Creator exists — has no place in that
+ * negotiation.
+ *
+ * So the record binds nothing, and the enforcement is what it cannot hold:
+ * there is **no amount column**, no percentage, and no proposal-version
+ * reference. A number here would be the proposal only a Creator may make; a
+ * rate would be a fourth answer to §14.3's three §6 settings. What the Founder
+ * states is an openness, and the terms are still §14.2's to negotiate — the
+ * §1.3 manual-but-recorded path the reference's own copy describes.
+ *
+ * A 0052 CHECK refuses an Idea campaign outright (§14.3 prohibits the fixed
+ * payment there), and a shape trigger requires the stored type to be the
+ * campaign's own — without it the CHECK would be satisfiable by writing
+ * `pre_launch` onto an Idea campaign and would enforce nothing.
+ *
+ * Insert-only, superseded rather than edited: an answer somebody changed their
+ * mind about is two facts, and which one was live when a Creator was approached
+ * is a question that may have to be answered later.
+ *
+ * **It is read by Admin when recruiting, and by nothing else.** A later phase
+ * asked to read it as a default, a filter, or an eligibility condition is
+ * asking for the §1 rule 6 violation the missing columns exist to prevent.
+ */
+export const founderFixedPaymentOpenness = pgTable(
+  'founder_fixed_payment_openness',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id),
+    /**
+     * `open` | `not_open` | `undecided`, CHECK-pinned in 0052.
+     *
+     * `undecided` is a recorded "I do not know yet", which is a different fact
+     * from never having been asked (§1.4) — and is what lets the flow offer a
+     * way past the screen without inventing a default.
+     */
+    stance: text('stance').notNull(),
+    /** The type it was answered against. Trigger-pinned to the campaign's own. */
+    campaignType: text('campaign_type').notNull(),
+    recordedBy: text('recorded_by').notNull(),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+    /** The one column UPDATE is granted on. Write-once by trigger. */
+    supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  },
+  (t) => ({
+    campaignIdx: index('founder_openness_campaign_idx').on(t.campaignId, t.recordedAt),
+  }),
+);
+
+export type FounderFixedPaymentOpenness = typeof founderFixedPaymentOpenness.$inferSelect;

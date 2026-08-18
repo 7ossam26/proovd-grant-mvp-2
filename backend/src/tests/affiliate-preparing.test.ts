@@ -130,21 +130,18 @@ async function invitedFounder(): Promise<{ campaignId: string; draftId: string; 
   return { campaignId: created.body.campaignId, draftId: created.body.draftId, raw };
 }
 
-/** Drives the simplified vetting to a submitted state so the claim can proceed. */
+/** Drives §9's vetting to a submitted state so the claim can proceed. */
 async function submitVetting(raw: string, campaignId: string, draftId: string): Promise<void> {
-  // The campaign path is Admin's step now (simplified flow, 2026-08-10).
-  await request(h.app)
-    .put(`/api/admin/founders/${draftId}/campaign-path`)
-    .set('cookie', admin.cookie)
-    .send({ campaignPath: 'pre_build' })
-    .expect(200);
-
+  // §9 step 1 is the Founder's own again (2026-08-18). Admin's discovery route
+  // still exists; this journey walks what a Founder actually does.
   await request(h.app)
     .patch(`/api/draft/${raw}/vetting`)
     .send({
+      selectedType: 'pre_build',
       problem: 'Independent physiotherapists lose income to last-minute cancellations.',
       solution: 'A waitlist that fills a cancelled slot automatically.',
-      views: '10k_100k',
+      competition:
+        'A receptionist working down a paper list, and two booking suites that charge per seat.',
     })
     .expect(200);
 
@@ -524,15 +521,13 @@ describe('§33.2.4 — the preparing Campaign kit', () => {
 
     const kit = res.body.kit;
     // §10: "the complete currently available Founder/problem/solution/
-    // competition information and the single Campaign kit." Competition is a
-    // legacy field under the simplified flow (2026-08-10): new campaigns never
-    // collect it, so "currently available" is honestly null here — a record
-    // that has one still renders it.
+    // competition information and the single Campaign kit." Positioning is
+    // collected again (2026-08-18), so all four are genuinely available.
     expect(kit.founder.name).toBe('Rowan');
     expect(kit.productName).toBe('Waitlist');
     expect(kit.problem).toMatch(/last-minute cancellations/i);
     expect(kit.solution).toMatch(/waitlist that fills/i);
-    expect(kit.competition).toBeNull();
+    expect(kit.competition).toMatch(/paper list/i);
     // §3: the customer-facing name, never the internal one.
     expect(kit.campaignType).toBe('Idea Campaign');
     expect(JSON.stringify(kit)).not.toMatch(/pre_build|pre_launch/);

@@ -159,12 +159,18 @@ const INVITATION_FIXED_CONTENT = [
   { key: 'invSupport', label: 'Support contact' },
 ] as const;
 
-/** The simplified flow's three Founder steps (2026-08-10, product direction). */
-const VETTING_STEP_LABELS = ['Problem', 'Solution', 'Amount of views'] as const;
+/**
+ * §9's three answered steps (2026-08-18: the 2026-08-10 deviation withdrawn —
+ * Positioning is asked again and the amount of views is not).
+ */
+const VETTING_STEP_LABELS = ['Problem', 'Solution', 'Positioning'] as const;
 
 /**
  * The views-range labels, restated from `shared/src/vetting/steps.ts` (the
  * backend cannot import shared at runtime) and drift-tested.
+ *
+ * Retired from collection. Kept because the answers a Founder already gave are
+ * still theirs and Admin still has to be able to read them.
  */
 const VIEWS_RANGE_LABELS: Record<string, string> = {
   under_10k: 'Under 10,000',
@@ -172,6 +178,14 @@ const VIEWS_RANGE_LABELS: Record<string, string> = {
   '100k_1m': '100,000 – 1,000,000',
   over_1m: 'Over 1,000,000',
 };
+
+/**
+ * What renders where a stored views answer would have been, on a campaign
+ * onboarded after the question was retired. Restated from shared and
+ * drift-tested, like the labels above.
+ */
+const VIEWS_NOT_COLLECTED_LABEL =
+  'Not collected — this question was retired on 18 August 2026 and was never asked on this campaign.';
 
 const CREATOR_MATCH_STEP_LABEL = 'Potential Creator matches';
 const ACCOUNT_CREATED_STEP_LABEL = 'Account created';
@@ -1599,18 +1613,23 @@ async function composeVetting(db: Database, ctx: FounderContext): Promise<Vettin
   const answers: Array<{ key: 'problem' | 'solution' | 'views' | 'competition'; text: string | null }> = [
     { key: 'problem', text: row?.problemText ?? null },
     { key: 'solution', text: row?.solutionText ?? null },
-    { key: 'views', text: row?.viewsRange ? (VIEWS_RANGE_LABELS[row.viewsRange] ?? null) : null },
+    { key: 'competition', text: row?.competitionText ?? null },
   ];
-  // Legacy records answered Competition under the five-step flow. The answer
-  // survives and Admin may still read it; a new record never shows the row.
-  if (present(row?.competitionText)) {
-    answers.push({ key: 'competition', text: row?.competitionText ?? null });
+  // The amount of views was asked between 2026-08-10 and 2026-08-18 only. A
+  // stored answer still renders — it is the Founder's own and Admin reads it —
+  // and a campaign onboarded after the retirement renders the ABSENCE by name
+  // rather than a blank row, because "nobody was asked" and "asked and left
+  // empty" are different facts (§16a, §1.4).
+  if (row?.viewsRange != null) {
+    answers.push({ key: 'views', text: VIEWS_RANGE_LABELS[row.viewsRange] ?? null });
+  } else {
+    answers.push({ key: 'views', text: VIEWS_NOT_COLLECTED_LABEL });
   }
 
   const done = [
     present(row?.problemText),
     present(row?.solutionText),
-    row?.viewsRange != null,
+    present(row?.competitionText),
   ];
 
   const signal = campaign ? await readPossibleCreatorSignal(db, campaign.id) : null;
@@ -1700,6 +1719,8 @@ function provenanceOf(
 ): string | null {
   if (!row) return null;
   if (key === 'views') {
+    // No provenance line where nothing was collected: the row already says so,
+    // and "Chosen by X" over an absence would attribute an answer nobody gave.
     return row.viewsRange !== null ? `Chosen by ${preferredName}` : null;
   }
   if (key === 'competition') {

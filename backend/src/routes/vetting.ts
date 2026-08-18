@@ -37,7 +37,10 @@ import {
   ensureVetting,
   saveVetting,
   submitVetting,
-  type VettingStep,
+  readPossibleCreatorSignal,
+  viewCreatorSignal,
+  type VettingResumePosition,
+  type CampaignTypeValue,
 } from '../vetting/service.js';
 import {
   ensureClaimProfile,
@@ -141,9 +144,15 @@ export function createVettingRouter(
     const result = await saveVetting(db, draftId, {
       ...(str('problem') !== undefined ? { problem: str('problem') } : {}),
       ...(str('solution') !== undefined ? { solution: str('solution') } : {}),
-      ...(str('views') !== undefined ? { views: str('views') } : {}),
+      ...(str('competition') !== undefined ? { competition: str('competition') } : {}),
+      // §9 step 1 is the Founder's own again (2026-08-18). Admin's route stays
+      // beside it; whichever writes last is what submission locks, and the
+      // history records each with the supplier that actually wrote it.
+      ...(str('selectedType') !== undefined
+        ? { selectedType: str('selectedType') as CampaignTypeValue | null }
+        : {}),
       ...(typeof body['resumeStep'] === 'string'
-        ? { resumeStep: body['resumeStep'] as VettingStep }
+        ? { resumeStep: body['resumeStep'] as VettingResumePosition }
         : {}),
       actor: actorOf(draftId),
     });
@@ -183,10 +192,53 @@ export function createVettingRouter(
     res.status(201).json(result.state);
   });
 
+  /* ── §10 — the possible-creator result ─────────────────────────────────── */
+
+  /**
+   * Restored 2026-08-18 with the rest of the §9/§10 reversion.
+   *
+   * §10 places it "immediately after valid vetting and before account creation",
+   * which is where the flow puts the screen — and it does NOT gate the claim,
+   * so nothing downstream reads this route's answer. A Founder whose result is
+   * unrecorded proceeds; they simply do not see the screen.
+   *
+   * `viewCreatorSignal` collapses zero and unrecorded into one answer before
+   * anything is serialized, so there is no branch here that could tell them
+   * apart and no field in the response that varies between them.
+   */
+  router.get(`${base}/creator-signal`, openLimiter, draft, async (req, res) => {
+    const draftId = draftIdOf(req, res);
+    if (!draftId) return;
+
+    const state = await ensureVetting(db, draftId, actorOf(draftId));
+    if (!state) {
+      res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
+      return;
+    }
+
+    // §10 puts this after valid vetting. Before that there is nothing to be a
+    // signal about, and answering anyway would leak the shape of the record.
+    if (!state.submittedAt) {
+      res.status(409).json({
+        error: 'vetting_not_submitted',
+        title: 'This step is not open yet',
+        whatHappened: 'Your answers have not been submitted.',
+        next: 'Finish the three questions first.',
+      });
+      return;
+    }
+
+    res.json(
+      viewCreatorSignal(
+        // §31.9's "possible-creator rendering" stamp: this is one of the two
+        // Founder-facing reads that may set it, because this is the Founder
+        // actually being shown the number.
+        await readPossibleCreatorSignal(db, state.campaignId, { stampRendered: true }),
+      ),
+    );
+  });
+
   /* ── §10 — the account claim ───────────────────────────────────────────── */
-  /* Simplified flow (2026-08-10): there is no possible-creator step between
-     submission and the claim any more, so no `/creator-signal` route either.
-     The Admin assessment is still recordable and renders in the workspace. */
 
   router.get(`${base}/claim`, openLimiter, draft, async (req, res) => {
     const draftId = draftIdOf(req, res);

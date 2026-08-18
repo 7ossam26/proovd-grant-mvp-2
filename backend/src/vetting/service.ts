@@ -1,14 +1,25 @@
 /**
- * Pre-account vetting — Spec §9, §23.1, and the simplified flow.
+ * Pre-account vetting — Spec §9, §23.1.
  *
- * ── Recorded deviation from Spec §9 (2026-08-10, product direction) ─────────
+ * ── The 2026-08-10 deviation was WITHDRAWN on 2026-08-18 ───────────────────
  * The Founder answers three questions behind a draft token — Problem, Solution,
- * and the amount of views — with every keystroke saved. The campaign path is no
- * longer the Founder's step: Admin sets it on this record from discovery
- * (`setCampaignPath`), and submission still locks it permanently and moves the
- * campaign to `vetting_submitted`, exactly as §9's lock requires. Competition
- * is no longer collected; its columns, its never-prefill CHECK, and existing
- * answers all survive untouched.
+ * and Positioning — and chooses their own campaign path, with every keystroke
+ * saved. That is §9 as written, and it is a *reversion*: the 2026-08-10 change
+ * that moved the path to Admin, dropped Competition and asked for an amount of
+ * views instead has been withdrawn by the same kind of product direction that
+ * introduced it. `shared/src/vetting/steps.ts` states all four reversions.
+ *
+ * Admin's `setCampaignPath` STAYS. It is how a path is set from discovery, and
+ * the Founder's screen arrives pre-selected from it; the Founder's own answer
+ * supersedes, and the 0052 history trigger records each with the supplier that
+ * actually wrote it rather than assuming Proovd did. Submission still locks the
+ * type permanently and moves the campaign to `vetting_submitted`, exactly as
+ * §9's lock requires — nothing about the 0007 trigger changed in either
+ * direction.
+ *
+ * `views_range` is retired from COLLECTION only: no step, no save key, no
+ * surface asks it. The column, its CHECK, its history and every stored answer
+ * survive, because a record is not made wrong by a later product decision.
  *
  * ── Nothing here takes a campaign id or a draft id from a caller ────────────
  * Every entry point takes the draft id the *verified token* produced, exactly
@@ -58,15 +69,32 @@ import { auditEvents } from '../db/schema/integrity.js';
  * ids are restated and `src/tests/vetting.test.ts` fails the suite if the two
  * ever disagree.
  */
-export const VETTING_ANSWER_STEPS = ['problem', 'solution', 'views'] as const;
+export const VETTING_ANSWER_STEPS = ['problem', 'solution', 'competition'] as const;
 
 export const VETTING_STEPS = VETTING_ANSWER_STEPS;
 
 export type VettingStep = (typeof VETTING_STEPS)[number];
 
 /**
+ * Where a Founder can be, which is not the same list as what they answer.
+ *
+ * The campaign path is a screen with a stored answer (`selected_type`) and no
+ * text, so it is a position but not an "answer step". Keeping the two lists
+ * apart is what lets a Founder who stopped on the path screen resume there
+ * instead of one screen past it — the failure the 2026-08-10 mapping produced
+ * the moment the path screen came back.
+ */
+export const VETTING_RESUME_POSITIONS = ['campaign_path', ...VETTING_ANSWER_STEPS] as const;
+
+export type VettingResumePosition = (typeof VETTING_RESUME_POSITIONS)[number];
+
+/**
  * The amount-of-views ranges, restated from `shared/src/vetting/steps.ts` and
  * drift-tested. The ids are stored; only shared's labels ever render.
+ *
+ * **Read-only since 2026-08-18.** No save path writes one any more (see the
+ * header); this list exists so a stored answer can still be validated when it
+ * is read, and so the drift test keeps the two registers in step.
  */
 export const VIEWS_RANGES = ['under_10k', '10k_100k', '100k_1m', 'over_1m'] as const;
 export type ViewsRange = (typeof VIEWS_RANGES)[number];
@@ -90,21 +118,32 @@ export interface FieldProvenance {
 export interface VettingState {
   draftId: string;
   campaignId: string;
-  /** The campaign path Admin set from discovery. Read-only to the Founder. */
+  /**
+   * The campaign path. Chosen by the Founder (§9 step 1), and pre-selected from
+   * Admin's discovery answer where one exists. Freely changeable until submit.
+   */
   selectedType: CampaignTypeValue | null;
   problem: string | null;
   solution: string | null;
-  /** The Founder's amount-of-views answer, as a shared range id. */
+  /** §9 step 4. Always the Founder's own words — never prefilled (§33.1.5). */
+  competition: string | null;
+  /**
+   * A stored amount-of-views answer, where one exists.
+   *
+   * Retired from collection on 2026-08-18. Present here because the record is,
+   * and because Admin reads it; nothing writes it and no step asks for it.
+   */
   views: ViewsRange | null;
   provenance: {
     problem: FieldProvenance;
     solution: FieldProvenance;
+    competition: FieldProvenance;
   };
   /** §9: "Returning restores the latest saved draft and says when it was saved." */
   lastSavedAt: string | null;
-  resumeStep: VettingStep | null;
+  resumeStep: VettingResumePosition | null;
   submittedAt: string | null;
-  /** Which of §9's four answers are present. Drives progress and Admin's view. */
+  /** Which of §9's three answers are present. Drives progress and Admin's view. */
   completeness: Record<(typeof VETTING_ANSWER_STEPS)[number], boolean>;
   campaignStatus: string;
   /** Set once submission locks it. Read-only thereafter (§9). */
@@ -119,15 +158,29 @@ function present(value: string | null): boolean {
 }
 
 /**
- * Stored resume positions from the five-step flow map onto the nearest live
- * step, so a Founder who paused mid-flow before the simplification resumes
- * somewhere real rather than at a screen that no longer exists.
+ * A stored resume position, mapped onto a position that exists today.
+ *
+ * Two vocabularies have been stored in this column: §9's five-step one, and the
+ * 2026-08-10 three-step one. Both are mapped rather than discarded, because
+ * DNA §5.12 is that position survives interruption and a Founder who paused is
+ * owed the screen they paused on.
+ *
+ * `views` maps to `competition`, because Positioning is the answer that took
+ * its place in the sequence — the third and last one. `possible_creator_result`
+ * maps there too: §10's result follows the last answer, and resuming *at* a
+ * result the server may not have would be resuming at a blank screen.
+ *
+ * `campaign_path` maps to itself now. Until 2026-08-18 it mapped to `problem`,
+ * which was right while the Founder had no path screen and became wrong the
+ * moment one came back: it resumed a Founder one screen past where they stopped.
  */
-function normaliseResumeStep(value: string | null): VettingStep | null {
+function normaliseResumeStep(value: string | null): VettingResumePosition | null {
   if (value === null) return null;
-  if ((VETTING_STEPS as readonly string[]).includes(value)) return value as VettingStep;
-  if (value === 'campaign_path') return 'problem';
-  return 'views';
+  if ((VETTING_RESUME_POSITIONS as readonly string[]).includes(value)) {
+    return value as VettingResumePosition;
+  }
+  if (value === 'views' || value === 'possible_creator_result') return 'competition';
+  return 'problem';
 }
 
 function toState(row: CampaignVetting, campaignStatus: string, campaign: {
@@ -140,6 +193,7 @@ function toState(row: CampaignVetting, campaignStatus: string, campaign: {
     selectedType: (row.selectedType as CampaignTypeValue | null) ?? null,
     problem: row.problemText,
     solution: row.solutionText,
+    competition: row.competitionText,
     views: (row.viewsRange as ViewsRange | null) ?? null,
     provenance: {
       problem: {
@@ -156,6 +210,17 @@ function toState(row: CampaignVetting, campaignStatus: string, campaign: {
         firstEditedAt: iso(row.solutionFirstEditedAt),
         lastEditedAt: iso(row.solutionLastEditedAt),
       },
+      // `prefilledText` and `prefilledAt` are structurally null and always will
+      // be: there are no `competition_prefilled_*` columns to read them from.
+      // The shape is uniform so a surface can render provenance the same way
+      // for all three; the absence is what §33.1.5 is about.
+      competition: {
+        supplier: row.competitionSupplier,
+        prefilledText: null,
+        prefilledAt: null,
+        firstEditedAt: iso(row.competitionFirstEditedAt),
+        lastEditedAt: iso(row.competitionLastEditedAt),
+      },
     },
     lastSavedAt: iso(row.lastSavedAt),
     resumeStep: normaliseResumeStep(row.resumeStep),
@@ -163,7 +228,7 @@ function toState(row: CampaignVetting, campaignStatus: string, campaign: {
     completeness: {
       problem: present(row.problemText),
       solution: present(row.solutionText),
-      views: row.viewsRange !== null,
+      competition: present(row.competitionText),
     },
     campaignStatus,
     lockedType: (campaign.type as CampaignTypeValue | null) ?? null,
@@ -230,8 +295,10 @@ export interface SaveVettingInput {
   /** Absent keys are untouched. A key present with `null` clears that answer. */
   problem?: string | null;
   solution?: string | null;
-  views?: string | null;
-  resumeStep?: VettingStep;
+  competition?: string | null;
+  /** §9 step 1, the Founder's own answer. Supersedes Admin's discovery value. */
+  selectedType?: CampaignTypeValue | null;
+  resumeStep?: VettingResumePosition;
   actor: string;
 }
 
@@ -275,11 +342,11 @@ export async function saveVetting(
     };
   }
 
-  if (input.views !== undefined && input.views !== null) {
-    if (!(VIEWS_RANGES as readonly string[]).includes(input.views)) {
+  if (input.selectedType !== undefined && input.selectedType !== null) {
+    if (!CAMPAIGN_TYPES.includes(input.selectedType)) {
       return {
         ok: false,
-        message: 'That is not one of the view ranges.',
+        message: 'That is not one of the two campaign paths.',
         next: 'Choose one of the options shown. Nothing was changed.',
       };
     }
@@ -288,11 +355,14 @@ export async function saveVetting(
   const now = new Date();
   const patch: Record<string, unknown> = { lastSavedAt: now, updatedBy: input.actor };
 
-  if (input.views !== undefined) {
-    patch['viewsRange'] = input.views;
+  if (input.selectedType !== undefined) {
+    // §9 locks the type at SUBMISSION, not here. Until then this is a draft
+    // answer the Back button may revisit as often as the Founder likes.
+    patch['selectedType'] = input.selectedType;
+    patch['typeChosenAt'] = input.selectedType === null ? null : now;
   }
   if (input.resumeStep !== undefined) {
-    if (!VETTING_STEPS.includes(input.resumeStep)) {
+    if (!(VETTING_RESUME_POSITIONS as readonly string[]).includes(input.resumeStep)) {
       return {
         ok: false,
         message: 'That is not a step in this form.',
@@ -311,6 +381,21 @@ export async function saveVetting(
     current.provenance.solution,
     now,
   );
+
+  if (input.competition !== undefined) {
+    const next = normalise(input.competition);
+    patch['competitionText'] = next;
+    // Never anything but `founder`, and never derived from a comparison against
+    // a prefill — there is no prefill to compare against and there never will
+    // be (§9, §33.1.5). The CHECK constraint says the same thing again.
+    patch['competitionSupplier'] = next === null ? null : 'founder';
+    if (next !== current.competition) {
+      if (!current.provenance.competition.firstEditedAt) {
+        patch['competitionFirstEditedAt'] = now;
+      }
+      patch['competitionLastEditedAt'] = now;
+    }
+  }
 
   await db.update(campaignVetting).set(patch).where(eq(campaignVetting.draftId, draftId));
 
@@ -561,14 +646,16 @@ export async function submitVetting(
     };
   }
 
-  // The campaign path is Admin's answer now, and submission is the moment it
-  // locks — so a submission cannot happen before Proovd has recorded one. The
-  // message owns the wait (§27.1): it is our step, not the Founder's.
+  // §9 step 1 is the Founder's again (2026-08-18), and submission is the moment
+  // it locks — so a submission cannot happen before it is answered. It is not
+  // in `completeness`, because it is a choice rather than something typed, so
+  // it is reported by name in `missing` and the message names the screen.
   if (!current.selectedType) {
     return {
       ok: false,
-      message: 'We are still finishing the setup of your campaign record on our side.',
-      next: 'Everything you have written is saved. Try again shortly, or reply to your invitation email and we will sort it out.',
+      message: 'You have not chosen a campaign path yet.',
+      next: 'Go back and pick whether you have an idea or a product. Everything you have written is saved.',
+      missing: ['campaign_path'],
     };
   }
 
@@ -593,7 +680,7 @@ export async function submitVetting(
 
     await tx
       .update(campaignVetting)
-      .set({ submittedAt: now, resumeStep: 'views', updatedBy: actor })
+      .set({ submittedAt: now, resumeStep: 'competition', updatedBy: actor })
       .where(and(eq(campaignVetting.draftId, draftId), isNull(campaignVetting.submittedAt)));
 
     await tx.insert(auditEvents).values({
@@ -716,6 +803,45 @@ export async function recordPossibleCreatorSignal(
 
   const signal = await readPossibleCreatorSignal(db, input.campaignId);
   return signal ? { ok: true, signal } : { ok: false, message: 'The record was not written.' };
+}
+
+/**
+ * What the Founder is allowed to see at §10's result screen.
+ *
+ * §10: "For the pre-screened invited cohort, the result must not be zero; a zero
+ * result routes to Admin before the Founder proceeds." So there are exactly two
+ * outcomes and no third:
+ *
+ *  - a count of one or more renders, with §10's disclosures;
+ *  - anything else — zero, or nothing recorded yet — renders a waiting state
+ *    owned by Proovd.
+ *
+ * The zero and the not-yet-recorded cases deliberately produce the *same*
+ * Founder-facing state. They mean the same thing to the Founder: Proovd is
+ * looking at it. Distinguishing them would tell them a number §10 says they
+ * must not be shown, and a test compares the two rendered outputs.
+ *
+ * ── What it does NOT do, and that is the half that changed ─────────────────
+ * It does not gate the account claim. §10 orders the result *before* account
+ * creation and says nothing about blocking one; the 2026-08-10 change removed
+ * the gate, and reinstating the screen on 2026-08-18 deliberately did not
+ * reinstate it. A Founder whose result is unrecorded still proceeds — the
+ * screen is skipped and Admin sees the gap on their own workspace.
+ *
+ * `basis` never appears here. It is Admin's own justification for the number
+ * and is not a thing a Founder is shown (§10, §11).
+ */
+export interface CreatorSignalView {
+  status: 'available' | 'with_admin';
+  count: number | null;
+  recordedAt: string | null;
+}
+
+export function viewCreatorSignal(signal: PossibleCreatorSignal | null): CreatorSignalView {
+  if (!signal || signal.count <= 0) {
+    return { status: 'with_admin', count: null, recordedAt: null };
+  }
+  return { status: 'available', count: signal.count, recordedAt: signal.recordedAt };
 }
 
 /* ── The wrong-type path (§9, §33.1.7) ────────────────────────────────────── */

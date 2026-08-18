@@ -1,6 +1,12 @@
 /**
- * The Founder draft surfaces under the simplified flow (2026-08-10, product
- * direction) — order, progress, autosave, restore, the claim, and §33.11.
+ * The Founder draft surfaces — §9's own four items, order, progress, autosave,
+ * restore, the claim, and §33.11.
+ *
+ * ── Updated for the 2026-08-18 reversion ──────────────────────────────────
+ * The campaign path is the Founder's step again and Positioning is the third
+ * answer, so the flow is four screens rather than three. This surface is
+ * INTERIM — Founder Flow v2 replaces it with twenty-six full-bleed pages in
+ * Session B — and the tests below moved with the records, not with a design.
  *
  * The real route table in a memory router with `fetch` stubbed at the network
  * boundary. The server-side halves — that the type lock is permanent, that the
@@ -19,7 +25,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import { appRoutes } from '../../routes.js';
-import { VETTING_STEPS, VIEWS_RANGE_CHOICES } from '@proovd/shared';
+import { VETTING_STEPS, CAMPAIGN_PATH_CHOICES } from '@proovd/shared';
 
 type StubResult = { status: number; body: unknown } | undefined;
 type Handler = (url: string, init?: RequestInit) => StubResult;
@@ -68,15 +74,19 @@ function vettingState(overrides: Record<string, unknown> = {}): Record<string, u
     selectedType: null,
     problem: null,
     solution: null,
+    competition: null,
+    // Retired from collection. Present on the payload because a record from
+    // before 2026-08-18 carries one; nothing on this surface asks for it.
     views: null,
     provenance: {
       problem: { ...EMPTY_PROVENANCE },
       solution: { ...EMPTY_PROVENANCE },
+      competition: { ...EMPTY_PROVENANCE },
     },
     lastSavedAt: null,
     resumeStep: null,
     submittedAt: null,
-    completeness: { problem: false, solution: false, views: false },
+    completeness: { problem: false, solution: false, competition: false },
     campaignStatus: 'invited_draft',
     lockedType: null,
     typeLockedAt: null,
@@ -99,7 +109,8 @@ function stubVetting(initial: Record<string, unknown> = {}) {
       state['completeness'] = {
         problem: typeof state['problem'] === 'string' && state['problem'] !== '',
         solution: typeof state['solution'] === 'string' && state['solution'] !== '',
-        views: typeof state['views'] === 'string' && state['views'] !== '',
+        competition:
+          typeof state['competition'] === 'string' && state['competition'] !== '',
       };
       return { status: 200, body: state };
     }
@@ -152,19 +163,80 @@ function renderAt(path: string) {
 
 const renderVetting = () => renderAt(`/draft/${TOKEN}/vetting`);
 
-const viewsLabel = VIEWS_RANGE_CHOICES[1]!.label;
+/** §9 step 1's own labels. `pre_build` never renders (§3.1). */
+const IDEA = CAMPAIGN_PATH_CHOICES.find((c) => c.type === 'pre_build')!;
+const PRODUCT = CAMPAIGN_PATH_CHOICES.find((c) => c.type === 'pre_launch')!;
+
+/**
+ * A `Choice` radio's accessible name is its label AND its second line, because
+ * both are inside the control. So each is matched by its prompt rather than
+ * compared to it.
+ */
+const pathRadio = (choice: { prompt: string }) =>
+  screen.getByRole('radio', { name: new RegExp(choice.prompt, 'i') });
+
+/** The four positions, in order — three answers plus the path. */
+const NAV_LABELS = ['Campaign path', ...VETTING_STEPS.map((s) => s.label)];
+
+/** The campaign path answered, so a test can start on the Problem step. */
+const AT_PROBLEM = { selectedType: 'pre_launch', resumeStep: 'problem' };
+
+/** Everything before Positioning, so a test can start where it means to. */
+const THROUGH_SOLUTION = {
+  selectedType: 'pre_launch',
+  problem: 'A problem.',
+  solution: 'A solution.',
+  resumeStep: 'competition',
+  completeness: { problem: true, solution: true, competition: false },
+};
 
 /* ══════════════════════════════════════════════════════════════════════════
    The simplified sequence — order, progress, Back/Continue, autosave, restore
    ══════════════════════════════════════════════════════════════════════════ */
 
-describe('the simplified vetting sequence', () => {
-  it('opens on step 1 of 3 and shows the progress', async () => {
+describe('the §9 vetting sequence', () => {
+  it('opens on step 1 of 4 and shows the progress', async () => {
     stubVetting();
     renderVetting();
 
-    await screen.findByRole('heading', { name: /what problem does your product solve/i });
-    expect(await screen.findByText('Step 1 of 3')).toBeTruthy();
+    // §9 step 1: the campaign path, the Founder's own again since 2026-08-18.
+    await screen.findByRole('heading', { name: /which of these is closer to where you are today/i });
+    expect(await screen.findByText('Step 1 of 4')).toBeTruthy();
+  });
+
+  it('states what the campaign path commits to, and that it is permanent (§9)', async () => {
+    stubVetting();
+    const { container } = renderVetting();
+    await screen.findByRole('heading', { name: /which of these is closer/i });
+
+    // §9: "the step must explain what is being chosen in plain language before
+    // it is chosen." Both paths' commitments render, before the choice.
+    const text = container.textContent ?? '';
+    for (const choice of CAMPAIGN_PATH_CHOICES) {
+      expect(text).toContain(choice.name);
+      for (const line of choice.commitments) expect(text).toContain(line);
+    }
+    expect(text).toMatch(/permanent/i);
+    // The lock is at submission, not here — which is what makes Back safe.
+    expect(text).toMatch(/when you submit/i);
+  });
+
+  it('arrives pre-selected from Admin’s discovery answer, and the Founder may change it', async () => {
+    const user = userEvent.setup();
+    stubVetting({ selectedType: 'pre_build' });
+    renderVetting();
+
+    await screen.findByRole('heading', { name: /which of these is closer/i });
+    expect(pathRadio(IDEA).getAttribute('aria-checked')).toBe('true');
+
+    await user.click(pathRadio(PRODUCT));
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (r) => r.method === 'PATCH' && r.body?.['selectedType'] === 'pre_launch',
+        ),
+      ).toBe(true),
+    );
   });
 
   it('walks the fixed order and submitting lands on the account claim', async () => {
@@ -173,19 +245,24 @@ describe('the simplified vetting sequence', () => {
     stubClaim();
     renderVetting();
 
-    // 1. Problem
+    // 1. Campaign path
+    await screen.findByRole('heading', { name: /which of these is closer/i });
+    await user.click(pathRadio(IDEA));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
+
+    // 2. Problem
     await screen.findByRole('heading', { name: /what problem does your product solve/i });
     await user.type(screen.getByLabelText(/what problem does your product solve/i), 'A problem.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
-    // 2. Solution
+    // 3. Solution
     await screen.findByRole('heading', { name: /what does your product do about it/i });
     await user.type(screen.getByLabelText(/what does your product do about it/i), 'A solution.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
 
-    // 3. Amount of views — the hook stage, then the submit moment.
-    await screen.findByRole('heading', { name: /how many views does your content get/i });
-    await user.click(screen.getByRole('radio', { name: viewsLabel }));
+    // 4. Positioning — always blank, always the Founder's, then submit.
+    await screen.findByRole('heading', { name: /who else is solving this/i });
+    await user.type(screen.getByLabelText(/who else is solving this/i), 'Two suites.');
     await user.click(screen.getByRole('button', { name: /submit and set up my account/i }));
 
     // The claim, directly. No review screen and no result page between.
@@ -198,25 +275,29 @@ describe('the simplified vetting sequence', () => {
   it('Continue is unavailable until the step is answered', async () => {
     stubVetting();
     renderVetting();
-    await screen.findByRole('heading', { name: /what problem does your product solve/i });
+    await screen.findByRole('heading', { name: /which of these is closer/i });
     expect(screen.getByRole('button', { name: /^Continue to / }).hasAttribute('disabled')).toBe(true);
   });
 
   it('Back returns to the previous step and does not exist on the first', async () => {
     const user = userEvent.setup();
-    stubVetting({ problem: 'A problem.', completeness: { problem: true, solution: false, views: false } });
+    stubVetting({
+      selectedType: 'pre_launch',
+      problem: 'A problem.',
+      completeness: { problem: true, solution: false, competition: false },
+    });
     renderVetting();
 
-    await screen.findByRole('heading', { name: /what problem does your product solve/i });
+    await screen.findByRole('heading', { name: /which of these is closer/i });
     // §33.11.4, §1.4: nothing precedes step 1, so there is no control rather
     // than a permanently disabled one — and every nav control names where it
     // goes.
     expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
-    await screen.findByRole('heading', { name: /what does your product do about it/i });
-    await user.click(screen.getByRole('button', { name: /^Back to / }));
     await screen.findByRole('heading', { name: /what problem does your product solve/i });
+    await user.click(screen.getByRole('button', { name: /^Back to / }));
+    await screen.findByRole('heading', { name: /which of these is closer/i });
   });
 
   it('returning to an earlier step preserves a later answer', async () => {
@@ -224,15 +305,17 @@ describe('the simplified vetting sequence', () => {
     stubVetting();
     renderVetting();
 
-    await screen.findByRole('heading', { name: /what problem/i });
+    await screen.findByRole('heading', { name: /which of these is closer/i });
+    await user.click(pathRadio(IDEA));
+    await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what problem/i), 'A problem.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
     await user.type(screen.getByLabelText(/what does your product do/i), 'A solution.');
     await user.click(screen.getByRole('button', { name: /^Continue to / }));
-    await screen.findByRole('heading', { name: /how many views/i });
-    await user.click(screen.getByRole('radio', { name: viewsLabel }));
+    await screen.findByRole('heading', { name: /who else is solving this/i });
+    await user.type(screen.getByLabelText(/who else is solving this/i), 'Two suites.');
 
-    // All the way back to step 1, then forward again. Step 3's answer survives.
+    // All the way back to step 2, then forward again. Step 4's answer survives.
     await user.click(
       within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', {
         name: 'Problem',
@@ -243,18 +326,18 @@ describe('the simplified vetting sequence', () => {
 
     await user.click(
       within(screen.getByRole('navigation', { name: 'All steps' })).getByRole('button', {
-        name: 'Amount of views',
+        name: 'Positioning',
       }),
     );
-    await screen.findByRole('heading', { name: /how many views/i });
-    expect(
-      screen.getByRole('radio', { name: viewsLabel }).getAttribute('aria-checked'),
-    ).toBe('true');
+    await screen.findByRole('heading', { name: /who else is solving this/i });
+    expect((screen.getByLabelText(/who else is solving this/i) as HTMLTextAreaElement).value).toBe(
+      'Two suites.',
+    );
   });
 
   it('says Saving… then Saved with a time (§9’s vocabulary)', async () => {
     const user = userEvent.setup();
-    stubVetting();
+    stubVetting(AT_PROBLEM);
     renderVetting();
 
     await screen.findByRole('heading', { name: /what problem/i });
@@ -275,7 +358,7 @@ describe('the simplified vetting sequence', () => {
         // A 500 is transient: worth retrying, and the line may say so.
         return { status: 500, body: { title: 'Proovd could not be reached' } };
       }
-      return { status: 200, body: vettingState() };
+      return { status: 200, body: vettingState(AT_PROBLEM) };
     });
     renderVetting();
 
@@ -298,7 +381,7 @@ describe('the simplified vetting sequence', () => {
           body: { title: 'That was not saved', whatHappened: 'Refused.', next: 'Nothing changed.' },
         };
       }
-      return { status: 200, body: vettingState() };
+      return { status: 200, body: vettingState(AT_PROBLEM) };
     });
     renderVetting();
 
@@ -322,7 +405,7 @@ describe('the simplified vetting sequence', () => {
         attempts += 1;
         return { status: 422, body: { title: 'That was not saved', whatHappened: 'Refused.' } };
       }
-      return { status: 200, body: vettingState() };
+      return { status: 200, body: vettingState(AT_PROBLEM) };
     });
     renderVetting();
 
@@ -341,7 +424,7 @@ describe('the simplified vetting sequence', () => {
       problem: 'Written last week.',
       lastSavedAt: '2026-07-24T09:30:00.000Z',
       resumeStep: 'problem',
-      completeness: { problem: true, solution: false, views: false },
+      completeness: { problem: true, solution: false, competition: false },
     });
     renderVetting();
 
@@ -362,7 +445,7 @@ describe('the simplified vetting sequence', () => {
       return original(type, listener as EventListener, options);
     });
 
-    stubVetting();
+    stubVetting(AT_PROBLEM);
     renderVetting();
     await screen.findByRole('heading', { name: /what problem/i });
     await user.type(screen.getByLabelText(/what problem/i), 'U');
@@ -371,39 +454,54 @@ describe('the simplified vetting sequence', () => {
     vi.restoreAllMocks();
   });
 
-  it('offers all four view ranges as one radio group', async () => {
-    stubVetting({
-      problem: 'p',
-      solution: 's',
-      resumeStep: 'views',
-      completeness: { problem: true, solution: true, views: false },
-    });
+  it('offers the two campaign paths as one radio group', async () => {
+    stubVetting();
     renderVetting();
 
-    await screen.findByRole('heading', { name: /how many views does your content get/i });
-    for (const choice of VIEWS_RANGE_CHOICES) {
-      expect(screen.getByRole('radio', { name: choice.label })).toBeTruthy();
+    await screen.findByRole('heading', { name: /which of these is closer/i });
+    // A real radio group, not two checkboxes that clear each other: one tab
+    // stop, arrow keys, and one question announced with two answers.
+    for (const choice of CAMPAIGN_PATH_CHOICES) {
+      expect(pathRadio(choice)).toBeTruthy();
     }
-    // Submit stays closed until the range is chosen.
+    expect(screen.getByRole('button', { name: /^Continue to / }).hasAttribute('disabled')).toBe(
+      true,
+    );
+  });
+
+  it('asks Positioning last, from a blank box, and never claims to have drafted it', async () => {
+    stubVetting(THROUGH_SOLUTION);
+    const { container } = renderVetting();
+
+    // §9, twice: always blank, written by the Founder, never prefilled and
+    // never represented as AI-generated. There is no prefill to render.
+    await screen.findByRole('heading', { name: /who else is solving this/i });
+    expect((screen.getByLabelText(/who else is solving this/i) as HTMLTextAreaElement).value).toBe(
+      '',
+    );
+
+    const text = container.textContent ?? '';
+    expect(text).toMatch(/yours from a blank page/i);
+    expect(text).not.toMatch(/we drafted/i);
+    expect(text).not.toMatch(/our draft/i);
+
+    // Submit stays closed until it is answered.
     expect(
       screen.getByRole('button', { name: /submit and set up my account/i }).hasAttribute('disabled'),
     ).toBe(true);
   });
 
-  it('asks no campaign-path question and no competition question', async () => {
+  it('asks §9’s four items and no fifth', async () => {
     stubVetting();
-    const { container } = renderVetting();
+    renderVetting();
     await screen.findByRole('heading', { name: /tell us about your product/i });
 
     const nav = screen.getByRole('navigation', { name: 'All steps' });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(
-      VETTING_STEPS.map((s) => s.label),
-    );
+    expect(within(nav).getAllByRole('button').map((b) => b.textContent)).toEqual(NAV_LABELS);
 
-    const text = container.textContent ?? '';
-    expect(text).not.toMatch(/which of these is closer/i);
-    expect(text).not.toMatch(/who else is solving this/i);
-    expect(text).not.toMatch(/\bCompetition\b/);
+    // Retired from collection on 2026-08-18: the question is not asked, and
+    // §9 never named it.
+    expect(screen.queryByText(/how many views/i)).toBeNull();
   });
 
   it('never renders an internal name (§3)', async () => {
@@ -428,8 +526,10 @@ describe('the simplified vetting sequence', () => {
           lastEditedAt: null,
         },
         solution: { ...EMPTY_PROVENANCE },
+        competition: { ...EMPTY_PROVENANCE },
       },
-      completeness: { problem: true, solution: false, views: false },
+      ...AT_PROBLEM,
+      completeness: { problem: true, solution: false, competition: false },
     });
     renderVetting();
 
@@ -578,15 +678,10 @@ describe('§33.11 the Founder surfaces are operable', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
-  it('has no axe violations on the views step', async () => {
-    stubVetting({
-      problem: 'p',
-      solution: 's',
-      resumeStep: 'views',
-      completeness: { problem: true, solution: true, views: false },
-    });
+  it('has no axe violations on the Positioning step', async () => {
+    stubVetting({ ...THROUGH_SOLUTION, resumeStep: 'competition' });
     const { container } = renderVetting();
-    await screen.findByRole('heading', { name: /how many views does your content get/i });
+    await screen.findByRole('heading', { name: /who else is solving this/i });
     expect(await axe(container)).toHaveNoViolations();
   });
 
@@ -603,7 +698,7 @@ describe('§33.11 the Founder surfaces are operable', () => {
 
     const nav = await screen.findByRole('navigation', { name: 'All steps' });
     const buttons = within(nav).getAllByRole('button');
-    expect(buttons.map((b) => b.textContent)).toEqual(VETTING_STEPS.map((s) => s.label));
+    expect(buttons.map((b) => b.textContent)).toEqual(NAV_LABELS);
     for (const button of buttons) {
       expect(button.hasAttribute('disabled')).toBe(false);
     }

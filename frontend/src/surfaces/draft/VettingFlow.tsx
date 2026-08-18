@@ -1,16 +1,19 @@
 /**
- * Pre-account vetting — the simplified flow (2026-08-10, product direction),
- * DNA §5.9, §5.12.
+ * Pre-account vetting — Spec §9, DNA §5.9, §5.12.
  *
- * Three questions, one per screen, in a fixed order, with everything saved as
- * it is typed: Problem and Solution arrive pre-filled from discovery for the
- * Founder to check and correct, and the amount of views is theirs to choose.
- * Finishing the last step submits and lands directly on the account claim —
- * there is no separate review screen and no result page between.
+ * ── This surface is INTERIM, and knowing that matters ──────────────────────
+ * Founder Flow v2 (2026-08-18) replaces it with twenty-six full-bleed pages.
+ * What landed here first is the *reversion* half of that work: §9's own four
+ * items are asked again — campaign path, Problem, Solution, Positioning — so
+ * that the flow a Founder can walk today matches the records the server now
+ * keeps. Session B rebuilds the presentation; nothing below is a design
+ * decision that survives it.
  *
- * The campaign path is no longer asked here: Admin sets it from discovery and
- * it locks at submission (the server refuses a submission until it is set).
- * Competition is no longer collected.
+ * The campaign path is the Founder's own choice again. Admin may set it first
+ * from discovery, in which case this screen arrives pre-selected; either way it
+ * stays changeable until submission, which is the moment §9's permanent lock
+ * happens. Positioning replaces the amount-of-views question, which §9 never
+ * asked for and which is retired from collection.
  *
  * ── This is a flow, not a wizard ────────────────────────────────────────────
  * "Returning to an earlier item preserves later valid answers." Every answer is
@@ -31,8 +34,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   VETTING_STEPS,
-  VIEWS_RANGE_CHOICES,
-  type ViewsRangeId,
+  CAMPAIGN_PATH_CHOICES,
+  CAMPAIGN_TYPE_LOCK_WARNING,
   type VettingStepCopy,
 } from '@proovd/shared';
 import {
@@ -56,22 +59,35 @@ import {
   saveVetting,
   submitVetting,
   DraftRequestError,
+  type CampaignTypeValue,
   type VettingPatch,
   type VettingState,
 } from './api.js';
 
 type Answers = {
+  selectedType: CampaignTypeValue | null;
   problem: string;
   solution: string;
-  views: ViewsRangeId | null;
+  competition: string;
 };
 
-type Screen = 'problem' | 'solution' | 'views';
+/**
+ * §9's four items. `campaign_path` is a position rather than an answer step —
+ * it has a stored value and no text — which is why it is named here and is not
+ * in `VETTING_STEPS`.
+ */
+type Screen = 'campaign_path' | 'problem' | 'solution' | 'competition';
 
-const SCREENS: Screen[] = ['problem', 'solution', 'views'];
+const SCREENS: Screen[] = ['campaign_path', 'problem', 'solution', 'competition'];
+
+const PATH_LABEL = 'Campaign path';
 
 const copyFor = (id: string): VettingStepCopy =>
   VETTING_STEPS.find((step) => step.id === id)!;
+
+/** The overview label for any screen, including the one with no step copy. */
+const labelFor = (screen: Screen): string =>
+  screen === 'campaign_path' ? PATH_LABEL : copyFor(screen).label;
 
 /** One sentence, shown to the eye and announced to a screen reader. */
 const stepLabel = (index: number): string => `Step ${index + 1} of ${SCREENS.length}`;
@@ -83,7 +99,7 @@ export function VettingFlow() {
   const [loaded, setLoaded] = useState<VettingState | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [answers, setAnswers] = useState<Answers | null>(null);
-  const [screen, setScreen] = useState<Screen>('problem');
+  const [screen, setScreen] = useState<Screen>('campaign_path');
   const [submitError, setSubmitError] = useState<{ title: string; what: string; next: string } | null>(
     null,
   );
@@ -106,9 +122,12 @@ export function VettingFlow() {
         if (cancelled) return;
         setLoaded(state);
         setAnswers({
+          // Pre-selected from Admin's discovery answer where there is one. The
+          // Founder's own choice supersedes it and the server records which.
+          selectedType: state.selectedType,
           problem: state.problem ?? '',
           solution: state.solution ?? '',
-          views: state.views,
+          competition: state.competition ?? '',
         });
         // DNA §5.12: position survives. Coming back never means starting over.
         const resume = state.resumeStep;
@@ -167,10 +186,11 @@ export function VettingFlow() {
     );
   }
 
-  const complete = {
+  const complete: Record<Screen, boolean> = {
+    campaign_path: answers.selectedType !== null,
     problem: answers.problem.trim() !== '',
     solution: answers.solution.trim() !== '',
-    views: answers.views !== null,
+    competition: answers.competition.trim() !== '',
   };
   const allComplete = SCREENS.every((s) => complete[s]);
 
@@ -257,6 +277,13 @@ export function VettingFlow() {
         </div>
 
         <div className="vetting__stage" ref={stageRef} key={screen}>
+          {screen === 'campaign_path' ? (
+            <PathStep
+              value={answers.selectedType}
+              onChange={(value) => update({ selectedType: value })}
+            />
+          ) : null}
+
           {screen === 'problem' ? (
             <WrittenStep
               copy={copyFor('problem')}
@@ -277,15 +304,44 @@ export function VettingFlow() {
             />
           ) : null}
 
-          {screen === 'views' ? (
-            <ViewsStep
-              value={answers.views}
-              onChange={(value) => update({ views: value })}
-              error={submitError}
-              /* The current step's own ask is the radio group above; the alert
-                 names only the EARLIER steps still unanswered. */
-              incomplete={SCREENS.filter((s) => s !== 'views' && !complete[s])}
-            />
+          {screen === 'competition' ? (
+            <>
+              <WrittenStep
+                copy={copyFor('competition')}
+                value={answers.competition}
+                supplier={loaded.provenance.competition.supplier}
+                /* Structurally null: there are no `competition_prefilled_*`
+                   columns to read one from, and §9 states twice that there
+                   never will be. `WrittenStep` renders "Your words" for it. */
+                prefilled={null}
+                onChange={(value) => update({ competition: value })}
+              />
+
+              {submitError ? (
+                <StatePanel
+                  state={submitError.title}
+                  whatHappened={submitError.what}
+                  next={submitError.next}
+                  owner="You"
+                  nextUpdate="When you try again"
+                  action="No action needed"
+                  reference="Your answers are saved"
+                  ring
+                />
+              ) : null}
+
+              {/* The current step's own ask is the box above; the alert names
+                  only the EARLIER steps still unanswered. */}
+              {SCREENS.filter((s) => s !== 'competition' && !complete[s]).length > 0 ? (
+                <p className="field-error" role="alert">
+                  Still to answer:{' '}
+                  {SCREENS.filter((s) => s !== 'competition' && !complete[s])
+                    .map((s) => labelFor(s))
+                    .join(', ')}
+                  .
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
 
@@ -296,10 +352,10 @@ export function VettingFlow() {
               promise of somewhere to go (§1.4). */}
           {index > 0 ? (
             <Button tier="tertiary" onClick={() => void advance(SCREENS[index - 1]!)}>
-              {`Back to ${copyFor(SCREENS[index - 1]!).label}`}
+              {`Back to ${labelFor(SCREENS[index - 1]!)}`}
             </Button>
           ) : null}
-          {screen === 'views' ? (
+          {screen === 'competition' ? (
             <Button
               tier="primary"
               disabled={!allComplete || submitting}
@@ -313,7 +369,7 @@ export function VettingFlow() {
               disabled={!complete[screen]}
               onClick={() => void advance(SCREENS[index + 1]!)}
             >
-              {`Continue to ${copyFor(SCREENS[index + 1]!).label}`}
+              {`Continue to ${labelFor(SCREENS[index + 1]!)}`}
             </Button>
           )}
         </div>
@@ -331,7 +387,7 @@ export function VettingFlow() {
                   aria-current={s === screen ? 'step' : undefined}
                   onClick={() => void advance(s)}
                 >
-                  {copyFor(s).label}
+                  {labelFor(s)}
                 </Button>
                 {complete[s] ? <Tag variant="sage">Answered</Tag> : null}
               </li>
@@ -408,61 +464,69 @@ function WrittenStep({
   );
 }
 
-/* ── Step 3: the amount of views, and the submit moment ───────────────────── */
+/* ── Step 1: the campaign path (§9, §33.1.7) ──────────────────────────────── */
 
 /**
- * Four exclusive ranges, so `Choice` (a real radio group) rather than four
+ * §9 step 1, the Founder's own again since 2026-08-18.
+ *
+ * Two exclusive answers, so `Choice` (a real radio group) rather than two
  * checkboxes that clear each other — keyboard users get arrow keys and one tab
- * stop, and a screen reader announces one question with four answers.
+ * stop, and a screen reader announces one question with two answers.
+ *
+ * §9: "the step must explain what is being chosen in plain language before it
+ * is chosen", because threshold, cardinality, refund source, payment schedule,
+ * fixed-payment legality and public page contents all branch on it. So both
+ * paths' commitments render — before the choice, not behind a disclosure.
+ *
+ * **Nothing here locks anything.** The lock is at submission; this writes a
+ * draft answer the Back button may revisit as often as the Founder likes. The
+ * permanence warning says so in the same words the review will.
+ *
+ * `name` is what renders. `pre_build` and `pre_launch` never reach a Founder
+ * (§3.1) — they are the values behind the labels and stay there.
  */
-function ViewsStep({
+function PathStep({
   value,
   onChange,
-  error,
-  incomplete,
 }: {
-  value: ViewsRangeId | null;
-  onChange: (value: ViewsRangeId) => void;
-  error: { title: string; what: string; next: string } | null;
-  incomplete: Screen[];
+  value: CampaignTypeValue | null;
+  onChange: (value: CampaignTypeValue) => void;
 }) {
-  const copy = copyFor('views');
   return (
     <>
-      <h2 className="step-title">{copy.title}</h2>
-      <p className="lede">{copy.why}</p>
+      <h2 className="step-title">Which of these is closer to where you are today?</h2>
+      <p className="lede">
+        It decides how your campaign works end to end — whether there is an order threshold,
+        how many pre-orders one Backer can place, which refund policy applies, and when you
+        are paid.
+      </p>
 
-      <Choice<ViewsRangeId>
-        label={copy.title}
-        entries={VIEWS_RANGE_CHOICES.map((choice) => ({
-          value: choice.id,
-          label: choice.label,
+      <Choice<CampaignTypeValue>
+        label="Which of these is closer to where you are today?"
+        entries={CAMPAIGN_PATH_CHOICES.map((choice) => ({
+          value: choice.type,
+          label: choice.prompt,
+          sub: choice.summary,
         }))}
         value={value ?? undefined}
         onValueChange={onChange}
       />
-      <p className="field-hint">{copy.expected}</p>
 
-      {error ? (
-        <StatePanel
-          state={error.title}
-          whatHappened={error.what}
-          next={error.next}
-          owner="You"
-          nextUpdate="When you try again"
-          action="No action needed"
-          reference="Your answers are saved"
-          ring
-        />
-      ) : null}
+      {/* Rendered with the existing `doc-list` treatment rather than a new
+          class: this surface is interim and Session B owns `PHASE 34`, so a
+          bespoke rule added here would be a rule written twice. */}
+      {CAMPAIGN_PATH_CHOICES.map((choice) => (
+        <section key={choice.type}>
+          <h3>{choice.name}</h3>
+          <ul className="doc-list">
+            {choice.commitments.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
 
-      {incomplete.length > 0 ? (
-        <p className="field-error" role="alert">
-          Still to answer: {incomplete.map((s) => copyFor(s).label).join(', ')}.
-        </p>
-      ) : null}
-
-      <p className="field-hint">{copy.next}</p>
+      <p className="field-hint">{CAMPAIGN_TYPE_LOCK_WARNING}</p>
     </>
   );
 }

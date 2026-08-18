@@ -80,20 +80,26 @@ export interface FieldProvenance {
 export interface VettingState {
   draftId: string;
   campaignId: string;
-  /** The campaign path Admin set from discovery. Read-only here. */
+  /** §9 step 1, the Founder's own choice; pre-selected from Admin's where set. */
   selectedType: CampaignTypeValue | null;
   problem: string | null;
   solution: string | null;
-  /** The amount-of-views answer, as a shared range id. */
+  /** §9 step 4. Always the Founder's own words — never prefilled (§33.1.5). */
+  competition: string | null;
+  /**
+   * A stored amount-of-views answer, where one exists. Retired from collection
+   * on 2026-08-18; read-only here and asked for by no step.
+   */
   views: import('@proovd/shared').ViewsRangeId | null;
   provenance: {
     problem: FieldProvenance;
     solution: FieldProvenance;
+    competition: FieldProvenance;
   };
   lastSavedAt: string | null;
   resumeStep: string | null;
   submittedAt: string | null;
-  completeness: Record<'problem' | 'solution' | 'views', boolean>;
+  completeness: Record<'problem' | 'solution' | 'competition', boolean>;
   campaignStatus: string;
   lockedType: CampaignTypeValue | null;
   typeLockedAt: string | null;
@@ -102,9 +108,28 @@ export interface VettingState {
 export interface VettingPatch {
   problem?: string | null;
   solution?: string | null;
-  views?: string | null;
+  competition?: string | null;
+  selectedType?: CampaignTypeValue | null;
   resumeStep?: string;
 }
+
+/* ── §10 the possible-creator result ──────────────────────────────────────── */
+
+/**
+ * §10's relevance signal.
+ *
+ * `with_admin` is the answer for a zero result AND for one nobody has recorded
+ * yet — the server collapses them before serializing, so there is no field here
+ * that could tell them apart.
+ */
+export interface CreatorSignal {
+  status: 'available' | 'with_admin';
+  count: number | null;
+  recordedAt: string | null;
+}
+
+export const fetchCreatorSignal = (token: string): Promise<CreatorSignal> =>
+  call(`${base(token)}/creator-signal`);
 
 export const fetchVetting = (token: string): Promise<VettingState> =>
   call(`${base(token)}/vetting`);
