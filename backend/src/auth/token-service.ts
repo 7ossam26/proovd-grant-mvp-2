@@ -90,7 +90,52 @@ export interface AffiliateInvitationSubject {
   associationId: string;
 }
 
-export type TokenSubject = DraftSubject | MagicLinkSubject | AffiliateInvitationSubject;
+/**
+ * ONE follow record's confirm or unfollow link (campaign-page-v2 Session C —
+ * a recorded §1 rule 6 deviation; see `db/schema/followers.ts`).
+ *
+ * ── Two lineages, one scope, and how they are told apart ───────────────────
+ * The CONFIRM link is single-use, so it is claimed. The UNFOLLOW link must
+ * keep working for the life of the record — and `verify` rejects a claimed
+ * token, while `secure_tokens_one_live_per_lineage` is keyed on
+ * `revoked_at IS NULL AND claimed_at IS NULL` — so it is a second lineage that
+ * is never claimed and is revoked only when the follow ends.
+ *
+ * Sharing a scope means either link would verify at either route, and that is
+ * not harmless: opening the unfollow link at the confirm route would CLAIM the
+ * unfollow lineage and leave the person with a dead unsubscribe link in their
+ * inbox. They are separated by a property each lineage genuinely has rather
+ * than by a flag — `expiresAt`. A confirmation link that still works a year
+ * later is a consent somebody else can grant from a forwarded email, so the
+ * confirm lineage expires; an unfollow link that expires is an opt-out with a
+ * deadline, so it never does. `followTokenPurpose` is the one reader.
+ */
+export interface CampaignFollowSubject {
+  scope: 'campaign_follow';
+  campaignFollowerId: string;
+}
+
+export type TokenSubject =
+  | DraftSubject
+  | MagicLinkSubject
+  | AffiliateInvitationSubject
+  | CampaignFollowSubject;
+
+/** How long a follow confirmation link stays openable (§25.8 window 5 covers
+ *  the hash; this is the consent's own freshness). */
+export const FOLLOW_CONFIRM_TTL_DAYS = 14;
+
+/**
+ * Which of the two `campaign_follow` lineages a verified token belongs to.
+ *
+ * Derived, never stored: an expiry is what actually differs, and a stored flag
+ * could disagree with the token's real lifetime.
+ */
+export function followTokenPurpose(token: {
+  expiresAt: Date | null;
+}): 'confirm' | 'unfollow' {
+  return token.expiresAt === null ? 'unfollow' : 'confirm';
+}
 
 /* ── Primitives ───────────────────────────────────────────────────────────── */
 
@@ -165,7 +210,14 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
           // §19 derives their expiry from campaign resolution + 180 days.
           subject.scope === 'founder_draft' || subject.scope === 'affiliate_invitation'
           ? new Date(now().getTime() + DRAFT_TTL_DAYS * 86_400_000)
-          : null;
+          : // A follow CONFIRM link expires and an UNFOLLOW link does not, and
+            // that difference is the only thing distinguishing the two
+            // lineages of this scope (see `followTokenPurpose`). The caller
+            // passes `expiresAt: null` explicitly for the unfollow lineage,
+            // which lands in the `!== undefined` branch above.
+            subject.scope === 'campaign_follow'
+            ? new Date(now().getTime() + FOLLOW_CONFIRM_TTL_DAYS * 86_400_000)
+            : null;
 
     const [record] = await db
       .insert(secureTokens)
@@ -182,6 +234,8 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
           subject.scope === 'backer_magic_link' ? subject.backerIdentityId : null,
         associationId:
           subject.scope === 'affiliate_invitation' ? subject.associationId : null,
+        campaignFollowerId:
+          subject.scope === 'campaign_follow' ? subject.campaignFollowerId : null,
       })
       .returning();
 
@@ -346,11 +400,13 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
         ? { scope: 'founder_draft', campaignDraftId: row.campaignDraftId! }
         : row.scope === 'affiliate_invitation'
           ? { scope: 'affiliate_invitation', associationId: row.associationId! }
-          : {
-              scope: 'backer_magic_link',
-              campaignId: row.campaignId!,
-              backerIdentityId: row.backerIdentityId!,
-            };
+          : row.scope === 'campaign_follow'
+            ? { scope: 'campaign_follow', campaignFollowerId: row.campaignFollowerId! }
+            : {
+                scope: 'backer_magic_link',
+                campaignId: row.campaignId!,
+                backerIdentityId: row.backerIdentityId!,
+              };
 
     return { ok: true, token: row, subject };
   }

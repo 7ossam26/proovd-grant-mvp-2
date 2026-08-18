@@ -1296,6 +1296,40 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       reference: REF,
     }),
 
+  /*
+    The follow record's consent RECEIPT (campaign-page-v2 Session C — a
+    recorded §1 rule 6 deviation). It is transactional: `optOutRule` stays
+    `forbidden`, so it carries no opt-out language, and the one way out it
+    names is a plain sentence in the body rather than an unsubscribe control.
+    The thing consented to is `backer_campaign_update_digest` below, which
+    already carries the route out.
+  */
+  backer_follow_confirmation: () =>
+    renderPlainNotice({
+      subject: `Confirm the summary for ${CAMPAIGN}`,
+      headline: 'One click and the summary starts.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'How often', value: 'Weekly' },
+        {
+          label: 'What this is not',
+          value: 'Not a pre-order. Nothing is charged and no card is saved.',
+        },
+        {
+          label: 'If you did not ask for this',
+          value:
+            'Nothing has started and nothing will. Ignore this email and no summary is ever sent.',
+        },
+      ],
+      paragraphs: [
+        `You are asking Proovd to email you a summary of what happens on ${CAMPAIGN}, weekly.`,
+        `If you would rather not receive it after all: ${APP}/campaign/${REF}/follow/stop/sample`,
+      ],
+      action: { label: 'Confirm the summary', url: `${APP}/campaign/${REF}/follow/confirm/sample` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
   backer_campaign_update_digest: () =>
     renderDigest({
       audience: 'backer',

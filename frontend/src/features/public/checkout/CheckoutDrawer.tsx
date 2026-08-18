@@ -156,6 +156,22 @@ export function CheckoutForm(props: CheckoutFormProps) {
 
   return (
     <div className="checkout">
+      {/*
+        The reference's two-segment rail and `STEP 1 OF 2`.
+
+        It lives inside the form rather than on the Drawer because the step
+        does: lifting the state out to hand it to a chrome prop would put the
+        §19 flow's own progress somewhere the flow cannot see it. The rail is
+        decorative — the step is named in text beside it, which is what a
+        screen reader reads — and the three steps are NOT renumbered: `details`
+        and `review` are §19's, and `success` is Appendix B.2's done state.
+      */}
+      <div className="checkout__rail">
+        <span className="checkout__rail-seg is-on" />
+        <span className={step === 'review' ? 'checkout__rail-seg is-on' : 'checkout__rail-seg'} />
+      </div>
+      <p className="checkout__step">Step {step === 'details' ? 1 : 2} of 2</p>
+
       {error ? (
         <p className="checkout__error" role="alert">
           {error.message}
@@ -216,6 +232,36 @@ export function CheckoutForm(props: CheckoutFormProps) {
 
       {step === 'review' && quote ? (
         <>
+          {/*
+            The reference's summary card and its `$0 today → $N at threshold`
+            pair, wrapping the values the §19 quote already returned. Nothing
+            here computes an amount: every figure below is `quote`'s, and the
+            full itemised list follows it unchanged.
+          */}
+          <div className="checkout__summary">
+            <span>
+              {quote.rewardTitle}
+              <small>{props.reward.delivery}</small>
+            </span>
+            <strong>US${quote.totalAuthorized}</strong>
+          </div>
+          <div className="checkout__rule">
+            <div>
+              <strong>US${quote.chargedToday}</strong>
+              <span>Today</span>
+            </div>
+            <span className="checkout__rule-arrow" aria-hidden="true">
+              →
+            </span>
+            <div>
+              <strong>US${quote.totalAuthorized}</strong>
+              <span>{props.model === 'idea' ? 'If the threshold is met' : 'When it closes'}</span>
+            </div>
+          </div>
+          <p className="checkout__cancel-note">
+            Cancel free any time before the charge date, and nothing is charged if you do.
+          </p>
+
           <dl className="checkout__amounts">
             <div>
               <dt>Reward</dt>
@@ -306,8 +352,24 @@ export function SuccessState({ success }: { success: PreorderSuccess }) {
   const magicToken = success.magicLinkUrl.split('/backer/')[1] ?? '';
   return (
     <div className="checkout checkout--success">
+      <span className="checkout__done-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="m5 12 4 4L19 6" />
+        </svg>
+      </span>
       <h3 className="checkout__success-lead">{PREORDER_SAVED_LEAD}.</h3>
       <p className="checkout__success-zero">US$0 charged today</p>
+      {/*
+        The reference's `Founding user #248` is deliberately NOT rendered.
+
+        17b's `campaign_backer_numbers` is minted on a Backer's first COMMENT,
+        not at pre-order (`campaign/comments.ts` is the only writer), so there
+        is no number here to show. Producing one would mean minting it in the
+        §19 flow — a behaviour change, in the one flow this rebuild is
+        explicitly a restyle of — and inventing a display number instead would
+        be a fabricated position in a queue (§30). The reserved reward and the
+        amounts below are what a person actually needs from this state.
+      */}
       <dl className="checkout__amounts">
         <div>
           <dt>Reserved</dt>
@@ -352,6 +414,7 @@ export function CheckoutDrawer(props: CheckoutFormProps & { triggerLabel?: strin
   return (
     <Drawer
       trigger={<Button tier="primary">{props.triggerLabel ?? 'Reserve a pre-order'}</Button>}
+      eyebrow={props.reward.title}
       title="Reserve a pre-order"
     >
       <CheckoutForm {...props} />

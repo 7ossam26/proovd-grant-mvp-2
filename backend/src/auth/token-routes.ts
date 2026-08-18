@@ -19,6 +19,14 @@ export const MAGIC_LINK_TOKEN_PATH = '/api/link';
 /** Private campaign-specific Affiliate invitation (§8, §11). */
 export const AFFILIATE_INVITATION_TOKEN_PATH = '/api/affiliate-invitation';
 
+/**
+ * A campaign follow's confirm or unfollow link (campaign-page-v2 Session C —
+ * a recorded §1 rule 6 deviation). The token is the first segment after the
+ * prefix, like every other shape here, so the redaction rule needs no
+ * special case.
+ */
+export const FOLLOW_TOKEN_PATH = '/api/follow';
+
 /** The Express route parameter every token middleware reads. */
 export const TOKEN_PARAM = 'token';
 
@@ -26,6 +34,7 @@ const TOKEN_BEARING_PREFIXES = [
   DRAFT_TOKEN_PATH,
   MAGIC_LINK_TOKEN_PATH,
   AFFILIATE_INVITATION_TOKEN_PATH,
+  FOLLOW_TOKEN_PATH,
 ] as const;
 
 export const REDACTED = '[redacted]';

@@ -7651,3 +7651,138 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
    Fixed at the slot rather than on this page, so every dark band gets it. */
 .mode-dark .accordion__head { color: var(--mode-title); }
 .mode-dark .accordion__body { color: var(--mode-body); }
+
+
+/* ── PHASE 33 — SESSION C (2026-08-18): the modal chrome and the follow ────
+   The checkout is a RESTYLE. `Drawer` is already Radix Dialog — portal,
+   overlay, focus trap, Escape, backdrop dismiss, GSAP open/close — so the
+   reference's `role="dialog" aria-modal="true"` behaviour already worked, and
+   `CheckoutForm`'s three steps (details → review → success) already matched
+   its two-steps-plus-done shell. Nothing below renumbers, reorders or merges
+   them, and nothing below adds a card field: the reference's `#cardInput` is
+   a mockup artefact and §34 gates live mode on samples mounting none. */
+
+/* The reference's `STEP 1 OF 2`. Decorative — `Dialog.Title` is still the
+   dialog's accessible name, and `.checkout__step` carries the step in text. */
+.drawer__eyebrow {
+  margin: 0 0 var(--sp-4);
+  color: var(--mode-body);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.checkout__rail {
+  margin-bottom: var(--sp-8);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+}
+.checkout__rail-seg {
+  height: 0.45rem;
+  background: var(--brand-5);
+  border: 1px solid var(--brand);
+}
+.checkout__rail-seg.is-on { background: var(--brand); }
+.checkout__step {
+  margin: 0 0 var(--sp-16);
+  color: var(--mode-body);
+  font-size: 0.85rem;
+  font-weight: 850;
+}
+
+/* The summary card and the `$0 today → $N later` pair. Both wrap values the
+   §19 quote already returned; nothing here computes an amount. */
+.checkout__summary {
+  padding: var(--sp-16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  background: var(--stat-mint-bg);
+  color: var(--dark);
+}
+.checkout__summary > span { display: flex; flex-direction: column; font-weight: 900; }
+.checkout__summary small { margin-top: var(--sp-4); color: var(--moss); font-weight: 750; }
+.checkout__summary > strong { font-size: 1.5rem; }
+
+.checkout__rule {
+  margin: var(--sp-24) 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--sp-16);
+}
+.checkout__rule > div {
+  min-height: 6rem;
+  padding: var(--sp-16);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--accent-blue);
+  border: 1px solid var(--brand);
+  color: var(--dark);
+}
+.checkout__rule strong { font-size: 1.5rem; }
+.checkout__rule span { color: var(--moss); font-size: 0.85rem; font-weight: 850; }
+.checkout__rule-arrow { color: var(--brand); font-size: 1.5rem; font-weight: 900; }
+
+.checkout__cancel-note {
+  margin: 0 0 var(--sp-24);
+  color: var(--mode-body);
+  font-weight: 800;
+}
+
+.checkout__done-icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin: var(--sp-8) auto var(--sp-16);
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: var(--mint);
+}
+.checkout__done-icon svg {
+  width: 2.2rem;
+  height: 2.2rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── `Follow build` ───────────────────────────────────────────────────────
+   A RECORDED DEVIATION from §1 rule 6, built by explicit product direction
+   (see migration 0050). It sits in the updates band's header, beside the
+   heading — the reference's own placement — and never renders on a sample. */
+
+.pc-build__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-32);
+  flex-wrap: wrap;
+}
+.pc-follow {
+  max-width: 26rem;
+  padding: var(--sp-24);
+  display: grid;
+  gap: var(--sp-12);
+  background: var(--grey-lightest);
+  border: var(--bw) solid var(--leaf);
+}
+.pc-follow__title { margin: 0; color: var(--darker); font-weight: 900; }
+.pc-follow__note { margin: 0; color: var(--moss); font-size: 0.9375rem; }
+.pc-follow--done { border-color: var(--brand); }
+
+@media (max-width: 599.98px) {
+  .pc-build__head { align-items: stretch; flex-direction: column; gap: var(--sp-24); }
+  .pc-follow { max-width: none; padding: var(--sp-16); }
+  .checkout__rule { grid-template-columns: 1fr; }
+  .checkout__rule-arrow { justify-self: center; transform: rotate(90deg); }
+}
+
+/* The way out of a follow ask, where there is no id to link back to yet. */
+.follow-action__reassurance { margin: var(--sp-16) 0 0; color: var(--moss); }

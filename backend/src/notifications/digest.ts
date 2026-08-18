@@ -33,7 +33,7 @@
  * the same key.
  */
 
-import { and, desc, eq, gt, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { campaigns } from '../db/schema/domain.js';
 import { campaignAffiliateAssociations, associationStatusHistory } from '../db/schema/domain.js';
@@ -45,6 +45,8 @@ import { founderClaimProfiles } from '../db/schema/vetting.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
 import { notificationDeliveries } from '../db/schema/integrity.js';
 import { notificationDigestPreferences } from '../db/schema/digest.js';
+import { campaignFollowers } from '../db/schema/followers.js';
+import type { TokenService } from '../auth/token-service.js';
 import { user } from '../db/schema/auth.js';
 import {
   activityKindsFor,
@@ -76,6 +78,13 @@ export interface DigestItem {
 }
 
 export interface DigestDeps {
+  /**
+   * Only the follower branch needs it: an unfollow link's raw value exists
+   * once, in the delivered URL (§28.1), so every digest to a follower mints
+   * its own. Optional so a deployment without it simply sends no follower
+   * digests rather than sending one with no way out.
+   */
+  tokenService?: TokenService | undefined;
   db: Database;
   notifier: Notifier;
   fromAddress: string;
@@ -311,6 +320,14 @@ export interface ComposeInput {
   /** The account for founder/affiliate; the identity for a Backer. */
   userId?: string | undefined;
   backerIdentityId?: string | undefined;
+  /**
+   * A campaign FOLLOWER (campaign-page-v2 Session C — a recorded §1 rule 6
+   * deviation). Rides the `backer` audience because the prefix names the
+   * delivery channel, not a claim that this person pre-ordered — but it is a
+   * separate field, because what a follower may SEE differs and keying that
+   * off the audience string would get it wrong silently.
+   */
+  followerId?: string | undefined;
   target: string;
   now: Date;
 }
@@ -332,6 +349,15 @@ export async function composeDigest(
     campaignIds = await founderCampaignIds(db, input.userId);
   } else if (input.audience === 'affiliate' && input.userId) {
     campaignIds = await creatorCampaignIds(db, input.userId);
+  } else if (input.followerId) {
+    const [follow] = await db
+      .select({ campaignId: campaignFollowers.campaignId })
+      .from(campaignFollowers)
+      .where(
+        and(eq(campaignFollowers.id, input.followerId), eq(campaignFollowers.state, 'confirmed')),
+      )
+      .limit(1);
+    campaignIds = follow ? [follow.campaignId] : [];
   } else if (input.audience === 'backer' && input.backerIdentityId) {
     const [identity] = await db
       .select({ campaignId: backerIdentities.campaignId })
@@ -350,7 +376,19 @@ export async function composeDigest(
       ...(await updateItems(
         db,
         campaignIds,
-        input.audience === 'backer' ? BACKER_VISIBLE_AUDIENCES : CREATOR_VISIBLE_AUDIENCES,
+        /*
+          A FOLLOWER takes the Creator list, never the Backer list.
+          `backer_only` updates are for people who actually pre-ordered, so
+          putting a follower on the Backer list would be a §18 disclosure
+          failure rather than a digest bug — which is why this branches on
+          follower-ness and not on `input.audience`, a string a follower
+          legitimately shares with a real Backer.
+        */
+        input.followerId
+          ? CREATOR_VISIBLE_AUDIENCES
+          : input.audience === 'backer'
+            ? BACKER_VISIBLE_AUDIENCES
+            : CREATOR_VISIBLE_AUDIENCES,
         window,
         titles,
       )),
@@ -382,7 +420,7 @@ export type DigestSendResult =
  */
 export async function sendDigest(
   deps: DigestDeps,
-  input: ComposeInput & { preferenceId: string },
+  input: ComposeInput & { preferenceId: string; preferencesUrl?: string | undefined },
 ): Promise<DigestSendResult> {
   if (!input.target) return { status: 'skipped_no_address' };
 
@@ -400,7 +438,13 @@ export async function sendDigest(
     // One primary action (§27.2). Where the reader manages the preference is
     // the honest destination for a message whose subject is "here is what
     // happened" — every item is already linked from the campaign it names.
-    preferencesUrl: preferencesUrlFor(deps.appBaseUrl, input),
+    /*
+      For a follower this IS the unfollow link, so the digest's single action
+      satisfies `oneActionAtMost` and `optOutRule: 'required'` at the same
+      time. It is passed in rather than derived because the raw token exists
+      only in the delivered URL (§28.1) — there is nothing here to recompute.
+    */
+    preferencesUrl: input.preferencesUrl ?? preferencesUrlFor(deps.appBaseUrl, input),
     supportEmail: deps.supportEmail,
     reference: input.preferenceId,
   });
@@ -486,6 +530,68 @@ export async function sweepDigests(
     if (outcome.status === 'sent') result.sent += 1;
     else if (outcome.status === 'duplicate') result.duplicates += 1;
     else if (outcome.status === 'skipped_no_activity') result.skippedEmpty += 1;
+  }
+
+  /*
+    ── The campaign followers ────────────────────────────────────────────────
+    A recorded §1 rule 6 deviation (campaign-page-v2 Session C). It reads
+    `campaign_followers`, NOT a fourth row in `notification_digest_preferences`:
+    migration 0035's `digest_preference_subject_matches_audience` CHECK admits
+    exactly two subject columns and three audiences, and both registers are
+    asserted deep-equal between shared and backend. The frequency lives on the
+    follow row instead.
+
+    It composes through the SAME `sendDigest`, so the empty-digest rule holds
+    unchanged — §33.6.11's absence is structural for a follower too, because
+    there is still no branch anywhere that produces a message from a date.
+  */
+  if (deps.tokenService) {
+    const followers = await deps.db
+      .select({
+        id: campaignFollowers.id,
+        email: campaignFollowers.email,
+        campaignId: campaignFollowers.campaignId,
+      })
+      .from(campaignFollowers)
+      .where(
+        and(
+          eq(campaignFollowers.state, 'confirmed'),
+          eq(campaignFollowers.frequency, frequency),
+          isNull(campaignFollowers.anonymisedAt),
+        ),
+      );
+
+    for (const follower of followers) {
+      result.considered += 1;
+      if (!follower.email) continue;
+
+      /*
+        A fresh unfollow token per send, deliberately. Rotating one lineage
+        would kill the link in every message already delivered — a person
+        unsubscribing from last week's summary would find a dead link, which
+        is the one failure an opt-out route must not have. Every token minted
+        here is bound to this follow alone and all of them are revoked the
+        moment it ends.
+      */
+      const stop = await deps.tokenService.issue(
+        { scope: 'campaign_follow', campaignFollowerId: follower.id },
+        { expiresAt: null },
+      );
+
+      const outcome = await sendDigest(deps, {
+        audience: 'backer',
+        frequency,
+        followerId: follower.id,
+        target: follower.email,
+        now,
+        preferenceId: follower.id,
+        preferencesUrl: `${deps.appBaseUrl}/follow/stop/${stop.raw}`,
+      });
+
+      if (outcome.status === 'sent') result.sent += 1;
+      else if (outcome.status === 'duplicate') result.duplicates += 1;
+      else if (outcome.status === 'skipped_no_activity') result.skippedEmpty += 1;
+    }
   }
 
   return result;

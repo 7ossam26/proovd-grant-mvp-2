@@ -47,6 +47,7 @@ import { animateDemoMessage, fillOnScroll, reduced } from '../../../components/a
 import { EmptyPanel, supportMailto } from '../states.js';
 import { SUPPORT_EMAIL } from '../site.js';
 import { CheckoutDrawer } from '../checkout/CheckoutDrawer.js';
+import { FollowBuild } from './FollowBuild.js';
 import { formatLocalInstant, formatUtcInstant, formatCalendarDate } from './format.js';
 import { SAMPLE_BANNER, chargeRule, consentPreview, expandedMorBlock } from './consent.js';
 import {
@@ -1096,9 +1097,20 @@ export function CampaignPage({
 
       {/* ── UPDATES — item 12 ──────────────────────────────────────────────── */}
       <Section className="pc-build" wrap={false} aria-labelledby="campaign-updates">
-        <h2 className="pc-display" id="campaign-updates">
-          {campaign.updatesHeading ?? 'Updates'}
-        </h2>
+        <div className="pc-build__head">
+          <h2 className="pc-display" id="campaign-updates">
+            {campaign.updatesHeading ?? 'Updates'}
+          </h2>
+          {/*
+            `Follow build` — a RECORDED DEVIATION from §1 rule 6, built by
+            explicit product direction (see `FollowBuild.tsx` and migration
+            0050). Never on a sample: a sample campaign has no real record to
+            follow, and §34 gates live mode on the samples collecting nothing.
+          */}
+          {!campaign.isSample && !ended ? (
+            <FollowBuild campaignId={campaign.slug} />
+          ) : null}
+        </div>
         {latest ? (
           <div className="update-list">
             <UpdateEntry update={latest} featured />

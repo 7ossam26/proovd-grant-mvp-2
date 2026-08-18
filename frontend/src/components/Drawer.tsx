@@ -21,10 +21,19 @@ import { useProovdMotion } from '../motion/MotionProvider.js';
 interface DrawerProps {
   trigger: ReactElement;
   title: ReactNode;
+  /**
+   * A small line above the title — the reference's `STEP 1 OF 2`.
+   *
+   * Deliberately NOT a replacement for `title`: `Dialog.Title` is the dialog's
+   * accessible name, and a screen reader announcing "step 1 of 2" instead of
+   * what the dialog is for would be a worse dialog that looked like a better
+   * one. It is decorative and marked so.
+   */
+  eyebrow?: ReactNode;
   children: ReactNode;
 }
 
-export function Drawer({ trigger, title, children }: DrawerProps) {
+export function Drawer({ trigger, title, eyebrow, children }: DrawerProps) {
   const [open, setOpen] = useState(false);
   const closing = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -66,6 +75,11 @@ export function Drawer({ trigger, title, children }: DrawerProps) {
         </Dialog.Overlay>
         <Dialog.Content asChild>
           <div ref={contentRef} className="drawer mode-drawer">
+            {eyebrow ? (
+              <p className="drawer__eyebrow" aria-hidden="true">
+                {eyebrow}
+              </p>
+            ) : null}
             <Dialog.Title className="h2">{title}</Dialog.Title>
             {children}
           </div>

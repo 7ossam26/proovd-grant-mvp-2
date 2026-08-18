@@ -51,6 +51,7 @@ import { sweepTransferRetries } from '../close/earnings.js';
 import { sweepFounderPaymentSchedule } from '../close/founder-payments.js';
 import { sweepDay14Reviews } from '../fulfillment/day14.js';
 import { sweepDigests } from '../notifications/digest.js';
+import { sweepFollowConsent } from '../followers/retention.js';
 import { sweepRosterUpdates } from '../affiliates/roster-notifications.js';
 import { sweepSupportPromises } from '../support/promises.js';
 import type { Scheduler as SchedulerPort } from '../interviews/calcom.js';
@@ -62,6 +63,14 @@ import type { InterviewNotificationContext } from '../interviews/notifications.j
  * calendar days; the job is named for what it does.
  */
 export const UNCLAIMED_DRAFT_RETENTION_JOB = 'unclaimed-draft-retention';
+/**
+ * §25.8 window 4 for the campaign follow record — "Marketing consent: until
+ * unsubscribe + 2 years" (campaign-page-v2 Session C, a recorded §1 rule 6
+ * deviation). It runs on `RETENTION_SCHEDULE_CRON` beside the draft sweep
+ * because it is the same kind of act: it removes content on a clock the Spec
+ * fixes, and it never sends anything.
+ */
+export const FOLLOW_CONSENT_RETENTION_JOB = 'follow-consent-retention';
 
 /**
  * Daily. The window is 30 calendar days, so an hourly sweep would buy hours of
@@ -335,6 +344,20 @@ export async function startScheduler({
   });
 
   await boss.schedule(UNCLAIMED_DRAFT_RETENTION_JOB, RETENTION_SCHEDULE_CRON, undefined, {
+    tz: 'UTC',
+  });
+
+  await boss.createQueue(FOLLOW_CONSENT_RETENTION_JOB);
+  await boss.work(FOLLOW_CONSENT_RETENTION_JOB, async () => {
+    const result = await sweepFollowConsent({ db, audit });
+    // Counts only, for the reason the draft sweep above records: naming what
+    // it removed in a log would defeat the removal.
+    log('follow consent retention sweep complete', {
+      considered: result.considered,
+      anonymised: result.anonymised,
+    });
+  });
+  await boss.schedule(FOLLOW_CONSENT_RETENTION_JOB, RETENTION_SCHEDULE_CRON, undefined, {
     tz: 'UTC',
   });
 
@@ -654,6 +677,11 @@ export async function startScheduler({
           fromAddress: launch.context.fromAddress,
           supportEmail: launch.context.supportEmail,
           appBaseUrl: launch.context.appBaseUrl,
+          // Only the follower branch needs it: an unfollow link's raw value
+          // exists once, in the delivered URL (§28.1), so each send mints its
+          // own. Without a token service the branch sends nothing, rather than
+          // sending a summary with no way out of it.
+          tokenService: tokens,
         },
         { frequency },
       );

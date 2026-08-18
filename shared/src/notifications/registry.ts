@@ -529,6 +529,29 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.5',
     description: 'Campaign update digest if selected',
   },
+  /*
+    The ONE message the campaign-page-v2 follow record adds (a recorded §1 rule
+    6 deviation — see migration 0050). It is the consent RECEIPT for §27.7's
+    optional summary, not the summary itself, so it is transactional: its
+    `optOutRule` stays `forbidden` and it carries no opt-out language at all.
+    The recurring send needs no key of its own — it rides
+    `backer_campaign_update_digest`, which is already in `NON_TRANSACTIONAL_KEYS`
+    and already carries the opt-out route.
+
+    The `backer_` prefix names the DELIVERY CHANNEL and history scope, not a
+    claim that this person pre-ordered. It is deliberately not a fifth
+    audience: `registry.test.ts` asserts the audience set equals exactly
+    {founder, affiliate, backer, internal}, the key regex is a closed
+    alternation, and `audienceOf` would throw on the hot render path for an
+    unknown prefix. The prefix also reaches no reader — `HISTORY_AUDIENCES` is
+    founder/affiliate/admin, so a Backer has no notification-history surface
+    and a follower is never shown this word.
+  */
+  backer_follow_confirmation: {
+    audience: 'backer',
+    specRef: '§27.7',
+    description: 'Confirm a campaign follow (double opt-in receipt)',
+  },
   backer_delivery: {
     audience: 'backer',
     specRef: '§27.5',

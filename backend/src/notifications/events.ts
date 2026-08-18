@@ -555,6 +555,8 @@ export const INTERNAL_CAMPAIGN_SUBMITTED = 'internal_campaign_submitted' as cons
 export const FOUNDER_ACTIVITY_DIGEST = 'founder_activity_digest' as const;
 export const AFFILIATE_ACTIVITY_DIGEST = 'affiliate_activity_digest' as const;
 export const BACKER_CAMPAIGN_UPDATE_DIGEST = 'backer_campaign_update_digest' as const;
+/** The follow record's double-opt-in receipt (campaign-page-v2 Session C). */
+export const BACKER_FOLLOW_CONFIRMATION = 'backer_follow_confirmation' as const;
 
 export const FOUNDER_CONNECTED_ACCOUNT_STATUS = 'founder_connected_account_status' as const;
 export const AFFILIATE_CONNECTED_ACCOUNT_INFO_REQUIRED =
@@ -659,6 +661,7 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_ACTIVITY_DIGEST,
   AFFILIATE_ACTIVITY_DIGEST,
   BACKER_CAMPAIGN_UPDATE_DIGEST,
+  BACKER_FOLLOW_CONFIRMATION,
   FOUNDER_SUBMISSION_RECEIPT,
   FOUNDER_CHANGES_REQUIRED,
   FOUNDER_CAMPAIGN_APPROVED,

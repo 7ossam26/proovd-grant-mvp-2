@@ -40,6 +40,7 @@ import { createAdminListingRouter } from './routes/admin-listing.js';
 import { createCreatorDecisionRouter } from './routes/creator-decisions.js';
 import { createAttributionRouter } from './routes/attribution.js';
 import { createPublicCampaignRouter } from './routes/public-campaign.js';
+import { createFollowRouter } from './routes/follow.js';
 import { createBackerPreorderRouter } from './routes/backer-preorder.js';
 import { createBackerRouter } from './routes/backer.js';
 import { createAdminLiveModeRouter } from './routes/admin-live-mode.js';
@@ -359,6 +360,24 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   const cookiesSecure = config.appBaseUrl.startsWith('https://');
   app.use(createAttributionRouter({ db, secret: config.authSecret, secure: cookiesSecure }));
   app.use(createPublicCampaignRouter({ db, secret: config.authSecret }));
+  /*
+   * The campaign follow (campaign-page-v2 Session C) — a RECORDED DEVIATION
+   * from §1 rule 6, built by explicit product direction. Public, like the two
+   * routers above it: the ask answers one frozen body for every outcome, and
+   * confirm and unfollow are POSTs behind a page so no email scanner can
+   * complete a double opt-in or unsubscribe somebody who never clicked.
+   */
+  app.use(
+    createFollowRouter({
+      db,
+      tokens,
+      notifier,
+      appBaseUrl: config.appBaseUrl,
+      fromAddress: config.invitationContext.fromAddress,
+      supportEmail: config.invitationContext.supportEmail,
+      audit: (event) => audit({ ...event, targetId: event.targetId }),
+    }),
+  );
   // Phase 06 (§6, §26). The first product routes any guard is mounted on:
   // everything under /api/admin requires a session and the admin role, and
   // every write additionally requires a recent sign-in.

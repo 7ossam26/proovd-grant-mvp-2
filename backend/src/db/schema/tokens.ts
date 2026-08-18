@@ -60,6 +60,18 @@ export const tokenScope = pgEnum('token_scope', [
   'founder_draft',
   'backer_magic_link',
   'affiliate_invitation',
+  /**
+   * `campaign_follow` — ONE follow record's confirm or unfollow link
+   * (campaign-page-v2, Session C; a recorded §1 rule 6 deviation — see 0050).
+   *
+   * Two lineages share this scope and the difference is load-bearing. The
+   * CONFIRM link is single-use, so it is claimed. The UNFOLLOW link must keep
+   * working for the life of the record — and `verify` rejects a claimed token,
+   * while `secure_tokens_one_live_per_lineage` is keyed on
+   * `revoked_at IS NULL AND claimed_at IS NULL` — so it is never claimed, and
+   * is revoked only when the follow ends.
+   */
+  'campaign_follow',
 ]);
 
 /**
@@ -135,6 +147,16 @@ export const secureTokens = pgTable(
      * tests for.
      */
     associationId: uuid('association_id'),
+
+    /**
+     * `campaign_follow` — the one follow record this link confirms or ends.
+     *
+     * Named in `enforce_secure_token_immutability()` (0050) like every other
+     * binding column: leaving it out would leave a live delivered URL
+     * repointable at somebody else's follow, which is the cross-scope access
+     * §33.1.2 exists to catch.
+     */
+    campaignFollowerId: uuid('campaign_follower_id'),
 
     /* ── Lifecycle ─────────────────────────────────────────────────────────*/
 

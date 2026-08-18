@@ -54,6 +54,10 @@ import { CreatorPartnership } from './surfaces/creator/CreatorPartnership.js';
 import { CreatorCampaignClose } from './surfaces/creator/CreatorCampaignClose.js';
 import { DraftLanding } from './surfaces/DraftLanding.js';
 import { BackerPage } from './features/public/backer/BackerPage.js';
+import {
+  FollowConfirmPage,
+  FollowStopPage,
+} from './features/public/campaign/FollowAction.js';
 import { VettingFlow } from './surfaces/draft/VettingFlow.js';
 import { AccountClaim } from './surfaces/draft/AccountClaim.js';
 import {
@@ -332,6 +336,26 @@ const rootChildren: RouteObject[] = [
     // by an account-less Backer through a token, not a navigable site path.
     path: 'backer/:token',
     element: <BackerPage />,
+  },
+  {
+    /*
+      The campaign follow's confirm and unfollow pages (campaign-page-v2
+      Session C — a recorded §1 rule 6 deviation). Outside PublicLayout for the
+      same reason the draft and Backer links are: reached by an account-less
+      person through a token, not by navigating the site — so they are
+      deliberately NOT in `site.ts`'s route inventory and no footer links them.
+
+      They are pages rather than one-click links because a link that acts on
+      being FETCHED records the answers email scanners give: a GET confirm
+      would let a scanner complete the double opt-in, and a GET unfollow would
+      unsubscribe somebody who never clicked.
+    */
+    path: 'follow/confirm/:token',
+    element: <FollowConfirmPage />,
+  },
+  {
+    path: 'follow/stop/:token',
+    element: <FollowStopPage />,
   },
   {
     // Phase 07 (§9, §10). The vetting sequence, its result, and the account

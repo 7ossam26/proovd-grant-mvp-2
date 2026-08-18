@@ -172,7 +172,7 @@ recorded in [CLAUDE.md](CLAUDE.md) with its date. The Admin panel's five
 workspaces and its floating task list came that way; the current one is the
 public campaign page.
 
-**The campaign page is being rebuilt in three sessions, and two have landed.** Spec §18 defines that page's *content* and hands presentation to the
+**The campaign page was rebuilt in three sessions, all of which have landed.** Spec §18 defines that page's *content* and hands presentation to the
 DNA document by name — "the DNA UX document controls presentation" — so a
 redesign is licensed and dropping one of its fourteen items is not. The
 reference drops four; they are placed rather than lost.
@@ -241,10 +241,55 @@ screenshot was really the left third of a 489px render and read as an overflow
 that was not there. Rendering the page inside a 320px iframe gives a true
 viewport; at that width every band stacks and nothing scrolls sideways.
 
-The last session builds the checkout modal and the follow record. The modal is a
-restyle of an existing dialog and will not gain a card field: the reference has
-one because it has no backend, and Spec §34 gates live mode on sample pages
-mounting no payment field at all.
+The last session is the checkout modal and the follow record.
+
+The modal is a restyle and nothing more. The dialog was already a real dialog —
+portal, overlay, focus trap, Escape, backdrop dismiss — and its three steps
+already matched the reference's shell, so what changed is a progress rail, a
+summary card, and a done-state icon. It did not gain a card field: the
+reference has one because it has no backend, and Spec §34 gates live mode on
+sample pages mounting no payment field at all. One thing the reference draws
+was left out rather than faked — a "founding user #248" line, because that
+number is minted when a Backer first comments, not when they pre-order, and
+inventing one would be a fabricated position in a queue.
+
+**The follow record is a deliberate exception to the rule this codebase runs
+on.** Spec §1 rule 6 says invent no new commercial capability, and capturing an
+email from somebody who has not pre-ordered — then mailing them — is exactly
+that. It is built by explicit product direction and recorded as a deviation, so
+a later session does not delete it as a mistake or read it as permission for
+more. What keeps it narrow is asserted by tests rather than intended:
+
+- One message, and it is a receipt. The recurring mail is the summary the
+  product already had; following adds no second message, no welcome, and no
+  re-engagement.
+- Double opt-in, and the confirm and unsubscribe links act on a click rather
+  than on being fetched — an email scanner prefetching a one-click link would
+  otherwise complete a consent, or cancel one, on somebody's behalf.
+- The public form is the same kind of non-answering route the "send my link
+  again" ask already was: one frozen reply for a hit, a miss, a bad address, an
+  unknown campaign, and a caller over the rate limit, because a route that
+  answers differently tells anyone who asks which addresses are interested in
+  which campaign.
+- A follower sees only what the public sees. Updates written for people who
+  actually pre-ordered never reach them — a disclosure rule, not a mail bug, so
+  the code branches on being a follower rather than on the delivery channel
+  they share with real Backers.
+- Nothing chases anybody. There is no column anywhere to record when to send a
+  follow-up, no job that reads the table except the one that deletes from it,
+  and no public follower count. The absences are checked, because the strongest
+  form of a promise not to chase somebody is having nowhere to write down when.
+- Retention is the window the Spec already fixes for marketing consent — until
+  unsubscribe, plus two years — and the erasure is irreversible at the database
+  rather than by a service being careful.
+
+One open question was answered in writing instead of by editing a test. A
+marketing send conventionally carries an unsubscribe header, and a test forbids
+adding one because it would attach to every message the product sends,
+including receipts and deadlines that nobody may opt out of. The header does
+not ship; the summary already carries its own unsubscribe as its single action.
+If deliverability later requires it, it attaches to the non-transactional
+messages alone, as its own decision with its own test.
 
 ## Layout
 

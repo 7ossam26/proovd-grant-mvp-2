@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CheckoutForm } from './CheckoutDrawer.js';
 import type { Quote, PreorderSuccess } from './api.js';
@@ -93,11 +93,26 @@ describe('§33.5.2 — the checkout shows every required fact', () => {
     renderForm();
     await fillDetailsAndCalculate(user);
 
-    expect(await screen.findByText('US$25.00')).toBeInTheDocument();
-    expect(screen.getByText('US$2.00')).toBeInTheDocument();
-    expect(screen.getByText('US$27.00')).toBeInTheDocument();
-    // US$0 charged today.
-    expect(screen.getByText('US$0.00')).toBeInTheDocument();
+    /*
+      Scoped to the itemised list, which is where §33.5.2's contract actually
+      lives: "subtotal + tax = total" is a statement about the breakdown, not
+      about the page containing the string somewhere. Session C's restyle adds
+      the reference's summary card and its `US$0 today → US$27.00` pair, so the
+      total legitimately appears more than once — asserting it HERE is narrower
+      than the page-wide query it replaces, not looser.
+    */
+    await screen.findByText('US$25.00');
+    const amounts = document.querySelector('.checkout__amounts') as HTMLElement;
+    expect(amounts).not.toBeNull();
+    const itemised = within(amounts);
+    expect(itemised.getByText('US$25.00')).toBeInTheDocument();
+    expect(itemised.getByText('US$2.00')).toBeInTheDocument();
+    expect(itemised.getByText('US$27.00')).toBeInTheDocument();
+    // US$0 charged today — §30's most important fact on this surface, and the
+    // restyle now states it twice on purpose (the itemised row and the
+    // reference's `today` card). Asserted in the itemised list for the same
+    // reason as the three above.
+    expect(itemised.getByText('US$0.00')).toBeInTheDocument();
     expect(screen.getByText(/Seller: Dana Rivera/)).toBeInTheDocument();
     expect(screen.getByText(/Charged on the close date/)).toBeInTheDocument();
     expect(screen.getByText(/Delivery: December 2026/)).toBeInTheDocument();
@@ -114,7 +129,7 @@ describe('§33.5.3 — the optional consents are separate and unchecked', () => 
     const user = userEvent.setup();
     renderForm();
     await fillDetailsAndCalculate(user);
-    await screen.findByText('US$27.00');
+    await screen.findAllByText('US$27.00');
 
     const switches = screen.getAllByRole('switch');
     expect(switches).toHaveLength(3);
@@ -133,7 +148,7 @@ describe('§33.5.12 — the success state leads with not-charged and matches the
     const user = userEvent.setup();
     const { submitFn } = renderForm();
     await fillDetailsAndCalculate(user);
-    await screen.findByText('US$27.00');
+    await screen.findAllByText('US$27.00');
 
     // Confirm 18+, then authorize.
     const [ageSwitch] = screen.getAllByRole('switch');
@@ -142,7 +157,7 @@ describe('§33.5.12 — the success state leads with not-charged and matches the
 
     expect(await screen.findByText('Pre-order saved — you were not charged.')).toBeInTheDocument();
     expect(screen.getByText('US$0 charged today')).toBeInTheDocument();
-    expect(screen.getByText('US$27.00')).toBeInTheDocument();
+    expect((await screen.findAllByText('US$27.00')).length).toBeGreaterThan(0);
     expect(submitFn).toHaveBeenCalledOnce();
     // The success action links to the Backer magic-link page.
     expect(screen.getByRole('link', { name: /Review or cancel/ })).toHaveAttribute(
@@ -155,7 +170,7 @@ describe('§33.5.12 — the success state leads with not-charged and matches the
     const user = userEvent.setup();
     const { submitFn } = renderForm();
     await fillDetailsAndCalculate(user);
-    await screen.findByText('US$27.00');
+    await screen.findAllByText('US$27.00');
 
     await user.click(screen.getByRole('button', { name: 'Authorize pre-order' }));
     expect(submitFn).not.toHaveBeenCalled();

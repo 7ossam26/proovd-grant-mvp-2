@@ -162,3 +162,7 @@ export * from './creator-workspace.js';
 // schedule-shaped column — both absences asserted by test, because §30 is why
 // this is a note an Admin checks and never a queue that chases anybody.
 export * from './admin-tasks.js';
+
+// The campaign follow record (campaign-page-v2 Session C — a recorded §1 rule 6
+// deviation; see the file header and migration 0050).
+export * from './followers.js';

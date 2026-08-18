@@ -22,6 +22,7 @@ import type {
   MagicLinkSubject,
   TokenService,
   TokenSubject,
+  CampaignFollowSubject,
 } from './token-service.js';
 import type { SecureToken } from '../db/schema/tokens.js';
 import { sendTokenRejection } from './token-rejection.js';
@@ -35,6 +36,8 @@ declare module 'express-serve-static-core' {
     magicLinkSubject?: MagicLinkSubject;
     /** Present only after `requireAffiliateInvitationToken` has admitted it. */
     affiliateInvitationSubject?: AffiliateInvitationSubject;
+    /** Present only after `requireCampaignFollowToken` has admitted it. */
+    campaignFollowSubject?: CampaignFollowSubject;
     /** The verified row, for routes that need its version or issue time. */
     secureToken?: SecureToken;
   }
@@ -124,6 +127,8 @@ function createTokenGuard(tokens: TokenService, scope: TokenSubject['scope']): R
       req.draftSubject = result.subject;
     } else if (result.subject.scope === 'affiliate_invitation') {
       req.affiliateInvitationSubject = result.subject;
+    } else if (result.subject.scope === 'campaign_follow') {
+      req.campaignFollowSubject = result.subject;
     } else {
       req.magicLinkSubject = result.subject;
     }
