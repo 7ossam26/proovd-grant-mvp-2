@@ -6938,3 +6938,716 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .cr-relpick { flex-direction: column; align-items: stretch; }
   .cr-drow { flex-direction: column; align-items: stretch; }
 }
+
+
+/* ══════════════════════════ PHASE 33 — the public campaign page rebuilt
+   (campaign-page-v2, Session B, 2026-08-18)
+
+   The §18 campaign page redrawn to the supplied reference. §18 licenses this
+   in its own words — "Every campaign page exposes all of the following; the
+   DNA UX document controls presentation" — so the ORDER is the reference's
+   and the CONTENT is §18's, all fourteen items.
+
+   The three conventions PHASE 25 set, and 26–32 restated, bind here too:
+
+     1. TOKENS ONLY. The reference's :root maps onto this file's 1:1, and the
+        mapping is recorded rather than guessed:
+          --light #E9FFE1 → --mint          --link #D2FBC2 → --leaf
+          --soft  #95C79D → --sage          --muted #669370 → --moss
+          --visual #F7F7F7 → --grey-lightest
+          --light-stat #EAF7EE → --stat-mint-bg
+          --blue  #DEFAFC → --accent-blue   --yellow #F7FF9E → --accent-yellow
+          --line 2px→1px at ≤600px → --bw, which already does exactly that
+        px is legal for hairlines, radii, and the 44px touch minimum.
+
+     2. SCOPED OVERRIDES. Everything new is prefixed .pc- (.cmp- is PHASE 28's
+        Campaigns Admin and .site-nav is the site header's own). The pieces
+        that already exist — .btn, .tag, .kv, .doc-list, .accordion, .progress,
+        .dock, .update, .consent, .sample-banner — are reused, never restyled
+        in place.
+
+     3. BRAND FILL TAKES --mint. proovd.css:158's hard rule, and the reason the
+        reference's own --white on brand is NOT carried over: #FAFAFA on
+        #41ED98 is imperceptible. Every brand fill below reads --mint.
+
+   The two breakpoints are the reference's own (1099.98px and 599.98px) and
+   each rule names the overflow it answers.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Local fluid recipes. Both bounds always ship (§9); these are the reference's
+   own display sizes, which sit between --fs-h2 and --fs-hero. */
+.pc-hero,
+.pc-benefits,
+.pc-story,
+.pc-campaign,
+.pc-seller,
+.pc-rewards,
+.pc-build,
+.pc-faq,
+.pc-comments,
+.pc-foot {
+  --pc-display: clamp(2.75rem, 6vw, 6rem);
+  --pc-h1:      clamp(3rem, 6.2vw, 6.7rem);
+  --pc-num:     clamp(4rem, 9vw, 9rem);
+  --pc-pad:     clamp(3.5rem, 7vw, 7rem);
+}
+
+/* The in-page anchors the campaign nav and the hero CTA point at. Without this
+   the sticky header covers the heading it has just scrolled to. */
+[id^="campaign-"] { scroll-margin-top: 6.5rem; }
+
+/* The big band headings. One recipe, five bands. */
+.pc-display {
+  max-width: 14ch;
+  margin: 0;
+  color: var(--mode-title, var(--darker));
+  font-size: var(--pc-display);
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 0.94;
+}
+
+
+/* ── THE CAMPAIGN HEADER VARIANT ──────────────────────────────────────────
+   The three campaign routes stay inside PublicLayout — it is thin, but it
+   owns the skip link, the scroll reset, and focus into <main> on navigation
+   (§33.11.1), and moving out would silently drop all three. */
+
+/* A sticky header needs its own ground: without one the sample banner and the
+   hero scroll THROUGH it. The reference's own treatment — solid page white and
+   a brand hairline. Below .dock (800) and .scrim (940), which must both win. */
+.site-header--campaign {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: var(--white);
+  border-bottom: 1px solid var(--brand);
+}
+.pc-nav { gap: var(--sp-32); }
+.pc-nav__cta { min-width: 7.5rem; }
+
+
+/* ── HERO ─────────────────────────────────────────────────────────────────
+   Copy left, demo stage right. The reference's viewport-tall hero is kept
+   only above 1100px: below it the stage stacks, and a 100svh hero would then
+   be two full screens before the reader reaches anything at all. */
+
+.pc-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(28rem, 0.85fr);
+  overflow: hidden;
+  background: var(--grey-lightest);
+  border-block: 1px solid var(--leaf);
+}
+.pc-hero__copy {
+  padding: var(--pc-pad) var(--gutter);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.pc-kicker {
+  margin: 0 0 var(--sp-16);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  color: var(--moss);
+  font-size: 0.9375rem;
+  font-weight: 850;
+}
+.pc-hero__h1 {
+  max-width: 12ch;
+  margin: 0;
+  color: var(--darker);
+  font-size: var(--pc-h1);
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  line-height: 0.9;
+}
+.pc-hero__h1 span { color: var(--brand); }
+.pc-hero__lede {
+  max-width: 30rem;
+  margin: var(--sp-24) 0 0;
+  color: var(--dark);
+  font-size: clamp(1.0625rem, 1.4vw, 1.375rem);
+  font-weight: 550;
+  line-height: 1.45;
+}
+.pc-hero__actions {
+  margin-top: var(--sp-32);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-24);
+}
+.pc-hero__cta { min-height: 3.65rem; padding-inline: var(--sp-24); }
+.pc-hero__today { color: var(--moss); font-size: 1rem; font-weight: 750; }
+.pc-hero__today strong { color: var(--dark); font-size: 1.25rem; }
+.pc-hero__social {
+  margin: var(--sp-48) 0 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  color: var(--dark);
+  font-size: 0.9375rem;
+}
+.pc-avatars { display: flex; }
+.pc-avatars i {
+  width: 2.7rem;
+  height: 2.7rem;
+  display: grid;
+  place-items: center;
+  background: var(--dark);
+  color: var(--mint);
+  border: 2px solid var(--grey-lightest);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 900;
+}
+.pc-avatars i + i { margin-left: -0.55rem; background: var(--brand); color: var(--mint); }
+
+@media (min-width: 1100px) {
+  .pc-hero { min-height: calc(100svh - 4.75rem); }
+}
+
+
+/* ── THE DEMO STAGE ───────────────────────────────────────────────────────
+   Optional presentation of the Founder's own product. A campaign with no
+   moments renders no stage at all, so nothing here needs an empty state. */
+
+.pc-demo {
+  min-width: 0;
+  margin: var(--sp-16);
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--sp-24);
+  background: var(--mint);
+  color: var(--darker);
+}
+.pc-demo__top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--moss);
+  font-size: 0.9375rem;
+  font-weight: 850;
+}
+.pc-demo__message { align-self: center; }
+.pc-demo__state {
+  display: inline-flex;
+  padding: var(--sp-8) var(--sp-12);
+  background: var(--dark);
+  color: var(--mint);
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pc-demo__headline {
+  max-width: 11ch;
+  margin: var(--sp-16) 0 var(--sp-24);
+  color: var(--darker);
+  font-size: clamp(2.25rem, 4.2vw, 4.25rem);
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 0.94;
+}
+.pc-demo__signal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  color: var(--dark);
+  font-size: 1rem;
+  font-weight: 800;
+}
+.pc-demo__signal i {
+  width: 0.75rem;
+  height: 0.75rem;
+  background: var(--brand);
+  border-radius: 50%;
+}
+/* The app's own control, illustrated. Deliberately not a button: nothing on
+   this stage operates anything, and a control that looks live and is not is
+   worse than one that reads as an illustration (§1.4). */
+.pc-demo__action {
+  min-height: 3.4rem;
+  padding: var(--sp-12) var(--sp-16);
+  display: inline-flex;
+  align-items: center;
+  background: var(--brand);
+  color: var(--mint);
+  font-size: 1rem;
+  font-weight: 900;
+}
+.pc-demo__moments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: var(--bw) solid var(--dark);
+}
+.pc-moment {
+  min-width: 0;
+  min-height: 6.5rem;
+  padding: var(--sp-16);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--white);
+  color: var(--dark);
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pc-moment + .pc-moment { border-left: 1px solid var(--dark); }
+.pc-moment.is-active { background: var(--brand); color: var(--mint); }
+.pc-moment span { font-size: 0.8rem; font-weight: 900; }
+.pc-moment strong { margin-top: var(--sp-8); font-size: 1rem; line-height: 1.15; }
+.pc-moment small { margin-top: auto; padding-top: var(--sp-8); font-size: 0.78rem; font-weight: 750; }
+
+
+/* ── BENEFITS ─────────────────────────────────────────────────────────────
+   Three treatments named by SHAPE, never by one campaign's copy: §30 lists
+   streaks among the forbidden mechanics, and a variant called `streak` is
+   unusable by the next Founder. Each card's accent travels with its shape. */
+
+.pc-benefits { padding: var(--pc-pad) var(--gutter); background: var(--white); }
+.pc-benefit-grid {
+  margin-top: clamp(2.5rem, 6vw, 5.5rem);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-16);
+}
+.pc-benefit {
+  min-height: 23rem;
+  padding: var(--sp-32);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: var(--bw) solid var(--dark);
+}
+.pc-benefit h3 { margin: 0; font-size: 1.25rem; font-weight: 900; }
+.pc-benefit > strong {
+  margin-top: auto;
+  font-size: clamp(1.75rem, 3vw, 3rem);
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+.pc-benefit--bars  { background: var(--accent-blue);   color: var(--dark); }
+.pc-benefit--check { background: var(--brand); color: var(--mint); border-color: var(--brand); }
+.pc-benefit--dots  { background: var(--accent-yellow); color: var(--dark); }
+
+.pc-benefit__bars { margin: auto 0; display: grid; gap: var(--sp-12); }
+.pc-benefit__bars span {
+  width: 58%;
+  height: 1.15rem;
+  display: block;
+  background: var(--white);
+  border: 1px solid var(--dark);
+}
+.pc-benefit__bars span:nth-child(2) { width: 84%; }
+.pc-benefit__bars span:nth-child(3) { width: 100%; }
+.pc-benefit__bars span:nth-child(4) { width: 70%; }
+.pc-benefit__bars span.is-active { background: var(--brand); border-color: var(--brand); }
+
+.pc-benefit__check {
+  width: 8.5rem;
+  height: 8.5rem;
+  margin: auto;
+  display: grid;
+  place-items: center;
+  background: var(--white);
+  color: var(--dark);
+  border-radius: 50%;
+}
+.pc-benefit__check svg {
+  width: 3.5rem;
+  height: 3.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pc-benefit__dots {
+  margin: auto 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--sp-8);
+}
+.pc-benefit__dots i { aspect-ratio: 1; background: var(--dark); border-radius: 50%; }
+.pc-benefit__dots i.is-rest { background: transparent; border: var(--bw) solid var(--dark); }
+
+
+/* ── STORY ────────────────────────────────────────────────────────────────
+   The pull quote IS the band heading — that is the reference's design, and
+   §18 item 10 asks for the narrative, not for a heading that says "Story". */
+
+.pc-story {
+  padding: var(--pc-pad) var(--gutter);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.55fr);
+  grid-template-areas: "founder action" "quote action" "expand expand";
+  align-items: start;
+  column-gap: clamp(2rem, 8vw, 9rem);
+  row-gap: var(--sp-32);
+  background: var(--white);
+  border-block: 1px solid var(--leaf);
+}
+.pc-founder-mark { grid-area: founder; display: flex; align-items: center; gap: var(--sp-12); }
+.pc-founder-mark > span {
+  width: 4.2rem;
+  height: 4.2rem;
+  display: grid;
+  place-items: center;
+  background: var(--dark);
+  color: var(--mint);
+  font-size: 1rem;
+  font-weight: 900;
+}
+.pc-founder-mark p { margin: 0; display: flex; flex-direction: column; }
+.pc-founder-mark strong { color: var(--dark); font-size: 1rem; }
+.pc-founder-mark small { margin-top: var(--sp-4); color: var(--moss); font-size: 0.85rem; font-weight: 750; }
+.pc-story .pc-display { grid-area: quote; max-width: 16ch; }
+.pc-story__expand { grid-area: expand; }
+.pc-story__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1.5rem, 5vw, 5rem);
+}
+.pc-story__cols h3 { margin-top: 0; }
+
+
+/* ── THE CAMPAIGN PANEL — items 4, 5 and 6 ────────────────────────────────
+   The number is the hero (DNA §5.1). The eyebrow reads `Order threshold`,
+   never the reference's own word for it: §3.2 bans that word for an Idea
+   threshold in EVERY audience, and its last paragraph binds identifiers too —
+   which is why no class, prop, or register value below carries it either.
+   §33.11.3's scan reads the built bundle, where a prop name survives
+   minification; the Campaigns hub hit exactly that scan on its first draft. */
+
+.pc-panel { padding: var(--pc-pad) var(--gutter); display: grid; gap: var(--sp-48); }
+.pc-count { display: grid; gap: var(--sp-8); }
+.pc-count__eyebrow {
+  color: var(--leaf);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pc-count__value {
+  margin: 0;
+  color: var(--white);
+  font-size: var(--pc-num);
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  line-height: 0.8;
+}
+.pc-count__value small { color: var(--brand); font-size: 0.3em; letter-spacing: -0.03em; }
+.pc-count p { margin: 0; color: var(--mint); font-size: 1.125rem; font-weight: 800; }
+
+/* The reference's own bar, expressed through the existing Progress component
+   so the ARIA role, name, and value text come with it (§28.5). */
+.pc-track { margin-bottom: var(--sp-24); }
+.pc-panel__note { margin: 0; color: var(--mint); font-size: 1rem; }
+.pc-panel__h3 { margin: 0 0 var(--sp-12); color: var(--white); }
+.pc-panel__lede { margin: 0 0 var(--sp-24); color: var(--mint); font-size: 1.125rem; }
+.pc-panel__cancel { margin: var(--sp-16) 0 0; color: var(--leaf); font-weight: 750; }
+
+.pc-steps {
+  margin: 0 0 var(--sp-24);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-16);
+  list-style: none;
+  counter-reset: none;
+}
+.pc-steps li {
+  min-height: 7rem;
+  padding: var(--sp-16);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  background: var(--brand-5);
+  border: 1px solid var(--brand);
+}
+.pc-steps li span { color: var(--brand); font-size: 1rem; font-weight: 900; }
+.pc-steps li strong { color: var(--white); font-size: 1.125rem; line-height: 1.2; }
+
+
+/* ── THE SELLER BAND — items 2, 7 and 8 ───────────────────────────────────
+   §18 requires the merchant-of-record disclosure ABOVE the pre-order action.
+   This band sits immediately before .pc-rewards, which holds every control
+   that can open checkout, so the requirement is satisfied literally. */
+
+.pc-seller { padding: var(--pc-pad) var(--gutter); }
+.pc-seller__lede { max-width: var(--measure); font-size: 1.125rem; }
+.pc-seller__grid {
+  margin-top: var(--sp-48);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1.5rem, 5vw, 5rem);
+}
+.pc-seller__grid h3 { margin-top: 0; }
+.pc-seller__grid h4 { margin-bottom: var(--sp-8); }
+
+
+/* ── REWARDS — items 3 and 9 ──────────────────────────────────────────────
+   The cards are a real toggle group: `aria-pressed` per choice, arrow keys
+   across them, and the CHOSEN reward is what the checkout opens against.
+   A sold-out card stays visible and unavailable (§19), never hidden. */
+
+.pc-rewards { padding: var(--pc-pad) var(--gutter); background: var(--grey-lightest); }
+.pc-rewards__pretax { max-width: var(--measure); margin: var(--sp-24) 0 0; color: var(--moss); }
+.pc-reward-grid {
+  margin-top: clamp(2.5rem, 6vw, 5rem);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-16);
+  align-items: start;
+}
+.pc-reward { min-width: 0; background: var(--white); border: var(--bw) solid var(--leaf); }
+.pc-reward.is-selected { border-color: var(--brand); }
+.pc-reward__choice {
+  width: 100%;
+  min-height: var(--touch);
+  padding: var(--sp-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  background: transparent;
+  color: var(--dark);
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pc-reward__choice:disabled { cursor: default; color: var(--grey); }
+.pc-reward__top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16); }
+.pc-reward__badge {
+  padding: var(--sp-8) var(--sp-12);
+  background: var(--dark);
+  color: var(--mint);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.is-selected .pc-reward__badge { background: var(--brand); color: var(--mint); }
+.pc-reward__mark {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: var(--bw) solid var(--moss);
+}
+.is-selected .pc-reward__mark { background: var(--brand); border-color: var(--brand); }
+.pc-reward__title {
+  margin-top: var(--sp-24);
+  color: var(--darker);
+  font-size: 1.625rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+.pc-reward__price {
+  color: var(--dark);
+  font-size: clamp(2.75rem, 5vw, 4.25rem);
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  line-height: 0.9;
+}
+.pc-reward__pretax { color: var(--moss); font-size: 0.85rem; font-weight: 750; }
+.pc-reward__contents { margin-top: var(--sp-16); display: grid; gap: var(--sp-8); }
+.pc-reward__contents span { color: var(--dark); font-size: 1rem; font-weight: 750; }
+.pc-reward__meta {
+  margin-top: var(--sp-16);
+  padding-top: var(--sp-12);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  border-top: 1px solid var(--leaf);
+  color: var(--dark);
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+.pc-reward__facts { padding: 0 var(--sp-24) var(--sp-24); }
+
+.pc-preorder { margin-top: clamp(2.5rem, 6vw, 5rem); max-width: var(--measure); }
+.pc-preorder h3 { margin-top: 0; }
+
+
+/* ── UPDATES — item 12 ────────────────────────────────────────────────────
+   The latest update is the feature; the rest sit behind one disclosure. The
+   metric renders as value + label together, because the label IS the number's
+   accessible name — a bare `86%` reads as nothing at all (§28.5). */
+
+.pc-build { padding: var(--pc-pad) var(--gutter); background: var(--white); }
+.pc-build .update-list { margin-top: clamp(2rem, 5vw, 4rem); display: grid; gap: var(--sp-24); }
+.update--featured {
+  padding: clamp(1.5rem, 4vw, 3rem);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-32);
+  background: var(--accent-blue);
+  border: var(--bw) solid var(--brand);
+}
+.update--featured .update__meta { grid-column: 1 / -1; }
+.update__metric {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  color: var(--dark);
+}
+.update__metric strong {
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  line-height: 1;
+}
+.update__metric span { color: var(--moss); font-size: 0.85rem; font-weight: 850; }
+.update-archive { display: grid; gap: var(--sp-24); }
+
+
+/* ── FAQ — item 11 ────────────────────────────────────────────────────────*/
+
+.pc-faq { padding: var(--pc-pad) var(--gutter); }
+.pc-faq .pc-display { margin-inline: auto; text-align: center; }
+.pc-faq__list {
+  width: min(100%, 60rem);
+  margin: clamp(2rem, 5vw, 4rem) auto 0;
+  background: var(--white);
+  border: var(--bw) solid var(--brand);
+}
+
+
+/* ── COMMENTS — item 13 ───────────────────────────────────────────────────
+   A band of its own above the footer. The thread itself lives on the Backer's
+   magic-link page — §18 admits only an authenticated Backer, and nobody on
+   this page is authenticated, so there is nothing here to attribute a post to. */
+
+.pc-comments { background: var(--white); }
+
+
+/* ── ITEM 14 — the dark footer band ───────────────────────────────────────
+   This band and <SiteFooter/> below it are two dark bands that read as one
+   footer, which is the reference's own arrangement. */
+
+.pc-foot {
+  padding: var(--pc-pad) var(--gutter);
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(1.5rem, 5vw, 5rem);
+  align-items: start;
+}
+.pc-foot__lead h2 { margin-top: 0; }
+.pc-foot__platform { margin: 0; color: var(--leaf); font-size: 1rem; font-weight: 750; }
+.pc-foot__body > p { margin-top: 0; }
+
+
+/* ── THE PHONE DOCK ───────────────────────────────────────────────────────
+   The existing .dock, which is already fixed with safe-area padding below
+   600px and static above it — a second fixed bar would be a second answer. */
+
+.pc-dock { align-items: center; }
+.pc-dock__what { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.pc-dock__what span {
+  overflow: hidden;
+  color: var(--moss);
+  font-size: 0.8rem;
+  font-weight: 750;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pc-dock__what strong { margin-top: var(--sp-4); color: var(--dark); font-size: 0.95rem; }
+/* Above the phone breakpoint the dock is the reference's own: absent. The
+   reward card's action is the control, and a duplicate bar competing with it
+   would be two primary actions in one payment state (§30). */
+@media (min-width: 601px) { .pc-dock { display: none; } }
+
+
+/* ═══════════════════════════════════════════════ PHASE 33 — RESPONSIVE ══
+   Both breakpoints are the reference's own. Each rule names the overflow it
+   answers; wide content scrolls inside its own container and the page body
+   never scrolls sideways (§33.11.1). */
+
+/* The hero's demo stage has a 28rem minimum, so below ~1100px the two-column
+   hero cannot fit without the copy column collapsing under its own headline.
+   Everything three-across has the same problem one card earlier. */
+@media (max-width: 1099.98px) {
+  .pc-nav { display: none; }
+  .pc-hero { grid-template-columns: 1fr; }
+  .pc-demo { min-height: 34rem; margin-top: 0; }
+  .pc-benefit-grid,
+  .pc-reward-grid,
+  .pc-steps { grid-template-columns: 1fr; }
+  .pc-benefit { min-height: 18rem; }
+  .pc-story {
+    grid-template-columns: 1fr;
+    grid-template-areas: "founder" "quote" "action" "expand";
+  }
+  .pc-story__cols,
+  .pc-seller__grid,
+  .pc-foot { grid-template-columns: 1fr; }
+  .update--featured { grid-template-columns: 1fr; }
+  .update__metric { align-items: flex-start; }
+}
+
+/* At 320 the two remaining pressure points are the demo's three moment
+   buttons — which stay three-across, because stacking them turns a one-glance
+   control into a scroll — and the hero headline, whose desktop clamp floor of
+   3rem still overflows 12ch at that width. */
+@media (max-width: 599.98px) {
+  .pc-hero__copy { padding: var(--sp-64) var(--sp-16) var(--sp-48); }
+  .pc-hero__h1 { max-width: 10ch; font-size: clamp(2.5rem, 13vw, 3.5rem); }
+  .pc-hero__lede { max-width: 22rem; font-size: 1.0625rem; }
+  .pc-hero__actions { align-items: stretch; flex-direction: column; gap: var(--sp-12); }
+  .pc-hero__cta { width: 100%; }
+  .pc-hero__social { margin-top: var(--sp-32); }
+
+  .pc-demo { min-height: 28rem; margin: 0 var(--sp-16) var(--sp-16); padding: var(--sp-16); }
+  .pc-demo__headline { margin: var(--sp-12) 0 var(--sp-16); font-size: 2.25rem; }
+  .pc-moment { min-height: 6.1rem; padding: var(--sp-8); }
+  .pc-moment span, .pc-moment small { font-size: 0.75rem; }
+  .pc-moment strong { font-size: 0.85rem; }
+
+  .pc-benefits,
+  .pc-story,
+  .pc-panel,
+  .pc-seller,
+  .pc-rewards,
+  .pc-build,
+  .pc-faq,
+  .pc-foot { padding: var(--sp-80) var(--sp-16); }
+
+  .pc-display { font-size: clamp(2.25rem, 10vw, 3rem); }
+  .pc-benefit { min-height: 17rem; padding: var(--sp-24); }
+  .pc-benefit__check { width: 7rem; height: 7rem; }
+  .pc-count__value { font-size: clamp(3.5rem, 18vw, 5.5rem); }
+  .pc-reward__price { font-size: 3.25rem; }
+  .update--featured { padding: var(--sp-24); }
+}
+
+/* The demo advances on its own; a reader who has asked for less motion gets
+   none of it. `reduced()` already stops the interval in the component — this
+   is the CSS half, for the entrance the runtime would otherwise jump-cut. */
+@media (prefers-reduced-motion: reduce) {
+  .pc-demo__message { animation: none; }
+}
+
+
+/* ── PHASE 33 — one correction outside this page's own selectors ──────────
+   `.accordion__head` has read a hardcoded `--darker` since Phase 02 and has
+   no mode slot, so EVERY Accordion inside a `mode-dark` band has rendered
+   near-black on dark green. That includes §18's own "How this works"
+   merchant-of-record expander, which has shipped that way since Phase 14b —
+   the browser pass is what found it, because the accessible name is correct
+   either way and axe reads contrast against the element's own declared
+   background rather than the band showing through it (PHASE 28 and 31 both
+   recorded the same class of defect).
+
+   Fixed at the slot rather than on this page, so every dark band gets it. */
+.mode-dark .accordion__head { color: var(--mode-title); }
+.mode-dark .accordion__body { color: var(--mode-body); }

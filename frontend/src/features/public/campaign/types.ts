@@ -30,6 +30,15 @@ export interface CampaignUpdate {
   isMaterialDeliveryChange: boolean;
   priorCommitment: string | null;
   revisedCommitment: string | null;
+  /**
+   * The headline metric the rebuilt page renders beside the body (0049).
+   *
+   * Both halves or neither — a database CHECK, because a bare `86%` is nothing
+   * to a screen reader and a label with no value is an empty promise. The page
+   * renders the label as the number's own accessible name for that reason.
+   */
+  metricLabel?: string | null;
+  metricValue?: string | null;
 }
 
 /**

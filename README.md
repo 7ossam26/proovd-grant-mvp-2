@@ -172,8 +172,7 @@ recorded in [CLAUDE.md](CLAUDE.md) with its date. The Admin panel's five
 workspaces and its floating task list came that way; the current one is the
 public campaign page.
 
-**The campaign page is being rebuilt in three sessions, and only the first has
-landed.** Spec §18 defines that page's *content* and hands presentation to the
+**The campaign page is being rebuilt in three sessions, and two have landed.** Spec §18 defines that page's *content* and hands presentation to the
 DNA document by name — "the DNA UX document controls presentation" — so a
 redesign is licensed and dropping one of its fourteen items is not. The
 reference drops four; they are placed rather than lost.
@@ -205,10 +204,47 @@ so the check now runs on all of them, and the three fields it does not run on
 are listed with the property that makes each one structurally unable to carry a
 promise. The default is that a new field is checked.
 
-The remaining two sessions build the page itself and the checkout modal. The
-modal is a restyle of an existing dialog and will not gain a card field: the
-reference has one because it has no backend, and Spec §34 gates live mode on
-sample pages mounting no payment field at all.
+The second session builds the page itself, and adds no column, no route, and no
+register entry — every deliverable is markup, CSS, motion, or a test. The band
+order becomes the reference's; the item list stays §18's. The four items the
+reference does not draw at all are placed rather than lost, and three of
+them — who is selling this, the refund summary, and the merchant-of-record
+disclosure — become one band sitting immediately before the reward cards,
+because §18 requires that disclosure above the pre-order action and that band
+is the last thing a reader passes before any control that can open checkout.
+
+The page's own acceptance test was split in two, deliberately. One checks the
+band order, which is a design decision and may change again. The other checks
+that all fourteen of §18's items are present and in document order, which may
+not. The old single test would have passed a page that had quietly dropped an
+item into a footer.
+
+A browser pass at 1280 and 320 found three defects, none of which a headless
+DOM or an accessibility scanner can see. This is the fourth rebuild in a row
+where that has been true:
+
+- **The threshold bar rendered completely full at 168 of 250.** The scroll
+  reveal animated the fill from zero to "whatever the element currently reads",
+  and it read the untouched default rather than the real value. The helper now
+  takes the value as a required argument, so the number the bar draws and the
+  number it announces to a screen reader come from one expression.
+- **The sticky campaign header had no background**, so everything below scrolled
+  through it.
+- **An accordion heading has been near-black on dark green since the design
+  system was written**, because it reads a hardcoded colour and has no dark-mode
+  slot. That includes the page's own "How this works" disclosure, which has
+  shipped that way since the campaign page first went live. Fixed at the slot,
+  so every dark band in the product gets it.
+
+Chrome's headless window has a minimum width of about 500px, so the first 320px
+screenshot was really the left third of a 489px render and read as an overflow
+that was not there. Rendering the page inside a 320px iframe gives a true
+viewport; at that width every band stacks and nothing scrolls sideways.
+
+The last session builds the checkout modal and the follow record. The modal is a
+restyle of an existing dialog and will not gain a card field: the reference has
+one because it has no backend, and Spec §34 gates live mode on sample pages
+mounting no payment field at all.
 
 ## Layout
 

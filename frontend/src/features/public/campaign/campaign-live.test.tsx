@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, fireEvent } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { MotionProvider } from '../../../motion/MotionProvider.js';
 import { CampaignPage } from './CampaignPage.js';
@@ -246,6 +246,15 @@ describe('the live campaign page — updates (§18 item 12)', () => {
       }),
     );
     const section = container.querySelector('#campaign-updates')?.closest('section') as HTMLElement;
+    // The rebuilt page features the LATEST update and stages the rest one
+    // gesture below (DNA §5.12) — so the archive has to be opened before the
+    // earlier one is readable. Radix unmounts a closed panel, which is what
+    // makes this a real disclosure rather than a hidden div.
+    const archive = [...section.querySelectorAll('button')].find((b) =>
+      /earlier update/i.test(b.textContent ?? ''),
+    );
+    expect(archive).toBeDefined();
+    fireEvent.click(archive as HTMLButtonElement);
     const text = textOf(section);
     expect(text).toContain('We shipped the beta');
     expect(text).toContain('First paragraph.');

@@ -273,3 +273,67 @@ export function animateMenuClose(menu: HTMLElement, done: () => void): void {
     onComplete: done,
   });
 }
+
+/* ── Campaign page v2 ──────────────────────────────────────────────────────
+   Two helpers the rebuilt public campaign page needs and nothing else in the
+   system had. Both are the reference's own behaviour, moved off raw inline
+   GSAP and behind `motionLive()` (DNA §6). */
+
+/**
+ * The demo stage's message, on each change of moment.
+ *
+ * The reference does this with a CSS `@keyframes demo-in` that re-fires because
+ * the node is replaced by `innerHTML`. React reuses the node, so a CSS
+ * animation would run once and never again — the imperative path is not a
+ * stylistic preference here, it is the only one that works.
+ */
+export function animateDemoMessage(el: HTMLElement): void {
+  const g = gsap();
+  if (!g || !motionLive()) return;
+  g.from(el, { y: 8, autoAlpha: 0, duration: dur('quick'), ease: ease('out') });
+}
+
+/**
+ * The threshold bar fills from the left when it first scrolls into view.
+ *
+ * `once: true` — a bar that re-fills every time it passes the fold is the
+ * attention farming §30 forbids, and it re-announces nothing useful either.
+ *
+ * `value` is REQUIRED and is the end state, 0–1. It is not read off the
+ * element, and that is the whole point of this signature: `Progress` owns
+ * `.progress__fill`, whose resting transform is `scaleX(0)` with the runtime
+ * tweening it to the real value on mount. A `gsap.from` here would take
+ * whatever scaleX it happened to observe as its DESTINATION — mid-tween, or
+ * the untouched 1 — and a threshold bar that renders full at 168 of 250 is
+ * the worst thing this page could get wrong. So the caller passes the number
+ * it already rendered into the accessible value text, and the two cannot
+ * disagree. Returns a teardown so a React effect kills the trigger with the
+ * component; with no ScrollTrigger or no motion this does nothing at all and
+ * `Progress`'s own mechanism stands.
+ */
+export function fillOnScroll(
+  fill: HTMLElement,
+  trigger: HTMLElement,
+  value: number,
+): () => void {
+  const g = gsap();
+  const ST = (window as unknown as { ScrollTrigger?: unknown }).ScrollTrigger;
+  if (!g || !ST || !motionLive()) return () => {};
+  const end = Math.max(0, Math.min(1, value));
+  const tween = g.fromTo(
+    fill,
+    { scaleX: 0 },
+    {
+      scaleX: end,
+      transformOrigin: 'left center',
+      duration: dur('slow'),
+      ease: ease('out'),
+      overwrite: 'auto',
+      scrollTrigger: { trigger, start: 'top 78%', once: true },
+    },
+  ) as { scrollTrigger?: { kill: () => void }; kill?: () => void };
+  return () => {
+    tween.scrollTrigger?.kill();
+    tween.kill?.();
+  };
+}

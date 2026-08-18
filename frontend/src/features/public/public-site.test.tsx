@@ -449,24 +449,34 @@ describe('sample campaigns (§18, §34)', () => {
     );
   });
 
-  it('follows §18’s fourteen-item content order', () => {
+  /*
+    The BAND order — rewritten deliberately for the campaign-page-v2 rebuild,
+    not adjusted to match. §18 hands presentation to the DNA document, so the
+    order below is the reference's; what §18 keeps is the CONTENT, which the
+    next test checks anchor by anchor.
+
+    Two things moved and both are §18 read literally. The `h1` is the hero
+    headline with the campaign title as the kicker above it — item 1 asks for
+    the title exposed, not for it to be the `h1`. And items 2, 7 and 8 became
+    one `.pc-seller` band placed immediately before the reward cards, because
+    §18 puts the merchant-of-record disclosure ABOVE the pre-order action and
+    that band is the last thing a reader passes before any control that can
+    open checkout.
+  */
+  it('renders the rebuilt band order', () => {
     const { container } = renderRoute('/campaign/sample-pre-build');
     const ids = [...container.querySelectorAll('h1, h2[id]')].map(
       (el) => el.id || 'campaign-title',
     );
     expect(ids).toEqual([
-      'campaign-title', // 1
-      'campaign-founder', // 2
-      'campaign-rewards', // 3
-      'campaign-charge-rule', // 4
-      'campaign-dates', // 5
-      'campaign-threshold', // 6 — Idea only
-      'campaign-refunds', // 7
-      'campaign-mor', // 8
-      'campaign-preorder', // 9
+      'campaign-hero', // the hero headline; the title is the kicker above it
+      'campaign-benefits',
       'campaign-story', // 10
-      'campaign-faq', // 11
+      'campaign-progress', // 4, 5, 6 live in this panel
+      'campaign-mor', // 8 — and 2 and 7 inside the same band
+      'campaign-rewards', // 3, and 9 inside the same band
       'campaign-updates', // 12
+      'campaign-faq', // 11
       'campaign-comments', // 13
       'campaign-support', // 14
       // 14 continues into the §31.4 site footer below.
@@ -474,6 +484,66 @@ describe('sample campaigns (§18, §34)', () => {
       'footer-legal-heading',
       'footer-site-heading',
     ]);
+  });
+
+  /*
+    …and the CONTENT gate. The band order above is a design decision and may
+    change again; §18's fourteen items may not. Each one has a stable anchor,
+    whatever heading level the design puts it at, and they appear in document
+    order — so an item cannot be satisfied by a stray element at the bottom of
+    the page.
+  */
+  const ITEM_ANCHORS = [
+    'campaign-title', // 1
+    'campaign-hero',
+    'campaign-story', // 10
+    'campaign-progress',
+    'campaign-threshold', // 6 — Idea only
+    'campaign-charge-rule', // 4
+    'campaign-dates', // 5
+    'campaign-mor', // 8
+    'campaign-founder', // 2
+    'campaign-refunds', // 7
+    'campaign-rewards', // 3
+    'campaign-preorder', // 9
+    'campaign-updates', // 12
+    'campaign-faq', // 11
+    'campaign-comments', // 13
+    'campaign-support', // 14
+  ];
+
+  it('exposes every one of §18’s fourteen items, in document order', () => {
+    const { container } = renderRoute('/campaign/sample-pre-build');
+    const found = ITEM_ANCHORS.map((id) => container.querySelector(`#${id}`));
+    const missing = ITEM_ANCHORS.filter((_, i) => found[i] === null);
+    expect(missing).toEqual([]);
+
+    // Document order, compared as positions rather than as a second list.
+    const all = [...container.querySelectorAll('[id]')].map((el) => el.id);
+    const positions = ITEM_ANCHORS.map((id) => all.indexOf(id));
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  /*
+    §34 gates live mode on a sample mounting no payment field at all, and the
+    rebuilt page has FOUR reserve-shaped controls where the old one had a
+    single disabled button. Two scroll (the nav and the hero) and two would
+    open checkout on a real campaign (the selected card and the phone dock).
+    So this counts every one of them and partitions the set — a test that
+    named one control would pass while the other three were live.
+  */
+  it.each(SAMPLES)('$path offers no way into checkout at all', ({ path }) => {
+    const { container } = renderRoute(path);
+    const reserveish = [...container.querySelectorAll('a, button')].filter((el) =>
+      /reserve|pre-order/i.test(el.textContent ?? ''),
+    );
+    expect(reserveish.length).toBeGreaterThan(0);
+    const live = reserveish.filter((el) =>
+      el.tagName === 'A'
+        ? !(el.getAttribute('href') ?? '').startsWith('#')
+        : !(el as HTMLButtonElement).disabled,
+    );
+    expect(live.map((el) => el.textContent)).toEqual([]);
   });
 
   it('hides the threshold on a Product Campaign and shows it on an Idea Campaign', () => {
