@@ -12,6 +12,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { namingViolations } from '../notifications/contract.js';
+import { FOUNDER_FLOW_PAGES, FOUNDER_FLOW_ROUTES } from '../vetting/index.js';
 import {
   CONSISTENCY_FACT_KEYS,
   CONSISTENCY_SURFACE_KEYS,
@@ -238,5 +239,43 @@ describe('§3.2 the equity rule reads a claim, not a word', () => {
     ]) {
       expect(namingViolations(copy, 'backer'), copy).toEqual([]);
     }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The Founder flow's own pages are in the register — Founder Flow v2
+   ══════════════════════════════════════════════════════════════════════════ */
+
+describe('the Founder onboarding flow', () => {
+  const founderFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_vetting')!;
+
+  it('restates every flow page in PRINCIPAL_FLOWS, in order', () => {
+    // `PRINCIPAL_FLOWS` is `as const`, so the routes cannot be spread in from
+    // `FOUNDER_FLOW_PAGES` without widening every one to `string`. They are
+    // restated and drift-tested instead — the arrangement the state enums, the
+    // §6 settings and the §27 keys all use.
+    expect(founderFlow.routes.slice(0, FOUNDER_FLOW_ROUTES.length)).toEqual(
+      FOUNDER_FLOW_ROUTES,
+    );
+  });
+
+  it('gives every page a distinct id, address, title and one-line help', () => {
+    expect(new Set(FOUNDER_FLOW_PAGES.map((p) => p.id)).size).toBe(FOUNDER_FLOW_PAGES.length);
+    expect(new Set(FOUNDER_FLOW_PAGES.map((p) => p.path)).size).toBe(FOUNDER_FLOW_PAGES.length);
+    for (const page of FOUNDER_FLOW_PAGES) {
+      expect(page.path.startsWith('/draft/:token'), page.id).toBe(true);
+      expect(page.title.trim().length, page.id).toBeGreaterThan(3);
+      // One line, and it stops. A help card is not a second copy of the page.
+      expect(page.help.trim().length, page.id).toBeGreaterThan(30);
+      expect(page.help.split('\n').length, page.id).toBe(1);
+    }
+  });
+
+  it('holds only the pages that exist', () => {
+    // Twenty-six are planned and four are built. A register entry claiming a
+    // surface the product does not have is §1.4's failure in a different file,
+    // and the help drawer would offer to jump to an address that refuses.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(4);
+    for (const page of FOUNDER_FLOW_PAGES) expect(page.stage).toBe(1);
   });
 });

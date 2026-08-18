@@ -52,7 +52,12 @@ import {
 import { FormalOpportunity } from './surfaces/creator/FormalOpportunity.js';
 import { CreatorPartnership } from './surfaces/creator/CreatorPartnership.js';
 import { CreatorCampaignClose } from './surfaces/creator/CreatorCampaignClose.js';
-import { DraftLanding } from './surfaces/DraftLanding.js';
+import { InviteClaim } from './surfaces/founder-flow/InviteClaim.js';
+import {
+  ProblemConfirm,
+  SolutionConfirm,
+} from './surfaces/founder-flow/ConfirmAnswer.js';
+import { CampaignTypeStep } from './surfaces/founder-flow/CampaignTypeStep.js';
 import { BackerPage } from './features/public/backer/BackerPage.js';
 import {
   FollowConfirmPage,
@@ -321,13 +326,38 @@ const rootChildren: RouteObject[] = [
     ],
   },
   {
-    // Phase 06b (§7, §33.1.1). The Founder's invited draft. Outside the public
-    // shell — its header offers a nav bar of things to probe, and this page is
-    // reached by a personal link, not by browsing. Outside the Admin shell for
-    // the opposite reason: §26 licenses dashboard density in Admin and nowhere
-    // else, and this is a Founder surface.
+    /*
+      Founder Flow v2, Session B (2026-08-18) — the first four of twenty-six
+      full-bleed pages, each its own top-level route.
+
+      Outside the public shell, because its header offers a nav bar of things to
+      probe and these pages are reached by a personal link rather than by
+      browsing. Outside the Admin shell for the opposite reason: §26 licenses
+      dashboard density in Admin and nowhere else. And outside every guard,
+      because a draft token is not a session.
+
+      One address per page, and `FOUNDER_FLOW_PAGES` is the one list of them —
+      the help drawer and §33.11's flow register both read it, so a page cannot
+      exist in the router and be missing from either. DNA §5.12 wants position
+      to survive interruption, and twenty-six screens is twenty-six positions a
+      single stateful page would destroy on reload.
+
+      `draft/:token` is the address in the invitation email and does not move.
+    */
     path: 'draft/:token',
-    element: <DraftLanding />,
+    element: <InviteClaim />,
+  },
+  {
+    path: 'draft/:token/problem',
+    element: <ProblemConfirm />,
+  },
+  {
+    path: 'draft/:token/solution',
+    element: <SolutionConfirm />,
+  },
+  {
+    path: 'draft/:token/campaign-type',
+    element: <CampaignTypeStep />,
   },
   {
     // Phase 15 (§19, §20). The Backer's long-lived campaign-scoped magic-link

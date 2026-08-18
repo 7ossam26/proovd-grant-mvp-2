@@ -441,14 +441,21 @@ green. A truncated session produces code that looks finished and is not.
 auth regime or a money gate ends — and after Session A each is walkable from screen 1 the moment
 it lands, which is the cheapest way to find a seam that does not join.
 
-| | Screens | Ends at | Depends on |
-|---|---|---|---|
-| **A** | none | the record, the reversions, the order decided in writing | — |
-| **B** | 1–4 | the shell exists and four screens prove it | A |
-| **C** | 5–6, 7–9, 17 | the end of the draft token | A, B |
-| **D** | 16, then 10–15 | the end of `evaluateWorkspace` | A, B, C |
-| **E** | 25, 20 | the listing fee is paid | A–D |
-| **F** | 18, 21–24, 19, 26 | live | A–E |
+| | Screens | Ends at | Depends on | State |
+|---|---|---|---|---|
+| **A** | none | the record, the reversions, the order decided in writing | — | **built** 2026-08-18 |
+| **B** | 1–4 | the shell exists and four screens prove it | A | **built** 2026-08-18 |
+| **C** | 5–6, 7–9, 17 | the end of the draft token | A, B | |
+| **D** | 16, then 10–15 | the end of `evaluateWorkspace` | A, B, C | |
+| **E** | 25, 20 | the listing fee is paid | A–D | |
+| **F** | 18, 21–24, 19, 26 | live | A–E | |
+
+**Session C inherits one decision from B's walk.** The reference asks Problem and Solution twice —
+screens 2–3, then again at 7–8, whose own help card calls it *"last look at the problem and the
+solution"*. §9 has one `problem_text` and one `solution_text`, and B built screens 2–3 as those two
+answers at `/draft/:token/problem` and `/draft/:token/solution`. **C must not collect either record
+on a second screen**; what 7–8 become, if anything, is C's to decide. See
+`founder-flow-reconciliation.md` §4.5.
 
 **Two things must not be reordered for convenience.** The six-digit code's *mechanism* lands with
 its screens in C and never after them — a screen built first grows a client-side "is this code

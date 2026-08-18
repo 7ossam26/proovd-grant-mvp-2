@@ -2719,151 +2719,11 @@ html.no-motion .camp-link:hover::after { transform: scaleX(1); }
 .admin-auth .admin-signin { justify-items: stretch; }
 
 
-/* ══════════════════════════════ 2026-08-10 · the invited-draft landing (§7)
-   Rebuilt to the reference composition: the elapsed-time line, the greeting,
-   and one supporting sentence on the left; the invite card on the right; Help
-   pinned to the corner. Slots only — the headline reads the mode title ink,
-   the card reads the brand, and nothing here picks a color the palette does
-   not already own. */
-
-.invite-landing {
-  min-height: 100vh;
-  padding: var(--sp-24) var(--gutter) var(--sp-96);
-  display: grid;
-  align-content: start;
-}
-
-.invite-landing__grid {
-  /* 100% of the padding box, never wider — `width: var(--wrap)` here would
-     overflow the gutter on viewports narrower than the wrap cap. The 82rem
-     cap reproduces the reference's outer margins at 1560px. */
-  width: 100%;
-  max-width: 82rem;
-  margin-inline: auto;
-  /* The reference sits the composition in the upper middle of the viewport —
-     the time line lands at roughly 31% of the height, not at the top edge and
-     not vertically centered. */
-  padding-top: clamp(var(--sp-64), 30vh, 20rem);
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  column-gap: clamp(var(--sp-48), 7vw, var(--sp-160));
-  row-gap: var(--sp-64);
-  align-items: start;
-}
-
-.invite-landing__time {
-  margin: 0 0 var(--sp-64);
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--mode-title);
-}
-
-.invite-landing__headline {
-  margin: 0 0 var(--sp-32);
-  font-size: clamp(2.25rem, 3.4vw, 3.375rem);
-  line-height: 1.16;
-  /* Bold with the hero's own tight tracking — measured against the reference:
-     500 renders visibly lighter than the mock, 900 visibly wider. */
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--mode-title);
-  /* Breaks the reference's own way: "…our meeting got / us excited about…" */
-  max-width: 11.5em;
-}
-
-.invite-landing__lede {
-  margin: 0;
-  font-size: 1.375rem;
-  line-height: 1.45;
-  font-weight: 500;
-  color: var(--mode-body);
-  max-width: 22em;
-}
-
-/* The invite card: brand outline, the pure-white component fill, the envelope
-   mark astride the top border, and the CTA as the card's own bottom edge. */
-.invite-landing__aside {
-  justify-self: end;
-  width: 100%;
-  max-width: 29rem;
-  margin-top: var(--sp-80);
-}
-
-.invite-card {
-  position: relative;
-  display: grid;
-  background: var(--surface);
-  border: var(--bw) solid var(--brand);
-  border-radius: var(--radius);
-}
-
-.invite-card__icon {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translate(-50%, -55%);
-  padding-inline: var(--sp-12);
-  background: var(--surface);
-  color: var(--brand);
-  line-height: 0;
-}
-
-.invite-card__email {
-  margin: 0;
-  padding: var(--sp-64) var(--sp-24) var(--sp-48);
-  text-align: center;
-  font-size: clamp(1.375rem, 2vw, 1.875rem);
-  font-weight: 500;
-  color: var(--brand);
-  overflow-wrap: anywhere;
-}
-
-.invite-card__cta.btn {
-  width: 100%;
-  min-height: 3.75rem;
-  font-size: 1.125rem;
-  border-radius: 0;
-}
-
-.invite-card__terms {
-  margin: var(--sp-24) 0 0;
-  text-align: center;
-  font-size: 0.75rem;
-  color: var(--grey);
-}
-.invite-card__terms a { color: inherit; text-decoration: underline; }
-
-/* Fixed to the corner on every viewport; the page reserves bottom room so the
-   stacked mobile layout can scroll its last content clear of it. The secondary
-   tier is transparent at rest, so it re-reads its rest background from the
-   component fill to stay legible over anything it floats above. */
-.invite-landing__help {
-  position: fixed;
-  right: var(--sp-32);
-  bottom: var(--sp-32);
-  --r-bg: var(--surface);
-  padding: var(--sp-8) var(--sp-32);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-@media (max-width: 900px) {
-  .invite-landing { padding-bottom: var(--sp-120); }
-  .invite-landing__grid {
-    grid-template-columns: minmax(0, 1fr);
-    padding-top: var(--sp-64);
-  }
-  .invite-landing__aside {
-    justify-self: stretch;
-    max-width: 28rem;
-    margin-inline: auto;
-  }
-}
-
-@media (max-width: 600px) {
-  .invite-landing__help { right: var(--sp-16); bottom: var(--sp-16); }
-}
+/* The 2026-08-10 invited-draft landing block was REMOVED on 2026-08-18.
+   `DraftLanding` became screen 1 of the Founder Flow v2 sequence and its
+   markup went with it, so `.invite-landing` / `.invite-card` matched nothing
+   and shipped in every browser. PHASE 34 at the bottom of this file is where
+   that page lives now. */
 
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -7786,3 +7646,404 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
 
 /* The way out of a follow ask, where there is no id to link back to yet. */
 .follow-action__reassurance { margin: var(--sp-16) 0 0; color: var(--moss); }
+
+
+/* ══════════════════════ PHASE 34 — the Founder onboarding flow rebuilt
+   (Founder Flow v2, Session B, 2026-08-18)
+
+   The Founder's path from an invited draft to a live campaign, redrawn to the
+   supplied reference as a sequence OF pages rather than a form. Four of
+   twenty-six are built; every later screen renders inside what is here.
+
+   The conventions PHASE 25 set and 26-33 restated bind here too:
+
+     1. TOKENS ONLY. The prefix is .ff- (.fhead/.fdr-/.fov-/.frec- are PHASE
+        25/31's Founder ADMIN workspace and .cr- is PHASE 26/32's; neither is
+        related to this). px is legal for hairlines, radii, and the 44px touch
+        minimum.
+
+     2. SCOPED. .btn, .choice, .field, .tag, .doc-list, .drawer, .sticker and
+        .wordmark are reused, never restyled in place.
+
+     3. BRAND FILL TAKES --mint (proovd.css:158). The reference's own #FAFAFA
+        on #41ED98 is imperceptible, so its green CTAs read --mint here.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── THE TWELVE-COLOUR DECISION, made once for all twenty-six screens ──────
+   The reference names nineteen colours. Seven map straight across: #41ED98
+   --brand, #013F17 --dark, #012D10 --darker, #FAFAFA --white, #E9FFE1 --mint,
+   #A2AFA8 --grey, #DEFAFC --accent-blue.
+
+   The other twelve resolve to tokens that already exist. PHASE 34 mints NO new
+   colour, and each resolution is a decision rather than a rounding:
+
+     #3BDC8C  brand hover   -> the .btn variant swap. Section 7.1 expresses
+                              hover as variant-1 <-> variant-2, not as a darker
+                              shade; a second mechanism would give the product
+                              two answers to what a hover is.
+     #8FCBA3  mid green     -> --sage  (#95C79D, six hex points away)
+     #4E8C67  muted green   -> --moss  (#669370)
+     #4E785C  rule green    -> --moss
+       Three mid-greens for three dash treatments is a distinction nobody can
+       see at 5px, and the palette already carries a mid-green ramp with the
+       same green cast. Two greens for three uses, and the flow's dashes match
+       the rest of the product.
+     #F4FFA0  pale yellow   -> --accent-yellow (#F7FF9E, three points away)
+     #FBFFD4  cream         -> --accent-yellow as a FILL where the pale yellow
+                              is a BORDER. The reference's two yellows differ by
+                              role, and this system already expresses role as
+                              border-vs-background.
+     #DEF6FF  row blue      -> --accent-blue   (#DEFAFC)
+     #F5F5F5  card grey     -> --grey-lightest (#F7F7F7)
+     #E7F7EA  preview green -> --stat-mint-bg  (#EAF7EE)
+     #B4B4B5  legal grey    -> --grey
+     #E4E4E4  border grey   -> --grey
+     #D6D6D6  disabled grey -> --grey, under .btn's own disabled treatment
+       The last three are NEUTRAL greys. Every grey in this file is
+       green-tinted (--grey #A2AFA8, --grey-light #F1F3F2, --grey-lightest
+       #F7F7F7), so a neutral ramp would not sit beside them on one page - and
+       introducing one changes the cast of the whole product, not this flow.
+
+   ── The stage ─────────────────────────────────────────────────────────────
+   The reference authors on a fixed 2496x1542 stage at scale(0.37). This takes
+   its README's own option 2: divide by ~2.7 for CSS px at 1440 and express the
+   result in the --sp- scale and clamp(), with the RATIOS as the source of
+   truth. Section
+   33.11.1's 320px reflow is not satisfiable by a scaled fixed stage.
+
+   Border radius is var(--radius). The reference's "2px everywhere. Never
+   rounded." and this file's "--radius: 1px - sharp. everywhere." are the same
+   design intent, and one of them is already the system.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Local display recipes. Both bounds always ship. These are the reference's
+   own sizes converted: its 90px headline / 2.7 is about 33px at 1440. */
+.ff {
+  --ff-display: clamp(2rem, 4.6vw, 3.4rem);
+  --ff-lede:    clamp(1.0625rem, 1.6vw, 1.375rem);
+  --ff-gap:     clamp(1.5rem, 3vw, 2.5rem);
+  --ff-pad:     clamp(1.25rem, 4vw, 3.5rem);
+}
+
+/* ── The full-bleed page ──────────────────────────────────────────────────
+   Each page owns its viewport: no header, no footer, no progress bar, no
+   navigation dock. `min-height` rather than `height`, because a page whose
+   content is taller than the viewport must scroll rather than clip - which is
+   the whole difference between this and the reference's fixed stage. */
+
+.ff {
+  min-height: 100vh;
+  min-height: 100svh;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+}
+.ff__stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--ff-pad);
+  gap: var(--ff-gap);
+  position: relative;
+}
+.ff__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  flex-wrap: wrap;
+}
+.ff__top-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-16);
+}
+.ff__meta {
+  font-weight: 700;
+  color: var(--dark);
+  font-size: 0.9375rem;
+}
+.ff__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 72rem;
+  margin-inline: auto;
+  padding-block: var(--ff-gap);
+}
+
+/* The message badge. It enters with the page and is then still - the
+   reference's six-second shake loop is the pattern DNA 5.10 names. */
+.ff__badge {
+  position: fixed;
+  right: var(--sp-24);
+  bottom: var(--sp-24);
+  z-index: 60;
+}
+
+/* ── The help drawer ──────────────────────────────────────────────────────
+   Inside .drawer.mode-drawer, so the panel, the scrim and the slide are the
+   ones every other sheet in the product uses. */
+
+.ff-help__sub { margin: 0 0 var(--sp-24); color: var(--mode-body); }
+.ff-help__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-12); }
+.ff-help__card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-4) var(--sp-12);
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-16);
+  background: none;
+  border: var(--bw) solid var(--moss);
+  border-radius: var(--radius);
+  color: var(--mode-body);
+  cursor: pointer;
+  min-height: var(--touch);
+}
+.ff-help__card.is-current {
+  border-color: var(--brand);
+  background: var(--brand-5);
+}
+.ff-help__title { font-weight: 900; color: var(--mode-title); }
+.ff-help__state {
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand);
+  align-self: start;
+}
+.ff-help__body { grid-column: 1 / -1; font-size: 0.9375rem; }
+
+/* ── The splash ───────────────────────────────────────────────────────────
+   Owned by proovd-motion.js: once per session, a 4s backstop that always
+   exits, and `html.no-motion [data-splash] { display: none }` above. */
+
+.ff-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 980;
+  background: var(--brand);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--sp-24);
+}
+.ff-splash__mark { --sk-size: 5rem; }
+.ff-splash__word {
+  font-weight: 900;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  color: var(--mint);
+}
+
+/* ── Shared page furniture ────────────────────────────────────────────────  */
+
+/* The reference sets an emphasised headline word as a sticker IMAGE, which
+   takes the word out of the sentence for anybody not looking at it. Here it is
+   the word, wearing the sticker. */
+.ff-word {
+  display: inline-block;
+  border-radius: var(--radius);
+  background: var(--mint);
+  color: var(--dark);
+  padding: 0 var(--sp-8);
+  box-shadow: 0 0 0 var(--bw) var(--brand);
+}
+
+/* The reference's 28px #E9FFE1 text-stroke, in the platform's own property.
+   `paint-order` puts the stroke behind the glyph so the letterform survives. */
+.ff-stroke {
+  color: var(--dark);
+  -webkit-text-stroke: 0.16em var(--mint);
+  paint-order: stroke fill;
+}
+
+/* Every page's nav row. One primary, and the labels name where they go. */
+.ff-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-16);
+  margin-top: var(--ff-gap);
+}
+.ff-nav .btn--primary { margin-left: auto; }
+
+/* ── Screen 1 — the invite ────────────────────────────────────────────────  */
+
+.ff-invite { display: grid; gap: var(--ff-gap); }
+/* The reference's 285px pale-blue band: 285 / 2.7 is about 106px at 1440. */
+.ff-invite__band {
+  height: clamp(3.5rem, 7vw, 6.625rem);
+  background: var(--accent-blue);
+  border-radius: var(--radius);
+}
+.ff-invite__body { display: grid; gap: var(--sp-24); max-width: 54rem; }
+.ff-invite__since {
+  margin: 0;
+  color: var(--moss);
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+.ff-invite__head {
+  margin: 0;
+  font-size: var(--ff-display);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--dark);
+  text-wrap: pretty;
+}
+.ff-invite__lede {
+  margin: 0;
+  font-size: var(--ff-lede);
+  color: var(--moss);
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+.ff-invite__act { display: grid; gap: var(--sp-12); }
+.ff-invite__email { margin: 0; font-weight: 700; color: var(--dark); }
+.ff-invite__cta.btn { width: 100%; justify-content: center; }
+.ff-invite__legal {
+  margin: 0;
+  color: var(--moss);
+  font-size: 0.875rem;
+  max-width: var(--measure);
+}
+.ff-invite__legal a { color: inherit; text-decoration: underline; }
+
+/* ── Screens 2-3 — confirming what we understood ──────────────────────────  */
+
+.ff-confirm { display: grid; gap: var(--sp-24); }
+.ff-confirm__head {
+  margin: 0;
+  font-size: var(--ff-display);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  color: var(--dark);
+  text-wrap: pretty;
+}
+
+/* The dark panel wrapping a light field. The reference hides the native
+   scrollbar and tracks a custom 9px rail with JS; this styles the platform's
+   own instead - the same slim brand rail, with no second scroll position to
+   keep in step and nothing to go wrong when a tween drops. */
+.ff-panel {
+  background: var(--dark);
+  border-radius: var(--radius);
+  padding: var(--sp-24);
+}
+.ff-panel .field-label,
+.ff-panel .field-hint { color: var(--mint); }
+.ff-panel__text {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand) var(--dark);
+}
+.ff-panel__text::-webkit-scrollbar { width: 9px; }
+.ff-panel__text::-webkit-scrollbar-track { background: var(--dark); }
+.ff-panel__text::-webkit-scrollbar-thumb {
+  background: var(--brand);
+  border-radius: 99px;
+}
+.ff-panel__text[readonly] { cursor: default; }
+
+.ff-confirm__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-16);
+}
+.ff-confirm__provenance { margin: 0; color: var(--moss); max-width: var(--measure); }
+.ff-confirm__status { color: var(--moss); font-weight: 700; font-size: 0.9375rem; }
+.ff-confirm__status[data-state='failed'] { color: var(--dark); }
+.ff-confirm__next-note { margin: 0; color: var(--moss); max-width: var(--measure); }
+
+/* ── Screen 4 — the campaign path ─────────────────────────────────────────  */
+
+.ff-type { display: grid; gap: var(--sp-24); }
+.ff-type__head {
+  margin: 0;
+  font-size: var(--ff-display);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--dark);
+}
+.ff-type__lede {
+  margin: 0;
+  font-size: var(--ff-lede);
+  color: var(--moss);
+  max-width: var(--measure);
+  text-wrap: pretty;
+}
+
+/* Both options at once. The reference pages between them because two 440px
+   stickers do not fit a fixed 2496px stage; in responsive units they sit side
+   by side and stack at 320px, which is also what the reflow rule wants - and
+   Section 9 requires both explained BEFORE the choice, which a pager hides. */
+.ff-type__explain {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--ff-gap);
+}
+.ff-type__explain-card {
+  padding: var(--sp-24);
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+}
+.ff-type__explain-card h2 {
+  margin: 0 0 var(--sp-16);
+  font-size: 1.25rem;
+  color: var(--dark);
+}
+.ff-type__explain-card .doc-list { margin-bottom: 0; }
+
+/* The sticker that travels into the confirmed row. Decorative. */
+/* The space is reserved whether or not a path is chosen, so picking one does
+   not shift the two explanations under the reader's cursor. */
+.ff-type__hero {
+  display: flex;
+  justify-content: center;
+  min-height: clamp(6rem, 14vw, 11rem);
+}
+.ff-type__hero .sticker { display: block; --sk-size: clamp(6rem, 14vw, 11rem); }
+
+.ff-type__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-16); }
+.ff-type__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-24);
+  padding: var(--sp-24);
+  border: var(--bw) solid var(--grey);
+  border-radius: var(--radius);
+}
+.ff-type__row .sticker { --sk-size: 3.5rem; }
+.ff-type__row.is-chosen { border-color: var(--brand); background: var(--brand-5); }
+.ff-type__row-label { font-weight: 900; font-size: 1.125rem; color: var(--dark); }
+.ff-type__row-name { margin-left: auto; color: var(--moss); font-weight: 700; }
+
+.ff-type__commitments h2 { margin: 0 0 var(--sp-16); font-size: 1.25rem; color: var(--dark); }
+.ff-type__warning { margin: 0; color: var(--moss); max-width: var(--measure); }
+
+/* ── PHASE 34 — RESPONSIVE ────────────────────────────────────────────────  */
+
+@media (max-width: 599.98px) {
+  .ff__badge { right: var(--sp-16); bottom: var(--sp-16); }
+  .ff__body { justify-content: flex-start; }
+  /* The badge is fixed bottom-right. Without this the last control on a page
+     can never be scrolled clear of it. */
+  .ff__stage { padding-bottom: calc(var(--ff-pad) + 3.5rem); }
+  .ff-nav { flex-direction: column; align-items: stretch; }
+  .ff-nav .btn { width: 100%; justify-content: center; }
+  .ff-nav .btn--primary { margin-left: 0; order: -1; }
+  .ff-type__row { flex-wrap: wrap; gap: var(--sp-12); }
+  .ff-type__row-name { margin-left: 0; width: 100%; }
+  .ff-confirm__meta { flex-direction: column; gap: var(--sp-8); }
+  /* The stroke reads as a blur at small sizes; the mint fill carries it. */
+  .ff-stroke { -webkit-text-stroke-width: 0.1em; }
+}

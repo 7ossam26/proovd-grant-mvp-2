@@ -216,6 +216,57 @@ from `Campaign in review`. §15 reviews and approves a **campaign**; nothing in 
 a *person* at that point — the Founder already has an account by then. Session F renders one honest
 waiting state per real record rather than two screens for one.
 
+### 4.4 The reference has a **fourteenth** screen the README does not number: `reach`
+
+Found by Session B's own walk of the prototype's `SCREENS` array, which is
+`['claim','problem','solution','reach','kind','type','vetting','intake','match','model',
+'approval','fee','build','live']`. `reach` sits **between Solution and campaign type** and is a
+full page: forty phones orbiting in 3D behind
+
+> **We can get [product] in front of 10,000 new people**
+
+with the number counting up, its own HELP button, and a help card reading *"The audience our
+creators can put in front of your campaign. No action needed, just have a look."*
+
+The Session A reconciliation attributed this line to screen 1, where the README mentions it. It is
+its own screen, at the largest type in the flow, and `RTARGET = 10000` is a hardcoded constant in
+the prototype.
+
+**Refused.** §7 forbids Admin promising acceptance, results, reward pricing, or a named Creator's
+participation, and no record holds an audience number — `views_range` was the *Founder's own*
+content reach and is retired, and `possible_creator_results` counts Creators and stores a basis.
+§10's match screen is the honest version of this beat and already sits in stage 1: it counts
+Creators who might be a fit, carries six sentences saying what the number is *not*, and names
+nobody. Recorded in `FOUNDER_FLOW_ABSENCES` rather than as a comment, because an element that is
+absent has nowhere on a page to say why.
+
+### 4.5 The reference asks Problem and Solution **twice**
+
+`si: 'problem'` / `si: 'solution'` are screens 2–3 — "This is how we understood your problem", the
+prefill with an edit toggle. `VSTEPS[0]` and `VSTEPS[1]` are screens 7–8 inside the answer
+sequence, and the prototype's own help card for them is `probConfirm` — *"Confirm the basics. Last
+look at the problem and the solution before the rest of the questions build on them."*
+
+Two passes over one record, one screen apart, and screen 15 (Last look) already reviews all eight.
+§9 has one `problem_text` and one `solution_text`.
+
+**Session B built screens 2–3 as those two answers**, at `/draft/:token/problem` and
+`/draft/:token/solution`, and the interim Positioning surface no longer re-asks them — it names any
+that are missing and links back to the page that owns each. **Session C decides what, if anything,
+7–8 become**; what it must not do is collect either record on a second screen, because a record
+collected in two places is a record whose two copies eventually disagree.
+
+### 4.6 `By continuing you're agreeing to Proovd's Terms of Service and Privacy Policy`
+
+Drawn on the reference's invite screen as the legal line, and — separately — shipped on the Phase
+06b landing surface since it was built.
+
+**Refused, and this is the one finding that was already in the product.** §10 records acceptance at
+the account claim as three separate controls (§28.4), and no `policy_consents` row exists for
+anything a person does on the invite page. A sentence claiming agreement was given is a claim about
+a record that is not there. The documents are linked as reading, and `FLOW_NOTHING_COMMITTED` says
+what opening the form does and does not do.
+
 ---
 
 ## 5. What Session A built, and what it deliberately did not
@@ -283,8 +334,74 @@ control with no explanation and it does not fake the capability.
 
 ---
 
-## 7. Session A's result
+## 7. Results
 
-`npm test`: **118 files, 2,987 tests, green in one run.** §33.1.1 through §33.1.9 pass, updated to
-the reverted flow rather than around it — and **every test in §33.1.5 passed unchanged**, which is
-the point: the never-prefill guarantee was structural, not a property of the question being absent.
+**Session A** — `npm test`: **118 files, 2,987 tests, green in one run.** §33.1.1 through §33.1.9
+pass, updated to the reverted flow rather than around it — and **every test in §33.1.5 passed
+unchanged**, which is the point: the never-prefill guarantee was structural, not a property of the
+question being absent.
+
+**Session B** — `npm test`: **119 files, 3,040 tests, green in one run.** §33.11.1 through
+§33.11.7 pass with the four new addresses in `PRINCIPAL_FLOWS` and swept; the §33.11.3 bundle scan
+passes over a fresh `dist`.
+
+---
+
+## 8. Session B's screen order, as built
+
+The four addresses, and what each is:
+
+| Page id | Address | Reference | Note |
+|---|---|---|---|
+| `invite` | `/draft/:token` | 1 | The address in the invitation email; it does not move. |
+| `problem` | `/draft/:token/problem` | 2 | §9's Problem answer, with its prefill provenance. |
+| `solution` | `/draft/:token/solution` | 3 | §9's Solution answer. |
+| `campaign-type` | `/draft/:token/campaign-type` | 4 (`kind`) | Two stages on one route; locks nothing. |
+
+`/draft/:token/vetting` remains, asking §9's third answer and submitting. It is interim, it renders
+outside `FlowPage` deliberately (declaring a page id for a screen Session C moves would put a
+non-existent surface in the register), and it re-asks nothing screens 2–4 own.
+
+Four decisions worth carrying forward:
+
+- **Both campaign paths render at once**, with all ten commitments, rather than behind the
+  reference's pager. §9 requires the choice explained *before* it is made, and behind a pager half
+  of that explanation is one interaction away from somebody who never presses the arrow. The pager
+  is the reference's answer to a fixed 2496px stage; responsive units remove the constraint.
+- **The confirmation field is a `readOnly` textarea, not a paragraph that swaps into one.** Same
+  element in both states: a long answer scrolls natively either way, focus survives the mode change,
+  and there is no second DOM shape to keep accessible.
+- **`Next` does not collapse while editing.** The reference animates its height and margin to zero;
+  a disappearing primary action inside a twenty-six page sequence is a trap at 320px where
+  `Done editing` and `Continue` need not be on screen together. The panel still grows.
+- **The custom 9px scrollbar rail is the platform's own scrollbar, styled.** Same design, and no
+  second scroll position to keep in step with the real one.
+
+---
+
+## 9. What the browser pass found, and nothing else could
+
+Four defects, all invisible to jsdom, axe, and the type checker. This is the fifth rebuild in a row
+where that has been true.
+
+1. **A CSS comment containing `*/` closed early and killed the whole `PHASE 34` token block.** The
+   header explained the stage conversion as `--sp-*/clamp()`; `*/` inside a comment *ends* the
+   comment, so everything after it parsed as garbage until the next `*/` — taking `--ff-display`,
+   `--ff-pad` and the rest with it. Every page rendered at browser-default type with 8px of body
+   margin. A file-wide comment-balance scan now runs beside the fix.
+2. **`.field__label` matched nothing.** The `Field` component's classes are `field-label` and
+   `field-hint`, single hyphen. So the label on the dark panel rendered dark green on dark green and
+   was invisible — and axe cannot see it, because the accessible name was correct either way. This
+   is the same class of defect PHASE 28, PHASE 31 and PHASE 33 each recorded.
+3. **The travelling sticker had zero size.** `.sticker` sets a width and no `display`, and every
+   other sticker in the product sits in a flex or grid parent that blockifies it; inside a plain
+   `<span>` the width was ignored. Its space is now reserved too, so choosing a path does not shift
+   the two explanations under the reader's cursor.
+4. **`--grey` on `--white` is about 2.2:1**, and it was carrying real sentences — a permanence
+   warning, a legal line, a save status. It is the token for placeholders and disabled ink. Those
+   five lines read `--moss` now, which is what PHASE 33 uses for body copy.
+
+Two things the pass confirmed rather than found: the splash works (it is the runtime's own, once
+per session with a 4-second backstop, and `--virtual-time-budget=4000` was simply catching it
+mid-play), and a 320px viewport still needs the iframe technique — Chrome on Windows reports
+`clientWidth: 489` for `--window-size=320`.

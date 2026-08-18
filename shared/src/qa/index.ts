@@ -75,10 +75,23 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_vetting',
-    label: 'Founder vetting and the account claim (simplified flow)',
-    specRef: '§9, §10',
+    label: 'The invited Founder: the invite, §9’s answers, and the account claim',
+    specRef: '§7, §9, §10',
     audience: 'founder',
-    routes: ['/draft/:token', '/draft/:token/vetting', '/draft/:token/claim'],
+    // Founder Flow v2 Session B (2026-08-18) split the first four screens onto
+    // their own addresses. The first four are restated from
+    // `FOUNDER_FLOW_PAGES` rather than imported, because this register is
+    // `as const` and a spread would widen every route to `string` — and they
+    // are drift-tested against it, the arrangement the state enums, the §6
+    // settings and the notification keys all use.
+    routes: [
+      '/draft/:token',
+      '/draft/:token/problem',
+      '/draft/:token/solution',
+      '/draft/:token/campaign-type',
+      '/draft/:token/vetting',
+      '/draft/:token/claim',
+    ],
     keyboardPathRequired: true,
   },
   {

@@ -26,7 +26,18 @@ type GSAP = {
     from: (t: unknown, v: Record<string, unknown>, p?: string | number) => unknown;
     to: (t: unknown, v: Record<string, unknown>, p?: string | number) => unknown;
   };
+  killTweensOf: (t: unknown) => unknown;
 };
+
+/** GSAP Flip, vendored at `public/vendor/gsap/Flip.min.js` and on window. */
+type FlipPlugin = {
+  getState: (t: unknown, v?: Record<string, unknown>) => unknown;
+  from: (state: unknown, v: Record<string, unknown>) => unknown;
+};
+
+function flip(): FlipPlugin | null {
+  return (window as unknown as { Flip?: FlipPlugin }).Flip ?? null;
+}
 
 function gsap(): GSAP | null {
   const g = (window as unknown as { gsap?: GSAP }).gsap;
@@ -336,4 +347,198 @@ export function fillOnScroll(
     tween.scrollTrigger?.kill();
     tween.kill?.();
   };
+}
+
+
+/* ── Founder Flow v2 ───────────────────────────────────────────────────────
+   The four motions the twenty-six-page Founder onboarding flow needs, moved
+   off the reference's raw inline GSAP and behind `motionLive()` (DNA §6).
+
+   Every duration below is a `ProovdAPI.MOTION.dur` token rather than the
+   reference's own number, and each comment records which reference value the
+   token stands in for. §6.1's ceiling is `grand: 0.90` — "nothing exceeds
+   this" — and the reference's longest here is 0.62s, so nothing had to be cut
+   to fit. What did change is that three near-identical eases (`power3.out`,
+   `power3.inOut`, `power2.in`) resolve to the three the system already names. */
+
+/**
+ * The relay entrance. Every page in the flow uses it.
+ *
+ * The reference stages every `data-anim` child at `x: 150 * direction,
+ * opacity: 0` and relays them in at 0.62s `power3.out` with a 0.085s stagger,
+ * reversed `from: 'end'` on back navigation. `direction` is +1 forward, −1
+ * back, and first paint is always forward.
+ *
+ * 150 is a value on a fixed 2496px stage rendered at `scale(0.37)`. The
+ * README's own conversion (§Fidelity, option 2) is to divide by ~2.7, giving
+ * ~56 CSS px at 1440 — and it is capped against the viewport, because a 56px
+ * horizontal slide at 320px is a quarter of the screen.
+ *
+ * `data-anim="grow"` is the reference's own exception and scales instead; it
+ * is partitioned out here rather than branched on at the call site, so a page
+ * that wants the grow marks one element and nothing else changes.
+ */
+export function relayIn(stage: HTMLElement | null, direction: 1 | -1): () => void {
+  const g = gsap();
+  if (!g || !stage || !motionLive()) return () => {};
+  const all = Array.from(stage.querySelectorAll('[data-anim]'));
+  const grows = all.filter((el) => el.getAttribute('data-anim') === 'grow');
+  const relay = all.filter((el) => el.getAttribute('data-anim') !== 'grow');
+  const travel = Math.min(56, window.innerWidth / 8) * direction;
+
+  if (relay.length) {
+    g.fromTo(
+      relay,
+      { x: travel, autoAlpha: 0 },
+      {
+        x: 0,
+        autoAlpha: 1,
+        duration: dur('slow'), // 0.60 stands in for the reference's 0.62
+        ease: ease('out'), // power3.out
+        stagger: {
+          each: window.Proovd?.MOTION.stagger.base ?? 0.08,
+          // Back navigation relays from the LAST child, so the element the
+          // person is returning toward is the one that arrives first.
+          from: direction === -1 ? 'end' : 'start',
+        },
+        overwrite: 'auto',
+      },
+    );
+  }
+
+  // The grow is the reference's `back.out(1.35)`; `snap` is `back.out(1.4)`.
+  if (grows.length) {
+    g.fromTo(
+      grows,
+      { scale: 0.6, autoAlpha: 0 },
+      {
+        scale: 1,
+        autoAlpha: 1,
+        duration: dur('slow'),
+        ease: ease('snap'),
+        overwrite: 'auto',
+      },
+    );
+  }
+
+  // The README's own stuck sweep, and the runtime's 3s force-reveal applied to
+  // a set it cannot see: `holdHidden` only registers `[data-reveal]`, and these
+  // elements are staged by an inline `fromTo` instead. A dropped tween would
+  // otherwise leave a blank page with a working keyboard path — the worst
+  // failure this flow has, because nothing about it looks broken.
+  const sweep = window.setTimeout(() => {
+    for (const el of all) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility' });
+      }
+    }
+  }, 2200);
+  return () => window.clearTimeout(sweep);
+}
+
+/**
+ * The page exit, with the README's 520ms fallback.
+ *
+ * The outgoing page fades before the route changes, so `done` is what actually
+ * navigates. The fallback exists because a tween in a backgrounded tab does not
+ * progress: without it, a Founder who switched tabs mid-transition comes back
+ * to a page that faded and never left. That is the one thing this helper must
+ * not get wrong, so the timer ships inside it rather than at each call site.
+ *
+ * The `setTimeout` here drives a NAVIGATION, never a status: nothing about what
+ * is recorded depends on it, and if it fires early the only cost is that a fade
+ * is cut short.
+ */
+export function pageExit(stage: HTMLElement | null, done: () => void): void {
+  const g = gsap();
+  if (!g || !stage || !motionLive()) {
+    done();
+    return;
+  }
+  let ran = false;
+  const fallback = window.setTimeout(() => {
+    if (ran) return;
+    ran = true;
+    done();
+  }, 520);
+  g.to(stage, {
+    autoAlpha: 0,
+    duration: dur('quick'), // 0.20 stands in for the reference's 0.28
+    ease: ease('exit'), // power2.in
+    overwrite: 'auto',
+    onComplete: () => {
+      if (ran) return;
+      ran = true;
+      window.clearTimeout(fallback);
+      done();
+    },
+  });
+}
+
+/**
+ * Campaign type, phase 1: the chosen sticker swells while the rest fades.
+ *
+ * The reference scales the sticker to 1.55 over 0.26s `power2.out` while the
+ * headline, copy and CTA fade out (`opacity 0, y −10`, 0.18s). `done` runs when
+ * the swell finishes and is what swaps the stage — so with motion off the swap
+ * is immediate and the FLIP that follows is a no-op, which is the jump-cut DNA
+ * §6.6 asks for rather than a second code path.
+ */
+export function swellChoice(
+  sticker: HTMLElement | null,
+  fading: Element[],
+  done: () => void,
+): void {
+  const g = gsap();
+  if (!g || !sticker || !motionLive()) {
+    done();
+    return;
+  }
+  if (fading.length) {
+    g.to(fading, { autoAlpha: 0, y: -10, duration: dur('instant'), ease: ease('exit') });
+  }
+  g.to(sticker, {
+    scale: 1.55,
+    duration: dur('quick'), // 0.20 stands in for the reference's 0.26
+    ease: ease('out'),
+    onComplete: done,
+  });
+}
+
+/**
+ * Campaign type, phase 2: the sticker flips from where it was into its row.
+ *
+ * Two calls, either side of a React state change. `captureFlip` runs before the
+ * stage swaps and `flipHome` in the layout effect after — which is the
+ * reference's "invert is set synchronously before paint; the tween starts on
+ * the next frame", expressed in React's own ordering rather than reproduced by
+ * hand.
+ *
+ * The pick stage's sticker and the confirm row's sticker are different DOM
+ * nodes, so they are matched by `data-flip-id` rather than by identity. Without
+ * that the state captured before the swap describes an element that no longer
+ * exists and Flip animates nothing.
+ *
+ * Returns null — and `flipHome` runs `done` immediately — whenever Flip is
+ * absent or motion is off, so the caller never waits on a tween that will not
+ * happen.
+ */
+export function captureFlip(selector: string): unknown | null {
+  const F = flip();
+  if (!F || !motionLive()) return null;
+  return F.getState(selector);
+}
+
+export function flipHome(state: unknown, done?: () => void): void {
+  const F = flip();
+  if (!F || !state || !motionLive()) {
+    done?.();
+    return;
+  }
+  F.from(state, {
+    duration: dur('slow'), // 0.60 stands in for the reference's 0.52
+    ease: ease('move'), // power2.inOut for the reference's power3.inOut
+    absolute: true,
+    onComplete: done,
+  });
 }

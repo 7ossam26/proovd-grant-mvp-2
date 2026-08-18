@@ -295,7 +295,7 @@ messages alone, as its own decision with its own test.
 
 The path a Founder walks from opening a pre-filled invitation to a live
 campaign becomes twenty-six full-screen steps with no app chrome. It is six
-sessions; the first has landed. The walk that scopes the rest is
+sessions; the first two have landed. The walk that scopes the rest is
 [docs/phases/founder-reconciliation](docs/phases/founder-flow-reconciliation.md),
 and the brief is [docs/phases/founder-flow-v2.md](docs/phases/founder-flow-v2.md).
 
@@ -344,6 +344,32 @@ cannot hold: no amount, no percentage, and no reference to a proposal. It also
 cannot exist at all for an Idea campaign, which the Spec forbids the payment on,
 and the database refuses it two independent ways.
 
+**The second session is the shell and the first four screens**, and it adds no
+column, no server route and no migration — it is a surface, a register, a
+stylesheet section and a suite. Each page is its own web address, so a Founder
+who closes the tab on step three comes back to step three, and the help panel
+lists the page they are on and every page behind it with a line saying what each
+one is for. It does not list the pages ahead: a panel that did would be a
+progress bar with reading attached, offering to jump to addresses that refuse.
+
+Two of the reference's own touches were changed rather than copied. It shows one
+campaign type at a time between arrows; both now render at once, because the
+Spec requires the choice explained before it is made and behind an arrow half
+that explanation belongs to somebody who never pressed it. And it hides the
+`Next` button while a Founder is editing; a primary action that disappears
+inside a twenty-six step sequence is a trap on a phone, so the panel still grows
+and the button stays.
+
+**Walking it in a real browser found four defects nothing else could — the fifth
+rebuild in a row where that is true.** A stray `*/` inside a stylesheet comment
+closed the comment early and silently deleted the whole new token block, so
+every page rendered at browser-default type. A label on the dark panel was
+styled through a class name that does not exist, rendering dark green on dark
+green while the automated accessibility check saw a perfectly correct label. A
+decorative shape had no size. And the palette's lightest grey, which is meant
+for placeholder text, was carrying a permanence warning and a legal line at
+about half the contrast those need.
+
 Three parts of the flow cannot be completed in the current environment, and none
 of them is stubbed: the eight policy documents are still in legal review so the
 account step refuses in the open and says why, and file storage and the
@@ -358,7 +384,8 @@ npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
 shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/policies/   the eight canonical policy records and their versions
   src/settings/   the §6 operating-constant register
-  src/vetting/    the §9 vetting sequence, its copy, and the two campaign paths
+  src/vetting/    the §9 vetting sequence, its copy, the two campaign paths, and
+                  the onboarding flow's page register
   src/affiliates/ the §5.3 subtypes and their evidence, §8's recruitment
                   record, and §2.2's active-partnership slot rule
   src/workspace/  the §12 optional items, what does not count as evidence for
