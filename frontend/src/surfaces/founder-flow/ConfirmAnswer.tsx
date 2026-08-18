@@ -145,7 +145,7 @@ function ConfirmAnswer({ config }: { config: Config }) {
   }
 
   return (
-    <FlowPage pageId={config.field} token={token} badge>
+    <FlowPage pageId={config.field} param={token} badge>
       <Body config={config} token={token} loaded={loaded} initial={value} />
     </FlowPage>
   );

@@ -81,7 +81,7 @@ export function CodeStep() {
   }
 
   return (
-    <FlowPage pageId="code" token={token} badge>
+    <FlowPage pageId="code" param={token} badge>
       <Body token={token} loaded={loaded} />
     </FlowPage>
   );

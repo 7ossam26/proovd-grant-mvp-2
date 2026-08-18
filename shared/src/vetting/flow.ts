@@ -10,9 +10,9 @@
  * somewhere that does not exist.
  *
  * ── It holds only the pages that EXIST ──────────────────────────────────────
- * Twenty-six are planned and four are built. Declaring the other twenty-two
+ * Twenty-six are planned and fifteen are built. Declaring the other eleven
  * would be `events.ts`'s failure in a different file — a register entry
- * claiming a surface the product does not have (§1.4). Sessions C through F
+ * claiming a surface the product does not have (§1.4). Sessions E and F
  * append to this list as they build; the help drawer's "everything before it"
  * is therefore always true rather than aspirational.
  *
@@ -39,12 +39,23 @@ export interface FounderFlowPage {
   /** Stable id. The help drawer, the router, and the tests all key on it. */
   id: string;
   /**
-   * The route pattern. `:token` is the router's own param and is substituted
-   * by `founderFlowPath` — never interpolated by hand at a call site, because
-   * a raw token in a hand-built string is one edit away from a query parameter
-   * a Referer would carry to a third party (§28.1).
+   * The route pattern. Its one parameter is substituted by `founderFlowPath` —
+   * never interpolated by hand at a call site, because a raw token in a
+   * hand-built string is one edit away from a query parameter a Referer would
+   * carry to a third party (§28.1).
    */
   path: string;
+  /**
+   * Which value that parameter is.
+   *
+   * Stage 1 and 2 are addressed by the draft token; stage 3 onward by the
+   * campaign, because §10's claim invalidates the token and every route past it
+   * is behind `requireRole('founder')`. Naming it here is what lets one
+   * `founderFlowPath` serve both without a call site guessing — and it is what
+   * the help drawer reads to decide whether an earlier page is still reachable
+   * from where somebody is standing.
+   */
+  param: 'token' | 'campaignId';
   /** The help drawer's card title. */
   title: string;
   /** The help drawer's one-line explanation. One line, and it stops. */
@@ -56,6 +67,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'invite',
     path: '/draft/:token',
+    param: 'token',
     title: 'Your invite',
     help: 'We filled in most of this from our call. Read it, change anything that is off, and open the form.',
     stage: 1,
@@ -63,6 +75,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'problem',
     path: '/draft/:token/problem',
+    param: 'token',
     title: 'Your problem',
     help: 'The problem we heard you describe. A reviewer and a Creator both read it, so plain words beat polished ones.',
     stage: 1,
@@ -70,6 +83,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'solution',
     path: '/draft/:token/solution',
+    param: 'token',
     title: 'Your solution',
     help: 'What you are building, in your words. One or two sentences beats a paragraph.',
     stage: 1,
@@ -77,6 +91,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'campaign-type',
     path: '/draft/:token/campaign-type',
+    param: 'token',
     title: 'Campaign type',
     help: 'An Idea Campaign tests demand before you build. A Product Campaign pre-sells something that already exists. The choice locks when you submit the form.',
     stage: 1,
@@ -84,6 +99,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'email',
     path: '/draft/:token/email',
+    param: 'token',
     title: 'Your email',
     help: 'Where we send everything about this campaign. It is filled in from your invitation — change it if that is not the address you want.',
     stage: 1,
@@ -91,6 +107,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'code',
     path: '/draft/:token/code',
+    param: 'token',
     title: 'Confirm your email',
     help: 'Six digits, sent to that address. It only confirms we can reach you — it creates no account and signs you into nothing.',
     stage: 1,
@@ -98,6 +115,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'positioning',
     path: '/draft/:token/positioning',
+    param: 'token',
     title: 'Your positioning',
     help: 'The one answer we never draft for you. Who else solves this, and why someone would choose you. Finishing it submits your answers.',
     stage: 1,
@@ -105,9 +123,76 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   {
     id: 'match',
     path: '/draft/:token/match',
+    param: 'token',
     title: 'Creators who may fit',
     help: 'How many Creators in your category might be a fit for what you just described. It is a relevance signal, not a roster, and nobody has agreed to anything.',
     stage: 1,
+  },
+  {
+    /*
+      Session D (2026-08-18). §10's account claim — the only stage-2 page there
+      is, and the boundary the whole flow turns on. Its address does not move:
+      it shipped in Phase 07 and the match screen has pointed at it since C.
+    */
+    id: 'claim',
+    path: '/draft/:token/claim',
+    param: 'token',
+    title: 'Your details',
+    help: 'The last of what we need before your account exists: your name, when you were born, where you are, and the three agreements. Nothing is charged and no card is asked for.',
+    stage: 2,
+  },
+  {
+    /*
+      Stage 3 — the five §12 answers and the review over all eight. Addressed by
+      CAMPAIGN, because the claim just invalidated the token and every route
+      behind these is `requireRole('founder')`.
+    */
+    id: 'visuals',
+    path: '/campaigns/:campaignId/setup/visuals',
+    param: 'campaignId',
+    title: 'Your visuals',
+    help: 'Pictures or video of the product, approved by you for the campaign page. One is enough, and it takes US$2 off your listing fee.',
+    stage: 3,
+  },
+  {
+    id: 'branding',
+    path: '/campaigns/:campaignId/setup/branding',
+    param: 'campaignId',
+    title: 'Your brand',
+    help: 'A logo, the colours, and what the type is doing. Written direction rather than a mood board — a reviewer and a Creator both read it. US$2 off.',
+    stage: 3,
+  },
+  {
+    id: 'interview',
+    path: '/campaigns/:campaignId/setup/interview',
+    param: 'campaignId',
+    title: 'Your interview',
+    help: 'A conversation with a person at Proovd. It counts once the booking is confirmed — a slot you picked and did not confirm does not. US$2 off.',
+    stage: 3,
+  },
+  {
+    id: 'story',
+    path: '/campaigns/:campaignId/setup/story',
+    param: 'campaignId',
+    title: 'Your story',
+    help: 'Why you are building this, in your words, for the public page. You approve it before it counts — a draft or a transcript on its own does not. US$2 off.',
+    stage: 3,
+  },
+  {
+    id: 'socials',
+    path: '/campaigns/:campaignId/setup/socials',
+    param: 'campaignId',
+    title: 'Your socials',
+    help: 'One public page for you or the product that we can open and you control. US$2 off.',
+    stage: 3,
+  },
+  {
+    id: 'last-look',
+    path: '/campaigns/:campaignId/setup/review',
+    param: 'campaignId',
+    title: 'Last look',
+    help: 'All eight answers in one place, with what your listing fee comes to. Open any of the five optional ones to change it and you come straight back here.',
+    stage: 3,
   },
 ];
 
@@ -127,15 +212,17 @@ export function founderFlowIndex(id: string): number {
 }
 
 /**
- * A page's real address for one draft.
+ * A page's real address, for one draft or one campaign.
  *
- * The token is encoded here, once. Every caller passes the raw value and gets
- * a path back; nothing builds one by hand.
+ * The value is encoded here, once. Every caller passes the raw one and gets a
+ * path back; nothing builds one by hand. Which value a page wants is the page's
+ * own `param`, so a caller cannot pass a campaign id to a token-addressed page
+ * by writing the wrong template string — there is no template string.
  */
-export function founderFlowPath(id: string, token: string): string {
+export function founderFlowPath(id: string, param: string): string {
   const page = founderFlowPage(id);
   if (!page) throw new Error(`unknown founder flow page: ${id}`);
-  return page.path.replace(':token', encodeURIComponent(token));
+  return page.path.replace(`:${page.param}`, encodeURIComponent(param));
 }
 
 /* ── The help drawer ──────────────────────────────────────────────────────── */
@@ -151,6 +238,27 @@ export function founderFlowPath(id: string, token: string): string {
  */
 export const FOUNDER_FLOW_HELP_TITLE = 'Help';
 export const FOUNDER_FLOW_HELP_SUBHEAD = 'This page and everything before it';
+
+/**
+ * Why an earlier card in the drawer is reading rather than a jump.
+ *
+ * §10: a successful claim "invalidates the draft token". So from a page
+ * addressed by the campaign, every page addressed by the token has no address
+ * left — and offering the jump anyway would send somebody to the
+ * unusable-link page from their own help drawer. The card keeps its
+ * explanation, which is the half that was worth having, and loses the control
+ * that would fail (§1.4).
+ */
+export const FOUNDER_FLOW_EARLIER_STAGE_CLOSED =
+  'Your invitation link was used up when your account was created, so this step no longer opens. Your answers are on your campaign record.';
+
+/** Whether one page can be reached from another — the same parameter, or not. */
+export function founderFlowReachableFrom(fromId: string, toId: string): boolean {
+  const from = founderFlowPage(fromId);
+  const to = founderFlowPage(toId);
+  if (!from || !to) return false;
+  return from.param === to.param;
+}
 
 /* ── What the reference draws and the Spec forbids ────────────────────────── */
 
@@ -226,7 +334,88 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
       'That is `--grey` on `--white`, about 2.2:1, applied to the text a person is actively typing. It is the token for placeholders and disabled ink, and Session B moved five sentences off it for the same reason. The dashed brand underline is what marks focus here; the ink stays legible.',
     specRef: '§28.5, §33.11',
   },
+  {
+    element: 'The legal-name field labelled `Username:` on the details screen',
+    absentBecause:
+      'It writes `founder_claim_profiles.legal_name`, which is what §10 collects and what Stripe is later given. Calling it a username misnames the record on the one screen that creates it — and it invites a nickname into the field the seller of record is identified by.',
+    specRef: '§10',
+  },
+  {
+    element:
+      'The details screen collecting three fields — legal name, phone, birthdate — and nothing else',
+    absentBecause:
+      'It is not an absence in the reference so much as a gap: §10 lists nine contents for this surface, and the prototype has no account behind it to need the rest. Country and state, sole-proprietor or entity, the password, the three agreements and the three representations are all here, because the account cannot exist without them and `completeClaim` refuses by name for each.',
+    specRef: '§10, §28.4',
+  },
+  {
+    element:
+      'The interview screen’s own platform tiles (Meet / Zoom / Teams) and time-slot chips',
+    absentBecause:
+      'tech-stack §12: "The booking record in our database is the source of truth, populated from Cal.com webhooks." A picker of our own is a second scheduler, and the two would disagree about what was booked — the provider would hold a slot this product never recorded, or the reverse. The screen renders the Cal.com embed, and a named absence while that account is unconfigured.',
+    specRef: '§12, tech-stack §12',
+  },
+  {
+    element:
+      'The branding screen’s draggable HSV square — a saturation/value plane with a handle, over a hue bar',
+    absentBecause:
+      'A drag surface with no keyboard equivalent fails §28.5 on the one screen where the alternative is free, and §12 does not ask for a colour VALUE: it asks for "saved direction containing at least colors and typography/style guidance", which is writing. The hex field, the swatches it builds, and the direction box are all here; only the plane is not.',
+    specRef: '§28.5, §12',
+  },
+  {
+    element: 'The last-look card grid offering an edit affordance on all eight answers',
+    absentBecause:
+      'Three of the eight are §9 answers, and §9 locks them at submission — the route that wrote them is behind the draft token the claim just invalidated. So the first three cards render what was submitted and offer nothing, and the five optional ones open. An edit control that cannot work is worse than none.',
+    specRef: '§9, §10, §1.4',
+  },
 ];
+
+/* ── The four sentences Session D pins ────────────────────────────────────── */
+
+/**
+ * Rendered on every one of the five optional answers, and on Last look.
+ *
+ * §12's completion rules are objective and are decided by the server from the
+ * evidence — "Empty files, placeholders, duplicate uploads, inaccessible URLs,
+ * unapproved drafts, and unconfirmed appointments do not qualify." There is no
+ * control on any of these screens that marks an answer done, and a Founder who
+ * expected one needs to be told that rather than left hunting for it.
+ */
+export const FLOW_COMPLETION_IS_DECIDED =
+  'Proovd decides whether an answer counts, from what you actually provide — there is no box to tick. If something is missing we say which part, here, as soon as you save.';
+
+/**
+ * Rendered with the edit affordance on Last look.
+ *
+ * The reference's own behaviour, and the one most likely to be dropped: it is
+ * carried in the address rather than in a component's state, so a reload in the
+ * middle of an edit still comes back here.
+ */
+export const FLOW_LAST_LOOK_RETURNS =
+  'Opening one from here brings you straight back to this page when you are done.';
+
+/**
+ * Rendered under the date of birth.
+ *
+ * §10 collects a date of birth and lists "US/18+ and sanctions
+ * representations" separately, as things the Founder states. The check on this
+ * screen is a courtesy over a recorded representation — Proovd derives no age
+ * and never claims to have verified one, which is exactly what the Admin
+ * Eligibility tab already renders. Saying so stops the field reading as an
+ * identity check it is not.
+ */
+export const FLOW_AGE_IS_YOUR_STATEMENT =
+  'We check the date adds up to 18 or over as you type. That is a courtesy, not a verification — what stands on your record is your own confirmation below.';
+
+/**
+ * Rendered under the claim's primary control.
+ *
+ * The pair of facts somebody wants before they hand over a password: what this
+ * costs, and what happens to the link they arrived on (§10: the claim
+ * "invalidates the draft token").
+ */
+export const FLOW_CLAIM_USES_THE_LINK =
+  'This creates your account and uses up your invitation link. Nothing is charged and no card is asked for.';
+
 
 /* ── The two sentences the shell itself pins ────────────────────── */
 

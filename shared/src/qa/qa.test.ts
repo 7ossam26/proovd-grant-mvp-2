@@ -12,7 +12,18 @@
 
 import { describe, it, expect } from 'vitest';
 import { namingViolations } from '../notifications/contract.js';
-import { FOUNDER_FLOW_PAGES, FOUNDER_FLOW_ROUTES } from '../vetting/index.js';
+import {
+  FOUNDER_ANSWER_SEQUENCE,
+  FOUNDER_FLOW_PAGES,
+  FOUNDER_FLOW_ROUTES,
+  VETTING_STEPS,
+  founderAnswerLabel,
+  founderAnswerNext,
+  founderAnswerPrevious,
+  founderFlowPath,
+  founderFlowReachableFrom,
+} from '../vetting/index.js';
+import { OPTIONAL_ITEMS } from '../workspace/index.js';
 import {
   CONSISTENCY_FACT_KEYS,
   CONSISTENCY_SURFACE_KEYS,
@@ -248,14 +259,26 @@ describe('§3.2 the equity rule reads a claim, not a word', () => {
 
 describe('the Founder onboarding flow', () => {
   const founderFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_vetting')!;
+  const setupFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_workspace')!;
 
   it('restates every flow page in PRINCIPAL_FLOWS, in order', () => {
     // `PRINCIPAL_FLOWS` is `as const`, so the routes cannot be spread in from
     // `FOUNDER_FLOW_PAGES` without widening every one to `string`. They are
     // restated and drift-tested instead — the arrangement the state enums, the
     // §6 settings and the §27 keys all use.
-    expect(founderFlow.routes.slice(0, FOUNDER_FLOW_ROUTES.length)).toEqual(
-      FOUNDER_FLOW_ROUTES,
+    //
+    // Session D split them across two flow entries, because the register's
+    // audience is one thing and its AUTH REGIME is another: stages 1–2 are the
+    // draft token and stage 3 is a Founder session, and a §33.11 sweep has to
+    // stub a different thing for each. Together they are still every page.
+    const tokenPages = FOUNDER_FLOW_PAGES.filter((page) => page.param === 'token');
+    const campaignPages = FOUNDER_FLOW_PAGES.filter((page) => page.param === 'campaignId');
+    expect(founderFlow.routes).toEqual(tokenPages.map((page) => page.path));
+    expect(setupFlow.routes.slice(0, campaignPages.length)).toEqual(
+      campaignPages.map((page) => page.path),
+    );
+    expect([...founderFlow.routes, ...campaignPages.map((page) => page.path)].sort()).toEqual(
+      [...FOUNDER_FLOW_ROUTES].sort(),
     );
   });
 
@@ -263,7 +286,7 @@ describe('the Founder onboarding flow', () => {
     expect(new Set(FOUNDER_FLOW_PAGES.map((p) => p.id)).size).toBe(FOUNDER_FLOW_PAGES.length);
     expect(new Set(FOUNDER_FLOW_PAGES.map((p) => p.path)).size).toBe(FOUNDER_FLOW_PAGES.length);
     for (const page of FOUNDER_FLOW_PAGES) {
-      expect(page.path.startsWith('/draft/:token'), page.id).toBe(true);
+      expect(page.path.includes(`:${page.param}`), page.id).toBe(true);
       expect(page.title.trim().length, page.id).toBeGreaterThan(3);
       // One line, and it stops. A help card is not a second copy of the page.
       expect(page.help.trim().length, page.id).toBeGreaterThan(30);
@@ -272,14 +295,98 @@ describe('the Founder onboarding flow', () => {
   });
 
   it('holds only the pages that exist', () => {
-    // Twenty-six are planned and eight are built — Session B built the first
-    // four, Session C the four that finish the draft token. A register entry
-    // claiming a surface the product does not have is §1.4's failure in a
-    // different file, and the help drawer would offer to jump to an address
-    // that refuses.
-    expect(FOUNDER_FLOW_PAGES).toHaveLength(8);
-    // Every one of the eight is still reached on the invitation token. Stage 2
-    // is the claim, and it is Session D's.
-    for (const page of FOUNDER_FLOW_PAGES) expect(page.stage).toBe(1);
+    // Twenty-six are planned and fifteen are built — Session B built the first
+    // four, Session C the four that finish the draft token, Session D the claim
+    // and the six behind it. A register entry claiming a surface the product
+    // does not have is §1.4's failure in a different file, and the help drawer
+    // would offer to jump to an address that refuses.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(15);
+  });
+
+  it('addresses a page by the parameter its own auth regime has', () => {
+    // The whole reason `param` exists. Stage 1 and 2 run on the draft token;
+    // §10's claim invalidates it, so stage 3 onward is addressed by campaign.
+    // A stage-3 page holding `:token` would be a page nobody could reach.
+    for (const page of FOUNDER_FLOW_PAGES) {
+      expect(page.param, page.id).toBe(page.stage <= 2 ? 'token' : 'campaignId');
+    }
+    expect(FOUNDER_FLOW_PAGES.filter((page) => page.stage === 2)).toHaveLength(1);
+  });
+
+  it('offers a jump only where the parameter carries over', () => {
+    // What the help drawer reads. From a stage-3 page every earlier card is
+    // reading rather than a control, because the address it needs no longer
+    // exists (§10) — and offering it anyway would send somebody to the
+    // unusable-link page from their own help drawer.
+    expect(founderFlowReachableFrom('problem', 'invite')).toBe(true);
+    expect(founderFlowReachableFrom('story', 'visuals')).toBe(true);
+    expect(founderFlowReachableFrom('visuals', 'claim')).toBe(false);
+    expect(founderFlowReachableFrom('last-look', 'problem')).toBe(false);
+    // An id nobody registered is not reachable from anywhere, rather than
+    // throwing on a help drawer somebody opened.
+    expect(founderFlowReachableFrom('visuals', 'nope')).toBe(false);
+  });
+
+  it('substitutes whichever parameter the page declares', () => {
+    expect(founderFlowPath('positioning', 'tok en')).toBe('/draft/tok%20en/positioning');
+    expect(founderFlowPath('visuals', 'camp-1')).toBe('/campaigns/camp-1/setup/visuals');
+    expect(founderFlowPath('last-look', 'camp-1')).toBe('/campaigns/camp-1/setup/review');
+  });
+});
+
+describe('the eight answers, as a sequence over two registers', () => {
+  it('covers §9’s three and §12’s five, once each, in flow order', () => {
+    expect(FOUNDER_ANSWER_SEQUENCE).toHaveLength(8);
+    expect(FOUNDER_ANSWER_SEQUENCE.filter((e) => e.owner === 'vetting')).toHaveLength(3);
+    expect(FOUNDER_ANSWER_SEQUENCE.filter((e) => e.owner === 'optional')).toHaveLength(5);
+    expect(new Set(FOUNDER_ANSWER_SEQUENCE.map((e) => e.key)).size).toBe(8);
+  });
+
+  it('keeps the two registers apart — every key lives in exactly one', () => {
+    // The brief's own instruction, and the reason it matters: a §12 answer is
+    // COMPLETE or not, decided server-side from objective evidence, and a
+    // merged register would quietly make that a Founder assertion.
+    const vettingIds = new Set<string>(VETTING_STEPS.map((step) => step.id));
+    const optionalIds = new Set<string>(OPTIONAL_ITEMS.map((item) => item.key));
+    for (const entry of FOUNDER_ANSWER_SEQUENCE) {
+      const inVetting = vettingIds.has(entry.key);
+      const inOptional = optionalIds.has(entry.key);
+      expect(inVetting !== inOptional, entry.key).toBe(true);
+      expect(entry.owner === 'vetting' ? inVetting : inOptional, entry.key).toBe(true);
+    }
+  });
+
+  it('makes every §9 answer uneditable after the claim, and every §12 one editable', () => {
+    // Not a policy: §9's route is behind the draft token and §10's claim
+    // invalidates it, so there is no address to send anybody to. Last look
+    // reads this rather than comparing an index somebody could reorder.
+    for (const entry of FOUNDER_ANSWER_SEQUENCE) {
+      expect(entry.editableAfterClaim, entry.key).toBe(entry.owner === 'optional');
+    }
+  });
+
+  it('points every entry at a page that exists', () => {
+    for (const entry of FOUNDER_ANSWER_SEQUENCE) {
+      expect(FOUNDER_FLOW_PAGES.some((page) => page.id === entry.pageId), entry.key).toBe(true);
+    }
+  });
+
+  it('takes its labels from whichever register owns the answer', () => {
+    expect(founderAnswerLabel(FOUNDER_ANSWER_SEQUENCE[0]!)).toBe(
+      VETTING_STEPS.find((step) => step.id === 'problem')!.label,
+    );
+    expect(founderAnswerLabel(FOUNDER_ANSWER_SEQUENCE[3]!)).toBe(
+      OPTIONAL_ITEMS.find((item) => item.key === 'visuals')!.label,
+    );
+  });
+
+  it('walks the five optional answers and stops', () => {
+    expect(founderAnswerNext('visuals')?.pageId).toBe('branding');
+    expect(founderAnswerNext('socials')).toBeNull();
+    expect(founderAnswerPrevious('visuals')).toBeNull();
+    expect(founderAnswerPrevious('socials')?.pageId).toBe('story');
+    // A §9 page is not in the optional sequence at all, so it walks to neither.
+    expect(founderAnswerNext('positioning')).toBeNull();
+    expect(founderAnswerPrevious('positioning')).toBeNull();
   });
 });

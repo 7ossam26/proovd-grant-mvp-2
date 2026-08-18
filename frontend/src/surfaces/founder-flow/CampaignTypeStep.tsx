@@ -109,7 +109,7 @@ export function CampaignTypeStep() {
   }
 
   return (
-    <FlowPage pageId="campaign-type" token={token} badge>
+    <FlowPage pageId="campaign-type" param={token} badge>
       <Body token={token} loaded={loaded} />
     </FlowPage>
   );

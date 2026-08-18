@@ -25,6 +25,8 @@
 import { desc, eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { campaigns } from '../db/schema/domain.js';
+import { campaignVetting } from '../db/schema/vetting.js';
+import { TRANSCRIPTION_UNAVAILABLE } from '../transcription/index.js';
 import {
   campaignOptionalItems,
   highEffortClassifications,
@@ -229,10 +231,39 @@ export interface FounderWorkspaceView {
       interviewer: string | null;
     } | null;
   };
+  /**
+   * The three §9 answers, read-only.
+   *
+   * Founder Flow v2 Session D. Last look reviews all EIGHT answers, and three
+   * of them are §9's rather than §12's — so the surface needs them, and there
+   * is nowhere else it could get them: the route that wrote them is behind the
+   * draft token, which §10's claim invalidated on the way here.
+   *
+   * Read-only in the strong sense. There is no patch key on this projection's
+   * writer that reaches `campaign_vetting`, so a control offering to edit one
+   * would have nothing to call. That is also why Last look renders these three
+   * with no edit affordance (§1.4) — and why the §9 lock survives the rebuild
+   * rather than depending on a surface remembering it.
+   */
+  vetting: {
+    problem: string | null;
+    solution: string | null;
+    competition: string | null;
+    submittedAt: string | null;
+  };
   lastSavedAt: string | null;
   resumeStep: string | null;
   /** False while Track A4 has not landed. The surface says so, honestly. */
   uploadsAvailable: boolean;
+  /**
+   * Whether dictation works here, and why not when it does not.
+   *
+   * It rides the READ rather than being discovered at the microphone,
+   * because a 503 at the point of use arrives after somebody has already
+   * pressed record. The sentence is the port's own constant, so the screen
+   * and the server log cannot disagree about the reason.
+   */
+  transcription: { available: true } | { available: false; absentBecause: string };
 }
 
 export async function readFounderWorkspace(
@@ -242,6 +273,8 @@ export async function readFounderWorkspace(
     uploadsAvailable: boolean;
     /** Phase 09b. Absent while the scheduling provider is unconfigured. */
     interviewEmbed?: { eventTypeLink: string; reference: string } | undefined;
+    /** Session D: the same port the Positioning step uses. */
+    transcriptionAvailable?: boolean | undefined;
   },
 ): Promise<FounderWorkspaceView | null> {
   const rows = await loadWorkspaceRows(db, input.campaignId);
@@ -253,10 +286,20 @@ export async function readFounderWorkspace(
     .where(eq(campaigns.id, input.campaignId))
     .limit(1);
 
-  const [fee, highEffort, config] = await Promise.all([
+  const [fee, highEffort, config, vetting] = await Promise.all([
     feeView(db, input.campaignId),
     highEffortView(db, input.campaignId),
     readInterviewConfiguration(db),
+    db
+      .select({
+        problem: campaignVetting.problemText,
+        solution: campaignVetting.solutionText,
+        competition: campaignVetting.competitionText,
+        submittedAt: campaignVetting.submittedAt,
+      })
+      .from(campaignVetting)
+      .where(eq(campaignVetting.campaignId, input.campaignId))
+      .limit(1),
   ]);
 
   const ordered = OPTIONAL_ITEM_KEYS.map((key) => rows.items.find((i) => i.item === key)).filter(
@@ -319,9 +362,18 @@ export async function readFounderWorkspace(
           }
         : null,
     },
+    vetting: {
+      problem: vetting[0]?.problem ?? null,
+      solution: vetting[0]?.solution ?? null,
+      competition: vetting[0]?.competition ?? null,
+      submittedAt: vetting[0]?.submittedAt?.toISOString() ?? null,
+    },
     lastSavedAt: rows.workspace.lastSavedAt?.toISOString() ?? null,
     resumeStep: rows.workspace.resumeStep,
     uploadsAvailable: input.uploadsAvailable,
+    transcription: input.transcriptionAvailable
+      ? { available: true }
+      : { available: false, absentBecause: TRANSCRIPTION_UNAVAILABLE },
   };
 }
 

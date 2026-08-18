@@ -67,7 +67,13 @@ import { EmailStep } from './surfaces/founder-flow/EmailStep.js';
 import { CodeStep } from './surfaces/founder-flow/CodeStep.js';
 import { PositioningStep } from './surfaces/founder-flow/PositioningStep.js';
 import { MatchStep } from './surfaces/founder-flow/MatchStep.js';
-import { AccountClaim } from './surfaces/draft/AccountClaim.js';
+import { ClaimStep } from './surfaces/founder-flow/ClaimStep.js';
+import { VisualsStep } from './surfaces/founder-flow/VisualsStep.js';
+import { BrandingStep } from './surfaces/founder-flow/BrandingStep.js';
+import { InterviewStep } from './surfaces/founder-flow/InterviewStep.js';
+import { StoryStep } from './surfaces/founder-flow/StoryStep.js';
+import { SocialsStep } from './surfaces/founder-flow/SocialsStep.js';
+import { LastLook } from './surfaces/founder-flow/LastLook.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -441,8 +447,14 @@ const rootChildren: RouteObject[] = [
     element: <DraftResultRedirect />,
   },
   {
+    /*
+      Founder Flow v2 Session D (2026-08-18). The address does not move — it
+      shipped in Phase 07, the match screen has pointed at it since Session C,
+      and it is the one stage-2 page there is. What renders changed: the same
+      §10 claim, re-presented as a full-bleed flow page.
+    */
     path: 'draft/:token/claim',
-    element: <AccountClaim />,
+    element: <ClaimStep />,
   },
   {
     // Phase 08b (§11, §33.2.2, §33.2.3). The Creator's compact signup — ONE
@@ -533,6 +545,44 @@ const rootChildren: RouteObject[] = [
     // Outside both shells, for the reasons the campaign routes below document.
     path: 'campaigns',
     element: <FounderCampaigns />,
+  },
+  {
+    /*
+      Founder Flow v2 Session D (2026-08-18) — stage 3. The five §12 answers
+      and the review over all eight, each its own top-level address inside the
+      Founder guard.
+
+      Addressed by CAMPAIGN rather than by the draft token every earlier page
+      uses, because §10's claim invalidated it and these write through
+      /api/founder/campaigns/:id/*. `FOUNDER_FLOW_PAGES` carries which
+      parameter each page wants, so nothing here builds a path by hand.
+
+      Twenty-six positions a single stateful page would destroy on reload, and
+      the `?from=review` on an edit opened from Last look is in the address for
+      the same reason (DNA §5.12).
+    */
+    path: 'campaigns/:campaignId/setup/visuals',
+    element: <VisualsStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/branding',
+    element: <BrandingStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/interview',
+    element: <InterviewStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/story',
+    element: <StoryStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/socials',
+    element: <SocialsStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/review',
+    element: <LastLook />,
   },
   {
     // Phase 09a (§12, DNA §5.9). The signed-in Founder's campaign workspace.

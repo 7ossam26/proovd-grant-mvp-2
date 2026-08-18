@@ -511,3 +511,118 @@ One deliberate departure from the reference's scale: the match hero is
 `clamp(2.75rem, 7.4vw, 5.5rem)` rather than 198px/900. That ratio — 2.25× its own campaign-type
 headline — does not survive a 320px viewport. It is still clearly the largest type in the flow,
 which is DNA §5.8's one delight.
+
+## 12. Session D's screen order, as built
+
+The claim, and the six addresses behind it:
+
+| Page id | Address | Reference | Note |
+|---|---|---|---|
+| `claim` | `/draft/:token/claim` | 16 | §10's account claim. The one stage-2 page. Address unchanged since Phase 07. |
+| `visuals` | `/campaigns/:campaignId/setup/visuals` | 10 | `campaign_assets` (`purpose: 'visual'`). |
+| `branding` | `/campaigns/:campaignId/setup/branding` | 11 | `campaign_workspace` + `campaign_assets` (`purpose: 'logo'`). |
+| `interview` | `/campaigns/:campaignId/setup/interview` | 12 | `founder_interview_bookings`, fed by Cal.com. |
+| `story` | `/campaigns/:campaignId/setup/story` | 13 | `campaign_workspace.story_text` + approval. |
+| `socials` | `/campaigns/:campaignId/setup/socials` | 14 | `campaign_social_profiles`. |
+| `last-look` | `/campaigns/:campaignId/setup/review` | 15 | The review over all eight answers. |
+
+**The parameter changes at the claim, and that is the whole of stage 2.** Every
+page before it is addressed by the draft token; §10's claim invalidates that
+token, and every route behind these six is `requireRole('founder')`. So
+`FounderFlowPage` gained `param: 'token' | 'campaignId'`, `founderFlowPath`
+substitutes whichever the page declares, and `founderFlowReachableFrom` is what
+the help drawer reads to decide whether an earlier card is a jump or reading.
+
+**`/campaigns/:campaignId/workspace` keeps its address and loses its five steps.**
+Two Founder-facing surfaces over the same five items would be two places to
+answer one question — the reasoning that deleted `DraftLanding` in Session B and
+the interim vetting surface in Session C. What is left there is payout
+onboarding and the listing fee, which are **Session E's screens 25 and 20**;
+Last look's `All good` points at it for exactly as long as that is true. The
+Founder's own campaign list now opens Last look for the pre-money states and the
+fee surface for the two money ones, which is what those states are about.
+
+### What the Session D walk found that neither earlier walk did
+
+Five elements the reference draws are refused, each now an entry in
+`FOUNDER_FLOW_ABSENCES`:
+
+1. **`Username:` as the legal-name field label.** It writes
+   `founder_claim_profiles.legal_name`, which is what §10 collects and what
+   Stripe is later given. Calling it a username misnames the record on the one
+   screen that creates it — and invites a nickname into the field the seller of
+   record is identified by.
+2. **The details screen collecting three fields and nothing else.** Less a
+   refusal than a gap: §10 lists nine contents and the prototype has no account
+   behind it to need the rest. Country and state, sole-proprietor or entity, the
+   password, the three agreements and the three representations are all here,
+   because `completeClaim` refuses by name for each.
+3. **The interview screen's own platform tiles and time-slot chips.** tech-stack
+   §12: "The booking record in our database is the source of truth, populated
+   from Cal.com webhooks." A picker of our own is a second scheduler, and the two
+   would disagree about what was booked.
+4. **The branding screen's draggable HSV plane.** A drag surface with no keyboard
+   equivalent fails §28.5 on the one screen where the alternative is free, and
+   §12 does not ask for a colour VALUE — it asks for "saved direction containing
+   at least colors and typography/style guidance", which is writing. The hex
+   field, the swatches it builds, and the direction box all ship; only the plane
+   does not.
+5. **An edit affordance on all eight Last-look cards.** Three of the eight are §9
+   answers, locked at submission, and the route that wrote them is behind the
+   token the claim just invalidated. Those three cards render what was submitted
+   and offer nothing.
+
+### Three decisions inside the session
+
+**Signing in after the claim is the browser doing what a person would.** §10's
+successful claim creates the account and invalidates the token; it does not
+mention a session, and `completeClaim` issues none. The flow continues into
+`requireRole('founder')` territory, so somebody has to sign in. Rather than add a
+second session-minting path to the most carefully guarded transaction in the
+product, the claim screen posts the password the Founder just chose to
+`/api/auth/sign-in/email` — the real route, with its real rate limit, its real
+origin guard, and no new server code. It buys no access the password itself would
+not. If it fails the ACCOUNT still exists, and the screen says exactly that.
+
+**The return-from-Last-look contract is `?from=review`, in the address.** The
+reference's own behaviour — "jumping into a section from here returns you to Last
+look on that section's Next" — and the brief calls it "a router contract rather
+than a component flag" for a reason: a component flag does not survive a reload
+in the middle of an edit, and this sequence's position is the URL everywhere else.
+
+**Dictation on Story needed a second route, and the port is unchanged.**
+`POST /api/draft/:token/transcribe` is Positioning's and cannot serve Story: the
+claim invalidated that token on the way here. `POST /api/founder/campaigns/:id/transcribe`
+is the same port behind the Founder guard, with the same configured-check before
+the body parser and the same absence carried on the read. Everything that keeps
+deviation 2 narrow is a property of the port rather than of either route.
+
+---
+
+## 13. What the Session D browser pass found, and nothing else could
+
+Two defects, both invisible to jsdom, axe, and the type checker. Seventh
+rebuild in a row.
+
+1. **A `.tag` inside `.ff-item__status` stretched into a full-width band.**
+   The container is a column flex, `.tag` is `inline-flex`, and a flex ITEM in
+   a column is stretched to the container width by the default
+   `align-items: stretch`. So `Not counting yet` and `Counts` rendered as
+   dark and moss bars across the measure rather than as chips. axe reads a
+   correctly named Tag either way. `align-items: flex-start` fixes it, and the
+   complete state — one sentence with a chip in it — stops being a flex column
+   at all.
+2. **§12’s completion rule read as a claim that it had already happened.**
+   `OPTIONAL_ITEMS.interview.completesWhen` is literally `Your booking is
+   confirmed.` — correct as a RULE and wrong as a lede under the question, on
+   the one screen where nothing is booked. §1.4 in one line, and the same
+   sentence appears again on the Last look card for a MISSING answer. Both now
+   carry a label (`What makes this count` / `Counts when`) and the register is
+   untouched: it is a condition everywhere, and only the presentation said
+   otherwise.
+
+One harness bug worth recording so the next session does not chase it: the
+fixture server matched `/workspace` before the static-file fallback, so
+`/campaigns/c1/workspace` served JSON at a PAGE address and the screenshot was
+a wall of raw payload. The check is `p.startsWith('/api/') && p.includes(...)`
+now. Nothing about the product was wrong.

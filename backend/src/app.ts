@@ -660,6 +660,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       // messages, which this router has sent since 09b.
       appBaseUrl: config.appBaseUrl,
       ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
+      // Founder Flow v2 Session D: the same port the draft route uses, so
+      // one deployment decision governs dictation on both steps.
+      ...(config.transcription ? { transcription: config.transcription } : {}),
     }),
   );
   // Phase 09b (§12, tech-stack §12). The booking provider's webhook. Mounts its

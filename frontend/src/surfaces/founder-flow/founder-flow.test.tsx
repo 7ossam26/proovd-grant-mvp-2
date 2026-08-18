@@ -1,5 +1,5 @@
 /**
- * The Founder onboarding flow, screens 1–4 — Founder Flow v2, Session B.
+ * The Founder onboarding flow, screens 1–17 — Founder Flow v2, Sessions B–D.
  *
  * The real route table in a memory router with `fetch` stubbed at the network
  * boundary. What is proved here is the half only the surface owns: that each of
@@ -27,11 +27,20 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import {
   CAMPAIGN_PATH_CHOICES,
+  FLOW_AGE_IS_YOUR_STATEMENT,
+  FLOW_CLAIM_USES_THE_LINK,
+  FLOW_COMPLETION_IS_DECIDED,
+  FLOW_LAST_LOOK_RETURNS,
+  FOUNDER_ANSWER_SEQUENCE,
+  FOUNDER_FLOW_EARLIER_STAGE_CLOSED,
   FOUNDER_FLOW_ABSENCES,
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
   POSSIBLE_CREATOR_RESULT_DISCLOSURES,
+  founderAnswerLabel,
+  founderFlowPath,
 } from '@proovd/shared';
+import { invalidateSession } from '../../lib/session.js';
 import { appRoutes } from '../../routes.js';
 
 type StubResult = { status: number; body: unknown } | undefined;
@@ -45,6 +54,7 @@ function respond(status: number, body: unknown): Response {
 }
 
 beforeEach(() => {
+  invalidateSession();
   handlers = [];
   requests = [];
   vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
@@ -140,9 +150,11 @@ function renderAt(path: string) {
   return render(<RouterProvider router={router} />);
 }
 
+/* Session D: a page is addressed by its own parameter — the draft token
+   through the claim, the campaign after it. */
 const at = (id: string) => {
   const page = FOUNDER_FLOW_PAGES.find((p) => p.id === id)!;
-  return page.path.replace(':token', TOKEN);
+  return founderFlowPath(id, page.param === 'token' ? TOKEN : CAMPAIGN);
 };
 
 const ANSWERED = {
@@ -167,8 +179,7 @@ describe('the flow is a sequence of pages', () => {
   it('gives every page its own address, and each one restores there', async () => {
     for (const page of FOUNDER_FLOW_PAGES) {
       handlers = [];
-      stubLanding();
-      stubVetting(ANSWERED);
+      stubAllRegimes();
       const view = renderAt(at(page.id));
       // The heading is what proves the surface rendered rather than an error
       // state — every one of the four owns exactly one `h1`.
@@ -454,8 +465,7 @@ describe('the refusals', () => {
     stubVetting(ANSWERED);
     for (const page of FOUNDER_FLOW_PAGES) {
       handlers = [];
-      stubLanding();
-      stubVetting(ANSWERED);
+      stubAllRegimes();
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       const text = document.body.textContent ?? '';
@@ -494,8 +504,7 @@ describe('the refusals', () => {
     stubVetting(ANSWERED);
     for (const page of FOUNDER_FLOW_PAGES) {
       handlers = [];
-      stubLanding();
-      stubVetting(ANSWERED);
+      stubAllRegimes();
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       const text = document.body.textContent ?? '';
@@ -524,8 +533,7 @@ describe('§33.11 the flow is operable', () => {
   it('has no axe violations on any of the four pages', async () => {
     for (const page of FOUNDER_FLOW_PAGES) {
       handlers = [];
-      stubLanding();
-      stubVetting(ANSWERED);
+      stubAllRegimes();
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       expect(await axe(view.container), `axe on ${page.id}`).toHaveNoViolations();
@@ -536,8 +544,7 @@ describe('§33.11 the flow is operable', () => {
   it('exposes exactly one level-1 heading per page (§33.11.2)', async () => {
     for (const page of FOUNDER_FLOW_PAGES) {
       handlers = [];
-      stubLanding();
-      stubVetting(ANSWERED);
+      stubAllRegimes();
       const view = renderAt(at(page.id));
       await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1));
       view.unmount();
@@ -547,8 +554,7 @@ describe('§33.11 the flow is operable', () => {
   it('names a destination on every nav control (§33.11.4)', async () => {
     for (const page of FOUNDER_FLOW_PAGES) {
       handlers = [];
-      stubLanding();
-      stubVetting(ANSWERED);
+      stubAllRegimes();
       stubClaim();
       stubCode();
       stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
@@ -590,7 +596,25 @@ const CLAIM_FIELD = {
   editedAt: null as string | null,
 };
 
-function claimView(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+/**
+ * The three §10 documents, as they actually ship: `draft`.
+ *
+ * A consent may cite only a PUBLISHED version (a trigger, not a service
+ * rule), so `completeClaim` refuses and the claim screen renders the reason.
+ * Stubbing an empty list instead would be stubbing a state the product does
+ * not have, and the refusal is the thing worth testing.
+ */
+const DRAFT_POLICIES = [
+  { slug: 'terms', route: '/terms', title: 'Terms of Service', version: 'v1.0', status: 'draft' },
+  { slug: 'founder-aup', route: '/founder-aup', title: 'Founder Acceptable Use Policy', version: 'v1.0', status: 'draft' },
+  { slug: 'privacy', route: '/privacy', title: 'Privacy Policy', version: 'v1.0', status: 'draft' },
+];
+
+const PUBLISHED_POLICIES = DRAFT_POLICIES.map((p) => ({ ...p, status: 'published' }));
+function claimView(
+  overrides: Record<string, unknown> = {},
+  policies: unknown[] = DRAFT_POLICIES,
+): Record<string, unknown> {
   return {
     profile: {
       draftId: 'd1',
@@ -614,13 +638,13 @@ function claimView(overrides: Record<string, unknown> = {}): Record<string, unkn
       claimedAt: null,
       ...overrides,
     },
-    policies: [],
-    canComplete: false,
+    policies,
+    canComplete: policies.length > 0,
   };
 }
 
-function stubClaim(overrides: Record<string, unknown> = {}) {
-  const view = claimView(overrides);
+function stubClaim(overrides: Record<string, unknown> = {}, policies: unknown[] = DRAFT_POLICIES) {
+  const view = claimView(overrides, policies);
   handlers.push((url, init) => {
     if (!/\/api\/draft\/[^/]+\/claim$/.test(url)) return undefined;
     const profile = view['profile'] as Record<string, unknown>;
@@ -973,3 +997,433 @@ describe('the flow is operable over Session C pages', () => {
     }
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SESSION D — the claim (16), the five §12 answers (10–14), and Last look (15)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const CAMPAIGN = 'camp-d1';
+
+function workspaceState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    campaignId: CAMPAIGN,
+    campaignStatus: 'account_claimed',
+    listingPaid: false,
+    items: [
+      { item: 'visuals', complete: true, completedAt: '2026-08-18T10:00:00.000Z', decisionSource: 'objective_evidence', rejections: [], locked: false, invalidated: { at: null, explanation: null } },
+      { item: 'branding', complete: false, completedAt: null, decisionSource: null, rejections: ['logo_missing'], locked: false, invalidated: { at: null, explanation: null } },
+      { item: 'interview', complete: false, completedAt: null, decisionSource: null, rejections: ['booking_absent'], locked: false, invalidated: { at: null, explanation: null } },
+      { item: 'story', complete: false, completedAt: null, decisionSource: null, rejections: ['not_approved'], locked: false, invalidated: { at: null, explanation: null } },
+      { item: 'socials', complete: false, completedAt: null, decisionSource: null, rejections: ['no_profile'], locked: false, invalidated: { at: null, explanation: null } },
+    ],
+    fee: {
+      baseCents: '3500',
+      itemDiscountCents: '200',
+      maxDiscountCents: '1000',
+      minSubtotalCents: '2500',
+      completedItems: 1,
+      discountLines: [{ item: 'visuals', discountCents: '200' }],
+      discountCents: '200',
+      subtotalCents: '3300',
+      calculatedAt: '2026-08-18T10:00:00.000Z',
+      locked: false,
+      separateStreamNote: 'The 5% is separate.',
+    },
+    highEffort: null,
+    brand: { colors: null, typography: null, notes: null, approved: false, logos: [] },
+    story: { text: null, approved: false },
+    visuals: [],
+    socials: [],
+    interview: {
+      bookable: false,
+      missingSettings: ['interview_providers', 'interviewers'],
+      providers: [],
+      availability: null,
+      embed: { available: false, eventTypeLink: null, reference: null },
+      booking: null,
+    },
+    lastSavedAt: null,
+    resumeStep: null,
+    uploadsAvailable: false,
+    transcription: { available: false, absentBecause: 'Dictation is not set up on this deployment.' },
+    vetting: {
+      problem: 'Benches are lit from the ceiling, so the board sits in a shadow.',
+      solution: 'A clamp lamp with a magnetic arm that holds its position.',
+      competition: 'Head torches, and putting up with it.',
+      submittedAt: '2026-08-18T09:00:00.000Z',
+    },
+    ...overrides,
+  };
+}
+
+/** Serves the one workspace read the six stage-3 pages share. */
+function stubWorkspace(initial: Record<string, unknown> = {}) {
+  let state = workspaceState(initial);
+  handlers.push((url, init) => {
+    if (!url.includes('/workspace')) return undefined;
+    if (init?.method === 'PATCH') {
+      const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
+      // Only what the server DERIVES comes back. The text fields deliberately
+      // are not echoed: §9's rule is that the caller's state is the only copy
+      // of what was typed, and a suite that echoed them would never catch a
+      // surface reading them back.
+      if ('brandApproved' in patch) {
+        state = { ...state, brand: { ...(state['brand'] as object), approved: patch['brandApproved'] } };
+      }
+      if ('storyApproved' in patch) {
+        state = { ...state, story: { ...(state['story'] as object), approved: patch['storyApproved'] } };
+      }
+      return { status: 200, body: { workspace: state } };
+    }
+    return { status: 200, body: { workspace: state } };
+  });
+  return () => state;
+}
+
+/** The whole stage-3 sequence, for a walk that crosses pages. */
+function stubStage3(initial: Record<string, unknown> = {}) {
+  // The six stage-3 pages are behind `RequireRole` — that is the whole point of
+  // the stage boundary — so a sweep of them needs an identity as well as data.
+  handlers.push((url) =>
+    url.startsWith('/api/account/me')
+      ? { status: 200, body: { account: { role: 'founder', email: 'rowan@example.com', name: 'Rowan' } } }
+      : undefined,
+  );
+  stubWorkspace(initial);
+  handlers.push((url) => (url.includes('/api/payouts') ? { status: 200, body: { payouts: null } } : undefined));
+}
+
+describe('the claim (16)', () => {
+  it('renders §10’s contents, and the three representations as three controls', async () => {
+    stubClaim();
+    renderAt(at('claim'));
+    await screen.findByRole('heading', { name: /good to have you/i });
+
+    // §10's nine listed contents, each its own control.
+    expect(screen.getByLabelText(/legal name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^phone/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/date of birth/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^country/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^state/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/choose a password/i)).toBeInTheDocument();
+
+    // §28.4: three separate, unchecked representations. Never one control.
+    for (const label of [/i am a us person/i, /i am 18 or older/i, /sanctions list/i]) {
+      const control = screen.getByRole('checkbox', { name: label });
+      expect(control).not.toBeChecked();
+    }
+    expect(screen.queryByRole('checkbox', { name: /accept all/i })).toBeNull();
+  });
+
+  it('refuses in the open while the agreements are drafts, and offers no button', async () => {
+    // All eight §31.4 documents are `draft`; a consent may cite only a
+    // published version (a trigger), so `completeClaim` returns
+    // `policies_unpublished`. The screen says why rather than showing a
+    // control that would be refused.
+    stubClaim();
+    renderAt(at('claim'));
+    await screen.findByRole('heading', { name: /good to have you/i });
+
+    expect(screen.getByText(/still with our lawyers/i)).toBeInTheDocument();
+    expect(screen.getByText(/no account has been created/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /create my account/i })).toBeNull();
+  });
+
+  it('collects a phone and says, in those words, that it is never verified', async () => {
+    // §33.1.8's surface half. There is no code to send to it and no control
+    // here that could add one.
+    stubClaim();
+    renderAt(at('claim'));
+    await screen.findByRole('heading', { name: /good to have you/i });
+
+    expect(screen.getByText(/never send codes to this number/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /verify (my )?phone/i })).toBeNull();
+  });
+
+  it('says the date check is a courtesy over what the Founder states (§10)', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    renderAt(at('claim'));
+    await screen.findByRole('heading', { name: /good to have you/i });
+
+    expect(screen.getByText(FLOW_AGE_IS_YOUR_STATEMENT)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/date of birth/i), '1990-01-31');
+    expect(await screen.findByText(/^That is \d+ — 18 or over\.$/)).toBeInTheDocument();
+
+    // And it is advice, never a gate: nothing here refuses on the number.
+    await user.clear(screen.getByLabelText(/date of birth/i));
+    await user.type(screen.getByLabelText(/date of birth/i), '2020-01-31');
+    expect(await screen.findByText(/^That is \d+, which is under 18\.$/)).toBeInTheDocument();
+  });
+
+  it('opens a calendar that is operable from the keyboard, and closes on Escape', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    renderAt(at('claim'));
+    await screen.findByRole('heading', { name: /good to have you/i });
+
+    await user.click(screen.getByRole('button', { name: /pick it on a calendar/i }));
+    const grid = await screen.findByRole('grid');
+    expect(grid).toBeInTheDocument();
+
+    // One tab stop for the whole grid, arrows inside it (§28.5).
+    const focusable = within(grid).getAllByRole('button').filter((b) => b.tabIndex === 0);
+    expect(focusable).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: /change the year/i }));
+    expect(screen.queryByRole('grid')).toBeNull();
+    const years = screen.getAllByRole('button', { name: /^\d{4}$/ });
+    expect(years.length).toBeGreaterThan(0);
+  });
+
+  it('says what creating the account does to the invitation link', async () => {
+    stubClaim({}, PUBLISHED_POLICIES);
+    renderAt(at('claim'));
+    await screen.findByRole('heading', { name: /good to have you/i });
+    expect(screen.getByText(FLOW_CLAIM_USES_THE_LINK)).toBeInTheDocument();
+  });
+});
+
+describe('the five §12 answers (10–14)', () => {
+  it('gives each one its own address and one question', async () => {
+    for (const id of ['visuals', 'branding', 'interview', 'story', 'socials']) {
+      handlers = [];
+      stubStage3();
+      const view = renderAt(at(id));
+      await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1));
+      view.unmount();
+    }
+  });
+
+  it('names the saving from the SETTING, never from a hardcoded $2', async () => {
+    // The reference hardcodes FEE_PER=2. §6 makes it a setting, and Phase 06's
+    // rule is that a hardcoded number is a bug even when it is right.
+    stubStage3({ fee: { ...(workspaceState()['fee'] as object), itemDiscountCents: '350' } });
+    renderAt(at('branding'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText(/US\$3\.50 off your listing fee/)).toBeInTheDocument();
+  });
+
+  it('offers no control that marks an answer done, and says who decides', async () => {
+    stubStage3();
+    renderAt(at('branding'));
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.getByText(FLOW_COMPLETION_IS_DECIDED)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /mark (this )?complete/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /mark (this )?(as )?done/i })).toBeNull();
+  });
+
+  it('says what is not counting, in the Founder’s own words', async () => {
+    stubStage3();
+    renderAt(at('branding'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText('A logo or wordmark has not been uploaded.')).toBeInTheDocument();
+  });
+
+  it('renders the Track A4 upload absence rather than a control that fails', async () => {
+    stubStage3();
+    renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText(/add a photo or video/i)).toBeNull();
+    expect(screen.getByText(/uploading is not switched on/i)).toBeInTheDocument();
+  });
+
+  it('names the missing §6 settings instead of offering a slot', async () => {
+    stubStage3();
+    renderAt(at('interview'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText('Booking an interview is not open yet')).toBeInTheDocument();
+    expect(screen.getByText(/interview_providers/)).toBeInTheDocument();
+    // tech-stack §12: the booking record is the provider's. No picker here.
+    expect(screen.queryByRole('button', { name: /google meet|zoom|teams/i })).toBeNull();
+  });
+
+  it('offers copy, never generate (§12, §30)', async () => {
+    const user = userEvent.setup();
+    stubStage3();
+    renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getByText('Making visuals that look like your product'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Copy prompt' })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('button', { name: /generate/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /write (it|this) for me/i })).toBeNull();
+  });
+
+  it('renders the dictation absence on Story rather than a microphone that refuses', async () => {
+    stubStage3();
+    renderAt(at('story'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText(/dictation is not set up on this deployment/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /say it instead/i })).toBeNull();
+    // The one thing dictation would do, and nothing beside it (§12, §30).
+    expect(screen.queryByRole('button', { name: /summari[sz]e|rewrite|suggest/i })).toBeNull();
+  });
+
+  it('walks the sequence forward and back, naming each destination', async () => {
+    const user = userEvent.setup();
+    stubStage3();
+    renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getByRole('button', { name: 'Continue to Your brand' }));
+    await screen.findByRole('heading', { name: /logo and a written brand direction/i });
+
+    await user.click(screen.getByRole('button', { name: 'Back to Your visuals' }));
+    await screen.findByRole('heading', { name: /photo or video of what you are making/i });
+  });
+
+  it('ends the sequence at Last look', async () => {
+    const user = userEvent.setup();
+    stubStage3();
+    renderAt(at('socials'));
+    await screen.findByRole('heading', { level: 1 });
+    await user.click(screen.getByRole('button', { name: 'Continue to Last look' }));
+    await screen.findByRole('heading', { name: /last look/i });
+  });
+});
+
+describe('Last look (15)', () => {
+  it('shows all eight answers, and the fee the server computed', async () => {
+    stubStage3();
+    renderAt(at('last-look'));
+    await screen.findByRole('heading', { name: /last look/i });
+
+    for (const entry of FOUNDER_ANSWER_SEQUENCE) {
+      expect(screen.getByText(founderAnswerLabel(entry)), entry.key).toBeInTheDocument();
+    }
+    expect(screen.getByText('US$33.00')).toBeInTheDocument();
+    // Nothing computed here: the reference's FEE_BASE / FEE_PER / FEE_FLOOR are
+    // four §6 settings and every amount arrives already worked out.
+    expect(screen.getByText(/down from US\$35\.00/i)).toBeInTheDocument();
+  });
+
+  it('offers no way to change a §9 answer, because there is no address left', async () => {
+    stubStage3();
+    renderAt(at('last-look'));
+    await screen.findByRole('heading', { name: /last look/i });
+
+    // §9's route is behind the draft token and §10's claim invalidated it.
+    for (const entry of FOUNDER_ANSWER_SEQUENCE.filter((e) => e.owner === 'vetting')) {
+      const label = founderAnswerLabel(entry);
+      expect(screen.queryByRole('button', { name: new RegExp(`change ${label}`, 'i') })).toBeNull();
+    }
+    expect(screen.getAllByText(/submitted with your answers/i).length).toBe(3);
+  });
+
+  it('returns here when an answer is opened from here, and says so', async () => {
+    const user = userEvent.setup();
+    stubStage3();
+    renderAt(at('last-look'));
+    await screen.findByRole('heading', { name: /last look/i });
+
+    expect(screen.getByText(FLOW_LAST_LOOK_RETURNS)).toBeInTheDocument();
+
+    const brandLabel = founderAnswerLabel(
+      FOUNDER_ANSWER_SEQUENCE.find((entry) => entry.key === 'branding')!,
+    );
+    await user.click(screen.getByRole('button', { name: `Add ${brandLabel}` }));
+    await screen.findByRole('heading', { name: /logo and a written brand direction/i });
+
+    // The contract is in the ADDRESS, so it survives a reload mid-edit — and
+    // both controls name Last look rather than the next answer.
+    expect(screen.getAllByRole('button', { name: 'Back to Last look' }).length).toBe(2);
+    await user.click(screen.getAllByRole('button', { name: 'Back to Last look' })[1]!);
+    await screen.findByRole('heading', { name: /last look/i });
+  });
+
+  it('carries the return through a reload of the edited page', async () => {
+    stubStage3();
+    renderAt(`${at('branding')}?from=review`);
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getAllByRole('button', { name: 'Back to Last look' }).length).toBe(2);
+  });
+});
+
+describe('the help drawer across the claim', () => {
+  it('offers reading but no jump once the invitation link is spent', async () => {
+    const user = userEvent.setup();
+    stubStage3();
+    renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getAllByRole('button', { name: 'Help' })[0]!);
+    const drawer = await screen.findByRole('dialog');
+
+    // The card for an earlier page is still there, with its explanation.
+    expect(within(drawer).getByText('Your positioning')).toBeInTheDocument();
+    // …and it is not a control, because the address it needs no longer exists.
+    expect(
+      within(drawer).queryByRole('button', { name: /your positioning/i }),
+    ).toBeNull();
+    expect(within(drawer).getAllByText(FOUNDER_FLOW_EARLIER_STAGE_CLOSED).length).toBeGreaterThan(0);
+    // A page in the same stage still jumps.
+    expect(within(drawer).getByRole('button', { name: /your visuals/i })).toBeInTheDocument();
+  });
+});
+
+describe('§33.11 the flow is operable over Session D pages', () => {
+  const PAGES = ['claim', 'visuals', 'branding', 'interview', 'story', 'socials', 'last-look'];
+
+  function stubAll() {
+    stubClaim();
+    stubStage3();
+  }
+
+  it('has no axe violations on any of them', async () => {
+    for (const id of PAGES) {
+      handlers = [];
+      stubAll();
+      const view = renderAt(at(id));
+      await screen.findByRole('heading', { level: 1 });
+      expect((await axe(view.container)).violations, id).toEqual([]);
+      view.unmount();
+    }
+  });
+
+  it('exposes exactly one level-1 heading per page (§33.11.2)', async () => {
+    for (const id of PAGES) {
+      handlers = [];
+      stubAll();
+      const view = renderAt(at(id));
+      await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }), id).toHaveLength(1));
+      view.unmount();
+    }
+  });
+
+  it('names a destination on every nav control (§33.11.4)', async () => {
+    for (const id of PAGES) {
+      handlers = [];
+      stubAll();
+      const view = renderAt(at(id));
+      await screen.findByRole('heading', { level: 1 });
+      for (const control of screen.getAllByRole('button')) {
+        const name = (control.textContent ?? '').trim().toLowerCase();
+        expect(OBJECTLESS_CTA_LABELS as readonly string[], `${id}: ${name}`).not.toContain(name);
+      }
+      view.unmount();
+    }
+  });
+});
+
+/**
+ * Every read the flow makes, across all three auth regimes.
+ *
+ * The sweeps below walk all fifteen pages, and after Session D those cross
+ * from the draft token to a Founder session. A loop that stubbed only the
+ * draft reads would render six error states and report them as swept —
+ which is exactly the failure §33.11.1's own stub-server check exists for.
+ */
+function stubAllRegimes() {
+  stubLanding();
+  stubVetting(ANSWERED);
+  stubClaim();
+  stubCode();
+  stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
+  stubStage3();
+}

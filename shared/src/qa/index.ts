@@ -102,10 +102,22 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_workspace',
-    label: 'The optional items, the interview, and the listing fee',
+    label: 'The five optional answers, the review over all eight, and the listing fee',
     specRef: '§12, §24.6',
     audience: 'founder',
-    routes: ['/campaigns/:campaignId/workspace'],
+    // Founder Flow v2 Session D (2026-08-18) moved the five §12 answers onto
+    // one address each with Last look as the review, so this flow is now seven
+    // routes rather than one. Restated from FOUNDER_FLOW_PAGES rather than
+    // imported, for the reason the vetting entry above records.
+    routes: [
+      '/campaigns/:campaignId/setup/visuals',
+      '/campaigns/:campaignId/setup/branding',
+      '/campaigns/:campaignId/setup/interview',
+      '/campaigns/:campaignId/setup/story',
+      '/campaigns/:campaignId/setup/socials',
+      '/campaigns/:campaignId/setup/review',
+      '/campaigns/:campaignId/workspace',
+    ],
     keyboardPathRequired: true,
   },
   {

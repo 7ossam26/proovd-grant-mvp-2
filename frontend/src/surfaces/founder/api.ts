@@ -172,6 +172,15 @@ export interface WorkspaceState {
   lastSavedAt: string | null;
   resumeStep: string | null;
   uploadsAvailable: boolean;
+  /** Founder Flow v2 Session D. A deployment fact, carried with the read. */
+  transcription: { available: true } | { available: false; absentBecause: string };
+  /** Session D. §9's three answers, read-only — Last look renders all eight. */
+  vetting: {
+    problem: string | null;
+    solution: string | null;
+    competition: string | null;
+    submittedAt: string | null;
+  };
 }
 
 export interface WorkspacePatch {
@@ -200,6 +209,20 @@ export const listCampaigns = (): Promise<{
 
 export const fetchWorkspace = (campaignId: string): Promise<{ workspace: WorkspaceState }> =>
   call(`${base(campaignId)}/workspace`);
+
+/**
+ * Dictation on the Story step (deviation 2, Session D).
+ *
+ * The audio is the body; there is no JSON envelope and no metadata field, so
+ * there is nothing to carry a title, a prompt, or an instruction. The response
+ * is the transcript and nothing derived from it.
+ */
+export const transcribeStory = (campaignId: string, audio: Blob): Promise<{ text: string }> =>
+  call(`${base(campaignId)}/transcribe`, {
+    method: 'POST',
+    headers: { 'content-type': audio.type || 'audio/webm' },
+    body: audio,
+  });
 
 export const saveWorkspace = (
   campaignId: string,

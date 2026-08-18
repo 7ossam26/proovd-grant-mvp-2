@@ -72,7 +72,7 @@ export function MatchStep() {
   }
 
   return (
-    <FlowPage pageId="match" token={token} badge>
+    <FlowPage pageId="match" param={token} badge>
       <Body token={token} signal={signal} />
     </FlowPage>
   );

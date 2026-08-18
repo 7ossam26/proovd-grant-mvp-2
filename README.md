@@ -295,7 +295,7 @@ messages alone, as its own decision with its own test.
 
 The path a Founder walks from opening a pre-filled invitation to a live
 campaign becomes twenty-six full-screen steps with no app chrome. It is six
-sessions; the first three have landed. The walk that scopes the rest is
+sessions; the first four have landed. The walk that scopes the rest is
 [docs/phases/founder-reconciliation](docs/phases/founder-flow-reconciliation.md),
 and the brief is [docs/phases/founder-flow-v2.md](docs/phases/founder-flow-v2.md).
 
@@ -431,6 +431,67 @@ file actually defines. Values a component deliberately supplies itself are
 exempt, and both checks read the file with comments removed — the first version
 failed on its own explanation.
 
+**The fourth session is the account, and the five optional answers behind it.**
+It is the boundary the whole flow turns on: everything before it is an
+invitation link and everything after it is a signed-in Founder, because a
+successful claim deliberately uses that link up. So a page now says which of the
+two it is addressed by, and the help panel from a later page still shows the
+earlier ones with their explanations but stops offering to jump to them — the
+address they need no longer exists, and a panel offering it would send somebody
+to a dead-link page from their own help.
+
+The account transaction itself was not touched. What was needed after it was a
+way to carry on: the Spec's claim creates an account and mentions no session, so
+somebody has to sign in. Rather than add a second way of minting a session to
+the most carefully guarded transaction in the product, the screen signs in the
+ordinary way — with the password the person just chose, through the same route
+anyone else uses. If that fails the account still exists, and the screen says so
+rather than implying the claim was lost.
+
+It still cannot complete, and that is correct. The eight legal documents are
+drafts, an acceptance may only cite a published one, and so the account cannot
+be created yet — the screen renders the reason where the button would be.
+
+Date of birth is a typed field with a calendar underneath it rather than a
+calendar with a field: typing is what a password manager fills and what a screen
+reader handles, and the calendar is for people who would rather point. The 18+
+check beside it is a courtesy over something the Founder states themselves —
+Proovd derives no age and never claims to have verified one — so nothing refuses
+on a number the browser worked out.
+
+**Whether a bonus answer counts is decided by the server, from what was actually
+provided, and the screens say so where somebody would look for the checkbox that
+is not there.** There is no control that marks one done and no field that
+carries one; the tests post four plausible spellings of "complete" at the route
+and count five answers still incomplete. The saving each one earns is read from
+the setting that defines it rather than written into the page — the prototype
+hardcodes the three fee numbers, and all three are configuration.
+
+Last look is the eight answers in one place with what the listing fee comes to.
+The five optional ones open; the three from the earlier questions do not, and
+that is not a policy — those are locked when the answers are submitted, and the
+route that wrote them is behind the link the account claim just used up. Opening
+one of the five from here brings you back here rather than continuing forward,
+and that promise is kept in the web address, so it survives a reload in the
+middle of an edit.
+
+Two of the reference's own elements were refused for reasons worth stating. Its
+interview screen draws its own meeting-platform tiles and time slots; the
+booking calendar is the source of truth for what was booked, and a second picker
+is a second calendar that will eventually disagree with it. And its brand screen
+draws a draggable colour square with no keyboard equivalent, on the one screen
+where the alternative — typing a hex code — is free.
+
+**Walking it in a browser found two more defects, the seventh rebuild in a row.**
+A small status chip stretched into a full-width bar, because an inline element
+inside a vertical stack is stretched to the container by default; the automated
+check reads a perfectly correct chip either way. And the rule that says what
+makes an answer count is written as the finished state — "Your booking is
+confirmed." — which is right as a rule and reads as a claim that it already
+happened when it sits under the question on the one screen where nothing is
+booked. Both now carry a label saying it is a condition.
+
+
 Three parts of the flow cannot be completed in the current environment, and none
 of them is stubbed: the eight policy documents are still in legal review so the
 account step refuses in the open and says why, and file storage and the
@@ -446,7 +507,9 @@ shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/policies/   the eight canonical policy records and their versions
   src/settings/   the §6 operating-constant register
   src/vetting/    the §9 vetting sequence, its copy, the two campaign paths,
-                  the onboarding flow's page register, and the email code
+                  the onboarding flow's page register, the eight-answer
+                  sequence over §9's and §12's two registers, and the
+                  email code
   src/affiliates/ the §5.3 subtypes and their evidence, §8's recruitment
                   record, and §2.2's active-partnership slot rule
   src/workspace/  the §12 optional items, what does not count as evidence for
@@ -561,13 +624,18 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          Campaigns, Support, Backers, and the
                          floating Tasks panel; Today is the one parked section
   src/surfaces/          the unusable-link page
-  src/surfaces/draft/    the Founder journey: vetting, the relevance signal,
-                         account claim
+  src/surfaces/draft/    what is left of the old draft journey: the client the
+                         onboarding pages call
+  src/surfaces/founder-flow/ the onboarding flow itself — the full-bleed page
+                         shell and its help drawer, the invite, the three
+                         questions, the campaign type, the address and its
+                         code, the relevance signal, the account claim with
+                         its calendar, the five optional answers, and Last
+                         look
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
                          preparing Campaign kit
-  src/surfaces/founder/  the campaign workspace: five optional items as a flow,
-                         the fee preview, the helper resources, the listing
-                         payment with its Appendix A.5 consent, the live
+  src/surfaces/founder/  the listing fee and payout setup, the helper
+                         resources, the Appendix A.5 consent, the live
                          campaign home — Glance, one action, Explore — and the
                          campaign build, where every §14.4 ingredient finally
                          has a box (twelve had none, four of them required)

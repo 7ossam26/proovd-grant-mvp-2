@@ -74,6 +74,11 @@ import {
   cancelBooking,
 } from '../workspace/interview.js';
 import { MEETING_PROVIDERS, type MeetingProvider } from '../workspace/registry.js';
+import {
+  unconfiguredTranscription,
+  TRANSCRIPTION_UNAVAILABLE,
+  type Transcription,
+} from '../transcription/index.js';
 
 export const FOUNDER_PATH = '/api/founder';
 
@@ -99,6 +104,13 @@ export interface FounderRouterConfig {
    */
   appBaseUrl?: string | undefined;
   internalRecipient?: string | undefined;
+  /**
+   * Dictation on the Story step (Founder Flow v2 deviation 2, Session D).
+   * Defaults to the port that refuses loudly, so a deployment with no
+   * provider says so rather than reporting a recording as transcribed when
+   * nothing left the browser.
+   */
+  transcription?: Transcription | undefined;
 }
 
 /** §27.1: a refusal says what happened and what to do next. */
@@ -117,6 +129,7 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
   const router = Router();
   const founder = requireRole(auth, 'founder');
   const json = express.json({ limit: '256kb' });
+  const transcription = config.transcription ?? unconfiguredTranscription;
 
   const actorId = (req: express.Request) => `user:${req.authUser?.id ?? ''}`;
 
@@ -167,6 +180,7 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
     const view = await readFounderWorkspace(db, {
       campaignId,
       uploadsAvailable: storage.configured,
+      transcriptionAvailable: transcription.configured,
       // The reference is minted per response and handed only to the
       // authenticated Founder of this campaign. It binds whatever they book to
       // this campaign and nothing else — see `interviews/reference.ts`.
@@ -181,6 +195,70 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
     });
     res.json({ workspace: view });
   }
+
+  /* ── Dictation on the Story step (deviation 2, Session D) ──────────────── */
+
+  /**
+   * The same port, the same refusal, behind the Founder guard instead.
+   *
+   * `POST /api/draft/:token/transcribe` (Session C) is the Positioning step's,
+   * and it cannot serve this one: §10's claim invalidated that token on the way
+   * here, so by the time a Founder reaches the Story step there is no draft
+   * address left. The alternative — keeping the draft token alive past the
+   * claim so one route could serve both — would undo §10's own guarantee for
+   * the convenience of one microphone.
+   *
+   * Everything that keeps deviation 2 narrow is unchanged, because it is a
+   * property of the PORT rather than of either route: one method, no generate,
+   * no summarize, no rewrite, no suggest; and the audio is not kept — there is
+   * no column for it, no bucket key, and no job, because §25.8 defines seven
+   * retention windows and none covers a dictation recording.
+   *
+   * The configured check runs BEFORE the body parser, so an unconfigured
+   * deployment refuses without first buffering the ten megabytes it is about to
+   * refuse — `unconfiguredStorage` and `unconfiguredScheduler`'s posture,
+   * applied to a request that is large by nature.
+   */
+  router.post(
+    `${FOUNDER_PATH}/campaigns/:campaignId/transcribe`,
+    founder,
+    (_req, res, next) => {
+      if (transcription.configured) return next();
+      res.status(503).json({
+        error: 'transcription_unavailable',
+        title: 'Dictation is not available',
+        whatHappened: TRANSCRIPTION_UNAVAILABLE,
+        next: 'Type your story in the box. It is the same box either way, and it saves as you go.',
+        owner: 'Proovd',
+      });
+    },
+    express.raw({ type: ['audio/*'], limit: '10mb' }),
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const audio = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!audio || audio.length === 0) {
+        res.status(400).json({
+          error: 'no_audio',
+          title: 'We did not receive a recording',
+          whatHappened: 'The request carried no audio, so there was nothing to turn into text.',
+          next: 'Record again, or type your story instead.',
+        });
+        return;
+      }
+
+      const result = await transcription.transcribe({
+        audio,
+        contentType: req.headers['content-type'] ?? 'audio/webm',
+      });
+      // The transcript, and nothing derived from it (§12, §30). §12 also makes
+      // the Founder's APPROVAL the completing act for Story, so this text lands
+      // in the box as an unapproved draft exactly like typing would — which is
+      // what "a transcript does not count" means in practice.
+      res.json({ text: result.text });
+    },
+  );
 
   /* ── The Founder's campaigns ────────────────────────────────────────────── */
 

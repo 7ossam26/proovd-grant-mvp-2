@@ -58,6 +58,7 @@ import {
   type VettingPatch,
   type VettingState,
 } from '../draft/api.js';
+import { Dictation } from './Dictation.js';
 import { FlowPage, useFlowNav } from './FlowPage.js';
 
 const STEP = VETTING_STEPS.find((step) => step.id === 'competition')!;
@@ -91,7 +92,7 @@ export function PositioningStep() {
   if (!loaded) return <SurfaceLoading subject="your answers" reference="Your invitation link" />;
 
   return (
-    <FlowPage pageId="positioning" token={token} badge>
+    <FlowPage pageId="positioning" param={token} badge>
       <Body token={token} loaded={loaded} />
     </FlowPage>
   );
@@ -182,8 +183,8 @@ function Body({ token, loaded }: { token: string; loaded: VettingState }) {
       </div>
 
       <Dictation
-        token={token}
         availability={loaded.transcription}
+        transcribe={(audio) => transcribeAudio(token, audio)}
         onText={(text) => change(answer ? `${answer.trimEnd()} ${text}` : text)}
       />
 
@@ -217,110 +218,6 @@ function Body({ token, loaded }: { token: string; loaded: VettingState }) {
           Submit and see your Creator match
         </Button>
       </div>
-    </div>
-  );
-}
-
-/**
- * "Say it instead" — deviation 2's one control.
- *
- * There is exactly one thing it does. No suggest, no rewrite, no summarise, and
- * no second button that offers any of those: §12 forbids an embedded AI product
- * and §30 defers AI rewriting by name, and the absence is what enforces it.
- *
- * While the port is unconfigured the reason renders where the control would be
- * — the Affiliate evidence uploader's arrangement, for its reason. A microphone
- * that refuses when pressed is worse than no microphone, because somebody has
- * already spoken into it.
- */
-function Dictation({
-  token,
-  availability,
-  onText,
-}: {
-  token: string;
-  availability: VettingState['transcription'];
-  onText: (text: string) => void;
-}) {
-  const [state, setState] = useState<'idle' | 'recording' | 'working'>('idle');
-  const [failed, setFailed] = useState(false);
-  const recorder = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
-
-  useEffect(() => {
-    return () => {
-      recorder.current?.stream.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
-
-  if (availability && !availability.available) {
-    return (
-      <p className="ff-answer__dictation-absent" data-anim="note">
-        {availability.absentBecause}
-      </p>
-    );
-  }
-
-  async function start() {
-    setFailed(false);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const media = new MediaRecorder(stream);
-      chunks.current = [];
-      media.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.current.push(event.data);
-      };
-      media.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(chunks.current, { type: media.mimeType || 'audio/webm' });
-        chunks.current = [];
-        setState('working');
-        try {
-          const { text } = await transcribeAudio(token, blob);
-          if (text.trim()) onText(text.trim());
-        } catch {
-          setFailed(true);
-        } finally {
-          setState('idle');
-        }
-        // The recording is not kept here either. `blob` goes out of scope with
-        // this callback and nothing holds a reference to it.
-      };
-      recorder.current = media;
-      media.start();
-      setState('recording');
-    } catch {
-      setFailed(true);
-      setState('idle');
-    }
-  }
-
-  function stop() {
-    recorder.current?.stop();
-    recorder.current = null;
-  }
-
-  return (
-    <div className="ff-answer__dictation" data-anim="note">
-      {state === 'recording' ? (
-        <Button tier="secondary" onClick={stop}>
-          Stop recording and add the words
-        </Button>
-      ) : (
-        <Button tier="secondary" disabled={state === 'working'} onClick={() => void start()}>
-          {state === 'working' ? 'Turning your recording into words…' : 'Say it instead'}
-        </Button>
-      )}
-      <span className="ff-answer__dictation-note">
-        We turn what you say into text in this box. Nothing is written for you, and the recording
-        is not kept.
-      </span>
-      {failed ? (
-        <p role="alert" className="ff-answer__refusal">
-          We could not turn that recording into text, so nothing was added. Type your answer
-          instead — it is the same box either way.
-        </p>
-      ) : null}
     </div>
   );
 }

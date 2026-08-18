@@ -275,6 +275,19 @@ const workspace: WorkspaceState = {
   lastSavedAt: '2026-08-03T10:05:00.000Z',
   resumeStep: null,
   uploadsAvailable: false,
+  // Track A4 on both counts, which is the state a §33.11 sweep should meet:
+  // the surfaces render their named absences rather than dead controls.
+  transcription: {
+    available: false,
+    absentBecause:
+      'Dictation is not set up on this deployment, so we cannot turn a recording into text. Nothing was recorded and nothing was sent. Type your answer instead — it is the same box either way.',
+  },
+  vetting: {
+    problem: 'Weekly build updates take an hour nobody has.',
+    solution: 'A voice note becomes the update, in your own words.',
+    competition: 'Notion templates and a shared doc. Doing nothing is the real one.',
+    submittedAt: '2026-08-02T09:00:00.000Z',
+  },
 };
 
 const listing: ListingState = {

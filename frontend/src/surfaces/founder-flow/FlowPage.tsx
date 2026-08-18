@@ -40,11 +40,13 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router';
 import {
+  FOUNDER_FLOW_EARLIER_STAGE_CLOSED,
   FOUNDER_FLOW_HELP_SUBHEAD,
   FOUNDER_FLOW_HELP_TITLE,
   FOUNDER_FLOW_PAGES,
   founderFlowIndex,
   founderFlowPath,
+  founderFlowReachableFrom,
 } from '@proovd/shared';
 import { Button } from '../../components/Button.js';
 import { Drawer } from '../../components/Drawer.js';
@@ -67,7 +69,8 @@ interface FlowNav {
   leave: (to: string, direction?: 1 | -1) => void;
   /** The same, addressed by flow page id. */
   leaveToPage: (pageId: string, direction?: 1 | -1) => void;
-  token: string;
+  /** This page's own route parameter: a draft token, or a campaign id. */
+  param: string;
 }
 
 const FlowNavContext = createContext<FlowNav | null>(null);
@@ -81,7 +84,8 @@ export function useFlowNav(): FlowNav {
 interface FlowPageProps {
   /** An id from `FOUNDER_FLOW_PAGES`. The help drawer marks it current. */
   pageId: string;
-  token: string;
+  /** The value for this page's own route parameter. */
+  param: string;
   /**
    * The line beside HELP — screen 1's `~3 mins`. Optional because only the
    * invite page has one; a page with nothing to say there renders nothing
@@ -100,7 +104,7 @@ interface FlowPageProps {
   children: ReactNode;
 }
 
-export function FlowPage({ pageId, token, meta, badge, children }: FlowPageProps) {
+export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps) {
   const navigate = useNavigate();
   const stageRef = useRef<HTMLDivElement>(null);
 
@@ -127,12 +131,12 @@ export function FlowPage({ pageId, token, meta, badge, children }: FlowPageProps
 
   const leaveToPage = useCallback(
     (nextId: string, direction: 1 | -1 = 1) =>
-      leave(founderFlowPath(nextId, token), direction),
-    [leave, token],
+      leave(founderFlowPath(nextId, param), direction),
+    [leave, param],
   );
 
   return (
-    <FlowNavContext.Provider value={{ leave, leaveToPage, token }}>
+    <FlowNavContext.Provider value={{ leave, leaveToPage, param }}>
       <main className="ff" data-flow-page={pageId}>
         <div className="ff__stage" ref={stageRef}>
           <div className="ff__top">
@@ -143,7 +147,7 @@ export function FlowPage({ pageId, token, meta, badge, children }: FlowPageProps
               {meta ? <span className="ff__meta">{meta}</span> : null}
               <HelpDrawer
                 pageId={pageId}
-                token={token}
+                param={param}
                 trigger={
                   <Button tier="secondary" small className="ff__help">
                     Help
@@ -159,7 +163,7 @@ export function FlowPage({ pageId, token, meta, badge, children }: FlowPageProps
             <div className="ff__badge">
               <HelpDrawer
                 pageId={pageId}
-                token={token}
+                param={param}
                 trigger={
                   <Button tier="primary" small className="ff__badge-btn">
                     Reading for this step
@@ -187,14 +191,25 @@ export function FlowPage({ pageId, token, meta, badge, children }: FlowPageProps
  * It lists what is behind and never what is ahead. A drawer that listed the
  * pages to come would be a progress bar with reading attached, and it would
  * offer to jump to addresses that refuse.
+ *
+ * ── Some of what is behind has no address left (Session D) ──────────────────
+ * §10's claim invalidates the draft token, and every page from the five §12
+ * answers on is addressed by the campaign instead. So from stage 3 the earlier
+ * cards cannot be jumped to at all — the address they need does not exist any
+ * more. `founderFlowReachableFrom` decides it from the two pages' own
+ * parameters rather than from a stage number, so it stays right when stage 4
+ * and 5 land. An unreachable card keeps its reading, which is the half worth
+ * having, and renders the reason where the control would be (§1.4) instead of
+ * offering a jump to the unusable-link page.
  */
 function HelpDrawer({
   pageId,
-  token,
+  param,
   trigger,
 }: {
   pageId: string;
-  token: string;
+  /** The value for this page's own route parameter. */
+  param: string;
   trigger: ReactElement;
 }) {
   const navigate = useNavigate();
@@ -211,6 +226,21 @@ function HelpDrawer({
       <ul className="ff-help__list">
         {visible.map((page) => {
           const current = page.id === pageId;
+          const reachable = current || founderFlowReachableFrom(pageId, page.id);
+
+          if (!reachable) {
+            return (
+              <li key={page.id}>
+                <div className="ff-help__card is-closed">
+                  <span className="ff-help__title">{page.title}</span>
+                  <span className="ff-help__state">Done</span>
+                  <span className="ff-help__body">{page.help}</span>
+                  <span className="ff-help__closed">{FOUNDER_FLOW_EARLIER_STAGE_CLOSED}</span>
+                </div>
+              </li>
+            );
+          }
+
           return (
             <li key={page.id}>
               <button
@@ -223,7 +253,7 @@ function HelpDrawer({
                   // the route change, and the relay on the destination runs
                   // backwards because that is the direction of travel.
                   pendingDirection = -1;
-                  void navigate(founderFlowPath(page.id, token));
+                  void navigate(founderFlowPath(page.id, param));
                 }}
               >
                 <span className="ff-help__title">{page.title}</span>

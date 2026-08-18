@@ -136,7 +136,7 @@ export function InviteClaim() {
   const since = approxSince(draft.lastContactAt);
 
   return (
-    <FlowPage pageId="invite" token={token} meta={draft.expectedSetupTime ?? undefined}>
+    <FlowPage pageId="invite" param={token} meta={draft.expectedSetupTime ?? undefined}>
       <Splash />
       <div className="ff-invite">
         <div className="ff-invite__band" data-anim="pill" aria-hidden="true" />

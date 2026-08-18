@@ -129,6 +129,8 @@ function workspace(overrides: Record<string, unknown> = {}) {
     lastSavedAt: null,
     resumeStep: null,
     uploadsAvailable: false,
+    transcription: { available: false, absentBecause: 'Dictation is not set up here.' },
+    vetting: { problem: null, solution: null, competition: null, submittedAt: null },
     ...overrides,
   };
 }
@@ -204,85 +206,18 @@ describe('the fee preview (§12, §24.6)', () => {
   });
 });
 
-describe('the workspace flow (§12, DNA §5.9)', () => {
-  it('presents one item at a time with progress and a named next step', async () => {
-    mount();
-    await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
-
-    // §12: "not a widget dashboard or endless form". The first step's question
-    // is the hero; the other four are not on the screen.
-    expect(screen.getByText(/photo or video of what you are making/)).toBeInTheDocument();
-    expect(screen.queryByText(/Is your campaign story written/)).not.toBeInTheDocument();
-
-    // Phase 23a (§33.11.4): the nav names its destination, and step 1 offers no
-    // Back — there is nothing behind it (§1.4).
-    expect(screen.getByRole('button', { name: /^Continue to / })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull();
-    expect(screen.getByText('5 steps left')).toBeInTheDocument();
-  });
-
-  it('advances to the next single decision', async () => {
-    const user = userEvent.setup();
-    mount();
-    await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
-
-    expect(screen.getByText(/logo and a written brand direction/)).toBeInTheDocument();
-    expect(screen.queryByText(/photo or video of what you are making/)).not.toBeInTheDocument();
-  });
-
-  it('says what is not complete, in the Founder’s words', async () => {
-    mount();
-    await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
-    expect(screen.getByText('Complete')).toBeInTheDocument();
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
-    expect(screen.getByText('A logo or wordmark has not been uploaded.')).toBeInTheDocument();
-  });
-
-  it('renders no upload control while storage is unconfigured', async () => {
-    mount();
-    await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
-
-    // §1.4 / the 08b precedent: a control that cannot work is worse than none.
-    expect(screen.queryByText('Add a visual')).not.toBeInTheDocument();
-    expect(screen.getByText(/Uploading is not switched on/)).toBeInTheDocument();
-  });
-
-  it('names the missing §6 settings instead of offering an interview slot', async () => {
-    const user = userEvent.setup();
-    mount();
-    await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
-
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
-    await user.click(screen.getByRole('button', { name: /^Continue to / }));
-
-    expect(screen.getByText('Booking an interview is not open yet')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Every other item on this page still counts toward your listing fee/),
-    ).toBeInTheDocument();
-  });
-});
-
-describe('the helper resources (§12, §30)', () => {
-  it('offers copy, never generate', async () => {
-    const user = userEvent.setup();
-    mount();
-    await waitFor(() => expect(screen.getByText('Your campaign')).toBeInTheDocument());
-
-    await user.click(screen.getByText('Making visuals that look like your product'));
-
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Copy prompt' })).toBeInTheDocument(),
-    );
-
-    // §12: "not an embedded AI product." §30 defers AI rewriting by name.
-    expect(screen.queryByRole('button', { name: /generate/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /write (it|this) for me/i })).not.toBeInTheDocument();
-  });
-});
+/*
+ * The five §12 answers moved to `founder-flow.test.tsx` with the surface.
+ *
+ * Founder Flow v2 Session D (2026-08-18) rebuilt Visuals, Branding, Interview,
+ * Story and Socials as five pages under `/campaigns/:campaignId/setup/*`. Every
+ * assertion this file used to make about them — one decision at a time, the
+ * rejection sentences in the Founder's own words, the named §6 absence, the
+ * named Track A4 absence, and §12's copy-never-generate guidance — went with
+ * them rather than being deleted. What is left here is what this address still
+ * renders: the itemised fee, the high-effort classification, and what payment
+ * fixes.
+ */
 
 describe('high effort (§12)', () => {
   it('is described neutrally and names the one thing it controls', async () => {
@@ -310,11 +245,11 @@ describe('after payment (§12)', () => {
   it('says the amount paid does not move, and disables the controls', async () => {
     mount(workspace({ listingPaid: true }));
     await waitFor(() =>
-      expect(screen.getByText('Your listing fee is paid, so these are fixed')).toBeInTheDocument(),
+      expect(screen.getByText('Your listing fee is paid')).toBeInTheDocument(),
     );
 
     expect(
-      screen.getByText(/Changing something now does not change that amount/),
+      screen.getByText(/Changing an answer now does not change that amount/),
     ).toBeInTheDocument();
   });
 });

@@ -62,12 +62,20 @@ interface FounderCampaign {
  * nobody can reach.
  */
 const DESTINATION: Record<CampaignStatus, { path: string; label: string }> = {
-  // Before the campaign is built: the workspace is where the work is.
-  invited_draft: { path: 'workspace', label: 'Open the campaign workspace' },
-  vetting_submitted: { path: 'workspace', label: 'Open the campaign workspace' },
-  account_claimed: { path: 'workspace', label: 'Open the campaign workspace' },
+  // Before the campaign is built. Founder Flow v2 Session D put the five §12
+  // answers on their own pages with Last look as the review over all eight, so
+  // the account-claimed state opens THAT rather than the fee surface — that is
+  // where the work is at that point. The two money states still open the fee
+  // surface, which is what those states are about (§23.1 orders them that way
+  // too: stripe_onboarding_pending precedes listing_fee_pending).
+  //
+  // The two pre-account states are present because the type demands they be —
+  // a Founder cannot be signed in while their campaign is `invited_draft`.
+  invited_draft: { path: 'setup/review', label: 'Open your campaign answers' },
+  vetting_submitted: { path: 'setup/review', label: 'Open your campaign answers' },
+  account_claimed: { path: 'setup/review', label: 'Open your campaign answers' },
   stripe_onboarding_pending: { path: 'workspace', label: 'Finish setting up payouts' },
-  listing_fee_pending: { path: 'workspace', label: 'Open the campaign workspace' },
+  listing_fee_pending: { path: 'workspace', label: 'Pay your listing fee' },
 
   // Building the page and answering review.
   affiliate_response_and_build: { path: 'build', label: 'Build the campaign page' },

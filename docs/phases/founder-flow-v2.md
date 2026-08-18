@@ -446,7 +446,7 @@ it lands, which is the cheapest way to find a seam that does not join.
 | **A** | none | the record, the reversions, the order decided in writing | — | **built** 2026-08-18 |
 | **B** | 1–4 | the shell exists and four screens prove it | A | **built** 2026-08-18 |
 | **C** | 5–6, 7–9, 17 | the end of the draft token | A, B | **built** 2026-08-18 |
-| **D** | 16, then 10–15 | the end of `evaluateWorkspace` | A, B, C | |
+| **D** | 16, then 10–15 | the end of `evaluateWorkspace` | A, B, C | **built** 2026-08-18 |
 | **E** | 25, 20 | the listing fee is paid | A–D | |
 | **F** | 18, 21–24, 19, 26 | live | A–E | |
 
@@ -463,6 +463,14 @@ on a second screen**; what 7–8 become, if anything, is C's to decide. See
 back to the page that owns it. `/draft/:token/vetting` is retired and redirects to it. **Session D
 inherits the same rule for screen 15 (Last look): it reviews all eight answers and collects none of
 them.** See `founder-flow-reconciliation.md` §10.
+
+**Session D honoured it.** Last look reads all eight from the ONE workspace projection and
+collects nothing; its five §12 cards open the answer that owns each, and its three §9 cards
+offer nothing at all, because §9 locks them at submission and §10 invalidated the token their
+route sits behind. **Session E inherits one decision in return:** `/campaigns/:campaignId/workspace`
+kept its address and lost its five steps, so what it renders today is payout onboarding and the
+listing fee — screens 25 and 20 — and Last look’s `All good` points at it until they have their
+own pages. See `founder-flow-reconciliation.md` §12.
 
 **Two things must not be reordered for convenience.** The six-digit code's *mechanism* lands with
 its screens in C and never after them — a screen built first grows a client-side "is this code

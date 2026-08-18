@@ -74,7 +74,7 @@ export function EmailStep() {
   if (!loaded) return <SurfaceLoading subject="your email" reference="Your invitation link" />;
 
   return (
-    <FlowPage pageId="email" token={token} badge>
+    <FlowPage pageId="email" param={token} badge>
       <Body token={token} loaded={loaded} />
     </FlowPage>
   );
