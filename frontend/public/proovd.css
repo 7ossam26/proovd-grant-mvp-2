@@ -8588,3 +8588,212 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .ff-cal { max-width: none; padding: var(--sp-12); }
   .ff-cal__years { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ── PHASE 34 — Session E: the money (screens 25, 20) ──────────────────────
+   Added 2026-08-19. Nothing above this comment is edited, and no colour is
+   minted: Session B's header records the twelve-colour decision once, for all
+   twenty-six screens, and these resolve to the same tokens.
+
+   The reference draws both screens as one enormous centred lockup — 126px and
+   118px headlines, a 290px fee, a 1130px button. That scale is the reference's
+   fixed 2496px stage; here the type scales with the viewport and the page
+   scrolls, which is the whole difference between this and a fixed stage.
+
+   Two of the reference's own treatments are deliberately not reproduced, both
+   recorded in `FOUNDER_FLOW_ABSENCES`: the `You saved $0` line at zero, and
+   the browser-derived `Discount $10 by completing tasks`.                  */
+
+.ff-money {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-24);
+  max-width: 44rem;
+  align-self: center;
+  width: 100%;
+}
+/* The two screens the reference centres — payouts-ready and the fee hero. */
+.ff-money--done { text-align: center; align-items: center; }
+
+.ff-money__title {
+  margin: 0;
+  font-size: clamp(1.875rem, 6.4vw, 3.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  color: var(--dark);
+}
+/* A page whose hero is a NUMBER gives its title less weight than one whose
+   hero is the title (DNA §5.1 — one hero per moment). */
+.ff-money__title--small { font-size: clamp(1.5rem, 4.4vw, 2.5rem); }
+
+.ff-money__lede { margin: 0; max-width: var(--measure); color: var(--moss); }
+.ff-money__sub {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  color: var(--dark);
+}
+.ff-money__foot {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--moss);
+  font-size: 0.9375rem;
+}
+
+/* Screen 20's hero. The reference sets 290px on a 2496px stage; this is the
+   same proportion of a real viewport, floored so it stays a hero on a phone. */
+.ff-money__amount {
+  margin: 0;
+  font-size: clamp(3.5rem, 14vw, 8rem);
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  font-weight: 900;
+  color: var(--dark);
+}
+/* After payment the number is a record rather than an ask, so it stops
+   shouting — the amount has already left the Founder's account. */
+.ff-money__amount--paid { font-size: clamp(2.5rem, 8vw, 4.5rem); }
+
+/* The saving, in the brand fill. Never rendered at zero. */
+.ff-money__saving {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--moss);
+  font-weight: 700;
+}
+
+/* Stripe sending somebody back without paying is ordinary, and §30 wants the
+   money fact first. The accent band is the one the toasts already use. */
+.ff-money__canceled {
+  margin: 0;
+  padding: var(--sp-12) var(--sp-16);
+  background: var(--accent-yellow);
+  color: var(--dark);
+}
+
+.ff-money__panel {
+  padding-top: var(--sp-24);
+  border-top: 1px solid var(--grey-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+/* A `.btn` is `inline-flex`, and a flex ITEM in a column is stretched to the
+   container by the default `align-items: stretch` — so a tertiary control here
+   rendered full width with its label centred, which reads as a stray line of
+   text rather than as a control. Session D's `.tag` lesson, on a button. */
+.ff-money__panel > .btn { align-self: flex-start; }
+.ff-money__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--sp-16);
+}
+
+/* ── §13's itemisation ────────────────────────────────────────────────────
+   Each earned saving on its own labeled line — not one "discounts" row. The
+   Founder is meant to see which of their own answers earned which. */
+.ff-lines {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  padding: var(--sp-16) 0;
+  border-top: 1px solid var(--grey-light);
+  border-bottom: 1px solid var(--grey-light);
+}
+.ff-lines__row,
+.ff-lines__note {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-16);
+}
+.ff-lines dt { margin: 0; color: var(--moss); }
+.ff-lines dd { margin: 0; color: var(--dark); font-variant-numeric: tabular-nums; }
+.ff-lines__row--saving dd { color: var(--moss); }
+.ff-lines__row--total { padding-top: var(--sp-8); border-top: 1px solid var(--grey-light); }
+.ff-lines__row--total dt,
+.ff-lines__row--total dd { color: var(--dark); font-weight: 700; }
+/* Tax before an address exists is a sentence, not a US$0.00 line (§1.4). */
+.ff-lines__note dd { color: var(--moss); font-size: 0.9375rem; text-align: right; }
+
+/* ── Screen 25's Prepare list ─────────────────────────────────────────────
+   What STRIPE will ask for. There is no input in this block and no route
+   behind it that would take one (§11, §5.3, §13) — the note is inside the
+   panel rather than under it, because a list of things somebody is about to be
+   asked for reads as the start of a form until the sentence arrives. */
+.ff-prepare {
+  padding: var(--sp-24);
+  border: 2px solid var(--grey-light);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+.ff-prepare__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-16);
+}
+.ff-prepare__title {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  color: var(--dark);
+}
+.ff-prepare__mark {
+  color: var(--moss);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.8125rem;
+}
+.ff-prepare__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+}
+.ff-prepare__item { display: flex; flex-direction: column; gap: var(--sp-4); }
+.ff-prepare__label { color: var(--dark); font-weight: 700; }
+.ff-prepare__why { color: var(--moss); font-size: 0.9375rem; }
+.ff-prepare__note {
+  margin: 0;
+  padding-top: var(--sp-16);
+  border-top: 1px solid var(--grey-light);
+  color: var(--moss);
+  font-size: 0.9375rem;
+}
+
+/* ── §12's high-effort note, which moved onto Last look with Session E ──── */
+.ff-look__effort {
+  padding: var(--sp-16) var(--sp-24);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.ff-look__effort-title {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  color: var(--dark);
+}
+.ff-look__effort-body { margin: 0; max-width: var(--measure); color: var(--moss); }
+.ff-look__effort-fine {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--moss);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 599.98px) {
+  .ff-money__fields { grid-template-columns: 1fr; }
+  .ff-prepare { padding: var(--sp-16); }
+  .ff-lines__row,
+  .ff-lines__note { flex-direction: column; gap: var(--sp-4); align-items: flex-start; }
+  .ff-lines__note dd { text-align: left; }
+}

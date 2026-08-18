@@ -202,8 +202,13 @@ export function createFounderListingRouter(deps: FounderListingDeps): Router {
           db,
           gateway,
           audit,
-          successUrl: `${context.appBaseUrl}/campaigns/${campaignId}/workspace?listing=paid`,
-          cancelUrl: `${context.appBaseUrl}/campaigns/${campaignId}/workspace?listing=canceled`,
+          // Founder Flow v2 Session E (2026-08-19): the listing fee has its own
+          // page now, and it is the ONE address for it — it renders the
+          // pre-payment state, §24.6’s record afterwards, and §31.6’s
+          // cancellation decision. Landing back anywhere else would mean a
+          // second surface over the same money (`CLAUDE.md`, Session D).
+          successUrl: `${context.appBaseUrl}/campaigns/${campaignId}/setup/fee?listing=paid`,
+          cancelUrl: `${context.appBaseUrl}/campaigns/${campaignId}/setup/fee?listing=canceled`,
           connectUrls,
         },
         {

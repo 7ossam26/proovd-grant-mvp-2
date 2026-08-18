@@ -139,7 +139,9 @@ is a sentence a Founder reads rather than a constraint name.
 | 25 | Get paid: `Prepare:` list, three icon rows, `Take me to stripe` | **re-presentation** | §13's hosted onboarding over `beginOnboarding`. The list tells the Founder what Stripe will ask for and **collects none of it** — there is no route that accepts a bank, tax or identity field, and the absence is the enforcement. |
 | 25 | Only the happy path is drawn | **differently** | §13 has four states. **Restricted has no resume and no payment control** — it offers a support path. The other three are built here or the fee screen inherits a dead end. |
 | 25 | `Payouts ready`, piggy bank, Continue | **as drawn** | |
-| 20 | Struck-through original, current fee, savings copy, `Saved $2` toast | **as drawn** | The toast renders a **server-returned** delta and only when a real recalculation produced one. |
+| 20 | Struck-through original, current fee, savings copy, `Saved $2` toast | **differently** | Corrected by the Session E walk: the README describes all four; the prototype draws only the number and one savings line. The "down from" is rendered from the server's own base; the toast is **refused** (§14) — a saving cannot be earned from this screen. |
+| 20 | `You saved $0 by doing bonus tasks`, at zero | **refused** | Telling somebody who completed none of the optional answers that they saved nothing, on the screen where they can still do them (§14). |
+| 20 | `Discount $10 by completing tasks` | **refused** | Derived in the browser as `fee() − FEE_FLOOR`. Phase 09's named trap; the screen states a count and a per-item amount the server sent (§14). |
 | 20 | — | **absent from the reference** | Appendix A.5 verbatim, through `resolveListingFeeConsent`, which substitutes exactly two amounts and throws on any surviving bracket. Tax is a real Stripe Tax calculation against a real billing address, computed **before** the consent. |
 | 20 | `Enter` advances the primary action | **refused** | §30 forbids competing actions in a payment state, and a stray keystroke must not authorize a charge. Enter advances only where the page's single control is a one-line input — never on a textarea page, never here. |
 
@@ -626,3 +628,142 @@ fixture server matched `/workspace` before the static-file fallback, so
 `/campaigns/c1/workspace` served JSON at a PAGE address and the screenshot was
 a wall of raw payload. The check is `p.startsWith('/api/') && p.includes(...)`
 now. Nothing about the product was wrong.
+
+---
+
+## 14. Session E's screen order, as built
+
+Two screens, and both of them gates:
+
+| Page id | Address | Reference | Note |
+|---|---|---|---|
+| `payouts` | `/campaigns/:campaignId/setup/payouts` | 25 | §13's hosted onboarding. The reference's two screens — "Get paid" and "Payouts ready" — are two of §13's five states, and one page renders all five. |
+| `fee` | `/campaigns/:campaignId/setup/fee` | 20 | §24.6's listing fee, Appendix A.5's consent, and §31.6's cancellation. The ONE address for the listing fee. |
+
+**Stripe before the fee, and the server is what says so.**
+`beginListingCheckout` refuses without a complete `founder_seller` account and
+§23.1 orders the two campaign states the same way — `stripe_onboarding_pending`
+precedes `listing_fee_pending`. Drawn the reference's way round, screen 20 is a
+payment control on a page the server declines. `founder-flow-e.test.ts` drives
+exactly that refusal, asserts it names payout setup rather than failing
+generically, and asserts no session reached the gateway.
+
+**`/campaigns/:campaignId/workspace` is retired to a redirect.** Session D took
+its five §12 steps and Session E takes its payout and listing-fee panels, so
+nothing is left for it to render — and keeping it would be a second surface over
+the same money, which is what one address for §13 and §24.6 exists to stop. The
+address survives its component because things this session does not own point at
+it: the §27.3/§27.4 campaign emails sent since Phase 12, Appendix C's §34
+walkthrough steps, and whatever a Founder bookmarked. `/draft/:token/vetting`
+was retired the same way in Session C.
+
+Three things moved with it rather than being deleted:
+
+- **`ListingPayment` and its 13-test suite** became the fee page and
+  `listing-payment.test.tsx` repointed at the route. It reads Appendix A.5 out
+  of the Spec file and compares it, which is the strongest assertion in the
+  product about that text; deleting the component would have deleted it.
+- **`FeePreview`'s itemisation** is the fee page's own `FeeLines` — §13's base
+  line, each earned saving on its own labeled line, and the subtotal.
+- **`HighEffortPanel`** went to **Last look**, not to the fee page. It is
+  derived from three of the answers on that page and it changes nothing about
+  the listing fee; §14.3's compensation ceiling is the one thing it touches.
+
+### What the Session E walk found that the README does not say
+
+The README describes the fee screen as showing "the original struck through,
+the current fee, savings copy, and a 'Saved $2' pulse toast when a bonus answer
+lands." **The prototype draws none of the first and none of the last.** Serving
+it and reaching the screen shows one number, one savings line, one discount
+button, and `Pay & Start`. That is what a walk is for, and it changed two
+verdicts in §3's stage-4 table, which had been written from the README.
+
+Five elements are refused, each now an entry in `FOUNDER_FLOW_ABSENCES`:
+
+1. **`You saved $0 by doing bonus tasks`, rendered at zero.** The prototype
+   renders it whatever the saving is. Telling somebody who completed none of the
+   optional answers that they saved nothing is worse than silence — it reads as
+   a report that the work is not worth doing, on the screen where they can still
+   do it. The savings line renders only when there is a saving; otherwise
+   `LISTING_FEE_STILL_LOWERABLE` says the same beat forward.
+2. **`Discount $10 by completing tasks`**, derived in the browser as
+   `fee() − FEE_FLOOR`. A second implementation of the fee in a React component
+   is Phase 09's named trap. The screen says how many optional answers are open
+   and what each is worth — a count and a per-item amount the server sent. It is
+   also more accurate: the reference's subtraction equals the remaining discount
+   only because its three constants line up, and §6 lets an operator change any
+   of them.
+3. **The `Saved $2` pulse toast.** An optional answer cannot be completed from
+   the fee screen — the five that complete one are six addresses away — so the
+   toast announces a change that happened somewhere else, to somebody who was
+   not there when it did.
+4. **`Pay & Start`.** Appendix A.5 is exact text and fixes the action as well as
+   the body: `Agree and Pay US$[TOTAL]`. The consent opens *"By clicking Agree
+   and Pay"*, so any other label leaves that sentence describing a control that
+   is not on the page.
+5. **`Continue` on the payouts-ready screen.** §33.11.4: a control names its
+   destination, and `OBJECTLESS_CTA_LABELS` scans for that exact word. On this
+   screen the next thing is money.
+
+### Three decisions inside the session
+
+**Only a complete account offers a way forward.** `listingFeeEligible` is true
+only for a COMPLETE seller account, so the fee page refuses for
+`more_information_required`, `under_review` and `restricted` alike — and a
+control that opens a page whose server-side answer is already known to be a
+refusal is §1.4's failure with an arrow on it. §13 is strongest about the
+restricted state ("no misleading ability to pay the listing fee"); the other two
+are the same fact with a happier ending, so they are treated the same way.
+
+**The message badge is absent from the fee page, and only from it.** It renders
+as a second `.btn--primary`, and §30 forbids competing actions in a payment
+state — a small green button beside `Agree and Pay US$35.72` is exactly the
+competition it means. Help is not lost: HELP is in the flow's top bar on every
+page, which is where §27.1's sixth question is answered.
+
+**Stripe returns to the deployment's one URL, so `/stripe/return` gains a way
+back rather than a guess.** §32.2 gives Connect a single configured return
+address, so that page cannot know which campaign somebody was working on — and
+it must not guess, because a connected account belongs to the PERSON and is
+reused across their campaigns (§11). The control names the campaign list, which
+already opens each campaign at the surface its own state calls for.
+
+---
+
+## 15. What the Session E browser pass found, and nothing else could
+
+
+Three defects, all invisible to jsdom, axe, and the type checker. Eighth
+rebuild in a row.
+
+1. **The page `h1` rendered smaller than the `<p>` beneath it.** On the three
+   §13 states and the two fee refusals the page title used
+   `.ff-money__title--small` (max 2.5rem) above `StatePanel`'s own head, which
+   is `--fs-step` at weight 900 — the same size, heavier, and wrapping to two
+   lines. So "How you get paid" read as a caption over "Stripe cannot continue
+   with this account". §33.11.2 passes either way: it counts `h1`s and checks
+   levels, and the panel head is a `<p>`. The state branches use the full title
+   now; the two pages whose hero is a number or the title itself keep the
+   smaller one.
+2. **The cancellation control stretched to the full measure with its label
+   centred.** `.ff-money__panel` is a column flex, `.btn` is `inline-flex`, and
+   a flex ITEM in a column is stretched by the default `align-items: stretch` —
+   so `Cancel and refund my listing fee` read as a stray centred line of text
+   rather than as a control. Session D's `.tag` lesson, on a button;
+   `.ff-money__panel > .btn { align-self: flex-start }` fixes it without
+   touching the `StatePanel` and the fields that DO want the full width.
+3. **The payouts screen named the wrong destination**, on the screen somebody
+   reads immediately before leaving for a third party: *"Stripe opens in this
+   tab. When you come back, this page shows what it said."* Stripe does not
+   return anybody there — §32.2 gives Connect one configured return address per
+   deployment and it is `/stripe/return`, which re-reads the account and renders
+   whichever §13 state is true. §1.4 in one sentence.
+
+And one §27.1 gap the walk caught rather than the browser: the §31.6 free
+cancellation deadline rendered `freeUntil.toLocaleString()` — `1/1/2099,
+11:00:00 AM`, the machine's locale, naming no zone at all. §27.1 asks for the
+timezone spelled out on a deadline, and this is the one deadline on the page:
+after it, cancellation stops being an automatic refund and becomes a request an
+Admin decides. It renders local with UTC beside it now, the pair `StatePanel`'s
+own `When` produces. The bug was inherited from `ListingPayment` rather than
+introduced, which is exactly why moving a surface is when to look at it.

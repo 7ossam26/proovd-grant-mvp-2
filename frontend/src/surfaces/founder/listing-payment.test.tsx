@@ -8,8 +8,14 @@
  * including that Appendix A.5 renders **verbatim** with its variables resolved,
  * which is the one thing no server test can see.
  *
- * The surface is rendered directly rather than through the workspace route, so
- * a failure points at the payment panel rather than at the flow around it.
+ * ── Where it renders, since 2026-08-19 ────────────────────────────────────
+ * Founder Flow v2 Session E made the listing fee its own page — screen 20, at
+ * `/campaigns/:campaignId/setup/fee` — and retired the campaign workspace that
+ * used to hold it. This suite moved with the surface rather than being deleted
+ * with the component, because what it proves is the Founder's side of §33.3.5
+ * and Appendix A.5, and neither of those changed address. It now drives the
+ * real route through `appRoutes`, which is also what proves the page is
+ * reachable at all.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -18,9 +24,9 @@ import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
-import { MemoryRouter } from 'react-router';
-import { MotionProvider } from '../../motion/MotionProvider.js';
-import { ListingPayment } from './ListingPayment.js';
+import { createMemoryRouter, RouterProvider } from 'react-router';
+import { appRoutes } from '../../routes.js';
+import { invalidateSession } from '../../lib/session.js';
 
 type StubResult = { status: number; body: unknown } | undefined;
 type Handler = (url: string, init?: RequestInit) => StubResult;
@@ -33,6 +39,7 @@ function respond(status: number, body: unknown): Response {
 }
 
 beforeEach(() => {
+  invalidateSession();
   handlers = [];
   requests.length = 0;
   vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
@@ -65,23 +72,81 @@ const QUOTE = {
   descriptor: 'PROOVD LISTING',
 };
 
+/**
+ * The §12 fee the page's hero reads.
+ *
+ * Deliberately a different subtotal from the quote's, so an assertion about one
+ * cannot pass by finding the other.
+ */
+const WORKSPACE_FEE = {
+  baseCents: '3500',
+  itemDiscountCents: '200',
+  maxDiscountCents: '1000',
+  minSubtotalCents: '2500',
+  completedItems: 2,
+  discountLines: [
+    { item: 'branding', discountCents: '200' },
+    { item: 'story', discountCents: '200' },
+  ],
+  discountCents: '400',
+  subtotalCents: '3100',
+  calculatedAt: '2026-08-19T10:00:00.000Z',
+  locked: false,
+  separateStreamNote:
+    'This is the one-off fee for listing your campaign. Proovd separately retains 5% of ' +
+    'captured campaign rewards if your campaign succeeds; that is not part of this total.',
+};
+
 function mount(listing: Record<string, unknown>, quote: unknown = QUOTE) {
   handlers.push((url, init) => {
     if (url.endsWith('/listing/checkout') && init?.method === 'POST') {
       return { status: 200, body: { checkout: quote } };
     }
     if (url.endsWith('/listing')) return { status: 200, body: { listing } };
+    if (url.startsWith('/api/account/me')) {
+      return {
+        status: 200,
+        body: { account: { role: 'founder', email: 'rowan@example.com', name: 'Rowan' } },
+      };
+    }
+    if (url.includes('/workspace')) {
+      return {
+        status: 200,
+        body: {
+          workspace: {
+            campaignId: CAMPAIGN,
+            campaignStatus: 'listing_fee_pending',
+            listingPaid: listing['paid'] === true,
+            items: [],
+            fee: WORKSPACE_FEE,
+            highEffort: null,
+            brand: { colors: null, typography: null, notes: null, approved: false, logos: [] },
+            story: { text: null, approved: false },
+            visuals: [],
+            socials: [],
+            interview: {
+              bookable: false,
+              missingSettings: [],
+              providers: [],
+              availability: null,
+              embed: { available: false, eventTypeLink: null, reference: null },
+              booking: null,
+            },
+            lastSavedAt: null,
+            resumeStep: null,
+            uploadsAvailable: false,
+            transcription: { available: false, absentBecause: 'Not set up here.' },
+            vetting: { problem: null, solution: null, competition: null, submittedAt: null },
+          },
+        },
+      };
+    }
     return undefined;
   });
-  // `MotionProvider` reads the location to re-bind motion on navigation, so
-  // even a single panel renders inside a router.
-  return render(
-    <MemoryRouter>
-      <MotionProvider>
-        <ListingPayment campaignId={CAMPAIGN} />
-      </MotionProvider>
-    </MemoryRouter>,
-  );
+  const router = createMemoryRouter(appRoutes, {
+    initialEntries: [`/campaigns/${CAMPAIGN}/setup/fee`],
+  });
+  return render(<RouterProvider router={router} />);
 }
 
 /** The A.5 block, straight from the Spec — the same source the shared test uses. */
@@ -112,11 +177,11 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
     mount(eligible);
     const user = userEvent.setup();
 
-    await waitFor(() => expect(screen.getByText('Pay your listing fee')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
 
     // Tax needs an address, so the total is quoted only after one is given.
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
-    await user.click(screen.getByRole('button', { name: 'Show my total' }));
+    await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
     await waitFor(() => expect(screen.getByText('Total due now')).toBeInTheDocument());
 
@@ -140,9 +205,9 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
     mount(eligible);
     const user = userEvent.setup();
 
-    await waitFor(() => expect(screen.getByText('Pay your listing fee')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
-    await user.click(screen.getByRole('button', { name: 'Show my total' }));
+    await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
     const consent = await screen.findByTestId('listing-consent');
     const rendered = consent.textContent ?? '';
@@ -166,9 +231,9 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
   it('states the refund promise, the separate 5%, and that a pending proposal is not acceptance', async () => {
     mount(eligible);
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('Pay your listing fee')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
-    await user.click(screen.getByRole('button', { name: 'Show my total' }));
+    await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
     await screen.findByTestId('listing-consent');
     const page = document.body.textContent ?? '';
@@ -186,24 +251,30 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
   it('offers one payment action, carrying A.5’s exact words and the session URL', async () => {
     mount(eligible);
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('Pay your listing fee')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
-    await user.click(screen.getByRole('button', { name: 'Show my total' }));
+    await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
     const pay = await screen.findByRole('link', { name: 'Agree and Pay US$33.48' });
     expect(pay).toHaveAttribute('href', QUOTE.url);
 
-    // §30: no competing action in a payment state.
+    // §30: no competing action in a payment state. The flow's Back control
+    // sits beside it and is deliberately `tertiary` — the rule is about a
+    // second thing competing for the press, not about having a way out.
     const primaries = document.querySelectorAll('.btn--primary');
     expect(primaries).toHaveLength(1);
+    expect(primaries[0]?.textContent).toContain('Agree and Pay');
+    // Help is not lost by keeping it to one: HELP is in the flow's top bar on
+    // every page, which is where §27.1's sixth question is answered.
+    expect(screen.getByRole('button', { name: /^help$/i })).toBeInTheDocument();
   });
 
   it('keeps the newsletter consent unchecked and separate (§28.4)', async () => {
     mount(eligible);
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('Pay your listing fee')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
-    await user.click(screen.getByRole('button', { name: 'Show my total' }));
+    await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
     await screen.findByTestId('listing-consent');
     const newsletter = screen.getByRole('checkbox', {
@@ -218,9 +289,9 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
     // that divergence is the bug the no-arithmetic rule exists to expose.
     mount(eligible, { ...QUOTE, totalCents: '9999' });
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByText('Pay your listing fee')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
-    await user.click(screen.getByRole('button', { name: 'Show my total' }));
+    await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
     await screen.findByTestId('listing-consent');
     expect(screen.getByText('US$99.99')).toBeInTheDocument();
@@ -243,7 +314,7 @@ describe('states with no path to payment (§13)', () => {
     await waitFor(() =>
       expect(screen.getByText('Payment is not available')).toBeInTheDocument(),
     );
-    expect(screen.queryByRole('button', { name: /Show my total/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Work out my total/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Agree and Pay/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Contact support/)).toBeInTheDocument();
   });
@@ -310,7 +381,9 @@ describe('after payment (§24.6, §31.6)', () => {
     expect(screen.getByText('US$35.00')).toBeInTheDocument();
     expect(screen.getByText('Story completed')).toBeInTheDocument();
     expect(screen.getByText('US$2.64')).toBeInTheDocument();
-    expect(screen.getByText('US$35.64')).toBeInTheDocument();
+    // Twice by design: the page's own hero keeps the amount after payment, and
+    // §24.6's itemisation states it as the total charged. One field, one value.
+    expect(screen.getAllByText('US$35.64')).toHaveLength(2);
     expect(screen.getAllByText(/PROOVD LISTING/).length).toBeGreaterThanOrEqual(1);
 
     expect(

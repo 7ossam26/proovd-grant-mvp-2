@@ -22,7 +22,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Measure, Section, StatePanel, NO_ACTION } from '../../components/index.js';
+import { Button, Measure, Section, StatePanel, NO_ACTION } from '../../components/index.js';
 import { PageLoading } from '../../features/public/states.js';
 import { PayoutOnboarding, type PayoutRole, type PayoutState } from './PayoutOnboarding.js';
 import { PayoutRequestError, recordReturn, requestOnboardingLink } from './api.js';
@@ -102,6 +102,19 @@ export function StripeReturn({ event }: StripeReturnProps) {
         <h1 className="page-title">Payout setup</h1>
         {/* §13's four states, rendered by the one component both roles use. */}
         <PayoutOnboarding payouts={payouts} role={role} onStart={start} />
+        {/*
+          The way back (§27.1's sixth question — how do I carry on from here).
+
+          Stripe returns to ONE configured URL per deployment (§32.2), so this
+          page cannot know which campaign somebody was working on, and it should
+          not guess: a connected account belongs to the PERSON and is reused
+          across their campaigns (§11). So the control names the list, which
+          already opens each campaign at the surface its own state calls for —
+          including, for a Founder who has just finished here, the listing fee.
+        */}
+        <Button tier="primary" href={role === 'founder' ? '/campaigns' : '/creator/campaigns'}>
+          Back to your campaigns
+        </Button>
       </Measure>
     </Section>
   );

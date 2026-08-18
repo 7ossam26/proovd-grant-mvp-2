@@ -1,5 +1,5 @@
 /**
- * The Founder onboarding flow, screens 1–17 — Founder Flow v2, Sessions B–D.
+ * The Founder onboarding flow, screens 1–20 and 25 — Founder Flow v2, B–E.
  *
  * The real route table in a memory router with `fetch` stubbed at the network
  * boundary. What is proved here is the half only the surface owns: that each of
@@ -36,9 +36,17 @@ import {
   FOUNDER_FLOW_ABSENCES,
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
+  LISTING_FEE_CHECKOUT_CANCELED,
+  LISTING_FEE_LOCKED_AFTER_PAYMENT,
+  LISTING_FEE_NEWSLETTER_LABEL,
+  LISTING_FEE_STILL_LOWERABLE,
+  PAYOUT_PREPARE_COLLECTS_NOTHING,
   POSSIBLE_CREATOR_RESULT_DISCLOSURES,
+  SEPARATE_FIVE_PERCENT_NOTE,
+  STRIPE_PREPARE_ITEMS,
   founderAnswerLabel,
   founderFlowPath,
+  resolveListingFeeConsent,
 } from '@proovd/shared';
 import { invalidateSession } from '../../lib/session.js';
 import { appRoutes } from '../../routes.js';
@@ -1090,7 +1098,12 @@ function stubStage3(initial: Record<string, unknown> = {}) {
       : undefined,
   );
   stubWorkspace(initial);
-  handlers.push((url) => (url.includes('/api/payouts') ? { status: 200, body: { payouts: null } } : undefined));
+  // Session E: the two stage-4 pages read these. The handler here used to
+  // match `/api/payouts`, which is not an address this product has — the real
+  // bases are `/api/founder/payouts` and `/api/creator/payouts` — so it never
+  // fired, and the sweeps below rendered a payout panel with nothing in it.
+  stubPayouts({ state: 'complete', listingFeeEligible: true });
+  stubListing();
 }
 
 describe('the claim (16)', () => {
@@ -1414,9 +1427,10 @@ describe('§33.11 the flow is operable over Session D pages', () => {
 /**
  * Every read the flow makes, across all three auth regimes.
  *
- * The sweeps below walk all fifteen pages, and after Session D those cross
- * from the draft token to a Founder session. A loop that stubbed only the
- * draft reads would render six error states and report them as swept —
+ * The sweeps below walk all seventeen pages, and after Session D those cross
+ * from the draft token to a Founder session and on to the money. A loop that
+ * stubbed only the draft reads would render eight error states and report them
+ * as swept —
  which is exactly the failure §33.11.1's own stub-server check exists for.
  */
 function stubAllRegimes() {
@@ -1427,3 +1441,420 @@ function stubAllRegimes() {
   stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
   stubStage3();
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session E — the money (screens 25, 20)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const PAYOUTS_BASE = {
+  stripeAccountId: null as string | null,
+  missingRequirements: [] as string[],
+  pendingVerification: [] as string[],
+  disabledReason: null as string | null,
+  canResume: true,
+  onboardingAvailable: true,
+  listingFeeEligible: false,
+  linkActivationBlocked: false,
+  paymentReceiptBlocked: false,
+  campaignReviewBlocked: false,
+  lastSyncedAt: null as string | null,
+};
+
+function stubPayouts(overrides: Record<string, unknown> = {}) {
+  const payouts = { ...PAYOUTS_BASE, state: 'not_started', ...overrides };
+  handlers.push((url) =>
+    /\/api\/founder\/payouts$/.test(url) ? { status: 200, body: { payouts } } : undefined,
+  );
+  handlers.push((url) =>
+    /\/api\/founder\/payouts\/link$/.test(url)
+      ? { status: 200, body: { url: 'https://connect.stripe.example/x', expiresAt: '2026-08-19T12:00:00.000Z', reused: false } }
+      : undefined,
+  );
+  return payouts;
+}
+
+const QUOTE = {
+  url: 'https://checkout.stripe.example/s/1',
+  sessionId: 'cs_1',
+  baseCents: '3500',
+  discountLines: [{ item: 'visuals', discountCents: '200' }],
+  discountCents: '200',
+  subtotalCents: '3300',
+  taxCents: '272',
+  totalCents: '3572',
+  descriptor: 'PROOVD LISTING',
+};
+
+function stubListing(overrides: Record<string, unknown> = {}, quote = QUOTE) {
+  const listing = {
+    paid: false,
+    onboardingState: 'complete',
+    listingFeeEligible: true,
+    taxAvailable: true,
+    checkoutAvailable: true,
+    ...overrides,
+  };
+  handlers.push((url, init) => {
+    if (/\/listing\/checkout$/.test(url) && init?.method === 'POST') {
+      return { status: 200, body: { checkout: quote } };
+    }
+    if (/\/listing$/.test(url)) return { status: 200, body: { listing } };
+    return undefined;
+  });
+  return listing;
+}
+
+/** The §24.6 record a paid campaign renders. */
+function paidListing(overrides: Record<string, unknown> = {}) {
+  return {
+    paid: true,
+    payment: {
+      baseCents: '3500',
+      discountLines: [{ item: 'visuals', discountCents: '200' }],
+      discountCents: '200',
+      promotionCents: '0',
+      subtotalCents: '3300',
+      taxCents: '272',
+      totalCents: '3572',
+      descriptor: 'PROOVD LISTING',
+      receiptUrl: null,
+      paidAt: '2026-08-19T10:00:00.000Z',
+      responseDeadlineAt: '2026-08-22T10:00:00.000Z',
+      freeCancellationDeadlineAt: '2099-01-01T10:00:00.000Z',
+    },
+    refund: null,
+    cancellation: null,
+    ...overrides,
+  };
+}
+
+function stubMoney(payouts: Record<string, unknown> = {}, listing: Record<string, unknown> = {}) {
+  handlers.push((url) =>
+    url.startsWith('/api/account/me')
+      ? { status: 200, body: { account: { role: 'founder', email: 'rowan@example.com', name: 'Rowan' } } }
+      : undefined,
+  );
+  stubPayouts(payouts);
+  stubListing(listing);
+  stubWorkspace();
+}
+
+describe('how you get paid (25)', () => {
+  it('names what Stripe will ask for, and collects none of it', async () => {
+    stubMoney();
+    renderAt(at('payouts'));
+    await screen.findByRole('heading', { name: /set up how you get paid/i });
+
+    for (const item of STRIPE_PREPARE_ITEMS) {
+      expect(screen.getByText(item.label)).toBeInTheDocument();
+    }
+    expect(screen.getByText(PAYOUT_PREPARE_COLLECTS_NOTHING)).toBeInTheDocument();
+
+    // §11 forbids reproducing provider-controlled fields; §5.3 says Proovd
+    // stores statuses and IDs and never full bank details; §13 forbids storing
+    // identity documents. The absence IS the enforcement, so it is asserted as
+    // an absence rather than by checking what a field is named.
+    const page = document.querySelector('.ff') as HTMLElement;
+    expect(page.querySelectorAll('input')).toHaveLength(0);
+    expect(page.querySelectorAll('select')).toHaveLength(0);
+    expect(page.querySelectorAll('textarea')).toHaveLength(0);
+  });
+
+  it('opens Stripe rather than a form of our own', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    stubMoney();
+    renderAt(at('payouts'));
+    await screen.findByRole('heading', { name: /set up how you get paid/i });
+
+    await userEvent.click(screen.getByRole('button', { name: /take me to stripe/i }));
+    await waitFor(() =>
+      expect(requests.some((r) => r.url.endsWith('/api/founder/payouts/link') && r.method === 'POST')).toBe(true),
+    );
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('https://connect.stripe.example/x'));
+  });
+
+  it('names the listing fee when the account is complete, rather than “Continue”', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(at('payouts'));
+    await screen.findByRole('heading', { name: /all set to get paid/i });
+
+    const forward = screen.getByRole('button', { name: /continue to your listing fee/i });
+    expect(forward).toBeInTheDocument();
+    // §33.11.4's own register, by exact match on the trimmed accessible name.
+    for (const control of screen.getAllByRole('button')) {
+      expect(OBJECTLESS_CTA_LABELS as readonly string[]).not.toContain(
+        (control.textContent ?? '').trim(),
+      );
+    }
+
+    await userEvent.click(forward);
+    await screen.findByRole('heading', { name: /your listing fee/i });
+  });
+
+  it('offers a restricted account a support path and no way to pay', async () => {
+    stubMoney({ state: 'restricted', canResume: false, disabledReason: 'rejected.fraud' });
+    renderAt(at('payouts'));
+    await screen.findByText(/Stripe cannot continue with this account/i);
+
+    // §13: "no misleading ability to pay the listing fee", and no retry either —
+    // looping somebody through onboarding that will fail again is §1.4's
+    // failure with a spinner on it.
+    for (const control of screen.getAllByRole('button')) {
+      const label = (control.textContent ?? '').toLowerCase();
+      expect(label).not.toMatch(/pay|listing fee|stripe|finish|resume|try again/);
+    }
+    expect(screen.queryByRole('link', { name: /listing fee/i })).not.toBeInTheDocument();
+    // The raw provider reason never reaches the Founder (§25.6, §33.9.11).
+    expect(document.body.textContent).not.toContain('rejected.fraud');
+  });
+
+  it('offers no way forward while Stripe is still reviewing', async () => {
+    // `listingFeeEligible` is true only for a COMPLETE account, so the fee page
+    // refuses for this one too — and a control opening a page whose answer we
+    // already know is a refusal is the same §1.4 failure with a happier tone.
+    stubMoney({ state: 'under_review', pendingVerification: ['individual.verification.document'] });
+    renderAt(at('payouts'));
+    await screen.findByText(/Stripe is checking your details/i);
+
+    for (const control of screen.getAllByRole('button')) {
+      expect((control.textContent ?? '').toLowerCase()).not.toContain('listing fee');
+    }
+  });
+});
+
+describe('the listing fee (20)', () => {
+  it('renders the server’s subtotal and derives none of its own', async () => {
+    // A surface that recalculated would produce US$25.00 from a US$35.00 base
+    // and five savings whatever the server said. The reference does exactly
+    // that — `max(25, 35 − 2 × n)` — which is how the preview and the charge
+    // come to disagree (Phase 09's trap).
+    stubMoney(
+      { state: 'complete', listingFeeEligible: true },
+      {},
+    );
+    handlers.unshift((url) =>
+      url.includes('/workspace')
+        ? {
+            status: 200,
+            body: {
+              workspace: workspaceState({
+                fee: { ...(workspaceState()['fee'] as object), subtotalCents: '2900', completedItems: 5 },
+              }),
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee/i });
+
+    const hero = document.querySelector('.ff-money__amount') as HTMLElement;
+    expect(hero.textContent).toBe('US$29.00');
+    expect(screen.queryByText('US$25.00')).not.toBeInTheDocument();
+  });
+
+  it('never reports a saving of zero, and says what each answer is worth', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    handlers.unshift((url) =>
+      url.includes('/workspace')
+        ? {
+            status: 200,
+            body: {
+              workspace: workspaceState({
+                fee: {
+                  ...(workspaceState()['fee'] as object),
+                  completedItems: 0,
+                  discountLines: [],
+                  discountCents: '0',
+                  subtotalCents: '3500',
+                },
+              }),
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee/i });
+
+    // The reference renders `You saved $0 by doing bonus tasks` here.
+    expect(document.body.textContent).not.toMatch(/saved\s+US\$0/i);
+    expect(document.body.textContent).not.toMatch(/saved\s+\$0/i);
+    expect(screen.getByText(/Each optional answer takes US\$2\.00 off/)).toBeInTheDocument();
+    expect(screen.getByText(LISTING_FEE_STILL_LOWERABLE)).toBeInTheDocument();
+  });
+
+  it('shows the base line and each earned saving on its own labeled line (§13)', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee/i });
+
+    expect(screen.getByText('Listing a campaign')).toBeInTheDocument();
+    expect(screen.getByText('US$35.00')).toBeInTheDocument();
+    expect(screen.getByText('Visuals completed')).toBeInTheDocument();
+    expect(screen.getByText('−US$2.00')).toBeInTheDocument();
+    // Tax is Stripe's, against a real address. A US$0.00 line here would be a
+    // claim nobody has made (§1.4).
+    expect(screen.getByText(/Worked out from your billing address/)).toBeInTheDocument();
+  });
+
+  it('explains the separate 5% without conflating the two streams (§24.6)', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee/i });
+
+    const note = screen.getByText(SEPARATE_FIVE_PERCENT_NOTE);
+    const text = note.textContent?.toLowerCase() ?? '';
+    // The three facts §24.6 needs, whatever the wording: which fee this is,
+    // that the 5% is a different one, and that the two never commingle.
+    expect(text).toContain('5%');
+    expect(text).toContain('separately from this listing fee');
+    expect(text).toContain('unchanged by anything on this page');
+  });
+
+  it('refuses while payout setup is unfinished, and names the reason', async () => {
+    stubMoney({ state: 'more_information_required' }, { checkoutAvailable: false, listingFeeEligible: false, onboardingState: 'more_information_required' });
+    renderAt(at('fee'));
+    await screen.findByText(/Your payout setup is not finished/);
+
+    expect(screen.queryByRole('button', { name: /agree and pay/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /work out my total/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /finish setting up payouts/i })).toBeInTheDocument();
+  });
+
+  it('offers a restricted account no payment control at all (§13)', async () => {
+    stubMoney({ state: 'restricted' }, { checkoutAvailable: false, listingFeeEligible: false, onboardingState: 'restricted' });
+    renderAt(at('fee'));
+    await screen.findByText(/Payment is not available/);
+
+    for (const control of screen.getAllByRole('button')) {
+      const label = (control.textContent ?? '').toLowerCase();
+      expect(label).not.toMatch(/pay|total|finish setting up/);
+    }
+  });
+
+  it('renders Appendix A.5 verbatim once the total is known, with A.5’s own action', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee/i });
+
+    await userEvent.type(screen.getByLabelText(/billing zip/i), '97201');
+    await userEvent.click(screen.getByRole('button', { name: /work out my total/i }));
+
+    const consent = await screen.findByTestId('listing-consent');
+    const expected = resolveListingFeeConsent({ subtotal: '33.00', total: '35.72' });
+    // Byte-identical, and the resolver throws on any surviving bracket.
+    expect(consent.textContent).toBe(expected.body);
+    expect(expected.body).not.toMatch(/\[[A-Z]+\]/);
+
+    // §30: ONE action in a payment state, and A.5 fixes its words. The
+    // reference's own `Pay & Start` would leave the consent's opening clause —
+    // "By clicking Agree and Pay" — describing a control that is not there.
+    expect(screen.getByRole('link', { name: expected.action })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pay & start/i })).not.toBeInTheDocument();
+    const rows = document.querySelectorAll('.ff-lines__row--total dd');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toBe('US$35.72');
+  });
+
+  it('keeps the newsletter its own unchecked control (§28.4)', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee/i });
+    await userEvent.type(screen.getByLabelText(/billing zip/i), '97201');
+    await userEvent.click(screen.getByRole('button', { name: /work out my total/i }));
+    await screen.findByTestId('listing-consent');
+
+    const optIn = screen.getByRole('checkbox', { name: LISTING_FEE_NEWSLETTER_LABEL });
+    expect(optIn).not.toBeChecked();
+  });
+
+  it('does not advance on Enter (disagreement 10)', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee/i });
+
+    // The reference binds Enter to the current page's primary action
+    // throughout. §30 forbids competing actions in a payment state, and a
+    // stray keystroke in a ZIP field must not authorize a charge.
+    await userEvent.type(screen.getByLabelText(/billing zip/i), '97201{Enter}');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(requests.some((r) => r.url.includes('/listing/checkout'))).toBe(false);
+    expect(screen.queryByTestId('listing-consent')).not.toBeInTheDocument();
+  });
+
+  it('renders §24.6’s record and §31.6’s decision once the fee is paid', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true }, paidListing());
+    renderAt(at('fee'));
+    await screen.findByRole('heading', { name: /your listing fee is paid/i });
+
+    const total = document.querySelector('.ff-money__amount') as HTMLElement;
+    expect(total.textContent).toBe('US$35.72');
+    expect(screen.getByText(/PROOVD LISTING/)).toBeInTheDocument();
+    expect(screen.getByText(LISTING_FEE_LOCKED_AFTER_PAYMENT)).toBeInTheDocument();
+    // §31.6, inside the window: the whole amount back, including its tax.
+    expect(
+      screen.getByRole('button', { name: /cancel and refund my listing fee/i }),
+    ).toBeInTheDocument();
+    // §30: the payment action is gone once there is nothing to pay.
+    expect(screen.queryByRole('link', { name: /agree and pay/i })).not.toBeInTheDocument();
+  });
+
+  it('says nothing was charged when Stripe sends somebody back (§30)', async () => {
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(`${at('fee')}?listing=canceled`);
+    await screen.findByRole('heading', { name: /your listing fee/i });
+
+    expect(screen.getByText(LISTING_FEE_CHECKOUT_CANCELED)).toBeInTheDocument();
+  });
+});
+
+describe('what Session E moved', () => {
+  it('redirects the retired campaign workspace to the listing fee', async () => {
+    // The address survives its component: §27.3/§27.4 campaign emails sent
+    // since Phase 12 point at it, so do Appendix C's §34 walkthrough steps, and
+    // the listing fee is what a Founder following one was coming for.
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    renderAt(`/campaigns/${CAMPAIGN}/workspace`);
+    // The fee page rendered, which is the whole claim — the memory router the
+    // suite drives never touches `window.location`.
+    await screen.findByRole('heading', { name: /your listing fee/i });
+    expect(screen.getByText(LISTING_FEE_STILL_LOWERABLE)).toBeInTheDocument();
+  });
+
+  it('sends Last look’s All good to Stripe rather than to the fee', async () => {
+    // `beginListingCheckout` refuses without a complete `founder_seller`, so
+    // the fee page reached first is a fee page whose only path is the refusal.
+    stubStage3();
+    renderAt(at('last-look'));
+    await screen.findByRole('heading', { name: /last look/i });
+
+    await userEvent.click(screen.getByRole('button', { name: /set up how you get paid/i }));
+    // Which §13 state greets them depends on their account; that it is the
+    // payouts PAGE is the claim, and `data-flow-page` is what says so.
+    await waitFor(() =>
+      expect(document.querySelector('[data-flow-page="payouts"]')).not.toBeNull(),
+    );
+  });
+
+  it('carries §12’s high-effort note onto Last look, neutrally', async () => {
+    stubStage3({
+      highEffort: {
+        visualsCompleted: true,
+        brandingCompleted: false,
+        interviewScheduledOrConfirmed: false,
+        highEffort: false,
+        calculatedAt: '2026-08-18T10:00:00.000Z',
+      },
+    });
+    renderAt(at('last-look'));
+    await screen.findByText('What Creators will see about preparation');
+
+    // §12: "Present the criteria neutrally, not as a quality judgment."
+    // DNA §5.10 and §30 forbid copy implying the Founder underperformed.
+    const body = document.body.textContent ?? '';
+    expect(body).toMatch(/not a judgement of your campaign/);
+    expect(body).toMatch(/no effect on\s+whether a fixed payment is available/);
+    expect(body.toLowerCase()).not.toContain('low effort');
+    expect(body.toLowerCase()).not.toContain('poor');
+  });
+});

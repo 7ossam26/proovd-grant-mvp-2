@@ -41,6 +41,7 @@ import type {
   RosterView,
   WorkspaceState,
 } from '../../surfaces/founder/api.js';
+import type { PayoutState } from '../../surfaces/payouts/PayoutOnboarding.js';
 import type {
   CreatorCloseView,
   CreatorInvitationState,
@@ -296,6 +297,30 @@ const listing: ListingState = {
   listingFeeEligible: true,
   taxAvailable: true,
   checkoutAvailable: true,
+};
+
+/**
+ * §13's connected-account state — the shape both payout reads answer with.
+ *
+ * `{ payouts: PayoutState }`, which is what the routes return and what
+ * `fetchPayouts` unwraps. Until Session E this fixture was a flat object with
+ * different field names, so `result.payouts` was `undefined`, `PayoutOnboarding`
+ * never mounted, and the sweep reported a surface it had not actually
+ * rendered — the §33.11.1 failure that harness exists to catch, in the harness.
+ */
+const payoutState: PayoutState = {
+  state: 'complete',
+  stripeAccountId: 'acct_qa',
+  missingRequirements: [],
+  pendingVerification: [],
+  disabledReason: null,
+  canResume: false,
+  onboardingAvailable: true,
+  listingFeeEligible: true,
+  linkActivationBlocked: false,
+  paymentReceiptBlocked: false,
+  campaignReviewBlocked: false,
+  lastSyncedAt: '2026-08-10T10:00:00.000Z',
 };
 
 /* ── §14.4/§15 the build, the preview, and the review round ────────────────── */
@@ -1897,7 +1922,7 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/founder\/notifications\/preferences$/, body: { preference: digestPreference } },
   { match: /\/api\/founder\/notifications\/history/, body: { history: notificationHistory } },
   { match: /\/api\/founder\/campaigns$/, body: { campaigns: [{ campaignId: QA.campaignId, status: 'live', type: 'pre_launch', listingPaid: true, highEffort: false }] } },
-  { match: /\/api\/founder\/payouts/, body: { status: 'complete', connectedAccountId: 'acct_qa', requirements: null, updatedAt: '2026-08-10T10:00:00.000Z', onboardingAvailable: false } },
+  { match: /\/api\/founder\/payouts/, body: { payouts: payoutState } },
 
   /* Creator (§11, §14, §18, §21) */
   { match: /\/api\/affiliate-invitation\/[^/]+\/payout$/, body: { status: 'not_started', connectedAccountId: null, requirements: null, updatedAt: null, onboardingAvailable: false } },
@@ -1909,7 +1934,7 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/creator\/campaigns$/, body: { campaigns: [{ associationId: QA.associationId, campaignId: QA.campaignId, productName: QA.title, status: 'active', revealedAt: '2026-08-03T10:00:00.000Z', revoked: false, reviewAvailable: true }] } },
   { match: /\/api\/creator\/notifications\/preferences$/, body: { preference: digestPreference } },
   { match: /\/api\/creator\/notifications\/history/, body: { history: notificationHistory } },
-  { match: /\/api\/creator\/payouts/, body: { status: 'complete', connectedAccountId: 'acct_qa2', requirements: null, updatedAt: '2026-08-10T10:00:00.000Z', onboardingAvailable: false } },
+  { match: /\/api\/creator\/payouts/, body: { payouts: { ...payoutState, stripeAccountId: 'acct_qa2' } } },
 
   /* Public campaign, checkout, and the magic link (§18, §19, §20) */
   { match: /\/api\/campaign\/[^/]+\/checkout\/quote$/, body: QA_QUOTE },

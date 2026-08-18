@@ -10,11 +10,11 @@
  * somewhere that does not exist.
  *
  * ── It holds only the pages that EXIST ──────────────────────────────────────
- * Twenty-six are planned and fifteen are built. Declaring the other eleven
+ * Twenty-six are planned and seventeen are built. Declaring the other nine
  * would be `events.ts`'s failure in a different file — a register entry
- * claiming a surface the product does not have (§1.4). Sessions E and F
- * append to this list as they build; the help drawer's "everything before it"
- * is therefore always true rather than aspirational.
+ * claiming a surface the product does not have (§1.4). Session F appends the
+ * rest as it builds; the help drawer's "everything before it" is therefore
+ * always true rather than aspirational.
  *
  * ── The order is the reconciliation's, not the reference's ──────────────────
  * `docs/phases/founder-flow-reconciliation.md` §1 is the canonical order, and
@@ -194,6 +194,31 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     help: 'All eight answers in one place, with what your listing fee comes to. Open any of the five optional ones to change it and you come straight back here.',
     stage: 3,
   },
+  {
+    /*
+      Stage 4 — the money. Session E (2026-08-19).
+
+      Stripe FIRST, and not as a preference: `beginListingCheckout` refuses
+      without a complete `founder_seller` account, and §23.1 orders the two
+      states the same way — `stripe_onboarding_pending` precedes
+      `listing_fee_pending`. The reference draws the fee at 20 and payouts at
+      25; drawn that way, screen 20 offers a payment the server declines.
+    */
+    id: 'payouts',
+    path: '/campaigns/:campaignId/setup/payouts',
+    param: 'campaignId',
+    title: 'How you get paid',
+    help: 'Your campaign takes payments through a Stripe account in your name. Stripe asks for your ID, bank and tax details directly — Proovd never sees them.',
+    stage: 4,
+  },
+  {
+    id: 'fee',
+    path: '/campaigns/:campaignId/setup/fee',
+    param: 'campaignId',
+    title: 'Your listing fee',
+    help: 'The one-off fee for listing your campaign, lowered by every optional answer you completed. Sales tax is worked out from your billing address before you agree to anything.',
+    stage: 4,
+  },
 ];
 
 export type FounderFlowPageId = (typeof FOUNDER_FLOW_PAGES)[number]['id'];
@@ -366,6 +391,39 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
     absentBecause:
       'Three of the eight are §9 answers, and §9 locks them at submission — the route that wrote them is behind the draft token the claim just invalidated. So the first three cards render what was submitted and offer nothing, and the five optional ones open. An edit control that cannot work is worse than none.',
     specRef: '§9, §10, §1.4',
+  },
+  {
+    element:
+      'The listing-fee screen’s `You saved $0 by doing bonus tasks`, rendered when nothing was completed',
+    absentBecause:
+      'The walk found the prototype renders that line at zero. Telling somebody who did none of the optional answers that they saved nothing is worse than silence — it reads as a report that the work is not worth doing, on the screen where they can still do it. The savings line renders only when there is a saving; otherwise `LISTING_FEE_STILL_LOWERABLE` says the same beat forward.',
+    specRef: '§1.4, DNA §5.4',
+  },
+  {
+    element:
+      'The listing-fee screen’s `Discount $10 by completing tasks` — the remaining discount, derived in the browser as `fee() − FEE_FLOOR`',
+    absentBecause:
+      'A second implementation of the fee, in a React component, is Phase 09’s named trap: it is how the preview and the charge diverge. The screen says how many optional answers are still open and what each one is worth — a count and a per-item amount the server sent — and never a total this browser worked out. It is also more accurate: the reference’s subtraction only equals the remaining discount because its three constants happen to line up, and §6 lets an operator change any of them.',
+    specRef: '§6, §12, §24.6',
+  },
+  {
+    element:
+      'The `Saved $2` pulse toast on the listing-fee screen, firing when a bonus answer lands',
+    absentBecause:
+      'An optional answer cannot be completed from the fee screen — the five that complete one are six addresses away — so the toast announces a change that happened somewhere else, to somebody who was not there when it did. The saving is stated where it is earned: each answer page shows what it took off, and Last look shows the running total. The README describes this toast; the prototype draws nothing of the kind, which is what the walk was for.',
+    specRef: '§1.4, DNA §5.10',
+  },
+  {
+    element: 'The listing-fee screen’s payment control reading `Pay & Start`',
+    absentBecause:
+      'Appendix A.5 is exact text and it fixes the action as well as the body: `Agree and Pay US$[TOTAL]`, resolved by `resolveListingFeeConsent` from the same amounts the session charges. The consent opens `By clicking Agree and Pay` — a button reading anything else makes the sentence above it describe a control that is not there.',
+    specRef: 'Appendix A.5, §13',
+  },
+  {
+    element: 'The payouts-ready screen’s `Continue`',
+    absentBecause:
+      '§33.11.4: a control names its destination. `Continue` is the objectless label the register scans for by exact match, and on this screen the next thing is money — the one place in the flow where somebody should know what they are opening before they open it.',
+    specRef: '§33.11.4, DNA §5.13',
   },
 ];
 

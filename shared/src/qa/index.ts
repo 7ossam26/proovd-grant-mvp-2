@@ -102,13 +102,17 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_workspace',
-    label: 'The five optional answers, the review over all eight, and the listing fee',
-    specRef: '§12, §24.6',
+    label: 'The five optional answers and the review over all eight',
+    specRef: '§12',
     audience: 'founder',
     // Founder Flow v2 Session D (2026-08-18) moved the five §12 answers onto
-    // one address each with Last look as the review, so this flow is now seven
-    // routes rather than one. Restated from FOUNDER_FLOW_PAGES rather than
-    // imported, for the reason the vetting entry above records.
+    // one address each with Last look as the review, so this flow is six
+    // routes rather than one. Session E (2026-08-19) took the listing fee out
+    // of it — `/campaigns/:campaignId/workspace` retired to a redirect and the
+    // money is its own flow below, because it is its own auth regime: a
+    // complete `founder_seller` account, which none of these six needs.
+    // Restated from FOUNDER_FLOW_PAGES rather than imported, for the reason
+    // the vetting entry above records.
     routes: [
       '/campaigns/:campaignId/setup/visuals',
       '/campaigns/:campaignId/setup/branding',
@@ -116,7 +120,21 @@ export const PRINCIPAL_FLOWS = [
       '/campaigns/:campaignId/setup/story',
       '/campaigns/:campaignId/setup/socials',
       '/campaigns/:campaignId/setup/review',
-      '/campaigns/:campaignId/workspace',
+    ],
+    keyboardPathRequired: true,
+  },
+  {
+    key: 'founder_money',
+    label: 'Setting up payouts and paying the listing fee',
+    specRef: '§13, §24.6',
+    audience: 'founder',
+    // Founder Flow v2 Session E (2026-08-19). Its own entry rather than two
+    // more routes on the one above: §33.11's sweep has to stub a different
+    // thing here (a connected account and a listing state, not a workspace),
+    // and §28.5 grades a payment path on its own terms.
+    routes: [
+      '/campaigns/:campaignId/setup/payouts',
+      '/campaigns/:campaignId/setup/fee',
     ],
     keyboardPathRequired: true,
   },

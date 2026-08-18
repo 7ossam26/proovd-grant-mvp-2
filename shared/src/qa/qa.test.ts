@@ -20,6 +20,8 @@ import {
   founderAnswerLabel,
   founderAnswerNext,
   founderAnswerPrevious,
+  founderFlowIndex,
+  founderFlowPage,
   founderFlowPath,
   founderFlowReachableFrom,
 } from '../vetting/index.js';
@@ -260,6 +262,7 @@ describe('§3.2 the equity rule reads a claim, not a word', () => {
 describe('the Founder onboarding flow', () => {
   const founderFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_vetting')!;
   const setupFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_workspace')!;
+  const moneyFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_money')!;
 
   it('restates every flow page in PRINCIPAL_FLOWS, in order', () => {
     // `PRINCIPAL_FLOWS` is `as const`, so the routes cannot be spread in from
@@ -267,17 +270,19 @@ describe('the Founder onboarding flow', () => {
     // restated and drift-tested instead — the arrangement the state enums, the
     // §6 settings and the §27 keys all use.
     //
-    // Session D split them across two flow entries, because the register's
+    // Session D split them across flow entries, because the register's
     // audience is one thing and its AUTH REGIME is another: stages 1–2 are the
-    // draft token and stage 3 is a Founder session, and a §33.11 sweep has to
-    // stub a different thing for each. Together they are still every page.
+    // draft token, stage 3 is a Founder session, and stage 4 additionally
+    // needs a complete `founder_seller` account — a §33.11 sweep has to stub a
+    // different thing for each. Together they are still every page, and the
+    // last assertion is what keeps that true when a session adds one.
     const tokenPages = FOUNDER_FLOW_PAGES.filter((page) => page.param === 'token');
     const campaignPages = FOUNDER_FLOW_PAGES.filter((page) => page.param === 'campaignId');
     expect(founderFlow.routes).toEqual(tokenPages.map((page) => page.path));
-    expect(setupFlow.routes.slice(0, campaignPages.length)).toEqual(
+    expect([...setupFlow.routes, ...moneyFlow.routes]).toEqual(
       campaignPages.map((page) => page.path),
     );
-    expect([...founderFlow.routes, ...campaignPages.map((page) => page.path)].sort()).toEqual(
+    expect([...founderFlow.routes, ...setupFlow.routes, ...moneyFlow.routes].sort()).toEqual(
       [...FOUNDER_FLOW_ROUTES].sort(),
     );
   });
@@ -295,12 +300,13 @@ describe('the Founder onboarding flow', () => {
   });
 
   it('holds only the pages that exist', () => {
-    // Twenty-six are planned and fifteen are built — Session B built the first
-    // four, Session C the four that finish the draft token, Session D the claim
-    // and the six behind it. A register entry claiming a surface the product
-    // does not have is §1.4's failure in a different file, and the help drawer
-    // would offer to jump to an address that refuses.
-    expect(FOUNDER_FLOW_PAGES).toHaveLength(15);
+    // Twenty-six are planned and seventeen are built — Session B built the
+    // first four, Session C the four that finish the draft token, Session D the
+    // claim and the six behind it, Session E the two money screens. A register
+    // entry claiming a surface the product does not have is §1.4's failure in a
+    // different file, and the help drawer would offer to jump to an address
+    // that refuses.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(17);
   });
 
   it('addresses a page by the parameter its own auth regime has', () => {
@@ -311,6 +317,21 @@ describe('the Founder onboarding flow', () => {
       expect(page.param, page.id).toBe(page.stage <= 2 ? 'token' : 'campaignId');
     }
     expect(FOUNDER_FLOW_PAGES.filter((page) => page.stage === 2)).toHaveLength(1);
+  });
+
+  it('puts Stripe before the listing fee, because the server does', () => {
+    // `founder-flow-reconciliation.md` §1, move 2. The reference draws the fee
+    // at 20 and payouts at 25; `beginListingCheckout` refuses without a
+    // complete `founder_seller` account, so drawn that way screen 20 offers a
+    // payment the server declines. §23.1 orders the two states the same way.
+    const payouts = founderFlowIndex('payouts');
+    const fee = founderFlowIndex('fee');
+    expect(payouts).toBeGreaterThan(-1);
+    expect(fee).toBeGreaterThan(payouts);
+    expect(founderFlowPage('payouts')?.stage).toBe(4);
+    expect(founderFlowPage('fee')?.stage).toBe(4);
+    // And after Last look, which is where stage 3 ends.
+    expect(payouts).toBeGreaterThan(founderFlowIndex('last-look'));
   });
 
   it('offers a jump only where the parameter carries over', () => {

@@ -28,7 +28,6 @@ import { SupportCase } from './features/admin/support/SupportCase.js';
 import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirectory.js';
 import { CampaignRecord } from './features/admin/campaigns/CampaignRecord.js';
 import { BackersWorkspace } from './features/admin/backers/BackersWorkspace.js';
-import { CampaignWorkspace } from './surfaces/founder/Workspace.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
@@ -74,6 +73,8 @@ import { InterviewStep } from './surfaces/founder-flow/InterviewStep.js';
 import { StoryStep } from './surfaces/founder-flow/StoryStep.js';
 import { SocialsStep } from './surfaces/founder-flow/SocialsStep.js';
 import { LastLook } from './surfaces/founder-flow/LastLook.js';
+import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
+import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -95,6 +96,20 @@ function DraftVettingRedirect() {
 function DraftResultRedirect() {
   const { token = '' } = useParams();
   return <Navigate to={`/draft/${encodeURIComponent(token)}/claim`} replace />;
+}
+
+/**
+ * The retired campaign workspace (Session E, 2026-08-19).
+ *
+ * Phase 09a's workspace lost its five §12 steps to Session D and its payout and
+ * listing-fee panels to Session E. The address survives its component because
+ * things this session does not own point at it — §27.3/§27.4 campaign emails
+ * sent since Phase 12, Appendix C's §34 walkthrough steps, and whatever a
+ * Founder bookmarked — and the listing fee is what they were coming for.
+ */
+function WorkspaceRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
 }
 
 /*
@@ -585,13 +600,37 @@ const rootChildren: RouteObject[] = [
     element: <LastLook />,
   },
   {
-    // Phase 09a (§12, DNA §5.9). The signed-in Founder's campaign workspace.
-    // Outside the public shell and outside the Admin shell, for the reasons the
-    // Creator routes document: §26 licenses dashboard density in Admin only,
-    // and this is not a public page — everything on it is scoped to the
-    // session and re-checked against the caller's own claim on every request.
+    /*
+      Founder Flow v2 Session E (2026-08-19) — stage 4, the money.
+
+      Stripe BEFORE the fee, because `beginListingCheckout` refuses without a
+      complete `founder_seller` account and §23.1 orders the two campaign states
+      the same way. The reference draws them the other way round, which would
+      put a payment control on a page the server declines.
+    */
+    path: 'campaigns/:campaignId/setup/payouts',
+    element: <PayoutsStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/fee',
+    element: <FeeStep />,
+  },
+  {
+    /*
+      Retired 2026-08-19 (Session E), and a redirect rather than a deletion.
+
+      Phase 09a's campaign workspace lost its five §12 steps to Session D and
+      its payout and listing-fee panels to Session E, so there is nothing left
+      for it to render — and keeping it would be a second surface over the same
+      money, which is exactly what one address for §13 and §24.6 exists to stop.
+
+      The address stays because things point at it that this session does not
+      own: the §27.3/§27.4 campaign emails sent since Phase 12, Appendix C's
+      §34 walkthrough steps, and any link a Founder kept. `/draft/:token/vetting`
+      was retired the same way in Session C.
+    */
     path: 'campaigns/:campaignId/workspace',
-    element: <CampaignWorkspace />,
+    element: <WorkspaceRedirect />,
   },
   {
     // Phase 12a (§14.5). The Founder's roster view during the 72-hour clock.

@@ -24,9 +24,16 @@
  * fee anywhere under `frontend/src/surfaces/`.
  *
  * ── Where the money screens are ────────────────────────────────────────────
- * `All good` goes to the Stripe and listing-fee surfaces, which are Session E's
- * screens 25 and 20. Until they land it goes to the address that holds them
- * today, and says what happens next rather than implying the flow ends here.
+ * `All good` opens Stripe payout setup, which Session E built as screen 25 —
+ * and not the listing fee, which is screen 20 behind it, because
+ * `beginListingCheckout` refuses without a complete `founder_seller` account.
+ *
+ * ── And why the high-effort note is here ───────────────────────────────────
+ * Session E retired the campaign workspace, which was the only surface that
+ * rendered §12's high-effort classification. It lands here rather than on the
+ * fee screen because it is derived from three of the answers on this page and
+ * it changes nothing about the listing fee — §14.3's compensation ceiling is
+ * the one thing it touches.
  */
 
 import { useParams } from 'react-router';
@@ -106,6 +113,15 @@ function Body({ campaignId, state }: { campaignId: string; state: WorkspaceState
         {FLOW_LAST_LOOK_RETURNS}
       </p>
 
+      {/* §12's high-effort classification, which Session E's retirement of the
+          campaign workspace left without a home. It belongs here rather than on
+          the fee screen: it is derived from three of the answers on this page,
+          and it changes nothing about the listing fee — §14.3's compensation
+          ceiling is the one thing it touches. Presented neutrally, because §12
+          says so in as many words: "Present the criteria neutrally, not as a
+          quality judgment." */}
+      <HighEffortNote state={state} />
+
       <ul className="ff-look__grid" data-anim="field">
         {FOUNDER_ANSWER_SEQUENCE.map((entry) => (
           <AnswerCard
@@ -126,17 +142,40 @@ function Body({ campaignId, state }: { campaignId: string; state: WorkspaceState
         <Button tier="tertiary" onClick={() => leaveToPage('socials', -1)}>
           Back to Your socials
         </Button>
-        {/* Session E replaces this with screens 25 and 20. Until it does, the
-            address that holds the payout setup and the listing fee today is
-            where `All good` goes — a control that named a page which does not
-            exist yet would be §1.4's failure with a forward arrow on it. */}
-        <Button
-          tier="primary"
-          onClick={() => leave(`/campaigns/${encodeURIComponent(campaignId)}/workspace`, 1)}
-        >
-          All good — go to payouts and your listing fee
+        {/* Session E (2026-08-19) built screens 25 and 20, so this names the
+            first of them. Stripe before the fee, because `beginListingCheckout`
+            refuses without a complete `founder_seller` account. */}
+        <Button tier="primary" onClick={() => leaveToPage('payouts')}>
+          All good — set up how you get paid
         </Button>
       </div>
+    </div>
+  );
+}
+
+function HighEffortNote({ state }: { state: WorkspaceState }) {
+  const high = state.highEffort;
+  if (!high) return null;
+
+  const prepared = [
+    high.visualsCompleted ? 'visuals' : null,
+    high.brandingCompleted ? 'branding' : null,
+    high.interviewScheduledOrConfirmed ? 'an interview' : null,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div className="ff-look__effort" data-anim="note">
+      <h2 className="ff-look__effort-title">What Creators will see about preparation</h2>
+      <p className="ff-look__effort-body">
+        {prepared.length > 0
+          ? `You have ${prepared.join(', ')} in place. Creators promoting your campaign will be offered the standard rate.`
+          : 'You have not added visuals, branding, or an interview yet. While that is the case, a Creator may propose a rate above the standard one — because they would be doing more of the preparation themselves.'}
+      </p>
+      <p className="ff-look__effort-fine">
+        This is a description of what is ready, not a judgement of your campaign. It affects one
+        thing: whether a Creator may propose a percentage above the base rate. It has no effect on
+        whether a fixed payment is available, and none on your listing fee beyond the savings above.
+      </p>
     </div>
   );
 }

@@ -447,7 +447,7 @@ it lands, which is the cheapest way to find a seam that does not join.
 | **B** | 1–4 | the shell exists and four screens prove it | A | **built** 2026-08-18 |
 | **C** | 5–6, 7–9, 17 | the end of the draft token | A, B | **built** 2026-08-18 |
 | **D** | 16, then 10–15 | the end of `evaluateWorkspace` | A, B, C | **built** 2026-08-18 |
-| **E** | 25, 20 | the listing fee is paid | A–D | |
+| **E** | 25, 20 | the listing fee is paid | A–D | **built** 2026-08-19 |
 | **F** | 18, 21–24, 19, 26 | live | A–E | |
 
 
@@ -471,6 +471,16 @@ route sits behind. **Session E inherits one decision in return:** `/campaigns/:c
 kept its address and lost its five steps, so what it renders today is payout onboarding and the
 listing fee — screens 25 and 20 — and Last look’s `All good` points at it until they have their
 own pages. See `founder-flow-reconciliation.md` §12.
+
+**Session E took them, and retired the address.** Screens 25 and 20 are their own pages at
+`/campaigns/:campaignId/setup/{payouts,fee}`, `/campaigns/:campaignId/workspace` is a redirect to
+the fee, and Last look’s `All good` now opens Stripe rather than the fee — because
+`beginListingCheckout` refuses without a complete `founder_seller` account, which is the same
+mechanism that reordered the two screens in the first place. `ListingPayment` and its thirteen-test
+suite moved to the fee page rather than being deleted with the component; §12's high-effort note
+moved to Last look. **Session F inherits one decision in return:** the paid state's forward control
+names `/campaigns/:campaignId/build`, which is the real surface that comes next today — screen 18
+and the four build steps replace it. See `founder-flow-reconciliation.md` §14.
 
 **Two things must not be reordered for convenience.** The six-digit code's *mechanism* lands with
 its screens in C and never after them — a screen built first grows a client-side "is this code

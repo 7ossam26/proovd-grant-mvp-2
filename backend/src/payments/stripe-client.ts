@@ -868,7 +868,15 @@ export interface MemoryStripeGateway extends StripeGateway {
   readonly created: Array<{ id: string; role: string; country: string }>;
   /** The flat rate the fake tax calculation applies. Set by tests. */
   setTaxRate(rate: number): void;
-  /** Every session this gateway created, newest last. */
+  /**
+   * Every session this gateway created, newest last.
+   *
+   * `successUrl`/`cancelUrl` are recorded because where Stripe sends somebody
+   * back to is a real product decision — Founder Flow v2 Session E moved both
+   * from the retired campaign workspace to the listing-fee page — and a
+   * decision no test can see is one the next refactor silently reverses.
+   * Optional because the fixed-payment funding session (§16) does not set them.
+   */
   readonly sessions: Array<{
     id: string;
     paymentIntentId: string;
@@ -876,6 +884,8 @@ export interface MemoryStripeGateway extends StripeGateway {
     taxCents: bigint;
     metadata: Record<string, string>;
     idempotencyKey: string;
+    successUrl?: string;
+    cancelUrl?: string;
   }>;
   /** Every refund call, so a test can assert exactly one reached the provider. */
   readonly refunds: Array<{
@@ -1218,6 +1228,8 @@ export function createMemoryStripeGateway(config: {
         taxCents: input.taxCents,
         metadata: input.metadata,
         idempotencyKey: input.idempotencyKey,
+        successUrl: input.successUrl,
+        cancelUrl: input.cancelUrl,
       });
       return {
         id,

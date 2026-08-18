@@ -295,7 +295,7 @@ messages alone, as its own decision with its own test.
 
 The path a Founder walks from opening a pre-filled invitation to a live
 campaign becomes twenty-six full-screen steps with no app chrome. It is six
-sessions; the first four have landed. The walk that scopes the rest is
+sessions; the first five have landed. The walk that scopes the rest is
 [docs/phases/founder-reconciliation](docs/phases/founder-flow-reconciliation.md),
 and the brief is [docs/phases/founder-flow-v2.md](docs/phases/founder-flow-v2.md).
 
@@ -491,6 +491,48 @@ confirmed." — which is right as a rule and reads as a claim that it already
 happened when it sits under the question on the one screen where nothing is
 booked. Both now carry a label saying it is a condition.
 
+**The fifth session is the money: setting up how a Founder gets paid, and then
+paying the listing fee.** Both are gates, and the order is not a preference —
+the server refuses to open a payment until the Founder's own payment account is
+finished, so a fee screen reached first is a fee screen whose only outcome is
+the refusal. The prototype draws them the other way round, which would put a
+payment button on a page the server declines.
+
+Only a finished account offers a way forward. The three unfinished states — more
+information wanted, still being reviewed, and stopped altogether — each say what
+is true and offer no route to payment, because the payment page would refuse for
+all three and a button that opens a known refusal is worse than none. The
+stopped one additionally offers no way to try again: starting over would end the
+same way, and the honest answer is a person to talk to.
+
+The list of what to have ready before leaving for the payment provider is a
+written record rather than three lines on a page, and it sits beside a sentence
+saying we collect none of it. That is the difference between naming what
+somebody else will ask for and quietly starting a form: with the sentence
+attached, adding a box means deleting a promise, and a test checks the page has
+no box of any kind.
+
+Two of the prototype's own touches are refused. It congratulates people who
+completed none of the optional answers with "you saved $0" — the report they
+least need on the screen where they can still change it. And it works out the
+remaining discount in the browser from three hardcoded numbers, all of which are
+settings somebody can change; the page states how many answers are still open
+and what each is worth, which is both accurate and computed once, on the server.
+
+The listing fee also becomes one address rather than two. The old campaign
+workspace had already lost its five optional answers to the fourth session; it
+loses its payment panel here and becomes a redirect, because two places to pay
+one fee is two places for the amount to disagree. The address stays alive
+because emails sent months ago point at it.
+
+**Walking it in a browser found three more defects, the eighth rebuild in a
+row.** A page title rendered smaller than the sentence beneath it, so the title
+read as a caption. A cancellation control stretched across the full width with
+its label centred, which reads as a stray line of text rather than as something
+to press. And the payment-setup screen told people the wrong thing about where
+they would land when they came back from the provider — on the screen somebody
+reads immediately before leaving.
+
 
 Three parts of the flow cannot be completed in the current environment, and none
 of them is stubbed: the eight policy documents are still in legal review so the
@@ -630,15 +672,14 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          shell and its help drawer, the invite, the three
                          questions, the campaign type, the address and its
                          code, the relevance signal, the account claim with
-                         its calendar, the five optional answers, and Last
-                         look
+                         its calendar, the five optional answers, Last look,
+                         payout setup, and the listing fee
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
                          preparing Campaign kit
-  src/surfaces/founder/  the listing fee and payout setup, the helper
-                         resources, the Appendix A.5 consent, the live
-                         campaign home — Glance, one action, Explore — and the
-                         campaign build, where every §14.4 ingredient finally
-                         has a box (twelve had none, four of them required)
+  src/surfaces/founder/  the helper resources, the live campaign home — Glance,
+                         one action, Explore — and the campaign build, where
+                         every §14.4 ingredient finally has a box (twelve had
+                         none, four of them required)
   src/surfaces/notifications/ the digest preference and notification history,
                          one page for both roles and the Backer control
   src/surfaces/payouts/  Stripe onboarding for both roles, and where Stripe
