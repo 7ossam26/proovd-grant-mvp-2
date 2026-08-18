@@ -272,10 +272,14 @@ describe('the Founder onboarding flow', () => {
   });
 
   it('holds only the pages that exist', () => {
-    // Twenty-six are planned and four are built. A register entry claiming a
-    // surface the product does not have is §1.4's failure in a different file,
-    // and the help drawer would offer to jump to an address that refuses.
-    expect(FOUNDER_FLOW_PAGES).toHaveLength(4);
+    // Twenty-six are planned and eight are built — Session B built the first
+    // four, Session C the four that finish the draft token. A register entry
+    // claiming a surface the product does not have is §1.4's failure in a
+    // different file, and the help drawer would offer to jump to an address
+    // that refuses.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(8);
+    // Every one of the eight is still reached on the invitation token. Stage 2
+    // is the claim, and it is Session D's.
     for (const page of FOUNDER_FLOW_PAGES) expect(page.stage).toBe(1);
   });
 });

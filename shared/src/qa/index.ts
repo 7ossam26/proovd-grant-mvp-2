@@ -78,18 +78,24 @@ export const PRINCIPAL_FLOWS = [
     label: 'The invited Founder: the invite, §9’s answers, and the account claim',
     specRef: '§7, §9, §10',
     audience: 'founder',
-    // Founder Flow v2 Session B (2026-08-18) split the first four screens onto
-    // their own addresses. The first four are restated from
-    // `FOUNDER_FLOW_PAGES` rather than imported, because this register is
-    // `as const` and a spread would widen every route to `string` — and they
-    // are drift-tested against it, the arrangement the state enums, the §6
-    // settings and the notification keys all use.
+    // Founder Flow v2 (2026-08-18) split the flow onto one address per screen:
+    // Session B built the first four, Session C the four that finish the draft
+    // token. They are restated from `FOUNDER_FLOW_PAGES` rather than imported,
+    // because this register is `as const` and a spread would widen every route
+    // to `string` — and they are drift-tested against it, the arrangement the
+    // state enums, the §6 settings and the notification keys all use.
+    //
+    // `/draft/:token/vetting` left this list with Session C: Positioning is
+    // its own page now and the address is a redirect, not a surface.
     routes: [
       '/draft/:token',
       '/draft/:token/problem',
       '/draft/:token/solution',
       '/draft/:token/campaign-type',
-      '/draft/:token/vetting',
+      '/draft/:token/email',
+      '/draft/:token/code',
+      '/draft/:token/positioning',
+      '/draft/:token/match',
       '/draft/:token/claim',
     ],
     keyboardPathRequired: true,

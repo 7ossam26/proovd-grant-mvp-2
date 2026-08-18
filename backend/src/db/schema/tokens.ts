@@ -72,6 +72,23 @@ export const tokenScope = pgEnum('token_scope', [
    * is revoked only when the follow ends.
    */
   'campaign_follow',
+  /**
+   * `founder_email_code` — ONE invited draft's six-digit email code
+   * (Founder Flow v2 Session C; a recorded §1 rule 6 deviation — see 0053 and
+   * `shared/src/vetting/email-code.ts`).
+   *
+   * It binds `campaign_draft_id`, the same column `founder_draft` binds,
+   * because a code belongs to the draft it was requested from. The two are
+   * told apart by `verify`'s own scope check, so a draft link presented at the
+   * code route fails with the one frozen rejection.
+   *
+   * Its `token_hash` is an HMAC over the draft id, the address and the code —
+   * NOT the plain SHA-256 the other four use. Six digits is 10^6 values: a
+   * plain digest would collide two live codes on the UNIQUE hash index and
+   * would itself be a lookup back to the code. `issueFounderEmailCode` is the
+   * only writer and `verifyFounderEmailCode` the only reader.
+   */
+  'founder_email_code',
 ]);
 
 /**

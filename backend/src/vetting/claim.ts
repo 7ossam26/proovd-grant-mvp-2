@@ -111,8 +111,20 @@ export interface ClaimProfileState {
     businessEntityType: ClaimFieldState;
   };
   soleProprietor: boolean | null;
-  /** §5.2. Derived from how the address arrived; never asserted as verified. */
-  emailOwnership: 'invited_link' | 'google_oauth' | 'self_supplied_unverified' | null;
+  /**
+   * §5.2. Derived from how the address ARRIVED — never asserted.
+   *
+   * `code_verified` is the one state that is evidence rather than provenance:
+   * a code we sent to that exact address came back (Founder Flow v2 Session C,
+   * a recorded §1 rule 6 deviation). It is granted by one path and survives
+   * only while the address does — editing it re-derives from the new value.
+   */
+  emailOwnership:
+    | 'invited_link'
+    | 'google_oauth'
+    | 'self_supplied_unverified'
+    | 'code_verified'
+    | null;
   /** §5.2/§33.1.8: always false, and there is no route that changes it. */
   phoneVerified: false;
   representations: {
@@ -350,13 +362,31 @@ export async function saveClaimProfile(
     const next = normalise(input.email)?.toLowerCase() ?? null;
     patch['email'] = next;
     patch['emailSupplier'] = next === null ? null : next === f.email.prefilled ? 'proovd' : 'founder';
-    // §5.2: the invitation establishes ownership of the address it was sent to,
-    // and of no other. An address the Founder typed is recorded as unverified,
-    // because it is — there is no email-verification route yet, and pretending
-    // otherwise would be the §1.4 failure in one enum value.
-    patch['emailOwnership'] =
-      next === null ? null : next === f.email.prefilled ? 'invited_link' : 'self_supplied_unverified';
-    if (next !== f.email.value) patch['emailEditedAt'] = now;
+    /*
+     * §5.2: the invitation establishes ownership of the address it was sent
+     * to, and of no other. An address the Founder typed is recorded as
+     * unverified, because it is.
+     *
+     * It is re-derived only when the value actually CHANGES (Founder Flow v2
+     * Session C). Recomputing on every save was harmless while the three
+     * states were all provenance — the answer never differed — and stopped
+     * being harmless the moment `code_verified` existed: a Founder who
+     * verified their address and then typed the same address again would have
+     * silently dropped back to `invited_link`, and would be asked to verify
+     * something they had just verified. Changing the address DOES re-derive,
+     * which is the half that must not be lost: a verified state may never
+     * outlive the address it was granted for, and the code itself agrees —
+     * its hash binds the address, so the old code stops working too.
+     */
+    if (next !== f.email.value) {
+      patch['emailOwnership'] =
+        next === null
+          ? null
+          : next === f.email.prefilled
+            ? 'invited_link'
+            : 'self_supplied_unverified';
+      patch['emailEditedAt'] = now;
+    }
   }
 
   if (

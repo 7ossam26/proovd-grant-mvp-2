@@ -175,6 +175,19 @@ const schema = z.object({
   // it is in the page a Founder loads.
   CALCOM_EVENT_TYPE_LINK: z.string().optional(),
 
+  // ── Dictation — the transcription port (Founder Flow v2 deviation 2) ────
+  // "Say it instead" on §9's Positioning step and §12's Story. Optional to
+  // boot for the same reason Resend, R2 and Cal.com are: the app has to start
+  // before anyone can see it is missing. Absent, `unconfiguredTranscription`
+  // refuses every recording loudly and the screen renders the absence rather
+  // than a dead microphone (§1.4).
+  //
+  // Both or neither. A URL with no key would fail at the first recording, in
+  // production, mid-sentence — the failure shape `checkObjectStorage` and
+  // `checkScheduler` both exist to prevent.
+  TRANSCRIPTION_API_URL: z.string().url().optional(),
+  TRANSCRIPTION_API_KEY: z.string().optional(),
+
   // ── Jobs ─────────────────────────────────────────────────────────────────
   // Must be present and ≥32 chars. Protects close-batch and cron endpoints.
   CRON_SECRET: z.string().min(32, 'CRON_SECRET must be at least 32 characters'),
@@ -415,6 +428,27 @@ function checkScheduler(data: Env): void {
   }
 }
 
+/**
+ * Dictation is configured or it is not (Founder Flow v2 deviation 2).
+ *
+ * A URL with no key presigns nothing and authenticates nothing; it fails at
+ * the first recording. Fail at boot instead, like the other three ports.
+ */
+function checkTranscription(data: Env): void {
+  const parts = [data.TRANSCRIPTION_API_URL, data.TRANSCRIPTION_API_KEY];
+  const present = parts.filter(Boolean).length;
+  if (present !== 0 && present !== parts.length) {
+    throw new Error(
+      'Dictation is half-configured: set TRANSCRIPTION_API_URL and ' +
+        'TRANSCRIPTION_API_KEY, or neither of them.',
+    );
+  }
+}
+
+/** True only when both dictation values are present. Read by `createApp`. */
+export function transcriptionConfigured(env: Env): boolean {
+  return Boolean(env.TRANSCRIPTION_API_URL && env.TRANSCRIPTION_API_KEY);
+}
 /** True only when all three Cal.com values are present. Read by `createApp`. */
 export function schedulerConfigured(env: Env): boolean {
   return Boolean(env.CALCOM_API_KEY && env.CALCOM_WEBHOOK_SECRET && env.CALCOM_EVENT_TYPE_LINK);
@@ -505,6 +539,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
   checkWebhookSecrets(result.data);
   checkObjectStorage(result.data);
   checkScheduler(result.data);
+  checkTranscription(result.data);
   return result.data;
 }
 

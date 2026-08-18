@@ -15,6 +15,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { axe } from 'jest-axe';
 import userEvent from '@testing-library/user-event';
 import { renderRoute } from './test-harness.js';
@@ -112,5 +115,99 @@ describe('§33.11.2 — structure a screen reader can navigate', () => {
       }
       unmount();
     }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The stylesheet itself — Founder Flow v2, Session C
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Two ways `proovd.css` can be silently wrong, and both have now happened.
+ *
+ * Session B shipped a comment containing `*​/` inside it, which ENDS the comment
+ * — so the whole `PHASE 34` token block parsed as garbage and every page in the
+ * flow rendered at browser-default type. Session C shipped `gap: var(--sp-20)`
+ * against a scale that has no `--sp-20`, so the declaration was invalid and the
+ * gap collapsed to zero on the one screen with the most stacked prose in it.
+ *
+ * Neither is visible to jsdom, to axe, or to the type checker: the markup is
+ * correct, the accessible names are correct, and the build succeeds. Only a
+ * screenshot showed them — which is the right way to find one of them and a
+ * ridiculous way to find the second one twice. These two scans are cheap and
+ * they run on every commit.
+ */
+describe('proovd.css parses as its author intended', () => {
+  const css = readFileSync(
+    path.resolve(fileURLToPath(import.meta.url), '..', '..', '..', '..', 'public', 'proovd.css'),
+    'utf8',
+  );
+
+  it('closes every comment exactly once', () => {
+    // A `*` followed by `/` inside a comment closes it early, and everything
+    // after it up to the next `*/` is parsed as declarations. The depth never
+    // rises above 1 and ends at 0, or something is unbalanced.
+    let depth = 0;
+    let index = 0;
+    let maxDepth = 0;
+    while (index < css.length) {
+      if (css.startsWith('/*', index)) {
+        depth += 1;
+        maxDepth = Math.max(maxDepth, depth);
+        index += 2;
+        continue;
+      }
+      if (css.startsWith('*/', index)) {
+        depth -= 1;
+        expect(depth, `a comment closed that was never opened, near char ${index}`).toBeGreaterThanOrEqual(0);
+        index += 2;
+        continue;
+      }
+      index += 1;
+    }
+    expect(depth, 'an unclosed comment swallows the rest of the file').toBe(0);
+    expect(maxDepth, 'CSS comments do not nest, so a depth above 1 means one closed early').toBe(1);
+  });
+
+  /*
+   * The two token scans read the file with comments STRIPPED, and the
+   * comment-balance one above deliberately does not.
+   *
+   * This file explains, at length, which tokens it deliberately does not
+   * define and which mistyped one caused which defect. A scan that could not
+   * tell an explanation from a usage would force those explanations out, and
+   * the reasoning is the more valuable half — `backend/src/notifications` makes
+   * the same split for the same reason. The very first version of this test
+   * failed on its own comment naming `var(--paper)`.
+   */
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('uses no spacing token the scale does not define', () => {
+    const defined = new Set([...css.matchAll(/--sp-(\d+)\s*:/g)].map((m) => m[1]));
+    const used = new Set([...code.matchAll(/var\(--sp-(\d+)\)/g)].map((m) => m[1]));
+    const missing = [...used].filter((token) => !defined.has(token));
+    expect(missing, `var(--sp-N) with no --sp-N in the scale: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('uses no colour, radius, or motion token the file does not define', () => {
+    /*
+     * The same failure in the other custom-property families. `var(--x)` with
+     * no `--x` is not an error anywhere — the declaration is simply dropped —
+     * so a mistyped token is a rule that quietly does nothing.
+     *
+     * `var(--x, fallback)` is EXEMPT, and the distinction is the point: a
+     * property a component sets inline (`--track`, `--sweep`, `--p`) is
+     * deliberately undefined in this file and carries its own default. A
+     * property with no fallback and no definition is a typo, which is how
+     * `.cr-file` came to have no background at all.
+     */
+    const defined = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+    const used = new Set(
+      [...code.matchAll(/var\((--[a-z0-9-]+)\s*(,?)/g)]
+        .filter((m) => m[2] !== ',')
+        .map((m) => m[1]),
+    );
+    const missing = [...used].filter((token) => !defined.has(token));
+    expect(missing, `undefined custom properties: ${missing.join(', ')}`).toEqual([]);
   });
 });

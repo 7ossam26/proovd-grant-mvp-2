@@ -81,6 +81,34 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     help: 'An Idea Campaign tests demand before you build. A Product Campaign pre-sells something that already exists. The choice locks when you submit the form.',
     stage: 1,
   },
+  {
+    id: 'email',
+    path: '/draft/:token/email',
+    title: 'Your email',
+    help: 'Where we send everything about this campaign. It is filled in from your invitation — change it if that is not the address you want.',
+    stage: 1,
+  },
+  {
+    id: 'code',
+    path: '/draft/:token/code',
+    title: 'Confirm your email',
+    help: 'Six digits, sent to that address. It only confirms we can reach you — it creates no account and signs you into nothing.',
+    stage: 1,
+  },
+  {
+    id: 'positioning',
+    path: '/draft/:token/positioning',
+    title: 'Your positioning',
+    help: 'The one answer we never draft for you. Who else solves this, and why someone would choose you. Finishing it submits your answers.',
+    stage: 1,
+  },
+  {
+    id: 'match',
+    path: '/draft/:token/match',
+    title: 'Creators who may fit',
+    help: 'How many Creators in your category might be a fit for what you just described. It is a relevance signal, not a roster, and nobody has agreed to anything.',
+    stage: 1,
+  },
 ];
 
 export type FounderFlowPageId = (typeof FOUNDER_FLOW_PAGES)[number]['id'];
@@ -170,6 +198,33 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
     absentBecause:
       'Those are internal values and never reach a Founder. `CAMPAIGN_PATH_CHOICES[].name` — Idea Campaign, Product Campaign — is the only thing that renders.',
     specRef: '§3.1',
+  },
+  {
+    element:
+      'The match screen’s sub-line, `In your category are ready to promote this`',
+    absentBecause:
+      '§10 forbids exactly this claim: the number "guarantees neither that anyone will take part nor what results they would produce" and "is not the recruited/accepted roster". "Ready to promote this" says people who have agreed to nothing are ready to promote something. `POSSIBLE_CREATOR_RESULT_DISCLOSURES` is the honest version of the same beat, and it is six sentences long because every one of them is a limit the number needs.',
+    specRef: '§10, §30',
+  },
+  {
+    element:
+      'The match screen’s breakdown — `1 Newsletter / blog operator`, `2 Community owners`',
+    absentBecause:
+      '`possible_creator_results` holds a count, a basis, and who recorded it. There is no category breakdown to render, so drawing one would mean inventing a fact (§1 rule 6) about people the Founder may not be shown — and §11’s boundary is why: describing them by kind is a step from "names no Creator" toward a roster. The `basis` never leaves Admin.',
+    specRef: '§10, §11, §1 rule 6',
+  },
+  {
+    element: 'The email screen’s headline, `To save your progress verify your email:`',
+    absentBecause:
+      'Progress is already saved. §9’s autosave writes every answer through the draft token, and the link in the invitation is what brings a Founder back to it — verifying an address changes none of that. A sentence naming the wrong mechanism is the §1.4 failure in one line, and it is the line somebody reads while deciding whether they can close the tab.',
+    specRef: '§1.4, §9',
+  },
+  {
+    element:
+      'The email field’s ink turning `#A2AFA8` while the field has focus, returning to `#013F17` on blur',
+    absentBecause:
+      'That is `--grey` on `--white`, about 2.2:1, applied to the text a person is actively typing. It is the token for placeholders and disabled ink, and Session B moved five sentences off it for the same reason. The dashed brand underline is what marks focus here; the ink stays legible.',
+    specRef: '§28.5, §33.11',
   },
 ];
 

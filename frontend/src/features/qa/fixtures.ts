@@ -25,7 +25,7 @@ import type {
   FounderListRow,
   FounderWorkspaceDetail,
 } from '../admin/api.js';
-import type { ClaimView, VettingState } from '../../surfaces/draft/api.js';
+import type { ClaimView, CreatorSignal, VettingState } from '../../surfaces/draft/api.js';
 import type {
   BuildState,
   CampaignHomeView,
@@ -103,6 +103,20 @@ const draftLanding: DraftLanding = {
     'Proovd cannot promise acceptance, results, reward pricing, or that any particular Creator will take part.',
 };
 
+/**
+ * §10's relevance signal (Founder Flow v2 Session C).
+ *
+ * `available` with a positive count, because the sweep has to render the hero
+ * and the six disclosures. The other state — zero AND unrecorded, which the
+ * server collapses into one answer before serializing — is asserted in the
+ * flow suite by comparing the two rendered outputs.
+ */
+const creatorSignal: CreatorSignal = {
+  status: 'available',
+  count: 3,
+  recordedAt: '2026-08-05T09:10:00.000Z',
+};
+
 const vetting: VettingState = {
   draftId: QA.draftId,
   campaignId: QA.campaignId,
@@ -144,6 +158,13 @@ const vetting: VettingState = {
   submittedAt: null,
   completeness: { problem: true, solution: true, competition: true },
   campaignStatus: 'vetting_in_progress',
+  // Founder Flow v2 Session C. Track A everywhere today, so the Positioning
+  // screen renders the named absence rather than a microphone that refuses.
+  transcription: {
+    available: false,
+    absentBecause:
+      'Dictation is not set up on this deployment, so we cannot turn a recording into text. Nothing was recorded and nothing was sent. Type your answer instead — it is the same box either way.',
+  },
   lockedType: null,
   typeLockedAt: null,
 };
@@ -1841,6 +1862,7 @@ export const QA_ROUTES: StubRoute[] = [
 
   /* Draft (§7, §9, §10) */
   { match: /\/api\/draft\/[^/]+\/vetting$/, body: vetting },
+  { match: /\/api\/draft\/[^/]+\/creator-signal$/, body: creatorSignal },
   { match: /\/api\/draft\/[^/]+\/claim$/, body: claim },
   { match: /\/api\/draft\/[^/]+$/, body: draftLanding },
 

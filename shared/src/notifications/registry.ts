@@ -46,6 +46,25 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.3',
     description: 'Password reset',
   },
+  /**
+   * The six-digit code that confirms a Founder can be reached at the address
+   * on their draft (Founder Flow v2 Session C — a recorded §1 rule 6
+   * deviation; `shared/src/vetting/email-code.ts` is the record).
+   *
+   * It sits BESIDE `founder_email_verification` rather than reusing it, and
+   * that entry keeps its `never` decision unchanged: §27.3 scopes it to
+   * "public-route email verification if later enabled", `disableSignUp: true`
+   * still closes that route, and the reason recorded in `unsent.ts` is still
+   * true. This is the invited route, which is a different fact.
+   *
+   * Transactional and not opt-out-able (§27.2). It carries no amount, no
+   * deadline a person must meet, and exactly one thing to do.
+   */
+  founder_email_code: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description: 'Email confirmation code',
+  },
   founder_interview_confirmed: {
     audience: 'founder',
     specRef: '§27.3',

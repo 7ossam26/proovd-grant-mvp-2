@@ -510,6 +510,16 @@ export const FOUNDER_ROSTER_UPDATE = 'founder_roster_update' as const;
  */
 export const INTERNAL_INVITATION_CLAIMED = 'internal_invitation_claimed' as const;
 export const FOUNDER_PASSWORD_RESET = 'founder_password_reset' as const;
+
+/**
+ * The six-digit email confirmation code (Founder Flow v2 Session C — a
+ * recorded §1 rule 6 deviation).
+ *
+ * Beside `founder_email_verification`, which stays in `unsent.ts` with its
+ * `never` decision intact: §27.3 scopes that one to a public route and there
+ * still is none. This is the invited route.
+ */
+export const FOUNDER_EMAIL_CODE = 'founder_email_code' as const;
 /*
  * The Affiliate workspace rebuild, Session B (2026-08-17). The reset key is
  * chosen by the account's ROLE inside the one reset path — an Affiliate's
@@ -668,6 +678,7 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   INTERNAL_CAMPAIGN_SUBMITTED,
   INTERNAL_INVITATION_CLAIMED,
   FOUNDER_PASSWORD_RESET,
+  FOUNDER_EMAIL_CODE,
   AFFILIATE_PASSWORD_RESET,
   AFFILIATE_CORRECTION_REQUEST,
   AFFILIATE_DISCLOSURE_TRACKING_AVAILABLE,

@@ -295,7 +295,7 @@ messages alone, as its own decision with its own test.
 
 The path a Founder walks from opening a pre-filled invitation to a live
 campaign becomes twenty-six full-screen steps with no app chrome. It is six
-sessions; the first two have landed. The walk that scopes the rest is
+sessions; the first three have landed. The walk that scopes the rest is
 [docs/phases/founder-reconciliation](docs/phases/founder-flow-reconciliation.md),
 and the brief is [docs/phases/founder-flow-v2.md](docs/phases/founder-flow-v2.md).
 
@@ -370,6 +370,67 @@ decorative shape had no size. And the palette's lightest grey, which is meant
 for placeholder text, was carrying a permanence warning and a legal line at
 about half the contrast those need.
 
+**The third session finishes everything reachable on the invitation link** — the
+address, a six-digit confirmation code, the last of the three questions, and the
+relevance signal — and it carries two of the rebuild's three deliberate
+exceptions.
+
+The code is the larger of them. Nothing in this product had a one-time code
+before, and the important thing about this one is what it does not do: it
+confirms that an address can be reached, and it creates no account. The account
+still happens where the Spec puts it, one screen later, with its own agreements
+chosen one at a time. Six digits is only a secret if two things hold — every
+wrong answer looks identical to every other kind of wrong answer, and there is a
+limit on guesses — so the tests compare whole responses rather than fields, and
+they exhaust the guess counter and then try the *right* code to prove it is
+finished. A code is stored as a keyed digest of the draft, the address and the
+digits together, not a plain hash: six digits have only a million possible
+values, so a plain hash would eventually collide two live codes and would itself
+be a lookup table back to the code. Binding the address in has a second effect
+worth having — change your address and the code you were sent stops working,
+which is right, because the thing being verified is the address.
+
+Asking for a code answers the same sentence whatever happened, including when
+you have asked too many times, and it answers *before* it does the work: a hit
+sends mail and a miss returns immediately, and that difference is measurable even
+when the words match.
+
+The other exception is dictation on the two open-ended questions. It transcribes
+and does nothing else — there is no summarize, rewrite or suggest control, and
+the recording is not kept, because none of the retention rules covers one and
+inventing a rule would be the same overreach in the other direction. What lands
+in the box is the Founder's own words, saved exactly as typing them would be.
+The provider is unconfigured here, so the screen says so where the microphone
+would be rather than offering a button that refuses.
+
+**The reference asks two of its questions twice, and the second asking was not
+built.** There is one stored answer for each, so collecting either in two places
+would eventually produce two versions of it. What the positioning screen does
+instead is name any earlier answer that is still empty and link back to the page
+that owns it. Two more of the reference's own touches were refused: a line
+claiming Creators are "ready to promote this" — nobody has agreed to anything at
+that point — and a breakdown of them by category, which no record holds. And its
+email headline says confirming an address is what saves your progress, which is
+not what saves your progress: the link in the invitation is, and everything has
+been saving as you type since the second screen.
+
+**Walking it in a browser again found four defects, the sixth rebuild in a row.**
+A spacing value that does not exist in the scale, so the rule was dropped and a
+whole screen's gaps collapsed to nothing. A floating help badge sitting on top of
+the primary button on a short laptop window. Placeholder-grey carrying a real
+instruction — and the first fix for that was itself a bug, styling the dark
+panel's hint dark-green-on-dark-green, which is the same class of thing the
+previous session found. And a background colour naming a token this stylesheet
+has never defined, which has left one Admin surface's file rows with no
+background since the day they shipped.
+
+Two of those were the stylesheet being silently invalid rather than wrong, which
+has now happened twice, so two checks run on every commit: every comment opens
+and closes exactly once, and every colour or spacing value names something the
+file actually defines. Values a component deliberately supplies itself are
+exempt, and both checks read the file with comments removed — the first version
+failed on its own explanation.
+
 Three parts of the flow cannot be completed in the current environment, and none
 of them is stubbed: the eight policy documents are still in legal review so the
 account step refuses in the open and says why, and file storage and the
@@ -384,8 +445,8 @@ npm workspaces, one root `package.json`, one multi-stage `Dockerfile`.
 shared/     Zod schemas, money waterfall, state machines, business-day calendar
   src/policies/   the eight canonical policy records and their versions
   src/settings/   the §6 operating-constant register
-  src/vetting/    the §9 vetting sequence, its copy, the two campaign paths, and
-                  the onboarding flow's page register
+  src/vetting/    the §9 vetting sequence, its copy, the two campaign paths,
+                  the onboarding flow's page register, and the email code
   src/affiliates/ the §5.3 subtypes and their evidence, §8's recruitment
                   record, and §2.2's active-partnership slot rule
   src/workspace/  the §12 optional items, what does not count as evidence for
@@ -453,7 +514,9 @@ backend/    Express 5 + Drizzle + Postgres 16
                       public page, and live editing's one tiered door plus the
                       comment thread
   src/invitations/    Founder prospects, the invitation, the retention sweep
-  src/vetting/        the §9 answers and their provenance, the §10 account claim
+  src/vetting/        the §9 answers and their provenance, the §10 account claim,
+                      and the six-digit email code
+  src/transcription/  the dictation port — transcribes, stores nothing
   src/affiliates/     Creator recruitment, verification, the private
                       invitation, and the §11 compact signup
   src/workspace/      the §12 evidence rules, the interview booking record,

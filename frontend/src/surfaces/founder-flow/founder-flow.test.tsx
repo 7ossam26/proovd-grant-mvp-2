@@ -30,6 +30,7 @@ import {
   FOUNDER_FLOW_ABSENCES,
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
+  POSSIBLE_CREATOR_RESULT_DISCLOSURES,
 } from '@proovd/shared';
 import { appRoutes } from '../../routes.js';
 
@@ -548,6 +549,9 @@ describe('§33.11 the flow is operable', () => {
       handlers = [];
       stubLanding();
       stubVetting(ANSWERED);
+      stubClaim();
+      stubCode();
+      stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       for (const control of screen.getAllByRole('button')) {
@@ -572,5 +576,400 @@ describe('§33.11 the flow is operable', () => {
     forward.focus();
     await user.keyboard('{Enter}');
     await screen.findByRole('heading', { name: /how we understood your solution/i });
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session C — the address, the code, Positioning, and §10's signal
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const CLAIM_FIELD = {
+  value: null as string | null,
+  prefilled: null as string | null,
+  supplier: null as string | null,
+  editedAt: null as string | null,
+};
+
+function claimView(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    profile: {
+      draftId: 'd1',
+      campaignId: 'c1',
+      fields: {
+        legalName: { ...CLAIM_FIELD },
+        preferredName: { ...CLAIM_FIELD },
+        email: { ...CLAIM_FIELD, value: 'rowan@example.com', prefilled: 'rowan@example.com' },
+        phone: { ...CLAIM_FIELD },
+        dateOfBirth: { ...CLAIM_FIELD },
+        country: { ...CLAIM_FIELD },
+        stateRegion: { ...CLAIM_FIELD },
+        businessName: { ...CLAIM_FIELD },
+        businessEntityType: { ...CLAIM_FIELD },
+      },
+      soleProprietor: null,
+      emailOwnership: 'invited_link',
+      phoneVerified: false,
+      representations: { usPerson: false, age18Plus: false, sanctions: false },
+      lastSavedAt: null,
+      claimedAt: null,
+      ...overrides,
+    },
+    policies: [],
+    canComplete: false,
+  };
+}
+
+function stubClaim(overrides: Record<string, unknown> = {}) {
+  const view = claimView(overrides);
+  handlers.push((url, init) => {
+    if (!/\/api\/draft\/[^/]+\/claim$/.test(url)) return undefined;
+    const profile = view['profile'] as Record<string, unknown>;
+    if (init?.method === 'PATCH') {
+      const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
+      const fields = profile['fields'] as Record<string, Record<string, unknown>>;
+      if ('email' in patch) fields['email'] = { ...fields['email'], value: patch['email'] };
+      return { status: 200, body: profile };
+    }
+    return { status: 200, body: view };
+  });
+  return () => view;
+}
+
+/** The two code routes. `accept` is the one value that verifies. */
+function stubCode(accept = '418306') {
+  const asked: number[] = [];
+  handlers.push((url, init) => {
+    if (/\/email-code$/.test(url)) {
+      asked.push(asked.length);
+      return {
+        status: 202,
+        body: { status: 'sent', title: 'Check your email', whatHappened: 'x', next: 'y' },
+      };
+    }
+    if (/\/email-code\/verify$/.test(url)) {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { code?: string };
+      return body.code === accept
+        ? { status: 200, body: { verified: true } }
+        : {
+            status: 401,
+            body: {
+              error: 'link_unavailable',
+              title: 'We cannot open this link',
+              detail: '',
+              next: '',
+              support: '/support/link',
+            },
+          };
+    }
+    return undefined;
+  });
+  return asked;
+}
+
+function stubSignal(body: Record<string, unknown>) {
+  handlers.push((url) => (/\/creator-signal$/.test(url) ? { status: 200, body } : undefined));
+}
+
+describe('the address', () => {
+  it('is prefilled from the invitation and says so', async () => {
+    stubClaim();
+    renderAt(at('email'));
+    // Wait for the page rather than the field: a loading panel is announced
+    // too, and a label query that matches it passes before the read resolves.
+    await screen.findByRole('heading', { level: 1 });
+    const field = await screen.findByLabelText(/your email address/i);
+    expect((field as HTMLInputElement).value).toBe('rowan@example.com');
+    expect(screen.getByText(/filled in from your invitation/i)).toBeInTheDocument();
+  });
+
+  it('does not claim that confirming an address is what saves your progress', async () => {
+    // The reference's own headline is `To save your progress verify your email:`
+    // and it names the wrong mechanism: §9's autosave has been writing through
+    // the draft token since screen 2 (§1.4).
+    stubClaim();
+    renderAt(at('email'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(document.body.textContent).not.toMatch(/to save your progress/i);
+  });
+
+  it('asks for a code and moves on, and nothing branches on the answer', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    const asked = stubCode();
+    stubVetting(ANSWERED);
+    renderAt(at('email'));
+    await user.click(await screen.findByRole('button', { name: /send me a code/i }));
+    await waitFor(() => expect(asked.length).toBe(1));
+    await screen.findByRole('heading', { name: /six-digit code/i });
+  });
+
+  it('will not send to something that is not an address', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    renderAt(at('email'));
+    await screen.findByRole('heading', { level: 1 });
+    const field = await screen.findByLabelText(/your email address/i);
+    await user.clear(field);
+    await user.type(field, 'rowan');
+    expect(screen.getByRole('button', { name: /send me a code/i })).toBeDisabled();
+  });
+});
+
+describe('the six-digit code', () => {
+  it('labels every box and says what confirming does NOT do', async () => {
+    stubClaim();
+    stubCode();
+    renderAt(at('code'));
+    for (let i = 1; i <= 6; i++) {
+      expect(await screen.findByLabelText(`Digit ${i} of 6`)).toBeInTheDocument();
+    }
+    // §1.4, on the screen most likely to read as a sign-in.
+    expect(document.body.textContent).toMatch(/creates no account/i);
+  });
+
+  it('advances on the sixth digit', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    stubCode('418306');
+    stubVetting(ANSWERED);
+    renderAt(at('code'));
+    await user.click(await screen.findByLabelText('Digit 1 of 6'));
+    await user.keyboard('418306');
+    await screen.findByRole('heading', { name: /who else is solving this/i });
+  });
+
+  it('takes a pasted code, because that is how people enter one', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    stubCode('418306');
+    stubVetting(ANSWERED);
+    renderAt(at('code'));
+    await user.click(await screen.findByLabelText('Digit 1 of 6'));
+    await user.paste('418306');
+    await screen.findByRole('heading', { name: /who else is solving this/i });
+  });
+
+  it('offers a real control as well as the auto-advance (§28.5)', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    stubCode('418306');
+    stubVetting(ANSWERED);
+    renderAt(at('code'));
+    const confirm = await screen.findByRole('button', { name: /confirm your email/i });
+    expect(confirm).toBeDisabled();
+    await user.click(await screen.findByLabelText('Digit 1 of 6'));
+    await user.keyboard('41830');
+    expect(confirm).toBeDisabled();
+  });
+
+  it('says one thing for every refusal, and lets you try again', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    stubCode('418306');
+    renderAt(at('code'));
+    await user.click(await screen.findByLabelText('Digit 1 of 6'));
+    await user.keyboard('000000');
+    const alert = await screen.findByRole('alert');
+    // It says nothing about WHICH of the five things went wrong, because the
+    // server tells the surface nothing more (§5.5).
+    expect(alert.textContent).toMatch(/may have been mistyped/i);
+    expect(alert.textContent).not.toMatch(/too many/i);
+    expect(screen.getByLabelText('Digit 1 of 6')).toHaveValue('');
+  });
+
+  it('clears the box before it on backspace, so a typo is fixable', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    stubCode();
+    renderAt(at('code'));
+    await user.click(await screen.findByLabelText('Digit 1 of 6'));
+    await user.keyboard('41');
+    // Focus is on box 3 and it is empty, so the keystroke clears box 2 and
+    // moves there. Box 1 is untouched — a second backspace would clear it,
+    // which is the point: every box is reachable without a mouse.
+    await user.keyboard('{Backspace}');
+    expect(screen.getByLabelText('Digit 2 of 6')).toHaveValue('');
+    expect(screen.getByLabelText('Digit 1 of 6')).toHaveValue('4');
+  });
+});
+
+describe('positioning', () => {
+  it('renders blank with no Proovd draft behind it (§9, §33.1.5)', async () => {
+    stubVetting(ANSWERED);
+    renderAt(at('positioning'));
+    const box = await screen.findByLabelText(/positioning/i);
+    expect((box as HTMLTextAreaElement).value).toBe('');
+    // The one field the product never drafts. There is no "we wrote this"
+    // treatment on this screen at all.
+    expect(document.body.textContent).not.toMatch(/we wrote this from our conversation/i);
+    expect(screen.getByText(/we do not draft for you/i)).toBeInTheDocument();
+  });
+
+  it('does not ask Problem or Solution a second time', async () => {
+    // The reference asks both twice. §9 has one of each, and a record collected
+    // in two places is a record whose copies eventually disagree.
+    stubVetting(ANSWERED);
+    renderAt(at('positioning'));
+    await screen.findByLabelText(/positioning/i);
+    expect(screen.queryByDisplayValue(ANSWERED.problem)).toBeNull();
+    expect(screen.queryByDisplayValue(ANSWERED.solution)).toBeNull();
+  });
+
+  it('names a missing earlier answer and links back to the page that owns it', async () => {
+    stubVetting({
+      ...ANSWERED,
+      completeness: { problem: false, solution: true, competition: false },
+    });
+    renderAt(at('positioning'));
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByRole('link', { name: /your problem/i })).toHaveAttribute(
+      'href',
+      at('problem'),
+    );
+  });
+
+  it('submits, then goes to the match', async () => {
+    const user = userEvent.setup();
+    // Registered BEFORE `stubVetting`, whose matcher is `url.includes('/vetting')`
+    // and would otherwise answer the submit with the unsubmitted state.
+    handlers.push((url, init) =>
+      url.includes('/vetting/submit') && init?.method === 'POST'
+        ? {
+            status: 200,
+            body: { ...vettingState(ANSWERED), submittedAt: '2026-08-18T12:00:00.000Z' },
+          }
+        : undefined,
+    );
+    stubVetting(ANSWERED);
+    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
+    renderAt(at('positioning'));
+    await user.type(await screen.findByLabelText(/positioning/i), 'Spreadsheets, mostly.');
+    await user.click(screen.getByRole('button', { name: /submit and see your creator match/i }));
+    await screen.findByRole('heading', { name: /3 creators/i });
+  });
+
+  it('renders the dictation absence rather than a microphone that refuses', async () => {
+    stubVetting({
+      ...ANSWERED,
+      transcription: {
+        available: false,
+        absentBecause: 'Dictation is not set up on this deployment.',
+      },
+    });
+    renderAt(at('positioning'));
+    await screen.findByLabelText(/positioning/i);
+    expect(screen.getByText(/dictation is not set up/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /say it instead/i })).toBeNull();
+  });
+
+  it('offers nothing that writes for you (§12, §30)', async () => {
+    stubVetting({ ...ANSWERED, transcription: { available: true } });
+    renderAt(at('positioning'));
+    await screen.findByLabelText(/positioning/i);
+    expect(screen.getByRole('button', { name: /say it instead/i })).toBeInTheDocument();
+    for (const word of [/suggest/i, /rewrite/i, /summari[sz]e/i, /generate/i, /improve/i]) {
+      expect(screen.queryByRole('button', { name: word })).toBeNull();
+    }
+  });
+});
+
+describe('the relevance signal', () => {
+  it('renders Creators, never the internal word (§3.1)', async () => {
+    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
+    renderAt(at('match'));
+    await screen.findByRole('heading', { name: /3 creators/i });
+    expect(document.body.textContent).not.toMatch(/affiliate/i);
+  });
+
+  it('states every one of the limits, in full', async () => {
+    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
+    renderAt(at('match'));
+    await screen.findByRole('heading', { name: /3 creators/i });
+    for (const line of POSSIBLE_CREATOR_RESULT_DISCLOSURES) {
+      expect(screen.getByText(line)).toBeInTheDocument();
+    }
+  });
+
+  it('renders identically for a zero result and an unrecorded one', async () => {
+    // §10: "a zero result routes to Admin before the Founder proceeds", and
+    // distinguishing the two would show a Founder a number §10 forbids. The
+    // server collapses them before serializing; this compares what renders.
+    stubSignal({ status: 'with_admin', count: null, recordedAt: null });
+    const first = renderAt(at('match'));
+    await screen.findByRole('heading', { name: /working on your match/i });
+    const zero = document.body.textContent;
+    first.unmount();
+
+    handlers = [];
+    stubSignal({ status: 'with_admin', count: null, recordedAt: null });
+    renderAt(at('match'));
+    await screen.findByRole('heading', { name: /working on your match/i });
+    expect(document.body.textContent).toBe(zero);
+  });
+
+  it('promises nothing about what those Creators will do, and names none', async () => {
+    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
+    renderAt(at('match'));
+    await screen.findByRole('heading', { name: /3 creators/i });
+    const text = document.body.textContent ?? '';
+    // The reference's own sub-line. It claims people who have agreed to nothing
+    // are ready to promote something.
+    expect(text).not.toMatch(/ready to promote/i);
+    // And the breakdown, which no record holds.
+    expect(text).not.toMatch(/newsletter|community owners/i);
+  });
+
+  it('does not gate the claim: the way forward is offered in both states', async () => {
+    stubSignal({ status: 'with_admin', count: null, recordedAt: null });
+    renderAt(at('match'));
+    await screen.findByRole('heading', { name: /working on your match/i });
+    expect(screen.getByRole('button', { name: /set up your account/i })).toBeEnabled();
+  });
+});
+
+describe('the flow is operable over Session C pages', () => {
+  const PAGES = ['email', 'code', 'positioning', 'match'];
+
+  function stubEverything() {
+    stubClaim();
+    stubCode();
+    stubVetting(ANSWERED);
+    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
+  }
+
+  it('has no axe violations on any of them', async () => {
+    for (const id of PAGES) {
+      handlers = [];
+      stubEverything();
+      const view = renderAt(at(id));
+      await screen.findByRole('heading', { level: 1 });
+      expect(await axe(view.container), id).toHaveNoViolations();
+      view.unmount();
+    }
+  });
+
+  it('exposes exactly one level-1 heading per page (§33.11.2)', async () => {
+    for (const id of PAGES) {
+      handlers = [];
+      stubEverything();
+      const view = renderAt(at(id));
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.getAllByRole('heading', { level: 1 }), id).toHaveLength(1);
+      view.unmount();
+    }
+  });
+
+  it('names a destination on every nav control (§33.11.4)', async () => {
+    for (const id of PAGES) {
+      handlers = [];
+      stubEverything();
+      const view = renderAt(at(id));
+      await screen.findByRole('heading', { level: 1 });
+      for (const button of screen.getAllByRole('button')) {
+        const label = (button.textContent ?? '').trim().toLowerCase();
+        expect(OBJECTLESS_CTA_LABELS as readonly string[], `${id}: ${label}`).not.toContain(label);
+      }
+      view.unmount();
+    }
   });
 });

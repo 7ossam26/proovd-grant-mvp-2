@@ -35,6 +35,7 @@ import { renderSignupConfirmed } from './templates/affiliate-signup-confirmed.js
 import { renderPreparingAvailable } from './templates/affiliate-preparing-available.js';
 import { renderFormalOpportunity } from './templates/affiliate-formal-opportunity.js';
 import { renderInterviewEmail } from './templates/founder-interview.js';
+import { renderEmailCodeNotice } from '../vetting/email-code.js';
 import { renderListingReceipt, renderListingRefund } from './templates/listing-fee.js';
 import {
   renderAcceptConfirmation,
@@ -975,6 +976,15 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
 
 
   /* The last four customer messages §27 named and nothing sent (Phase 22b). */
+  /**
+   * Founder Flow v2 Session C. Rendered by the SAME function the sender
+   * calls, so what the contract report checks is what a Founder receives —
+   * and the sample code is not a real one, because this catalog is rendered
+   * by the preview surface and by the coverage suite, neither of which may
+   * mint anything.
+   */
+  founder_email_code: () =>
+    renderEmailCodeNotice({ code: '418306', reference: REF, supportEmail: SUPPORT }),
   founder_password_reset: () =>
     renderPlainNotice({
       subject: 'Reset your Proovd password',

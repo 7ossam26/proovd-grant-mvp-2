@@ -32,6 +32,7 @@ import { createFounderRouter } from './routes/founder.js';
 import { createAdminWorkspaceRouter } from './routes/admin-workspace.js';
 import { unconfiguredStorage, type ObjectStorage } from './storage/object-storage.js';
 import { unconfiguredScheduler, type Scheduler } from './interviews/calcom.js';
+import type { Transcription } from './transcription/index.js';
 import { createCalcomWebhookRouter } from './routes/calcom-webhook.js';
 import { createStripeWebhookRouter } from './routes/stripe-webhooks.js';
 import { createPayoutRouter } from './routes/payouts.js';
@@ -143,6 +144,13 @@ export interface AppConfig {
    */
   interviewScheduler?: Scheduler;
   /**
+   * Dictation (Founder Flow v2 deviation 2). Defaults to the port that
+   * refuses loudly, exactly as storage and scheduling do: it transcribes and
+   * does nothing else, and an unconfigured deployment renders the absence
+   * rather than reporting speech as transcribed (§1.4, §12, §30).
+   */
+  transcription?: Transcription;
+  /**
    * §32.2's Stripe client. Unlike the other three ports this has no
    * "unconfigured" default — `env.ts` has always required the keys, so a running
    * process always has one. The suite injects its own to drive signatures, mode
@@ -172,6 +180,14 @@ export interface AppConfig {
    * from one loopback address than any person would.
    */
   draftVerifyLimit?: number;
+  /**
+   * The email code's own hourly allowance (Founder Flow v2 Session C).
+   *
+   * Separate from `draftVerifyLimit` because this route sends mail, so its
+   * production default is the tight resend limit. The suite raises it, except
+   * in the one test that drives the limiter.
+   */
+  emailCodeLimit?: number;
   /**
    * The blanket per-address request limit. Defaults to the production value.
    *
@@ -273,7 +289,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       }),
     ...(config.google ? { google: config.google } : {}),
   });
-  const tokens = createTokenService({ db, audit });
+  const tokens = createTokenService({ db, audit, secret: config.authSecret });
 
   // ── Security headers ───────────────────────────────────────────────────────
   app.use(helmet());
@@ -592,6 +608,21 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       // Phase 08c (§10, §33.1.9). The account claim is the event; this is its
       // consumer. Idempotent, so a failed run costs nothing but a retry.
       handoff: { db, notifier, context: config.invitationContext },
+      // Founder Flow v2 Session C (§5.2 — a recorded §1 rule 6 deviation).
+      // The code VERIFIES AN EMAIL: it creates no account, mints no session,
+      // and `completeClaim` is untouched.
+      emailCode: {
+        db,
+        tokens,
+        notifier,
+        fromAddress: config.invitationContext.fromAddress,
+        supportEmail: config.invitationContext.supportEmail,
+        audit,
+      },
+      // Deviation 2. Unset everywhere today, so the port refuses loudly and
+      // the Positioning screen renders the absence (Track A).
+      ...(config.transcription ? { transcription: config.transcription } : {}),
+      ...(config.emailCodeLimit !== undefined ? { emailCodeLimit: config.emailCodeLimit } : {}),
     }),
   );
   // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator: their campaigns and

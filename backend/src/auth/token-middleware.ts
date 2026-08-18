@@ -129,6 +129,13 @@ function createTokenGuard(tokens: TokenService, scope: TokenSubject['scope']): R
       req.affiliateInvitationSubject = result.subject;
     } else if (result.subject.scope === 'campaign_follow') {
       req.campaignFollowSubject = result.subject;
+    } else if (result.subject.scope === 'founder_email_code') {
+      // Deliberately writes NOTHING. A six-digit code is checked by
+      // `verifyFounderEmailCode` on a route that already holds a verified draft
+      // token; it is not a credential a middleware admits, and it must never
+      // become one — a request arriving with only a code has no draft this
+      // guard could name. The branch exists so the union stays total and a
+      // code can never fall through into `magicLinkSubject`.
     } else {
       req.magicLinkSubject = result.subject;
     }

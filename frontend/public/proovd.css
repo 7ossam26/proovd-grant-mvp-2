@@ -6674,7 +6674,10 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   padding: var(--sp-12) var(--sp-16);
   border: 1px solid var(--grey-light);
   border-radius: 12px;
-  background: var(--paper);
+  /* Was `var(--paper)`, which this file never defines — so the declaration was
+     dropped and the row had no background at all. Found by the token scan added
+     in Founder Flow v2 Session C, not by looking at it. */
+  background: var(--white);
 }
 .cr-file > span { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
 .cr-file strong { font-size: 0.9375rem; font-weight: 800; color: var(--darker); overflow-wrap: anywhere; }
@@ -8035,9 +8038,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
 @media (max-width: 599.98px) {
   .ff__badge { right: var(--sp-16); bottom: var(--sp-16); }
   .ff__body { justify-content: flex-start; }
-  /* The badge is fixed bottom-right. Without this the last control on a page
-     can never be scrolled clear of it. */
-  .ff__stage { padding-bottom: calc(var(--ff-pad) + 3.5rem); }
+  .ff__body { justify-content: flex-start; }
   .ff-nav { flex-direction: column; align-items: stretch; }
   .ff-nav .btn { width: 100%; justify-content: center; }
   .ff-nav .btn--primary { margin-left: 0; order: -1; }
@@ -8046,4 +8047,165 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .ff-confirm__meta { flex-direction: column; gap: var(--sp-8); }
   /* The stroke reads as a blur at small sizes; the mint fill carries it. */
   .ff-stroke { -webkit-text-stroke-width: 0.1em; }
+}
+
+/* The badge is fixed bottom-right at EVERY width, so the stage reserves room
+   for it at every width. It was mobile-only until the Session C browser pass:
+   at 1280x520 the badge sat squarely on top of the primary control, which is a
+   laptop with browser chrome rather than an unusual viewport.               */
+.ff__stage { padding-bottom: calc(var(--ff-pad) + 3.5rem); }
+
+/* ── PHASE 34 — Session C: the address, the code, Positioning, the match ───
+   Added 2026-08-18. Nothing above this comment is edited, and no colour is
+   minted: Session B's header records the twelve-colour decision once, for all
+   twenty-six screens, and these four resolve to the same tokens.
+
+   The reference greys the email field's own ink while it has focus. That is
+   `--grey` on `--white`, about 2.2:1, applied to the text somebody is actively
+   typing — the token for placeholders and disabled ink. The dashed brand
+   underline is what marks focus here instead, which is the reference's own
+   treatment minus the part that costs legibility.                          */
+
+/* `.field-hint` is `--grey`, which is about 2.2:1 on `--white` — the token for
+   placeholders and disabled ink. On these pages a hint is a real sentence that
+   changes what somebody types, so it reads `--moss` like every other line of
+   body copy here. Scoped to the flow rather than changed at the component:
+   `.field-hint` renders on every form in the product and moving it globally is
+   its own change with its own screenshot pass.
+
+   `:where()` rather than `.ff`, and that is the whole reason this rule works.
+   Session B's `.ff-panel .field-hint { color: var(--mint) }` is two classes and
+   sits ABOVE this line, so a plain `.ff .field-hint` would tie on specificity,
+   win on order, and paint the dark panel's hint mid-green on dark green. The
+   first draft did exactly that, and only the screenshot said so. `:where()`
+   contributes nothing, leaving this at one class — enough to beat the bare
+   `.field-hint` above it and not enough to beat the panel.                  */
+:where(.ff) .field-hint { color: var(--moss); }
+
+/* Screen 5 — the address */
+.ff-email { display: flex; flex-direction: column; gap: var(--sp-24); }
+.ff-email__head {
+  margin: 0;
+  font-size: var(--ff-display);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  color: var(--dark);
+}
+.ff-email__lede { margin: 0; max-width: var(--measure); color: var(--moss); }
+.ff-email__field { max-width: 34rem; }
+.ff-email__input {
+  width: 100%;
+  padding: var(--sp-12) 0;
+  border: 0;
+  border-bottom: 2px dashed var(--brand);
+  border-radius: 0;
+  background: transparent;
+  color: var(--dark);
+  font-family: inherit;
+  font-size: clamp(1.25rem, 4vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ff-email__input:focus-visible {
+  outline: none;
+  border-bottom-style: solid;
+  box-shadow: 0 2px 0 0 var(--brand);
+}
+
+/* Screen 6 — the six-digit code */
+.ff-code { display: flex; flex-direction: column; gap: var(--sp-24); }
+.ff-code__head {
+  margin: 0;
+  font-size: clamp(1.75rem, 6vw, 3.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--dark);
+}
+.ff-code__lede { margin: 0; max-width: var(--measure); color: var(--moss); }
+.ff-code__done { margin: 0; color: var(--moss); font-weight: 700; }
+.ff-code__boxes {
+  display: flex;
+  gap: var(--sp-12);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  flex-wrap: wrap;
+}
+.ff-code__slot { display: block; }
+.ff-code__box {
+  width: 3.25rem;
+  height: 3.75rem;
+  border: 2px solid var(--grey);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--dark);
+  font-family: inherit;
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+.ff-code__box:focus-visible { outline: none; border-color: var(--brand); }
+.ff-code__error { margin: 0; max-width: var(--measure); color: var(--dark); font-weight: 700; }
+.ff-code__resend { margin: 0; color: var(--moss); }
+.ff-code__resend-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--dark);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--brand);
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+
+/* Screen 9 — an answer, and the dictation control */
+.ff-answer { display: flex; flex-direction: column; gap: var(--sp-24); }
+.ff-answer__head {
+  margin: 0;
+  font-size: clamp(1.75rem, 6vw, 3.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  color: var(--dark);
+}
+.ff-answer__lede { margin: 0; max-width: var(--measure); color: var(--moss); }
+.ff-answer__missing { margin: 0; max-width: var(--measure); color: var(--dark); font-weight: 700; }
+.ff-answer__field { max-width: 44rem; }
+.ff-answer__note { margin: var(--sp-12) 0 0; color: var(--moss); }
+.ff-answer__warning { margin: 0; max-width: var(--measure); color: var(--moss); }
+.ff-answer__refusal { margin: 0; max-width: var(--measure); color: var(--dark); font-weight: 700; }
+.ff-answer__dictation {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-16);
+  flex-wrap: wrap;
+}
+.ff-answer__dictation-note { color: var(--moss); max-width: 26rem; }
+.ff-answer__dictation-absent { margin: 0; max-width: var(--measure); color: var(--moss); }
+
+/* Screen 17 — the §10 relevance signal */
+.ff-match { display: flex; flex-direction: column; gap: var(--sp-24); }
+/* The one place the flow raises its voice. The reference sets this at 198px/900
+   — 2.25x its own campaign-type headline, and the largest type anywhere in the
+   twenty-six screens. That ratio does not survive a 320px viewport, so this is
+   the same intent at a workable scale: clearly the biggest thing in the flow,
+   and DNA §5.8's one delight rather than a second display size to reuse.    */
+.ff-match__head {
+  margin: 0;
+  font-size: clamp(2.75rem, 7.4vw, 5.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  color: var(--dark);
+}
+.ff-match__lede { margin: 0; max-width: var(--measure); font-size: 1.25rem; color: var(--moss); }
+.ff-match__limits { max-width: var(--measure); }
+.ff-match__limits h2 { margin: 0 0 var(--sp-16); font-size: 1.25rem; color: var(--dark); }
+
+@media (max-width: 599.98px) {
+  /* Six boxes plus five gaps must fit 320px minus the stage padding. */
+  .ff-code__box { width: 2.5rem; height: 3rem; font-size: 1.375rem; }
+  .ff-code__boxes { gap: var(--sp-8); }
+  .ff-answer__dictation { flex-direction: column; align-items: stretch; }
+  .ff-answer__dictation .btn { width: 100%; justify-content: center; }
 }

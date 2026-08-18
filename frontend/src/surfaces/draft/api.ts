@@ -101,10 +101,23 @@ export interface VettingState {
   submittedAt: string | null;
   completeness: Record<'problem' | 'solution' | 'competition', boolean>;
   campaignStatus: string;
+  /** Founder Flow v2 Session C. A deployment fact, carried with the read. */
+  transcription?: TranscriptionAvailability;
   lockedType: CampaignTypeValue | null;
   typeLockedAt: string | null;
 }
 
+/**
+ * Whether dictation is available on this deployment, and why not when it is not.
+ *
+ * It rides the vetting read rather than being discovered at the microphone,
+ * because a 503 at the point of use arrives after somebody has already pressed
+ * record. The sentence is the port’s own, so the screen and the server log
+ * cannot disagree about the reason.
+ */
+export type TranscriptionAvailability =
+  | { available: true }
+  | { available: false; absentBecause: string };
 export interface VettingPatch {
   problem?: string | null;
   solution?: string | null;
@@ -131,6 +144,52 @@ export interface CreatorSignal {
 export const fetchCreatorSignal = (token: string): Promise<CreatorSignal> =>
   call(`${base(token)}/creator-signal`);
 
+/* ── §5.2 the six-digit email code (Founder Flow v2, Session C) ─────────── */
+
+/**
+ * The one answer to "send me a code", whatever happened.
+ *
+ * The route returns this for a hit, a draft with no address on it, a provider
+ * that refused, and a caller over the limit — at 202 in every case, never a
+ * 429. Nothing here branches on it, because there is nothing to branch on;
+ * the result of the request arrives in the person’s inbox.
+ */
+export interface EmailCodeAck {
+  status: 'sent';
+  title: string;
+  whatHappened: string;
+  next: string;
+}
+
+export const requestEmailCode = (token: string): Promise<EmailCodeAck> =>
+  call(`${base(token)}/email-code`, { method: 'POST', body: JSON.stringify({}) });
+
+/**
+ * Checks a code. Throws `DraftRequestError` carrying the frozen link-unavailable
+ * body for every failure mode — wrong, expired, already used, too many tries,
+ * never requested. The surface renders one sentence for all of them, because
+ * the server tells it nothing more (§5.5).
+ */
+export const verifyEmailCode = (token: string, code: string): Promise<{ verified: true }> =>
+  call(`${base(token)}/email-code/verify`, {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+
+/**
+ * Dictation (deviation 2). Sends the recording and gets back what was said.
+ *
+ * Nothing is stored: no bucket key comes back, no id, no handle. The text
+ * lands in the Founder’s own textarea and saves through the ordinary autosave
+ * as their words, which is what keeps §9’s "never represented as
+ * AI-generated" true on the Positioning step.
+ */
+export const transcribeAudio = (token: string, audio: Blob): Promise<{ text: string }> =>
+  call(`${base(token)}/transcribe`, {
+    method: 'POST',
+    headers: { 'content-type': audio.type || 'audio/webm' },
+    body: audio,
+  });
 export const fetchVetting = (token: string): Promise<VettingState> =>
   call(`${base(token)}/vetting`);
 
@@ -165,7 +224,17 @@ export interface ClaimProfileState {
   campaignId: string;
   fields: Record<ClaimFieldName, ClaimFieldState>;
   soleProprietor: boolean | null;
-  emailOwnership: 'invited_link' | 'google_oauth' | 'self_supplied_unverified' | null;
+  /**
+   * §5.2. `code_verified` is Founder Flow v2 Session C (a recorded §1 rule 6
+   * deviation) and the only one of the four that is evidence rather than
+   * provenance: a code we sent to that exact address came back.
+   */
+  emailOwnership:
+    | 'invited_link'
+    | 'google_oauth'
+    | 'self_supplied_unverified'
+    | 'code_verified'
+    | null;
   phoneVerified: false;
   representations: { usPerson: boolean; age18Plus: boolean; sanctions: boolean };
   lastSavedAt: string | null;

@@ -345,6 +345,12 @@ question being absent.
 §33.11.7 pass with the four new addresses in `PRINCIPAL_FLOWS` and swept; the §33.11.3 bundle scan
 passes over a fresh `dist`.
 
+**Session C** — `npm test`: **119 files, 3,100 tests, green in one run.** §33.1.1 through §33.1.9
+pass **unchanged** — including §33.1.5 and §33.1.9, which is C10's own contract: `completeClaim`
+is not touched by the code, and the never-prefill guarantee holds with Positioning collected again.
+§33.11.1 through §33.11.7 pass over the eight addresses, and the §27 coverage partition still
+holds with one new key beside `founder_email_verification`, whose `never` decision is unchanged.
+
 ---
 
 ## 8. Session B's screen order, as built
@@ -379,7 +385,7 @@ Four decisions worth carrying forward:
 
 ---
 
-## 9. What the browser pass found, and nothing else could
+## 9. What the Session B browser pass found, and nothing else could
 
 Four defects, all invisible to jsdom, axe, and the type checker. This is the fifth rebuild in a row
 where that has been true.
@@ -405,3 +411,103 @@ Two things the pass confirmed rather than found: the splash works (it is the run
 per session with a 4-second backstop, and `--virtual-time-budget=4000` was simply catching it
 mid-play), and a 320px viewport still needs the iframe technique — Chrome on Windows reports
 `clientWidth: 489` for `--window-size=320`.
+
+## 10. Session C's screen order, as built
+
+The four addresses that finish the draft token, and what each is:
+
+| Page id | Address | Reference | Note |
+|---|---|---|---|
+| `email` | `/draft/:token/email` | 5 | `founder_claim_profiles.email`. The reference's headline is refused. |
+| `code` | `/draft/:token/code` | 6 | **Deviation 1.** Verifies an email; creates no account. |
+| `positioning` | `/draft/:token/positioning` | 9 | §9's third answer, and the submission that locks the type. |
+| `match` | `/draft/:token/match` | 17 | §10's relevance signal, at §10's own position. |
+
+**`/draft/:token/vetting` is retired and redirects to `/draft/:token/positioning`.** It was the
+interim surface that asked §9's third answer and submitted; Positioning is its own page now and the
+submission went with it. A redirect rather than a deleted route, because the address shipped in
+Phase 07 and somebody may have it bookmarked.
+
+**Screens 7–8 become nothing, which is §4.5's decision carried out.** The reference asks Problem
+and Solution a second time inside the answer sequence; §9 has one `problem_text` and one
+`solution_text`, and Session B built screens 2–3 as those two answers. What the Positioning screen
+does instead is name any earlier answer that is still empty and link back to the page that owns it.
+A record collected in two places is a record whose copies eventually disagree — and a suite testing
+both copies would have made that look correct.
+
+### What the Session C walk found that neither earlier walk did
+
+Four elements the reference draws are refused, each now an entry in `FOUNDER_FLOW_ABSENCES`:
+
+1. **`In your category are ready to promote this`** — the match screen's sub-line. §10 says the
+   number "guarantees neither that anyone will take part nor what results they would produce" and
+   "is not the recruited/accepted roster". "Ready to promote this" says people who have agreed to
+   nothing are ready to promote something. `POSSIBLE_CREATOR_RESULT_DISCLOSURES` is the honest
+   version of the same beat, and it is six sentences long because every one of them is a limit the
+   number needs.
+2. **The match breakdown** — `1 Newsletter / blog operator`, `2 Community owners`.
+   `possible_creator_results` holds a count, a basis, and who recorded it. There is no category
+   breakdown to render, so drawing one means inventing a fact (§1 rule 6) about people §11 says a
+   Founder may not be shown. The `basis` never leaves Admin.
+3. **`To save your progress verify your email:`** — the email screen's headline. Progress is already
+   saved: §9's autosave has been writing every answer through the draft token since screen 2, and
+   the invitation link is what brings a Founder back to all of it. A sentence naming the wrong
+   mechanism is the §1.4 failure in one line, and it is the line somebody reads while deciding
+   whether they can close the tab.
+4. **The email field's ink turning `#A2AFA8` on focus** — `--grey` on `--white` is about 2.2:1,
+   applied to the text a person is actively typing. It is the token for placeholders and disabled
+   ink, and Session B moved five sentences off it for the same reason. The dashed brand underline
+   marks focus instead.
+
+And one copy defect confirmed: the reference's `six digit code we just **send** you` /
+`just **sent** you` disagree between its two branches. One source, and it reads `sent`.
+
+### Two decisions inside the deviations
+
+**The code screen keeps a submit control as well as the auto-advance.** The reference has none — the
+sixth digit fires the check — which is right for the common case and cannot be the only path: a
+rejected code leaves six full boxes and nothing to press, and a keyboard or screen-reader user needs
+a control they chose to operate (§28.5, §33.11.4). So both.
+
+**The reference's Positioning hint is refused.** Its `"Nothing" is not an answer.` contradicts §9's
+own expectation, which this product already states as "the real alternatives — including doing
+nothing, or a spreadsheet". A hint that argued with it would push a Founder to invent a competitor.
+
+---
+
+## 11. What the Session C browser pass found, and nothing else could
+
+Four defects, all invisible to jsdom, axe, and the type checker. Sixth rebuild in a row.
+
+1. **`gap: var(--sp-20)` against a scale with no `--sp-20`.** The declaration was invalid, so the
+   gap collapsed to zero on the one screen with the most stacked prose in it: the Positioning
+   headline sat directly on its lede, and the dictation absence ran into the permanence warning.
+   A `var()` naming an undefined property is not an error anywhere — the declaration is simply
+   dropped — so the page just looked badly designed.
+2. **The message badge sat on top of the primary control at 1280×520.** `.ff__stage`'s
+   badge clearance was inside the `max-width: 599.98px` block; the badge is fixed at every width.
+   A laptop with browser chrome is that viewport.
+3. **`.field-hint` is `--grey`**, about 2.2:1, and on these pages a hint is a real sentence that
+   changes what somebody types. Moved to `--moss` **inside the flow only** — and the first draft of
+   that fix was itself a defect: `.ff .field-hint` ties Session B's `.ff-panel .field-hint` on
+   specificity and wins on order, so the dark panel's hint went mid-green on dark green.
+   `:where(.ff)` contributes nothing to specificity, which is exactly what was needed.
+4. **`.cr-file { background: var(--paper) }`** — a token this file has never defined, so the
+   Affiliate workspace's evidence rows have had no background since 2026-08-17. Found by the scan
+   below rather than by looking at it.
+
+**Two scans now run on every commit**, in `a11y.test.tsx`, because finding (1) is the second time a
+silently-invalid stylesheet has shipped — Session B's was a comment containing `*/`, which closed
+early and killed the whole `PHASE 34` token block:
+
+- Every CSS comment opens and closes exactly once, and never nests.
+- Every `var(--x)` with **no fallback** names a property the file defines. `var(--x, fallback)` is
+  exempt, and the distinction is the point: `--track`, `--sweep`, `--p` and four others are set
+  inline by a component and carry their own default. Both scans read the file with comments
+  stripped, because the very first version failed on its own comment naming `var(--paper)` —
+  `backend/src/notifications` makes the same split for the same reason.
+
+One deliberate departure from the reference's scale: the match hero is
+`clamp(2.75rem, 7.4vw, 5.5rem)` rather than 198px/900. That ratio — 2.25× its own campaign-type
+headline — does not survive a 320px viewport. It is still clearly the largest type in the flow,
+which is DNA §5.8's one delight.

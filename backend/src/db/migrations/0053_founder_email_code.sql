@@ -1,0 +1,60 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- 0053 — the six-digit email code's two enum labels
+--       (Founder Flow v2, Session C — a RECORDED §1 rule 6 deviation)
+--
+-- ── Why this is two files ───────────────────────────────────────────────────
+-- Postgres refuses to USE an enum label in the transaction that added it, and
+-- the Drizzle migrator runs one transaction per file. So both `ALTER TYPE`
+-- statements land here and the scope-binding CHECK that NAMES the new label
+-- lands in 0054. This is the 0008/0009 dance, restated by 0050/0051 for the
+-- follow token three days ago. Do not merge them back together.
+--
+-- ── The deviation, and how narrow it is ─────────────────────────────────────
+-- §5.2 gives the Founder "Email/password or Google OAuth" and there is no OTP
+-- anywhere in this product. Its own second sentence, though, reads: "A private
+-- invitation or Google sign-in may establish invited-email ownership. A future
+-- public onboarding route requires email verification." Email verification is
+-- therefore a mechanism §5.2 anticipates; what is new is applying it on the
+-- INVITED route.
+--
+-- The code VERIFIES AN EMAIL. It creates no account, mints no session, and
+-- does not touch `completeClaim` — §10 still owns account creation and its
+-- `founder_signup_complete` exactly-once transaction is unchanged. See
+-- `shared/src/vetting/email-code.ts` for the full record.
+--
+-- ── What this migration deliberately does NOT add ───────────────────────────
+--   * No new table. The code rides `secure_tokens`, which already carries the
+--     lineage model, the single-use claim, the immutability trigger, the
+--     revocation reasons, and — the one a six-digit secret actually needs —
+--     `failed_attempts`. A second token store is a second set of §28.1
+--     guarantees to keep in step, which is the reason the Affiliate rebuild
+--     refused `affiliate_history`.
+--   * No new COLUMN, so `enforce_secure_token_immutability()` needs no change:
+--     it names the columns that may never move and this adds none of them.
+--   * No column matching `%verif%` on `founder_claim_profiles`. §33.1.8 scans
+--     for one and must keep finding nothing — an `email_verified_at` column
+--     would fail that scan, and `email_ownership`'s fourth VALUE does not.
+--     That is the other reason the fact lands in the enum rather than beside
+--     it.
+--   * Nothing for the phone. `user.phone_verified` stays CHECK-pinned false and
+--     no SMS path exists (§33.1.8). The guardrail that keeps this deviation
+--     from drifting onto a phone number is that test, unedited.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- The fifth token scope. Bound to ONE invited draft — the same column
+-- `founder_draft` binds, because the thing being verified belongs to that
+-- draft and to nothing else. 0054 adds the branch that enforces it.
+ALTER TYPE "token_scope" ADD VALUE 'founder_email_code';--> statement-breakpoint
+
+-- The fourth email-ownership state, and the first that means verified.
+--
+-- The other three record how an address ARRIVED (§5.2): `invited_link` — we
+-- sent to it; `google_oauth` — a provider asserted it; `self_supplied_unverified`
+-- — the Founder typed it and nothing checked. `code_verified` records that a
+-- code we sent to that exact address came back, which is the only one of the
+-- four that is evidence the address is reachable NOW.
+--
+-- Set by exactly one path: `verifyFounderEmailCode`. An address the Founder
+-- edits afterwards is re-derived from how the NEW value arrived, so a verified
+-- state can never outlive the address it was granted for.
+ALTER TYPE "email_ownership" ADD VALUE 'code_verified';

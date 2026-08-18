@@ -15,10 +15,23 @@
  * A helpful error message here is a user-enumeration vulnerability.
  */
 
-import { randomBytes, createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { and, eq, isNull, lte, sql } from 'drizzle-orm';
+import {
+  randomBytes,
+  createHash,
+  createHmac,
+  randomInt,
+  randomUUID,
+  timingSafeEqual,
+} from 'node:crypto';
+import { and, desc, eq, isNull, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { secureTokens, type SecureToken } from '../db/schema/tokens.js';
+import {
+  EMAIL_CODE_LENGTH,
+  isCodeShaped,
+  EMAIL_CODE_MAX_ATTEMPTS,
+  EMAIL_CODE_TTL_MINUTES,
+} from '../vetting/email-code-logic.js';
 
 /* ── Configuration ────────────────────────────────────────────────────────── */
 
@@ -119,7 +132,8 @@ export type TokenSubject =
   | DraftSubject
   | MagicLinkSubject
   | AffiliateInvitationSubject
-  | CampaignFollowSubject;
+  | CampaignFollowSubject
+  | FounderEmailCodeSubject;
 
 /** How long a follow confirmation link stays openable (§25.8 window 5 covers
  *  the hash; this is the consent's own freshness). */
@@ -135,6 +149,63 @@ export function followTokenPurpose(token: {
   expiresAt: Date | null;
 }): 'confirm' | 'unfollow' {
   return token.expiresAt === null ? 'unfollow' : 'confirm';
+}
+
+/* ── The Founder's six-digit email code ───────────────────────────────────── */
+
+/**
+ * ONE invited draft's email verification code (Founder Flow v2 Session C — a
+ * recorded §1 rule 6 deviation; see `shared/src/vetting/email-code.ts`).
+ *
+ * It rides this table rather than a second store because everything a
+ * six-digit secret needs is already here: the lineage model, single-use
+ * `claimed_at`, an absolute `expires_at`, the revocation reasons, the
+ * immutability trigger, and `failed_attempts` — which is the one that turns
+ * 10^6 possible values into a secret rather than a puzzle.
+ *
+ * `verify()` can never return this subject in practice, twice over: no route
+ * passes `'founder_email_code'` as an expected scope, and a six-character raw
+ * value is rejected by that function's own length guard before it reaches the
+ * database. `verifyFounderEmailCode` is the only reader, and it does not share
+ * a hash function with `verify` — see `codeHash`.
+ */
+export interface FounderEmailCodeSubject {
+  scope: 'founder_email_code';
+  campaignDraftId: string;
+}
+
+/**
+ * The hash stored for a code, and it is not `hashToken`.
+ *
+ * `secure_tokens_hash_idx` is UNIQUE on `token_hash`. A plain SHA-256 over six
+ * digits has 10^6 possible digests: two live codes would collide on that index
+ * — so the second Founder to be sent `418306` would get a constraint violation
+ * — and the digest itself is a rainbow table one row wide, so a leaked backup
+ * would hand over every live code.
+ *
+ * An HMAC keyed on `BETTER_AUTH_SECRET` fixes both, and binding the draft and
+ * the address INTO it buys a third thing: a code minted for one draft cannot
+ * verify another, and a code minted for one address stops working the moment
+ * the Founder changes it. That is the same construction
+ * `backend/src/interviews/reference.ts` uses to bind a Cal.com booking, and the
+ * label is what keeps the two from ever being the same value.
+ */
+function codeHash(secret: string, draftId: string, email: string, code: string): string {
+  return createHmac('sha256', secret)
+    .update(`proovd:founder-email-code:v1|${draftId}|${email.trim().toLowerCase()}|${code}`)
+    .digest('hex');
+}
+
+/**
+ * Six uniformly random digits.
+ *
+ * `randomInt` rejects out-of-range draws internally, so there is no modulo
+ * bias — and bias matters here in a way it does not for a 256-bit token,
+ * because a skewed distribution over 10^6 shortens a guessing attack by
+ * exactly as much as it skews.
+ */
+function generateCode(): string {
+  return String(randomInt(0, 10 ** EMAIL_CODE_LENGTH)).padStart(EMAIL_CODE_LENGTH, '0');
 }
 
 /* ── Primitives ───────────────────────────────────────────────────────────── */
@@ -182,10 +253,21 @@ export interface TokenServiceDeps {
     newValue?: unknown;
     actorId?: string | null;
   }) => Promise<void>;
+  /**
+   * `BETTER_AUTH_SECRET`. Keys the HMAC that stores a six-digit email code
+   * (see `codeHash`) and nothing else — the other four scopes hold a plain
+   * SHA-256 of a 256-bit value, which needs no key.
+   */
+  secret: string;
   now?: () => Date;
 }
 
-export function createTokenService({ db, audit, now = () => new Date() }: TokenServiceDeps) {
+export function createTokenService({
+  db,
+  audit,
+  secret,
+  now = () => new Date(),
+}: TokenServiceDeps) {
   /**
    * Issues a brand-new token and its lineage.
    *
@@ -324,6 +406,192 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     });
   }
 
+  /* ── The Founder's six-digit email code (Founder Flow v2, Session C) ───── */
+
+  /**
+   * Mints a code for one draft and one address, superseding any live one.
+   *
+   * A resend keeps the lineage and takes the next version, which is `rotate`'s
+   * own shape — so the previous code stops working the moment a new one is
+   * sent (§7's resend rule: "invalidates all older versions immediately"). It
+   * is not `rotate` itself only because the hash differs; everything else
+   * about the two is the same, including the partial unique index that makes a
+   * half-completed supersession impossible to commit.
+   *
+   * The raw code is returned exactly once and is never recoverable. Nothing
+   * writes it to a log, an audit row, or a response — the audit row below
+   * records that a code was issued and to which draft, and stops there.
+   */
+  async function issueFounderEmailCode(
+    campaignDraftId: string,
+    email: string,
+  ): Promise<{ code: string; record: SecureToken }> {
+    const code = generateCode();
+    const expiresAt = new Date(now().getTime() + EMAIL_CODE_TTL_MINUTES * 60_000);
+
+    return db.transaction(async (tx) => {
+      const live = await tx
+        .select()
+        .from(secureTokens)
+        .where(
+          and(
+            eq(secureTokens.scope, 'founder_email_code'),
+            eq(secureTokens.campaignDraftId, campaignDraftId),
+            isNull(secureTokens.revokedAt),
+          ),
+        )
+        .for('update');
+
+      const previous = live.length
+        ? live.reduce((a, b) => (a.version >= b.version ? a : b))
+        : null;
+
+      if (previous) {
+        await tx
+          .update(secureTokens)
+          .set({ revokedAt: now(), revokedReason: 'superseded_by_rotation' })
+          .where(
+            and(
+              eq(secureTokens.scope, 'founder_email_code'),
+              eq(secureTokens.campaignDraftId, campaignDraftId),
+              isNull(secureTokens.revokedAt),
+            ),
+          );
+      }
+
+      const [record] = await tx
+        .insert(secureTokens)
+        .values({
+          scope: 'founder_email_code',
+          tokenHash: codeHash(secret, campaignDraftId, email, code),
+          version: previous ? previous.version + 1 : 1,
+          lineageId: previous ? previous.lineageId : randomUUID(),
+          supersedesTokenId: previous ? previous.id : null,
+          expiresAt,
+          campaignDraftId,
+        })
+        .returning();
+
+      await audit({
+        action: 'token.issued',
+        targetType: 'secure_token',
+        targetId: record.id,
+        internalReason: `issued founder_email_code v${record.version}`,
+        // Deliberately no code, and no address either: the address is on the
+        // claim profile, which is where support looks, and copying it into an
+        // insert-only table would put a second permanent copy of a personal
+        // fact somewhere §25.8's sweep cannot reach.
+        newValue: { scope: 'founder_email_code', version: record.version, expiresAt },
+      });
+
+      return { code, record };
+    });
+  }
+
+  /**
+   * Checks a submitted code against the live one for this draft and address.
+   *
+   * ── Why the lookup is by DRAFT and not by hash ──────────────────────────
+   * The obvious implementation hashes the submitted code and looks the digest
+   * up, which is what `verify` does for a 43-character token. It cannot work
+   * here: a wrong code hashes to nothing, so there is no row to count the
+   * attempt against — and the attempt counter is the entire reason a six-digit
+   * secret is a secret. So the live row is found by draft, and the comparison
+   * is `safeCompareHex` in application code, which is the defence-in-depth
+   * case §28.1 names by hand.
+   *
+   * Every rejection returns the same value and the route renders the same body
+   * (§5.5). Wrong, expired, already-used, locked-out, never-requested, and
+   * "requested for a different address" are one answer.
+   */
+  async function verifyFounderEmailCode(input: {
+    campaignDraftId: string;
+    email: string;
+    code: string;
+  }): Promise<VerifyResult<FounderEmailCodeSubject>> {
+    const reject = async (reason: string, id: string | null) => {
+      await audit({
+        action: 'token.verify_failed',
+        targetType: 'secure_token',
+        targetId: id,
+        internalReason: `founder_email_code: ${reason}`,
+      });
+      return { ok: false as const, error: TOKEN_INVALID };
+    };
+
+    if (!isCodeShaped(input.code)) return reject('malformed code', null);
+
+    const [row] = await db
+      .select()
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_email_code'),
+          eq(secureTokens.campaignDraftId, input.campaignDraftId),
+          isNull(secureTokens.revokedAt),
+          isNull(secureTokens.claimedAt),
+        ),
+      )
+      .orderBy(desc(secureTokens.version))
+      .limit(1);
+
+    if (!row) return reject('no live code for this draft', null);
+    if (row.expiresAt && row.expiresAt <= now()) return reject('expired', row.id);
+    if (row.failedAttempts >= EMAIL_CODE_MAX_ATTEMPTS) {
+      return reject('attempt limit exceeded', row.id);
+    }
+
+    const expected = codeHash(secret, input.campaignDraftId, input.email, input.code);
+    if (!safeCompareHex(row.tokenHash, expected)) {
+      // The counter lives on the row rather than in a limiter, so it survives a
+      // restart and cannot be reset by changing address or IP. Six wrong
+      // guesses and this code is finished; asking for a new one is the only
+      // way forward, which is what makes 10^6 large enough.
+      await db
+        .update(secureTokens)
+        .set({ failedAttempts: sql`${secureTokens.failedAttempts} + 1` })
+        .where(eq(secureTokens.id, row.id));
+      return reject('code mismatch', row.id);
+    }
+
+    // Single-use, settled by the database rather than by this function: two
+    // tabs submitting the same correct code at once produce one success and
+    // one ordinary rejection. `claimDraft`'s mechanism, and its reasoning.
+    const claimed = await db
+      .update(secureTokens)
+      .set({
+        claimedAt: now(),
+        revokedAt: now(),
+        revokedReason: 'claimed',
+        lastUsedAt: now(),
+        firstUsedAt: sql`coalesce(${secureTokens.firstUsedAt}, ${now()})`,
+        failedAttempts: 0,
+      })
+      .where(
+        and(
+          eq(secureTokens.id, row.id),
+          isNull(secureTokens.claimedAt),
+          isNull(secureTokens.revokedAt),
+        ),
+      )
+      .returning({ id: secureTokens.id });
+
+    if (claimed.length !== 1) return reject('concurrent or repeat use', row.id);
+
+    await audit({
+      action: 'token.claimed',
+      targetType: 'secure_token',
+      targetId: row.id,
+      internalReason: 'founder_email_code verified',
+    });
+
+    return {
+      ok: true,
+      token: row,
+      subject: { scope: 'founder_email_code', campaignDraftId: input.campaignDraftId },
+    };
+  }
+
   /**
    * Verifies a raw token and returns its scoped subject.
    *
@@ -398,7 +666,15 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     const subject: TokenSubject =
       row.scope === 'founder_draft'
         ? { scope: 'founder_draft', campaignDraftId: row.campaignDraftId! }
-        : row.scope === 'affiliate_invitation'
+        : // Unreachable in practice, and by two independent mechanisms: no route
+          // passes this as an expected scope, and a six-character raw value is
+          // rejected by the length guard at the top of this function long
+          // before the lookup. It is here because the union is total, and a
+          // total union is what makes a sixth scope a compile error rather
+          // than a silent `backer_magic_link` in the fall-through.
+          row.scope === 'founder_email_code'
+          ? { scope: 'founder_email_code', campaignDraftId: row.campaignDraftId! }
+          : row.scope === 'affiliate_invitation'
           ? { scope: 'affiliate_invitation', associationId: row.associationId! }
           : row.scope === 'campaign_follow'
             ? { scope: 'campaign_follow', campaignFollowerId: row.campaignFollowerId! }
@@ -619,6 +895,8 @@ export function createTokenService({ db, audit, now = () => new Date() }: TokenS
     verify,
     claimDraft,
     claimAffiliateInvitation,
+    issueFounderEmailCode,
+    verifyFounderEmailCode,
     revoke,
     revokeDraftTokens,
     revokeAssociationTokens,

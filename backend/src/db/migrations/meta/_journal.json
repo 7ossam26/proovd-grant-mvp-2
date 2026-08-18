@@ -372,6 +372,20 @@
       "when": 1787068800000,
       "tag": "0052_founder_flow_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1787155200000,
+      "tag": "0053_founder_email_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1787241600000,
+      "tag": "0054_founder_email_code_binding",
+      "breakpoints": true
     }
   ]
 }

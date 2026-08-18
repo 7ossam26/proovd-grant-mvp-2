@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useParams, type RouteObject } from 'react-router';
 import { lazy, Suspense } from 'react';
-import { POLICY_DOCUMENTS } from '@proovd/shared';
+import { POLICY_DOCUMENTS, founderFlowPath } from '@proovd/shared';
 import { MotionProvider } from './motion/MotionProvider.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { LinkUnavailable } from './surfaces/LinkUnavailable.js';
@@ -63,13 +63,28 @@ import {
   FollowConfirmPage,
   FollowStopPage,
 } from './features/public/campaign/FollowAction.js';
-import { VettingFlow } from './surfaces/draft/VettingFlow.js';
+import { EmailStep } from './surfaces/founder-flow/EmailStep.js';
+import { CodeStep } from './surfaces/founder-flow/CodeStep.js';
+import { PositioningStep } from './surfaces/founder-flow/PositioningStep.js';
+import { MatchStep } from './surfaces/founder-flow/MatchStep.js';
 import { AccountClaim } from './surfaces/draft/AccountClaim.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
 } from './features/public/campaign/samples.js';
 
+/**
+ * `/draft/:token/vetting` — retired by Founder Flow v2 Session C.
+ *
+ * Positioning became its own page and took the submission with it. This is a
+ * redirect rather than a deleted route because the address shipped in Phase
+ * 07 and a Founder may have it bookmarked; landing them on the answer they
+ * were part-way through is the DNA §5.12 answer.
+ */
+function DraftVettingRedirect() {
+  const { token = '' } = useParams();
+  return <Navigate to={founderFlowPath('positioning', token)} replace />;
+}
 /** The old possible-creators result address, kept only as a way to the claim. */
 function DraftResultRedirect() {
   const { token = '' } = useParams();
@@ -360,6 +375,27 @@ const rootChildren: RouteObject[] = [
     element: <CampaignTypeStep />,
   },
   {
+    /*
+      Session C (2026-08-18) — the rest of the draft token. The address, the
+      six-digit code, §9's third answer, and §10's relevance signal, which is
+      the last screen before the claim.
+    */
+    path: 'draft/:token/email',
+    element: <EmailStep />,
+  },
+  {
+    path: 'draft/:token/code',
+    element: <CodeStep />,
+  },
+  {
+    path: 'draft/:token/positioning',
+    element: <PositioningStep />,
+  },
+  {
+    path: 'draft/:token/match',
+    element: <MatchStep />,
+  },
+  {
     // Phase 15 (§19, §20). The Backer's long-lived campaign-scoped magic-link
     // page: their transactions, the not-charged fact, and cancel-before-close.
     // Outside PublicLayout for the same reason the draft link is — it is reached
@@ -388,13 +424,15 @@ const rootChildren: RouteObject[] = [
     element: <FollowStopPage />,
   },
   {
-    // Phase 07 (§9, §10). The vetting sequence, its result, and the account
-    // claim. Four separate addresses rather than one stateful page, because
-    // DNA §5.12 requires position to survive interruption and a URL is the
-    // cheapest durable position there is — a Founder who bookmarks the middle
-    // of their form gets the middle of their form back.
+    /*
+      Retired by Session C (2026-08-18). It was the interim surface that asked
+      §9's third answer and submitted; Positioning is now its own page and the
+      submission goes with it. A bookmark from before the rebuild lands there
+      rather than on nothing — the address shipped from Phase 07 and somebody
+      may still be holding it.
+    */
     path: 'draft/:token/vetting',
-    element: <VettingFlow />,
+    element: <DraftVettingRedirect />,
   },
   {
     // The result page went with the simplified flow; a bookmarked address

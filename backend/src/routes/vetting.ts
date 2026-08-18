@@ -30,8 +30,16 @@ import { fromNodeHeaders } from 'better-auth/node';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
-import { requireDraftToken, createTokenVerifyLimiter } from '../auth/token-middleware.js';
-import { TOKEN_REJECTION_STATUS, TOKEN_REJECTION_BODY } from '../auth/token-rejection.js';
+import {
+  requireDraftToken,
+  createTokenVerifyLimiter,
+  createTokenResendLimiter,
+} from '../auth/token-middleware.js';
+import {
+  TOKEN_REJECTION_STATUS,
+  TOKEN_REJECTION_BODY,
+  sendTokenRejection,
+} from '../auth/token-rejection.js';
 import { DRAFT_TOKEN_PATH, TOKEN_PARAM } from '../auth/token-routes.js';
 import {
   ensureVetting,
@@ -48,6 +56,17 @@ import {
   completeClaim,
   FOUNDER_CLAIM_POLICY_SLUGS,
 } from '../vetting/claim.js';
+import {
+  EMAIL_CODE_ACK,
+  requestFounderEmailCode,
+  verifyFounderEmailCode,
+  type EmailCodeDeps,
+} from '../vetting/email-code.js';
+import {
+  unconfiguredTranscription,
+  TRANSCRIPTION_UNAVAILABLE,
+  type Transcription,
+} from '../transcription/index.js';
 import { policyVersions } from '../db/schema/policies.js';
 import { inArray } from 'drizzle-orm';
 import { revealPreparingCampaign, type HandoffDeps } from '../affiliates/handoff.js';
@@ -75,10 +94,43 @@ export function createVettingRouter(
     handoff?: HandoffDeps;
     /** Phase 22b: §27.6's new-account notice. Unset → it does not send. */
     internalRecipient?: string | undefined;
+    /**
+     * The six-digit email code's sender (Founder Flow v2 Session C).
+     *
+     * Optional, and absent means the route still answers its frozen ack and
+     * sends nothing — the same shape every notifier-less context in this
+     * product takes. What it must never do is answer differently.
+     */
+    emailCode?: (EmailCodeDeps & {
+      audit: (event: {
+        action: string;
+        targetType: 'campaign_draft';
+        targetId: string;
+        internalReason: string;
+      }) => Promise<void>;
+    }) | undefined;
+    /**
+     * Dictation (deviation 2). Defaults to the port that refuses loudly, so a
+     * deployment with no provider says so rather than reporting a recording
+     * as transcribed when nothing left the browser (§1.4).
+     */
+    transcription?: Transcription | undefined;
+    /**
+     * How many code requests one address may make per hour.
+     *
+     * Its own option because it is its own kind of traffic: this route SENDS
+     * MAIL, so the production default is the tight resend limit rather than
+     * the verify one — five an hour covers a person whose first mail landed in
+     * spam and does not cover a script. The suite raises it, and drives the
+     * limiter itself on a harness that leaves it alone.
+     */
+    emailCodeLimit?: number | undefined;
   } = {},
 ): Router {
   const handoff = options.handoff;
   const internalRecipient = options.internalRecipient;
+  const emailCode = options.emailCode;
+  const transcription = options.transcription ?? unconfiguredTranscription;
   const router = Router();
   const json: RequestHandler = express.json({ limit: '128kb' });
 
@@ -124,7 +176,21 @@ export function createVettingRouter(
       res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
       return;
     }
-    res.json(state);
+    /*
+     * The dictation port travels with the read, and the reason is the
+     * Affiliate evidence uploader's: a 503 at the point of use arrives after
+     * somebody has already pressed record. Carrying `available: false` here
+     * lets the screen render the absence with its reason instead of a
+     * microphone that refuses (§1.4). It is a fact about the deployment
+     * rather than about this draft, which is why it is a sibling of the
+     * state and not a field on it.
+     */
+    res.json({
+      ...state,
+      transcription: transcription.configured
+        ? { available: true as const }
+        : { available: false as const, absentBecause: TRANSCRIPTION_UNAVAILABLE },
+    });
   });
 
   router.patch(`${base}/vetting`, saveLimiter, draft, json, async (req, res) => {
@@ -191,6 +257,174 @@ export function createVettingRouter(
 
     res.status(201).json(result.state);
   });
+
+  /* ── §5.2 — the six-digit email code (Founder Flow v2, Session C) ──────── */
+
+  /**
+   * A RECORDED §1 rule 6 deviation. `shared/src/vetting/email-code.ts` is the
+   * record, `vetting/email-code.ts` the service.
+   *
+   * ── Ask for a code ────────────────────────────────────────────────────────
+   * Answers `EMAIL_CODE_ACK` for every outcome — an address on the profile, no
+   * address, a provider that refuses, and a caller over the limit — and answers
+   * it BEFORE doing the work, because minting-and-sending against returning
+   * immediately is measurable even when the bodies match. `magic-link-reissue`
+   * is the worked example and this is the same shape.
+   *
+   * 202, never a 429. Phase 04's rule, and the one that most often gets
+   * "corrected" by somebody who thinks a limiter should announce itself: a 429
+   * on the fifth try tells the caller the first four were interesting.
+   */
+  router.post(
+    `${base}/email-code`,
+    /*
+     * The RESEND limiter, not the verify one: this route sends mail, so an
+     * unthrottled one is a way to use Proovd to flood an inbox — §5.5’s own
+     * reasoning, and the same limiter the magic-link resend takes. A person
+     * legitimately asks twice (the first landed in spam, or they fixed a typo
+     * in the address), and five an hour covers that without covering a script.
+     *
+     * Its handler answers the ordinary ack at 202 rather than the token
+     * rejection, because on this route the ack IS the ordinary answer.
+     */
+    createTokenResendLimiter({
+      ...(options.emailCodeLimit !== undefined ? { limit: options.emailCodeLimit } : {}),
+      handler: (_req, res) => {
+        res.status(202).json(EMAIL_CODE_ACK);
+      },
+    }),
+    draft,
+    json,
+    async (req, res) => {
+      const draftId = draftIdOf(req, res);
+      if (!draftId) return;
+
+      const state = await ensureVetting(db, draftId, actorOf(draftId));
+      if (!state) {
+        res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
+        return;
+      }
+
+      // Answer first. Everything below is what a hit does and a miss does not.
+      res.status(202).json(EMAIL_CODE_ACK);
+
+      if (!emailCode) return;
+      try {
+        await requestFounderEmailCode(emailCode, {
+          draftId,
+          campaignId: state.campaignId,
+        });
+      } catch (error) {
+        // The response is already out, so this can only be recorded. It must
+        // not surface: an error path that behaved differently would be the
+        // oracle the route is built to avoid.
+        await emailCode.audit({
+          action: 'founder.email_code_send_failed',
+          targetType: 'campaign_draft',
+          targetId: draftId,
+          internalReason: `§5.2 email code send failed: ${
+            error instanceof Error ? error.message : 'unknown'
+          }`,
+        });
+      }
+    },
+  );
+
+  /**
+   * Check a code.
+   *
+   * One rejection for wrong, expired, already-used, locked-out, never-requested
+   * and requested-for-a-different-address — the frozen `TOKEN_REJECTION_BODY`
+   * at `TOKEN_REJECTION_STATUS`, padded to the same floor so the modes are not
+   * separable by a stopwatch either. The limiter answers that same body at that
+   * same status: 202 would be the ask route's answer, and a 202 here would tell
+   * a caller their code had been accepted.
+   */
+  router.post(
+    `${base}/email-code/verify`,
+    // Deliberately tighter than the ask. This is the route a guessing attack
+    // uses, and `failed_attempts` on the row is the other half of the answer.
+    createTokenVerifyLimiter({ limit: options.verifyLimit ?? 20, windowMs: 15 * 60 * 1000 }),
+    draft,
+    json,
+    async (req, res) => {
+      const startedAt = Date.now();
+      const draftId = draftIdOf(req, res);
+      if (!draftId) return;
+
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const code = typeof body['code'] === 'string' ? body['code'] : '';
+
+      const result = await verifyFounderEmailCode({ db, tokens }, { draftId, code });
+      if (!result.ok) {
+        await sendTokenRejection(res, startedAt);
+        return;
+      }
+
+      // The whole of what a success returns. No session, no account, no token —
+      // the surface re-reads the claim profile and finds `code_verified` there.
+      res.json({ verified: true });
+    },
+  );
+
+  /* ── §12 — dictation (Founder Flow v2 deviation 2, Session C) ──────────── */
+
+  /**
+   * Turns a recording into text, and does nothing else.
+   *
+   * The configured check runs BEFORE any body parser, so an unconfigured
+   * deployment refuses without buffering the audio it is about to refuse. The
+   * refusal is the port's own sentence — one constant, so the reason on the
+   * screen and the reason in the log cannot disagree.
+   *
+   * Nothing here writes the audio anywhere. There is no column for it, no
+   * bucket key, and no job: §25.8 defines seven retention windows and none
+   * covers a dictation recording, so the honest answer is to have nowhere to
+   * put it rather than to invent a window (§1 rule 6, in the other direction).
+   * The transcript goes back in the response and lands in the Founder's own
+   * textarea as ordinary editable text with supplier `founder` — which is what
+   * keeps §9's "never represented as AI-generated" true on the Positioning
+   * step, because nothing generated it.
+   */
+  router.post(
+    `${base}/transcribe`,
+    openLimiter,
+    draft,
+    (_req, res, next) => {
+      if (transcription.configured) return next();
+      res.status(503).json({
+        error: 'transcription_unavailable',
+        title: 'Dictation is not available',
+        whatHappened: TRANSCRIPTION_UNAVAILABLE,
+        next: 'Type your answer in the box. It is the same box either way, and it saves as you go.',
+        owner: 'Proovd',
+      });
+    },
+    express.raw({ type: ['audio/*'], limit: '10mb' }),
+    async (req, res) => {
+      const draftId = draftIdOf(req, res);
+      if (!draftId) return;
+
+      const audio = Buffer.isBuffer(req.body) ? req.body : null;
+      if (!audio || audio.length === 0) {
+        res.status(400).json({
+          error: 'no_audio',
+          title: 'We did not receive a recording',
+          whatHappened: 'The request carried no audio, so there was nothing to turn into text.',
+          next: 'Record again, or type your answer instead.',
+        });
+        return;
+      }
+
+      const result = await transcription.transcribe({
+        audio,
+        contentType: req.headers['content-type'] ?? 'audio/webm',
+      });
+      // The transcript, and nothing derived from it. There is no summary field
+      // here and no route that would produce one (§12, §30).
+      res.json({ text: result.text });
+    },
+  );
 
   /* ── §10 — the possible-creator result ─────────────────────────────────── */
 

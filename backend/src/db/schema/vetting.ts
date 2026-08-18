@@ -83,6 +83,17 @@ export const emailOwnership = pgEnum('email_ownership', [
   'invited_link',
   'google_oauth',
   'self_supplied_unverified',
+  /**
+   * The address was confirmed by a code we sent to it (Founder Flow v2
+   * Session C, 0053 — a recorded §1 rule 6 deviation).
+   *
+   * The other three record how an address ARRIVED; this is the only one that
+   * is evidence it is reachable NOW. Written by exactly one path, and an
+   * address the Founder edits afterwards is re-derived from how the new value
+   * arrived — so a verified state can never outlive the address it was
+   * granted for.
+   */
+  'code_verified',
 ]);
 
 /* ── campaign_vetting (§9) ──────────────────────────────────────────────────*/

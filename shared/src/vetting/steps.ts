@@ -58,6 +58,23 @@ export const VETTING_ANSWER_STEP_IDS = VETTING_STEP_IDS;
 
 export type VettingAnswerStepId = VettingStepId;
 
+/**
+ * What a step IS, presented — Founder Flow v2, Session C, 2026-08-18.
+ *
+ * The reference carries its own step register (`VSTEPS`) with `kind`, `required`,
+ * a question, a per-campaign-type hint and a placeholder. Those are presentation
+ * facts about the same three steps this register already names, so they land
+ * HERE rather than in a second register beside it: two registers over the same
+ * three ids is two answers to what a step is, and the copy in the one nobody
+ * updated is the copy that eventually ships.
+ *
+ * §12's five bonus answers stay in `OPTIONAL_ITEMS` and are NOT folded in. The
+ * flow presents all eight as one sequence, and that is a presentation over two
+ * registers — §12 completion is derived server-side from objective evidence,
+ * and a single answers register would quietly make it a Founder assertion.
+ */
+export type VettingStepKind = 'text';
+
 export interface VettingStepCopy {
   id: VettingStepId;
   /** Short label for the progress overview. */
@@ -70,6 +87,45 @@ export interface VettingStepCopy {
   next: string;
   /** §9: the evidence expected, where a Founder would otherwise guess. */
   expected?: string;
+  /**
+   * All three §9 answers are typed. The reference's other four kinds —
+   * `upload`, `branding`, `schedule`, `links` — belong to §12's five items and
+   * arrive with the surfaces that write them (Session D).
+   */
+  kind: VettingStepKind;
+  /**
+   * Whether Proovd may draft this answer from discovery.
+   *
+   * `false` on exactly one step, and it is not a preference. §9 states it
+   * twice for Positioning — "Always blank. Written by the Founder. Must never
+   * be prefilled or represented as AI-generated." The database says the same
+   * thing three more times: there are no `competition_prefilled_*` columns to
+   * read a draft from, a CHECK pins `competition_supplier` to `founder`, and
+   * §33.1.5 scans the tree for a fourth way in. This flag is the register's
+   * copy of that fact, and the suite asserts the two agree.
+   */
+  prefillable: boolean;
+  /**
+   * Whether "Say it instead" is offered (Founder Flow v2 deviation 2).
+   *
+   * The reference offers it on Positioning and Story and nowhere else, and
+   * that is kept: the two open-ended answers where a Founder is most likely to
+   * talk better than they type. It transcribes and does nothing else — there
+   * is no suggest, rewrite or summarise control beside it, which is the form
+   * the §12 temptation actually takes once a transcription vendor is in the
+   * tree.
+   */
+  dictation: boolean;
+  /**
+   * The reference's per-campaign-type hint, one line.
+   *
+   * It differs by type because the two paths are genuinely answering different
+   * questions: an Idea Campaign is describing something that does not exist
+   * yet, a Product Campaign something that does.
+   */
+  hint: { pre_build: string; pre_launch: string };
+  /** The empty-field prompt. Never a value, and never submitted as one. */
+  placeholder: string;
 }
 
 export const VETTING_STEPS: readonly VettingStepCopy[] = [
@@ -81,6 +137,15 @@ export const VETTING_STEPS: readonly VettingStepCopy[] = [
     next: 'It becomes the starting point for your public campaign page, which you write and we review before anything goes live.',
     expected:
       'The situation someone is in before your product exists, in their words rather than in feature names.',
+    kind: 'text',
+    prefillable: true,
+    dictation: false,
+    hint: {
+      pre_build: 'Describe it the way you would text a friend about it, not the way you would pitch it.',
+      pre_launch: 'Be concrete: who hits this today, how often, and what it costs them.',
+    },
+    placeholder:
+      'Who has this problem, how often it comes up, and what they do about it today.',
   },
   {
     id: 'solution',
@@ -89,6 +154,14 @@ export const VETTING_STEPS: readonly VettingStepCopy[] = [
     why: 'It is how we judge whether what you are offering can realistically be delivered on the timeline you set.',
     next: 'It goes into the same review, and into the brief a Creator reads before deciding.',
     expected: 'What the product actually does — not the vision, the thing that exists or will.',
+    kind: 'text',
+    prefillable: true,
+    dictation: false,
+    hint: {
+      pre_build: 'Describe what someone ends up with, not the stack you will build it on.',
+      pre_launch: 'Lead with what someone can do now that they could not do before.',
+    },
+    placeholder: 'What someone can do after using it that they could not do before.',
   },
   {
     id: 'competition',
@@ -100,6 +173,19 @@ export const VETTING_STEPS: readonly VettingStepCopy[] = [
     next: 'It stays internal. It is not published on your campaign page.',
     expected:
       'The real alternatives — including doing nothing, or a spreadsheet — and what someone gets from you instead.',
+    kind: 'text',
+    prefillable: false,
+    dictation: true,
+    hint: {
+      // The reference's own hint here is `"Nothing" is not an answer.` — which
+      // is refused, because for most products it is the true answer and the
+      // most useful one we get. `expected` above says so, and a hint that
+      // contradicted it would push a Founder to invent a competitor.
+      pre_build: 'Name the workaround people settle for today, then say where you beat it.',
+      pre_launch: 'One line: for whom, against what, and why you.',
+    },
+    placeholder:
+      'What people use instead today — including doing nothing — and the one place you clearly win.',
   },
 ];
 
