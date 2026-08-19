@@ -29,8 +29,16 @@ import { proposalVersions, associationCompensationAgreements } from '../db/schem
 import {
   respondToProposal,
   offerCreatorBonus,
+  readCompensationSettings,
+  resolveCell,
   type Refused,
 } from '../affiliates/decisions.js';
+import {
+  requestMeeting,
+  latestMeetingRequests,
+  type MeetingRefused,
+} from '../affiliates/meeting-requests.js';
+import { notifyMeetingRequested } from '../affiliates/meeting-notifications.js';
 import {
   notifyStandardAcceptance,
   notifyVersionDecision,
@@ -94,7 +102,11 @@ export function createFounderRosterRouter(deps: FounderRosterDeps): Router {
   /** The caller's own campaign, or null — §11's boundary in the query. */
   async function ownCampaign(campaignId: string, founderUserId: string) {
     const [row] = await db
-      .select({ id: campaigns.id })
+      .select({
+        id: campaigns.id,
+        type: campaigns.type,
+        highEffort: campaigns.highEffort,
+      })
       .from(campaigns)
       .innerJoin(founderClaimProfiles, eq(founderClaimProfiles.campaignId, campaigns.id))
       .where(and(eq(campaigns.id, campaignId), eq(founderClaimProfiles.claimedUserId, founderUserId)))
@@ -166,8 +178,30 @@ export function createFounderRosterRouter(deps: FounderRosterDeps): Router {
       : [];
     const agreementByAssociation = new Map(agreements.map((a) => [a.associationId, a]));
 
+    /* §14.3's cell for THIS campaign, so the revision control can bound itself
+       to what `validateProposalAgainstCell` will accept. The numbers come from
+       the §6 settings through `resolveCell` — the surface renders them and
+       decides nothing, because a second copy of the matrix in the browser is a
+       second answer to what the base is (Phase 06's rule). */
+    const settings = await readCompensationSettings(db);
+    const cell = resolveCell(
+      settings,
+      { campaignType: own.type ?? 'pre_build', highEffort: own.highEffort === true },
+      false,
+    );
+
+    /* Deviation 1's latest ask per Creator. One query for the whole roster. */
+    const meetings = await latestMeetingRequests(db, associationIds);
+
     res.json({
       roster: {
+        terms: {
+          basePercent: cell.basePercent,
+          ceilingPercent: cell.ceilingPercent,
+          bidAllowed: cell.bidAllowed,
+          fixedPaymentAllowed: cell.fixedPaymentAllowed,
+          highEffort: own.highEffort === true,
+        },
         // §14.5: the exact deadline; the surface renders remaining time from
         // it rather than the server claiming a countdown (§30).
         responseDeadlineAt: payment?.responseDeadlineAt.toISOString() ?? null,
@@ -205,6 +239,7 @@ export function createFounderRosterRouter(deps: FounderRosterDeps): Router {
                   fixedPaymentCents: agreement.fixedPaymentCents?.toString() ?? null,
                 }
               : null,
+            meetingRequest: meetings.get(row.associationId) ?? null,
           };
         }),
       },
@@ -333,6 +368,65 @@ export function createFounderRosterRouter(deps: FounderRosterDeps): Router {
           threshold: result.bonus.threshold.toString(),
           additionalPercent: result.bonus.additionalPercent,
           maxCombinedPercent: result.bonus.maxCombinedPercent,
+        },
+      });
+    },
+  );
+
+  /* ── Deviation 1: the meeting request (§30, §11, §22.9's shape) ─────────── */
+
+  const MEETING_REFUSAL_STATUS: Record<MeetingRefused['code'], number> = {
+    not_found: 404,
+    message_required: 422,
+    message_too_long: 422,
+    already_open: 409,
+    already_answered: 409,
+  };
+
+  /*
+    ONE route, and its body carries exactly one field. There is no `when`, no
+    `slot`, no `duration`, no `platform` and no `calendarId` — the record has no
+    column for any of them, and §12's Cal.com booking is the one thing in this
+    product that books time (§30, tech-stack §12).
+  */
+  router.post(
+    '/api/founder/campaigns/:campaignId/roster/:associationId/meeting',
+    founder,
+    json,
+    async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const message = typeof body['message'] === 'string' ? body['message'] : '';
+
+      const result = await requestMeeting(db, { audit }, {
+        campaignId: req.params['campaignId'] as string,
+        associationId: req.params['associationId'] as string,
+        founderUserId: userId(req),
+        message,
+        actor: `founder:${userId(req)}`,
+      });
+      if (!result.ok) {
+        res.status(MEETING_REFUSAL_STATUS[result.code]).json({
+          error: result.code,
+          whatHappened: result.whatHappened,
+          next: result.next,
+        });
+        return;
+      }
+
+      // After the transaction commits, on the 08c precedent: the send is
+      // deduped on the request row, so a crash between the two costs a retry
+      // rather than correctness.
+      await notifyMeetingRequested({ db, notifier, context }, { requestId: result.request.id });
+
+      res.json({
+        meetingRequest: {
+          id: result.request.id,
+          associationId: result.request.associationId,
+          status: result.request.status,
+          message: result.request.message,
+          requestedAt: result.request.requestedAt.toISOString(),
+          respondedAt: null,
+          responseNote: null,
         },
       });
     },

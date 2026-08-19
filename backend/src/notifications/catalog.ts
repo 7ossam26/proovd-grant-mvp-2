@@ -91,6 +91,11 @@ import {
   WORK_AGAIN_ACCEPTANCE_GRANTS_NOTHING,
   PREPARE_WITHOUT_OPENING,
 } from '../completion/logic.js';
+import {
+  MEETING_REQUEST_CHANGES_NOTHING,
+  MEETING_REQUEST_IS_NOT_A_SCHEDULER,
+  MEETING_REQUEST_NO_PENALTY,
+} from '../affiliates/meeting-logic.js';
 import { renderDigest } from './templates/digest.js';
 
 export interface RenderedMessage {
@@ -1433,6 +1438,28 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
         'This is a request to talk about working together on something new. Accepting it does not commit you to terms — nothing has been agreed and no campaign exists yet.',
       ],
       action: { label: 'Open the request', url: `${APP}/creator/campaigns/a1/close` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  /* ── Founder Dashboard Session C, deviation 1 (§30, §11) ─────────────── */
+
+  affiliate_meeting_request: () =>
+    renderPlainNotice({
+      subject: `A Founder would like to talk before you decide — ${CAMPAIGN}`,
+      headline: 'The Founder has asked to talk.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'From', value: 'Ada' },
+        {
+          label: 'What they said',
+          value: 'I would love ten minutes on how you would introduce this to your audience.',
+        },
+        { label: 'Who owns it', value: 'You — there is no deadline on your answer' },
+        { label: 'If you say no', value: MEETING_REQUEST_NO_PENALTY },
+      ],
+      paragraphs: [MEETING_REQUEST_IS_NOT_A_SCHEDULER, MEETING_REQUEST_CHANGES_NOTHING],
+      action: { label: 'Open the opportunity', url: `${APP}/creator/campaigns/a1/opportunity` },
       reference: REF,
       supportEmail: SUPPORT,
     }),

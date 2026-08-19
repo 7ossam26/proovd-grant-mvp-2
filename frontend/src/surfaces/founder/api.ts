@@ -452,12 +452,43 @@ export interface RosterCreator {
     note: string;
   } | null;
   lockedTerms: { totalPercent: number; fixedPaymentCents: string | null } | null;
+  /** Deviation 1's latest ask, or null (Founder Dashboard Session C). */
+  meetingRequest: MeetingRequestView | null;
+}
+
+/**
+ * Deviation 1's record, as it reaches the browser. There is no time, no
+ * duration, no platform and no calendar link, because the record holds none —
+ * §12's Cal.com booking is the one scheduler (§30, tech-stack §12).
+ */
+export interface MeetingRequestView {
+  id: string;
+  associationId: string;
+  status: string;
+  message: string;
+  requestedAt: string;
+  respondedAt: string | null;
+  responseNote: string | null;
+}
+
+/**
+ * §14.3's cell for this campaign, read from the §6 settings by the server. The
+ * surface bounds its revision control with these and decides nothing — a second
+ * copy of the matrix in the browser is a second answer to what the base is.
+ */
+export interface RosterTerms {
+  basePercent: number;
+  ceilingPercent: number;
+  bidAllowed: boolean;
+  fixedPaymentAllowed: boolean;
+  highEffort: boolean;
 }
 
 export interface RosterView {
   responseDeadlineAt: string | null;
   fullRefundOutcome: string;
   pendingProposalNote: string;
+  terms: RosterTerms;
   creators: RosterCreator[];
 }
 
@@ -474,6 +505,36 @@ export const respondToProposal = (
   call(`/api/founder/proposals/${encodeURIComponent(versionId)}/respond`, {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+
+/** §14.3's Creator-specific bonus, offered once terms are locked. */
+export const offerCreatorBonus = (
+  campaignId: string,
+  associationId: string,
+  body: {
+    triggerUnit: 'attributed_subtotal_cents' | 'unique_attributed_backers';
+    threshold: string;
+    additionalPercent: number;
+  },
+): Promise<{ bonus: { id: string; additionalPercent: number; maxCombinedPercent: number } }> =>
+  call(`${base(campaignId)}/roster/${encodeURIComponent(associationId)}/bonus`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+/**
+ * Deviation 1. The body carries exactly one field — there is no `when`, no
+ * `slot` and no `duration` to send, which is what keeps this a request rather
+ * than the scheduler §30 defers.
+ */
+export const requestMeeting = (
+  campaignId: string,
+  associationId: string,
+  message: string,
+): Promise<{ meetingRequest: MeetingRequestView }> =>
+  call(`${base(campaignId)}/roster/${encodeURIComponent(associationId)}/meeting`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
   });
 
 /* ── Campaign building, preview, and review (§14.4, §15) — Phase 12b ─────────── */

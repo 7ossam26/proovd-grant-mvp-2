@@ -235,11 +235,11 @@ export interface FounderChapterBuildState {
 
 export const FOUNDER_CHAPTER_BUILD = {
   choose: {
+    // §14.5's roster, §14.2's three responses, §14.3's bonus, the two
+    // `campaign_build` fields, and deviation 1 — built Session C. The retired
+    // `/roster` and `/creator-readiness` addresses redirect here.
     session: 'Session C',
-    ownedForNowBy: [
-      { label: 'Your Creator roster', path: '/campaigns/:campaignId/roster' },
-      { label: 'Creator readiness', path: '/campaigns/:campaignId/creator-readiness' },
-    ],
+    ownedForNowBy: null,
   },
   live: {
     // §20's Glance, ranked Act and Explore have existed since Phase 17a and are

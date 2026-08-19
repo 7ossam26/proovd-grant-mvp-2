@@ -9952,3 +9952,171 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
   .fd-band__more { margin-left: 0; }
   .fd-chapter { padding: var(--sp-8) var(--sp-12); }
 }
+
+/* ── Chapter 1, Choose ─────────────────────────────────────────────────────
+   Founder Dashboard Session C, added 2026-08-19. §14.5, §14.2, §14.3, §16.
+
+   The reference's shape, kept: a reader on the left and the open Creator on
+   the right, two columns collapsing to one. What is NOT kept is its modal
+   treatment — every panel here can be refused by the server, and `Modal`
+   closes on its own primary action, which would put the refusal on a card
+   behind a panel that has just vanished. DNA §5.14's Act stage is exactly
+   this: the decision opens in place, beside the field that caused it.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.fd-choose { display: grid; gap: var(--sp-32); }
+.fd-choose__head { display: grid; gap: var(--sp-8); }
+
+.fd-choose__split {
+  display: grid;
+  gap: var(--sp-24);
+  align-items: start;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+}
+
+/* The reader. A `nav` of Creators — it decides which card is OPEN and nothing
+   about who is on the roster (§14.5: Proovd owns recruitment follow-up). */
+.fd-roster { display: grid; gap: var(--sp-8); align-content: start; }
+.fd-roster ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-4); }
+.fd-roster__count { margin: 0; font-size: 1.125rem; }
+.fd-roster__count strong { font-size: 2.5rem; font-weight: 500; line-height: 1; }
+.fd-roster__waiting { margin: 0 0 var(--sp-8); color: var(--moss); }
+
+.fd-roster__row {
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--darker);
+  cursor: pointer;
+  font: inherit;
+}
+.fd-roster__row:hover { border-color: var(--brand); }
+.fd-roster__row.is-open { border-color: var(--brand); background: var(--brand-5); }
+.fd-roster__who { font-weight: 700; overflow-wrap: anywhere; }
+.fd-roster__meta { color: var(--moss); font-size: 0.875rem; }
+
+/* The open Creator. */
+.fd-creator {
+  display: grid;
+  gap: var(--sp-16);
+  padding: var(--sp-24);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-creator__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fd-offer { display: grid; gap: var(--sp-12); }
+
+/* An Act panel: the decision, in place. */
+.fd-act {
+  display: grid;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--brand-5);
+}
+/* A `.btn` is inline-flex, and a flex item in a column is stretched to the
+   container by the default `align-items: stretch` — the defect Founder Flow
+   Sessions D and E each recorded, and the Money console a third time. */
+.fd-act__opener { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+
+.fd-fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: var(--sp-8); }
+.fd-fieldset legend { font-weight: 700; padding: 0; }
+.fd-radio { display: flex; gap: var(--sp-8); align-items: start; cursor: pointer; }
+.fd-radio > span { display: grid; gap: var(--sp-4); }
+
+/* The hero numeral on the read-only base-cut panel (DNA §5.1). */
+.fd-hero-num {
+  font-size: clamp(3rem, 9vw, 5rem);
+  font-weight: 500;
+  line-height: 0.9;
+  margin: 0;
+  color: var(--darker);
+}
+
+/* A refused control's reason, rendered where the control would have been.
+   `--moss` rather than `--grey`: PHASE 34's finding — `--grey` on `--white`
+   is about 2.2:1, and these sentences carry the rules. */
+.fd-note { color: var(--moss); margin: 0; }
+.fd-absence {
+  color: var(--moss);
+  margin: 0;
+  padding-left: var(--sp-12);
+  border-left: var(--bw) solid var(--grey-light);
+}
+.fd-done { color: var(--dark); font-weight: 700; margin: 0; }
+
+.fd-fields { display: grid; gap: var(--sp-16); }
+
+
+/* ── Two fixes the browser pass found, and neither is visible to jsdom ─────
+
+   1. `.wrap` IS VIEWPORT-RELATIVE, AND THAT IS WRONG TWICE HERE. It is
+      `width: min(90vw, 1600px)`, which is correct for a top-level public
+      section and wrong for anything inside a box that has already spent a
+      gutter. Measured: at 320 the shell's own wrap ran 13px past the
+      viewport, and at 1280 the SECOND one — Phase 13's Creator readiness
+      brings its own Measure/Section pair when rendered as a section of this
+      chapter — ran 77px past its parent and scrolled the document sideways.
+
+      PHASE 38 found and fixed exactly this inside the Admin view. `.fd .wrap`
+      is that fix for the Founder shell, so every chapter B–G inherits it; the
+      two `.fd-choose` rules below are the nested-surface half.
+
+   2. A SENTENCE THAT STATES A RULE TAKES `--dark`; A CAPTION STAYS `--moss`.
+      Founder Flow Session E's finding, and the Money console's after it.
+      `--moss` on white measures 3.37:1, under AA — and these sentences are
+      the load-bearing copy of the chapter, because they are what says why a
+      control does not exist. The status captions beside them
+      (`.fd-roster__meta`, `.fd-roster__waiting`) keep `--moss`: that token's
+      own ratio is the product-wide gap Session B recorded, and closing it is
+      a design decision with its own six-surface pass. */
+.fd .wrap { width: 100%; }
+.fd-choose .measure { max-width: none; }
+.fd-choose .section { padding-inline: 0; padding-block: var(--sp-16); }
+.fd-note, .fd-absence { color: var(--dark); }
+
+/* 3. `min-width: auto` ON A GRID ITEM IS WHY A SINGLE-COLUMN GRID CAN BE WIDER
+      THAN ITS CONTAINER. An implicit `auto` track is sized to the widest
+      item's MIN-content, and a text input carries an intrinsic one (its
+      default `size`) that ignores `width: 100%`. So at 320 the two URL fields
+      set a 309px floor, every sibling stretched to the track, and the page
+      scrolled sideways — while `.fd-choose` itself measured a correct 272.
+      `minmax(0, 1fr)` is the one-line fix, applied to every grid this chapter
+      declares rather than to the one that happened to hold an input. */
+.fd-choose,
+.fd-choose__head,
+.fd-roster,
+.fd-creator,
+.fd-offer,
+.fd-act,
+.fd-fields,
+.fd-fieldset { grid-template-columns: minmax(0, 1fr); }
+
+/* 4. A HANDLE, A URL AND A UTC INSTANT ARE EACH ONE UNBREAKABLE TOKEN, and at
+      320 each is wider than the column. `.fd-roster__who` already carried this;
+      the detail heading and the embedded readiness cards did not, and measured
+      37px and 13px over. PHASE 36 made the same decision twice on the Money
+      console for the same reason. */
+.fd-creator__head h2,
+.fd-choose .card h2,
+.fd-choose .card h3,
+.fd-choose .card dd,
+.fd-choose .card li { overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .fd-choose__split { grid-template-columns: minmax(0, 1fr); }
+}

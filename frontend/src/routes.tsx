@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useParams, type RouteObject } from 'react-router';
 import { lazy, Suspense } from 'react';
-import { POLICY_DOCUMENTS, founderFlowPath } from '@proovd/shared';
+import { POLICY_DOCUMENTS, founderDashboardPath, founderFlowPath } from '@proovd/shared';
 import { MotionProvider } from './motion/MotionProvider.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { LinkUnavailable } from './surfaces/LinkUnavailable.js';
@@ -33,10 +33,8 @@ import { LiveModePage } from './features/admin/live-mode/LiveModePage.js';
 import { TodayPage } from './features/admin/today/TodayPage.js';
 import { MoneyQueue } from './features/admin/money/MoneyQueue.js';
 import { MoneyRecord } from './features/admin/money/MoneyRecord.js';
-import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
-import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
 import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
@@ -122,6 +120,16 @@ function DraftResultRedirect() {
 function WorkspaceRedirect() {
   const { campaignId = '' } = useParams();
   return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
+}
+
+/**
+ * The retired roster and Creator-readiness addresses (Founder Dashboard Session
+ * C, 2026-08-19). Chapter 1 absorbed both, so a §27 email or a bookmark minted
+ * before the rebuild lands on the chapter that now holds its content.
+ */
+function ChooseChapterRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderDashboardPath(campaignId, 'choose')} replace />;
 }
 
 /*
@@ -748,10 +756,20 @@ const rootChildren: RouteObject[] = [
     element: <WorkspaceRedirect />,
   },
   {
-    // Phase 12a (§14.5). The Founder's roster view during the 72-hour clock.
-    // Beside the workspace, outside both shells, for the same reasons.
+    /*
+      Phase 12a's roster and Phase 13's Creator readiness, retired to redirects
+      (Founder Dashboard Session C, 2026-08-19).
+
+      Chapter 1 absorbed both: §14.5's card, the exact deadline, the full-refund
+      outcome and §14.2's three responses, plus §16's thirteen-item checklist
+      rendered as a section of the chapter. Two Founder surfaces over one roster
+      would be two places to answer one proposal — the reasoning that retired
+      `/draft/:token/vetting` in the flow's Session C and `/workspace` in its
+      Session E. The addresses survive their components because §27.3/§27.4
+      emails and Appendix C's §34 walk steps point at them.
+    */
     path: 'campaigns/:campaignId/roster',
-    element: <FounderRoster />,
+    element: <ChooseChapterRedirect />,
   },
   {
     // Phase 12b (§14.4, §15). The Founder's parallel campaign build and the
@@ -766,10 +784,10 @@ const rootChildren: RouteObject[] = [
     element: <CampaignPreview />,
   },
   {
-    // Phase 13 (§16). The Founder's Creator-readiness and fixed-payment funding.
-    // Beside the workspace, roster, build, and preview, outside both shells.
+    // Retired with `/roster` above — Chapter 1 renders §16's readiness as a
+    // section once somebody's terms are locked.
     path: 'campaigns/:campaignId/creator-readiness',
-    element: <CreatorReadiness />,
+    element: <ChooseChapterRedirect />,
   },
   {
     // Phase 14c (§18). The Founder posts and reviews campaign updates once live.

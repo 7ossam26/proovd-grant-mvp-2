@@ -185,12 +185,22 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: true,
   },
   {
+    /*
+      Founder Dashboard Session C (2026-08-19): the roster and the readiness
+      checklist moved into Chapter 1, and the two old addresses redirect there.
+      The route swept is the chapter, because that is what a Founder now opens —
+      a sweep of a redirect proves the redirect and nothing about the surface.
+
+      `keyboardPathRequired` becomes true with the move: this is now where a
+      Founder accepts, declines, and revises terms, and §28.5 names decision
+      surfaces. It was false while the chapter was a read-only roster card.
+    */
     key: 'founder_roster',
-    label: 'Watching the roster and the Creator readiness',
-    specRef: '§14.5, §16',
+    label: 'Choosing the launch team: the roster, the three responses, and readiness',
+    specRef: '§14.5, §14.2, §14.3, §16',
     audience: 'founder',
-    routes: ['/campaigns/:campaignId/roster', '/campaigns/:campaignId/creator-readiness'],
-    keyboardPathRequired: false,
+    routes: ['/campaigns/:campaignId/home?chapter=choose'],
+    keyboardPathRequired: true,
   },
   {
     key: 'founder_live',

@@ -465,6 +465,29 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.4',
     description: 'Work-again request',
   },
+  /*
+    RECORDED DEVIATION — Founder Dashboard Session C, deviation 1, by explicit
+    product direction (2026-08-19). §30 defers "Direct Founder–Affiliate
+    messaging" and §11 says the Founder cannot contact the Affiliate directly,
+    so this key exists only because a mediated REQUEST record does — and it is
+    kept to exactly one key for the same reason `founder_meeting_requests` is
+    kept to one message.
+
+    There is deliberately no `founder_meeting_response` beside it. The Founder
+    reads the answer on the roster card they are already looking at, so a second
+    key would be a message §27 does not name for a fact already on screen; and
+    the request fires DURING the 72-hour window, unlike §22.9's, which fires
+    after a campaign has ended and nobody is watching a roster.
+
+    Deduped on the `founder_meeting_requests` ROW: one open ask per (campaign,
+    Creator) is a partial unique index, so a second row is a second deliberate
+    ask and a replay is not (§7's resend rule).
+  */
+  affiliate_meeting_request: {
+    audience: 'affiliate',
+    specRef: '§27.4',
+    description: 'Founder asks to meet before deciding',
+  },
   /** §27.7's other half of the same capability. See `founder_activity_digest`. */
   affiliate_activity_digest: {
     audience: 'affiliate',

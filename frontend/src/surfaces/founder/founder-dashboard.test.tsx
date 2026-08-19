@@ -15,7 +15,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { CAMPAIGN_STATUSES, CAMPAIGN_STATUS_CHAPTER, FOUNDER_CHAPTERS } from '@proovd/shared';
+import {
+  BASE_CUT_IS_NOT_YOURS_TO_SET,
+  BONUS_AFTER_ACCEPTANCE,
+  BONUS_COUNTS_TOWARD_THE_CEILING,
+  CAMPAIGN_STATUSES,
+  CAMPAIGN_STATUS_CHAPTER,
+  CHOOSE_ABSENCES,
+  COMMUNITY_IS_YOURS_TO_RUN,
+  FOUNDER_CHAPTERS,
+  MEETING_REQUEST_IS_NOT_A_SCHEDULER,
+  MEETING_REQUEST_ONE_MESSAGE,
+  NO_DOWNWARD_BID,
+} from '@proovd/shared';
 import { SERVICE_SLA_BLOCK } from '../../features/public/site.js';
 import { QA, QA_ROUTES } from '../../features/qa/fixtures.js';
 import { appRoutes } from '../../routes.js';
@@ -288,5 +300,175 @@ describe('the chapter register', () => {
         `no chapter for ${status}`,
       ).toBeDefined();
     }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Chapter 1, Choose — Founder Dashboard Session C.
+
+   The half of C5 that is a property of a rendered surface.
+   `backend/src/tests/founder-dashboard-c.test.ts` owns the record and the
+   routes; this owns what a Founder can see and press.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+const choose = () => `/campaigns/${CAMPAIGN}/home?chapter=choose`;
+
+describe('C1 — the roster is answered, never assembled', () => {
+  it('renders the recruited Creators and offers no way to add or send one', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(choose());
+    await waitFor(() => expect(screen.getAllByText(/@solderandsawdust/).length).toBeGreaterThan(0));
+
+    // §14.5: Proovd owns recruitment follow-up, and §30 defers Founder
+    // outreach to unmatched Creators. The reference draws "Send to affiliates".
+    for (const label of [/send to/i, /add creator/i, /invite a creator/i, /find creators/i, /browse/i]) {
+      expect(screen.queryByRole('button', { name: label })).toBeNull();
+      expect(screen.queryByRole('link', { name: label })).toBeNull();
+    }
+    // Every absence in the register renders its reason somewhere on the page.
+    for (const id of ['send_to_roster', 'browse_creators']) {
+      const absence = CHOOSE_ABSENCES.find((a) => a.id === id)!;
+      expect(screen.getByText(absence.sentence)).toBeTruthy();
+    }
+  });
+
+  it('offers §14.2’s three responses, and no fourth', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(choose());
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Accept/ })).toBeTruthy());
+
+    expect(screen.getByRole('button', { name: /Decline this offer/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Offer a different number/ })).toBeTruthy();
+    // "Reject match" says the Founder removed somebody, which they cannot.
+    expect(screen.queryByRole('button', { name: /reject match/i })).toBeNull();
+    expect(
+      screen.getByText(CHOOSE_ABSENCES.find((a) => a.id === 'remove_creator')!.sentence),
+    ).toBeTruthy();
+  });
+
+  it('bounds the revision above base and at the ceiling', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(choose());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Offer a different number/ })).toBeTruthy(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Offer a different number/ }));
+
+    // The fixture's base is 30 and its ceiling 50, so the control opens at 43
+    // (one below their 44) and cannot be driven to or below 30. A free slider
+    // produces refusals a Founder cannot act on — they lower the number to be
+    // reasonable and are told the standard terms already give more.
+    const group = await screen.findByRole('group', { name: /percentage you are offering/i });
+    expect(within(group).getByText('43%')).toBeTruthy();
+    const down = within(group).getAllByRole('button')[0]!;
+    for (let i = 0; i < 30; i++) {
+      if (down.hasAttribute('disabled')) break;
+      await userEvent.click(down);
+    }
+    expect(within(group).getByText('31%')).toBeTruthy();
+    expect(down.hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('C2/C4 — the bonus and the meeting request', () => {
+  it('offers the bonus only once terms are locked', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(choose());
+    await waitFor(() => expect(screen.getAllByText(/@solderandsawdust/).length).toBeGreaterThan(0));
+    // The open-proposal Creator has no locked terms, so the ceiling has no
+    // baseline to be measured against yet (§14.3, `offerCreatorBonus`).
+    expect(screen.queryByRole('button', { name: /Offer a bonus/ })).toBeNull();
+    expect(screen.getByText(BONUS_AFTER_ACCEPTANCE)).toBeTruthy();
+  });
+
+  it('the bonus control counts by result and never by a time window', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(`/campaigns/${CAMPAIGN}/home?chapter=choose&creator=assoc-qa-2`);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Offer a bonus/ })).toBeTruthy());
+    await userEvent.click(screen.getByRole('button', { name: /Offer a bonus/ }));
+
+    // §14.3 names exactly two trigger units. The reference adds "When should it
+    // count? — 3 days / 1 week / By campaign end", which is a third rule with
+    // no column on `creator_bonuses` behind it.
+    expect(await screen.findByRole('radio', { name: /Pre-orders they bring in/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /Sales they bring in/ })).toBeTruthy();
+    for (const label of [/3 days/i, /1 week/i, /by campaign end/i]) {
+      expect(screen.queryByRole('radio', { name: label })).toBeNull();
+      expect(screen.queryByRole('button', { name: label })).toBeNull();
+    }
+    expect(screen.getByText(BONUS_COUNTS_TOWARD_THE_CEILING)).toBeTruthy();
+    expect(
+      screen.getByText(CHOOSE_ABSENCES.find((a) => a.id === 'bonus_period')!.sentence),
+    ).toBeTruthy();
+  });
+
+  it('the meeting ask has one message box and no time to pick', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(choose());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Ask to talk first/ })).toBeTruthy(),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Ask to talk first/ }));
+
+    expect(await screen.findByRole('textbox', { name: /talk about/i })).toBeTruthy();
+    // §30 defers a Founder–Creator scheduler and requires §12's human one.
+    // The reference offers three slots and "Send meeting invite".
+    for (const label of [/tue/i, /wed/i, /fri/i, /10:00/, /send meeting invite/i]) {
+      expect(screen.queryByRole('button', { name: label })).toBeNull();
+      expect(screen.queryByRole('checkbox', { name: label })).toBeNull();
+    }
+    expect(screen.getByText(MEETING_REQUEST_IS_NOT_A_SCHEDULER)).toBeTruthy();
+    expect(screen.getByText(MEETING_REQUEST_ONE_MESSAGE)).toBeTruthy();
+  });
+
+  it('an answered request shows the answer and offers no second message', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(`/campaigns/${CAMPAIGN}/home?chapter=choose&creator=assoc-qa-2`);
+    await waitFor(() => expect(screen.getByText(/You asked to talk/)).toBeTruthy());
+    expect(screen.getByText(/Proovd is arranging the time/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Ask to talk/ })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /talk about/i })).toBeNull();
+  });
+});
+
+describe('C3 — the two surviving onboarding fields', () => {
+  it('renders the base cut read-only, with no way to set it', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(choose());
+    await waitFor(() => expect(document.querySelector('.fd-hero-num')?.textContent).toBe('30%'));
+    expect(screen.getByText(BASE_CUT_IS_NOT_YOURS_TO_SET)).toBeTruthy();
+    // §14.2 permits a bid ABOVE base, high-effort only. The reference says
+    // "Affiliates can bid higher or lower"; there is no downward bid anywhere.
+    expect(screen.getByText(NO_DOWNWARD_BID)).toBeTruthy();
+  });
+
+  it('takes the community link and refuses to sell a hosted one', async () => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(choose());
+    await waitFor(() => expect(screen.getByLabelText(/Link to your community/)).toBeTruthy());
+    // §30 defers a hosted Founder community, §1 rule 6 forbids inventing a fee,
+    // and §24's three money streams never commingle. The reference charges US$5
+    // for Proovd to stand up a Discord server.
+    expect(screen.getByText(COMMUNITY_IS_YOURS_TO_RUN)).toBeTruthy();
+    const body = document.body.textContent ?? '';
+    expect(body).not.toMatch(/\$5\b/);
+    expect(body).not.toMatch(/discord/i);
+  });
+});
+
+describe('the retired addresses', () => {
+  it.each([
+    ['roster', 'roster'],
+    ['creator-readiness', 'creator-readiness'],
+  ])('/%s lands in Chapter 1 rather than 404ing', async (_name, segment) => {
+    installShell({ status: 'affiliate_response_and_build' });
+    renderAt(`/campaigns/${CAMPAIGN}/${segment}`);
+    // §27 emails and Appendix C's §34 walk steps point at both, so the address
+    // survives its component.
+    await waitFor(() => expect(rail()).toBeTruthy());
+    const current = within(rail())
+      .getAllByRole('button')
+      .find((b) => b.getAttribute('aria-current') === 'page');
+    expect(current?.textContent?.trim()).toBe('Choose');
   });
 });

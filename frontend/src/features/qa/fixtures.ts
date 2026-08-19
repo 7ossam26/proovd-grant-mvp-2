@@ -547,6 +547,16 @@ const roster: RosterView = {
   fullRefundOutcome:
     'If no Creator accepts by the deadline, the campaign ends and your listing fee is refunded in full.',
   pendingProposalNote: 'A Creator has proposed different terms. Nothing is agreed until you both accept.',
+  /* §14.3's cell, as the server resolves it from the §6 settings. A bid above
+     base is high-effort-only, so the fixture is high-effort — otherwise the
+     revision control is correctly absent and the sweep would never render it. */
+  terms: {
+    basePercent: 30,
+    ceilingPercent: 50,
+    bidAllowed: true,
+    fixedPaymentAllowed: true,
+    highEffort: true,
+  },
   creators: [
     {
       associationId: QA.associationId,
@@ -559,12 +569,39 @@ const roster: RosterView = {
       openProposal: {
         versionId: 'ver-1',
         versionNumber: 2,
+        // Above the 30% base: `validateProposalAgainstCell` refuses anything at
+        // or below it, so a fixture below base would be a state the product
+        // cannot produce.
         awaitingYou: true,
-        bidTotalPercent: 24,
+        bidTotalPercent: 44,
         fixedPaymentRequestCents: '50000',
-        note: 'Asked for 24% and a fixed payment.',
+        note: 'Asked for 44% and a fixed Creator payment.',
       },
       lockedTerms: null,
+      meetingRequest: null,
+    },
+    {
+      // The other half of the chapter: somebody whose terms are LOCKED, which
+      // is what renders the §14.3 bonus control and §16's readiness section,
+      // plus deviation 1's answered request.
+      associationId: 'assoc-qa-2',
+      handle: '@benchtapes',
+      channelType: 'newsletter_operator',
+      audienceMetric: '9,200 subscribers',
+      niche: 'Weekend electronics',
+      bio: 'A Sunday newsletter about small builds.',
+      statusLabel: 'Accepted',
+      openProposal: null,
+      lockedTerms: { totalPercent: 35, fixedPaymentCents: null },
+      meetingRequest: {
+        id: 'meet-qa-1',
+        associationId: 'assoc-qa-2',
+        status: 'accepted',
+        message: 'Would love ten minutes on how you would introduce this.',
+        requestedAt: '2026-08-06T09:00:00.000Z',
+        respondedAt: '2026-08-06T15:30:00.000Z',
+        responseNote: 'Happy to talk.',
+      },
     },
   ],
 };

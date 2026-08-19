@@ -38,6 +38,11 @@ import {
   notifyVersionDecision,
   type DecisionNotificationContext,
 } from '../affiliates/decision-notifications.js';
+import {
+  openMeetingRequestsForCreator,
+  respondToMeetingRequest,
+  type MeetingRefused,
+} from '../affiliates/meeting-requests.js';
 
 export interface CreatorDecisionDeps {
   db: Database;
@@ -59,6 +64,15 @@ const REFUSAL_STATUS: Record<Refused['code'], number> = {
   proposal_already_open: 409,
   invalid_terms: 422,
   stale_version: 409,
+};
+
+/** Deviation 1's own refusals (Founder Dashboard Session C). */
+const MEETING_REFUSAL_STATUS: Record<MeetingRefused['code'], number> = {
+  not_found: 404,
+  message_required: 422,
+  message_too_long: 422,
+  already_open: 409,
+  already_answered: 409,
 };
 
 function sendRefusal(res: express.Response, refused: Refused): void {
@@ -347,6 +361,59 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
       });
     },
   );
+
+  /* ── Deviation 1: the Creator's one answer (Founder Dashboard Session C) ── */
+
+  /*
+    The response column has a writer, which is the whole reason this route is
+    here. A record with a `response_note` no route can fill is the §1.4 failure
+    — a promise of an answer nobody can give — so the ask and the answer land in
+    the same session.
+
+    It moves nothing. §14.2's three responses are the only things that change a
+    number, and this touches no version, no agreement, and no association
+    status: agreeing to talk is agreeing to talk.
+  */
+  router.get('/api/creator/meeting-requests', creator, async (req, res) => {
+    const requests = await openMeetingRequestsForCreator(db, userId(req));
+    res.json({ meetingRequests: requests });
+  });
+
+  router.post('/api/creator/meeting-requests/:requestId/respond', creator, json, async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const answer = body['answer'];
+    if (answer !== 'accepted' && answer !== 'declined') {
+      res.status(422).json({
+        error: 'invalid_action',
+        whatHappened: 'An answer is either yes or no.',
+        next: 'Nothing you entered was lost.',
+      });
+      return;
+    }
+
+    const result = await respondToMeetingRequest(db, { audit }, {
+      requestId: req.params['requestId'] as string,
+      affiliateUserId: userId(req),
+      answer,
+      note: typeof body['note'] === 'string' ? body['note'] : undefined,
+    });
+    if (!result.ok) {
+      res.status(MEETING_REFUSAL_STATUS[result.code]).json({
+        error: result.code,
+        whatHappened: result.whatHappened,
+        next: result.next,
+      });
+      return;
+    }
+    res.json({
+      meetingRequest: {
+        id: result.request.id,
+        status: result.request.status,
+        respondedAt: result.request.respondedAt?.toISOString() ?? null,
+        responseNote: result.request.responseNote,
+      },
+    });
+  });
 
   return router;
 }

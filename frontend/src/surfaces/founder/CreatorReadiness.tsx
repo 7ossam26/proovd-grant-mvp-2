@@ -36,8 +36,16 @@ function isoDay(iso: string | null): string {
   return iso ? iso.replace('T', ' ').slice(0, 16) + ' UTC' : '—';
 }
 
-export function CreatorReadiness() {
+/**
+ * `embedded` is the ONE thing Founder Dashboard Session C added here: rendered
+ * inside Chapter 1 this is a section of a chapter that already has an `h1`, so
+ * its own heading drops a level (§33.11.2 wants exactly one). Nothing else
+ * changes — the reads, the thirteen-item checklist, the funding path and the
+ * "no nudge" absence are all as Phase 13 built them.
+ */
+export function CreatorReadiness({ embedded = false }: { embedded?: boolean } = {}) {
   const { campaignId = '' } = useParams();
+  const Heading = embedded ? 'h2' : 'h1';
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'refused'; whatHappened: string }
@@ -102,7 +110,7 @@ export function CreatorReadiness() {
   return (
     <Measure>
       <Section>
-        <h1>Creator readiness</h1>
+        <Heading className={embedded ? 'h3' : undefined}>Creator readiness</Heading>
         <p>
           Each Creator can begin work only when every item on their checklist is complete. This is a
           safety control, not a formality — you cannot ask a Creator to start early, and there is no

@@ -171,3 +171,8 @@ export * from './followers.js';
 // nothing, and a resource list holding no campaign material — and the two that
 // close §5.3's never-implemented settings right.
 export * from './creator-flow.js';
+
+// The Founder→Creator meeting request (migration 0056, Founder Dashboard
+// Session C — a recorded §1 rule 6 deviation on §22.9's shape; see the file
+// header for the four absences that keep it from being a scheduler or a thread).
+export * from './meetings.js';
