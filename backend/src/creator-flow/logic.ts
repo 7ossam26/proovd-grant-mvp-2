@@ -13,7 +13,7 @@
  * It is not a second source of truth — it is the same truth, three times, with
  * a test in between.
  *
- * ── Why these four and not the rest ────────────────────────────────────────
+ * ── Why these and not the rest ─────────────────────────────────────────────
  * A vocabulary is restated here when a **CHECK constraint hardcodes it**. That
  * is the only place a drift becomes a runtime failure a person meets: a Creator
  * picks a tile the register added last week, the INSERT is refused by a
@@ -23,6 +23,16 @@
  * presentation, is imported directly through Vite, and is deliberately NOT
  * copied here, because two versions of one paragraph is how they begin to
  * disagree.
+ *
+ * ── One addition Session C had to make, and why it is the exception ─────────
+ * `VOICE_TONE_IDS` and the three voice caps are NOT CHECK-pinned: 0055 bounds
+ * a tone set only by `affiliate_voice_says_something`, deliberately, because a
+ * length cap in a CHECK refuses a row rather than telling somebody their chip
+ * is long. That left the SERVICE as the only thing standing between a request
+ * body and the array — and the browser is not the boundary (`lib/session.ts`).
+ * So they are restated and drift-tested for the same reason the rest are, even
+ * though the failure they prevent is a stored value nobody can render rather
+ * than a constraint violation.
  */
 
 /**
@@ -123,3 +133,31 @@ export const REFERRAL_STATES: readonly string[] = ['recorded', 'reviewed', 'clos
  */
 export const STANDING_SCORE_MIN = 0;
 export const STANDING_SCORE_MAX = 1000;
+
+/**
+ * The six recorded tones (`CREATOR_VOICE_TONES`).
+ *
+ * Not CHECK-pinned — see the header. The service refuses an id outside this
+ * list because an unknown tone renders as nothing at all on the §11 public
+ * card, which is a value that looks saved and is not (§1.4).
+ */
+export const VOICE_TONE_IDS: readonly string[] = [
+  'straight_talking',
+  'warm',
+  'funny',
+  'analytical',
+  'enthusiastic',
+  'understated',
+];
+
+/**
+ * The three voice bounds.
+ *
+ * Presentation constants rather than §6 settings — nothing is refused, gated,
+ * or priced on them, and the reward-card pager took the same position in
+ * Founder Flow Session F. Restated here because the service is what enforces
+ * them; a 10 KB "tone" is not a chip.
+ */
+export const VOICE_CUSTOM_MAX_LENGTH = 24;
+export const VOICE_CUSTOM_MAX_COUNT = 4;
+export const VOICE_MAX_TOTAL = 5;

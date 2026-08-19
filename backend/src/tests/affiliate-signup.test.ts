@@ -36,6 +36,10 @@ import { policyVersions } from '../db/schema/policies.js';
 import { policyConsents } from '../db/schema/vetting.js';
 import { affiliateProspects } from '../db/schema/affiliates.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
+import {
+  affiliateVoiceTones,
+  affiliateChannelMetrics,
+} from '../db/schema/creator-flow.js';
 import { campaignAffiliateAssociations, associationStatusHistory } from '../db/schema/domain.js';
 import { campaignDrafts } from '../db/schema/invitations.js';
 import { user as userTable } from '../db/schema/auth.js';
@@ -750,5 +754,201 @@ describe('§33.2.1 — the signup route grants nothing wider', () => {
     expect(serialized).not.toContain(RECRUITMENT.recruitmentSource);
     expect(serialized).not.toContain(RECRUITMENT.campaignFit);
     expect(serialized).not.toMatch(/qualityTier|internalComments|conflictNotes|sanctionsNotes/);
+  });
+});
+
+/* ══ Screens 4 and 6 — the two 0055 records (Creator Flow v2, Session C) ════ */
+
+describe('the recorded tone (§11, §12, §30)', () => {
+  it('records a set, and a second save supersedes rather than edits', async () => {
+    const { raw, associationId } = await invited();
+
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/voice`)
+      .send({ tones: ['warm'], customTones: [], flexible: false })
+      .expect(200);
+
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/voice`)
+      .send({ tones: ['warm', 'analytical'], customTones: ['shop-floor'], flexible: true })
+      .expect(200);
+
+    const rows = await h.db
+      .select()
+      .from(affiliateVoiceTones)
+      .innerJoin(
+        affiliateSignupProfiles,
+        eq(affiliateSignupProfiles.id, affiliateVoiceTones.profileId),
+      )
+      .where(eq(affiliateSignupProfiles.associationId, associationId));
+
+    // Two rows, one live. Which answer was live when a Founder looked is a
+    // question somebody may have to answer, and an UPDATE would have destroyed
+    // it (0055's immutability trigger refuses one anyway).
+    expect(rows).toHaveLength(2);
+    const live = rows.filter((r) => r.affiliate_voice_tones.supersededAt === null);
+    expect(live).toHaveLength(1);
+    expect(live[0]!.affiliate_voice_tones.tones).toEqual(['warm', 'analytical']);
+    expect(live[0]!.affiliate_voice_tones.flexible).toBe(true);
+
+    const read = await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(200);
+    expect(read.body.voice.tones).toEqual(['warm', 'analytical']);
+    expect(read.body.voice.customTones).toEqual(['shop-floor']);
+  });
+
+  it('refuses a tone nobody registered, and stores nothing', async () => {
+    const { raw, associationId } = await invited();
+
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/voice`)
+      .send({ tones: ['not_a_tone'], customTones: [], flexible: false })
+      .expect(400);
+
+    // The browser is not the boundary: `creatorVoiceViolations` runs on the
+    // surface for the sentence, and the service decides what enters the record.
+    const rows = await h.db
+      .select()
+      .from(affiliateVoiceTones)
+      .innerJoin(
+        affiliateSignupProfiles,
+        eq(affiliateSignupProfiles.id, affiliateVoiceTones.profileId),
+      )
+      .where(eq(affiliateSignupProfiles.associationId, associationId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('refuses a selection that says nothing at all', async () => {
+    const { raw } = await invited();
+    const res = await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/voice`)
+      .send({ tones: [], customTones: [], flexible: false })
+      .expect(400);
+    expect(res.body.whatHappened).toMatch(/no answer/i);
+  });
+
+  it('accepts `flexible` on its own, because that IS an answer', async () => {
+    const { raw } = await invited();
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/voice`)
+      .send({ tones: [], customTones: [], flexible: true })
+      .expect(200);
+  });
+});
+
+describe('the channel figures (§5.3, §8)', () => {
+  it('asks only what this Creator’s own subtype asks, and refuses the rest', async () => {
+    const { raw } = await invited();
+
+    // The recruited subtype is `social_creator`, whose §5.3 evidence names
+    // `followers` and `engagement` among the nine — and not `enrolled_students`.
+    const read = await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(200);
+    expect(read.body.metricsAsked).toEqual(['followers', 'engagement']);
+
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/metrics`)
+      .send({ values: { enrolled_students: '400' } })
+      .expect(400);
+
+    // 0055's CHECK pins the id to the nine; what it cannot know is WHOSE
+    // subtype, which is why the service reads it from the record.
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/metrics`)
+      .send({ values: { followers: 'About 40k' } })
+      .expect(200);
+
+    const after = await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(200);
+    expect(after.body.metrics.values).toEqual({ followers: 'About 40k' });
+  });
+
+  it('stores what somebody actually typed, not a number', async () => {
+    const { raw } = await invited();
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/metrics`)
+      .send({ values: { followers: '12,300 on the main list' } })
+      .expect(200);
+
+    const read = await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(200);
+    expect(read.body.metrics.values.followers).toBe('12,300 on the main list');
+  });
+
+  it('clears a metric by retiring its row rather than storing a blank', async () => {
+    const { raw, associationId } = await invited();
+
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/metrics`)
+      .send({ values: { followers: '40k', engagement: '6%' } })
+      .expect(200);
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/metrics`)
+      .send({ values: { followers: '' } })
+      .expect(200);
+
+    const read = await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(200);
+    // §16a: unanswered is the ABSENCE of a live row, never an empty one — and
+    // 0055 requires a non-blank value, so a blank could not be stored anyway.
+    expect(read.body.metrics.values).toEqual({ engagement: '6%' });
+
+    const rows = await h.db
+      .select()
+      .from(affiliateChannelMetrics)
+      .innerJoin(
+        affiliateSignupProfiles,
+        eq(affiliateSignupProfiles.id, affiliateChannelMetrics.profileId),
+      )
+      .where(eq(affiliateSignupProfiles.associationId, associationId));
+
+    // Two rows written, and the cleared one is RETIRED rather than deleted or
+    // blanked — the answer somebody gave and then withdrew is still a fact.
+    expect(rows).toHaveLength(2);
+    const followers = rows.find((r) => r.affiliate_channel_metrics.metricId === 'followers')!;
+    const engagement = rows.find((r) => r.affiliate_channel_metrics.metricId === 'engagement')!;
+    expect(followers.affiliate_channel_metrics.supersededAt).not.toBeNull();
+    expect(followers.affiliate_channel_metrics.value).toBe('40k');
+    expect(engagement.affiliate_channel_metrics.supersededAt).toBeNull();
+  });
+});
+
+describe('the two writes are behind the same token as everything else', () => {
+  it('answers the one rejection for a token that is not this invitation', async () => {
+    await request(h.app)
+      .put('/api/affiliate-invitation/not-a-real-token/voice')
+      .send({ tones: ['warm'], customTones: [], flexible: false })
+      .expect(TOKEN_REJECTION_STATUS);
+
+    await request(h.app)
+      .put('/api/affiliate-invitation/not-a-real-token/metrics')
+      .send({ values: { followers: '1' } })
+      .expect(TOKEN_REJECTION_STATUS);
+  });
+
+  it('stops answering the moment the account exists (§33.2.1)', async () => {
+    const { raw } = await invited();
+    await fillProfile(raw);
+    await publishClaimPolicies();
+    await claim(raw).expect(201);
+
+    // The claim CLAIMS and REVOKES the token. This is the fact screen 8 is an
+    // account address for: a "you are signed up" state at a token address is a
+    // state nobody can reach.
+    await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(TOKEN_REJECTION_STATUS);
+    await request(h.app)
+      .put(`/api/affiliate-invitation/${raw}/voice`)
+      .send({ tones: ['warm'], customTones: [], flexible: false })
+      .expect(TOKEN_REJECTION_STATUS);
+  });
+});
+
+describe('no upload route exists for either screen (§12, Track A4)', () => {
+  it('reports storage as unavailable rather than offering a presign', async () => {
+    const { raw } = await invited();
+    const read = await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(200);
+
+    // §1.4: the surface renders a named absence where the reference draws an
+    // upload control, and it is not guessing at the deployment.
+    expect(read.body.uploads).toEqual({ available: false });
+
+    for (const suffix of ['photo', 'evidence', 'uploads', 'presign']) {
+      await request(h.app).post(`/api/affiliate-invitation/${raw}/${suffix}`).send({}).expect(404);
+    }
   });
 });

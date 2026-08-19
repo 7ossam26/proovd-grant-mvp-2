@@ -47,11 +47,15 @@ import {
   FounderNotificationSettings,
 } from './surfaces/notifications/NotificationSettings.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
-import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
 import { WelcomeStep } from './surfaces/creator-flow/WelcomeStep.js';
 import { PasswordStep } from './surfaces/creator-flow/PasswordStep.js';
 import { ProfileStep } from './surfaces/creator-flow/ProfileStep.js';
 import { ChannelStep } from './surfaces/creator-flow/ChannelStep.js';
+import { VoiceStep as CreatorVoiceStep } from './surfaces/creator-flow/VoiceStep.js';
+import { PresenceStep } from './surfaces/creator-flow/PresenceStep.js';
+import { VerifyStep } from './surfaces/creator-flow/VerifyStep.js';
+import { AgreeStep } from './surfaces/creator-flow/AgreeStep.js';
+import { DoneStep } from './surfaces/creator-flow/DoneStep.js';
 import {
   CreatorCampaigns,
   CreatorCampaignKit,
@@ -107,6 +111,18 @@ function DraftVettingRedirect() {
   const { token = '' } = useParams();
   return <Navigate to={founderFlowPath('positioning', token)} replace />;
 }
+/**
+ * The interim signup address Session B parked Phase 08b's page at.
+ *
+ * Retired to a redirect by Session C rather than deleted, because the address
+ * shipped and somebody may have it open. `/agree` is the screen that took its
+ * job.
+ */
+function CreatorFinishRedirect() {
+  const { token = '' } = useParams();
+  return <Navigate to={`/creator-invitation/${encodeURIComponent(token)}/agree`} replace />;
+}
+
 /** The old possible-creators result address, kept only as a way to the claim. */
 function DraftResultRedirect() {
   const { token = '' } = useParams();
@@ -564,23 +580,32 @@ const rootChildren: RouteObject[] = [
     element: <ChannelStep />,
   },
   {
+    path: 'creator-invitation/:token/voice',
+    element: <CreatorVoiceStep />,
+  },
+  {
+    path: 'creator-invitation/:token/presence',
+    element: <PresenceStep />,
+  },
+  {
+    path: 'creator-invitation/:token/verify',
+    element: <VerifyStep />,
+  },
+  {
+    path: 'creator-invitation/:token/agree',
+    element: <AgreeStep />,
+  },
+  {
     /*
-     * Phase 08b's compact signup (§11, §33.2.2, §33.2.3), as the INTERIM tail
-     * of the flow until Session C builds screens 4–8 and the claim.
+     * Phase 08b's compact signup lived here for the length of Session B, as the
+     * interim tail of the flow. Session C built screens 4–8 and the claim, so
+     * `CreatorSignup` is deleted and the address is a redirect — somebody may
+     * have it open, and `/agree` is what it was standing in for.
      *
-     * It moved down one path segment and nothing about it changed: the same
-     * five §28.4 confirmations, the same two policy acceptances, the same
-     * `completeAffiliateSignup`, and the same surface confirming signup
-     * afterwards. What changed is that the four pages above it now own the
-     * first half of what it used to ask on one screen, so it asks that half no
-     * longer — see `CreatorSignup`'s own header.
-     *
-     * The Founder flow's Session B did exactly this with `/draft/:token/vetting`
-     * and Session C retired it. Session C retires this one the same way: a
-     * redirect, because the address is one somebody may have open.
+     * The Founder flow retired `/draft/:token/vetting` exactly this way.
      */
     path: 'creator-invitation/:token/finish',
-    element: <CreatorSignup />,
+    element: <CreatorFinishRedirect />,
   },
   {
     /*
@@ -604,6 +629,18 @@ const rootChildren: RouteObject[] = [
     ),
     children: [
       {
+    /*
+     * Screen 8 of the Creator flow (§11, §33.2.2, §33.2.3) — Session C.
+     *
+     * Inside the session group and NOT at a `/creator-invitation/:token`
+     * address, because the claim revokes the token: every stage-1 address
+     * answers the one rejection from the instant the account exists. It is
+     * `CREATOR_FLOW_PAGES`' one `param: 'none'` page for that reason.
+     */
+    path: 'creator/welcome',
+    element: <DoneStep />,
+  },
+  {
     // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator. Outside both
     // shells: §26 licenses dashboard density in Admin only, and this is not a
     // public page — it is reached by signing in, and everything on it is

@@ -193,32 +193,39 @@ export const PRINCIPAL_FLOWS = [
     specRef: '§11, §5.3, §28.4',
     audience: 'creator',
     // Creator Flow v2 (2026-08-19) split the compact signup onto one address
-    // per screen. Session B built the first four; the fifth is Phase 08b's own
-    // page at its interim address, which Session C replaces with screens 4–8
-    // and retires to a redirect.
+    // per screen. Session B built screens 0–3 and Session C 4–7; the interim
+    // address Session B parked Phase 08b's page at is now a redirect.
     //
     // Restated from `CREATOR_FLOW_PAGES` rather than spread, for the reason
     // `founder_vetting` records: this register is `as const` and a spread would
     // widen every route to `string`. Drift-tested against it.
     //
-    // Split from the session-scoped Creator surfaces below because these four
+    // Split from the session-scoped Creator surfaces below because these eight
     // are reached with an invitation token and NO account — which is the whole
     // of §11, and is a different auth regime rather than a different topic.
+    // Screen 8 is `creator_campaigns`' for exactly that reason: the claim
+    // revokes the token, so it is an account-level address.
     routes: [
       '/creator-invitation/:token',
       '/creator-invitation/:token/password',
       '/creator-invitation/:token/you',
       '/creator-invitation/:token/channel',
-      '/creator-invitation/:token/finish',
+      '/creator-invitation/:token/voice',
+      '/creator-invitation/:token/presence',
+      '/creator-invitation/:token/verify',
+      '/creator-invitation/:token/agree',
     ],
     keyboardPathRequired: true,
   },
   {
     key: 'creator_campaigns',
-    label: 'The signed-in Creator: their campaigns and payout setup',
-    specRef: '§10, §13, §31.5',
+    label: 'The signed-in Creator: their account, their campaigns, and payout setup',
+    specRef: '§10, §13, §31.5, §33.2.3',
     audience: 'creator',
-    routes: ['/creator/campaigns'],
+    // `/creator/welcome` is screen 8 of the flow and the one place §33.2.3's
+    // named waiting state renders — it is here rather than with the seven above
+    // because the claim revokes the invitation token (see `DoneStep`).
+    routes: ['/creator/welcome', '/creator/campaigns'],
     keyboardPathRequired: false,
   },
   {

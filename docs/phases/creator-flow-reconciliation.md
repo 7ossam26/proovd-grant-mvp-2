@@ -319,6 +319,12 @@ is 25 of those, and it added no backend test: everything it built is a surface,
 a register entry, a stylesheet section, or a column reader whose write path the
 existing `affiliate-signup` suite already drives.
 
+**After Session C: 128 files, 3,613 tests, 0 failures** — backend 1,711 (66
+files), shared 465 (31 files), frontend 1,437 (31 files). Session C added no
+file and no migration: its 14 new backend tests went into `affiliate-signup`
+and `creator-flow`, and its 18 new frontend ones into the two suites that
+already own §33.2.2/§33.2.3 and the flow.
+
 **A note on how that number was obtained, because the next session will hit
 it.** This machine cannot run `npm test` as one command: esbuild intermittently
 fails to read `tsconfig.base.json` with *"Access is denied"*, which aborts
@@ -484,3 +490,210 @@ every primary in the product carries.
 `## N. What the Session X browser pass found, and nothing else could` — to be appended in forward
 order by Sessions C–F. Ten rebuilds in a row have now found defects invisible to jsdom, axe, and the
 type checker; assume the next one will too.*
+
+---
+
+## 9. Session C — screens 4–8, and the claim
+
+**Landed 2026-08-19.** Five screens, two writes, no migration, and one defect
+that had been shipping since Phase 08b.
+
+The suites after Session C: backend **1,711**, shared **465**, frontend
+**1,437** — 3,613 tests across 66 backend files, 31 shared and 31 frontend, all
+green. §33.2.1 and §33.2.3 pass; §33.2.2 is re-authored, with one comment and
+one date.
+
+### Screen 8 could not be on the invitation token, and that is a FIX
+
+`completeAffiliateSignup` calls `tokens.claimAffiliateInvitation`, which sets
+**both** `claimed_at` and `revoked_at`. So from the instant the account exists,
+every `/creator-invitation/:token` address answers the one rejection —
+`affiliate-signup.test.ts` has asserted exactly that on a repeat claim since
+Phase 08b.
+
+Phase 08b's `CreatorSignup` re-read the invitation after a successful claim
+(`onClaimed={load}`) and rendered §33.2.3's waiting state from
+`profile.claimedAt`. That read **401s in production**, so a Creator who had just
+created their account was shown the unusable-link page. The frontend suite never
+saw it because it stubbed a claimed profile rather than driving a real claim —
+the §33.11.1 failure mode in its own test harness, and the reason the sweep
+checks for the fixture-missing panel.
+
+The waiting state has therefore been unreachable since it was written, and
+Session C is what makes it reachable: screen 8 is `/creator/welcome`, behind
+`RequireRole allow={['affiliate']}`, and it reads `/api/creator/campaigns` and
+the payout state rather than the invitation. A test asserts nothing on it talks
+to `/api/affiliate-invitation` at all.
+
+**Session A anticipated the shape of the answer** when it typed `param` as
+`'token' | 'none'` and wrote `CREATOR_FLOW_EARLIER_STAGE_CLOSED`. The register
+now holds eight token pages and exactly one addressed by nothing, and
+`creatorFlowPath` throws in both directions — a parameter for the page that
+takes none, and a missing one for a page that needs it. That is not a
+convenience: a token appended to an app address is a live credential in an app
+URL.
+
+### The claim signs in afterwards, because it mints no session
+
+`completeAffiliateSignup` creates the account and claims the invitation; §11
+does not ask it for a session and it issues none. So the Agree screen posts the
+password held in `draft.ts` to Better Auth's own `/api/auth/sign-in/email` — the
+real route, its real rate limit, its real origin guard, no new server code.
+Founder Flow Session D made the same call for the same reason.
+
+If that sign-in fails the ACCOUNT still exists, and
+`CREATOR_SIGN_IN_AFTER_CLAIM_FAILED` says so in those words rather than letting
+somebody believe they must start over with a link that no longer works.
+
+### Three §11 fields the reference never draws
+
+`dateOfBirth`, `country` and `stateRegion` are gates on `completeAffiliateSignup`
+and appear on **no screen of the prototype**, which bundles four representations
+into one sentence instead. This is a fifth omission beside the four §2 already
+names.
+
+They are collected on screen 7 rather than screen 2, because they are the
+factual half of two of the five confirmations — the birth date beside "I am at
+least 18", the state beside "I am based in the United States". §10's Founder
+claim puts the same pair on the same screen.
+
+**Nothing computes an age.** §11 records what somebody states, and the
+confirmation is the statement.
+
+### What the two new writes are, and what they are not
+
+`PUT …/voice` and `PUT …/metrics` over Session A's two 0055 tables. Neither is a
+primary action — both are the same autosave the PATCH is, addressed separately
+because they write append-only rows rather than columns.
+
+* **A PUT, not a PATCH, for the tone.** The SET is the answer: dropping a chip
+  is expressed by sending the remaining ones, and a merge would make removal
+  unrepresentable.
+* **Retire before insert, inside one transaction.** The partial unique index
+  permits one live row per profile, so an insert before the retire collides with
+  the row it is replacing — and the immutability trigger means there was never
+  an UPDATE path that would have avoided the question.
+* **The service validates, because the browser is not the boundary.**
+  `creatorVoiceViolations` runs on the surface for the sentence; the same
+  vocabulary runs on the server, restated in `creator-flow/logic.ts` and
+  drift-tested. That restatement is the **one exception** to Session A's rule of
+  restating only what a CHECK hardcodes: 0055 deliberately bounds a tone set
+  only by `affiliate_voice_says_something`, because a length cap in a CHECK
+  refuses a row rather than telling somebody their chip is long — which left the
+  service as the only thing between a request body and the array.
+* **A metric is refused unless the Creator's own subtype asks for it.** 0055's
+  CHECK pins the id to the nine; what it cannot know is WHOSE subtype. A podcast
+  Creator posting `enrolled_students` would satisfy the constraint and store a
+  figure §5.3 never asks a podcaster for, which an Admin would then verify
+  against a question nobody put to them. `permittedMetricsFor` is derived from
+  `REQUIRED_EVIDENCE`, and a test drives all seven subtypes through it and
+  through shared's `creatorChannelMetricsFor` and asserts they agree.
+* **Clearing a metric retires its row and inserts nothing.** 0055 requires a
+  non-blank value, so "I would rather not say" is the ABSENCE of a live row
+  rather than an empty one (§16a).
+* **Both reads are `ensureSignupProfile`, not a bare read** — the payout route's
+  own reasoning: a Creator who reaches a screen without having typed into an
+  earlier one has no profile row yet, and answering that with a refusal would
+  say "this link is broken" about a link that is fine.
+
+### One sentence stopped existing twice
+
+§11's waiting state names Proovd as the owner, and that sentence has existed
+twice since Phase 08b — once in `CreatorSignup`, once in
+`templates/affiliate-signup-confirmed.tsx` — written independently with nothing
+comparing them. The owner of a wait is a promise about who is accountable for
+ending it, and two copies is how one of them quietly becomes "the Founder's
+fault". `CREATOR_PROOVD_OWNS_THE_WAIT` is canonical now, the backend restates it
+for the `rootDir` reason, and `creator-flow.test.ts` fails if they disagree.
+
+### §33.2.2, re-authored — one test, one comment, one date
+
+§33.2.2 tests *"Compact flow has Proovd account action and Stripe payout action,
+no custom bank form/tour."* **Deviation 1** departs from the tour half by
+explicit product direction. The half that is load-bearing is what the suite now
+asserts, unchanged in substance:
+
+* one Proovd account action, and exactly one `.btn--primary` on the screen that
+  creates the account;
+* one Stripe payout action, still a handoff — Phase 10b's four assertions are
+  **verbatim**, only their entry point moved;
+* no bank, routing, tax-id or identity input on any screen, and no route that
+  could accept one;
+* five confirmations, five separate unchecked controls, five columns — counted
+  against `CREATOR_CONFIRMATIONS`, which names the column each writes, so the
+  count is compared to the schema rather than to a second list;
+* one PATCH key per confirmation control, asserted;
+* two policy acceptances and no third, with §31.5's per-campaign IP agreement
+  named as the reason.
+
+### What the Session C browser pass found, and nothing else could
+
+Five, and the eleventh rebuild in a row where the pass found what jsdom, axe and
+the type checker all agreed was fine.
+
+1. **"Date of birth" rendered twice.** `DateOfBirthField` renders its own label,
+   its own hint and its own calendar disclosure, and it was wrapped in a `Field`.
+   jsdom is happy with two labels and axe reads the nearer one.
+2. **The reused field carried a promise this screen does not keep.**
+   `FLOW_AGE_IS_YOUR_STATEMENT` says the field checks the date adds up to 18 or
+   over "as a courtesy" — TRUE on the Founder claim, which computes it, and a
+   claim about behaviour on the Creator's agreement, which computes nothing.
+   `DateOfBirthField` takes the note as a prop now, so the sentence belongs to
+   the screen rather than to the component (§1.4). The Founder flow is
+   unchanged: the prop defaults to its own constant.
+3. **§5.3's `basis` is ADMIN copy and was rendering to a Creator.** Screen 6's
+   metric hints read *"The audience-size metric §8 requires on the prospect."* —
+   a Spec section reference on a customer surface, the leak the Campaigns hub
+   recorded when `§21:` read aloud nine times, and worse here because the
+   audience is not an operator. The label renders and the basis does not; what a
+   Creator reads instead is `CHANNEL_METRICS_ARE_YOUR_OWN_FIGURES`, which says
+   the same useful thing in words written for them. A test now walks every
+   screen and refuses `/§\s*\d/`.
+4. **The tone help got HARDER to read at the moment somebody chose it.**
+   `--moss` is about 3.4:1 on white and about 2.3:1 on the chip's mint fill. axe
+   cannot see it: the accessible name is the label, and contrast is computed
+   against the element's own declared background rather than the fill behind it —
+   the same class of defect PHASE 28, 31 and 33 each recorded.
+5. **`--brand` on white is 1.46:1**, so the two policy links on the agreement
+   screen were unreadable. PHASE 34's `.ff-claim__consent a` took the same
+   position on the Founder claim; the underline carries the affordance.
+
+Plus one that is **not** a defect and is written down so the next pass does not
+chase it: an `<input>` whose VALUE is longer than its box reports
+`scrollWidth > clientWidth`, and the browser scrolls it natively. The probe
+reports it as clipping at 320 on the channel screen; the document does not
+scroll sideways and nothing is lost. It is the `.sr-only` false positive in a
+different shape.
+
+### Two contrast gaps that are pre-existing and were NOT changed here
+
+`--moss` body copy reads about **3.37:1** on white, and it is what Session B
+ships on every lede and note across the flow — Founder Flow Session C
+established it as the body-copy tone. `StatePanel`'s `state-panel__key` and
+`Tag`'s `tag--mint` read **2.18:1** and **2.66:1**, and both are Phase 02/05
+primitives used by every workspace in the product.
+
+Neither is Session C's to change: re-toning either is a product-wide edit with
+its own screenshot pass across every phase section, and doing it inside a
+five-screen session would be a change nobody could review. They are recorded
+here rather than silently inherited. `.btn--primary`'s 1.44:1 stays what it has
+always been — proovd.css:158's hard rule and tech-stack §3.6's documented,
+scoped exception, verified as recorded in Phase 23b.
+
+### What Session C deliberately did not build
+
+* **Any change to `completeAffiliateSignup`.** Not split, not reordered, not
+  made partial: one transaction, the same gates in the same order, account
+  creation still before it. `affiliate-signup.test.ts`'s own 40 assertions pass
+  untouched, which is a stronger statement than a copy of them passing
+  elsewhere — so the new suite deliberately does not re-drive §33.1.9.
+* **An upload route for either screen.** §12's bucket is Track A4 and
+  `unconfiguredStorage` throws; the payload carries `uploads.available` and the
+  surface renders a named absence. A test posts at four plausible addresses and
+  asserts 404 on all four.
+* **A `matchPct` meter, a score, or an unlock.** No threshold in §5.3 or §8
+  exists for one to measure.
+* **A third policy acceptance.** §31.5's IP agreement is per campaign and due
+  before work.
+* **Anything on screens 9–14.** Home, Pitches, Earnings, Resources and Settings
+  are Sessions D–F, and none of them is in `CREATOR_FLOW_PAGES`.

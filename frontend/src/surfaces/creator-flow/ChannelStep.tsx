@@ -34,6 +34,11 @@
  * student-only textarea IS that field and is keyed to it. It is asked of a
  * student and of nobody else, because §5.3 asks it of nobody else.
  *
+ * ── Session C took the handoff back ────────────────────────────────────────
+ * Session B pointed this screen's forward control at Phase 08b's compact signup
+ * because screen 4 did not exist. It does now, so this goes to `voice` through
+ * the register like every other page, and the interim address is a redirect.
+ *
  * ── One sentence the reference draws that is not true yet ───────────────────
  * *"You can edit all of this later under Profile."* Settings is Session F, and
  * §5.3 licenses that right while the product has no route for it — which is the
@@ -78,7 +83,7 @@ export function ChannelStep() {
 }
 
 function Body({ token, loaded }: { token: string; loaded: CreatorInvitationState }) {
-  const { leave, leaveToPage } = useCreatorFlowNav();
+  const { leaveToPage } = useCreatorFlowNav();
   const fields = loaded.profile.fields;
   const autosave = useInvitationSave(token);
 
@@ -106,17 +111,7 @@ function Body({ token, loaded }: { token: string; loaded: CreatorInvitationState
   async function advance() {
     if (!ready) return;
     await autosave.flush();
-    // Screen 4 is Session C's. Until it lands, forward is Phase 08b's compact
-    // signup at its interim address — which is a real page that finishes the
-    // account, not a placeholder. The Founder flow's Session B handed off to
-    // `/draft/:token/vetting` for exactly this stretch and Session C retired
-    // it; this is the same arrangement and the same ending.
-    //
-    // It is addressed directly rather than through `creatorFlowPath`, because
-    // it is NOT one of the flow's pages: it is in no register, has no help
-    // card, and is going away. A register entry for a page about to be deleted
-    // is a register that lies.
-    leave(`/creator-invitation/${encodeURIComponent(token)}/finish`, 1);
+    leaveToPage('voice', 1);
   }
 
   return (

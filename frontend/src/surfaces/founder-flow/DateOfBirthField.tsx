@@ -116,10 +116,22 @@ export function DateOfBirthField({
   value,
   disabled,
   onChange,
+  note,
 }: {
   value: string;
   disabled?: boolean;
   onChange: (next: string) => void;
+  /**
+   * The sentence under the field.
+   *
+   * A prop rather than a constant, because it describes what the SCREEN does
+   * and the two screens that render this do different things: the Founder's
+   * claim computes the 18+ check as a courtesy, and the Creator's agreement
+   * computes nothing at all. Shipping one sentence for both put a claim about
+   * behaviour on the screen that does not have it (§1.4) — found by the
+   * browser pass, Creator Flow v2 Session C.
+   */
+  note?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'days' | 'years'>('days');
@@ -201,7 +213,7 @@ export function DateOfBirthField({
         ) : null}
       </div>
 
-      <p className="ff-dob__note">{FLOW_AGE_IS_YOUR_STATEMENT}</p>
+      <p className="ff-dob__note">{note ?? FLOW_AGE_IS_YOUR_STATEMENT}</p>
 
       {open ? (
         <div

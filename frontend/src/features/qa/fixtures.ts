@@ -964,6 +964,26 @@ const creatorInvitation: CreatorInvitationState = {
     { slug: 'terms', title: 'Terms of Service', version: 'v1.0', status: 'draft', route: '/terms' },
     { slug: 'affiliate-aup', title: 'Creator Acceptable Use Policy', version: 'v1.0', status: 'draft', route: '/affiliate-aup' },
   ],
+  // 0055's two records (Session C). Both answered, because an unanswered one
+  // is a real state and a fixture stuck in it would sweep every screen in its
+  // empty shape and never render what a Creator coming back actually sees.
+  voice: {
+    tones: ['analytical', 'understated'],
+    customTones: ['shop-floor'],
+    flexible: false,
+    recordedAt: '2026-08-03T09:30:00.000Z',
+  },
+  metrics: {
+    values: { followers: '48,000', engagement: 'About 6% on a good week' },
+    recordedAt: '2026-08-03T09:32:00.000Z',
+  },
+  // What §5.3 asks a `social_creator` for, of the nine. The server derives it;
+  // this is the same answer, typed out, because a fixture that derived it would
+  // be testing the derivation against itself.
+  metricsAsked: ['followers', 'engagement'],
+  // Track A4, and the flow renders a named absence for both uploads. `true`
+  // here would sweep a state the deployment does not have.
+  uploads: { available: false },
 };
 
 const opportunity: FormalOpportunity = {

@@ -70,18 +70,29 @@ export interface CreatorFlowPage {
 /**
  * The pages a session has actually built.
  *
- * Session A shipped this empty and a test asserted it. Session B appends
- * screens 0–3; Session C appends 4–8, Session D the app shell. Each session
- * adds only what it renders, because a register pre-populated with fourteen
- * pages would make every "is this page reachable" check answer yes about
- * surfaces that do not exist — and the help drawer's "everything before it"
- * would be an aspiration rather than a fact.
+ * Session A shipped this empty and a test asserted it. Session B appended
+ * screens 0–3 and Session C appends 4–8; Session D adds the app shell. Each
+ * session adds only what it renders, because a register pre-populated with
+ * fourteen pages would make every "is this page reachable" check answer yes
+ * about surfaces that do not exist — and the help drawer's "everything before
+ * it" would be an aspiration rather than a fact.
  *
  * ── The addresses (Session B, 2026-08-19) ───────────────────────────────────
  * `/creator-invitation/:token` is the invitation's own address and screen 0 is
  * what the §8 email points at. Every later stage-1 page hangs below it, so the
  * token travels in the path and nowhere else (§28.1) and a Creator's position
  * is a URL they can reload (DNA §5.12).
+ *
+ * ── Screen 8 is stage 3, and that is forced by the record (Session C) ───────
+ * `completeAffiliateSignup` calls `tokens.claimAffiliateInvitation`, which sets
+ * BOTH `claimed_at` and `revoked_at` — so from the instant the account exists,
+ * every `/creator-invitation/:token` address answers the one rejection. A
+ * "your account is set up" screen at a token address is a screen nobody can
+ * reach, which is why `done` is `param: 'none'` and lives under `/creator`.
+ *
+ * That is not a Session C decision so much as one Session A anticipated when
+ * it typed `param` as `'token' | 'none'` and wrote
+ * `CREATOR_FLOW_EARLIER_STAGE_CLOSED`.
  */
 export const CREATOR_FLOW_PAGES: readonly CreatorFlowPage[] = [
   {
@@ -115,6 +126,46 @@ export const CREATOR_FLOW_PAGES: readonly CreatorFlowPage[] = [
     title: 'Your channel',
     help: 'What a Founder sees when they look at you: where you post, who watches, and what about.',
     stage: 1,
+  },
+  {
+    id: 'voice',
+    path: '/creator-invitation/:token/voice',
+    param: 'token',
+    title: 'Your voice',
+    help: 'How you describe your own style. Shown to Founders, and never used to write anything for you.',
+    stage: 1,
+  },
+  {
+    id: 'presence',
+    path: '/creator-invitation/:token/presence',
+    param: 'token',
+    title: 'Your bio',
+    help: 'The short description a Founder reads. We drafted one; your words replace it.',
+    stage: 1,
+  },
+  {
+    id: 'verify',
+    path: '/creator-invitation/:token/verify',
+    param: 'token',
+    title: 'Your numbers',
+    help: 'Your own audience figures, which somebody at Proovd checks against your channel.',
+    stage: 1,
+  },
+  {
+    id: 'agree',
+    path: '/creator-invitation/:token/agree',
+    param: 'token',
+    title: 'The agreement',
+    help: 'What you are agreeing to, and the one action that creates your account.',
+    stage: 2,
+  },
+  {
+    id: 'done',
+    path: '/creator/welcome',
+    param: 'none',
+    title: 'You are in',
+    help: 'Your account exists. What happens next, who owns the wait, and your payout setup.',
+    stage: 3,
   },
 ];
 

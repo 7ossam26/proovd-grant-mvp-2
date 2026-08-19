@@ -36,6 +36,7 @@ import {
   creatorFlowPath,
 } from '@proovd/shared';
 import { appRoutes } from '../../routes.js';
+import { invalidateSession } from '../../lib/session.js';
 import { clearDraft } from './draft.js';
 
 type StubResult = { status: number; body: unknown } | undefined;
@@ -150,6 +151,12 @@ function stubInvitation(options: { profile?: Record<string, unknown> } = {}) {
             { slug: 'terms', title: 'Terms of Service', version: '1.0', status: 'published', route: '/terms' },
             { slug: 'affiliate-aup', title: 'Creator Acceptable Use Policy', version: '1.0', status: 'published', route: '/affiliate-aup' },
           ],
+          // Session C's four (0055 + Track A4). Empty rather than answered,
+          // because this suite walks a Creator arriving for the first time.
+          voice: { tones: [], customTones: [], flexible: false, recordedAt: null },
+          metrics: { values: {}, recordedAt: null },
+          metricsAsked: ['followers', 'engagement'],
+          uploads: { available: false },
         },
       };
     }
@@ -158,6 +165,77 @@ function stubInvitation(options: { profile?: Record<string, unknown> } = {}) {
     }
     return undefined;
   });
+}
+
+/**
+ * What screen 8 needs, and the four token pages do not.
+ *
+ * `/creator/welcome` is behind `RequireRole allow={['affiliate']}` because the
+ * claim revokes the invitation token — `DoneStep` records the reasoning. So a
+ * walk over the whole register has to be able to answer for an account.
+ */
+function stubSignedInCreator() {
+  handlers.push((url) => {
+    if (url === '/api/account/me') {
+      return {
+        status: 200,
+        body: {
+          account: { id: 'u1', email: 'sam@example.com', name: 'Sam Okafor', role: 'affiliate' },
+        },
+      };
+    }
+    if (url === '/api/creator/campaigns') {
+      return {
+        status: 200,
+        body: {
+          campaigns: [
+            {
+              associationId: 'a1',
+              campaignId: 'campaign-1',
+              productName: 'Waitlist',
+              status: 'creator_prep',
+              revealedAt: null,
+              revoked: false,
+              reviewAvailable: false,
+            },
+          ],
+        },
+      };
+    }
+    if (url === '/api/creator/payouts') {
+      return {
+        status: 200,
+        body: {
+          payouts: {
+            state: 'not_started',
+            stripeAccountId: null,
+            missingRequirements: [],
+            pendingVerification: [],
+            disabledReason: null,
+            canResume: false,
+            onboardingAvailable: false,
+            listingFeeEligible: false,
+            linkActivationBlocked: true,
+            paymentReceiptBlocked: true,
+            campaignReviewBlocked: false,
+            lastSyncedAt: null,
+          },
+        },
+      };
+    }
+    return undefined;
+  });
+}
+
+/** The address of one page, whichever parameter it takes. */
+function pathOf(page: { id: string; param: 'token' | 'none' }): string {
+  return page.param === 'none' ? creatorFlowPath(page.id) : creatorFlowPath(page.id, TOKEN);
+}
+
+/** Render one register entry, whichever parameter its address takes. */
+async function renderPage(page: { id: string; param: 'token' | 'none' }) {
+  const router = createMemoryRouter(appRoutes, { initialEntries: [pathOf(page)] });
+  return render(<RouterProvider router={router} />);
 }
 
 async function renderAt(pageId: string) {
@@ -173,24 +251,45 @@ const patches = () =>
 /* ══ The register, the router, and the help drawer agree ══════════════════ */
 
 describe('the four pages are one list, read three ways', () => {
-  it('registers exactly the four screens Session B built, all on the token', () => {
+  // DELIBERATELY INVERTED (Creator Flow v2 Session C, 2026-08-19). Session B
+  // asserted its own four and that every page was on the token; Session C added
+  // screens 4–8, and screen 8 is deliberately NOT on the token — the claim
+  // revokes it (`DoneStep`). What Session B was protecting survives whole: the
+  // register is the flow in order, and the token pages are still token pages.
+  it('registers the nine screens, and only screen 8 is an account address', () => {
     expect(CREATOR_FLOW_PAGES.map((p) => p.id)).toEqual([
       'welcome',
       'password',
       'profile',
       'channel',
+      'voice',
+      'presence',
+      'verify',
+      'agree',
+      'done',
     ]);
-    for (const page of CREATOR_FLOW_PAGES) {
-      expect(page.param).toBe('token');
-      expect(page.stage).toBe(1);
+
+    const tokenPages = CREATOR_FLOW_PAGES.filter((p) => p.param === 'token');
+    expect(tokenPages).toHaveLength(8);
+    for (const page of tokenPages) {
+      expect(page.path.startsWith('/creator-invitation/:token')).toBe(true);
+      expect(page.stage).toBeLessThanOrEqual(2);
     }
+
+    // The one `param: 'none'` page, and the reason it is one.
+    const done = CREATOR_FLOW_PAGES.filter((p) => p.param === 'none');
+    expect(done.map((p) => p.id)).toEqual(['done']);
+    expect(done[0]!.stage).toBe(3);
+    expect(done[0]!.path.startsWith('/creator-invitation')).toBe(false);
   });
 
   it('gives every registered page a real address', async () => {
     stubInvitation();
+    stubSignedInCreator();
     for (const page of CREATOR_FLOW_PAGES) {
+      invalidateSession();
       const router = createMemoryRouter(appRoutes, {
-        initialEntries: [creatorFlowPath(page.id, TOKEN)],
+        initialEntries: [pathOf(page)],
       });
       const view = render(<RouterProvider router={router} />);
       // A page in the register with no route renders nothing at all, which is
@@ -484,11 +583,13 @@ describe('screen 3 — the channel', () => {
 
 /* ══ Across the four ══════════════════════════════════════════════════════ */
 
-describe('across the four screens', () => {
+describe('across every screen of the flow', () => {
   it('collects no bank, tax, or identity field anywhere (§11)', async () => {
     stubInvitation();
+    stubSignedInCreator();
     for (const page of CREATOR_FLOW_PAGES) {
-      const view = await renderAt(page.id);
+      invalidateSession();
+      const view = await renderPage(page);
       await screen.findByRole('heading', { level: 1 });
 
       for (const control of Array.from(document.querySelectorAll('input, select, textarea'))) {
@@ -502,12 +603,31 @@ describe('across the four screens', () => {
     }
   });
 
-  it('has no axe violation on any of the four', async () => {
+  it('has no axe violation on any screen', async () => {
     stubInvitation();
+    stubSignedInCreator();
     for (const page of CREATOR_FLOW_PAGES) {
-      const view = await renderAt(page.id);
+      invalidateSession();
+      const view = await renderPage(page);
       await screen.findByRole('heading', { level: 1 });
       expect(await axe(view.container)).toHaveNoViolations();
+      view.unmount();
+    }
+  });
+
+  it('renders no Spec section reference to a Creator (§3.1)', async () => {
+    stubInvitation();
+    stubSignedInCreator();
+    for (const page of CREATOR_FLOW_PAGES) {
+      invalidateSession();
+      const view = await renderPage(page);
+      await screen.findByRole('heading', { level: 1 });
+      // Found by the browser pass: screen 6 rendered
+      // `AFFILIATE_SUBTYPE_DEFINITIONS`' `basis`, which is written for the
+      // person doing the §8 verification and reads "The audience-size metric §8
+      // requires on the prospect." The Campaigns hub recorded the same leak
+      // when `§21:` read aloud nine times — and this audience is a customer.
+      expect(document.body.textContent ?? '').not.toMatch(/§\s*\d/);
       view.unmount();
     }
   });
@@ -538,5 +658,233 @@ describe('what the reference draws and this flow refuses', () => {
       expect(absence.absentBecause.length).toBeGreaterThan(60);
       expect(absence.specRef).toMatch(/§/);
     }
+  });
+});
+
+/* ══ Screens 4–7 (Creator Flow v2, Session C, 2026-08-19) ══════════════════ */
+
+describe('screen 4 — the voice', () => {
+  it('asks what the Creator sounds like, and never offers to write for them', async () => {
+    stubInvitation();
+    await renderAt('voice');
+    await screen.findByRole('heading', { level: 1 });
+
+    // The reference asks "Pick a tone we should write your scripts in." §30
+    // defers AI rewriting, §12 makes the helpers static, and there is no model
+    // client in this tree — so the QUESTION is re-authored, and the sentence
+    // that makes it honest travels with it. The scan is scoped to the question
+    // rather than page-wide, because the pinned promise says "rewrites" itself
+    // and a page-wide ban would forbid the sentence doing the work.
+    const promise = /nothing on proovd writes or rewrites your posts/i;
+    expect(document.body.textContent ?? '').toMatch(promise);
+
+    // Everything EXCEPT the pinned promise, which says "rewrites" itself — a
+    // page-wide ban would forbid the sentence doing the work. The same shape
+    // as the age scan below: exclude the statement, scan the rest.
+    const asked = Array.from(document.querySelectorAll('h1, h2, p, legend, label, span'))
+      .map((n) => n.textContent ?? '')
+      .filter((t) => !promise.test(t));
+    expect(asked.some((t) => /write your scripts|rewrite|generate/i.test(t))).toBe(false);
+  });
+
+  it('saves the whole set, so removing a chip is representable', async () => {
+    stubInvitation();
+    handlers.push((url, init) =>
+      url === `/api/affiliate-invitation/${TOKEN}/voice` && init?.method === 'PUT'
+        ? { status: 200, body: { voice: { tones: [], customTones: [], flexible: false, recordedAt: null } } }
+        : undefined,
+    );
+    const user = userEvent.setup();
+    await renderAt('voice');
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getByRole('button', { name: /warm/i }));
+    await user.click(screen.getByRole('button', { name: /next: your bio/i }));
+
+    await waitFor(() => {
+      const put = requests.find((r) => r.method === 'PUT');
+      expect(put).toBeTruthy();
+      // A PUT rather than a PATCH: the SET is the answer, and a merge would
+      // make removal unrepresentable.
+      expect(put!.body).toEqual({ tones: ['warm'], customTones: [], flexible: false });
+    });
+  });
+
+  it('refuses to advance on an answer that says nothing', async () => {
+    stubInvitation();
+    await renderAt('voice');
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('button', { name: /next: your bio/i })).toBeDisabled();
+  });
+
+  it('names every problem at once rather than one at a time', async () => {
+    stubInvitation();
+    const user = userEvent.setup();
+    await renderAt('voice');
+    await screen.findByRole('heading', { level: 1 });
+
+    // Six chips is over the total cap on its own.
+    for (const label of [/straight-talking/i, /warm/i, /funny/i, /analytical/i, /enthusiastic/i, /understated/i]) {
+      await user.click(screen.getByRole('button', { name: label }));
+    }
+    const problems = await screen.findByRole('alert');
+    expect(problems.textContent).toMatch(/narrow it down/i);
+  });
+
+  it('adds a custom tone on Enter without advancing the page', async () => {
+    stubInvitation();
+    const user = userEvent.setup();
+    await renderAt('voice');
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.type(screen.getByLabelText(/add your own/i), 'shop-floor{Enter}');
+    expect(screen.getByRole('button', { name: /remove shop-floor/i })).toBeTruthy();
+    expect(document.querySelector('[data-flow-page="voice"]')).toBeTruthy();
+    expect(document.querySelector('[data-flow-page="presence"]')).toBeNull();
+  });
+});
+
+describe('screen 5 — the bio', () => {
+  it('renders one handle field, not two (§11)', async () => {
+    stubInvitation();
+    await renderAt('presence');
+    await screen.findByRole('heading', { level: 1 });
+
+    // The reference draws a `Username` input beside the public handle. One
+    // column, two boxes, two values that eventually disagree.
+    expect(screen.queryByLabelText(/username/i)).toBeNull();
+    expect(screen.getByLabelText(/public name or handle/i)).toBeTruthy();
+  });
+
+  it('names the photo absence rather than rendering a dead control (§1.4)', async () => {
+    stubInvitation();
+    await renderAt('presence');
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.getByText(/photo uploads are not switched on yet/i)).toBeTruthy();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /photo|upload/i })).toBeNull();
+  });
+
+  it('labels Proovd’s draft bio as Proovd’s, and lets it be replaced', async () => {
+    stubInvitation();
+    const user = userEvent.setup();
+    await renderAt('presence');
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.getByText(/we drafted this from your public channel/i)).toBeTruthy();
+    await user.type(screen.getByLabelText(/short bio/i), '!');
+    await waitFor(() => expect(patches().some((p) => 'bio' in p)).toBe(true));
+  });
+});
+
+describe('screen 6 — the numbers', () => {
+  it('asks only what the server said this channel is asked (§5.3)', async () => {
+    stubInvitation();
+    await renderAt('verify');
+    await screen.findByRole('heading', { level: 1 });
+
+    // `metricsAsked` is `['followers', 'engagement']` in the stub. A field the
+    // browser derived and the route refused would be a box somebody could type
+    // into and never save.
+    expect(screen.getByLabelText(/^followers$/i)).toBeTruthy();
+    expect(screen.queryByLabelText(/enrolled/i)).toBeNull();
+  });
+
+  it('takes words as well as figures', async () => {
+    stubInvitation();
+    await renderAt('verify');
+    await screen.findByRole('heading', { level: 1 });
+    // "About 40k" is a real answer. A numeric input would refuse it and push
+    // somebody to type a figure they do not have.
+    expect(screen.getByLabelText(/^followers$/i).getAttribute('type')).not.toBe('number');
+  });
+
+  it('renders no score, no meter, and no unlock (§8, §30)', async () => {
+    stubInvitation();
+    await renderAt('verify');
+    await screen.findByRole('heading', { level: 1 });
+
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/affiliate score|match|unlock|%\s*complete/i);
+    expect(document.querySelector('progress, [role="progressbar"]')).toBeNull();
+  });
+
+  it('names the evidence absence rather than offering an upload (§12, Track A4)', async () => {
+    stubInvitation();
+    await renderAt('verify');
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.getByText(/screenshot uploads are not switched on yet/i)).toBeTruthy();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+  });
+});
+
+describe('screen 7 — the agreement', () => {
+  it('does not promise there are no clawbacks (§22.1, §29.5, §24.8)', async () => {
+    stubInvitation();
+    await renderAt('agree');
+    await screen.findByRole('heading', { level: 1 });
+
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/no clawbacks/i);
+    expect(text).not.toMatch(/your (money|pay) is guaranteed/i);
+    // §29.5 protects VALID FINALIZED commission, and only absent
+    // Creator-caused invalidity. Saying which is stronger copy than saying
+    // neither.
+    expect(text).toMatch(/can be reversed/i);
+  });
+
+  it('takes exactly two policy acceptances, and says where the third belongs', async () => {
+    stubInvitation();
+    await renderAt('agree');
+    await screen.findByRole('heading', { level: 1 });
+
+    // §31.5's IP agreement is PER CAMPAIGN and due before WORK — collected at
+    // §14.2 acceptance, on the campaign it belongs to.
+    expect(screen.queryByRole('checkbox', { name: /IP|NDA|confidentiality/i })).toBeNull();
+    expect(screen.getByText(/per campaign/i)).toBeTruthy();
+  });
+
+  it('collects the three §11 fields the reference never draws', async () => {
+    stubInvitation();
+    await renderAt('agree');
+    await screen.findByRole('heading', { level: 1 });
+
+    // Gates on `completeAffiliateSignup`, and on no screen of the prototype.
+    // They sit beside the two confirmations they are the factual half of.
+    expect(screen.getByLabelText(/date of birth/i)).toBeTruthy();
+    expect(screen.getByLabelText(/country/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^state$/i)).toBeTruthy();
+  });
+
+  it('derives no age from the date of birth (§11)', async () => {
+    stubInvitation();
+    const user = userEvent.setup();
+    await renderAt('agree');
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.type(screen.getByLabelText(/date of birth/i), '1994-03-11');
+    // §11 records what somebody states, and the 18+ confirmation is the
+    // statement. Nothing here computes, ticks, or refuses on an age — the scan
+    // excludes the confirmation itself, whose own words are "at least 18 years
+    // old" and which is the statement rather than a derivation of one.
+    const derived = Array.from(document.querySelectorAll('p, span, div'))
+      .map((n) => n.textContent ?? '')
+      .filter((t) => !/at least 18 years old/i.test(t));
+    expect(derived.some((t) => /you are \d+|\d+ years old today|\bage:/i.test(t))).toBe(false);
+    expect(
+      screen.getByRole('checkbox', { name: /at least 18 years old/i }).getAttribute('aria-checked'),
+    ).toBe('false');
+  });
+
+  it('asks for the password again only when a reload lost it', async () => {
+    stubInvitation();
+    clearDraft();
+    await renderAt('agree');
+    await screen.findByRole('heading', { level: 1 });
+    // It is module state by design: a credential in `sessionStorage` outlives
+    // the tab and is readable by anything in the page.
+    expect(screen.getByText(/a refresh loses it/i)).toBeTruthy();
   });
 });

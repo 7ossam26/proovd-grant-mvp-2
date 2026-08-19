@@ -145,3 +145,263 @@ export const CREATOR_CHANNEL_IS_THE_PUBLIC_CARD =
  */
 export const CREATOR_CHANNEL_CORRECTIONS_TODAY =
   'If any of this changes, tell us and we will update it for you.';
+
+/* ── Screen 4: your voice ─────────────────────────────────────────────────── */
+
+/**
+ * The reference's heading, kept. Its LEDE is what was refused.
+ *
+ * *"Pick a tone we should write your scripts in"* promises generation. §30
+ * defers AI pitch rewriting and refinement, §12 makes the helper resources
+ * "static, copy-ready guidance—not an embedded AI product", and there is no
+ * model client anywhere in this tree. `VOICE_IS_NEVER_USED_TO_REWRITE` in
+ * `voice.ts` is the pinned sentence that travels with the control; this is the
+ * question re-asked so that sentence is not a correction of the line above it.
+ */
+export const CREATOR_VOICE_HEAD = 'Sound like you.';
+export const CREATOR_VOICE_LEDE =
+  'How would you describe your own style? Founders read this when they are deciding whether you suit their campaign.';
+
+/** Above the six chips. The reference's own framing, and an accurate one. */
+export const CREATOR_VOICE_CHIPS_LABEL = 'A tone you are good at';
+
+/**
+ * What the reference says here is *"These are the most popular ones for your
+ * niche."*, which is a claim about data nothing holds — no record counts tone
+ * choices, and none is grouped by niche. Refused rather than approximated.
+ */
+export const CREATOR_VOICE_CHIPS_HELP =
+  'Pick as many as genuinely fit. You can change this later.';
+
+export const CREATOR_VOICE_CUSTOM_LABEL = 'Add your own';
+export const CREATOR_VOICE_FLEXIBLE_LABEL = 'I am flexible with different tones';
+
+/* ── Screen 5: presence ───────────────────────────────────────────────────── */
+
+export const CREATOR_PRESENCE_HEAD = 'Put a face to it.';
+export const CREATOR_PRESENCE_LEDE =
+  'This is how Founders see you. A photo and a short bio tell them who they would be working with.';
+
+/**
+ * Pinned. Renders where the reference draws its photo control.
+ *
+ * §12's object storage is Track A4 and `unconfiguredStorage` throws rather than
+ * pretending, so there is no bucket to put a photo in — no presign route, no
+ * file input, and `profile_photo_key` stays unread. §1.4 gives two honest
+ * options, hide the control or say what it is; hiding it would make the flow
+ * describe a smaller product than the one being built, so the reason renders
+ * where the control would be. This is the Affiliate evidence uploader's
+ * arrangement (2026-08-17), applied to the Creator's own screen.
+ */
+export const CREATOR_PHOTO_UNAVAILABLE =
+  'Photo uploads are not switched on yet — we have no file storage connected, so there is nowhere for one to go. Your bio and your channel are what a Founder sees in the meantime, and we will ask you for a photo once this opens.';
+
+/**
+ * The bio's source label. §11's correction right, on the §8 Admin-written bio.
+ *
+ * `affiliate_prospects.admin_bio` is what a person at Proovd wrote after
+ * researching the channel, and §11 requires both the label saying so and the
+ * ability to change it.
+ */
+export const CREATOR_BIO_PREFILL_NOTE =
+  'We drafted this from your public channel. Put it in your own words — what you write is what Founders read.';
+
+/* ── Screen 6: verify ─────────────────────────────────────────────────────── */
+
+export const CREATOR_VERIFY_HEAD = 'Show us the numbers.';
+
+/**
+ * The reference's own lede is about uploading screenshots, which is the half
+ * that cannot happen yet. What CAN happen is the figures, so the question is
+ * the figures and the upload is a named absence below them.
+ */
+export const CREATOR_VERIFY_LEDE =
+  'Tell us how big your audience is. Somebody at Proovd checks this against your channel before a Founder sees it.';
+
+/**
+ * Pinned. Renders where the reference draws its upload control.
+ *
+ * The record already exists — 0048's `affiliate_evidence_files` is keyed on the
+ * prospect, so a Creator-supplied row needs no new table — and what is missing
+ * is the bucket. Same reason as the photo, said for the thing an Admin will
+ * eventually verify against.
+ */
+export const CREATOR_EVIDENCE_UNAVAILABLE =
+  'Screenshot uploads are not switched on yet — we have no file storage connected. If we need to see something, we will ask you for it directly rather than leave you guessing.';
+
+/** True, and worth keeping. The reference's own sentence. */
+export const CREATOR_VERIFY_READ_ONLY =
+  'We never post, message, or act on your behalf. Nothing here connects to your account.';
+
+/* ── Screen 7: the agreement ──────────────────────────────────────────────── */
+
+/**
+ * The re-authored head and lede.
+ *
+ * The reference draws *"You stay in control. Your pay is guaranteed."* over
+ * *"As long as you follow the rules below, your earnings lock in. No
+ * clawbacks."* — on the screen where somebody is consenting, which is where an
+ * untrue promise costs the most. The first half is true and is kept; the second
+ * is not, and `CREATOR_FLOW_ABSENCES` carries the full argument.
+ */
+export const CREATOR_AGREE_HEAD = 'You stay in control.';
+export const CREATOR_AGREE_LEDE =
+  'Two things worth knowing before you create the account. Neither is fine print.';
+
+/**
+ * §17, §14.2. The reference's first promise, which is true as drawn.
+ *
+ * Nothing publishes for a Creator: §14.2's acceptance is theirs, §17's post is
+ * written and published by them, and Admin verifies what they submitted rather
+ * than producing it.
+ */
+export const CREATOR_AGREE_CONTROL_TITLE = 'You decide what you post';
+export const CREATOR_AGREE_CONTROL_BODY =
+  'Nothing goes out in your name. You write the post, you publish it, and you choose which campaigns to take at all — turning one down does not count against you.';
+
+/**
+ * §22.1, §29.5, §24.8. The re-authored second promise.
+ *
+ * §29.5 protects VALID FINALIZED commission, and only absent Creator-caused
+ * invalidity. §22.1 provides for cancelling unpaid invalid amounts and creating
+ * a contractual recovery record on fraud, fake traffic, self-dealing, false
+ * claims, invalid proof, or material breach — and 20a's
+ * `applyCauseBasedAffiliateAdjustment` exists because that happens.
+ *
+ * So the guarantee is real and it is narrower than "no clawbacks": what is
+ * protected is valid earnings against the campaign going badly, which is the
+ * thing a Creator is actually worried about. Saying which is stronger copy than
+ * saying neither.
+ */
+export const CREATOR_AGREE_MONEY_TITLE = 'Valid earnings are not clawed back for performance';
+export const CREATOR_AGREE_MONEY_BODY =
+  'Once pre-orders you brought in are charged and your commission is finalized, it is not reduced because the campaign did less well than hoped or because a Founder changed their mind. Earnings from invalid activity — fake traffic, self-dealing, or breaking the agreement — can be reversed, and that is a recorded decision with a reason behind it.';
+
+/**
+ * Above the five §28.4 controls.
+ *
+ * The reference bundles four representations into one sentence and one button.
+ * §28.4 forbids bundling and requires the 18+ confirmation unchecked, and §11
+ * names five things rather than four.
+ */
+export const CREATOR_AGREE_CONFIRMATIONS_LABEL = 'Five things you are telling us';
+export const CREATOR_AGREE_CONFIRMATIONS_HELP =
+  'Each one is a separate statement and none of them is ticked for you.';
+
+/**
+ * §11's two acceptances, and why there is no third.
+ *
+ * The reference's single button accepts *"the Terms, Acceptable Use Policy, and
+ * IP & NDA Agreement"*. §31.5's IP agreement is PER CAMPAIGN and is due before
+ * WORK — it is collected at §14.2 acceptance, on the campaign it belongs to —
+ * so taking it here would collect it for a campaign this Creator has not been
+ * offered yet. `AFFILIATE_CLAIM_POLICY_SLUGS` has held exactly two since Phase
+ * 08b and does not change.
+ */
+export const CREATOR_AGREE_IP_LATER =
+  'The intellectual-property and confidentiality agreement is per campaign, so we ask for it when you accept a campaign rather than now.';
+
+/**
+ * §11's five confirmations, as a register.
+ *
+ * §28.4 forbids bundling, so each is its own unchecked control writing its own
+ * column — and a register is what lets a test count the CONTROLS and the
+ * COLUMNS and compare the two numbers. Five labels hard-coded in a component
+ * can be counted; they cannot be compared to the schema.
+ *
+ * `column` is the `affiliate_signup_profiles` column each writes, named here so
+ * the comparison is against the database rather than against a second list.
+ */
+export interface CreatorConfirmation {
+  /** The `SaveSignupInput` key, which is also the PATCH body key. */
+  key: string;
+  /** The `affiliate_signup_profiles` column it writes. */
+  column: string;
+  label: string;
+}
+
+export const CREATOR_CONFIRMATIONS: readonly CreatorConfirmation[] = [
+  {
+    key: 'confirmAge18Plus',
+    column: 'confirm_age_18_plus',
+    label: 'I am at least 18 years old.',
+  },
+  {
+    key: 'confirmUsBased',
+    column: 'confirm_us_based',
+    label: 'I am based in the United States.',
+  },
+  {
+    key: 'confirmActualOperator',
+    column: 'confirm_actual_operator',
+    label:
+      'I am the person who actually runs this channel — not an agency or a manager acting for somebody else.',
+  },
+  {
+    key: 'confirmNoDuplicateAccounts',
+    column: 'confirm_no_duplicate_accounts',
+    label: 'This is my only Proovd account.',
+  },
+  {
+    key: 'confirmSanctionsEligible',
+    column: 'confirm_sanctions_eligible',
+    label: 'I am not on a sanctions list and I am eligible to be paid under US sanctions rules.',
+  },
+];
+
+/* ── Screen 8: all set ────────────────────────────────────────────────────── */
+
+export const CREATOR_DONE_HEAD = 'You are in.';
+
+/**
+ * §11's waiting state, named (§33.2.3).
+ *
+ * It lives on this screen and not on the invitation, because
+ * `completeAffiliateSignup` claims AND revokes the token — so from the moment
+ * the account exists, every `/creator-invitation/:token` address answers the
+ * one rejection. A "you are signed up" state at a token address is a state
+ * nobody can reach.
+ */
+export const CREATOR_DONE_ACCOUNT_MADE =
+  'Your Proovd account is set up, and you are joined to the one campaign this invitation was for.';
+
+/**
+ * What happens if the sign-in after the claim does not go through.
+ *
+ * The ACCOUNT still exists — the claim is its own transaction and it committed.
+ * Saying so is the difference between "try again" and somebody believing they
+ * have to start over with a link that no longer works.
+ */
+export const CREATOR_SIGN_IN_AFTER_CLAIM_FAILED =
+  'Your account was created — that part is done and it did not fail. We could not sign you in automatically just now, which is a separate step. Sign in with the email and password you just chose.';
+
+/**
+ * §11's waiting state names Proovd as the owner. One sentence, two renderers.
+ *
+ * It has existed twice since Phase 08b — once in `CreatorSignup` and once in
+ * `templates/affiliate-signup-confirmed.tsx` — written independently, with
+ * nothing comparing them. The owner of a wait is a promise about who is
+ * accountable for ending it, and two copies of that promise is how one of them
+ * quietly becomes "the Founder's fault".
+ *
+ * This is the canonical text. The frontend imports it; the backend restates it
+ * for the `rootDir` reason and `creator-flow.test.ts` fails if they disagree.
+ */
+export const CREATOR_PROOVD_OWNS_THE_WAIT =
+  'Proovd owns this step. We are working with the Founder to finish their setup, and we will ' +
+  'email you as soon as there is something for you to look at.';
+
+/**
+ * Under the date of birth on the agreement screen.
+ *
+ * The Founder flow's `FLOW_AGE_IS_YOUR_STATEMENT` says the field checks the
+ * date adds up to 18 or over "as a courtesy" — which is TRUE there, because
+ * `ClaimStep` computes it. Nothing on the Creator's agreement screen does, so
+ * reusing that sentence with the component would have been a claim about
+ * behaviour this screen does not have (§1.4). Found by the browser pass.
+ *
+ * What is true here is the half that matters either way: §11 records what
+ * somebody states, and the confirmation below is the statement.
+ */
+export const CREATOR_AGE_IS_YOUR_STATEMENT =
+  'We do not work out your age from this and we do not verify it. What stands on your record is your own confirmation below.';

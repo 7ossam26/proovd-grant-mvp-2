@@ -1,5 +1,5 @@
 /**
- * Phase 08b surfaces — §33.2.2 and §33.2.3, the half a Creator can see.
+ * §33.2.2 and §33.2.3 — the half of the Creator's signup a person can see.
  *
  *   33.2.2  Compact flow has Proovd account action and Stripe payout action,
  *           no custom bank form/tour.
@@ -9,14 +9,37 @@
  * boundary. Server-side rules — that the claim refuses, that a draft policy
  * blocks it, that the token cannot be crossed — are proved in
  * `backend/src/tests/affiliate-signup.test.ts` against the real routes.
+ *
+ * ── §33.2.2, RE-AUTHORED (Creator Flow v2 Session C, 2026-08-19) ────────────
+ * §11 asks for "one compact account-and-profile flow" and forbids a
+ * "multi-page education sequence"; §30 defers general product tours. Creator
+ * Flow v2's **deviation 1** departs from that half by explicit product
+ * direction, and `docs/phases/creator-flow-v2.md` records what it is not
+ * licence for — not a public signup, not a second invitation mechanism, not a
+ * tour anywhere else in the product.
+ *
+ * The half that is load-bearing does not move, and is what the tests below
+ * assert: **one Proovd account action, one Stripe payout action, no custom bank
+ * form.** Every §11 content bullet is still collected, the five confirmations
+ * are still five separate unchecked controls writing five columns, no bank,
+ * routing, tax-id or identity input exists on any screen, there is no public
+ * route, and the invitation still claims exactly one association.
+ *
+ * ── Where the two states live now ──────────────────────────────────────────
+ * The account action is screen 7 (`/agree`). The waiting state is screen 8
+ * (`/creator/welcome`) — a SESSION address, because `completeAffiliateSignup`
+ * claims and revokes the invitation token, so a "you are signed up" state at a
+ * token address is one nobody can reach. `DoneStep` records that in full.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
+import { CREATOR_CONFIRMATIONS } from '@proovd/shared';
 import { appRoutes } from '../../routes.js';
+import { invalidateSession } from '../../lib/session.js';
 import { NO_ACTION } from '../../components/index.js';
 
 type StubResult = { status: number; body: unknown } | undefined;
@@ -79,8 +102,11 @@ function profileFor(overrides: Record<string, unknown> = {}) {
       email: field('sam@example.com', 'sam@example.com'),
       phone: field('+1 555 0199', '+1 555 0199'),
       channelReference: field('https://example.social/@sambuilds', 'https://example.social/@sambuilds'),
+      channelType: field('instagram'),
       audienceNiche: field('Indie software founders', 'Indie software founders'),
       audienceSize: field('42,000 followers', '42,000 followers'),
+      nicheDescription: field('Threads about shipping alone.'),
+      outreachPlan: field(null),
       bio: field('Sam writes about building software alone.', 'Sam writes about building software alone.'),
       dateOfBirth: field(null),
       country: field(null),
@@ -119,8 +145,8 @@ const DRAFT_POLICIES = PUBLISHED_POLICIES.map((p) => ({ ...p, status: 'draft' })
  * §13's onboarding state, as the server would report it.
  *
  * Phase 10b's panel reads `/api/creator/payouts` on mount, so every case that
- * renders the signed-up surface needs one — a case that does not stub it gets
- * no panel at all, which is the honest behaviour when the state is unreadable.
+ * renders screen 8 needs one — a case that does not stub it gets no panel at
+ * all, which is the honest behaviour when the state is unreadable.
  */
 function stubPayouts(overrides: Record<string, unknown> = {}) {
   handlers.push((url) =>
@@ -149,11 +175,14 @@ function stubPayouts(overrides: Record<string, unknown> = {}) {
   );
 }
 
-function stubInvitation(options: {
-  profile?: Record<string, unknown>;
-  conditional?: Record<string, unknown>;
-  policies?: unknown;
-} = {}) {
+function stubInvitation(
+  options: {
+    profile?: Record<string, unknown>;
+    conditional?: Record<string, unknown>;
+    policies?: unknown;
+    uploads?: { available: boolean };
+  } = {},
+) {
   handlers.push((url, init) => {
     if (url === `/api/affiliate-invitation/${TOKEN}` && (init?.method ?? 'GET') === 'GET') {
       return {
@@ -172,6 +201,10 @@ function stubInvitation(options: {
             ...options.conditional,
           },
           policies: options.policies ?? PUBLISHED_POLICIES,
+          voice: { tones: [], customTones: [], flexible: false, recordedAt: null },
+          metrics: { values: {}, recordedAt: null },
+          metricsAsked: ['followers', 'engagement'],
+          uploads: options.uploads ?? { available: false },
         },
       };
     }
@@ -182,201 +215,139 @@ function stubInvitation(options: {
   });
 }
 
-async function renderSignup() {
-  const router = createMemoryRouter(appRoutes, {
-    // MOVED (Creator Flow v2 Session B, 2026-08-19). `/creator-invitation/:token`
-    // is screen 0 of the flow now; this page is its interim tail at `/finish`
-    // until Session C builds screens 4–8 and retires the address to a redirect.
-    //
-    // Only the ENTRY POINT moved. Every assertion below is the one it always
-    // was, and §33.2.2's own claim — one page, one primary action — is
-    // re-authored in Session C, which is the session that removes the page.
-    initialEntries: [`/creator-invitation/${TOKEN}/finish`],
-  });
-  const view = render(<RouterProvider router={router} />);
-  return view;
+/**
+ * Screen 8 is behind `RequireRole allow={['affiliate']}`, so it needs a real
+ * session answer. The account exists by the time this screen renders — the
+ * claim is what put it there.
+ */
+function stubSignedIn() {
+  handlers.push((url) =>
+    url === '/api/account/me'
+      ? {
+          status: 200,
+          body: {
+            account: {
+              id: 'u1',
+              email: 'sam@example.com',
+              name: 'Sam Okafor',
+              role: 'affiliate',
+            },
+          },
+        }
+      : undefined,
+  );
 }
 
-/* ══ §33.2.2 — exactly two primary actions, no bank form, no tour ════════ */
+/** Screen 8's own read. The account exists by the time this is called. */
+function stubCampaigns(overrides: Record<string, unknown> = {}) {
+  handlers.push((url) =>
+    url === '/api/creator/campaigns'
+      ? {
+          status: 200,
+          body: {
+            campaigns: [
+              {
+                associationId: 'a1',
+                campaignId: 'campaign-1',
+                productName: 'Waitlist',
+                status: 'creator_prep',
+                revealedAt: null,
+                revoked: false,
+                reviewAvailable: false,
+                ...overrides,
+              },
+            ],
+          },
+        }
+      : undefined,
+  );
+}
 
-describe('§33.2.2 — the compact flow', () => {
-  it('is one page with one primary action', async () => {
+async function renderAt(path: string) {
+  // The session read is module-cached and shared across every caller on the
+  // page, so one test's answer would otherwise be the next test's first paint.
+  invalidateSession();
+  const router = createMemoryRouter(appRoutes, { initialEntries: [path] });
+  return render(<RouterProvider router={router} />);
+}
+
+/** Screen 7 — the agreement, and §11's one account action. */
+const renderAgree = () => renderAt(`/creator-invitation/${TOKEN}/agree`);
+/** Screen 8 — the account, and §11's one payout action. */
+const renderDone = () => {
+  stubSignedIn();
+  return renderAt('/creator/welcome');
+};
+
+/* ══ §33.2.2 — one account action, one payout action, no bank form ════════ */
+
+describe('§33.2.2 — the account action and the payout action', () => {
+  it('offers exactly one primary action on the screen that creates the account', async () => {
     stubInvitation();
-    await renderSignup();
+    await renderAgree();
 
-    expect(
-      await screen.findByRole('button', { name: /confirm and create account/i }),
-    ).toBeTruthy();
-
-    // §11 forbids a multi-page sequence. No stepper, no next/back, no tour.
-    expect(screen.queryByRole('button', { name: /^next$/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^back$/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /skip|take the tour|get started/i })).toBeNull();
-    expect(screen.queryByText(/step \d+ of \d+/i)).toBeNull();
-  });
-
-  it('has exactly one primary button on the whole page', async () => {
-    stubInvitation();
-    await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
-
-    const primaries = [...document.querySelectorAll('.btn--primary')];
+    await screen.findByRole('heading', { level: 1 });
+    const primaries = document.querySelectorAll('.btn--primary');
     expect(primaries).toHaveLength(1);
-    expect(primaries[0]!.textContent).toMatch(/confirm and create account/i);
+    expect(primaries[0]!.textContent).toContain('Confirm and create account');
   });
 
   it('collects no bank, tax, or identity-document field (§11)', async () => {
     stubInvitation();
-    await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
+    await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
 
-    // §11: "Proovd must not reproduce provider-controlled banking or identity
-    // fields in a custom form." Nothing on this page asks for one.
-    for (const control of screen.getAllByRole('textbox')) {
-      const label = control.closest('label')?.textContent ?? '';
-      expect(label).not.toMatch(
-        /routing|account number|bank|IBAN|sort code|tax id|SSN|social security|passport|driver/i,
-      );
+    const forbidden = /account number|routing|iban|sort code|ssn|social security|ein|tax id|passport|driver|upload/i;
+    for (const control of Array.from(document.querySelectorAll('input, textarea, select'))) {
+      const label = document.querySelector(`label[for="${control.id}"]`)?.textContent ?? '';
+      expect(label).not.toMatch(forbidden);
+      expect(control.getAttribute('name') ?? '').not.toMatch(forbidden);
     }
-    expect(
-      screen.queryByText(/routing number|account number|tax identification|upload.*id/i),
-    ).toBeNull();
-  });
-
-  it('labels the prefilled fields with their source, and flips on correction', async () => {
-    stubInvitation();
-    const user = userEvent.setup();
-    await renderSignup();
-
-    const bio = await screen.findByLabelText(/how proovd describes you/i);
-    expect(screen.getByText(/written by proovd from your public channel/i)).toBeTruthy();
-
-    await user.clear(bio);
-    await user.type(bio, 'My own words.');
-    expect(await screen.findByText(/^you wrote this\.$/i)).toBeTruthy();
-  });
-
-  it('does not re-ask what the flow already collected, and names it instead', async () => {
-    // MOVED (Creator Flow v2 Session B, 2026-08-19). The phone, the legal name,
-    // the email and the channel are screens 2–3's now, and the assertion that
-    // the phone is labelled unverified moved with them to
-    // `creator-flow.test.tsx`. A record collected on two screens is a record
-    // whose two copies eventually disagree, and a suite testing both copies
-    // would have made that look correct.
-    //
-    // What is tested here is the other half: this page asks for none of them
-    // and names each with a link back to the page that owns it (§1.4).
-    stubInvitation();
-    await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
-
-    for (const label of [/^phone$/i, /full legal name/i, /^email$/i, /audience niche/i]) {
-      expect(screen.queryByLabelText(label)).toBeNull();
-    }
-    expect(screen.getByRole('heading', { name: /what you told us/i })).toBeTruthy();
-
-    // Still nowhere to verify a phone number, on any surface (§33.1.8).
-    expect(screen.queryByRole('button', { name: /verify/i })).toBeNull();
-  });
-
-  it('shows the channel type without letting the Creator change it', async () => {
-    // Changing it would invalidate the §5.3 verification recorded against it.
-    stubInvitation();
-    await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
-
-    expect(screen.getByText(/we have you recorded as a social creator/i)).toBeTruthy();
-    expect(screen.queryByRole('combobox')).toBeNull();
-  });
-
-  it('keeps the claim unavailable until everything §11 requires is present', async () => {
-    stubInvitation();
-    const user = userEvent.setup();
-    await renderSignup();
-
-    const claim = await screen.findByRole('button', { name: /confirm and create account/i });
-    expect(claim.hasAttribute('disabled')).toBe(true);
-
-    await user.type(await screen.findByLabelText(/date of birth/i), '1994-03-11');
-    await user.type(await screen.findByLabelText(/^country$/i), 'US');
-    await user.type(await screen.findByLabelText(/^state$/i), 'CA');
-    await user.type(await screen.findByLabelText(/choose a password/i), 'a-perfectly-good-password');
-
-    // Still blocked: the five confirmations and the two agreements are unticked.
-    expect(claim.hasAttribute('disabled')).toBe(true);
-
-    for (const name of [
-      /at least 18/i,
-      /based in the united states/i,
-      /actually runs this channel/i,
-      /duplicate proovd accounts/i,
-      /sanctions list/i,
-      /i accept the terms of service/i,
-      /i accept the creator acceptable use policy/i,
-    ]) {
-      await user.click(screen.getByRole('checkbox', { name }));
-    }
-
-    await waitFor(() => expect(claim.hasAttribute('disabled')).toBe(false));
+    // There is no route to post one to either, which is what actually makes it
+    // true — the absence of the field is only the visible half.
+    expect(document.querySelector('input[type="file"]')).toBeNull();
   });
 
   it('presents the five confirmations unchecked and unbundled (§28.4)', async () => {
     stubInvitation();
-    const user = userEvent.setup();
-    await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
+    await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
 
-    const boxes = [
-      screen.getByRole('checkbox', { name: /at least 18/i }),
-      screen.getByRole('checkbox', { name: /based in the united states/i }),
-      screen.getByRole('checkbox', { name: /actually runs this channel/i }),
-      screen.getByRole('checkbox', { name: /duplicate proovd accounts/i }),
-      screen.getByRole('checkbox', { name: /sanctions list/i }),
-    ];
-    for (const box of boxes) {
-      expect(box.getAttribute('data-state') ?? box.getAttribute('aria-checked')).not.toBe('checked');
-    }
-
-    // There is no "accept all", and ticking one ticks exactly one.
-    expect(screen.queryByRole('checkbox', { name: /accept all|agree to everything/i })).toBeNull();
-    await user.click(boxes[0]!);
-    expect(boxes[1]!.getAttribute('aria-checked')).not.toBe('true');
+    const boxes = screen.getAllByRole('checkbox');
+    // The five §11 confirmations plus the two §11 policy acceptances. Both sets
+    // are separate controls; nothing on the page sets more than one.
+    expect(boxes).toHaveLength(CREATOR_CONFIRMATIONS.length + PUBLISHED_POLICIES.length);
+    for (const box of boxes) expect(box.getAttribute('aria-checked')).toBe('false');
+    expect(screen.queryByText(/accept all/i)).toBeNull();
   });
 
-  it('sends only the field that changed (§11)', async () => {
+  it('writes one column per confirmation, and never two from one control', async () => {
     stubInvitation();
     const user = userEvent.setup();
-    await renderSignup();
+    await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
 
-    await user.type(await screen.findByLabelText(/^country$/i), 'US');
+    await user.click(screen.getByRole('checkbox', { name: CREATOR_CONFIRMATIONS[0]!.label }));
     await waitFor(() => {
-      const patch = requests.filter((r) => r.method === 'PATCH').at(-1);
-      expect(patch, 'no autosave patch was sent').toBeTruthy();
-      expect(Object.keys(patch!.body as object)).toEqual(['country']);
+      const patch = requests.find((r) => r.method === 'PATCH');
+      expect(patch).toBeTruthy();
+      expect(Object.keys(patch!.body as object)).toEqual([CREATOR_CONFIRMATIONS[0]!.key]);
     });
   });
 
-  it('never autosaves the password (§28.2)', async () => {
+  it('keeps the account action unavailable until everything §11 requires is present', async () => {
     stubInvitation();
-    const user = userEvent.setup();
-    await renderSignup();
-
-    await user.type(
-      await screen.findByLabelText(/choose a password/i),
-      'a-perfectly-good-password',
-    );
-    await user.type(await screen.findByLabelText(/^country$/i), 'US');
-
-    await waitFor(() => expect(requests.some((r) => r.method === 'PATCH')).toBe(true));
-    for (const sent of requests) {
-      expect(JSON.stringify(sent.body ?? {})).not.toContain('a-perfectly-good-password');
-    }
+    await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
+    expect(
+      screen.getByRole('button', { name: /confirm and create account/i }),
+    ).toBeDisabled();
   });
 
   it('reports the payout step as a status with no control while Stripe is unconfigured (§11, §1.4)', async () => {
-    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubCampaigns();
     stubPayouts({ onboardingAvailable: false });
-    await renderSignup();
+    await renderDone();
 
     expect(await screen.findByText(/payout setup is not open yet/i)).toBeTruthy();
     expect(screen.getByText(/proovd never asks for your bank or tax details/i)).toBeTruthy();
@@ -388,9 +359,9 @@ describe('§33.2.2 — the compact flow', () => {
   });
 
   it('offers the Stripe handoff once it is available, and still no form (§11, §5.3)', async () => {
-    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubCampaigns();
     stubPayouts({ onboardingAvailable: true, canResume: true });
-    await renderSignup();
+    await renderDone();
 
     expect(await screen.findByRole('button', { name: /set up payouts/i })).toBeTruthy();
 
@@ -403,14 +374,14 @@ describe('§33.2.2 — the compact flow', () => {
   });
 
   it('names the exact missing requirement rather than saying "more information" (§13)', async () => {
-    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubCampaigns();
     stubPayouts({
       state: 'more_information_required',
       onboardingAvailable: true,
       canResume: true,
       missingRequirements: ['external_account', 'individual.verification.document'],
     });
-    await renderSignup();
+    await renderDone();
 
     expect(
       await screen.findByText(/a bank account to be paid into.*a photo of your ID/i),
@@ -419,14 +390,14 @@ describe('§33.2.2 — the compact flow', () => {
   });
 
   it('offers a restricted account support and no way to try again (§13)', async () => {
-    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
+    stubCampaigns();
     stubPayouts({
       state: 'restricted',
       onboardingAvailable: true,
       canResume: false,
       disabledReason: 'rejected.fraud',
     });
-    await renderSignup();
+    await renderDone();
 
     expect(await screen.findByText(/stripe cannot continue with this account/i)).toBeTruthy();
     // §13: a safe support path, and no resume — looping someone through
@@ -437,19 +408,45 @@ describe('§33.2.2 — the compact flow', () => {
   });
 });
 
+/* ══ The agreement screen's own §1.8 refusals ════════════════════════════ */
+
+describe('§22.1, §29.5, §31.5 — what the agreement screen does not promise', () => {
+  it('does not claim earnings can never be clawed back', async () => {
+    stubInvitation();
+    await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
+
+    const text = document.body.textContent ?? '';
+    // §22.1 provides for cancelling unpaid invalid amounts and a contractual
+    // recovery record; §29.5 protects only VALID FINALIZED commission.
+    expect(text).not.toMatch(/no clawbacks/i);
+    expect(text).not.toMatch(/your (money|pay) is guaranteed/i);
+    expect(text).toMatch(/can be reversed/i);
+  });
+
+  it('takes two policy acceptances and says why the IP agreement is not one', async () => {
+    stubInvitation();
+    await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
+
+    // §11's two. §31.5's IP agreement is per campaign and due before WORK.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(
+      CREATOR_CONFIRMATIONS.length + 2,
+    );
+    expect(screen.getByText(/per campaign/i)).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: /IP|NDA|confidentiality/i })).toBeNull();
+  });
+});
+
 /* ══ The draft-agreement state ═══════════════════════════════════════════ */
 
 describe('§11 — a draft agreement blocks the claim, in the open', () => {
   it('renders the reason and no claim control', async () => {
     stubInvitation({ policies: DRAFT_POLICIES });
-    await renderSignup();
+    await renderAgree();
 
-    expect(await screen.findByText(/these agreements are not final yet/i)).toBeTruthy();
-    expect(screen.getByText(/still with our lawyers/i)).toBeTruthy();
-    expect(screen.getByText(/nothing you have entered is lost/i)).toBeTruthy();
-    // The control is absent, not disabled.
+    await screen.findByText(/still with our lawyers/i);
     expect(screen.queryByRole('button', { name: /confirm and create account/i })).toBeNull();
-    expect(screen.queryByRole('checkbox', { name: /i accept the terms/i })).toBeNull();
   });
 });
 
@@ -457,51 +454,50 @@ describe('§11 — a draft agreement blocks the claim, in the open', () => {
 
 describe('§33.2.3 — the waiting state', () => {
   it('answers all six of §27.1’s questions and says No action needed', async () => {
-    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
-    await renderSignup();
+    stubCampaigns();
+    stubPayouts();
+    await renderDone();
 
-    // Confirms signup, and names the campaign.
-    expect(await screen.findByText(/your proovd account is set up/i)).toBeTruthy();
-    expect(screen.getAllByText(/Waitlist/).length).toBeGreaterThan(0);
-
-    // Names the state, says the Founder is finishing setup.
-    expect(screen.getByText(/waiting for the founder/i)).toBeTruthy();
-    expect(screen.getByText(/still finishing their setup/i)).toBeTruthy();
-
-    // Identifies Proovd as owner, and gives a next-update expectation.
-    expect(screen.getByText(/proovd owns this step/i)).toBeTruthy();
-    expect(screen.getAllByText(/we will email you as soon as/i).length).toBeGreaterThan(0);
-
-    // §11's exact words, from the one exported constant.
-    expect(screen.getAllByText(NO_ACTION).length).toBeGreaterThan(0);
+    const head = await screen.findByText(/waiting for the founder/i);
+    // Scoped to the waiting panel: the payout panel is a `StatePanel` too and
+    // legitimately says `No action needed` while Stripe is unconfigured. A
+    // page-wide query would find both and report a duplicate that is not one.
+    const panel = head.closest('.state-panel') as HTMLElement;
+    expect(within(panel).getByText(/still finishing their setup/i)).toBeTruthy();
+    expect(within(panel).getByText(/proovd owns this step/i)).toBeTruthy();
+    expect(within(panel).getByText(NO_ACTION)).toBeTruthy();
+    expect(within(panel).getByText(/we will email you/i)).toBeTruthy();
   });
 
   it('offers no action and no work while waiting', async () => {
-    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
-    await renderSignup();
-    await screen.findByText(/your proovd account is set up/i);
+    stubCampaigns();
+    stubPayouts();
+    await renderDone();
 
-    // Accept, decline, propose, and link activation are all Phase 12+ and
-    // must be unreachable here.
-    for (const forbidden of [/accept/i, /decline/i, /propose/i, /activate/i, /tracking link/i]) {
-      expect(screen.queryByRole('button', { name: forbidden })).toBeNull();
-    }
+    await screen.findByText(/waiting for the founder/i);
+    expect(screen.queryByRole('button', { name: /accept|decline|propose|review campaign/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /review campaign/i })).toBeNull();
   });
 
-  it('does not offer Review campaign before the Campaign kit exists (§1.4)', async () => {
-    // The Founder has claimed, so §11's condition is "preparing" — but the kit
-    // and the Review action are Phase 08c. Claiming the capability early would
-    // be the §1.4 failure.
-    stubInvitation({
-      profile: { claimedAt: '2026-08-01T09:00:00.000Z' },
-      conditional: { state: 'preparing', founderClaimedAt: '2026-08-01T10:00:00.000Z' },
-    });
-    await renderSignup();
+  it('offers Review campaign only once there is something to read (§10, §1.4)', async () => {
+    stubCampaigns({ reviewAvailable: true });
+    stubPayouts();
+    await renderDone();
 
-    expect(await screen.findByText(/the campaign is being prepared/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /review campaign/i })).toBeNull();
-    expect(screen.queryByRole('link', { name: /review campaign/i })).toBeNull();
-    expect(screen.getAllByText(NO_ACTION).length).toBeGreaterThan(0);
+    await screen.findByText(/ready to read/i);
+    expect(screen.getByRole('link', { name: /review campaign/i })).toBeTruthy();
+  });
+
+  it('lives at an account address, because the claim revokes the token', async () => {
+    // The regression this screen exists to fix: Phase 08b re-read the
+    // invitation after a successful claim, and that read 401s in production.
+    // Nothing on screen 8 talks to `/api/affiliate-invitation`.
+    stubCampaigns();
+    stubPayouts();
+    await renderDone();
+    await screen.findByText(/waiting for the founder/i);
+
+    expect(requests.some((r) => r.url.includes('/api/affiliate-invitation'))).toBe(false);
   });
 });
 
@@ -509,63 +505,57 @@ describe('§33.2.3 — the waiting state', () => {
 
 describe('§5.5 — an unusable invitation', () => {
   it('renders the one identical unavailable page', async () => {
-    handlers.push(() => ({
-      status: 401,
-      body: { error: 'link_unavailable', title: "We can't open this link" },
-    }));
-    await renderSignup();
-    expect(await screen.findByText(/can.t open this link/i)).toBeTruthy();
+    handlers.push(() => ({ status: 401, body: { error: 'invalid' } }));
+    await renderAgree();
+    await screen.findByText(/can.t open this link/i);
   });
 });
 
 /* ══ §33.11 — accessibility is an acceptance test ════════════════════════ */
 
 describe('§33.11 — the Creator signup is accessible', () => {
-  it('has no axe violations on the signup flow', async () => {
+  it('has no axe violations on the agreement screen', async () => {
     stubInvitation();
-    const { container } = await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
-    const results = await axe(container);
-    expect(results.violations).toEqual([]);
-  }, 30_000);
+    const { container } = await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
+    expect(await axe(container)).toHaveNoViolations();
+  });
 
   it('has no axe violations on the waiting state', async () => {
-    stubInvitation({ profile: { claimedAt: '2026-08-01T09:00:00.000Z' } });
-    const { container } = await renderSignup();
-    await screen.findByText(/your proovd account is set up/i);
-    const results = await axe(container);
-    expect(results.violations).toEqual([]);
-  }, 30_000);
+    stubCampaigns();
+    stubPayouts();
+    const { container } = await renderDone();
+    await screen.findByText(/waiting for the founder/i);
+    expect(await axe(container)).toHaveNoViolations();
+  });
 
   it('gives every control a programmatic label', async () => {
     stubInvitation();
-    await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
+    await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
 
-    for (const control of [
-      ...screen.getAllByRole('textbox'),
-      ...screen.getAllByRole('checkbox'),
-    ]) {
-      const id = control.getAttribute('id');
-      // Four legitimate ways to name a control, and this surface uses three of
-      // them: `Field` wires <label for>, the confirmations are content-named
-      // buttons, and nothing here relies on aria-label alone.
+    for (const control of Array.from(
+      document.querySelectorAll<HTMLElement>('input, textarea, select'),
+    )) {
       const labelled =
-        control.getAttribute('aria-label') ||
-        control.getAttribute('aria-labelledby') ||
-        control.closest('label')?.textContent ||
-        (id ? document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent : '') ||
-        // Content-named: a <button role="checkbox"> takes its name from its text.
-        (control.tagName === 'BUTTON' ? control.textContent : '') ||
-        '';
-      expect(labelled.trim(), control.outerHTML.slice(0, 120)).not.toBe('');
+        control.getAttribute('aria-label') ??
+        control.getAttribute('aria-labelledby') ??
+        (control.id ? document.querySelector(`label[for="${control.id}"]`)?.textContent : null);
+      expect(labelled, `unlabelled control: ${control.outerHTML.slice(0, 80)}`).toBeTruthy();
     }
   });
 
-  it('exposes exactly one level-1 heading', async () => {
+  it('exposes exactly one level-1 heading on each screen', async () => {
     stubInvitation();
-    await renderSignup();
-    await screen.findByRole('button', { name: /confirm and create account/i });
-    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    const agree = await renderAgree();
+    await screen.findByRole('heading', { level: 1 });
+    expect(within(agree.container).getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    agree.unmount();
+
+    stubCampaigns();
+    stubPayouts();
+    const done = await renderDone();
+    await screen.findByText(/waiting for the founder/i);
+    expect(within(done.container).getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 });

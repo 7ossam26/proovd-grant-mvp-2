@@ -124,11 +124,37 @@ export interface CreatorPolicy {
   route: string;
 }
 
+/** Screen 4's record (0055). A SET, superseded rather than edited. */
+export interface CreatorVoice {
+  tones: string[];
+  customTones: string[];
+  flexible: boolean;
+  recordedAt: string | null;
+}
+
+/** Screen 6's record (0055). One live row per metric; absent means unanswered. */
+export interface CreatorMetrics {
+  values: Record<string, string>;
+  recordedAt: string | null;
+}
+
 export interface CreatorInvitationState {
   landing: CreatorLanding;
   profile: CreatorProfile;
   conditional: CreatorConditional;
   policies: CreatorPolicy[];
+  voice: CreatorVoice;
+  metrics: CreatorMetrics;
+  /**
+   * The §5.3 figures this Creator's own channel is asked for.
+   *
+   * Sent by the server rather than derived here, so the question somebody
+   * answers and the set the write accepts come from one place — the surface
+   * cannot show a field the route would refuse.
+   */
+  metricsAsked: string[];
+  /** Track A4. `false` renders a named absence, never a dead control (§1.4). */
+  uploads: { available: boolean };
 }
 
 export const fetchInvitation = (token: string): Promise<CreatorInvitationState> =>
@@ -163,6 +189,18 @@ export const saveInvitation = (
   patch: CreatorPatch,
 ): Promise<{ profile: CreatorProfile }> =>
   call(base(token), { method: 'PATCH', body: JSON.stringify(patch) });
+
+export const saveCreatorVoice = (
+  token: string,
+  body: { tones: string[]; customTones: string[]; flexible: boolean },
+): Promise<{ voice: CreatorVoice }> =>
+  call(`${base(token)}/voice`, { method: 'PUT', body: JSON.stringify(body) });
+
+export const saveCreatorMetrics = (
+  token: string,
+  values: Record<string, string>,
+): Promise<{ metrics: CreatorMetrics }> =>
+  call(`${base(token)}/metrics`, { method: 'PUT', body: JSON.stringify({ values }) });
 
 /** §11's one primary action: `Confirm and create account`. */
 export const completeSignup = (

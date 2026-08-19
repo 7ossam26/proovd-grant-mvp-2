@@ -607,6 +607,10 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       tokens,
       notifier,
       context: config.invitationContext,
+      // Read for `configured` alone. Creator Flow v2 Session C's screens 5 and
+      // 6 render a named absence while R2 is unset (Track A4); there is no
+      // presign or upload route on this router to reach it with.
+      objectStorage: config.objectStorage ?? unconfiguredStorage,
       ...(config.draftVerifyLimit !== undefined
         ? { verifyLimit: config.draftVerifyLimit }
         : {}),

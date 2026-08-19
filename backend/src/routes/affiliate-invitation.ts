@@ -23,7 +23,24 @@
  * status behind `Finish payout setup`. There is no route here that collects a
  * bank account, a tax id, or an identity document — §11 forbids reproducing
  * provider-controlled fields, and the absence of the route is what makes that
- * true rather than a promise. There is no tour route and no step sequence.
+ * true rather than a promise.
+ *
+ * §33.2.2 also tested "no tour", and Creator Flow v2's deviation 1 is what
+ * departs from that half by explicit product direction — see
+ * `docs/phases/creator-flow-v2.md`. What did NOT change is everything this
+ * paragraph is about: the two actions are still two, and the absence of a
+ * banking route is still the enforcement.
+ *
+ * ── Two writes Session C added, and no upload route ─────────────────────────
+ * `PUT …/voice` and `PUT …/metrics` record screens 4 and 6 into 0055's two
+ * insert-only tables. Neither is a primary action — both are the same autosave
+ * the PATCH above is, addressed separately because they write append-only rows
+ * rather than columns.
+ *
+ * There is deliberately no presign and no upload route for the photo or the
+ * evidence screenshots: §12's object storage is Track A4, `unconfiguredStorage`
+ * throws rather than pretending, and the GET below reports `available: false`
+ * so the surface renders a named absence instead of a dead control (§1.4).
  */
 
 import { Router, type RequestHandler } from 'express';
@@ -48,7 +65,15 @@ import {
   readConditionalState,
   AFFILIATE_CLAIM_POLICY_SLUGS,
 } from '../affiliates/signup.js';
+import {
+  readCreatorVoice,
+  readCreatorMetrics,
+  recordCreatorVoice,
+  recordCreatorMetrics,
+  permittedMetricsFor,
+} from '../affiliates/creator-profile.js';
 import { sendSignupConfirmation } from '../affiliates/signup-notification.js';
+import { unconfiguredStorage, type ObjectStorage } from '../storage/object-storage.js';
 import { policyVersions } from '../db/schema/policies.js';
 import { inArray } from 'drizzle-orm';
 
@@ -63,6 +88,12 @@ export interface AffiliateInvitationDeps {
   verifyLimit?: number;
   /** Phase 22b: §27.6's new-account notice. Unset → it does not send. */
   internalRecipient?: string | undefined;
+  /**
+   * Track A4. Read for its `configured` flag and for nothing else — there is
+   * no upload route here to presign against, and adding one is what would make
+   * screen 5's and screen 6's named absences into dead controls.
+   */
+  objectStorage?: ObjectStorage;
 }
 
 export function createAffiliateInvitationRouter({
@@ -73,6 +104,7 @@ export function createAffiliateInvitationRouter({
   context,
   verifyLimit,
   internalRecipient,
+  objectStorage,
 }: AffiliateInvitationDeps): Router {
   const router = Router();
   const json: RequestHandler = express.json({ limit: '64kb' });
@@ -86,6 +118,7 @@ export function createAffiliateInvitationRouter({
   ];
 
   const base = `${AFFILIATE_INVITATION_TOKEN_PATH}/:${TOKEN_PARAM}`;
+  const storage = objectStorage ?? unconfiguredStorage;
 
   /** Everything the surface needs to render, for a verified invitation. */
   router.get(base, ...guard, async (req, res) => {
@@ -126,7 +159,35 @@ export function createAffiliateInvitationRouter({
       .from(policyVersions)
       .where(inArray(policyVersions.slug, [...AFFILIATE_CLAIM_POLICY_SLUGS]));
 
-    res.json({ landing, profile, conditional, policies });
+    // 0055's two insert-only records. Read in the same call as everything
+    // else, because five screens each fetching their own slice would be five
+    // shapes of one record and the first field two of them both render is the
+    // first place they disagree.
+    const [voice, metrics] = await Promise.all([
+      readCreatorVoice(db, associationId),
+      readCreatorMetrics(db, associationId),
+    ]);
+
+    res.json({
+      landing,
+      profile,
+      conditional,
+      policies,
+      voice,
+      metrics,
+      /**
+       * Which of the nine §5.3 figures this Creator's own channel is asked
+       * for. Sent rather than derived in the browser so the question a Creator
+       * answers and the set the write accepts come from one place.
+       */
+      metricsAsked: permittedMetricsFor(profile.channelSubtype ?? ''),
+      /**
+       * Track A4, stated rather than implied. The surface renders the reason
+       * where an upload control would be; a `false` here with no route behind
+       * it is the honest shape (§1.4).
+       */
+      uploads: { available: storage.configured },
+    });
   });
 
   /** Autosave. A save writes only the keys it was given (§11). */
@@ -175,6 +236,85 @@ export function createAffiliateInvitationRouter({
       return;
     }
     res.json({ profile: result.state });
+  });
+
+  /**
+   * Screen 4's tone set (0055).
+   *
+   * A PUT rather than a PATCH because the SET is the answer: dropping a chip is
+   * expressed by sending the remaining ones, and a merge would make removal
+   * unrepresentable. The record supersedes rather than edits, so each PUT is a
+   * new row and the previous answer survives.
+   */
+  router.put(`${base}/voice`, ...guard, json, async (req, res) => {
+    const associationId = req.affiliateInvitationSubject?.associationId;
+    if (!associationId) {
+      res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
+      return;
+    }
+
+    const body = req.body as Record<string, unknown>;
+    const strings = (key: string): string[] =>
+      Array.isArray(body[key])
+        ? (body[key] as unknown[]).filter((v): v is string => typeof v === 'string')
+        : [];
+
+    const result = await recordCreatorVoice(db, associationId, {
+      tones: strings('tones'),
+      customTones: strings('customTones'),
+      flexible: body['flexible'] === true,
+      actor: 'affiliate:invited',
+    });
+
+    if (!result.ok) {
+      res.status(400).json({
+        error: 'voice_refused',
+        title: 'That could not be saved',
+        whatHappened: result.message,
+        next: result.next,
+      });
+      return;
+    }
+    res.json({ voice: await readCreatorVoice(db, associationId) });
+  });
+
+  /**
+   * Screen 6's channel figures (0055).
+   *
+   * One row per metric, so a blank value RETIRES that metric's row and inserts
+   * nothing — 0055 requires a non-blank value, and "I would rather not say" is
+   * the absence of a live row rather than an empty one (§16a).
+   */
+  router.put(`${base}/metrics`, ...guard, json, async (req, res) => {
+    const associationId = req.affiliateInvitationSubject?.associationId;
+    if (!associationId) {
+      res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
+      return;
+    }
+
+    const raw = (req.body as Record<string, unknown>)['values'];
+    const values: Record<string, string> = {};
+    if (raw && typeof raw === 'object') {
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof value === 'string') values[key] = value;
+      }
+    }
+
+    const result = await recordCreatorMetrics(db, associationId, {
+      values,
+      actor: 'affiliate:invited',
+    });
+
+    if (!result.ok) {
+      res.status(400).json({
+        error: 'metrics_refused',
+        title: 'That could not be saved',
+        whatHappened: result.message,
+        next: result.next,
+      });
+      return;
+    }
+    res.json({ metrics: await readCreatorMetrics(db, associationId) });
   });
 
   /** §11's one primary action: `Confirm and create account`. */

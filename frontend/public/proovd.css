@@ -9966,7 +9966,11 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
 
 .crf-pw__head,
 .crf-you__head,
-.crf-channel__head {
+.crf-channel__head,
+.crf-voice__head,
+.crf-presence__head,
+.crf-verify__head,
+.crf-agree__head {
   font-size: var(--fs-step);
   line-height: 1.04;
   letter-spacing: -0.035em;
@@ -9975,7 +9979,11 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
 
 .crf-pw__lede,
 .crf-you__lede,
-.crf-channel__lede {
+.crf-channel__lede,
+.crf-voice__lede,
+.crf-presence__lede,
+.crf-verify__lede,
+.crf-agree__lede {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--moss);
@@ -10032,7 +10040,9 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
 /* ─────────────────────────────────────────────────────────── screen 2, you */
 
 .crf-you__fields,
-.crf-channel__fields {
+.crf-channel__fields,
+.crf-presence__fields,
+.crf-verify__fields {
   display: grid;
   gap: var(--sp-24);
 }
@@ -10219,4 +10229,299 @@ button.crf-help__card:hover { border-color: var(--brand); }
   .crf-nav { flex-direction: column; align-items: stretch; }
   .crf-nav .btn:last-child { margin-left: 0; }
   .crf-channel__grid { grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); }
+}
+
+/* ══════════════════════ PHASE 39 continued — screens 4–8
+   (Creator Flow v2, Session C, 2026-08-19)
+
+   The tone, the bio, the figures, the agreement, and the account. Everything
+   here extends the block above rather than restating it: the head, the lede,
+   the field grid, `.crf-nav` and `.crf-tile` are Session B's and are reused by
+   adding a selector rather than by writing a second rule.
+
+   Two absences are STYLED, which is the point of them being here at all —
+   `.crf-presence__absent` and `.crf-verify__absent` are where the reference
+   draws an upload control, and they have to read as a stated reason rather
+   than as an error somebody caused (§1.4, Track A4).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────────── screen 4, the voice */
+
+.crf-voice__chips {
+  border: 0;
+  margin: 0 0 var(--sp-24);
+  padding: 0;
+  min-width: 0;
+}
+
+/* A <legend> loses its size to UA styling — Founder Flow Session F's finding,
+   and this screen's legend is its own question. */
+.crf-voice__legend {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--darker);
+  padding: 0;
+  margin: 0 0 var(--sp-4);
+}
+
+.crf-voice__help {
+  font-size: 0.875rem;
+  color: var(--moss);
+  margin: 0 0 var(--sp-16);
+}
+
+.crf-voice__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--sp-12);
+}
+
+/* A chip carries its own meaning under its label: "Understated" tells somebody
+   nothing about what they would be claiming to a Founder. */
+.crf-tone {
+  display: grid;
+  gap: var(--sp-4);
+  text-align: left;
+  min-height: var(--touch);
+  padding: var(--sp-12) var(--sp-16);
+  border: var(--bw) solid var(--grey);
+  background: var(--white);
+  font-family: inherit;
+  color: var(--darker);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.crf-tone:hover { border-color: var(--brand); }
+
+.crf-tone.is-on {
+  border-color: var(--brand);
+  background: var(--brand-5);
+}
+
+.crf-tone__label { font-weight: 800; font-size: 0.9375rem; }
+.crf-tone__help { font-size: 0.8125rem; color: var(--moss); line-height: 1.4; }
+
+/* `--moss` reads about 3.4:1 on white and about 2.3:1 once the chip takes its
+   mint fill — so the explanation got HARDER to read at the moment somebody
+   chose it. Found by the browser pass; axe cannot see it, because the
+   accessible name is the label and contrast is computed against the element's
+   own declared background rather than the fill behind it. */
+.crf-tone.is-on .crf-tone__help { color: var(--dark); }
+
+.crf-voice__custom-list {
+  list-style: none;
+  margin: 0 0 var(--sp-16);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+}
+
+.crf-voice__custom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-12);
+  border: var(--bw) solid var(--brand);
+  background: var(--brand-5);
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--darker);
+}
+
+.crf-voice__remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--darker);
+  font-size: 1.125rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.crf-voice__remove:hover { color: var(--moss); }
+
+/* The add row: a field and its control on one line, wrapping when the field
+   would be narrower than it is readable. */
+.crf-voice__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-24);
+}
+
+.crf-voice__add > *:first-child { flex: 1 1 16rem; min-width: 0; }
+
+/* Its own control rather than a seventh chip: it says something about the
+   other answers, so it reads as a switch and not as a member of the set. */
+.crf-voice__flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  width: 100%;
+  min-height: var(--touch);
+  padding: var(--sp-12) var(--sp-16);
+  border: var(--bw) solid var(--grey);
+  background: var(--white);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--darker);
+  text-align: left;
+  cursor: pointer;
+}
+
+.crf-voice__flex.is-on { border-color: var(--brand); background: var(--brand-5); }
+
+/* The state as a word. A `space-between` row with one child reads as a box
+   with a hole in it, and the fill alone conveys on/off to nobody who cannot
+   see it (DNA §1). */
+.crf-voice__flex-state {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--moss);
+}
+
+.crf-voice__flex.is-on .crf-voice__flex-state { color: var(--dark); }
+
+.crf-voice__problems,
+.crf-verify__problems,
+.crf-agree__problems {
+  margin: var(--sp-16) 0 0;
+  padding: var(--sp-12) var(--sp-16);
+  border-left: 0.1875rem solid var(--accent-yellow);
+  background: var(--surface);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--dark);
+}
+
+ul.crf-voice__problems { padding-left: var(--sp-32); }
+
+.crf-voice__note,
+.crf-verify__note,
+.crf-presence__absent,
+.crf-verify__absent,
+.crf-verify__basis,
+.crf-verify__none {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--moss);
+  margin: var(--sp-24) 0 0;
+  max-width: 52ch;
+}
+
+/* ───────────────────────────────────────────────────────── screen 5, the bio */
+
+/* A named absence, not an error and not a disabled control. The rule it needs
+   is to look like a stated fact — the brand hairline says "this is Proovd
+   telling you something", where the yellow above says "something went wrong". */
+.crf-presence__absent,
+.crf-verify__absent,
+.crf-verify__none {
+  padding: var(--sp-16) var(--sp-24);
+  border-left: 0.1875rem solid var(--brand);
+  background: var(--surface);
+  margin: 0 0 var(--sp-32);
+}
+
+.crf-verify__absent { margin: var(--sp-32) 0 0; }
+
+/* ─────────────────────────────────────────────────── screen 6, the numbers */
+
+.crf-verify__basis { margin: var(--sp-16) 0 0; }
+
+/* ───────────────────────────────────────────────── screen 7, the agreement */
+
+.crf-agree__promises {
+  display: grid;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-32);
+}
+
+.crf-agree__promise {
+  padding: var(--sp-16) var(--sp-24);
+  border: var(--bw) solid var(--grey-light);
+  background: var(--surface);
+}
+
+.crf-agree__promise h2 {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  margin: 0 0 var(--sp-4);
+}
+
+.crf-agree__promise p {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--moss);
+  margin: 0;
+}
+
+.crf-agree__block { margin-bottom: var(--sp-32); display: grid; gap: var(--sp-16); }
+
+.crf-agree__block-head {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--darker);
+  margin: 0;
+}
+
+.crf-agree__block-help,
+.crf-agree__ip,
+.crf-agree__policy-link {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--moss);
+  margin: 0;
+}
+
+.crf-agree__policy { display: grid; gap: var(--sp-4); }
+
+/* `--brand` on white is about 1.46:1, so a brand-coloured link in body copy is
+   unreadable — PHASE 34's `.ff-claim__consent a` took the same position on the
+   Founder claim, and this is the same kind of link on the same kind of screen.
+   The underline is what carries the affordance. Found by the browser pass. */
+.crf-agree__policy-link a,
+.crf-agree__unpublished a,
+.crf-agree__problems a {
+  color: var(--dark);
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+}
+
+/* Where the primary action would be while the agreements are draft. It is a
+   stated reason and not a disabled control — §31.4's refusal, rendered. */
+.crf-agree__unpublished {
+  padding: var(--sp-16) var(--sp-24);
+  border-left: 0.1875rem solid var(--brand);
+  background: var(--surface);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--dark);
+  margin: 0;
+}
+
+/* ── Narrow widths ─────────────────────────────────────────────────────────
+   One correction, and it names what it answers: the tone grid's 15rem minimum
+   overflows below about 34rem once the stage gutter is taken, so it becomes a
+   single column. `.crf-nav` already stacks in the block above. */
+@media (max-width: 34rem) {
+  .crf-voice__grid { grid-template-columns: 1fr; }
+  .crf-voice__add > *:first-child { flex: 1 1 100%; }
 }

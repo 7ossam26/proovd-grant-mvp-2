@@ -583,7 +583,7 @@ account step refuses in the open and says why, and file storage and the
 scheduling provider are both unconfigured so the upload and interview steps
 render a named absence rather than a dead control.
 
-### The Creator's, next — two of six sessions have landed
+### The Creator's, next — three of six sessions have landed
 
 The same treatment is now under way on the other side of the product: the path
 a Creator walks from opening a private campaign invitation to promoting a live
@@ -615,6 +615,30 @@ column for how the request reached us. The last session adds the Creator's own
 way in, writing the same record. A second table would have been two copies of
 somebody's erasure request, which is the worst possible thing to have two
 copies of.
+
+**The third session is the rest of the walk** — how you describe your own
+style, your bio, your audience figures, the agreement, and the account itself.
+The old single-page signup is gone; its address redirects to the agreement
+screen, because somebody may still have it open.
+
+Building it turned up something that had been broken since the signup page was
+written. Creating the account uses up the invitation link — that is the whole
+point of a private invitation, and the server has always said so. But the page
+then re-read the invitation to show the "you're signed up, here is what happens
+next" state, which by then no longer opens. Every Creator who finished signing
+up was shown *"we can't open this link"* instead. The test suite did not catch
+it because it faked a finished signup rather than doing one, so the read that
+fails in real life never ran. That screen is now an account address rather than
+an invitation address, which is where it always belonged.
+
+The browser pass found five more things nothing else could — a duplicated
+field label, a promise inherited from a shared component that was true on the
+Founder's screen and untrue on the Creator's, an internal Spec reference
+reading aloud on a customer surface, an explanation that got *harder* to read
+the moment somebody selected it, and two unreadable links on the page where
+somebody accepts an agreement. That is the eleventh rebuild in a row where
+looking at the actual pixels found what the type checker, the tests, and the
+accessibility scanner all agreed was fine.
 
 Unlike every rebuild before it, this one replaces a working, acceptance-tested
 surface whose own source file argues against the design that replaces it. Spec

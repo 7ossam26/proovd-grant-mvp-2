@@ -60,6 +60,15 @@ import {
 } from '@proovd/shared';
 import { startHarness, type Harness } from './app-harness.js';
 import * as backendLogic from '../creator-flow/logic.js';
+import { permittedMetricsFor } from '../affiliates/creator-profile.js';
+import {
+  CREATOR_PROOVD_OWNS_THE_WAIT,
+  CREATOR_VOICE_CUSTOM_MAX_COUNT,
+  CREATOR_VOICE_CUSTOM_MAX_LENGTH,
+  CREATOR_VOICE_MAX_TOTAL,
+  AFFILIATE_SUBTYPES,
+} from '@proovd/shared';
+import { PROOVD_OWNS_THE_WAIT } from '../notifications/templates/affiliate-signup-confirmed.js';
 
 let h: Harness;
 
@@ -567,38 +576,64 @@ describe('every refused element is written down with the rule that refuses it', 
 
 describe('the page register holds only what exists', () => {
   it('holds exactly the screens a session has rendered', () => {
-    // DELIBERATELY INVERTED (Creator Flow v2 Session B, 2026-08-19). Session A
-    // asserted this was EMPTY, because it built no screen; Session B built four
-    // and appended them, so the empty assertion would now be asserting that
-    // Session B did not happen.
+    // DELIBERATELY INVERTED, twice. Session A asserted this was EMPTY because
+    // it built no screen; Session B (2026-08-19) built four and appended them;
+    // Session C (2026-08-19) built screens 4–8. Each inversion asserts more
+    // than the last rather than less.
     //
-    // The rule it was protecting is unchanged and is what is checked here:
-    // `events.ts`' rule applied to a surface — a page appears when something
-    // renders it, never before. A register pre-populated with the fourteen
-    // screens the reference draws would make every "is this reachable" check
-    // answer yes about surfaces that do not exist, and the help drawer's
-    // "everything before it" would be an aspiration rather than a fact.
+    // The rule being protected has not changed: `events.ts`' rule applied to a
+    // surface — a page appears when something renders it, never before. A
+    // register pre-populated with the fourteen screens the reference draws
+    // would make every "is this reachable" check answer yes about surfaces
+    // that do not exist, and the help drawer's "everything before it" would be
+    // an aspiration rather than a fact.
     expect(CREATOR_FLOW_PAGES.map((page) => page.id)).toEqual([
       'welcome',
       'password',
       'profile',
       'channel',
+      'voice',
+      'presence',
+      'verify',
+      'agree',
+      'done',
     ]);
 
-    // Every one is on the invitation token and in stage 1. The claim is the
-    // boundary, and no page may sit one stage earlier than the mechanism that
-    // authorises it.
     for (const page of CREATOR_FLOW_PAGES) {
-      expect(page.param).toBe('token');
-      expect(page.stage).toBe(1);
-      expect(page.path.startsWith('/creator-invitation/:token')).toBe(true);
       expect(page.help.length).toBeGreaterThan(20);
     }
 
-    // Sessions C–F have not run: none of the screens they own is registered.
-    for (const id of ['voice', 'presence', 'verify', 'agree', 'allset', 'home']) {
+    // Eight are on the invitation token. The claim is the boundary, and no page
+    // may sit one stage earlier than the mechanism that authorises it.
+    const onToken = CREATOR_FLOW_PAGES.filter((page) => page.param === 'token');
+    expect(onToken).toHaveLength(8);
+    for (const page of onToken) {
+      expect(page.path.startsWith('/creator-invitation/:token')).toBe(true);
+      expect(page.stage).toBeLessThanOrEqual(2);
+    }
+
+    // Exactly one page is addressed by nothing, and it is the one AFTER the
+    // claim. `claimAffiliateInvitation` sets both `claimed_at` and
+    // `revoked_at`, so every `/creator-invitation/:token` address answers the
+    // one rejection from the instant the account exists — a screen 8 on the
+    // token would be a screen nobody can reach.
+    const afterClaim = CREATOR_FLOW_PAGES.filter((page) => page.param === 'none');
+    expect(afterClaim.map((page) => page.id)).toEqual(['done']);
+    expect(afterClaim[0]!.stage).toBe(3);
+    expect(afterClaim[0]!.path.startsWith('/creator-invitation')).toBe(false);
+
+    // Sessions D–F have not run: none of the screens they own is registered.
+    for (const id of ['home', 'pitches', 'earnings', 'resources', 'settings']) {
       expect(CREATOR_FLOW_PAGES.some((page) => page.id === id)).toBe(false);
     }
+  });
+
+  it('refuses a parameter for a page that takes none, and demands one that does', () => {
+    // Not a convenience: the flow's addresses after the claim are account-level,
+    // and a token appended to one would be a live credential in an app URL.
+    expect(() => creatorFlowPath('done', 'tok_123')).toThrow(/takes no parameter/);
+    expect(() => creatorFlowPath('agree')).toThrow(/needs a token/);
+    expect(creatorFlowPath('done')).toBe('/creator/welcome');
   });
 
   it('refuses to build a path for a page nobody registered', () => {
@@ -637,5 +672,45 @@ describe('the recorded tone', () => {
     // switch would be a control nobody can use on its own.
     const def = await constraintDef('affiliate_voice_says_something');
     expect(def).toMatch(/flexible/);
+  });
+});
+
+/* ══ What Session C had to restate, and the one it did not (2026-08-19) ═════ */
+
+describe('the vocabularies Session C restated', () => {
+  it('keeps the six tones and the three caps in step with shared', () => {
+    // NOT CHECK-pinned — 0055 bounds a tone set only by
+    // `affiliate_voice_says_something`, deliberately, because a length cap in a
+    // CHECK refuses a row rather than telling somebody their chip is long. That
+    // left the SERVICE as the only thing between a request body and the array,
+    // and the browser is not the boundary.
+    expect([...backendLogic.VOICE_TONE_IDS].sort()).toEqual([...CREATOR_VOICE_TONE_IDS].sort());
+    expect(backendLogic.VOICE_CUSTOM_MAX_LENGTH).toBe(CREATOR_VOICE_CUSTOM_MAX_LENGTH);
+    expect(backendLogic.VOICE_CUSTOM_MAX_COUNT).toBe(CREATOR_VOICE_CUSTOM_MAX_COUNT);
+    expect(backendLogic.VOICE_MAX_TOTAL).toBe(CREATOR_VOICE_MAX_TOTAL);
+  });
+
+  it('derives the same per-subtype metrics as shared, for every subtype', () => {
+    // Two derivations over §5.3's own register, one in each package. A Creator
+    // must answer the question an Admin verifies against, so a subtype whose
+    // two answers disagreed would be a figure recorded against nothing.
+    for (const subtype of AFFILIATE_SUBTYPES) {
+      expect([...permittedMetricsFor(subtype)].sort()).toEqual(
+        creatorChannelMetricsFor(subtype).map((m) => m.id).sort(),
+      );
+    }
+    // The two subtypes §5.3 asks no audience figure of. §16a twice over: not
+    // populated is not zero, and here nobody was even asked.
+    expect(permittedMetricsFor('student_affiliate')).toEqual([]);
+    expect(permittedMetricsFor('niche_marketer')).toEqual([]);
+  });
+
+  it('says who owns the wait the same way in the inbox and on the screen', () => {
+    // §11's waiting state names Proovd as the owner. It existed twice from
+    // Phase 08b — once in the surface, once in the §27.4 template — written
+    // independently with nothing comparing them. The owner of a wait is a
+    // promise about who is accountable for ending it, and two copies is how
+    // one of them quietly becomes "the Founder's fault".
+    expect(PROOVD_OWNS_THE_WAIT).toBe(CREATOR_PROOVD_OWNS_THE_WAIT);
   });
 });
