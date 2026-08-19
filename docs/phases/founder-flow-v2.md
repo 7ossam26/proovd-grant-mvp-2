@@ -448,7 +448,7 @@ it lands, which is the cheapest way to find a seam that does not join.
 | **C** | 5–6, 7–9, 17 | the end of the draft token | A, B | **built** 2026-08-18 |
 | **D** | 16, then 10–15 | the end of `evaluateWorkspace` | A, B, C | **built** 2026-08-18 |
 | **E** | 25, 20 | the listing fee is paid | A–D | **built** 2026-08-19 |
-| **F** | 18, 21–24, 19, 26 | live | A–E | |
+| **F** | 18, 21–24, 19, 26 | live | A–E | **built** 2026-08-19 |
 
 
 **Session C inherits one decision from B's walk.** The reference asks Problem and Solution twice —

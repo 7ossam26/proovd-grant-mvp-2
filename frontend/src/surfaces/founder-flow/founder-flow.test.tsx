@@ -1,5 +1,5 @@
 /**
- * The Founder onboarding flow, screens 1–20 and 25 — Founder Flow v2, B–E.
+ * The whole Founder onboarding flow — Founder Flow v2, Sessions B–F.
  *
  * The real route table in a memory router with `fetch` stubbed at the network
  * boundary. What is proved here is the half only the surface owns: that each of
@@ -36,7 +36,16 @@ import {
   FOUNDER_FLOW_ABSENCES,
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
+  BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD,
+  FIXED_PAYMENT_BINDS_NOBODY,
+  FIXED_PAYMENT_IDEA_EXPLAINER,
+  FIXED_PAYMENT_STANCES,
+  FIXED_PAYMENT_TERMS_COME_LATER,
+  LIVE_MEANS_A_LAUNCH_RECORD,
   LISTING_FEE_CHECKOUT_CANCELED,
+  NOTHING_HERE_IS_A_TIMER,
+  ORDER_THRESHOLD_IS_A_COUNT,
+  ROSTER_CHIPS_ARE_RECORDED,
   LISTING_FEE_LOCKED_AFTER_PAYMENT,
   LISTING_FEE_NEWSLETTER_LABEL,
   LISTING_FEE_STILL_LOWERABLE,
@@ -1427,10 +1436,10 @@ describe('§33.11 the flow is operable over Session D pages', () => {
 /**
  * Every read the flow makes, across all three auth regimes.
  *
- * The sweeps below walk all seventeen pages, and after Session D those cross
- * from the draft token to a Founder session and on to the money. A loop that
- * stubbed only the draft reads would render eight error states and report them
- * as swept —
+ * The sweeps below walk all twenty-four pages, and after Session D those cross
+ * from the draft token to a Founder session, on to the money, and into the
+ * build. A loop that stubbed only the draft reads would render fifteen error
+ * states and report them as swept —
  which is exactly the failure §33.11.1's own stub-server check exists for.
  */
 function stubAllRegimes() {
@@ -1440,6 +1449,8 @@ function stubAllRegimes() {
   stubCode();
   stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
   stubStage3();
+  // Session F's seven pages read the openness, the build and the roster.
+  stubStage5();
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1856,5 +1867,320 @@ describe('what Session E moved', () => {
     expect(body).toMatch(/no effect on\s+whether a fixed payment is available/);
     expect(body.toLowerCase()).not.toContain('low effort');
     expect(body.toLowerCase()).not.toContain('poor');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session F — openness, the build, and live (18, 21–24, 19, 26)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const BUILD_FIELDS = {
+  title: null as string | null,
+  founderDisplayName: null,
+  founderEntityDisplay: null,
+  founderCountry: null,
+  founderProfileUrl: null,
+  opensAt: null,
+  closesAt: null,
+  brandPerception: null,
+  brandVoice: null,
+  heroPreference: null,
+  publicStory: null,
+  orderThreshold: null as number | null,
+  deliveryWindow: null,
+  earlyProductDisclaimer: null,
+  risksAndChallenges: null,
+  internalTargetCents: null,
+};
+
+function buildState(overrides: Record<string, unknown> = {}) {
+  return {
+    build: { ...BUILD_FIELDS },
+    rewardPackages: [],
+    faqs: [],
+    demoMoments: [],
+    benefitCards: [],
+    buildStatus: 'in_progress',
+    missing: ['title', 'publicStory', 'rewardPackages'],
+    campaignStatus: 'affiliate_response_and_build',
+    model: 'product',
+    reviewReadiness: { rosterStatus: 'gathering', buildStatus: 'in_progress', reviewReady: false },
+    ...overrides,
+  };
+}
+
+function stubBuild(initial: Record<string, unknown> = {}) {
+  let state = buildState(initial);
+  handlers.push((url, init) => {
+    if (!/\/build$/.test(url)) return undefined;
+    if (init?.method === 'PATCH') {
+      const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
+      // Only what the server DERIVES comes back (§9). The text fields are
+      // deliberately not echoed.
+      state = {
+        ...state,
+        build: { ...(state.build as object), ...patch } as typeof state.build,
+      };
+      return { status: 200, body: { buildStatus: state.buildStatus, missing: state.missing, build: state.build } };
+    }
+    return { status: 200, body: state };
+  });
+  handlers.push((url, init) =>
+    /\/build\/faqs$/.test(url) && init?.method === 'PUT'
+      ? { status: 200, body: { faq: { id: 'faq-1', question: 'When?', answer: 'March 2027.' } } }
+      : undefined,
+  );
+  handlers.push((url, init) =>
+    /\/build\/rewards$/.test(url) && init?.method === 'PUT'
+      ? { status: 200, body: { package: { id: 'rw-1' } } }
+      : undefined,
+  );
+  return () => state;
+}
+
+function stubOpenness(overrides: Record<string, unknown> = {}) {
+  const openness = {
+    applicable: true,
+    campaignType: 'pre_launch',
+    stance: null,
+    recordedAt: null,
+    standardBasePercent: 30,
+    withFixedBasePercent: 20,
+    ...overrides,
+  };
+  handlers.push((url, init) => {
+    if (!/fixed-payment-openness$/.test(url)) return undefined;
+    if (init?.method === 'PUT') {
+      const body = JSON.parse(String(init.body)) as { stance: string };
+      return { status: 200, body: { openness: { ...openness, stance: body.stance } } };
+    }
+    return { status: 200, body: { openness } };
+  });
+  return openness;
+}
+
+function stubStage5(build: Record<string, unknown> = {}, openness: Record<string, unknown> = {}) {
+  handlers.push((url) =>
+    url.startsWith('/api/account/me')
+      ? { status: 200, body: { account: { role: 'founder', email: 'rowan@example.com', name: 'Rowan' } } }
+      : undefined,
+  );
+  stubOpenness(openness);
+  stubBuild(build);
+  handlers.push((url) =>
+    /\/roster$/.test(url)
+      ? {
+          status: 200,
+          body: {
+            roster: {
+              responseDeadlineAt: null,
+              fullRefundOutcome: 'x',
+              pendingProposalNote: 'y',
+              creators: [
+                { associationId: 'a1', handle: '@nolan', channelType: null, audienceMetric: null, niche: null, bio: null, statusLabel: 'Accepted', openProposal: null },
+                { associationId: 'a2', handle: '@wren', channelType: null, audienceMetric: null, niche: null, bio: null, statusLabel: 'Reviewing', openProposal: null },
+              ],
+            },
+          },
+        }
+      : undefined,
+  );
+}
+
+describe('how Creators are paid (18)', () => {
+  it('offers three answers, and no amount anywhere', async () => {
+    stubStage5();
+    renderAt(at('creator-payment'));
+    await screen.findByRole('heading', { name: /how creators are paid/i });
+
+    // §14.3's percentages, from the settings the server sent — never typed
+    // into this file. The lede states the standard rate and the panel states
+    // both, which is why the standard one appears twice.
+    expect(screen.getAllByText(/30%/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/20%/)).toBeInTheDocument();
+
+    for (const stance of FIXED_PAYMENT_STANCES) {
+      expect(screen.getByRole('radio', { name: new RegExp(stance.label, 'i') })).toBeInTheDocument();
+    }
+    expect(screen.getByText(FIXED_PAYMENT_BINDS_NOBODY)).toBeInTheDocument();
+    expect(screen.getByText(FIXED_PAYMENT_TERMS_COME_LATER)).toBeInTheDocument();
+
+    // §16: the terms are the Creator's to propose. There is no field here that
+    // could carry an amount, and the record has no column for one.
+    const page = document.querySelector('.ff') as HTMLElement;
+    for (const input of page.querySelectorAll('input')) {
+      expect(input.getAttribute('type')).toBe('radio');
+    }
+    expect(page.textContent).not.toMatch(/\bupfront\b/i);
+    expect(page.textContent).not.toMatch(/US\$/);
+  });
+
+  it('records the answer and carries on into the build', async () => {
+    stubStage5();
+    renderAt(at('creator-payment'));
+    await screen.findByRole('heading', { name: /how creators are paid/i });
+
+    await userEvent.click(screen.getByRole('radio', { name: /would consider it/i }));
+    await userEvent.click(screen.getByRole('button', { name: /save and start/i }));
+
+    await waitFor(() =>
+      expect(
+        requests.some((r) => r.url.includes('fixed-payment-openness') && r.method === 'PUT'),
+      ).toBe(true),
+    );
+    const sent = requests.find((r) => r.url.includes('fixed-payment-openness') && r.method === 'PUT');
+    // The body carries the stance and nothing else — no amount to strip.
+    expect(Object.keys(sent!.body ?? {})).toEqual(['stance']);
+    await waitFor(() =>
+      expect(document.querySelector('[data-flow-page="voice"]')).not.toBeNull(),
+    );
+  });
+
+  it('gives an Idea campaign the explanation and no control at all (§14.3)', async () => {
+    stubStage5({}, { applicable: false, campaignType: 'pre_build' });
+    renderAt(at('creator-payment'));
+    await screen.findByRole('heading', { name: /how creators are paid/i });
+
+    expect(screen.getByText(FIXED_PAYMENT_IDEA_EXPLAINER)).toBeInTheDocument();
+    // The absence IS the rule. Not a disabled control — none at all.
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    expect(document.body.textContent).not.toMatch(/would consider it/i);
+  });
+});
+
+describe('the build steps (21–24)', () => {
+  it('composes the voice chips into the one §14.4 field, with no cap', async () => {
+    stubStage5();
+    renderAt(at('voice'));
+    await screen.findByRole('heading', { name: /how should your campaign sound/i });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Fun' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Regal' }));
+
+    const box = screen.getByLabelText(/your brand voice/i) as HTMLTextAreaElement;
+    expect(box.value).toBe('Fun, Regal');
+
+    // §14.4 caps nothing — the reference stops at six. Every suggestion is
+    // still offered after two are in.
+    expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThan(6);
+  });
+
+  it('takes the threshold as a count, never an amount (§4.1)', async () => {
+    stubStage5({ model: 'idea' });
+    renderAt(at('threshold'));
+    await screen.findByRole('heading', { name: /order threshold/i });
+
+    expect(screen.getByText(ORDER_THRESHOLD_IS_A_COUNT)).toBeInTheDocument();
+    // The reference labels this `(USD)` with `Ex: $1,000` and `Min. $500`.
+    const page = document.querySelector('.ff') as HTMLElement;
+    expect(page.textContent).not.toMatch(/USD|\$|minimum|Min\./i);
+    // §3.2 bans the word for an Idea threshold in every audience.
+    expect(page.textContent).not.toMatch(/\bgoals?\b/i);
+
+    await userEvent.type(screen.getByLabelText(/pre-orders needed/i), '12a0');
+    expect((screen.getByLabelText(/pre-orders needed/i) as HTMLInputElement).value).toBe('120');
+  });
+
+  it('tells a Product Founder the threshold step is not theirs (§14.4)', async () => {
+    stubStage5({ model: 'product' });
+    renderAt(at('threshold'));
+    await screen.findByText(/This step is for Idea Campaigns/i);
+
+    // No field to disable — a Product campaign has no public threshold.
+    expect(screen.queryByLabelText(/pre-orders needed/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /on to your faqs/i })).toBeInTheDocument();
+  });
+
+  it('previews an FAQ as it is typed', async () => {
+    stubStage5();
+    renderAt(at('faqs'));
+    await screen.findByRole('heading', { name: /what will people ask/i });
+
+    await userEvent.type(screen.getByLabelText(/the question/i), 'When will I get it?');
+    const preview = document.querySelector('.ff-faq__preview') as HTMLElement;
+    expect(within(preview).getByText('When will I get it?')).toBeInTheDocument();
+  });
+
+  it('converts a typed price to integer cents exactly once', async () => {
+    stubStage5();
+    renderAt(at('rewards'));
+    await screen.findByRole('heading', { name: /backer rewards/i });
+
+    await userEvent.type(screen.getByLabelText(/what is it called/i), 'Founding Edition');
+    await userEvent.type(screen.getByLabelText(/^price/i), '120.5');
+    await userEvent.type(screen.getByLabelText(/what is included/i), 'One lamp.');
+    await userEvent.type(screen.getByLabelText(/when does it arrive/i), 'March 2027');
+    await userEvent.type(screen.getByLabelText(/what you commit to/i), 'We email if it moves.');
+    await userEvent.click(screen.getByRole('button', { name: /add this reward/i }));
+
+    await waitFor(() =>
+      expect(requests.some((r) => r.url.includes('/build/rewards'))).toBe(true),
+    );
+    const sent = requests.find((r) => r.url.includes('/build/rewards'))!;
+    expect((sent.body as Record<string, unknown>)['priceCents']).toBe('12050');
+  });
+
+  it('does not claim the build is finished when it is not', async () => {
+    stubStage5();
+    renderAt(at('rewards'));
+    await screen.findByRole('heading', { name: /backer rewards/i });
+
+    // Ten shared fields are required plus one for Product; these four steps
+    // cover three. Telling somebody their campaign is built here is §1.4's
+    // failure with a celebration on it.
+    expect(screen.getByText(BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /see what is left on your campaign/i }),
+    ).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/your campaign is (built|ready|complete)/i);
+  });
+});
+
+describe('the two waiting states (19, 26)', () => {
+  it('says where the campaign stands, and never advances on its own', async () => {
+    stubStage5({ campaignStatus: 'pending_review' });
+    renderAt(at('in-review'));
+    await screen.findByRole('heading', { name: /where your campaign stands/i });
+
+    expect(screen.getByText(/with our review team/i)).toBeInTheDocument();
+    expect(screen.getByText(NOTHING_HERE_IS_A_TIMER)).toBeInTheDocument();
+
+    // The reference auto-advances after five seconds. Nothing here does.
+    const before = document.body.textContent;
+    await new Promise((r) => setTimeout(r, 120));
+    expect(document.body.textContent).toBe(before);
+  });
+
+  it('renders the roster as recorded states, not as an animation', async () => {
+    stubStage5({ campaignStatus: 'approved' });
+    renderAt(at('in-review'));
+    await screen.findByRole('heading', { name: /where your campaign stands/i });
+
+    expect(screen.getByText(ROSTER_CHIPS_ARE_RECORDED)).toBeInTheDocument();
+    expect(screen.getByText('@nolan')).toBeInTheDocument();
+    expect(screen.getByText('Accepted')).toBeInTheDocument();
+    // A Creator nobody has heard from is shown waiting, with §14.5's own word —
+    // never flipped to accepted on a timer.
+    expect(screen.getByText('Reviewing')).toBeInTheDocument();
+  });
+
+  it('refuses to celebrate a campaign that has not launched (§17)', async () => {
+    stubStage5({ campaignStatus: 'approved' });
+    renderAt(at('live'));
+    await screen.findByRole('heading', { name: /not live yet/i });
+
+    expect(document.body.textContent).not.toMatch(/you.{0,3}re live/i);
+    expect(screen.queryByRole('button', { name: /campaign home/i })).not.toBeInTheDocument();
+  });
+
+  it('hands over to §20’s campaign home once a launch record exists', async () => {
+    stubStage5({ campaignStatus: 'live' });
+    renderAt(at('live'));
+    await screen.findByRole('heading', { name: /you.{0,3}re live/i });
+
+    expect(screen.getByText(LIVE_MEANS_A_LAUNCH_RECORD)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /go to your campaign home/i }),
+    ).toBeInTheDocument();
   });
 });

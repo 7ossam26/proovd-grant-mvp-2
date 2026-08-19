@@ -663,6 +663,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       // Founder Flow v2 Session D: the same port the draft route uses, so
       // one deployment decision governs dictation on both steps.
       ...(config.transcription ? { transcription: config.transcription } : {}),
+      // Session F (§25.6): the openness answer is a recorded decision, so it
+      // needs the same writer every other decision in the product uses.
+      audit,
     }),
   );
   // Phase 09b (§12, tech-stack §12). The booking provider's webhook. Mounts its

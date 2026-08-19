@@ -75,6 +75,13 @@ import { SocialsStep } from './surfaces/founder-flow/SocialsStep.js';
 import { LastLook } from './surfaces/founder-flow/LastLook.js';
 import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
+import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
+import { VoiceStep } from './surfaces/founder-flow/VoiceStep.js';
+import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
+import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
+import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
+import { InReviewStep } from './surfaces/founder-flow/InReviewStep.js';
+import { LiveStep } from './surfaces/founder-flow/LiveStep.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -614,6 +621,48 @@ const rootChildren: RouteObject[] = [
   {
     path: 'campaigns/:campaignId/setup/fee',
     element: <FeeStep />,
+  },
+  {
+    /*
+      Founder Flow v2 Session F (2026-08-19) — stage 5, and the end of the flow.
+
+      After the fee because Phase 11's effect 4 is what opens the formal Creator
+      opportunity: before it there is no Creator to be open to, and §15's review
+      has nothing to review. `threshold` is Idea-only — §14.4 gives a Product
+      campaign no public threshold — and `buildFlowStepsFor` decides the walk, so
+      a Product Founder is never routed there.
+    */
+    path: 'campaigns/:campaignId/setup/creator-payment',
+    element: <CreatorPaymentStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/voice',
+    element: <VoiceStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/threshold',
+    element: <ThresholdStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/faqs',
+    element: <FaqsStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/rewards',
+    element: <RewardsStep />,
+  },
+  {
+    /*
+      `setup/review` is Last look; this is the other kind of review — §15's, of
+      the campaign — so it has its own address rather than a parameter on one
+      somebody may have bookmarked.
+    */
+    path: 'campaigns/:campaignId/setup/in-review',
+    element: <InReviewStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/live',
+    element: <LiveStep />,
   },
   {
     /*

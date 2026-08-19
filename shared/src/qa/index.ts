@@ -139,6 +139,26 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: true,
   },
   {
+    key: 'founder_page_build',
+    label: 'Creator pay, the four build steps, and going live',
+    specRef: '§14.3, §14.4, §15, §17',
+    audience: 'founder',
+    // Founder Flow v2 Session F (2026-08-19). Its own entry rather than seven
+    // more routes on `founder_build`: that flow is the campaign-build SURFACE,
+    // which a Founder returns to for the whole life of a campaign, and this is
+    // the sequence they walk once. The sweep stubs different reads for each.
+    routes: [
+      '/campaigns/:campaignId/setup/creator-payment',
+      '/campaigns/:campaignId/setup/voice',
+      '/campaigns/:campaignId/setup/threshold',
+      '/campaigns/:campaignId/setup/faqs',
+      '/campaigns/:campaignId/setup/rewards',
+      '/campaigns/:campaignId/setup/in-review',
+      '/campaigns/:campaignId/setup/live',
+    ],
+    keyboardPathRequired: true,
+  },
+  {
     key: 'founder_build',
     label: 'Building the campaign and submitting it for review',
     specRef: '§14.4, §15',

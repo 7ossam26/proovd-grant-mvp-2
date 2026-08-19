@@ -1909,6 +1909,22 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/founder\/campaigns\/[^/]+\/listing$/, body: { listing } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/roster$/, body: { roster } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/build$/, body: build },
+  // Session F (§14.3): the openness read. A Product campaign, so the screen
+  // renders its three answers rather than §14.3's Idea explanation — the sweep
+  // needs the shape with the control on it.
+  {
+    match: /\/api\/founder\/campaigns\/[^/]+\/fixed-payment-openness$/,
+    body: {
+      openness: {
+        applicable: true,
+        campaignType: 'pre_launch',
+        stance: null,
+        recordedAt: null,
+        standardBasePercent: 30,
+        withFixedBasePercent: 20,
+      },
+    },
+  },
   { match: /\/api\/founder\/campaigns\/[^/]+\/preview$/, body: { preview } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/review$/, body: { review: latestReview } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/creator-readiness$/, body: { readiness } },

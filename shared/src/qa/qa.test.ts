@@ -263,6 +263,7 @@ describe('the Founder onboarding flow', () => {
   const founderFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_vetting')!;
   const setupFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_workspace')!;
   const moneyFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_money')!;
+  const pageFlow = PRINCIPAL_FLOWS.find((flow) => flow.key === 'founder_page_build')!;
 
   it('restates every flow page in PRINCIPAL_FLOWS, in order', () => {
     // `PRINCIPAL_FLOWS` is `as const`, so the routes cannot be spread in from
@@ -279,12 +280,12 @@ describe('the Founder onboarding flow', () => {
     const tokenPages = FOUNDER_FLOW_PAGES.filter((page) => page.param === 'token');
     const campaignPages = FOUNDER_FLOW_PAGES.filter((page) => page.param === 'campaignId');
     expect(founderFlow.routes).toEqual(tokenPages.map((page) => page.path));
-    expect([...setupFlow.routes, ...moneyFlow.routes]).toEqual(
+    expect([...setupFlow.routes, ...moneyFlow.routes, ...pageFlow.routes]).toEqual(
       campaignPages.map((page) => page.path),
     );
-    expect([...founderFlow.routes, ...setupFlow.routes, ...moneyFlow.routes].sort()).toEqual(
-      [...FOUNDER_FLOW_ROUTES].sort(),
-    );
+    expect(
+      [...founderFlow.routes, ...setupFlow.routes, ...moneyFlow.routes, ...pageFlow.routes].sort(),
+    ).toEqual([...FOUNDER_FLOW_ROUTES].sort());
   });
 
   it('gives every page a distinct id, address, title and one-line help', () => {
@@ -300,13 +301,12 @@ describe('the Founder onboarding flow', () => {
   });
 
   it('holds only the pages that exist', () => {
-    // Twenty-six are planned and seventeen are built — Session B built the
-    // first four, Session C the four that finish the draft token, Session D the
-    // claim and the six behind it, Session E the two money screens. A register
-    // entry claiming a surface the product does not have is §1.4's failure in a
-    // different file, and the help drawer would offer to jump to an address
-    // that refuses.
-    expect(FOUNDER_FLOW_PAGES).toHaveLength(17);
+    // Twenty-six were planned and twenty-four are built. The two that are not
+    // are the reference's screens 7 and 8, which ask Problem and Solution a
+    // SECOND time — §9 has one of each, and Session C built nothing for them
+    // rather than a second surface over one record. So this is every page the
+    // flow has: B built four, C four, D seven, E two, F seven.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(24);
   });
 
   it('addresses a page by the parameter its own auth regime has', () => {

@@ -291,11 +291,11 @@ not ship; the summary already carries its own unsubscribe as its single action.
 If deliverability later requires it, it attaches to the non-transactional
 messages alone, as its own decision with its own test.
 
-### The Founder's onboarding, being rebuilt
+### The Founder's onboarding, rebuilt
 
 The path a Founder walks from opening a pre-filled invitation to a live
 campaign becomes twenty-six full-screen steps with no app chrome. It is six
-sessions; the first five have landed. The walk that scopes the rest is
+sessions, and all six have landed. The walk behind them is
 [docs/phases/founder-reconciliation](docs/phases/founder-flow-reconciliation.md),
 and the brief is [docs/phases/founder-flow-v2.md](docs/phases/founder-flow-v2.md).
 
@@ -533,6 +533,39 @@ to press. And the payment-setup screen told people the wrong thing about where
 they would land when they came back from the provider — on the screen somebody
 reads immediately before leaving.
 
+**The last session is what a Founder does with the money once it is paid:
+whether they would consider paying a Creator a fixed amount, the four parts of
+the campaign page that are worth writing in one sitting, and the two screens
+between sending a campaign for review and seeing it go live.**
+
+The pay question is the narrowest thing in the flow, deliberately. Creators ask
+for their own terms and both sides have to agree the same version, so a Founder
+is not in that negotiation during onboarding — what they answer is whether they
+would consider it, and the record has no field for an amount, a rate, or a
+proposal. Idea campaigns cannot have one at all, so that screen explains why and
+offers nothing to press.
+
+The build steps do not finish a campaign page, and the last one says so. A page
+needs about fifteen things and these four cover three of them; the next screen
+lists exactly what is left. The prototype's own limits — three rewards, six brand
+words, a minimum order value in dollars — are all numbers nobody agreed to, and
+the order threshold is a count of pre-orders rather than an amount of money.
+
+The two waiting screens are the ones the prototype gets most confidently wrong.
+It advances both after five seconds and flips three Creators to "accepted" on the
+way. What actually stands between a submitted campaign and a live one is a human
+review, real decisions by real Creators inside a real deadline, a readiness
+checklist, and a coordinated launch. None of them is a wait. So the screens stay,
+they say where the campaign actually is and who owes the next step, the Creator
+list shows what each person has actually done, and nothing moves on its own.
+
+**Walking it in a browser found four more defects, the ninth rebuild in a row.**
+A page title and the sentence under it read as two competing headlines. The
+"accepted" badge rendered quieter than the ones that had not happened yet — on
+the one screen where somebody is looking for who said yes. A question lost its
+size to a browser default. And two buttons on the final screen sat left of centre
+on a layout that is centred.
+
 
 Three parts of the flow cannot be completed in the current environment, and none
 of them is stubbed: the eight policy documents are still in legal review so the
@@ -668,12 +701,14 @@ frontend/   React 19 + Vite, styled solely by proovd.css
   src/surfaces/          the unusable-link page
   src/surfaces/draft/    what is left of the old draft journey: the client the
                          onboarding pages call
-  src/surfaces/founder-flow/ the onboarding flow itself — the full-bleed page
-                         shell and its help drawer, the invite, the three
-                         questions, the campaign type, the address and its
-                         code, the relevance signal, the account claim with
-                         its calendar, the five optional answers, Last look,
-                         payout setup, and the listing fee
+  src/surfaces/founder-flow/ the onboarding flow itself — twenty-four
+                         full-bleed pages, from a pre-filled invitation to a
+                         live campaign: the shell and its help drawer, the
+                         three questions, the campaign type, the address and
+                         its code, the relevance signal, the account claim,
+                         the five optional answers, Last look, payout setup,
+                         the listing fee, how Creators are paid, four parts of
+                         the campaign page, and the two waiting screens
   src/surfaces/creator/  the Creator's compact signup, waiting state, and the
                          preparing Campaign kit
   src/surfaces/founder/  the helper resources, the live campaign home — Glance,

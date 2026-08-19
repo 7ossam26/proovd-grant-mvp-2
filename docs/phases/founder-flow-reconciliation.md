@@ -767,3 +767,111 @@ after it, cancellation stops being an automatic refund and becomes a request an
 Admin decides. It renders local with UTC beside it now, the pair `StatePanel`'s
 own `When` produces. The bug was inherited from `ListingPayment` rather than
 introduced, which is exactly why moving a surface is when to look at it.
+
+---
+
+## 16. Session F's screen order, as built — and the flow is complete
+
+Seven pages, and the end of the sequence:
+
+| Page id | Address | Reference | Note |
+|---|---|---|---|
+| `creator-payment` | `/campaigns/:campaignId/setup/creator-payment` | 18 | Deviation 3's screen. An openness, never a pay-structure choice. |
+| `voice` | `/campaigns/:campaignId/setup/voice` | 21 | `campaign_build.brand_voice` — one §14.4 field, composed by chips. |
+| `threshold` | `/campaigns/:campaignId/setup/threshold` | 22 | `campaign_build.order_threshold`. Idea campaigns only. |
+| `faqs` | `/campaigns/:campaignId/setup/faqs` | 23 | `campaign_faqs`, with the reference's live preview. |
+| `rewards` | `/campaigns/:campaignId/setup/rewards` | 24 | `campaign_reward_packages`. |
+| `in-review` | `/campaigns/:campaignId/setup/in-review` | 19 + 26a | The waiting state. `setup/review` is Last look, so this is its own address. |
+| `live` | `/campaigns/:campaignId/setup/live` | 26b | Reachable only from a real §17 launch. |
+
+**Twenty-four pages, not twenty-six, and the two missing ones were decided in
+Session C.** The reference's screens 7 and 8 ask Problem and Solution a SECOND
+time; §9 has one of each, so C built nothing for them rather than a second
+surface over one record. The register now holds every page the flow has, which
+is what makes the help drawer's "everything before it" a fact.
+
+**Stage 5 is after the fee because Phase 11's effect 4 is what opens the formal
+Creator opportunity.** Before it there is no Creator to be open to, and §15's
+review has nothing to review.
+
+### What the Session F walk found
+
+The brief named two disagreements on these screens and the walk confirmed both,
+plus the §3.1 leak the reconciliation had already recorded. Nine entries went
+into `FOUNDER_FLOW_ABSENCES`:
+
+1. **`Upfront fee` / `No upfront fee` / `upfrontAmount` and the modal** — eleven
+   occurrences. §3.2 bans `upfront (fee|payout|payment)` in every audience
+   including identifiers, and §33.11.3 scans the built bundle. §3.2's own
+   replacement is `optional fixed Creator payment`, which is also §24.7's name
+   for the record. Resolved identically on 2026-08-11 for the Affiliate
+   workspace, where the reference had *mandated* the banned term.
+2. **The screen as a CHOICE of pay structure, with a Select button.** §16 makes
+   the fixed payment the CREATOR's request, accepted bilaterally through one
+   §14.2 version. A Founder picking a structure during onboarding would be
+   making the offer only a Creator may make.
+3. **`Set your order goal`**, and `goalAmount`, `goalInput`, `goalEmpty`,
+   `goalLow`, `goalFilled`, `goalNext`, `goalBoxBg` — sixty-five occurrences.
+   The third time: the Campaigns hub hit it with `progress.goal`,
+   campaign-page-v2 with `PRIVATE BETA GOAL`.
+4. **The threshold collected in dollars, with `(USD)`, `Ex: $1,000` and
+   `Min. $500`.** `order_threshold` is an integer COUNT of pre-orders (§4.1: "a
+   number of Backers, not a dollar amount"), and §14.4 fixes no minimum at all.
+5. **Three rewards and six voice adjectives as caps.** §14.4 caps neither; the
+   pager is a layout.
+6. **Both waiting screens auto-advancing after five seconds, with three Creator
+   chips flipping to accepted at 1.5s and 3s.** What stands between a submitted
+   campaign and a live one is §15's review, §14.2's bilateral decisions inside a
+   72-hour window, §16's readiness checklist and §17's launch. None is a wait,
+   and the chips are real people accepting real terms.
+7. **A second review screen, `Application in review`, reviewing the FOUNDER.**
+   §15 approves a campaign, not a person, and no record holds the other thing.
+8. **`…as soon as we get all your affiliates in place`** — the §3.1 leak on the
+   live screen.
+
+### Three decisions inside the session
+
+**The voice chips compose one field rather than becoming a second record.** A
+repeater beside `campaign_build.brand_voice` would make §14.4's field and the
+Founder's chips two answers to one question, and the one nobody updated is the
+one that ships. The textarea is always present, always editable, and always the
+record; the chips write into it.
+
+**The four steps do not complete a build, and the last one says so.** Ten shared
+fields are required plus four for Idea or one for Product; these four cover
+three. `BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD` renders on the last step and its
+forward control opens `/campaigns/:campaignId/build`, which lists exactly what
+is left from the server's own `missing`.
+
+**A Product Founder who reaches the threshold address is told whose step it is.**
+§14.4 gives them no public threshold, so there is no field to disable — the
+screen names the step that IS theirs and opens it.
+
+---
+
+## 17. What the Session F browser pass found, and nothing else could
+
+
+Four defects, all invisible to jsdom, axe, and the type checker. Ninth rebuild
+in a row.
+
+1. **The waiting screen's `h1` and `StatePanel`'s head read as two competing
+   headlines.** `.ff-build__title` maxes at 2.5rem and so does `--fs-step`, at
+   weight 900 — so "Where your campaign stands" and "Your campaign is approved"
+   sat at nearly the same size. Session E found the same inversion on the money
+   screens; the fix is the same, and it is scoped to `.ff-wait` so the build
+   steps keep the smaller title their form density wants.
+2. **`Accepted` rendered QUIETER than `Reviewing`.** `Tag`'s `moss` variant is a
+   mid-green fill with pale text, and the default is dark ink on light — so on
+   the one screen where a Founder is looking for who has said yes, the yes was
+   the low-contrast one. `mint` is the affirmative treatment.
+3. **The `<legend>` asking the screen's own question rendered smaller than the
+   explanation above it.** A `<legend>` takes UA styling that overrides an
+   inherited size, so the class on it lost. It carries its own size now.
+4. **The live screen's two controls sat left of centre.** Session B's
+   `.ff-nav .btn--primary { margin-left: auto }` is right for every step page
+   and fights the centring on the one screen that is a lockup.
+
+None of the four is visible to axe: every accessible name is correct, every
+heading level is right, and contrast on a `Tag` is computed against its own
+declared fill rather than against what it is competing with.

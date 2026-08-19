@@ -10,11 +10,12 @@
  * somewhere that does not exist.
  *
  * ── It holds only the pages that EXIST ──────────────────────────────────────
- * Twenty-six are planned and seventeen are built. Declaring the other nine
- * would be `events.ts`'s failure in a different file — a register entry
- * claiming a surface the product does not have (§1.4). Session F appends the
- * rest as it builds; the help drawer's "everything before it" is therefore
- * always true rather than aspirational.
+ * Twenty-six were planned and twenty-four are built. The two that are not
+ * are the reference's screens 7 and 8, which ask Problem and Solution a
+ * SECOND time — §9 has one of each, and Session C built nothing for them
+ * rather than a second surface over one record. So this is every page the
+ * flow has, and the help drawer's "everything before it" is a fact rather
+ * than an aspiration.
  *
  * ── The order is the reconciliation's, not the reference's ──────────────────
  * `docs/phases/founder-flow-reconciliation.md` §1 is the canonical order, and
@@ -218,6 +219,81 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     title: 'Your listing fee',
     help: 'The one-off fee for listing your campaign, lowered by every optional answer you completed. Sales tax is worked out from your billing address before you agree to anything.',
     stage: 4,
+  },
+  {
+    /*
+      Stage 5 — openness, the build, and what stands between a submitted
+      campaign and a live one. Session F (2026-08-19).
+
+      After the fee because Phase 11's effect 4 is what opens the formal
+      Creator opportunity: before it there is no Creator to be open to, and
+      §15's review has nothing to review.
+    */
+    id: 'creator-payment',
+    path: '/campaigns/:campaignId/setup/creator-payment',
+    param: 'campaignId',
+    title: 'How Creators are paid',
+    help: 'Creators take a share of what your campaign collects. On a Product Campaign one may also ask for a fixed payment — this is where you say whether you would consider it, and it commits you to nothing.',
+    stage: 5,
+  },
+  {
+    id: 'voice',
+    path: '/campaigns/:campaignId/setup/voice',
+    param: 'campaignId',
+    title: 'Your brand voice',
+    help: 'A few words for how your campaign should sound, and anything else worth knowing. A reviewer and a Creator both read it.',
+    stage: 5,
+  },
+  {
+    /*
+      Idea campaigns only — §14.4 gives a Product campaign no public
+      threshold. `buildFlowStepsFor` is what decides the walk; the page is
+      registered either way, because the register is the list of pages that
+      EXIST rather than the list one campaign happens to reach.
+    */
+    id: 'threshold',
+    path: '/campaigns/:campaignId/setup/threshold',
+    param: 'campaignId',
+    title: 'Your order threshold',
+    help: 'How many pre-orders your campaign needs before any card is charged. It is a count of pre-orders, never an amount of money.',
+    stage: 5,
+  },
+  {
+    id: 'faqs',
+    path: '/campaigns/:campaignId/setup/faqs',
+    param: 'campaignId',
+    title: 'Your FAQs',
+    help: 'The questions people ask before they pre-order, answered in your words. They render on your public page exactly as you write them.',
+    stage: 5,
+  },
+  {
+    id: 'rewards',
+    path: '/campaigns/:campaignId/setup/rewards',
+    param: 'campaignId',
+    title: 'Your Backer rewards',
+    help: 'What somebody receives for pre-ordering, what it costs, and when it arrives. Your campaign needs at least one.',
+    stage: 5,
+  },
+  {
+    /*
+      `setup/review` is Last look. This is the other kind of review — §15's,
+      of the campaign — so it gets its own address rather than a parameter on
+      one somebody may have bookmarked.
+    */
+    id: 'in-review',
+    path: '/campaigns/:campaignId/setup/in-review',
+    param: 'campaignId',
+    title: 'Your campaign in review',
+    help: 'Where your campaign stands between being submitted and going live: our review, your Creators’ decisions, and the coordinated launch.',
+    stage: 5,
+  },
+  {
+    id: 'live',
+    path: '/campaigns/:campaignId/setup/live',
+    param: 'campaignId',
+    title: 'Your campaign is live',
+    help: 'Your page is public and your Creators’ links are working. Everything after this happens on your campaign home.',
+    stage: 5,
   },
 ];
 
@@ -424,6 +500,59 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
     absentBecause:
       '§33.11.4: a control names its destination. `Continue` is the objectless label the register scans for by exact match, and on this screen the next thing is money — the one place in the flow where somebody should know what they are opening before they open it.',
     specRef: '§33.11.4, DNA §5.13',
+  },
+  {
+    element:
+      'The Creator-pay screen’s `Upfront fee` / `No upfront fee` structures, `upfrontAmount`, and the upfront-fee modal — eleven occurrences',
+    absentBecause:
+      '§3.2 bans `upfront (fee|payout|payment)` in every audience INCLUDING identifiers, and §33.11.3 scans the built bundle where a prop name survives minification. §3.2’s own replacement is `optional fixed Creator payment`, which is also §24.7’s name for the record. Resolved identically on 2026-08-11 for the Affiliate workspace, where the reference had *mandated* the banned term.',
+    specRef: '§3.2, §24.7, §33.11.3',
+  },
+  {
+    element:
+      'The Creator-pay screen as a CHOICE of pay structure, with a Select button that picks one',
+    absentBecause:
+      '§16 makes the optional fixed Creator payment the CREATOR’s request, accepted bilaterally through one §14.2 proposal version. A Founder picking a structure during onboarding — before the listing fee, before any Creator exists — would be making the offer only a Creator may make. What is collected is an OPENNESS, with no amount, no percentage and no proposal reference; the record has no column for any of them.',
+    specRef: '§16, §14.2, §1 rule 6',
+  },
+  {
+    element:
+      'The order-threshold screen’s `Set your order goal`, and `goalAmount`, `goalInput`, `goalEmpty`, `goalLow`, `goalFilled`, `goalNext`, `goalBoxBg` — sixty-five occurrences',
+    absentBecause:
+      '§3.2 bans `goal` for an Idea threshold, and its last paragraph binds identifiers. This is the third time it has come up: the Campaigns hub hit it with `progress.goal` and campaign-page-v2 with `PRIVATE BETA GOAL`, both caught by §33.11.3’s scan of the built bundle. The headline is `Set your order threshold`, and nothing — CSS class, prop, state key, register value, fixture — carries the word.',
+    specRef: '§3.2, §33.11.3',
+  },
+  {
+    element: 'The order threshold collected in dollars, with `(USD)`, `Ex: $1,000` and `Min. $500`',
+    absentBecause:
+      '`campaign_build.order_threshold` is an integer COUNT of pre-orders — §4.1: "a number of Backers, not a dollar amount" — so the reference collects a different commercial instrument. And §14.4 fixes no minimum at all, so `Min. $500` is an eligibility condition invented in a mockup (§1 rule 6). The field takes a count, and `ORDER_THRESHOLD_IS_A_COUNT` says so beside it.',
+    specRef: '§4.1, §14.4, §1 rule 6',
+  },
+  {
+    element: 'Three Backer rewards maximum, and six brand-voice adjectives maximum',
+    absentBecause:
+      '§14.4 caps neither. A cap is a commercial rule, and a Founder with four rewards would be refused by a number nobody agreed to. The reference’s three-card pager is a LAYOUT; if product wants a cap it is a §6 setting with its own decision.',
+    specRef: '§14.4, §1 rule 6',
+  },
+  {
+    element:
+      'Both waiting screens auto-advancing after five seconds, with three Creator chips flipping to accepted at 1.5s and 3s on the way',
+    absentBecause:
+      'Between a submitted campaign and a live one stand §15’s Admin review with its immutable approved snapshot, §14.2’s bilateral Creator decisions inside a 72-hour window, §16’s thirteen-item readiness checklist and §17’s five-step coordinated launch. NONE of them is a wait, and the chips flipping are real people accepting real terms. Both screens stay and become genuine waiting states answering §27.1’s six questions; the timer goes, and the chips render the recorded association states.',
+    specRef: '§15, §14.2, §16, §17, §1.4, §30',
+  },
+  {
+    element: 'A second review screen — `Application in review`, reviewing the FOUNDER',
+    absentBecause:
+      'The reference draws two. §15 approves a CAMPAIGN, not a person: it has review rounds, grouped feedback with a deep link and an owner, and an immutable approved snapshot. A screen saying a person is under review describes a decision this product does not make, and there is no record behind it.',
+    specRef: '§15, §1.4',
+  },
+  {
+    element:
+      'The live screen’s `Our Team will reach out to you as soon as we get all your affiliates in place`',
+    absentBecause:
+      '§3.1: `affiliate` is internal and never reaches a Founder. The third site in the bundle, and the one neither earlier walk named. `Creator` is the customer-facing word, and the sentence is re-authored to state what is recorded rather than to promise an outreach nobody scheduled.',
+    specRef: '§3.1, §7',
   },
 ];
 

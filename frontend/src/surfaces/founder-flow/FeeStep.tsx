@@ -503,7 +503,7 @@ function Paid({
   listing: ListingState;
   onChange: () => Promise<void>;
 }) {
-  const { leave } = useFlowNav();
+  const { leaveToPage } = useFlowNav();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<FounderError | null>(null);
   const payment = listing.payment!;
@@ -628,15 +628,12 @@ function Paid({
       </div>
 
       <div className="ff-nav" data-anim="cta">
-        {/* Session F puts screen 18 and the four build steps here. Until it
-            does, the campaign build is what comes next and it is a real
-            surface — a control naming a page that does not exist yet would be
-            §1.4's failure with a forward arrow on it. */}
-        <Button
-          tier="primary"
-          onClick={() => leave(`/campaigns/${encodeURIComponent(campaignId)}/build`)}
-        >
-          Build your campaign page
+        {/* Session F built screen 18, so the flow carries on rather than
+            handing over to the build surface. Phase 11's effect 4 is what
+            opened the formal Creator opportunity, which is why the question
+            about Creator pay comes immediately after the fee and not before. */}
+        <Button tier="primary" onClick={() => leaveToPage('creator-payment')}>
+          Next — how Creators are paid
         </Button>
       </div>
     </div>

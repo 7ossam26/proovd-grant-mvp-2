@@ -576,6 +576,37 @@ export interface BuildState {
   reviewReadiness: ReviewReadiness;
 }
 
+/* ── The fixed-payment openness (screen 18, Session F) ───────────────────────
+ *
+ * §16 makes the optional fixed Creator payment the CREATOR's request, accepted
+ * bilaterally through one §14.2 version. What this carries is an OPENNESS: no
+ * amount, no percentage, no proposal reference — and the record behind it has
+ * no column for any of them.
+ */
+
+export interface OpennessState {
+  /** False on an Idea Campaign: §14.3 prohibits the payment, so nothing to ask. */
+  applicable: boolean;
+  campaignType: 'pre_build' | 'pre_launch';
+  stance: 'open' | 'not_open' | 'undecided' | null;
+  recordedAt: string | null;
+  /** §14.3's two base percentages, from the §6 settings in force. */
+  standardBasePercent: number;
+  withFixedBasePercent: number;
+}
+
+export const fetchOpenness = (campaignId: string): Promise<{ openness: OpennessState }> =>
+  call(`${base(campaignId)}/fixed-payment-openness`);
+
+export const recordOpenness = (
+  campaignId: string,
+  stance: 'open' | 'not_open' | 'undecided',
+): Promise<{ openness: OpennessState }> =>
+  call(`${base(campaignId)}/fixed-payment-openness`, {
+    method: 'PUT',
+    body: JSON.stringify({ stance }),
+  });
+
 export const fetchBuild = (campaignId: string): Promise<BuildState> =>
   call(`${base(campaignId)}/build`);
 

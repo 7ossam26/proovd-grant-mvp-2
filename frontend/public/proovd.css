@@ -8797,3 +8797,193 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .ff-lines__note { flex-direction: column; gap: var(--sp-4); align-items: flex-start; }
   .ff-lines__note dd { text-align: left; }
 }
+
+/* ── PHASE 34 — Session F: openness, the build, and live ───────────────────
+   Added 2026-08-19. Nothing above this comment is edited, and no colour is
+   minted: Session B's header records the twelve-colour decision once, for all
+   twenty-six screens, and these resolve to the same tokens.
+
+   Three of the reference's own treatments are deliberately not reproduced,
+   each recorded in `FOUNDER_FLOW_ABSENCES` with the rule that refuses it: the
+   Creator-pay screen as a CHOICE of structure, the three-reward and
+   six-adjective caps, and both waiting screens auto-advancing on a timer with
+   Creator chips flipping to accepted on the way.                           */
+
+/* ── Screen 18 — how Creators are paid ──────────────────────────────────── */
+.ff-pay { display: flex; flex-direction: column; gap: var(--sp-24); max-width: 44rem; width: 100%; }
+.ff-pay__panel {
+  padding: var(--sp-24);
+  border: 2px solid var(--grey-light);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+/* The two sentences that stop this reading as an offer (§16, §14.2). */
+.ff-pay__pinned { margin: 0; max-width: var(--measure); color: var(--moss); font-size: 0.9375rem; }
+/* §14.3's Idea explanation, where the control would have been. */
+.ff-pay__explainer {
+  margin: 0;
+  padding: var(--sp-24);
+  border-left: 4px solid var(--moss);
+  background: var(--grey-lightest);
+  color: var(--dark);
+  max-width: var(--measure);
+}
+.ff-pay__choice { margin: 0; padding: 0; border: none; }
+.ff-pay__choice legend {
+  padding: 0 0 var(--sp-12);
+  /* A `<legend>` takes UA styling that overrides an inherited size, and this
+     one is the question the whole screen exists to ask — it cannot read
+     quieter than the explanation above it. */
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--dark);
+}
+
+/* ── Screens 21–24 — the build steps ────────────────────────────────────── */
+.ff-build { display: flex; flex-direction: column; gap: var(--sp-16); max-width: 56rem; width: 100%; }
+.ff-build__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 4.4vw, 2.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--dark);
+}
+/* §9's three phrases. Never empty-height: a status that appears and shifts the
+   page is a status people learn to ignore. */
+.ff-build__save { margin: 0; min-height: 1.25rem; color: var(--moss); font-size: 0.875rem; }
+.ff-build__not-done {
+  margin: 0;
+  padding: var(--sp-16);
+  background: var(--grey-lightest);
+  color: var(--dark);
+  max-width: var(--measure);
+}
+
+/* Screen 21 — the voice chips. A way into ONE field, never a second record. */
+.ff-voice { display: flex; flex-direction: column; gap: var(--sp-16); }
+.ff-voice__label { margin: 0; color: var(--moss); font-size: 0.9375rem; }
+.ff-voice__chips { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+.ff-voice__chip {
+  padding: var(--sp-8) var(--sp-16);
+  min-height: var(--touch);
+  border: 2px solid var(--grey-light);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--dark);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-voice__chip.is-on { border-color: var(--brand); background: var(--brand-15); }
+.ff-voice__custom { display: flex; align-items: flex-end; gap: var(--sp-16); flex-wrap: wrap; }
+.ff-voice__custom > *:first-child { flex: 1 1 14rem; }
+
+/* Screen 22 — the order threshold. A count, never an amount. */
+.ff-threshold { display: flex; flex-direction: column; gap: var(--sp-16); max-width: 34rem; }
+.ff-threshold__note { margin: 0; color: var(--moss); max-width: var(--measure); }
+
+/* Screen 23 — the FAQs, with the preview the reference draws beside them. */
+.ff-faq { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-32); align-items: start; }
+.ff-faq__form { display: flex; flex-direction: column; gap: var(--sp-16); }
+.ff-faq__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-16);
+  padding: var(--sp-24);
+  background: var(--stat-mint-bg);
+  border-radius: var(--radius);
+}
+.ff-faq__preview-label {
+  margin: 0;
+  color: var(--moss);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ff-faq__card { display: flex; flex-direction: column; gap: var(--sp-8); align-items: flex-start; }
+.ff-faq__q { margin: 0; color: var(--dark); font-weight: 700; }
+.ff-faq__a { margin: 0; color: var(--moss); }
+.ff-faq__empty { margin: 0; color: var(--moss); font-size: 0.9375rem; }
+
+/* Screen 24 — the Backer rewards. A list, because §14.4 caps nothing. */
+.ff-rewards { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-32); align-items: start; }
+.ff-rewards__form { display: flex; flex-direction: column; gap: var(--sp-16); }
+.ff-rewards__list { display: flex; flex-direction: column; gap: var(--sp-16); }
+.ff-rewards__label {
+  margin: 0;
+  color: var(--moss);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ff-rewards__empty { margin: 0; color: var(--moss); }
+.ff-rewards__card {
+  padding: var(--sp-24);
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.ff-rewards__card-title { margin: 0; color: var(--dark); font-weight: 900; font-size: 1.25rem; }
+.ff-rewards__card-price { margin: 0; color: var(--dark); font-weight: 700; }
+.ff-rewards__card-body { margin: 0; color: var(--moss); }
+.ff-rewards__card-when { margin: 0; color: var(--moss); font-size: 0.9375rem; }
+
+/* ── Screens 19 and 26 — the two waiting states ─────────────────────────── */
+.ff-wait { display: flex; flex-direction: column; gap: var(--sp-24); max-width: 44rem; width: 100%; }
+/* The h1 leads. `StatePanel`'s own head is `--fs-step` at weight 900, which is
+   the same size as `.ff-build__title` — two competing headlines rather than a
+   title and a state. Session E found the same inversion on the money screens. */
+.ff-wait .ff-build__title { font-size: clamp(1.875rem, 6.4vw, 3.75rem); letter-spacing: -0.035em; }
+/* Pinned: somebody told a screen updates itself will sit on it (§27.1). */
+.ff-wait__pinned { margin: 0; color: var(--moss); max-width: var(--measure); }
+.ff-wait__roster { display: flex; flex-direction: column; gap: var(--sp-12); }
+.ff-wait__chips { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-8); }
+.ff-wait__chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+}
+.ff-wait__handle { color: var(--dark); font-weight: 700; }
+
+.ff-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-24);
+  align-items: center;
+  text-align: center;
+  max-width: 44rem;
+  width: 100%;
+}
+.ff-live__title {
+  margin: 0;
+  font-size: clamp(3rem, 12vw, 7rem);
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  font-weight: 900;
+  color: var(--dark);
+}
+.ff-live__lede { margin: 0; max-width: var(--measure); color: var(--moss); }
+/* Session B's `.ff-nav .btn--primary { margin-left: auto }` pushes the primary
+   right, which fights the centring on the one screen that is a lockup. */
+.ff-live__nav { justify-content: center; }
+.ff-live__nav .btn--primary { margin-left: 0; }
+
+@media (max-width: 899.98px) {
+  .ff-faq,
+  .ff-rewards { grid-template-columns: 1fr; }
+}
+@media (max-width: 599.98px) {
+  .ff-pay__panel { padding: var(--sp-16); }
+  .ff-voice__custom > *:first-child { flex: 1 1 100%; }
+}

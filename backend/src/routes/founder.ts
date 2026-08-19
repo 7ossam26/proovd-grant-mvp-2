@@ -41,7 +41,9 @@ import { Router } from 'express';
 import express from 'express';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
+import type { AuditWriter } from '../auth/audit.js';
 import { requireRole } from '../auth/guards.js';
+import { readOpenness, recordOpenness } from '../campaign/openness.js';
 import type { ObjectStorage } from '../storage/object-storage.js';
 import type { Scheduler } from '../interviews/calcom.js';
 import { interviewReference } from '../interviews/reference.js';
@@ -111,7 +113,28 @@ export interface FounderRouterConfig {
    * nothing left the browser.
    */
   transcription?: Transcription | undefined;
+  /**
+   * §25.6's writer, for the one write in this router that records a decision
+   * rather than a draft (Session F's fixed-payment openness). Optional so the
+   * suites that build this router for the §12 workspace alone need no change;
+   * without it the openness route records the row and no audit event, which is
+   * a deployment that cannot happen rather than a default to tune.
+   */
+  audit?: AuditWriter | undefined;
 }
+
+/**
+ * The audit writer this router falls back to.
+ *
+ * It THROWS rather than swallowing: §1.3 makes manual work valid only when the
+ * app records it, and a decision recorded with no audit event is exactly the
+ * hole that rule exists to close. A deployment that wired this router without a
+ * writer fails on the first openness answer instead of quietly losing every
+ * one of them — the `unconfiguredTransport` posture, applied to §25.6.
+ */
+const noopAudit: AuditWriter = () => {
+  throw new Error('the Founder router was built without an audit writer (§25.6)');
+};
 
 /** §27.1: a refusal says what happened and what to do next. */
 function notFound(res: express.Response): void {
@@ -126,6 +149,7 @@ function notFound(res: express.Response): void {
 
 export function createFounderRouter(config: FounderRouterConfig): Router {
   const { db, auth, storage, scheduler, notifier, context, referenceSecret } = config;
+  const audit = config.audit ?? noopAudit;
   const router = Router();
   const founder = requireRole(auth, 'founder');
   const json = express.json({ limit: '256kb' });
@@ -195,6 +219,80 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
     });
     res.json({ workspace: view });
   }
+
+  /* ── The fixed-payment openness (screen 18, Session F) ─────────────────── */
+
+  /**
+   * §14.3's two base percentages and the live answer, or the reason there is
+   * none to give.
+   *
+   * The percentages are read from the §6 settings on every request rather than
+   * carried in the register: Phase 06's rule is that a hardcoded number is a bug
+   * even when it is right, and these two are the whole subject of the screen.
+   */
+  router.get(
+    `${FOUNDER_PATH}/campaigns/:campaignId/fixed-payment-openness`,
+    founder,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const view = await readOpenness(db, campaignId);
+      if (!view) {
+        // §9 locks the type at submission, and a campaign that has not reached
+        // that point has nothing to be open about. Saying which is §1.4's job.
+        res.status(409).json({
+          error: 'type_not_locked',
+          title: 'Your campaign type is not settled yet',
+          whatHappened:
+            'This question only applies once your campaign type is locked, which happens when you submit your answers.',
+          next: 'Finish your answers first. Nothing here is lost.',
+        });
+        return;
+      }
+      res.json({ openness: view });
+    },
+  );
+
+  /**
+   * Records the answer, and records nothing else.
+   *
+   * No amount, no percentage, no proposal version — the table has no column for
+   * any of them, and §16 makes the terms the Creator's to propose and both
+   * sides' to accept. An Idea campaign is refused by name here and by CHECK and
+   * trigger regardless (§14.3).
+   *
+   * Registered in §33.12.5's `UNGATED_ADMIN_WRITES`? No — this is a FOUNDER
+   * route, and that register is about `/api/admin`. It sits behind the Founder
+   * guard, the §29.8 reacceptance gate and the §26.7 standing gate, like every
+   * other write in this router.
+   */
+  router.put(
+    `${FOUNDER_PATH}/campaigns/:campaignId/fixed-payment-openness`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const result = await recordOpenness(db, audit, {
+        campaignId,
+        stance: String((req.body as Record<string, unknown>)?.['stance'] ?? ''),
+        actor: actorId(req),
+      });
+
+      if (!result.ok) {
+        res.status(result.code === 'not_found' ? 404 : 422).json({
+          error: result.code,
+          title: 'That answer could not be recorded',
+          whatHappened: result.message,
+          next: 'Nothing about your campaign has changed.',
+        });
+        return;
+      }
+      res.json({ openness: result.view });
+    },
+  );
 
   /* ── Dictation on the Story step (deviation 2, Session D) ──────────────── */
 
