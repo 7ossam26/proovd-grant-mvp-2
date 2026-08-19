@@ -28,6 +28,7 @@ import { SupportCase } from './features/admin/support/SupportCase.js';
 import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirectory.js';
 import { CampaignRecord } from './features/admin/campaigns/CampaignRecord.js';
 import { BackersWorkspace } from './features/admin/backers/BackersWorkspace.js';
+import { LiveModePage } from './features/admin/live-mode/LiveModePage.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
@@ -366,6 +367,19 @@ const rootChildren: RouteObject[] = [
          (view, filters, page) lives in the query string so a drilled-through
          list is a link an Admin can send. */
       { path: 'backers', element: <BackersWorkspace /> },
+      /*
+        §34, §2.1, Appendix C — the live-mode gate, built 2026-08-19 over the
+        API Phase 24 shipped and tested. That phase recorded its own gap: "the
+        API exists and is tested; there is no React page for it yet… §1.1 does
+        [name one], so this is a real gap rather than a decision."
+
+        There is no override on it and nowhere to add one — the
+        `/admin/prerequisites` posture since Phase 06a. The enable form is
+        ABSENT while the gate is shut rather than disabled, because §34 is
+        released by satisfying it and a disabled control is one somebody looks
+        for a way around.
+      */
+      { path: 'live-mode', element: <LiveModePage /> },
     ],
   },
   {

@@ -41,6 +41,7 @@ import type {
   RosterView,
   WorkspaceState,
 } from '../../surfaces/founder/api.js';
+import { APPENDIX_C_STEP_KEYS, LIVE_MODE_CONDITIONS } from '@proovd/shared';
 import type { PayoutState } from '../../surfaces/payouts/PayoutOnboarding.js';
 import type {
   CreatorCloseView,
@@ -1965,6 +1966,35 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/admin\/me$/, body: adminIdentity },
   { match: /\/api\/admin\/founders\/[^/?]+(\?.*)?$/, body: founderWorkspace },
   { match: /\/api\/admin\/founders(\?.*)?$/, body: { founders: [founderRow] } },
+  /* §34's gate, in the state this product is actually in: shut, with ten of
+     eleven conditions unsatisfied and no pilot. The sweep asserts there is no
+     control on the page that could open it, so the shut state is the one that
+     has to render. */
+  {
+    match: /\/api\/admin\/live-mode$/,
+    body: {
+      gate: {
+        open: false,
+        blockingKeys: LIVE_MODE_CONDITIONS.filter((c) => c.key !== 'key_separation').map(
+          (c) => c.key,
+        ),
+        conditions: LIVE_MODE_CONDITIONS.map((c) => ({
+          key: c.key,
+          verification: c.verification,
+          satisfied: c.key === 'key_separation',
+          detail:
+            c.key === 'key_separation'
+              ? 'The environment separates test from live, and this process is in test mode.'
+              : 'No answer has been filed for this condition. An unanswered condition is unsatisfied.',
+          filedAnswer: null,
+        })),
+      },
+      pilot: null,
+      appendixC: { passed: [], failed: [], unwalked: [...APPENDIX_C_STEP_KEYS] },
+      stripeMode: 'test',
+      approvalCopyState: 'conditional_copy_is_correct',
+    },
+  },
   /* The Tasks panel (2026-08-16) mounts inside AdminFrame, so EVERY Admin flow
      performs this read the moment the shell renders. One list, nothing in it —
      the launcher shows no badge and the sweep's flows are undisturbed. */

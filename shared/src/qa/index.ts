@@ -259,11 +259,15 @@ export const PRINCIPAL_FLOWS = [
     label: 'The Admin panel',
     specRef: '§26',
     audience: 'admin',
-    // §26.1's two addresses: every Founder, and one Founder's workspace. The
-    // panel's other sections are parked in the shell and have no route, so
-    // listing them here would sweep a surface that does not exist — and the
-    // register is what "every principal flow" is counted from.
-    routes: ['/admin/founders', '/admin/founders/:prospectId'],
+    // §26.1's two addresses: every Founder, and one Founder's workspace — plus
+    // §34's gate, added 2026-08-19, which is the one Admin surface where the
+    // §33.11 sweep has something specific to prove: that while the gate is shut
+    // there is no control on the page that could open it.
+    //
+    // The panel's remaining section (Today) is parked in the shell and has no
+    // route, so listing it here would sweep a surface that does not exist —
+    // and the register is what "every principal flow" is counted from.
+    routes: ['/admin/founders', '/admin/founders/:prospectId', '/admin/live-mode'],
     keyboardPathRequired: true,
   },
 ] as const satisfies readonly PrincipalFlow[];

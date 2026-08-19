@@ -8987,3 +8987,130 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .ff-pay__panel { padding: var(--sp-16); }
   .ff-voice__custom > *:first-child { flex: 1 1 100%; }
 }
+
+/* ════════════════════════════════════ PHASE 35 — the §34 live-mode gate
+   Added 2026-08-19, over the API Phase 24 shipped and tested. Nothing above
+   this comment is edited and no colour is minted.
+
+   The surface is dense on purpose — §26 licenses that in Admin and nowhere
+   else — but it is a READING surface first: eleven conditions, four walks, and
+   two forms that are used once each in the life of the product. So the state
+   leads every row and the form is behind one control.
+
+   There is no style here for a disabled enable control, because there is no
+   disabled enable control: while the gate is shut the form does not exist.  */
+
+/* ── `.page-title`, defined at last ───────────────────────────────────────
+   Two files have used this class — `StripeReturn.tsx` since Phase 10b and this
+   page — and `proovd.css` has never defined it, so both have been rendering an
+   `h1` at whatever the reset leaves and SMALLER than the `.section-title`
+   beneath them. axe cannot see it: the heading level is right and the
+   accessible name is correct either way.
+
+   It is the same class of defect as the `.sr-only` one found on 2026-08-11,
+   and it is fixed at the definition rather than at either call site, so the
+   payout return page gets it too. Filed here because this is where it was
+   found.                                                                    */
+.page-title {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--mode-title);
+}
+/* A section heading under a page title is the second level, not a rival. */
+.lm .section-title { font-size: 1.375rem; letter-spacing: -0.01em; }
+
+.lm__head { display: flex; flex-direction: column; gap: var(--sp-8); }
+
+/* ── Glance ─────────────────────────────────────────────────────────────── */
+.lm__glance { display: flex; align-items: center; gap: var(--sp-16); flex-wrap: wrap; }
+.lm__glance-count { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--dark); }
+/* The frozen refusal, rendered as the fact it is rather than as a warning. */
+.lm__frozen {
+  margin: var(--sp-16) 0 0;
+  padding: var(--sp-16);
+  background: var(--grey-lightest);
+  border-left: 4px solid var(--moss);
+  color: var(--dark);
+}
+
+.lm__facts { margin: var(--sp-16) 0 0; display: grid; gap: var(--sp-12); }
+.lm__fact { display: grid; grid-template-columns: minmax(9rem, max-content) 1fr; gap: var(--sp-16); align-items: baseline; }
+.lm__fact dt { margin: 0; color: var(--moss); font-size: 0.9375rem; }
+.lm__fact dd { margin: 0; color: var(--dark); }
+.lm__note { margin: 0; color: var(--moss); font-size: 0.9375rem; max-width: var(--measure); }
+.lm__sub { margin: var(--sp-24) 0 var(--sp-8); font-size: 1.0625rem; color: var(--dark); }
+
+/* ── The eleven ─────────────────────────────────────────────────────────── */
+.lm__conditions { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-16); }
+.lm__condition {
+  padding: var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  align-items: flex-start;
+}
+.lm__condition.is-satisfied { border-color: var(--stat-mint-text); }
+.lm__condition-head { display: flex; align-items: baseline; gap: var(--sp-12); width: 100%; }
+.lm__ordinal {
+  flex: none;
+  min-width: 1.5rem;
+  color: var(--moss);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.lm__requirement { margin: 0; flex: 1; color: var(--dark); font-weight: 700; }
+.lm__condition-facts { margin: 0; display: grid; gap: var(--sp-8); width: 100%; }
+
+/* ── The two forms ──────────────────────────────────────────────────────── */
+.lm__form {
+  width: 100%;
+  padding-top: var(--sp-16);
+  border-top: 1px solid var(--grey-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  align-items: flex-start;
+}
+.lm__form > .field,
+.lm__form > fieldset { width: 100%; }
+.lm__radio { margin: 0; padding: 0; border: none; display: flex; flex-direction: column; gap: var(--sp-8); }
+.lm__radio legend { padding: 0 0 var(--sp-8); color: var(--dark); font-weight: 700; }
+.lm__radio-row { display: flex; align-items: center; gap: var(--sp-8); color: var(--dark); }
+.lm__violations { margin: var(--sp-8) 0 0; padding-left: var(--sp-24); display: grid; gap: var(--sp-4); }
+.lm__owner {
+  width: 100%;
+  padding: var(--sp-16);
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+}
+.lm__owner-role { margin: 0; font-size: 0.9375rem; color: var(--dark); }
+
+/* ── Preflight and Appendix C ───────────────────────────────────────────── */
+.lm__preflight,
+.lm__steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-12); }
+.lm__preflight-row,
+.lm__step {
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+  align-items: flex-start;
+}
+.lm__preflight-row.is-done { border-color: var(--stat-mint-text); }
+.lm__statement { margin-top: var(--sp-24); }
+.lm__walk-actions { display: flex; gap: var(--sp-12); flex-wrap: wrap; }
+
+@media (max-width: 599.98px) {
+  .lm__fact { grid-template-columns: 1fr; gap: var(--sp-4); }
+  .lm__condition-head { flex-wrap: wrap; }
+}

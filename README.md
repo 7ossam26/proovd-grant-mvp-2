@@ -36,6 +36,15 @@ and two named pilot owners. None of that is a coding task. The gate is released
 by satisfying it, and there is no override on any surface and nowhere to add
 one.
 
+**As of 2026-08-19 there is a screen for it.** It lists the eleven conditions
+with, for each, what has to be true, how it is decided — checked now, a recorded
+test run, or a person's recorded judgement — and where the process cannot decide
+it, why not. It carries the enable form for the one pilot campaign, the two
+named owners, the rollback, and the forty-nine walkthrough steps. While the gate
+is shut the enable form is not on the page at all: not greyed out, absent, with
+what is actually in the way rendered where it would be. A greyed-out control is
+one somebody looks for a way around.
+
 | Phase | Delivered |
 | --- | --- |
 | 00 | Repo structure, design-system and prebuilt files in place |
@@ -715,6 +724,8 @@ frontend/   React 19 + Vite, styled solely by proovd.css
                          one action, Explore — and the campaign build, where
                          every §14.4 ingredient finally has a box (twelve had
                          none, four of them required)
+  src/features/admin/live-mode/ the §34 gate as a screen: eleven conditions,
+                         the one pilot and its rollback, and Appendix C's walks
   src/surfaces/notifications/ the digest preference and notification history,
                          one page for both roles and the Backer control
   src/surfaces/payouts/  Stripe onboarding for both roles, and where Stripe

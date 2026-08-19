@@ -306,6 +306,21 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
           >
             Support
           </NavLink>
+          {/*
+            §34, §2.1, Appendix C — the live-mode gate, built 2026-08-19 over
+            the API Phase 24 shipped and tested.
+
+            Last in the order because it is the rarest thing an Admin does and
+            the most consequential: §34's eleven conditions, the one named pilot
+            campaign, and the rollback. It carries no override and there is
+            nowhere to add one.
+          */}
+          <NavLink
+            to="/admin/live-mode"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
+            Live mode
+          </NavLink>
         </nav>
 
         <div className="topbar__right">
