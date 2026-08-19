@@ -501,3 +501,88 @@ export const fetchCreatorClose = (
   associationId: string,
 ): Promise<{ close: CreatorCloseView }> =>
   sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/close`);
+
+/* ── Home (Creator Flow v2 deviation 5, Session D) ────────────────────────── */
+
+export interface CreatorHomePitch {
+  associationId: string;
+  campaignId: string;
+  productName: string | null;
+  kind: 'opportunity' | 'proposal';
+}
+
+export interface CreatorHomeStanding {
+  score: number;
+  tier: string;
+  /** `null` while the cohort is short. Never a percentile computed anyway. */
+  percentile: number | null;
+  inputs: Record<string, number>;
+  computedAt: string;
+}
+
+export interface CreatorHomeLeader {
+  handle: string;
+  score: number;
+  tier: string;
+  isYou: boolean;
+}
+
+export interface CreatorHomeWorkAgain {
+  requestId: string;
+  associationId: string;
+  productName: string | null;
+  message: string;
+  requestedAt: string;
+}
+
+export interface CreatorHomeReferral {
+  id: string;
+  referredName: string;
+  state: string;
+  recordedAt: string;
+}
+
+export interface CreatorHomeView {
+  firstName: string | null;
+  pitches: CreatorHomePitch[];
+  standing: CreatorHomeStanding | null;
+  leaders: CreatorHomeLeader[];
+  cohortMinimum: number;
+  trackRecord: {
+    launched: number;
+    verified: number;
+    /** Integer cents as a string. Nothing in the browser computes on it. */
+    backedCents: string;
+  };
+  workAgain: CreatorHomeWorkAgain[];
+  referrals: CreatorHomeReferral[];
+}
+
+export const fetchCreatorHome = (): Promise<{ home: CreatorHomeView }> =>
+  sessionCall('/api/creator/home');
+
+/**
+ * Record a referral — deviation 3.
+ *
+ * There is no referrer in this body. The server resolves it from the session,
+ * because a caller that could name its own referrer could attribute a vouch to
+ * somebody else.
+ */
+export const saveCreatorReferral = (input: {
+  referredName: string;
+  referredContact: string;
+  relationship: string;
+  why: string;
+  note?: string;
+}): Promise<{ referrals: CreatorHomeReferral[] }> =>
+  sessionCall('/api/creator/referrals', { method: 'POST', body: JSON.stringify(input) });
+
+/** §22.9's answer. The route and its service are Phase 21b's, unchanged. */
+export const respondToWorkAgainRequest = (
+  requestId: string,
+  accept: boolean,
+): Promise<{ status: string }> =>
+  sessionCall(`/api/creator/work-again/${encodeURIComponent(requestId)}/respond`, {
+    method: 'POST',
+    body: JSON.stringify({ accept }),
+  });

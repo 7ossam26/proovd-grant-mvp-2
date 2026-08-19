@@ -161,3 +161,81 @@ export const VOICE_TONE_IDS: readonly string[] = [
 export const VOICE_CUSTOM_MAX_LENGTH = 24;
 export const VOICE_CUSTOM_MAX_COUNT = 4;
 export const VOICE_MAX_TOTAL = 5;
+
+/* ── The standing kernel (Session D, 2026-08-19) ──────────────────────────── */
+
+/**
+ * The tier thresholds, and the score's own arithmetic.
+ *
+ * These were presentation until Session D, and the note above still says so —
+ * it was written when nothing on this side computed a tier. The moment the
+ * server WRITES the CHECK-pinned `tier` column it needs the boundaries, and a
+ * server that read them from a request body would let a caller choose their own
+ * tier. So they are restated here on `business-calendar.ts`'s terms: the backend
+ * cannot import `@proovd/shared` at runtime, the values are the same values, and
+ * `creator-flow.test.ts` fails if the two ever disagree.
+ *
+ * **The tier still binds nothing.** Nothing in this file is read by a
+ * compensation, readiness, proposal, or eligibility path, and a source scan
+ * asserts it across `affiliates/decisions.ts`, `creator-payment/`,
+ * `close/earnings.ts` and `affiliates/readiness.ts`.
+ */
+export const STANDING_TIERS: readonly { id: string; minScore: number }[] = [
+  { id: 'starting', minScore: 0 },
+  { id: 'established', minScore: 400 },
+  { id: 'gold', minScore: 650 },
+  { id: 'platinum', minScore: 850 },
+];
+
+/** What each input is worth. See `shared/src/creator-flow/standing.ts`. */
+export const STANDING_POINTS: Record<string, number> = {
+  campaigns_completed: 120,
+  evidence_verified: 80,
+  posts_verified: 60,
+  obligations_met: 40,
+};
+
+/** The four input ids, in the order the register declares them. */
+export const STANDING_INPUT_IDS: readonly string[] = [
+  'campaigns_completed',
+  'posts_verified',
+  'obligations_met',
+  'evidence_verified',
+];
+
+/** How many Creators must have a standing before a percentile means anything. */
+export const STANDING_COHORT_MINIMUM = 10;
+
+/** The score, clamped to the CHECK's own bounds. Pure and total. */
+export function standingScore(counts: Record<string, number>): number {
+  let total = 0;
+  for (const [id, points] of Object.entries(STANDING_POINTS)) {
+    total += points * Math.max(0, Math.floor(counts[id] ?? 0));
+  }
+  return Math.min(STANDING_SCORE_MAX, Math.max(STANDING_SCORE_MIN, total));
+}
+
+/** The tier a score falls in. The one place the boundaries are read. */
+export function standingTier(score: number): string {
+  let current = STANDING_TIERS[0]!.id;
+  for (const tier of STANDING_TIERS) {
+    if (score >= tier.minScore) current = tier.id;
+  }
+  return current;
+}
+
+/**
+ * Where a score sits in its cohort, or `null` when there is no cohort.
+ *
+ * 0055 permits exactly those two shapes, and §16a is why: a brand-new Creator
+ * is not in the bottom percentile — there is nothing to compare them against,
+ * which is a different fact from ranking them last.
+ */
+export function standingPercentile(
+  score: number,
+  cohortScores: readonly number[],
+): number | null {
+  if (cohortScores.length < STANDING_COHORT_MINIMUM) return null;
+  const atOrBelow = cohortScores.filter((s) => s <= score).length;
+  return Math.min(100, Math.max(1, Math.round((atOrBelow / cohortScores.length) * 100)));
+}

@@ -78,6 +78,10 @@ export const CREATOR_AUDIT_TITLES: Record<string, string> = {
   // composer reads directly — an audit row beside it would render the same
   // event twice.
   'affiliate.prospect_created': 'Prospect recorded',
+  // Session D (Creator Flow v2, deviation 3). The referral has no §27 key —
+  // inventing one would be inventing a message — so the history IS how it
+  // reaches an Admin, which is why it must be on this list to be visible.
+  'affiliate.referral_recorded': 'Referred somebody for recruitment',
   'affiliate.prospect_updated': 'Research record updated',
   'affiliate.verification_recorded': 'Verification decision recorded',
   'affiliate.invitation_composed': 'Invitation composed',

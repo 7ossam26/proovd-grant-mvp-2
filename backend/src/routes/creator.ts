@@ -46,6 +46,8 @@ import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { buildCreatorPartnership } from '../affiliates/partnership.js';
 import { readCreatorClose } from '../close/creator-close.js';
+import { creatorProspectId, readCreatorHome } from '../affiliates/home.js';
+import { listCreatorReferrals, recordCreatorReferral } from '../affiliates/referrals.js';
 
 export const CREATOR_PATH = '/api/creator';
 
@@ -263,6 +265,91 @@ export function createCreatorRouter(
       return;
     }
     res.json({ close: result.view });
+  });
+
+  /**
+   * The Creator's home — Creator Flow v2 deviation 5, Session D.
+   *
+   * Scoped by session throughout: the §8 prospect id is resolved from the
+   * caller's own claimed profile inside `readCreatorHome`, and there is no id in
+   * this request at all.
+   *
+   * ── What is NOT in this payload, and the suite asserts it ────────────────
+   * A notification count. 22c's history has no count by design, and a badge
+   * here would be the first of the four things that turn it into a dashboard.
+   * The rail's Updates control opens the history and shows a list.
+   */
+  router.get(`${CREATOR_PATH}/home`, creator, async (req, res) => {
+    const home = await readCreatorHome(db, actorId(req));
+    res.json({
+      home: {
+        ...home,
+        trackRecord: {
+          ...home.trackRecord,
+          // §33.8.13's rule at the wire: money is integer cents everywhere and
+          // `bigint` does not serialize, so it crosses as a string and the
+          // surface formats it. Nothing computes on it in the browser.
+          backedCents: home.trackRecord.backedCents.toString(),
+        },
+        standing: home.standing
+          ? { ...home.standing, computedAt: home.standing.computedAt.toISOString() }
+          : null,
+        workAgain: home.workAgain.map((row) => ({
+          ...row,
+          requestedAt: row.requestedAt.toISOString(),
+        })),
+        referrals: home.referrals.map((row) => ({
+          ...row,
+          recordedAt: row.recordedAt.toISOString(),
+        })),
+      },
+    });
+  });
+
+  /**
+   * Record a referral — deviation 3.
+   *
+   * This creates no account, no prospect row, no association, and no token. It
+   * writes one row and one audit event, and the audit event is how it reaches
+   * an Admin: there is no §27 key for a referral and inventing one would be
+   * inventing a message the Spec does not define.
+   *
+   * The referrer is resolved from the SESSION and never from the body — a
+   * caller that could name its own referrer could attribute a vouch to somebody
+   * else, which is `routes/vetting.ts`'s recorded identity mistake.
+   */
+  router.post(`${CREATOR_PATH}/referrals`, creator, json, async (req, res) => {
+    const prospectId = await creatorProspectId(db, actorId(req));
+    if (!prospectId) {
+      res.status(404).json({ error: 'not_found', title: 'Account not found' });
+      return;
+    }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+    const result = await recordCreatorReferral(db, audit, {
+      referrerProspectId: prospectId,
+      actorId: `user:${actorId(req)}`,
+      referredName: text(body['referredName']),
+      referredContact: text(body['referredContact']),
+      relationship: text(body['relationship']),
+      why: text(body['why']),
+      note: text(body['note']) || undefined,
+    });
+
+    if (!result.ok) {
+      res.status(422).json({
+        error: result.code,
+        title: 'We need a little more',
+        whatHappened: result.message,
+        missing: result.missing,
+        next: 'Fill in the four answers and send it again.',
+        support: '/support',
+      });
+      return;
+    }
+
+    res.json({ referrals: await listCreatorReferrals(db, prospectId) });
   });
 
   return router;

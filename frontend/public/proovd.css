@@ -10525,3 +10525,443 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
   .crf-voice__grid { grid-template-columns: 1fr; }
   .crf-voice__add > *:first-child { flex: 1 1 100%; }
 }
+
+/* ══════════════════════ PHASE 40 — the Creator app shell and Home
+   (Creator Flow v2, Session D, 2026-08-19)
+
+   The first persistent chrome a Creator has ever had: a rail, two drawers, and
+   an account-level home. §26 makes the Admin panel the only dashboard-style
+   product in MVP, which is why this needed a recorded deviation to exist — and
+   why it deliberately does NOT look like `AdminFrame`. No environment cluster,
+   no Tasks launcher, no density.
+
+   The conventions PHASE 25 set and 26–39 restated bind here too:
+
+     1. TOKENS ONLY. Read a token or a mode slot, never a raw value. px is
+        legal for hairlines, radii, and the 44px minimum (via --touch).
+
+     2. SCOPED REUSE. .btn, .input, .field, .drawer, .accordion, .sr-only and
+        .notification-history are reused rather than restyled. Everything new
+        is prefixed .cra-.
+
+     3. RESPONSIVE IS A CORRECTION. Each media rule names the overflow it
+        answers. Wide content scrolls inside its own container; the body never
+        scrolls sideways.
+
+   THE PREFIX IS .cra-, AND IT IS DELIBERATELY NOT .crf-. PHASE 39 is the
+   onboarding FLOW, which is nine full-bleed pages under an invitation token;
+   this is the app a Creator reaches after the claim, under a session. Sharing
+   a prefix would mean one rule reaching across the auth boundary the two sides
+   of this product are separated by.
+
+   The five prefixes already taken:
+     .cr-   PHASE 26/32 — the Affiliate ADMIN workspace
+     .crf-  PHASE 39 — the Creator onboarding flow
+     .cf-   PHASE 31 — the Create Founder compose page
+     .ff-   PHASE 34 — the Founder onboarding flow
+     .mny-  PHASE 36 — the Money & Fulfillment console
+
+   ── THE RAIL IS DARK, AND IT READS `mode-dark` ────────────────────────────
+   The reference's rail is `#013F17`, which is `--dark`. Rather than naming the
+   colour, the element carries `mode-dark` and reads `--mode-bg`/`--mode-body`
+   — so the rail follows the same slot every dark band in the product does, and
+   a change to the dark palette reaches it without this section being edited.
+
+   ── ONE LAYOUT, TWO CHROMES, AND ONLY ONE IS EVER VISIBLE ─────────────────
+   `.cra-rail` is the vertical rail at >=900px; `.cra-bar` is the top bar with
+   the menu drawer below it. They are display-toggled rather than one element
+   reflowing, because the two carry different controls: the bar has a Menu
+   button that the rail does not need, and the rail lists five sections the bar
+   has no room for. Both render the same `SectionList`, so the two can never
+   disagree about what the sections ARE.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.cra {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--white);
+}
+
+/* ── The rail ─────────────────────────────────────────────────────────────── */
+
+.cra-rail {
+  display: none;
+  background: var(--mode-bg);
+  color: var(--mode-body);
+}
+
+.cra-rail__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+  font-weight: 900;
+  font-size: var(--fs-body);
+  letter-spacing: -0.05em;
+  color: var(--mode-title);
+  text-decoration: none;
+}
+
+.cra-rail__mark {
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--brand);
+  flex: none;
+}
+
+.cra-rail__list,
+.cra-menu__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.cra-rail__foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  align-items: flex-start;
+}
+
+/* One item treatment for the link, the button, and the disabled span, so the
+   three never drift apart. Buttons here are navigation and a drawer trigger,
+   not actions — .btn is deliberately not reused. */
+.cra-nav__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: var(--sp-8) 0;
+  min-height: var(--touch);
+  font: inherit;
+  font-weight: 800;
+  color: var(--mode-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cra-nav__item:hover,
+.cra-nav__item:focus-visible {
+  color: var(--mode-title);
+}
+
+.cra-nav__item[aria-current='page'] {
+  color: var(--mode-title);
+  box-shadow: inset 3px 0 0 var(--brand);
+  padding-left: var(--sp-12);
+}
+
+/* A section with no address. `aria-disabled` rather than `disabled` so it stays
+   in the tab order and a keyboard user meets the explanation a sighted user can
+   see (§28.5) — the Support workspace's own rule. */
+.cra-nav__item--off {
+  cursor: default;
+  font-weight: 700;
+}
+
+/* `--fs-step` is a flow step TITLE (clamp(1.625rem, 4vw, 2.5rem)) and reading
+   it as "one step down" put a 40px sentence in the rail. The browser pass found
+   it in three places; the small sizes this file already uses are 0.875rem and
+   0.9375rem. */
+.cra-nav__off {
+  display: block;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--mode-body);
+  opacity: 0.8;
+}
+
+/* ── The narrow-width bar ─────────────────────────────────────────────────── */
+
+.cra-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  padding: var(--sp-12) var(--gutter);
+  background: var(--mode-bg);
+  color: var(--mode-body);
+}
+
+.cra-bar__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-16);
+}
+
+.cra-bar .cra-nav__item {
+  width: auto;
+}
+
+.cra-menu__foot {
+  margin-top: var(--sp-24);
+}
+
+/* Inside `.drawer` the ground is `--darker` and `mode-drawer` sets the tones.
+   `--moss` is a LIGHT-mode body tone and was unreadable there — the browser
+   pass found it, which is the same class of defect PHASE 28, 31, 33 and 39 each
+   recorded: a colour correct in one mode carried into another. */
+.cra-drawer__lede {
+  color: var(--mode-body, var(--moss));
+  margin: 0 0 var(--sp-16);
+  max-width: var(--measure);
+}
+
+/* ── The page ─────────────────────────────────────────────────────────────── */
+
+.cra-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cra-page {
+  padding: var(--sp-32) var(--gutter) var(--sp-80);
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.cra-home__greeting {
+  font-weight: 700;
+  color: var(--moss);
+  margin: 0 0 var(--sp-16);
+}
+
+.cra-muted {
+  color: var(--moss);
+}
+
+/* Every pinned sentence sits WITH the thing it qualifies rather than below it,
+   which is why they are body-toned rather than fine print: STANDING_BINDS_NOTHING
+   beside the score, REFERRAL_PAYS_NOTHING beside the form. */
+.cra-pinned {
+  color: var(--dark);
+  margin: 0 0 var(--sp-16);
+  max-width: var(--measure);
+}
+
+.cra-problem {
+  color: var(--dark);
+  font-weight: 700;
+}
+
+/* ── The hero ─────────────────────────────────────────────────────────────── */
+
+.cra-hero {
+  background: var(--brand);
+  color: var(--dark);
+  padding: var(--sp-32);
+  margin-bottom: var(--sp-32);
+}
+
+/* The caught-up ending is a designed done-moment (DNA §5.4), not a smaller
+   version of the same band. The active hero carries `mode-dark` and this one
+   does not, so they differ in treatment as well as in content — and this one
+   has no control on it at all. */
+.cra-hero--calm {
+  background: var(--brand-5);
+  color: var(--dark);
+}
+
+/* Inside `mode-dark` the band reads the dark slots. Without this the hero's
+   own links inherit the page ink and vanish. */
+.cra-hero.mode-dark {
+  background: var(--mode-bg);
+  color: var(--mode-body);
+}
+
+.cra-hero.mode-dark .cra-hero__head {
+  color: var(--brand);
+}
+
+.cra-hero__list a {
+  color: var(--mode-link, var(--dark));
+  font-weight: 700;
+}
+
+.cra-hero.mode-dark .cra-muted {
+  color: var(--mode-body);
+  opacity: 0.85;
+}
+
+.cra-hero__eyebrow {
+  margin: 0 0 var(--sp-8);
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cra-hero__head {
+  margin: 0 0 var(--sp-24);
+  font-weight: 900;
+  font-size: var(--fs-hero);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.cra-hero__body {
+  margin: 0;
+  max-width: var(--measure);
+}
+
+.cra-hero__list {
+  list-style: none;
+  margin: var(--sp-24) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+/* ── The blocks ───────────────────────────────────────────────────────────── */
+
+.cra-home__split {
+  display: grid;
+  gap: var(--sp-32);
+}
+
+.cra-block {
+  border-top: var(--bw) solid var(--dark);
+  padding-top: var(--sp-16);
+  margin-bottom: var(--sp-32);
+}
+
+.cra-block__title {
+  margin: 0 0 var(--sp-12);
+  font-size: var(--fs-h2);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.cra-standing__score {
+  margin: 0;
+  font-weight: 900;
+  font-size: var(--fs-num);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.cra-standing__tier {
+  margin: var(--sp-4) 0 0;
+  font-weight: 800;
+}
+
+.cra-standing__freshness {
+  margin: var(--sp-4) 0 var(--sp-16);
+  font-size: 0.9375rem;
+}
+
+.cra-defs {
+  margin: 0 0 var(--sp-16);
+}
+
+.cra-defs > div {
+  border-top: 1px solid var(--grey-lightest);
+  padding: var(--sp-8) 0;
+}
+
+.cra-defs dt {
+  font-weight: 800;
+}
+
+.cra-defs dd {
+  margin: var(--sp-4) 0 0;
+  color: var(--moss);
+  overflow-wrap: anywhere;
+}
+
+.cra-tasks {
+  margin: 0;
+  padding-left: var(--sp-16);
+  color: var(--moss);
+}
+
+.cra-list {
+  list-style: none;
+  margin: 0 0 var(--sp-16);
+  padding: 0;
+}
+
+.cra-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+  border-top: 1px solid var(--grey-lightest);
+  padding: var(--sp-12) 0;
+  flex-wrap: wrap;
+}
+
+.cra-list__head {
+  margin: 0;
+  font-weight: 800;
+}
+
+.cra-list__acts {
+  display: flex;
+  gap: var(--sp-8);
+  flex: none;
+}
+
+.cra-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-16);
+}
+
+/* A .btn is inline-flex, and a flex item in a column is stretched to the
+   container width by the default align-items: stretch — which renders a label
+   centred across the measure. Session D, E and F of the Founder flow each hit
+   this; scoped to a direct child so a deliberate full-width control still can
+   be one. */
+.cra-block > .btn,
+.cra-menu__foot > .btn {
+  align-self: flex-start;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+/* At >=900px the rail takes the left column and the bar is gone. Below it the
+   five sections do not fit beside the page at all, so the bar and its menu
+   drawer carry them — a hidden section is a missing section (PHASE 32's own
+   rule about the Affiliate tab rail). */
+@media (min-width: 900px) {
+  .cra {
+    flex-direction: row;
+  }
+
+  .cra-rail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-16);
+    flex: 0 0 14rem;
+    padding: var(--sp-24) var(--sp-16);
+  }
+
+  .cra-bar {
+    display: none;
+  }
+}
+
+/* The side column is a third of the width and `--fs-h2` clamps to 3.25rem, so
+   `Refer another Creator` wrapped to three lines there. A block title is a
+   heading in both columns; only its size differs with the room it has. */
+@media (min-width: 64rem) {
+  .cra-home__side .cra-block__title {
+    font-size: clamp(1.5rem, 2.2vw, 2rem);
+  }
+}
+
+/* At >=64rem the side column sits beside the main one. Below it everything
+   stacks, which is also what keeps the page from scrolling sideways at 320. */
+@media (min-width: 64rem) {
+  .cra-home__split {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}

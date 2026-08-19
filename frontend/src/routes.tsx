@@ -56,6 +56,7 @@ import { PresenceStep } from './surfaces/creator-flow/PresenceStep.js';
 import { VerifyStep } from './surfaces/creator-flow/VerifyStep.js';
 import { AgreeStep } from './surfaces/creator-flow/AgreeStep.js';
 import { DoneStep } from './surfaces/creator-flow/DoneStep.js';
+import { CreatorHome } from './surfaces/creator-app/CreatorHome.js';
 import {
   CreatorCampaigns,
   CreatorCampaignKit,
@@ -647,6 +648,18 @@ const rootChildren: RouteObject[] = [
     // scoped to the session.
     path: 'creator/campaigns',
     element: <CreatorCampaigns />,
+  },
+  {
+    /*
+     * The Creator's home (Creator Flow v2 deviation 5, Session D).
+     *
+     * Its own address rather than a redirect from `/creator/campaigns`, because
+     * the app shell it carries is what Sessions E and F hang the rest of the
+     * sections off — and because a Creator who bookmarks it gets it back
+     * (DNA §5.12).
+     */
+    path: 'creator/home',
+    element: <CreatorHome />,
   },
   {
     // The one action §10 allows: `Review campaign`. Its own address, so a

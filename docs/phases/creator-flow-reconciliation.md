@@ -325,6 +325,18 @@ file and no migration: its 14 new backend tests went into `affiliate-signup`
 and `creator-flow`, and its 18 new frontend ones into the two suites that
 already own §33.2.2/§33.2.3 and the flow.
 
+**After Session D: 130 files, 3,662 tests, 0 failures** — backend **1,735** (67
+files), shared **465** (31 files), frontend **1,462** (32 files). Session D
+added one backend suite (24) and one frontend suite (15), and no migration.
+
+**One thing worth knowing about the batching itself.** The batch runner's own
+summary parse read *stderr* — which is where vitest writes the totals — and the
+first version redirected it to `/dev/null`, so every batch reported zero while
+every batch was in fact green. A run that reports 1,686 where 1,735 is expected
+is the runner, not the suite; the fix is to capture both streams and to count
+the `Test Files` line as well, so a missed batch is visible rather than silently
+subtracted.
+
 **A note on how that number was obtained, because the next session will hit
 it.** This machine cannot run `npm test` as one command: esbuild intermittently
 fails to read `tsconfig.base.json` with *"Access is denied"*, which aborts
@@ -697,3 +709,177 @@ scoped exception, verified as recorded in Phase 23b.
   before work.
 * **Anything on screens 9–14.** Home, Pitches, Earnings, Resources and Settings
   are Sessions D–F, and none of them is in `CREATOR_FLOW_PAGES`.
+
+---
+
+## 10. Session D — the app shell and Home
+
+**Landed 2026-08-19.** One shell, one page, two routes, no migration — and three
+of Session A's own register entries corrected by the first thing that read them.
+
+The suites after Session D: backend **1,735**, shared **465**, frontend
+**1,462**. §33.11.1–§33.11.7 pass over sixteen principal flows, one of them new.
+
+### The shell is not the Admin shell, and that is the deviation
+
+§26 makes the Admin panel the only dashboard-style product in MVP, so a rail, a
+menu drawer and a notification drawer for a Creator needed **deviation 5** to
+exist at all. What keeps it from becoming the thing §26 forbids is that every
+rule §20 states for the Founder campaign home is applied here and has a visible
+consequence:
+
+* **One thing waiting, or the caught-up ending.** The hero is the pitch count
+  with `Review pitches`, or `CREATOR_HOME_CAUGHT_UP` with **no control at all**.
+  The suite asserts the branch renders nothing operable rather than that one
+  particular button is missing — which would pass while a different one was
+  added.
+* **No counters table.** The pitch count is a query over the association states
+  and `proposal_versions`; the track record is three counts of rows. Nothing is
+  stored, so nothing can be wrong while the rows are right.
+* **Every number derived, or not shown.** A Creator with no completed campaign
+  has **no standing row at all** rather than a score of zero, a percentile with
+  no cohort is absent rather than computed anyway, and a leaderboard of three
+  does not render.
+* **Freshness is a time.** `GLANCE_FRESHNESS` is reused rather than a second
+  wording minted, and the suite scans the rendered surface for
+  `BANNED_FRESHNESS_TERMS`.
+
+### The tier binds nothing, and a source scan is the enforcement
+
+`MUST_NOT_READ_STANDING` names five modules by path and scans each for the table
+name, the Drizzle export, and the three functions — with comments stripped
+first, so a module may EXPLAIN that it must not read the standing without
+failing (`notifications/send.ts`'s own rule).
+
+The brief names `affiliates/readiness.ts` and there is no such file: §15's
+roster readiness is `campaign/readiness.ts` and §16's is
+`creator-payment/readiness.ts`. Both are in the register, because a scan naming
+a module that does not exist passes by finding nothing. The first draft threw on
+the missing path rather than skipping it, which is how that was found.
+
+### The score is invented, and the answer to that is transparency
+
+There is no way to build a score without choosing weights, and any choice is
+arbitrary in the sense §1 rule 6 cares about — which is why the score is a
+recorded deviation rather than something derived from a Spec sentence. What is
+available instead of a justification is that the numbers are IN the register the
+surface renders from, and "How this is worked out" states the arithmetic rather
+than describing it (§33.12.6's posture on the measurement scoreboard).
+
+The ordering does say something: a completed campaign needs all five §22.8
+criteria and an Admin decision; a passed evidence check is something an Admin
+reviewed; a first post that passed is smaller and repeatable; and running to the
+end with no §29 action is the weakest, because it is the absence of something.
+
+### Three of Session A's register entries were wrong, and the first read found all three
+
+Session A wrote no surface, so nothing exercised the `derivedFrom` strings until
+now.
+
+1. **`creator_post_submissions.outcome` does not exist** — the column is
+   `status`. Two entries named it.
+2. **`channels_verified` counted the wrong grain.** 0048 CHECK-pins
+   `affiliate_evidence_verifications.metric` to the five §5.3 evidence metrics —
+   audience size, engagement rate, audience demographics, channel ownership,
+   newsletter permission basis — so a Creator with ONE channel and three
+   verified metrics would have scored three channels. It is `evidence_verified`
+   now, labelled `Evidence checks passed`, and the name follows the record
+   rather than the record being bent to the name.
+3. The one surviving "how to climb" task followed it: `Verify another channel`
+   became `Add evidence about your channel`.
+
+What now stops this recurring is a test that parses every `table.column` out of
+every `derivedFrom` and asserts it exists in `information_schema`. It is cheap
+and it is the mechanism that would have caught all three.
+
+### The snapshot is written on a read, and that is deliberate
+
+`ensureStandingSnapshot` appends a row only when the derived counts DIFFER from
+the latest stored ones, so the write is caused by a RECORD having moved and
+never by time passing — there is no clock in the module, no sweep, and no job.
+A Creator who reloads a hundred times gets one row; the suite drives that.
+
+Writing on a read has precedent here: `readPreparingKit` writes its §31.5 access
+row in the same call that returns the content, and §20's `readGlance` issues its
+delivery receipt. What it buys over a sweep is that a Creator whose campaign
+completed an hour ago sees it, rather than seeing `STANDING_NOT_ENOUGH_HISTORY`
+until a cron fires.
+
+A recomputation is a NEW row and the earlier one keeps its own inputs — 21b's
+completion-findings reasoning applied to the number a Creator reads hardest.
+
+### The referral reaches an Admin, and there is no §27 key for it
+
+§1.4: a form that records something nobody will ever see is a promise. There is
+no §27 key for a referral and inventing one would be inventing a message the
+Spec does not define, so the destination is the record plus an `audit_events`
+row — which the Creators workspace history renders through its own allowlist.
+That is `founder_meeting_notes`' arrangement: a fact reaches an Admin through a
+history that composes rather than through a notification nobody specified.
+
+The audit row's target is the **referrer**, because the referred person has no
+record to attach anything to — and creating one would be the signup route this
+deviation refuses. The suite counts prospects, associations, users and tokens
+before and after and asserts all four are unchanged.
+
+### What the Session D browser pass found, and nothing else could
+
+Six, and the twelfth rebuild in a row where the pass found what jsdom, axe and
+the type checker all agreed was fine.
+
+1. **`--fs-step` is a flow step TITLE, not "one step down".** It is
+   `clamp(1.625rem, 4vw, 2.5rem)`, and reading it as a small size put a 40px
+   sentence in the rail, a 40px eyebrow on the hero, and a 40px freshness line
+   under the score. Three places, one misreading.
+2. **A `.btn--primary` IS the brand fill**, so the hero's primary control was
+   invisible on a brand-fill band — and the hero's own campaign links were
+   brand-on-brand and simply absent. The hero carries `mode-dark` now, where the
+   primary is white; the two hero states differ in treatment as well as in
+   content, which is DNA §5.4's point about the done-moment.
+3. **`toLocaleString()` on the freshness line** rendered
+   `8/18/2026, 12:15:00 PM` — the machine's locale, with seconds. It is a medium
+   date and a short time now. Not a bare time: `Updated 3:40 PM` is right for
+   §20's live read and would be a false freshness claim on a snapshot computed
+   three days ago.
+4. **The percentile was off by one** — `101 - percentile` rendered `top 19%` for
+   a percentile of 82.
+5. **`Refer another Creator` wrapped to three lines** in the side column, because
+   `--fs-h2` clamps to 3.25rem and the column is a third of the width.
+6. **`.cra-drawer__lede` used `--moss`**, a light-mode body tone, inside
+   `.drawer`'s `--darker` ground. The same class of defect PHASE 28, 31, 33 and
+   39 each recorded: a colour correct in one mode carried into another.
+
+Plus one the §33.11 sweep caught rather than the browser: the work-again row's
+`Yes` / `No` are **objectless CTAs** (§33.11.4). With two requests on screen a
+bare Yes says nothing about what is being agreed to, and §14.2's own word for
+the other half is Decline.
+
+### Two contrast gaps that are pre-existing and were NOT changed here
+
+`--btn2-text` is `--brand`, so every `.btn--secondary` in the product is about
+1.46:1 on white — which on the work-again row makes the accept control less
+legible than the decline beside it. That is DNA §7.1's variant-2 definition and
+the same documented, scoped tech-stack §3.6 territory as `.btn--primary`'s own
+1.44:1; re-toning it is a product-wide edit with its own screenshot pass across
+every phase section. And `--moss` body copy at ~3.37:1 is what Sessions B and C
+ship on every lede in this flow.
+
+Recorded rather than silently inherited, and rather than fixed on one surface so
+that one surface disagrees with the design system.
+
+### What Session D deliberately did not build
+
+* **Any migration.** Session A's 0055 held every record; this is its first
+  service.
+* **A sweep, a job, or a schedule of any kind.** The standing appears because a
+  record moved.
+* **A notification count anywhere.** 22c's history has no count in the payload,
+  no read-state write, and no `unread` column; the reference draws
+  `Updates · 2 new` in two places and both are in `CREATOR_APP_ABSENCES`.
+* **Any Pitches, Earnings, Resources or Settings surface.** Sessions E and F.
+  `Earnings` and `Resources` have no address at all and say so; `Pitches` and
+  `Settings` point at the addresses that already exist.
+* **An Admin surface for the standing or the referral.** The referral reaches an
+  Admin through the history it already writes to; a later phase asked to read
+  the standing as a default, a filter, or an eligibility condition is asking for
+  the §1 rule 6 violation the missing columns exist to prevent.

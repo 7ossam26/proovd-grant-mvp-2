@@ -583,7 +583,7 @@ account step refuses in the open and says why, and file storage and the
 scheduling provider are both unconfigured so the upload and interview steps
 render a named absence rather than a dead control.
 
-### The Creator's, next — three of six sessions have landed
+### The Creator's, next — four of six sessions have landed
 
 The same treatment is now under way on the other side of the product: the path
 a Creator walks from opening a private campaign invitation to promoting a live
@@ -639,6 +639,28 @@ the moment somebody selected it, and two unreadable links on the page where
 somebody accepts an agreement. That is the eleventh rebuild in a row where
 looking at the actual pixels found what the type checker, the tests, and the
 accessibility scanner all agreed was fine.
+
+**The fourth session is where a Creator lands after signing up** — a home, and
+the menu that sits beside every screen after it. It shows one thing at a time:
+what is waiting for you, or nothing at all, said plainly and with no button
+underneath it inviting you to do something anyway. Below that is a record of
+what you have done — campaigns finished, first posts that passed review, what
+people bought through your link — each number carrying, in one sentence, what it
+counts and where it came from.
+
+The part that needed the most care is a standing score, because a score is the
+easiest place in a product to hide a decision. This one decides nothing: it does
+not change your rate, it does not decide which campaigns you are invited to, and
+it does not affect what you can propose. That sentence sits beside the number
+rather than in a footnote, and a test refuses to let any part of the product that
+handles money or eligibility so much as read the table it lives in.
+
+Building it also found that three entries in the register the score is derived
+from named the wrong columns — one of them counted the wrong thing entirely, so
+a Creator with one channel and three verified facts about it would have been
+credited with three channels. Nothing had read those entries until now, which is
+what happens when a session writes records and no screen. A new check parses
+every column name in the register and asks the database whether it exists.
 
 Unlike every rebuild before it, this one replaces a working, acceptance-tested
 surface whose own source file argues against the design that replaces it. Spec

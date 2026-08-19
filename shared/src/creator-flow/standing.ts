@@ -134,7 +134,7 @@ export const CREATOR_STANDING_INPUTS: readonly CreatorStandingInput[] = [
   {
     id: 'posts_verified',
     label: 'First posts verified',
-    derivedFrom: "creator_post_submissions.outcome = 'passed'",
+    derivedFrom: "creator_post_submissions.status = 'passed'",
     explanation:
       'Posts that passed the §17 seven-point verification the first time they were reviewed.',
     specRef: '§17',
@@ -148,11 +148,24 @@ export const CREATOR_STANDING_INPUTS: readonly CreatorStandingInput[] = [
     specRef: '§29',
   },
   {
-    id: 'channels_verified',
-    label: 'Channels verified',
+    /*
+     * Session A named this `channels_verified` and labelled it "Channels
+     * verified". Session D found the record has a different GRAIN: 0048's
+     * `affiliate_evidence_verifications.metric` is CHECK-pinned to the five
+     * §5.3 evidence metrics — audience size, engagement rate, audience
+     * demographics, channel ownership, newsletter permission basis — so a
+     * Creator with ONE channel and three verified metrics would have scored
+     * three channels.
+     *
+     * The name follows the record rather than the record being bent to the
+     * name. What it counts is real and worth counting; it is just not a count
+     * of channels.
+     */
+    id: 'evidence_verified',
+    label: 'Evidence checks passed',
     derivedFrom: "affiliate_evidence_verifications.decision = 'verified'",
     explanation:
-      'Channels an Admin verified against the §5.3 evidence you supplied.',
+      'Facts about your channel an Admin checked against the evidence you supplied — audience size, engagement, who your audience is, that you own the channel, and how your list was built.',
     specRef: '§5.3, §8',
   },
 ];
@@ -180,7 +193,7 @@ export const CREATOR_TRACK_RECORD_ITEMS = [
   {
     id: 'verified',
     label: 'Verified',
-    derivedFrom: "creator_post_submissions.outcome = 'passed'",
+    derivedFrom: "creator_post_submissions.status = 'passed'",
     explanation: 'First posts that passed review.',
   },
   {
@@ -245,12 +258,86 @@ export const STANDING_HOW_IT_IS_WORKED_OUT =
  */
 export const CREATOR_STANDING_TASKS = [
   {
-    id: 'verify_second_channel',
-    label: 'Verify another channel',
+    id: 'add_channel_evidence',
+    label: 'Add evidence about your channel',
     /** §5.3's evidence register is the record; the ask is real. */
     derivedFrom: 'affiliate_evidence_verifications',
     explanation:
-      'Add evidence for a second channel and an Admin will review it. More verified channels means more campaigns you are a fit for.',
+      'Send us more about your audience and an Admin will check it. The more of your channel we can verify, the more campaigns you are a clear fit for.',
     specRef: '§5.3, §8',
   },
 ] as const;
+
+/* ── The score, and the arithmetic behind it (Session D, 2026-08-19) ──────── */
+
+/**
+ * What each input is worth, and why these four numbers rather than four others.
+ *
+ * There is no way to build a score without choosing weights, and any choice is
+ * arbitrary in the sense §1 rule 6 cares about — which is exactly why the score
+ * is a recorded deviation rather than something derived from a Spec sentence.
+ * What is available instead of a justification is TRANSPARENCY: the numbers are
+ * here, in the register the surface renders from, and the "how this is worked
+ * out" disclosure states the arithmetic rather than describing it. Two people
+ * reading the same score cannot mean different things by it (§33.12.6's own
+ * posture on the measurement scoreboard).
+ *
+ * The ordering does say something. A completed campaign is the strongest signal
+ * because it needs all five §22.8 criteria to hold and an Admin to decide it; a
+ * passed evidence check is next because it is evidence an Admin reviewed; a
+ * post that passed is a smaller, repeatable fact; and running to the end with no
+ * §29 action against you is the weakest of the four, because it is the absence
+ * of something rather than the presence of anything.
+ */
+export const CREATOR_STANDING_POINTS: Record<string, number> = {
+  campaigns_completed: 120,
+  evidence_verified: 80,
+  posts_verified: 60,
+  obligations_met: 40,
+};
+
+/**
+ * The score, from the four counts. Pure, total, and clamped to 0–1000 (0055's
+ * `affiliate_standing_score_bounded`).
+ *
+ * An unknown key contributes nothing rather than throwing: the counts arrive
+ * from a stored `inputs` object which may have been written by an earlier
+ * version of this register, and refusing to render a score somebody was already
+ * shown would be worse than ignoring a retired input.
+ */
+export function creatorStandingScore(counts: Record<string, number>): number {
+  let total = 0;
+  for (const [id, points] of Object.entries(CREATOR_STANDING_POINTS)) {
+    total += points * Math.max(0, Math.floor(counts[id] ?? 0));
+  }
+  return Math.min(CREATOR_STANDING_SCORE_MAX, Math.max(CREATOR_STANDING_SCORE_MIN, total));
+}
+
+/**
+ * How many Creators have to have a standing before a percentile means anything.
+ *
+ * §31.9's `COHORT_BASELINE_SIZE` reasoning, applied to the one number on this
+ * surface that is about other people: "top 8%" over a cohort of three is not a
+ * measurement, it is a sentence about two strangers. Below this the percentile
+ * is `null` and `STANDING_NOT_ENOUGH_HISTORY`'s sibling renders instead — never
+ * a percentile computed anyway and quietly labelled.
+ */
+export const CREATOR_STANDING_COHORT_MINIMUM = 10;
+
+/**
+ * Where a score sits in its cohort, 1–100, or `null` when there is no cohort to
+ * sit in (0055 permits exactly those two shapes).
+ *
+ * Counted as "the share of the cohort at or below this score", so the best
+ * standing is 100 and nobody is ever 0 — a percentile of zero would read as a
+ * rank rather than as a position, and §30's percentile-pruning prohibition is
+ * about exactly the reading where a number decides something about a person.
+ */
+export function creatorStandingPercentile(
+  score: number,
+  cohortScores: readonly number[],
+): number | null {
+  if (cohortScores.length < CREATOR_STANDING_COHORT_MINIMUM) return null;
+  const atOrBelow = cohortScores.filter((s) => s <= score).length;
+  return Math.min(100, Math.max(1, Math.round((atOrBelow / cohortScores.length) * 100)));
+}

@@ -63,6 +63,7 @@ import type {
   CreatorInvitationState,
   CreatorPartnership,
   FormalOpportunity,
+  CreatorHomeView,
 } from '../../surfaces/creator/api.js';
 import type { BackerPageData, BackerSupportView, CommentThread } from '../public/backer/api.js';
 import type { LiveCampaignResponse } from '../public/campaign/api.js';
@@ -1075,6 +1076,62 @@ const partnership: CreatorPartnership = {
     fields: ['preorders', 'conversion', 'earnings', 'payout'],
   },
   updatedAt: '2026-08-26T15:40:00.000Z',
+};
+
+/*
+ * The Creator's home (Creator Flow v2 deviation 5, Session D).
+ *
+ * The richest state on purpose: a pitch waiting, a standing with a cohort
+ * behind it, a work-again ask, and a referral — so the sweep renders every
+ * block rather than the caught-up ending, which draws almost nothing. The
+ * three states Home has to serve (pitches / none / no standing) are the unit
+ * suite's, where they can be asserted rather than merely rendered.
+ */
+const creatorHome: CreatorHomeView = {
+  firstName: 'Mohab',
+  pitches: [
+    {
+      associationId: QA.associationId,
+      campaignId: QA.campaignId,
+      productName: QA.title,
+      kind: 'opportunity',
+    },
+  ],
+  standing: {
+    score: 680,
+    tier: 'gold',
+    percentile: 82,
+    inputs: {
+      campaigns_completed: 3,
+      posts_verified: 3,
+      obligations_met: 3,
+      evidence_verified: 1,
+    },
+    computedAt: '2026-08-18T09:15:00.000Z',
+  },
+  leaders: [
+    { handle: '@rivera', score: 900, tier: 'platinum', isYou: false },
+    { handle: '@mohabvlogs', score: 680, tier: 'gold', isYou: true },
+  ],
+  cohortMinimum: 10,
+  trackRecord: { launched: 3, verified: 3, backedCents: '348000' },
+  workAgain: [
+    {
+      requestId: 'a0000000-0000-4000-8000-0000000000a1',
+      associationId: QA.associationId,
+      productName: QA.title,
+      message: 'We are starting a second campaign and would like you on it again.',
+      requestedAt: '2026-08-17T12:00:00.000Z',
+    },
+  ],
+  referrals: [
+    {
+      id: 'a0000000-0000-4000-8000-0000000000a2',
+      referredName: 'J. Park',
+      state: 'recorded',
+      recordedAt: '2026-08-16T12:00:00.000Z',
+    },
+  ],
 };
 
 const creatorClose: CreatorCloseView = {
@@ -2249,6 +2306,7 @@ export const QA_ROUTES: StubRoute[] = [
   /* Creator (§11, §14, §18, §21) */
   { match: /\/api\/affiliate-invitation\/[^/]+\/payout$/, body: { status: 'not_started', connectedAccountId: null, requirements: null, updatedAt: null, onboardingAvailable: false } },
   { match: /\/api\/affiliate-invitation\/[^/?]+(\?.*)?$/, body: creatorInvitation },
+  { match: /\/api\/creator\/home$/, body: { home: creatorHome } },
   { match: /\/api\/creator\/campaigns\/[^/]+\/opportunity$/, body: { opportunity } },
   { match: /\/api\/creator\/campaigns\/[^/]+\/partnership$/, body: { partnership } },
   { match: /\/api\/creator\/campaigns\/[^/]+\/close$/, body: { close: creatorClose } },

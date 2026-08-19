@@ -229,6 +229,22 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: false,
   },
   {
+    /*
+     * The Creator's home and the app shell (Creator Flow v2 deviation 5,
+     * Session D). Its own entry rather than an address appended to
+     * `creator_campaigns`: this is the first persistent chrome a Creator has —
+     * a rail, a menu drawer, and a notification drawer — and a sweep that
+     * rendered it as part of the campaigns list would report one flow as swept
+     * while never opening either drawer.
+     */
+    key: 'creator_home',
+    label: 'The Creator home: what is waiting, their standing, and their track record',
+    specRef: '§20 by analogy, §26, §27.7',
+    audience: 'creator',
+    routes: ['/creator/home'],
+    keyboardPathRequired: false,
+  },
+  {
     key: 'creator_decisions',
     label: 'The formal opportunity and the three decisions',
     specRef: '§14.1, §14.2',

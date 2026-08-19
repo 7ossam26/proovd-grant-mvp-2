@@ -11,7 +11,8 @@
  * keeps it narrow.
  *
  * Session B added the four screens the invitation token opens, and the copy
- * that is load-bearing rather than decorative.
+ * that is load-bearing rather than decorative; Session C the rest of the walk
+ * and the claim; Session D the app shell and Home, which is `app.ts`.
  */
 export * from './flow.js';
 export * from './onboarding.js';
@@ -21,3 +22,4 @@ export * from './referrals.js';
 export * from './resources.js';
 export * from './channels.js';
 export * from './settings.js';
+export * from './app.js';
