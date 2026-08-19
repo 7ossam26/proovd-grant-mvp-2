@@ -9114,3 +9114,375 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .lm__fact { grid-template-columns: 1fr; gap: var(--sp-4); }
   .lm__condition-head { flex-wrap: wrap; }
 }
+
+/* ════════════════════════════════ PHASE 36 — Money & Fulfillment (2026-08-19)
+
+   The console every money decision in the product is made from: the §21 close
+   batch, §21 reconciliation and results, §22.1 Creator earnings, §22.3 the
+   Founder payment, §24.8/§24.11 refunds and disputes, and §22.4–§22.7
+   fulfillment.
+
+   ── Why this reuses rather than invents ─────────────────────────────────────
+   The pill, the tab rail, the fact grid, and the row are the shapes PHASE 28
+   gave the Campaigns hub — an Admin moving between two reads of the same
+   campaign should not meet two visual languages. What is genuinely new here is
+   only what money needs: an amount that reads as an amount, a blocker list, a
+   preview block, and the refusal paragraph.
+
+   ── The amount is the one thing that must not be pretty ─────────────────────
+   Tabular figures, so a column of amounts aligns and a digit changing width
+   cannot make two numbers look different lengths. It is the only place in this
+   product where that matters enough to override the variable font's defaults.
+
+   ── Contrast was the defect on the last three surfaces ──────────────────────
+   PHASE 28's status pill was invisible on its own dark header, PHASE 31's dark
+   panel rendered near-black values, PHASE 33's accordion head inherited a
+   hardcoded dark. Every colour below is a token, and no `--mint` sits on
+   anything but a dark ground.
+*/
+
+.mny { display: flex; flex-direction: column; gap: var(--sp-32); }
+
+/* ── The queue hero, and the record header ──────────────────────────────── */
+.mny-hero { display: flex; flex-direction: column; gap: var(--sp-8); }
+.mny-back {
+  display: inline-block;
+  margin-bottom: var(--sp-16);
+  color: var(--dark);
+  font-weight: 700;
+  text-decoration: none;
+}
+.mny-back:hover { text-decoration: underline; }
+
+.mny-head { display: flex; flex-direction: column; gap: var(--sp-12); }
+.mny-head__title {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--mode-title);
+  /* A campaign id is the title here, and an id wraps badly at 320. */
+  overflow-wrap: anywhere;
+}
+.mny-head__state { display: flex; gap: var(--sp-8); flex-wrap: wrap; }
+.mny-head__cross { color: var(--dark); font-weight: 700; text-decoration: none; }
+.mny-head__cross:hover { text-decoration: underline; }
+
+/* ── Pills ──────────────────────────────────────────────────────────────── */
+.mny-pill {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: var(--sp-4) var(--sp-8);
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.mny-pill--sm { font-size: 0.75rem; }
+.mny-pill--ok   { border: var(--bw) solid var(--brand); background: var(--brand-5); color: var(--dark); }
+.mny-pill--wait { background: var(--accent-yellow); color: var(--darker); }
+.mny-pill--risk { background: var(--darker); color: var(--mint); }
+.mny-pill--off  { background: var(--grey-lightest); color: var(--moss); }
+
+/* ── The tab rail ───────────────────────────────────────────────────────── */
+.mny-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--grey-light);
+  padding-bottom: var(--sp-4);
+}
+.mny-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: var(--sp-8) var(--sp-12);
+  border-radius: var(--radius) var(--radius) 0 0;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--moss);
+  cursor: pointer;
+  /* 44px, met by padding rather than a fixed height so the label can wrap. */
+  min-height: 44px;
+}
+.mny-tab:hover { color: var(--dark); background: var(--grey-lightest); }
+.mny-tab.is-active {
+  color: var(--dark);
+  background: var(--brand-5);
+  box-shadow: inset 0 -3px 0 var(--brand);
+}
+
+.mny-panel { display: flex; flex-direction: column; gap: var(--sp-32); }
+.mny-panel__blurb { margin: 0; color: var(--moss); font-size: 0.9375rem; }
+
+/* ── Sections ───────────────────────────────────────────────────────────── */
+.mny-section { display: flex; flex-direction: column; gap: var(--sp-16); }
+.mny-section__head {
+  display: flex;
+  gap: var(--sp-16);
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.mny-section__title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--mode-title);
+}
+.mny-sub {
+  margin: var(--sp-16) 0 0;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: var(--mode-title);
+}
+
+/* ── Facts ──────────────────────────────────────────────────────────────── */
+.mny-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-12) var(--sp-24);
+}
+.mny-facts--wide { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.mny-facts dt {
+  margin: 0 0 var(--sp-4);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--moss);
+}
+.mny-facts dd { margin: 0; color: var(--dark); font-size: 0.9375rem; overflow-wrap: anywhere; }
+.mny-facts dd code {
+  font-size: 0.8125rem;
+  background: var(--grey-lightest);
+  padding: 0 var(--sp-4);
+  border-radius: 4px;
+}
+.mny-fact__note { display: block; margin-top: var(--sp-4); font-size: 0.8125rem; color: var(--moss); }
+
+/*
+  The amount. Tabular figures so a column aligns; never bold-and-huge, because
+  the number is not the hero here — the state beside it is.
+*/
+.mny-amount { font-variant-numeric: tabular-nums; font-weight: 700; }
+.mny-amount__qualifier { font-weight: 400; color: var(--moss); }
+
+/* ── Rows ───────────────────────────────────────────────────────────────── */
+.mny-rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-12); }
+.mny-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: inherit;
+  text-decoration: none;
+}
+a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
+.mny-row__lead { display: flex; gap: var(--sp-8); align-items: center; flex-wrap: wrap; }
+.mny-row__lead strong { overflow-wrap: anywhere; }
+.mny-row__recovery { font-size: 0.875rem; color: var(--moss); }
+
+.mny-rows--flat > li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+}
+.mny-item__spec { margin: 0; color: var(--dark); font-size: 0.9375rem; }
+.mny-item__latest { margin: 0; font-size: 0.875rem; color: var(--moss); }
+.mny-item__history { font-size: 0.875rem; color: var(--moss); }
+.mny-item__history summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.mny-item__history ul { margin: var(--sp-8) 0 0; padding-left: var(--sp-24); }
+
+/* ── Acts ───────────────────────────────────────────────────────────────── */
+.mny-acts { display: flex; gap: var(--sp-8); flex-wrap: wrap; }
+
+/* ── Blockers ───────────────────────────────────────────────────────────── */
+.mny-blockers {
+  margin: 0;
+  padding: var(--sp-12) var(--sp-16) var(--sp-12) var(--sp-32);
+  background: var(--accent-yellow);
+  color: var(--darker);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/* ── The pinned rules, and the refusals ─────────────────────────────────── */
+.mny-pinned {
+  margin: 0;
+  padding: var(--sp-12) var(--sp-16);
+  border-left: 3px solid var(--brand);
+  background: var(--brand-5);
+  color: var(--dark);
+  font-size: 0.9375rem;
+}
+.mny-absence {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px dashed var(--grey-light);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  color: var(--moss);
+}
+.mny-absence strong { color: var(--dark); }
+.mny-nothing { margin: 0; color: var(--moss); font-size: 0.9375rem; }
+
+/* ── The refund preview, and the dispute packet ─────────────────────────── */
+.mny-preview,
+.mny-packet {
+  padding: var(--sp-16);
+  background: var(--grey-lightest);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+.mny-preview ul,
+.mny-packet ul { margin: 0; padding-left: var(--sp-24); font-size: 0.9375rem; color: var(--dark); }
+
+/* The cause picker sits outside the dialog, so the treatment list inside it is
+   already narrowed when it opens. */
+.mny-cause { display: flex; flex-direction: column; gap: var(--sp-4); max-width: 32rem; }
+.mny-cause > span {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--moss);
+}
+.mny-cause select {
+  min-height: 44px;
+  padding: 0 var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--dark);
+  font: inherit;
+}
+
+/* ── Checklists ─────────────────────────────────────────────────────────── */
+.mny-checklist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-12); }
+.mny-checklist > li { display: flex; flex-direction: column; gap: var(--sp-4); }
+.mny-checklist .helper { margin: 0; }
+.mny-optional { color: var(--moss); font-weight: 400; }
+
+/* ── Links out ──────────────────────────────────────────────────────────── */
+.mny-link {
+  display: flex;
+  gap: var(--sp-12);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-12) var(--sp-16);
+  border: 1px solid var(--grey-light);
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+.mny-link:hover { border-color: var(--brand); background: var(--brand-5); }
+.mny-link--off { color: var(--moss); border-style: dashed; }
+.mny-link__what { display: flex; flex-direction: column; gap: var(--sp-4); }
+.mny-link__what small { color: var(--moss); }
+
+@media (max-width: 599.98px) {
+  .mny-facts { grid-template-columns: 1fr; }
+  .mny-section__head { flex-direction: column; }
+}
+
+/* ── Contrast: the browser pass, again ──────────────────────────────────────
+
+   `p.helper` is `--grey` at 13px and `.grey` is the same token. On `--white`
+   that is 2.18:1 — under the 3:1 large-text floor, let alone 4.5:1 body — and
+   on THIS surface those two classes are not carrying decoration. They carry
+   "anything still failing when the window shuts closes at US$0.00", "In flight
+   — a resume finishes it under this same key", and every one of the nine
+   sentences that says why a control does not exist.
+
+   So they are re-toned here, scoped to `.mny`, rather than at the definition:
+   `p.helper` is used by six workspaces and re-toning it product-wide is its own
+   change with its own six-surface screenshot pass. The pre-existing gap is
+   recorded rather than silently inherited.
+
+   The split is by JOB, not by size. A caption under a value stays quiet
+   (`--moss`, 3.37:1, which is what PHASE 33 uses for body copy). A sentence
+   that states a rule or names an absence is CONTENT and takes `--dark`
+   (11.67:1) — the refusals especially, because a refusal nobody can read is
+   the §1.4 failure the register exists to prevent.
+
+   Not touched: `.btn--primary`. Its `--mint`-on-`--brand` is 1.44:1 and is
+   proovd.css:158's own hard rule plus tech-stack §3.6's documented, scoped
+   exception for brand-fill buttons — verified as recorded in Phase 23b. Every
+   primary in the product looks like this, and overriding it here would be one
+   surface disagreeing with the design system rather than a fix. */
+
+.mny p.helper {
+  color: var(--moss);
+  font-size: 0.875rem;
+}
+.mny .grey { color: var(--moss); }
+
+/* A section's lede states the rule the section operates under. */
+.mny-section__head .helper {
+  color: var(--dark);
+  font-size: 0.9375rem;
+  max-width: 68ch;
+}
+.mny-panel__blurb { color: var(--dark); }
+
+/* The refusal is the point of the block it sits in. */
+.mny-absence span { color: var(--dark); }
+.mny-nothing { color: var(--dark); }
+
+/* An honest absence inside a fact grid — "Not finalized yet", "Not created" —
+   stays quieter than a value, and legible. */
+.mny-facts dd .grey { color: var(--moss); }
+
+/* ── The machine value, kept and demoted ────────────────────────────────────
+
+   The pill says §23.1's human label; this line carries the raw lifecycle value
+   and the batch status for an Admin reconciling against the database. The
+   Campaigns hub's own arrangement — the value is not hidden, it is placed. */
+.mny-head__technical { margin: 0; font-size: 0.8125rem; color: var(--moss); }
+.mny-head__technical code {
+  background: var(--grey-lightest);
+  padding: 0 var(--sp-4);
+  border-radius: 4px;
+}
+
+/* A reservation-status key is an identifier, so it is not shouted in caps the
+   way a written label is. */
+.mny-facts--codes dt { text-transform: none; letter-spacing: 0; font-family: inherit; }
+
+/* ── A `.btn` is inline-flex, and these containers are column flex ──────────
+
+   `.mny-rows--flat > li` and `.mny-section` are `flex-direction: column`, whose
+   default `align-items: stretch` blows an inline-flex child out to the full
+   measure. Session D recorded it for `.tag`, Session E for a `.btn`, and it is
+   the same rule a third time: a control that is not in a row has to say it does
+   not want the width, or `Record a verification` renders as a 750px bar.
+
+   Scoped to a DIRECT child so `.mny-acts` — which is a real row of controls —
+   is untouched. */
+.mny-rows--flat > li > .btn,
+.mny-section > .btn,
+.mny-preview > .btn { align-self: flex-start; }

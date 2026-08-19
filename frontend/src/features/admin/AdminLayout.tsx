@@ -307,6 +307,21 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
             Support
           </NavLink>
           {/*
+            §21, §22, §24 — the Money & Fulfillment console, built 2026-08-19.
+
+            Beside Campaigns and Backers because it is the third read of the
+            same campaign, and before Creators and Support because close work
+            has deadlines nobody can extend. It is the ONE place a money
+            decision is made: §22.1's Transfer, §22.3's release, §24.8's refund,
+            §24.11's dispute, and §22.4's Day 14 all have exactly one door.
+          */}
+          <NavLink
+            to="/admin/money"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
+            Money
+          </NavLink>
+          {/*
             §34, §2.1, Appendix C — the live-mode gate, built 2026-08-19 over
             the API Phase 24 shipped and tested.
 

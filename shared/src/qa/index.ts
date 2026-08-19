@@ -264,10 +264,21 @@ export const PRINCIPAL_FLOWS = [
     // §33.11 sweep has something specific to prove: that while the gate is shut
     // there is no control on the page that could open it.
     //
+    // The §21/§22/§24 money console joined on 2026-08-19. Both of its addresses
+    // are swept, because it is the surface where every money decision in the
+    // product is made and §27.1's six questions matter most on the screen that
+    // says what somebody is owed.
+    //
     // The panel's remaining section (Today) is parked in the shell and has no
     // route, so listing it here would sweep a surface that does not exist —
     // and the register is what "every principal flow" is counted from.
-    routes: ['/admin/founders', '/admin/founders/:prospectId', '/admin/live-mode'],
+    routes: [
+      '/admin/founders',
+      '/admin/founders/:prospectId',
+      '/admin/money',
+      '/admin/money/:campaignId',
+      '/admin/live-mode',
+    ],
     keyboardPathRequired: true,
   },
 ] as const satisfies readonly PrincipalFlow[];

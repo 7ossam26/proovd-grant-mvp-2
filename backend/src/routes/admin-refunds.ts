@@ -23,6 +23,7 @@ import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
 import type { TokenService } from '../auth/token-service.js';
 import type { StripeGateway } from '../payments/stripe-client.js';
+import { bigintSafeJson } from './json-safe.js';
 import { requireAdmin, requireFreshSession } from '../auth/guards.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
@@ -114,6 +115,14 @@ export function createAdminRefundsRouter(deps: AdminRefundsRouterDeps): Router {
   const admin = requireAdmin(auth);
   const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
   const json: RequestHandler = express.json({ limit: '64kb' });
+
+  /*
+    Money in this product is `bigint` all the way down, and `JSON.stringify`
+    throws on one. Several services here return Drizzle rows directly, so this
+    is mounted on the ROUTER rather than remembered per route — see
+    `routes/json-safe.ts`.
+  */
+  router.use(bigintSafeJson);
 
   const refundDeps = (): RefundDeps => ({
     db,

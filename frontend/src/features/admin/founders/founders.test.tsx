@@ -919,7 +919,7 @@ afterEach(() => {
 /* ── 1. The shell ──────────────────────────────────────────────────────────── */
 
 describe('§26, §1.4 — the Admin shell says what exists and what does not', () => {
-  it('renders the wordmark, the seven sections, and marks only the current one active', async () => {
+  it('renders the wordmark, the eight sections, and marks only the current one active', async () => {
     const { container } = await renderList();
 
     expect(container.querySelector('.wordmark')?.textContent).toBe('proovdAdmin');
@@ -932,14 +932,17 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
       'Backers',
       'Creators',
       'Support',
+      // The §21/§22/§24 money console, added 2026-08-19 — the ONE place a money
+      // decision is made in this product.
+      'Money',
       // §34's gate, added 2026-08-19 over the API Phase 24 shipped. Last in the
       // order because it is the rarest thing an Admin does and the most
       // consequential, and it carries no override.
       'Live mode',
     ]);
 
-    // Founders, Campaigns, Backers, Creators, Support and Live mode are the
-    // destinations that exist, so they are the anchors — and only the one being
+    // Founders, Campaigns, Backers, Creators, Support, Money and Live mode are
+    // the destinations that exist, so they are the anchors — and only the one being
     // viewed carries the active state. Today is the one section still parked. The
     // order is the shell's, not this list's: asserting the exact children is
     // what caught Support being added and then Backers, which is the whole
@@ -956,6 +959,9 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
     const support = within(nav).getByRole('link', { name: 'Support' });
     expect(support).toHaveAttribute('href', '/admin/support');
     expect(support.className).not.toContain('is-active');
+    const money = within(nav).getByRole('link', { name: 'Money' });
+    expect(money).toHaveAttribute('href', '/admin/money');
+    expect(money.className).not.toContain('is-active');
     const liveMode = within(nav).getByRole('link', { name: 'Live mode' });
     expect(liveMode).toHaveAttribute('href', '/admin/live-mode');
     expect(liveMode.className).not.toContain('is-active');

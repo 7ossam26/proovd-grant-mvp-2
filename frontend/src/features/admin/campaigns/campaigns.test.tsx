@@ -872,7 +872,16 @@ describe('the record', () => {
     await user.click(screen.getByRole('tab', { name: 'History' }));
 
     expect(screen.getByText('Listing fee paid')).toBeInTheDocument();
-    expect(screen.getByText('Money')).toBeInTheDocument();
+    /*
+      Scoped to the history's own tag, not the page.
+
+      `Money` became ambiguous when the Money & Fulfillment console joined the
+      shell nav on 2026-08-19 — the shell renders around every one of these
+      surfaces, so a page-wide text query can be made ambiguous by a section
+      being added. What this test is about is the history entry NAMING the admin
+      page it came from, and that is the tag.
+    */
+    expect(screen.getByText('Money', { selector: '.cmp-tag' })).toBeInTheDocument();
     expect(screen.getByText('Proovd')).toBeInTheDocument();
     expect(screen.getByText(CAMPAIGN_COPY.historyLede)).toBeInTheDocument();
   });

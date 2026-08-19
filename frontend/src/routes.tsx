@@ -29,6 +29,8 @@ import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirector
 import { CampaignRecord } from './features/admin/campaigns/CampaignRecord.js';
 import { BackersWorkspace } from './features/admin/backers/BackersWorkspace.js';
 import { LiveModePage } from './features/admin/live-mode/LiveModePage.js';
+import { MoneyQueue } from './features/admin/money/MoneyQueue.js';
+import { MoneyRecord } from './features/admin/money/MoneyRecord.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
@@ -379,6 +381,27 @@ const rootChildren: RouteObject[] = [
         released by satisfying it and a disabled control is one somebody looks
         for a way around.
       */
+      /*
+        §21, §22.1–§22.7, §24.8, §24.11, §26.6 — the Money & Fulfillment
+        console, built 2026-08-19. The Campaigns hub has named this destination
+        since it was built and carried "Money console not built yet — the
+        amounts here come from its records"; this is that console, and that
+        sentence is the promise it keeps.
+
+        Two addresses. The queue is ordered by §33.7.12's own rule — interrupted
+        batches first, because "an incomplete batch is visibly recoverable" is
+        the acceptance test — and the record carries its six views in `?tab=`,
+        for the reason the Support case and the Campaigns record do: they are
+        six views of ONE campaign's money, and a bookmark to the Founder payment
+        should still be that campaign (DNA §5.12).
+
+        Every money decision in the product is made here and nowhere else. A
+        second control elsewhere would be a second path into rules — §22.1's one
+        Transfer per Creator, §24.8's cause matrix, §22.3's W-9 block — whose
+        whole safety is that there is one.
+      */
+      { path: 'money', element: <MoneyQueue /> },
+      { path: 'money/:campaignId', element: <MoneyRecord /> },
       { path: 'live-mode', element: <LiveModePage /> },
     ],
   },

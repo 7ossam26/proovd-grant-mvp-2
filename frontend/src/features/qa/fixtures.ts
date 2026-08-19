@@ -41,7 +41,21 @@ import type {
   RosterView,
   WorkspaceState,
 } from '../../surfaces/founder/api.js';
-import { APPENDIX_C_STEP_KEYS, LIVE_MODE_CONDITIONS } from '@proovd/shared';
+import {
+  APPENDIX_C_STEP_KEYS,
+  BEST_EFFORT_RECOVERY_SENTENCE,
+  COMPLETION_OUTCOMES,
+  DISPUTE_EVIDENCE_ITEMS,
+  EARLY_RELEASE_EVIDENCE_FACTS,
+  FOUNDER_PAYMENT_STATUS_FACTS,
+  IDEA_REFUND_EXCEPTIONS,
+  LIVE_MODE_CONDITIONS,
+  PROOVD_FEE_TREATMENTS,
+  RECONCILIATION_ITEMS,
+  REFUND_CAUSES,
+  RESULTS_NARRATIVE_FIELDS,
+  THANK_YOU_ELIGIBILITY_FACTS,
+} from '@proovd/shared';
 import type { PayoutState } from '../../surfaces/payouts/PayoutOnboarding.js';
 import type {
   CreatorCloseView,
@@ -54,6 +68,15 @@ import type { LiveCampaignResponse } from '../public/campaign/api.js';
 import type { Quote, PreorderSuccess } from '../public/checkout/api.js';
 import type { DigestPreferenceView } from '../../surfaces/notifications/DigestPreference.js';
 import type { HistoryEntry } from '../../surfaces/notifications/NotificationHistory.js';
+import type {
+  CloseQueueView,
+  CloseRecordView,
+  CreatorEarningsView,
+  Day14QueueView,
+  DisputeQueueView,
+  FulfillmentView as MoneyFulfillmentView,
+  RefundQueueView,
+} from '../admin/money/api.js';
 import { qaSessionRole, type StubRoute } from './server.js';
 
 /* ── The one campaign every surface is rendering ───────────────────────────── */
@@ -1873,6 +1896,258 @@ const founderWorkspace: FounderWorkspaceDetail = {
  * would otherwise answer `/api/founder/campaigns/:id/build`.
  */
 
+/* ── Admin → Money & Fulfillment (§21, §22, §24), added 2026-08-19 ─────────── */
+
+/*
+  The same campaign, at the one moment where every tab has something on it: the
+  batch has completed, one card failed and recovered inside the window, three of
+  the four required reconciliation items are verified, one Creator is finalized
+  and not yet transferred, the Founder's first payment is released, one refund is
+  classified and one dispute is open.
+
+  A fixture set where every tab was empty would render six panels of honest
+  absences and prove nothing about the surface that shows money.
+*/
+
+const closeQueue: CloseQueueView = {
+  operations: {
+    incomplete: [],
+    retryWindow: [],
+    reconciling: [
+      {
+        campaignId: QA.campaignId,
+        campaignStatus: 'closed_reconciling',
+        requiredItemsVerified: 3,
+        requiredItemsTotal: 4,
+        resultsPrepared: false,
+      },
+    ],
+  },
+  reconciliationItems: RECONCILIATION_ITEMS.map((item) => ({
+    key: item.key,
+    spec: item.spec,
+    evaluation: item.evaluation,
+    requiredForResults: item.requiredForResults,
+    waitsOn: item.waitsOn,
+  })),
+  narrativeFields: RESULTS_NARRATIVE_FIELDS.map((field) => ({
+    key: field.key,
+    label: field.label,
+  })),
+};
+
+const closeRecord: CloseRecordView = {
+  detail: {
+    campaignId: QA.campaignId,
+    campaignStatus: 'closed_reconciling',
+    batch: {
+      status: 'completed',
+      startedAt: QA.closesAt,
+      completedAt: '2026-09-12T17:04:00.000Z',
+      thresholdDecision: { met: true, unique: 44, required: 40 },
+      retryWindowHours: 48,
+      firstFailureAt: '2026-09-12T17:02:00.000Z',
+      retryDeadlineAt: '2026-09-14T17:02:00.000Z',
+    },
+    reservationsByStatus: { captured: 43, capture_failed_dropped: 1 },
+    attempts: [
+      {
+        reservationId: QA.reservationId,
+        attemptNumber: 1,
+        idempotencyKey: `reservation-capture:${QA.reservationId}:1`,
+        amountCents: '12990',
+        outcome: 'succeeded',
+        paymentIntentId: 'pi_qa_1',
+        requestedAt: QA.closesAt,
+        resolvedAt: '2026-09-12T17:00:04.000Z',
+      },
+    ],
+  },
+  reconciliation: {
+    campaignId: QA.campaignId,
+    campaignStatus: 'closed_reconciling',
+    open: true,
+    openReason: null,
+    items: RECONCILIATION_ITEMS.map((item, index) => ({
+      key: item.key,
+      spec: item.spec,
+      evaluation: item.evaluation,
+      requiredForResults: item.requiredForResults,
+      derived: item.evaluation === 'app' ? { captured: 43, dropped: 1 } : null,
+      waitsOn: item.waitsOn,
+      latest:
+        item.requiredForResults && index < 3
+          ? {
+              result: 'verified',
+              note: 'Compared the capture ledger against the batch record; the counts agree.',
+              actor: 'user:admin-1',
+              recordedAt: '2026-09-15T09:00:00.000Z',
+            }
+          : null,
+      history: [],
+    })),
+    resultsPrepared: false,
+  },
+};
+
+const creatorEarnings: CreatorEarningsView = {
+  creators: [
+    {
+      associationId: QA.associationId,
+      associationStatus: 'active',
+      publicHandle: '@maren.builds',
+      email: 'maren@example.com',
+      attributedCaptured: 12,
+      validSubtotalCents: '144000',
+      latestDecision: {
+        id: 'decision-qa-1',
+        outcome: 'complete_verified',
+        deliverablesNote: 'Three compliant posts, all with the disclosure, verified against the ledger.',
+        decidedBy: 'user:admin-1',
+        decidedAt: '2026-09-15T10:00:00.000Z',
+      },
+      earnings: {
+        id: 'earnings-qa-1',
+        state: 'approved_for_transfer',
+        earnedPercent: 20,
+        commissionCents: '28800',
+        bonusCents: '0',
+        eligibleFixedCents: '0',
+        provisionalTotalCents: '36000',
+        earnedTotalCents: '28800',
+        unearnedReturnedCents: '7200',
+        approvedBy: 'user:admin-1',
+      },
+      transfer: null,
+      allocation: null,
+      thankYou: [],
+      transferEarliestAt: '2026-09-15T17:00:00.000Z',
+    },
+  ],
+  completionOutcomes: COMPLETION_OUTCOMES.map((outcome) => ({
+    key: outcome.key,
+    spec: outcome.spec,
+    fixedDisposition: outcome.fixedDisposition,
+    commissionDisposition: outcome.commissionDisposition,
+  })),
+  thankYouEligibilityFacts: THANK_YOU_ELIGIBILITY_FACTS.map((fact) => ({
+    key: fact.key,
+    label: fact.label,
+  })),
+};
+
+const refundQueue: RefundQueueView = {
+  cases: [
+    {
+      refundId: 'refund-qa-1',
+      reference: 'RF-QA123-456XY',
+      reservationId: QA.reservationId,
+      campaignId: QA.campaignId,
+      status: 'succeeded',
+      amountCents: '12990',
+      ideaExceptionReason: null,
+      cause: 'founder_or_product',
+      affiliateTreatment: 'earnings_remain',
+      proovdFeeTreatment: 'retained',
+      affiliateInvalidCents: null,
+      founderLiabilityCents: '12990',
+      evidence: 'The Founder confirmed the walnut finish was unavailable for this order.',
+      mandate: null,
+      recoveryNote: null,
+      decidedBy: 'user:admin-1',
+      failureMessage: null,
+      providerRefundId: 're_qa_1',
+      createdAt: '2026-09-16T11:00:00.000Z',
+    },
+  ],
+  unreconciled: [],
+  bestEffortRecovery: BEST_EFFORT_RECOVERY_SENTENCE,
+  causes: REFUND_CAUSES.map((cause) => ({
+    key: cause.key,
+    label: cause.label,
+    specRef: cause.specRef,
+    allocation: cause.allocation,
+    permittedAffiliateTreatments: cause.permittedAffiliateTreatments,
+    requiresMandate: cause.requiresMandate,
+  })),
+  ideaExceptions: IDEA_REFUND_EXCEPTIONS.map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+  })),
+  proovdFeeTreatments: [...PROOVD_FEE_TREATMENTS],
+};
+
+const disputeQueue: DisputeQueueView = {
+  disputes: [
+    {
+      disputeId: 'dispute-qa-1',
+      providerDisputeId: 'dp_qa_1',
+      campaignId: QA.campaignId,
+      reservationId: QA.reservationId,
+      status: 'needs_response',
+      amountCents: '12990',
+      reasonCode: 'product_not_received',
+      openedAt: '2026-09-17T08:00:00.000Z',
+      taskDueAt: '2026-09-18T08:00:00.000Z',
+      taskOverdue: false,
+      providerEvidenceDueBy: '2026-09-24T08:00:00.000Z',
+      classified: false,
+      allocationId: null,
+      evidenceAssembledAt: null,
+      closedAt: null,
+    },
+  ],
+  evidenceItems: DISPUTE_EVIDENCE_ITEMS.map((item) => ({
+    key: item.key,
+    label: item.label,
+    required: item.required,
+  })),
+  causes: refundQueue.causes,
+  proovdFeeTreatments: refundQueue.proovdFeeTreatments,
+  bestEffortRecovery: BEST_EFFORT_RECOVERY_SENTENCE,
+};
+
+const moneyFulfillment: MoneyFulfillmentView = {
+  fulfillment,
+  day14,
+  ghostBan: {
+    triggersMet: [],
+    labels: {},
+    alreadyBanned: false,
+    requiredFields: ['trigger', 'evidence', 'notice', 'decidedBy', 'decidedAt'],
+    permanentSentence: 'A ghost ban is permanent. There is no path that lifts it.',
+    triggers: [
+      { key: 'failed_day_14', label: 'The Day 14 Progress Check failed', met: false },
+      { key: 'no_delivery_no_communication', label: 'No delivery and no communication', met: false },
+    ],
+  },
+};
+
+const day14Queue: Day14QueueView = {
+  queue: [
+    {
+      campaignId: QA.campaignId,
+      campaignTitle: QA.title,
+      campaignType: 'pre_launch',
+      reviewId: 'review-qa-1',
+      dueAt: '2026-09-26T17:00:00.000Z',
+      overdue: false,
+      outcome: 'open',
+      submissionCount: 1,
+      latestSubmissionAt: '2026-09-25T12:00:00.000Z',
+      openClarifications: 0,
+      overdueClarifications: 0,
+      daysSinceLastUpdate: 2,
+      noSubstantiveUpdateInSevenDays: false,
+      blocksAPayment: true,
+    },
+  ],
+  failureReasons: [
+    { key: 'no_adequate_progress', label: 'No adequate progress evidence' },
+    { key: 'no_required_communication', label: 'The required communication was not sent' },
+  ],
+};
+
 export const QA_ROUTES: StubRoute[] = [
   /*
    * The session read, first — every Founder and Creator address is behind a
@@ -1995,6 +2270,17 @@ export const QA_ROUTES: StubRoute[] = [
       approvalCopyState: 'conditional_copy_is_correct',
     },
   },
+  /* The §21/§22/§24 money console (2026-08-19). Specific paths first: the
+     record's own reads sit UNDER `/api/admin/close/:id`, so a bare
+     `/api/admin/close` matcher placed above them would swallow every one. */
+  { match: /\/api\/admin\/close\/[^/?]+\/earnings$/, body: creatorEarnings },
+  { match: /\/api\/admin\/close\/[^/?]+\/founder-payments$/, body: { status: founderPayments, requests: [], evidenceFacts: EARLY_RELEASE_EVIDENCE_FACTS, statusFacts: FOUNDER_PAYMENT_STATUS_FACTS } },
+  { match: /\/api\/admin\/close\/[^/?]+$/, body: closeRecord },
+  { match: /\/api\/admin\/close$/, body: closeQueue },
+  { match: /\/api\/admin\/refunds(\?.*)?$/, body: refundQueue },
+  { match: /\/api\/admin\/disputes(\?.*)?$/, body: disputeQueue },
+  { match: /\/api\/admin\/fulfillment\/day-14$/, body: day14Queue },
+  { match: /\/api\/admin\/fulfillment\/campaigns\/[^/?]+$/, body: moneyFulfillment },
   /* The Tasks panel (2026-08-16) mounts inside AdminFrame, so EVERY Admin flow
      performs this read the moment the shell renders. One list, nothing in it —
      the launcher shows no badge and the sweep's flows are undisturbed. */

@@ -7,4 +7,5 @@ export * from './creator-workspace.js';
 export * from './support-workspace.js';
 export * from './campaign-workspace.js';
 export * from './backer-workspace.js';
+export * from './money-workspace.js';
 export * from './tasks.js';

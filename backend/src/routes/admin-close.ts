@@ -72,6 +72,7 @@ import {
   type FounderPaymentKind,
 } from '../close/founder-payments-logic.js';
 import { earlyReleaseRequests } from '../db/schema/founder-payments.js';
+import { bigintSafeJson, jsonSafe } from './json-safe.js';
 import { desc, eq } from 'drizzle-orm';
 
 export const ADMIN_CLOSE_BASE_PATH = '/api/admin/close';
@@ -97,6 +98,14 @@ export function createAdminCloseRouter(deps: AdminCloseRouterDeps): Router {
   const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
   const json: RequestHandler = express.json({ limit: '64kb' });
 
+  /*
+    Money in this product is `bigint` all the way down, and `JSON.stringify`
+    throws on one. Several services here return Drizzle rows directly, so this
+    is mounted on the ROUTER rather than remembered per route — see
+    `routes/json-safe.ts`.
+  */
+  router.use(bigintSafeJson);
+
   const closeDeps = () => ({
     db,
     gateway: deps.gateway,
@@ -111,7 +120,7 @@ export function createAdminCloseRouter(deps: AdminCloseRouterDeps): Router {
   router.get(ADMIN_CLOSE_BASE_PATH, admin, async (_req, res) => {
     const operations = await readCloseOperations(db);
     res.json({
-      operations,
+      operations: jsonSafe(operations),
       // The register travels with the payload so the surface renders §21's
       // items by definition rather than by a second hardcoded list.
       reconciliationItems: RECONCILIATION_ITEMS,
@@ -127,7 +136,7 @@ export function createAdminCloseRouter(deps: AdminCloseRouterDeps): Router {
       return;
     }
     const reconciliation = await readReconciliation(db, campaignId);
-    res.json({ detail, reconciliation });
+    res.json(jsonSafe({ detail, reconciliation }));
   });
 
   /**
@@ -315,7 +324,11 @@ export function createAdminCloseRouter(deps: AdminCloseRouterDeps): Router {
       return;
     }
     res.json({
-      creators: rows,
+      // `readCampaignEarnings` returns Drizzle rows, and every money column on
+      // them is a `bigint` — which `JSON.stringify` throws on. Without this the
+      // §22.1 queue answers 500 for any campaign that has earnings, which is
+      // exactly the campaign an Admin opened it to work on.
+      creators: jsonSafe(rows),
       // The registers travel with the payload — the surface renders §22.1's
       // outcomes and §22.2's facts by definition, not by a second list.
       completionOutcomes: COMPLETION_OUTCOMES,
@@ -631,7 +644,7 @@ export function createAdminCloseRouter(deps: AdminCloseRouterDeps): Router {
       .orderBy(desc(earlyReleaseRequests.createdAt));
     res.json({
       status,
-      requests,
+      requests: jsonSafe(requests),
       evidenceFacts: EARLY_RELEASE_EVIDENCE_FACTS,
       statusFacts: FOUNDER_PAYMENT_STATUS_FACTS,
     });
