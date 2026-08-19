@@ -212,10 +212,20 @@ describe('§18 the Creator active-partnership surface', () => {
     expect(p.firstPost.status).toBeNull();
     expect(p.fixedPayment.applicable).toBe(false);
 
-    // §18/§30: refresh-based, and the money metrics are labelled pending, not zero.
+    // §18/§30: refresh-based.
     expect(typeof p.updatedAt).toBe('string');
-    expect(p.pending.available).toBe(false);
-    expect(p.pending.fields.length).toBe(5);
+
+    // DELIBERATELY INVERTED (Creator Flow v2 Session F, 2026-08-20).
+    //
+    // Phase 14d asserted a `pending` block naming five metrics as unavailable,
+    // because Phase 15 had not created a reservation and Phase 19 had not moved
+    // any money. Both shipped, so a block still saying "not yet" about records
+    // that exist is §1.4's failure in the other direction. What that assertion
+    // was protecting survives and is the stronger half: a number nobody has
+    // computed is ABSENT, never a zero — `conversionRate` over no clicks is
+    // null rather than `0%` (§16a).
+    expect(p.performance.attributedPreorders).toBe(0);
+    expect(p.performance.conversionRate).toBeNull();
   });
 
   it('counts clicks from the attribution ledger and excludes link tests (§14.1)', async () => {

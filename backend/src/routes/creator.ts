@@ -45,6 +45,18 @@ import { notifyPostVerificationDue } from '../notifications/internal-queue.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { buildCreatorPartnership } from '../affiliates/partnership.js';
+import {
+  correctOwnProfileField,
+  readCreatorSettings,
+  requestOwnDeletion,
+} from '../affiliates/creator-settings.js';
+import { readCreatorEarnings } from '../affiliates/creator-money.js';
+import { readCreatorResources, recordResourceInterest } from '../affiliates/creator-resources.js';
+import {
+  discloseConflict,
+  discloseOwnPreorder,
+  requestPartnershipEnd,
+} from '../affiliates/creator-asks.js';
 import { readCreatorClose } from '../close/creator-close.js';
 import { creatorProspectId, readCreatorHome } from '../affiliates/home.js';
 import { listCreatorReferrals, recordCreatorReferral } from '../affiliates/referrals.js';
@@ -64,6 +76,12 @@ export interface CreatorRouterExtras {
   context?: LaunchNotificationContext | undefined;
   /** §27.6's inbox. Absent → the submission is still in the Admin queue. */
   internalRecipient?: string | undefined;
+  /**
+   * Whether object storage is configured (Track A4), threaded so the work
+   * surface can render a named absence rather than a dead download control —
+   * the arrangement the Affiliate evidence uploader already uses.
+   */
+  storageConfigured?: boolean | undefined;
 }
 
 export function createCreatorRouter(
@@ -225,7 +243,11 @@ export function createCreatorRouter(
       res.status(404).json({ error: 'not_found', title: 'Campaign not found' });
       return;
     }
-    const result = await buildCreatorPartnership(db, { associationId, appBaseUrl });
+    const result = await buildCreatorPartnership(db, {
+      associationId,
+      appBaseUrl,
+      storageConfigured: extras.storageConfigured === true,
+    });
     if (!result.ok) {
       res.status(result.code === 'not_found' ? 404 : 409).json({
         error: result.code,
@@ -351,6 +373,212 @@ export function createCreatorRouter(
 
     res.json({ referrals: await listCreatorReferrals(db, prospectId) });
   });
+
+  /* ── Session F: the four rail sections that had no address ──────────────── */
+
+  /**
+   * §5.3's own settings list, and this route is what closes a real gap.
+   *
+   * `saveSignupProfile` hard-refuses once `claimed_at` is set — a refusal that
+   * is load-bearing for the onboarding screens and stays exactly as it is. This
+   * is a different act with the Admin correction path's discipline: a required
+   * reason, a prior value read under lock inside the transaction that changes
+   * it (§33.12.4), and an audit row, because the profile has no history table.
+   */
+  router.get(`${CREATOR_PATH}/settings`, creator, async (req, res) => {
+    const result = await readCreatorSettings(db, actorId(req));
+    if (!result.ok) {
+      res
+        .status(404)
+        .json({ error: result.code, title: 'Account not found', whatHappened: result.message });
+      return;
+    }
+    res.json({ settings: result.settings });
+  });
+
+  router.put(`${CREATOR_PATH}/settings/:fieldId`, creator, json, async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+    const result = await correctOwnProfileField(db, {
+      userId: actorId(req),
+      // The field id is a register entry the service and 0055 both pin. A
+      // request naming a column reaches neither.
+      fieldId: req.params['fieldId'] as string,
+      newValue: str(body['value']),
+      reason: str(body['reason']),
+    });
+    if (!result.ok) {
+      res.status(result.code === 'not_found' ? 404 : 422).json({
+        error: result.code,
+        title: result.code === 'not_found' ? 'Account not found' : 'We could not save that',
+        whatHappened: result.message,
+        support: '/support',
+      });
+      return;
+    }
+    const settings = await readCreatorSettings(db, actorId(req));
+    res.json({ settings: settings.ok ? settings.settings : null });
+  });
+
+  /**
+   * §5.3's delete-account request, filed by the Creator.
+   *
+   * Writes 0044's SAME record with `received_via` naming this screen — which is
+   * exactly what that column exists for. Nothing is deleted and there is no
+   * approval state: §25.8's retention obligations do not end because somebody
+   * clicked a button.
+   */
+  router.post(`${CREATOR_PATH}/settings/delete-account`, creator, json, async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const result = await requestOwnDeletion(db, {
+      userId: actorId(req),
+      detail: typeof body['detail'] === 'string' ? body['detail'] : '',
+    });
+    if (!result.ok) {
+      res.status(result.code === 'not_found' ? 404 : 422).json({
+        error: result.code,
+        title: 'We could not record that',
+        whatHappened: result.message,
+        support: '/support',
+      });
+      return;
+    }
+    const settings = await readCreatorSettings(db, actorId(req));
+    res.json({ settings: settings.ok ? settings.settings : null });
+  });
+
+  /**
+   * Every campaign's money, in one place — deviation 5.
+   *
+   * A list, not a dashboard: each row is what that campaign's own close view
+   * says, from the one resolver, and the lifetime figure is a sum of recorded
+   * rows. There is no withdrawal anywhere in the payload (§22.1).
+   */
+  router.get(`${CREATOR_PATH}/earnings`, creator, async (req, res) => {
+    res.json({ earnings: await readCreatorEarnings(db, actorId(req)) });
+  });
+
+  /** Deviation 4. Four things that do not exist, and an interest record. */
+  router.get(`${CREATOR_PATH}/resources`, creator, async (req, res) => {
+    const result = await readCreatorResources(db, actorId(req));
+    if (!result.ok) {
+      res
+        .status(404)
+        .json({ error: result.code, title: 'Account not found', whatHappened: result.message });
+      return;
+    }
+    res.json({ resources: result.resources });
+  });
+
+  router.post(`${CREATOR_PATH}/resources/:resourceId`, creator, json, async (req, res) => {
+    const result = await recordResourceInterest(db, {
+      userId: actorId(req),
+      resourceId: req.params['resourceId'] as string,
+    });
+    if (!result.ok) {
+      res.status(result.code === 'not_found' ? 404 : 422).json({
+        error: result.code,
+        title: 'We could not record that',
+        whatHappened: result.message,
+      });
+      return;
+    }
+    const resources = await readCreatorResources(db, actorId(req));
+    res.json({ resources: resources.ok ? resources.resources : null });
+  });
+
+  /**
+   * §29.5: the Creator asks to end a partnership.
+   *
+   * Opens a §26.7 case with its own reference and §27.8's business-day promise.
+   * It does not write 0048's `association_termination_requests` row: that record
+   * requires a §24.8 cause and a permitted money treatment, and both are an
+   * Admin's recorded judgement — asking a Creator to pick one is asking them to
+   * classify a refund that does not exist.
+   */
+  router.post(
+    `${CREATOR_PATH}/campaigns/:associationId/end-request`,
+    creator,
+    json,
+    async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+      const result = await requestPartnershipEnd(db, {
+        userId: actorId(req),
+        associationId: req.params['associationId'] as string,
+        reasonId: str(body['reasonId']),
+        detail: str(body['detail']),
+        requesterEmail: req.authUser?.email ?? '',
+      });
+      if (!result.ok) {
+        res.status(result.code === 'not_found' ? 404 : 422).json({
+          error: result.code,
+          title: result.code === 'not_found' ? 'Campaign not found' : 'We could not send that',
+          whatHappened: result.message,
+          support: '/support',
+        });
+        return;
+      }
+      res.json({ reference: result.reference, acknowledgement: result.acknowledgement });
+    },
+  );
+
+  /**
+   * §29.1 and §29.2 — two records that existed with no Creator route.
+   *
+   * Both are facts somebody states, not judgements this product makes. §29.1's
+   * consequence (an own-link reservation's attribution moving to `blocked`) is
+   * the enforcement service's and is untouched here.
+   */
+  router.post(
+    `${CREATOR_PATH}/campaigns/:associationId/self-preorder-disclosure`,
+    creator,
+    json,
+    async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await discloseOwnPreorder(db, audit, {
+        userId: actorId(req),
+        associationId: req.params['associationId'] as string,
+        intentNote: typeof body['intentNote'] === 'string' ? body['intentNote'] : '',
+        selfFundedCertified: body['selfFundedCertified'] === true,
+        identityDisclosed: body['identityDisclosed'] === true,
+      });
+      if (!result.ok) {
+        res.status(result.code === 'not_found' ? 404 : 422).json({
+          error: result.code,
+          title: 'We could not record that',
+          whatHappened: result.message,
+        });
+        return;
+      }
+      res.json({ recorded: true });
+    },
+  );
+
+  router.post(
+    `${CREATOR_PATH}/campaigns/:associationId/conflict-disclosure`,
+    creator,
+    json,
+    async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await discloseConflict(db, audit, {
+        userId: actorId(req),
+        associationId: req.params['associationId'] as string,
+        relationshipKind:
+          typeof body['relationshipKind'] === 'string' ? body['relationshipKind'] : '',
+        detail: typeof body['detail'] === 'string' ? body['detail'] : '',
+      });
+      if (!result.ok) {
+        res.status(result.code === 'not_found' ? 404 : 422).json({
+          error: result.code,
+          title: 'We could not record that',
+          whatHappened: result.message,
+        });
+        return;
+      }
+      res.json({ recorded: true });
+    },
+  );
 
   return router;
 }

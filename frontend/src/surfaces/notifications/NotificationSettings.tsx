@@ -35,9 +35,19 @@ import {
 
 export interface NotificationSettingsProps {
   role: NotificationsRole;
+  /**
+   * Rendered inside another page rather than as its own address.
+   *
+   * Creator Flow v2 Session F embeds this on `/creator/settings` — the §5.3
+   * settings list — rather than duplicating §27.7's control, which would have
+   * been two places for one preference. An embedded copy takes an `h2`: two
+   * `h1`s on one page is a §33.11.2 failure, and the outer page has already
+   * named itself.
+   */
+  embedded?: boolean;
 }
 
-export function NotificationSettings({ role }: NotificationSettingsProps) {
+export function NotificationSettings({ role, embedded = false }: NotificationSettingsProps) {
   const [preference, setPreference] = useState<DigestPreferenceView | null>(null);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -113,9 +123,15 @@ export function NotificationSettings({ role }: NotificationSettingsProps) {
   return (
     <Section aria-labelledby="notification-settings-heading">
       <Measure>
-        <h1 className="h2" id="notification-settings-heading">
-          Notifications
-        </h1>
+        {embedded ? (
+          <h2 className="h2" id="notification-settings-heading">
+            Notifications
+          </h2>
+        ) : (
+          <h1 className="h2" id="notification-settings-heading">
+            Notifications
+          </h1>
+        )}
         <DigestPreference preference={preference} onSave={save} />
 
         {/*
@@ -124,9 +140,17 @@ export function NotificationSettings({ role }: NotificationSettingsProps) {
           count and there is nothing here that marks anything read.
         */}
         <section aria-labelledby="notification-history-heading">
-          <h2 className="h2" id="notification-history-heading">
-            What we have sent you
-          </h2>
+          {/* One level below whichever the title took, so an embedded copy does
+              not jump a heading level (§33.11.2). */}
+          {embedded ? (
+            <h3 className="h2" id="notification-history-heading">
+              What we have sent you
+            </h3>
+          ) : (
+            <h2 className="h2" id="notification-history-heading">
+              What we have sent you
+            </h2>
+          )}
           <NotificationHistory entries={entries} {...(cursor ? { onLoadMore: loadMore } : {})} />
         </section>
       </Measure>

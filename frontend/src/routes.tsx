@@ -57,12 +57,15 @@ import { VerifyStep } from './surfaces/creator-flow/VerifyStep.js';
 import { AgreeStep } from './surfaces/creator-flow/AgreeStep.js';
 import { DoneStep } from './surfaces/creator-flow/DoneStep.js';
 import { CreatorHome } from './surfaces/creator-app/CreatorHome.js';
+import { CreatorWork } from './surfaces/creator-app/CreatorWork.js';
+import { CreatorEarnings } from './surfaces/creator-app/CreatorEarnings.js';
+import { CreatorResources } from './surfaces/creator-app/CreatorResources.js';
+import { CreatorSettings } from './surfaces/creator-app/CreatorSettings.js';
 import {
   CreatorCampaigns,
   CreatorCampaignKit,
 } from './surfaces/creator/CreatorCampaigns.js';
 import { FormalOpportunity } from './surfaces/creator/FormalOpportunity.js';
-import { CreatorPartnership } from './surfaces/creator/CreatorPartnership.js';
 import { CreatorCampaignClose } from './surfaces/creator/CreatorCampaignClose.js';
 import { InviteClaim } from './surfaces/founder-flow/InviteClaim.js';
 import {
@@ -675,10 +678,43 @@ const rootChildren: RouteObject[] = [
     element: <FormalOpportunity />,
   },
   {
-    // Phase 14c (§18). The Creator's active-partnership dashboard once accepted:
-    // their link, disclosure, terms, readiness, first-post state, and clicks.
+    /*
+     * §17's active-partnership content list — the Creator's work surface.
+     *
+     * Rebuilt in Creator Flow v2 Session F at the SAME address Phase 14c gave
+     * it: §27.3's emails, the Creators workspace, and whatever a Creator
+     * bookmarked all point here, and moving it would have been a rename with
+     * no benefit.
+     */
     path: 'creator/campaigns/:associationId/partnership',
-    element: <CreatorPartnership />,
+    element: <CreatorWork />,
+  },
+  {
+    /*
+     * Every campaign's money in one place (Creator Flow v2 deviation 5).
+     *
+     * A list of Appendix B.7 blocks from the one resolver, not a dashboard —
+     * and with no withdrawal anywhere on it (§22.1).
+     */
+    path: 'creator/earnings',
+    element: <CreatorEarnings />,
+  },
+  {
+    // Deviation 4. Four guides that do not exist, and an interest record that
+    // holds no campaign material and cannot become the §31.5 kit.
+    path: 'creator/resources',
+    element: <CreatorResources />,
+  },
+  {
+    /*
+     * §5.3's settings list, editable at last.
+     *
+     * `/creator/settings/notifications` keeps its own address — §27.7's control
+     * shipped there in Phase 22c and is linked from every digest — and this
+     * page embeds the same component, so the two cannot drift.
+     */
+    path: 'creator/settings',
+    element: <CreatorSettings />,
   },
   {
     // Phase 18b (§21). The Creator's campaign close view: content verified,

@@ -583,7 +583,7 @@ account step refuses in the open and says why, and file storage and the
 scheduling provider are both unconfigured so the upload and interview steps
 render a named absence rather than a dead control.
 
-### The Creator's, next — four of six sessions have landed
+### The Creator's, next — five of six sessions have landed
 
 The same treatment is now under way on the other side of the product: the path
 a Creator walks from opening a private campaign invitation to promoting a live
@@ -661,6 +661,36 @@ a Creator with one channel and three verified facts about it would have been
 credited with three channels. Nothing had read those entries until now, which is
 what happens when a session writes records and no screen. A new check parses
 every column name in the register and asks the database whether it exists.
+
+**The fifth session fills the rest of the menu** — the page a Creator works from
+while a campaign runs, one place to see what they have earned, a short list of
+guides that do not exist yet, and the settings they can finally change. It was
+built before the session that comes before it in the plan, because the two do
+not overlap: that one rebuilds the list of offers, and none of these four pages
+reads it.
+
+The work page is the Spec's own list of what a Creator should be able to see
+while promoting something, item for item — their link, the disclosure they have
+to include, what the Founder will and will not let them say, how many people
+have clicked and how many have ordered, and what they have earned so far. Where
+the mock-up put a "Withdraw" button, there is a sentence instead: nobody
+withdraws anything here, and when the money is ready Proovd sends it. Where it
+offered to rewrite their script in their own voice, there is a note saying the
+materials are the Founder's, as supplied. And where it offered to report the
+Founder with a menu of punishments, there is a form that opens a real case with
+a real deadline and says plainly that asking changes nothing about what they
+have earned.
+
+The settings page closes something embarrassing: since the Creator workspace was
+built, Proovd has been able to email somebody asking them to correct a detail on
+their profile — and there was no page on which they could correct it. Now there
+is, and every change carries a short note about why, because the profile has no
+history of its own and that note is the only record of what happened.
+
+Looking at all four pages in a browser found five more things nothing else
+could, including a container that let every card sit flush against the edge of
+the screen while the heading above it did not, and a page whose one large number
+pushed the whole layout sideways on a phone.
 
 Unlike every rebuild before it, this one replaces a working, acceptance-tested
 surface whose own source file argues against the design that replaces it. Spec

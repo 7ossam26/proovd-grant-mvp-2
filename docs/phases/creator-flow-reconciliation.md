@@ -329,6 +329,11 @@ already own §33.2.2/§33.2.3 and the flow.
 files), shared **465** (31 files), frontend **1,462** (32 files). Session D
 added one backend suite (24) and one frontend suite (15), and no migration.
 
+**After Session F: 132 files, 3,740 tests, 0 failures** — backend **1,757** (68
+files), shared **465** (31 files), frontend **1,518** (33 files). Session F
+added one backend suite (22) and one frontend suite (21), inverted one Phase 14d
+assertion, and added no migration.
+
 **One thing worth knowing about the batching itself.** The batch runner's own
 summary parse read *stderr* — which is where vitest writes the totals — and the
 first version redirected it to `/dev/null`, so every batch reported zero while
@@ -883,3 +888,194 @@ that one surface disagrees with the design system.
   Admin through the history it already writes to; a later phase asked to read
   the standing as a default, a filter, or an eligibility condition is asking for
   the §1 rule 6 violation the missing columns exist to prevent.
+
+---
+
+## 12. Session F — work, Earnings, Resources, Settings
+
+**Landed 2026-08-20.** Four surfaces, nine routes, four services, no migration —
+and the last of the five deviations closed with the two rail entries that had
+been saying "Session F" since 2026-08-19.
+
+The suites after Session F: backend **1,757**, shared **465**, frontend
+**1,518**. §33.11.1–§33.11.7 pass over seventeen principal flows, one of them
+new.
+
+### It was built before Session E, and that is a departure
+
+The brief's scope table makes F depend on E. Session E replaces the Pitches
+LIST; F's four surfaces are reached from the rail and from the existing
+`/creator/campaigns`, which still works and still links to the partnership
+address. So the dependency is one of position in the walk, not of code — the
+22c-before-22b precedent — and what it costs is that F5's *"the full flow walks
+from the invitation email to a live campaign"* walks through the old list until
+E lands. Stated rather than glossed.
+
+### The §17 walk is a count, not a claim
+
+`CREATOR_WORK_ITEMS` is §17's *"After readiness/activation, show:"* — thirteen
+bullets, each naming the payload field that answers it — and the suite resolves
+every field against a REAL `buildCreatorPartnership` payload. A bullet that
+quietly loses its field fails; a field renamed in a refactor fails.
+
+`undefined` is the failure and `null` is an answer: a mid-campaign block on an
+initial-roster Creator is legitimately null, and treating that as missing would
+have forced a fake object into the payload.
+
+### The `pending` block is gone, and that is a Phase 14d assertion inverted
+
+Phase 14d shipped five metrics labelled unavailable because Phase 15 had not
+created a reservation and Phase 19 had not moved any money. Both shipped. A
+block still saying "not yet" about records that exist is §1.4's failure in the
+other direction, so `performance` carries the real numbers.
+
+What that assertion was protecting survives and is the stronger half: a number
+nobody has computed is ABSENT, never a zero. `conversionRate` over no clicks is
+`null` rather than `0%`, and `creator-partnership.test.ts` now asserts that
+instead — one test, one dated comment.
+
+### The bonus is the Creator's own, or there is none
+
+§14.3's bonus is per proposal version with a stored trigger unit and threshold.
+The reference draws a platform-wide *"50 reservations to your bonus tier"*;
+there is no such target and inventing one is §1 rule 6. A Creator with no agreed
+bonus gets `null` and the section does not render.
+
+The progress measure is a RUNNING total over rows still live or already charged,
+and `note` says so — the bonus is decided at close on captured, verified charges
+only. Reporting the finalization measure live would read 0 for every Creator
+until the close batch runs, which is true and useless.
+
+### The termination ask opens a case, and does NOT write 0048's row
+
+**A decision, and it departs from the brief's own sentence.**
+`association_termination_requests` requires a §24.8 `cause` and a
+`money_treatment` from that cause's permitted matrix. Both are an Admin's
+recorded judgement (20a), every one of the five causes asserts fault about
+somebody, and there is no unclassified shape — adding one would weaken a CHECK
+that exists to stop the strongest treatments becoming reachable.
+
+Asking a Creator to pick one is asking them to classify a refund that does not
+exist. So the Creator states §29.5's reason and the ask is a §26.7 support case
+with its own `PVD-` reference, its owner, and §27.8's business-day promise on
+the committed calendar; the Admin's own control on the Creators workspace
+records the classified 0048 row from it. `openAffiliateSupportCase` took exactly
+this shape on 2026-08-17 and this reuses it rather than opening a second queue.
+
+The suite asserts both halves: a case with a real deadline and calendar version
+appears, and `association_termination_requests` stays empty.
+
+### §5.3's settings gap, closed — and it is not a relaxation
+
+`saveSignupProfile` still hard-refuses once `claimed_at` is set; that refusal is
+load-bearing for onboarding screens 1–8 and is untouched. This is a different
+act with the Admin correction path's discipline: a required reason, the prior
+value read `FOR UPDATE` inside the transaction that changes it (§33.12.4 — the
+route has no parameter for the prior value, so a flattering pair is
+unrepresentable), an `audit_events` row in the same transaction, and §11's
+supplier triple recomputed so the source label stays true.
+
+The field id is a register entry and never a column name (16a's
+overridable-field reasoning). Three places agree and the suite proves it:
+shared's two registers, `backend/src/creator-flow/logic.ts`, and
+`pg_get_constraintdef` on 0055's own CHECK.
+
+The delete-account ask writes **0044's own record** with `received_via` naming
+this screen — which is precisely what that column exists for. A second table
+would have been the duplicate this codebase refuses everywhere else, and on an
+erasure request two copies disagreeing is the worst version of that failure.
+
+### There is no withdrawal, and the suite walks every control to say so
+
+§22.1, verbatim: *"The Affiliate never requests a Proovd withdrawal and never
+receives Backer funds before Transfer creation."* The reference draws `Withdraw`
+twice and `Ready to withdraw` above it.
+
+There is no control to disable — `EARNINGS_ARE_NOT_WITHDRAWN` stands where they
+were — and the enforcement is three scans: every button and link on both money
+surfaces, both money modules with comments stripped first (they EXPLAIN at
+length that there is no withdrawal), and two plausible route addresses driven
+and asserted 404.
+
+### Earnings is an address, not a second computation
+
+Each row calls `readCreatorClose` — the one resolver that renders Appendix B.7
+and throws on an unfilled bracket. The lifetime figure is a sum of RECORDED
+rows, read straight from `creator_earnings`, and an estimate is never added in:
+a lifetime number that moved when a campaign reconciled would have been wrong on
+the way there. There is no arithmetic in the module beyond that addition, and
+§24.4's split stays three separate stored numbers.
+
+### Deviation 4 is kept true by four absent columns
+
+`creator_resource_interest` has a resource key, a subject, and a timestamp, and
+the suite asserts `information_schema` holds no asset, URL, file, storage, or
+campaign column on it. It cannot become the §31.5 Campaign kit, which is per
+campaign, access-logged, and revocable. There is no download control, because
+there is no file — and a disabled one invites somebody to work out how to
+enable it.
+
+A second ask is not an error and not a second row: the unique index answers, and
+telling somebody their second tap failed would report a constraint as a problem
+with them.
+
+### What the Session F browser pass found, and nothing else could
+
+Five, and the thirteenth rebuild in a row where the pass found what jsdom, axe
+and the type checker all agreed was fine.
+
+1. **`Measure` is a max-width with no gutter.** All four pages used it, so every
+   `.card` sat flush against the viewport edge while the `Section` above it was
+   inset by `.wrap` — two different left edges on one page at 1280. They use
+   `.cra-page` now, which is Session D's own container and what Home already
+   used.
+2. **`.cra-amount` at `--fs-hero` pushed the document sideways at 320.**
+   `US$691.20` is 348px wide there — 28px of overflow, a §33.11.1 failure on the
+   one page whose whole job is a number. It clamps now.
+3. **A nested `.wrap` overflowed Settings at BOTH widths** — by 231px at 1280.
+   `.wrap` is `min(90vw, 1600px)`, a VIEWPORT width, and Settings embeds
+   §27.7's `NotificationSettings`, which renders its own `Section`. This is
+   PHASE 38's own defect on a different container, and the fix is scoped the
+   same way.
+4. **Ten one-row `dl.kv` lists produced five different value positions.**
+   `.kv__row` is `minmax(8rem, max-content)` and sizes per list, so the settings
+   "column" was not a column. One fixed label column, collapsing at the same
+   600px `.kv__row` does.
+5. **The `Copy` button lost 8px of its own label at 320.** A `.btn` is
+   `overflow: hidden` because it hosts the fill sweep; showing the URL itself
+   where the old surface showed a label is what squeezed the row. Session D and
+   Founder Flow Sessions D and E each lost a pass to the same property.
+
+Plus one change the pass prompted rather than a defect: the tracking link
+rendered the words *"Your tracking link"* where the URL should be, so a Creator
+could copy their link and never read it. It shows the URL now, which is also
+what the reference draws.
+
+### Two probe results that are NOT defects
+
+`.copylink__url` reports as clipping at 320 and is `text-overflow: ellipsis` —
+designed truncation. And a `span.sr-only` reports as a 1px clipping box on every
+route, which is the visually-hidden mechanism. Both are skipped, written down
+rather than silenced, because a scan tuned until it stops flagging a correct
+element would also stop flagging a wrong one.
+
+### Two contrast gaps that are pre-existing and were NOT changed here
+
+`.kv__row dt` and `.btn--secondary` — `--grey` at ~2.18:1 and `--brand` on white
+at ~1.46:1. Both are shared primitives every workspace uses, both are the
+documented tech-stack §3.6 territory, and re-toning either is a product-wide
+edit with its own screenshot pass. PHASE 41 uses neither: a sentence that states
+a rule takes `--dark`, a caption takes `--moss`.
+
+### What Session F deliberately did not build
+
+* **Any migration.** 0055 and 0044 held every record; this is their service.
+* **A second refund path or a second Transfer path.** There is one Transfer per
+  association and it is Admin's, from the close queue, under the §11 tax gate.
+* **A 0048 termination row from a Creator route.** See above.
+* **A Creator-facing dispute surface.** §30 defers the in-product dispute
+  centre; §29.9's Backer support path is the Backer's.
+* **A `List-Unsubscribe` header, a resource notification key, or any new §27
+  key at all.** The §27 coverage partition is untouched.
+* **Session E's Pitches list.** The rail still points at `/creator/campaigns`,
+  which is Phase 08c's list until E replaces it.

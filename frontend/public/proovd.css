@@ -10965,3 +10965,256 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   }
 }
+
+
+/* ══════════════════════ PHASE 41 — the Creator's work surface, Earnings,
+   Resources and Settings (Creator Flow v2, Session F, 2026-08-20)
+
+   The four pages that fill the rail Session D built. They render INSIDE
+   `CreatorAppShell`, so the prefix stays `.cra-` — a fifth family for pages
+   that live in the same chrome would be a distinction nobody reading the
+   markup could act on. PHASE 40 owns the shell; this owns what sits in it.
+
+   The conventions PHASE 25 set and 26–40 restated bind here too:
+
+     1. TOKENS ONLY. Read a token or a mode slot, never a raw value.
+
+     2. SCOPED REUSE. `.card`, `.kv`, `.btn`, `.field`, `.doc-list`,
+        `.state-panel`, `.tag` and `.notification-history` are reused rather
+        than restyled. Everything new is prefixed `.cra-`.
+
+     3. RESPONSIVE IS A CORRECTION. Each media rule names the overflow it
+        answers.
+
+   ── The two tones, and why they are not `--grey` ──────────────────────────
+   `--grey` is about 2.18:1 on white and has been the recorded gap since PHASE
+   36. Nothing on these four pages uses it: a sentence that states a RULE takes
+   `--dark` (`.cra-help` carries §22.1's no-withdrawal sentence, §5.3's reason
+   requirement, and §29.5's decides-no-money line — every one of them changes
+   what somebody does), and a caption that merely labels takes `--moss`.
+
+   ── `.cra-b7` is a `<pre>`, and that is deliberate ────────────────────────
+   Appendix B.7 is exact text with its own line breaks, resolved server-side
+   and thrown on an unfilled bracket. Reflowing it into paragraphs would be
+   this surface re-rendering an appendix, which is exactly what one resolver
+   exists to prevent. It scrolls inside itself rather than widening the page.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* The lede under a page title. One measure, always. */
+.cra-lede {
+  margin: var(--sp-8) 0 0;
+  max-width: var(--measure);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--moss);
+}
+
+/* A sentence that states a rule. Not a caption — it changes what you do. */
+.cra-help {
+  margin: var(--sp-12) 0 0;
+  max-width: var(--measure);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--dark);
+}
+
+/* §17's last bullet. A fact about when, never a claim about live. */
+.cra-fresh {
+  margin: var(--sp-8) 0 0;
+  font-size: 0.875rem;
+  color: var(--moss);
+}
+
+/*
+ * The lifetime figure on Earnings. A number, not a band.
+ *
+ * NOT `--fs-hero`. `US$691.20` at that size is 348px wide and pushes the
+ * document sideways at 320 — the browser pass measured 28px of overflow, which
+ * is a §33.11.1 failure on the one page whose whole job is a number. The clamp
+ * keeps the hero weight at every width the product supports.
+ */
+.cra-amount {
+  margin: var(--sp-12) 0 0;
+  font-size: clamp(2.25rem, 11vw, 4rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--dark);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * The page header, above the cards.
+ *
+ * These four pages use `.cra-page` — Session D's own container — rather than
+ * `Measure`, which is a max-width with NO gutter: a `.card` inside it sat flush
+ * against the viewport edge while the section above it was inset by `.wrap`.
+ * The browser pass found that at 1280, where two different left edges on one
+ * page are unmissable and invisible to every other check.
+ */
+.cra-page__head {
+  margin-bottom: var(--sp-32);
+}
+
+/*
+ * A `Section` nested inside the app page, and this is PHASE 38's own defect on
+ * a different container.
+ *
+ * `.wrap` is `width: min(90vw, 1600px)` — a VIEWPORT width, correct for a
+ * top-level public section and wrong for anything nested. Settings embeds
+ * §27.7's `NotificationSettings`, which renders its own `Section`, so the
+ * digest control computed 231px wider than the page holding it and pushed the
+ * document sideways at 1280 AND at 320. The browser pass measured both; no
+ * other check can see it, because the markup and the accessible names are
+ * correct either way.
+ *
+ * Scoped to `.cra-page`, exactly as PHASE 38 scoped the same fix to `.view`.
+ */
+.cra-page .wrap {
+  width: 100%;
+  max-width: 100%;
+}
+.cra-page .section {
+  padding-inline: 0;
+}
+
+/*
+ * One label column across every settings row.
+ *
+ * `.kv__row` is `minmax(8rem, max-content) 1fr` and sizes per `dl`. Ten
+ * one-row lists therefore produced five different value positions, which reads
+ * as a broken table rather than a list. A fixed column is what the reader
+ * needs, and it collapses at the same 600px `.kv__row` does.
+ */
+.cra-setting__row {
+  display: grid;
+  grid-template-columns: 12rem 1fr;
+  gap: var(--sp-16);
+  align-items: baseline;
+}
+.cra-setting__label {
+  color: var(--moss);
+  font-weight: 700;
+}
+.cra-setting__value {
+  color: var(--dark);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .cra-setting__row {
+    grid-template-columns: 1fr;
+    gap: var(--sp-4);
+  }
+}
+
+/* A subheading after a copy control had nothing above it (browser pass). */
+.cra-page .card h3 {
+  margin-top: var(--sp-24);
+}
+
+/*
+ * The copy control keeps its whole label at 320.
+ *
+ * `.copylink` is a flex row and `.copylink__url` truncates by design, but a
+ * long URL still squeezed the `Copy` button — and a `.btn` is `overflow:
+ * hidden` because it hosts the fill sweep, so it lost 8px of its own label
+ * rather than wrapping. Session F showed the URL itself where the old surface
+ * showed a label, which is what exposed it. Scoped, because it is this page's
+ * choice that made the row tight.
+ */
+.cra-page .copylink .btn {
+  flex: 0 0 auto;
+}
+
+/* §11's source label, under a settings value. */
+.cra-source {
+  margin: calc(var(--sp-4) * -1) 0 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--moss);
+}
+
+/* Appendix B.7, exactly as the resolver produced it. */
+.cra-b7 {
+  margin: var(--sp-16) 0 0;
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--brand-5);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--dark);
+  white-space: pre-wrap;
+  /* A long campaign name inside the block wraps rather than widening the page. */
+  overflow-wrap: anywhere;
+  overflow-x: auto;
+}
+
+/* One settings row and its editor. */
+.cra-setting {
+  padding: var(--sp-16) 0;
+  border-top: 1px solid var(--grey-light);
+}
+.cra-setting:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/*
+ * A row of controls. `.btn` is inline-flex, and an inline-flex flex item in a
+ * COLUMN is stretched to the container width by the default `align-items:
+ * stretch` — Founder Flow Sessions D and E and PHASE 36 each lost a browser
+ * pass to exactly this. Scoped to direct children so a nested layout is not
+ * caught by it.
+ */
+.cra-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: center;
+  margin-top: var(--sp-16);
+}
+
+/* A confirmation after a save. Assertive enough to notice, quiet enough to
+   sit under a title without competing with it. */
+.cra-notice {
+  margin: var(--sp-12) 0 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-left: 3px solid var(--brand);
+  background: var(--brand-5);
+  font-size: 0.875rem;
+  color: var(--dark);
+}
+
+/* A refusal the server sent back. */
+.cra-error {
+  margin: var(--sp-12) 0 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-left: 3px solid var(--accent-yellow);
+  background: var(--brand-5);
+  font-size: 0.875rem;
+  color: var(--dark);
+}
+
+/* A `.btn` directly inside a card stretches for the reason above. */
+.cra-setting > .btn,
+.cra-setting > .cra-acts > .btn {
+  align-self: flex-start;
+}
+
+/*
+ * ≤ 40rem: the settings editor's two controls stop sharing a line.
+ *
+ * `Save your public handle` and `Leave it as it is` are both long labels and a
+ * `.btn` is `overflow: hidden` (it hosts the fill sweep), so a squeezed row
+ * clips the right-hand end of a label rather than wrapping it. No breakpoint
+ * guess is needed for the wrap itself — `flex-wrap` does nothing at a width
+ * where the row fits — this rule only widens each control once it has wrapped.
+ */
+@media (max-width: 40rem) {
+  .cra-acts > .btn {
+    flex: 1 1 100%;
+  }
+}

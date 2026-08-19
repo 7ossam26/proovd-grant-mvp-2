@@ -253,15 +253,39 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: true,
   },
   {
+    /*
+     * §17's own content list, rebuilt in Creator Flow v2 Session F.
+     *
+     * `keyboardPathRequired` became true here: the surface now carries the §17
+     * first-post submission, the §29.1 and §29.2 disclosures, and the §29.5
+     * termination ask — four things somebody types and submits, where before it
+     * was a read with two copy controls.
+     */
     key: 'creator_partnership',
-    label: 'The active partnership and the campaign close',
-    specRef: '§18, §21, Appendix B.7',
+    label: 'The work surface and the campaign close',
+    specRef: '§17, §21, §29, Appendix B.7',
     audience: 'creator',
     routes: [
       '/creator/campaigns/:associationId/partnership',
       '/creator/campaigns/:associationId/close',
     ],
-    keyboardPathRequired: false,
+    keyboardPathRequired: true,
+  },
+  {
+    /*
+     * Earnings, Resources and Settings (Creator Flow v2 Session F).
+     *
+     * One entry rather than three: they are the three account-level sections
+     * the rail names, none of them is campaign-scoped, and each is a read with
+     * one kind of control. Settings is what carries the keyboard requirement —
+     * it is where somebody changes the address every message goes to.
+     */
+    key: 'creator_account',
+    label: 'The Creator’s earnings, resources, and account settings',
+    specRef: '§5.3, §14.1, §22.1, §27.7',
+    audience: 'creator',
+    routes: ['/creator/earnings', '/creator/resources', '/creator/settings'],
+    keyboardPathRequired: true,
   },
   {
     key: 'public_campaign',

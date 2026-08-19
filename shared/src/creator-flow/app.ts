@@ -81,23 +81,21 @@ export const CREATOR_APP_SECTIONS: readonly CreatorAppSection[] = [
   {
     id: 'earnings',
     label: 'Earnings',
-    href: null,
-    unavailableBecause:
-      'Your earnings live on each campaign for now — open a campaign from Pitches to see what it has earned. One earnings page across every campaign is being built.',
-    buildsIn: 'F',
+    href: '/creator/earnings',
+    unavailableBecause: null,
+    buildsIn: null,
   },
   {
     id: 'resources',
     label: 'Resources',
-    href: null,
-    unavailableBecause:
-      'Everything you need to promote a campaign is in that campaign’s own kit, which you get when you accept it. There is nothing separate to open yet.',
-    buildsIn: 'F',
+    href: '/creator/resources',
+    unavailableBecause: null,
+    buildsIn: null,
   },
   {
     id: 'settings',
     label: 'Settings',
-    href: '/creator/settings/notifications',
+    href: '/creator/settings',
     unavailableBecause: null,
     buildsIn: null,
   },

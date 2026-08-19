@@ -239,3 +239,64 @@ export function standingPercentile(
   const atOrBelow = cohortScores.filter((s) => s <= score).length;
   return Math.min(100, Math.max(1, Math.round((atOrBelow / cohortScores.length) * 100)));
 }
+
+/* ══ Session F, 2026-08-20 ══════════════════════════════════════════════════
+ *
+ * The §5.3 settings vocabulary, restated because 0055's
+ * `affiliate_correction_field_known` CHECK hardcodes the same ten ids and the
+ * backend cannot import `@proovd/shared` at runtime. Drift-tested against
+ * `CREATOR_SETTINGS_FIELDS` and `CREATOR_SETTINGS_GUARDED`, and against
+ * `pg_get_constraintdef` — three places, one truth.
+ *
+ * The prose is deliberately NOT restated: help text, the pinned sentences, and
+ * the consequence lines are imported through Vite by the surface, and two
+ * versions of one paragraph is how they begin disagreeing.
+ */
+
+/** The eight a Creator changes freely, with a reason and an audit row. */
+export const SETTINGS_FIELD_IDS = [
+  'public_handle',
+  'phone',
+  'channel_reference',
+  'audience_niche',
+  'audience_size',
+  'bio',
+  'niche_description',
+  'outreach_plan',
+] as const;
+
+/**
+ * The two that are not free edits.
+ *
+ * `legal_name` is the identity Stripe was given and `email` is where every
+ * transactional message goes. Neither is refused — §5.3 names both — but both
+ * carry the consequence before the change rather than after it.
+ */
+export const SETTINGS_GUARDED_IDS = ['legal_name', 'email'] as const;
+
+/**
+ * Every id 0055's CHECK admits. Session A restated the same ten as
+ * `CORRECTION_FIELD_IDS`; the suite asserts the split above rebuilds it
+ * exactly, so the two cannot drift into disagreeing about which are guarded.
+ */
+export const SETTINGS_ALL_FIELD_IDS: readonly string[] = [
+  ...SETTINGS_FIELD_IDS,
+  ...SETTINGS_GUARDED_IDS,
+];
+
+/**
+ * What Session F's route writes into 0044's `received_via`.
+ *
+ * That column exists precisely because the ask has arrived out of band until
+ * now, so a Creator-filed request must be distinguishable from one an Admin
+ * transcribed off a call.
+ */
+export const DELETION_RECEIVED_VIA = 'Creator settings screen';
+
+/** §29.5's four valid reasons for asking to end a partnership. */
+export const TERMINATION_REASON_IDS = [
+  'founder_material_breach',
+  'proovd_suspension',
+  'emergency_or_capacity',
+  'other',
+] as const;

@@ -13,24 +13,38 @@
  * [local time]" and that the metrics are refresh-based — the server provides the
  * instant, the surface provides the sentence.
  *
- * ── What is deferred, and why it is labelled not guessed (§1.4) ─────────────
- * §18 item 6 also lists attributed pre-orders, conversion, captured amount,
- * earnings, and Transfer/payout state. Those need the reservation the Phase 15
- * pre-order flow creates and the money the Phase 19 reconciliation moves. Until
- * then they do not exist, so the payload reports them as unavailable with the
- * reason — never a fabricated zero that reads as "no sales" (§1.4). Clicks are
- * real now (the §18 attribution ledger), and are shown.
+ * ── The metrics are real now — Creator Flow v2 Session F, 2026-08-20 ───────
+ * Phase 14d shipped a `pending` block naming attributed pre-orders, conversion,
+ * captured amount, earnings and payout state as unavailable, because Phase 15
+ * had not created a reservation and Phase 19 had not moved any money. Both
+ * shipped. So `performance` carries the real §17 numbers and `pending` is gone
+ * — a block still saying "not yet" about records that exist is §1.4's failure
+ * in the other direction.
+ *
+ * What survives from that block is its rule: a number nobody has computed is
+ * absent, never a zero. `conversionRate` over zero clicks is `null` (§16a, and
+ * 17a's), and the money block still renders no amount until there is a captured
+ * attributed subtotal to state.
+ *
+ * ── §19's boundary is what this payload may carry ──────────────────────────
+ * "Affiliate sees only aggregate clicks, attributed pre-orders, reward summary,
+ * and timestamps", and §28.4 adds that the Creator receives no Backer PII. So
+ * every number below is a COUNT or a SUM — there is no per-reservation row, no
+ * Backer identity, and no survey answer in the query at all, which is the form
+ * of that boundary that survives somebody adding a field later.
  */
 
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
-import { campaigns, campaignAffiliateAssociations } from '../db/schema/domain.js';
+import { campaigns, campaignAffiliateAssociations, reservations } from '../db/schema/domain.js';
 import { campaignBuild, campaignRewardPackages } from '../db/schema/build.js';
 import {
   trackingLinks,
   associationCompensationAgreements,
+  creatorBonuses,
 } from '../db/schema/decisions.js';
 import { creatorPostSubmissions } from '../db/schema/launch.js';
+import { campaignAssets } from '../db/schema/workspace.js';
 import { trackingLinkClicks } from '../db/schema/attribution.js';
 import { findAllocation } from '../creator-payment/allocations.js';
 import { CREATOR_DISCLOSURE_TEXT } from './decisions.js';
@@ -97,11 +111,66 @@ export interface CreatorPartnership {
   /** §18: clicks. Real now (the attribution ledger); link tests are excluded (§14.1). */
   clicks: { total: number; attributed: number };
 
-  /** §18 metrics that need Phase 15 (reservations) and Phase 19 (money). */
-  pending: {
-    available: false;
+  /**
+   * §17: "Clicks, attributed active pre-orders, conversion" and "Captured
+   * attributed amount after close."
+   *
+   * Aggregate only (§19). `conversionRate` is null over zero clicks rather than
+   * `0%` — a rate with no denominator is not a rate, and rendering one as zero
+   * reads as "nobody converted" (§16a).
+   */
+  performance: {
+    attributedPreorders: number;
+    activePreorders: number;
+    capturedPreorders: number;
+    capturedSubtotalCents: string;
+    /** Attributed pre-orders per click, 0–1, or null over zero clicks. */
+    conversionRate: number | null;
+    /** §17: the Creator's own attribution against everything else. */
+    attributionNote: string;
+  };
+
+  /**
+   * §17: "bonus progress" — and §14.3's bonus is CREATOR-SPECIFIC, per proposal
+   * version, with a stored trigger unit and threshold.
+   *
+   * Null where no bonus was agreed. The reference draws a platform-wide "50
+   * reservations to your bonus tier"; there is no such target and inventing one
+   * is §1 rule 6 (refused in `CREATOR_FLOW_ABSENCES`).
+   */
+  bonus: {
+    triggerUnit: string;
+    /** Cents for the subtotal unit; a count of people for the Backer unit. */
+    thresholdValue: string;
+    additionalPercent: number;
+    maxCombinedPercent: number;
+    /**
+     * Progress in the bonus's own unit, over this Creator's own attributed
+     * pre-orders that are still live or already charged.
+     *
+     * The bonus is DECIDED at close, on captured and verified charges only
+     * (`close/earnings.ts`), so this is a running measure and `note` says so.
+     * Reporting the finalization measure live would read 0 for every Creator
+     * until the close batch runs, which is true and useless.
+     */
+    progressValue: string;
     note: string;
-    fields: string[];
+    /** §14.3's recorded result. Null until finalization writes it once. */
+    earnedPercent: number | null;
+  } | null;
+
+  /**
+   * §31.5 kit material for this campaign, as the Founder supplied it.
+   *
+   * Downloaded, never generated (§30, §12). `available` is false while object
+   * storage is unconfigured (Track A4) — the arrangement the Affiliate evidence
+   * uploader uses: the payload names the gap so the surface renders an absence
+   * rather than a dead control.
+   */
+  materials: {
+    available: boolean;
+    unavailableBecause: string | null;
+    assets: Array<{ id: string; purpose: string; filename: string | null; contentType: string }>;
   };
 
   /**
@@ -175,7 +244,7 @@ const PARTNERSHIP_STATUSES = new Set(Object.keys(READINESS_LABELS));
 
 export async function buildCreatorPartnership(
   db: Database,
-  input: { associationId: string; appBaseUrl: string },
+  input: { associationId: string; appBaseUrl: string; storageConfigured?: boolean },
 ): Promise<PartnershipResult> {
   const [association] = await db
     .select({
@@ -238,6 +307,48 @@ export async function buildCreatorPartnership(
     })
     .from(trackingLinkClicks)
     .where(eq(trackingLinkClicks.associationId, input.associationId));
+
+  // §17: attributed pre-orders, conversion, and the captured attributed amount.
+  // Aggregate only (§19) — counts and one sum, with no per-reservation row and
+  // no Backer column selected at all.
+  const [preorderStats] = await db
+    .select({
+      attributed: sql<number>`count(*)::int`,
+      active: sql<number>`count(*) filter (where ${reservations.status} = 'reserved_active')::int`,
+      captured: sql<number>`count(*) filter (where ${reservations.status} = 'captured')::int`,
+      capturedSubtotal: sql<string>`coalesce(sum(${reservations.rewardSubtotalCents}) filter (where ${reservations.status} = 'captured'), 0)::text`,
+      // §14.3's two trigger units, measured over rows that are still live or
+      // already charged — the running total the bonus block reports.
+      liveSubtotal: sql<string>`coalesce(sum(${reservations.rewardSubtotalCents}) filter (where ${reservations.status} in ('reserved_active','captured')), 0)::text`,
+      liveBackers: sql<number>`count(distinct ${reservations.backerIdentityId}) filter (where ${reservations.status} in ('reserved_active','captured'))::int`,
+    })
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.campaignId, association.campaignId),
+        eq(reservations.attributionAssociationId, input.associationId),
+      ),
+    );
+
+  // §14.3: this Creator's own bonus, from their own accepted proposal version.
+  // There is no platform-wide target to fall back to and inventing one is
+  // §1 rule 6, so a Creator with no agreed bonus gets null.
+  const [bonus] = await db
+    .select()
+    .from(creatorBonuses)
+    .where(eq(creatorBonuses.associationId, input.associationId))
+    .limit(1);
+
+  // §31.5 kit material for the campaign. Downloaded, never generated.
+  const assetRows = await db
+    .select({
+      id: campaignAssets.id,
+      purpose: campaignAssets.purpose,
+      originalFilename: campaignAssets.originalFilename,
+      contentType: campaignAssets.contentType,
+    })
+    .from(campaignAssets)
+    .where(eq(campaignAssets.campaignId, association.campaignId));
 
   const readiness = READINESS_LABELS[association.status] ?? { ready: false, label: 'Not active' };
   const fixedApplicable = agreement?.fixedPaymentCents != null;
@@ -319,16 +430,50 @@ export async function buildCreatorPartnership(
         total: Number(clickStats?.total ?? 0),
         attributed: Number(clickStats?.attributed ?? 0),
       },
-      pending: {
-        available: false,
-        note: 'Attributed pre-orders, conversion, captured amount, estimated and finalized earnings, and payout status appear once the campaign takes pre-orders and, for earnings, after it closes and reconciles.',
-        fields: [
-          'Attributed active pre-orders',
-          'Conversion',
-          'Captured attributed amount',
-          'Estimated and finalized earnings with bonus progress',
-          'Transfer and payout state',
-        ],
+      performance: {
+        attributedPreorders: Number(preorderStats?.attributed ?? 0),
+        activePreorders: Number(preorderStats?.active ?? 0),
+        capturedPreorders: Number(preorderStats?.captured ?? 0),
+        capturedSubtotalCents: preorderStats?.capturedSubtotal ?? '0',
+        // §16a: a rate over a zero denominator is not zero, it is absent.
+        conversionRate:
+          Number(clickStats?.total ?? 0) > 0
+            ? Number(preorderStats?.attributed ?? 0) / Number(clickStats?.total ?? 0)
+            : null,
+        attributionNote:
+          'These count only what came through your own link. Pre-orders the campaign got any other way are not yours and are not shown here.',
+      },
+
+      bonus: bonus
+        ? {
+            triggerUnit: bonus.triggerUnit,
+            thresholdValue: bonus.threshold.toString(),
+            additionalPercent: bonus.additionalPercent,
+            maxCombinedPercent: bonus.maxCombinedPercent,
+            progressValue:
+              bonus.triggerUnit === 'attributed_subtotal_cents'
+                ? (preorderStats?.liveSubtotal ?? '0')
+                : String(preorderStats?.liveBackers ?? 0),
+            note:
+              'This counts pre-orders through your link that are still live or already charged. ' +
+              'The bonus itself is decided when the campaign closes, on charges that actually went ' +
+              'through and were verified as yours — so this is a running total, not a promise.',
+            earnedPercent: bonus.earnedPercent,
+          }
+        : null,
+
+      materials: {
+        available: input.storageConfigured === true,
+        unavailableBecause:
+          input.storageConfigured === true
+            ? null
+            : 'The campaign’s object storage is not configured in this deployment, so there is nothing stored to download yet. Everything the Founder has supplied in writing is above.',
+        assets: assetRows.map((a) => ({
+          id: a.id,
+          purpose: a.purpose,
+          filename: a.originalFilename,
+          contentType: a.contentType,
+        })),
       },
 
       // §20/§22.1. `estimated` is the honest state while a campaign runs: no

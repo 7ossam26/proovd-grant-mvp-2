@@ -12,7 +12,9 @@
  *
  * Session B added the four screens the invitation token opens, and the copy
  * that is load-bearing rather than decorative; Session C the rest of the walk
- * and the claim; Session D the app shell and Home, which is `app.ts`.
+ * and the claim; Session D the app shell and Home, which is `app.ts`; Session F the work
+ * surface, Earnings, Resources and Settings — `work.ts` and `money.ts`, over
+ * registers `resources.ts` and `settings.ts` had been holding since Session A.
  */
 export * from './flow.js';
 export * from './onboarding.js';
@@ -23,3 +25,5 @@ export * from './resources.js';
 export * from './channels.js';
 export * from './settings.js';
 export * from './app.js';
+export * from './work.js';
+export * from './money.js';

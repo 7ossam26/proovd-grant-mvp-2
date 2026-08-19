@@ -664,6 +664,9 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       notifier,
       context: launchContext,
       ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
+      // Creator Flow v2 Session F: the work surface renders a named absence
+      // rather than a dead download control while R2 is unconfigured.
+      storageConfigured: (config.objectStorage ?? unconfiguredStorage).configured,
     }),
   );
   // Phase 09a (§12, §33.3.1–4). The signed-in Founder's campaign workspace: the

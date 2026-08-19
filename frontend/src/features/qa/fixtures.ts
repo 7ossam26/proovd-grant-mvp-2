@@ -63,7 +63,10 @@ import type {
   CreatorInvitationState,
   CreatorPartnership,
   FormalOpportunity,
+  CreatorEarningsView as CreatorOwnEarningsView,
   CreatorHomeView,
+  CreatorResourcesView,
+  CreatorSettingsView,
 } from '../../surfaces/creator/api.js';
 import type { BackerPageData, BackerSupportView, CommentThread } from '../public/backer/api.js';
 import type { LiveCampaignResponse } from '../public/campaign/api.js';
@@ -1070,11 +1073,49 @@ const partnership: CreatorPartnership = {
   },
   readiness: { state: 'ready', ready: true, label: 'Ready' },
   clicks: { total: 1840, attributed: 31 },
-  pending: {
-    available: false,
-    note: 'Pre-order and earnings figures appear after the campaign closes.',
-    fields: ['preorders', 'conversion', 'earnings', 'payout'],
+  // Session F: the §17 metrics are real records now, not a "not yet" block.
+  performance: {
+    attributedPreorders: 31,
+    activePreorders: 24,
+    capturedPreorders: 7,
+    capturedSubtotalCents: '84000',
+    conversionRate: 31 / 1840,
+    attributionNote: 'These count only what came through your own link.',
   },
+  bonus: {
+    triggerUnit: 'unique_attributed_backers',
+    thresholdValue: '50',
+    additionalPercent: 5,
+    maxCombinedPercent: 40,
+    progressValue: '31',
+    note: 'The bonus is decided when the campaign closes, on charges that actually went through.',
+    earnedPercent: null,
+  },
+  materials: {
+    available: false,
+    unavailableBecause:
+      'The campaign’s object storage is not configured in this deployment, so there is nothing stored to download yet.',
+    assets: [],
+  },
+  obligations: [
+    {
+      key: 'disclosure',
+      statement: 'Include the disclosure on every post.',
+      enforcement: 'A post without it is a correction, and the link pauses until it is fixed.',
+    },
+  ],
+  earnings: {
+    state: 'estimated',
+    label: 'Estimated',
+    amountCents: null,
+    reason: 'The campaign has not closed, so no charge has been captured yet.',
+    owner: 'Proovd',
+    nextUpdate: 'After the campaign closes',
+    action: 'No action needed',
+    actionRequired: false,
+    statusBlock: null,
+  },
+  midCampaign: null,
   updatedAt: '2026-08-26T15:40:00.000Z',
 };
 
@@ -1167,6 +1208,54 @@ const creatorClose: CreatorCloseView = {
   nextReviewAt: '2026-09-15T12:00:00.000Z',
   nextReviewLine: 'Proovd reviews Creator completion on 15 September 2026.',
   thankYou: 'Thank you for the work you put into this campaign.',
+};
+
+/*
+ * Earnings, Resources and Settings (Creator Flow v2 Session F).
+ *
+ * The earnings list carries one CLOSED campaign, so the sweep renders a real
+ * Appendix B.7 block rather than the waiting state — which is the half of the
+ * surface with something in it. `creatorClose` is reused rather than a second
+ * close view invented: §33.11.5's rule is one campaign across every fixture.
+ */
+const creatorOwnEarnings: CreatorOwnEarningsView = {
+  lifetimeRecordedCents: '141200',
+  recordedCampaigns: 1,
+  rows: [
+    {
+      associationId: QA.associationId,
+      campaignId: QA.campaignId,
+      campaignTitle: QA.title,
+      close: creatorClose,
+      waitingOn: null,
+    },
+  ],
+};
+
+const creatorResources: CreatorResourcesView = { interested: ['best_practices'] };
+
+const creatorSettings: CreatorSettingsView = {
+  profileId: 'qa-profile',
+  prospectId: 'qa-prospect',
+  fields: [
+    { id: 'public_handle', label: 'Public handle', value: '@harlow', supplier: 'affiliate', guarded: false },
+    { id: 'phone', label: 'Phone', value: '+1 503 555 0142', supplier: 'proovd', guarded: false },
+    { id: 'channel_reference', label: 'Channel link or handle', value: 'youtube.com/@harlow', supplier: 'proovd', guarded: false },
+    { id: 'audience_niche', label: 'Audience niche', value: 'Woodworking', supplier: 'proovd', guarded: false },
+    { id: 'audience_size', label: 'Audience size', value: 'About 40,000', supplier: 'affiliate', guarded: false },
+    { id: 'bio', label: 'Bio', value: 'Builds furniture on camera.', supplier: 'proovd', guarded: false },
+    { id: 'niche_description', label: 'What you cover', value: 'Hand tools and shop lighting.', supplier: null, guarded: false },
+    { id: 'outreach_plan', label: 'How you reach your network', value: 'A weekly build video.', supplier: null, guarded: false },
+    { id: 'legal_name', label: 'Legal name', value: 'Sam Okafor', supplier: 'proovd', guarded: true },
+    { id: 'email', label: 'Email', value: 'sam@example.com', supplier: 'proovd', guarded: true },
+  ],
+  channelSubtype: 'social_creator',
+  payout: { state: 'complete', payoutsEnabled: true, accountPresent: true },
+  signed: [
+    { label: 'terms', version: '1.0', acceptedAt: '2026-08-01T10:00:00.000Z' },
+    { label: 'affiliate-aup', version: '1.0', acceptedAt: '2026-08-01T10:00:00.000Z' },
+  ],
+  deletionRequestedAt: null,
 };
 
 /* ── §18/§19/§20 the public campaign, the checkout, and the magic link ─────── */
@@ -2312,6 +2401,9 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/creator\/campaigns\/[^/]+\/close$/, body: { close: creatorClose } },
   { match: /\/api\/creator\/campaigns\/[^/?]+(\?.*)?$/, body: { kit: { associationId: QA.associationId, campaignId: QA.campaignId, campaignStatus: 'preparing', associationStatus: 'preparing', founder: { name: QA.founderDisplayName, entity: QA.founderLegalName, soleProprietor: false }, productName: QA.title, problem: 'Benches are badly lit.', solution: 'A clamp lamp that holds its position.', competition: 'Two incumbents at US$300.', campaignType: 'pre_launch', notYetAvailable: [{ item: 'Reward packages', because: 'The Founder has not built them yet.' }], workPermitted: false, decisionsAvailable: false } } },
   { match: /\/api\/creator\/campaigns$/, body: { campaigns: [{ associationId: QA.associationId, campaignId: QA.campaignId, productName: QA.title, status: 'active', revealedAt: '2026-08-03T10:00:00.000Z', revoked: false, reviewAvailable: true }] } },
+  { match: /\/api\/creator\/earnings$/, body: { earnings: creatorOwnEarnings } },
+  { match: /\/api\/creator\/resources$/, body: { resources: creatorResources } },
+  { match: /\/api\/creator\/settings$/, body: { settings: creatorSettings } },
   { match: /\/api\/creator\/notifications\/preferences$/, body: { preference: digestPreference } },
   { match: /\/api\/creator\/notifications\/history/, body: { history: notificationHistory } },
   { match: /\/api\/creator\/payouts/, body: { payouts: { ...payoutState, stripeAccountId: 'acct_qa2' } } },

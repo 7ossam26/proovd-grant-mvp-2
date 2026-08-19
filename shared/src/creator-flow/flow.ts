@@ -405,6 +405,13 @@ export const CREATOR_FLOW_ABSENCES: readonly CreatorFlowAbsence[] = [
     session: 'F',
   },
   {
+    element: 'The `Best time to post:` line on the work surface',
+    absentBecause:
+      'Found by the Session F walk rather than named in the brief. It is an analytic over when other people posted and how their traffic performed — nothing counts it, and building it would need per-Creator behavioural data §19 does not give this surface and §30 would not permit it to advise on. The click ledger records outcomes, not a recommendation.',
+    specRef: '§19, §30, §1 rule 6',
+    session: 'F',
+  },
+  {
     element:
       'The `Hit your next milestone` card and its "50 reservations to your bonus tier" target',
     absentBecause:

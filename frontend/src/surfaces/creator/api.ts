@@ -443,9 +443,67 @@ export interface CreatorPartnership {
   };
   readiness: { state: string; ready: boolean; label: string };
   clicks: { total: number; attributed: number };
-  pending: { available: false; note: string; fields: string[] };
+  /** §17: attributed pre-orders, conversion, and the captured amount. */
+  performance: {
+    attributedPreorders: number;
+    activePreorders: number;
+    capturedPreorders: number;
+    capturedSubtotalCents: string;
+    /** Null over zero clicks — a rate with no denominator is absent (§16a). */
+    conversionRate: number | null;
+    attributionNote: string;
+  };
+  /** §14.3: this Creator's own agreed bonus, or null where none was agreed. */
+  bonus: {
+    triggerUnit: string;
+    thresholdValue: string;
+    additionalPercent: number;
+    maxCombinedPercent: number;
+    progressValue: string;
+    note: string;
+    earnedPercent: number | null;
+  } | null;
+  /** §31.5 kit material, downloaded and never generated (§30, §12). */
+  materials: {
+    available: boolean;
+    unavailableBecause: string | null;
+    assets: Array<{ id: string; purpose: string; filename: string | null; contentType: string }>;
+  };
+  obligations: Array<{ key: string; statement: string; enforcement: string }>;
+  earnings: {
+    state: string;
+    label: string;
+    amountCents: string | null;
+    reason: string;
+    owner: string;
+    nextUpdate: string;
+    action: string;
+    actionRequired: boolean;
+    statusBlock: string | null;
+  };
+  midCampaign: {
+    joinedWithHoursRemaining: number;
+    adjustedDeliverables: string;
+    attributionNote: string;
+  } | null;
   updatedAt: string;
 }
+
+/**
+ * §17 step 4: the Creator submits the public post URL.
+ *
+ * The route has existed since Phase 14a and had no surface — the reference's
+ * `I published my first post` sets a boolean from a click and claims tracking
+ * starts there, both of which §17 contradicts.
+ */
+export const submitFirstPost = (
+  associationId: string,
+  body: { postUrl: string; channel?: string },
+): Promise<{ submission: { id: string; status: string } }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/submit-post`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 
 export const fetchPartnership = (
   associationId: string,
@@ -585,4 +643,102 @@ export const respondToWorkAgainRequest = (
   sessionCall(`/api/creator/work-again/${encodeURIComponent(requestId)}/respond`, {
     method: 'POST',
     body: JSON.stringify({ accept }),
+  });
+
+/* ── Session F: Earnings, Resources, Settings, and the asks ───────────────── */
+
+export interface CreatorEarningsRow {
+  associationId: string;
+  campaignId: string;
+  campaignTitle: string;
+  /** The campaign's own close view, or null while it has not closed (§16a). */
+  close: CreatorCloseView | null;
+  waitingOn: string | null;
+}
+
+export interface CreatorEarningsView {
+  lifetimeRecordedCents: string;
+  recordedCampaigns: number;
+  rows: CreatorEarningsRow[];
+}
+
+export const fetchCreatorEarnings = (): Promise<{ earnings: CreatorEarningsView }> =>
+  sessionCall('/api/creator/earnings');
+
+export interface CreatorResourcesView {
+  interested: string[];
+}
+
+export const fetchCreatorResources = (): Promise<{ resources: CreatorResourcesView }> =>
+  sessionCall('/api/creator/resources');
+
+export const recordResourceInterest = (
+  resourceId: string,
+): Promise<{ resources: CreatorResourcesView }> =>
+  sessionCall(`/api/creator/resources/${encodeURIComponent(resourceId)}`, { method: 'POST' });
+
+export interface CreatorSettingsField {
+  id: string;
+  label: string;
+  value: string | null;
+  /** §11's source label. Null where the field carries no provenance triple. */
+  supplier: string | null;
+  guarded: boolean;
+}
+
+export interface CreatorSettingsView {
+  profileId: string;
+  prospectId: string;
+  fields: CreatorSettingsField[];
+  channelSubtype: string | null;
+  payout: { state: string | null; payoutsEnabled: boolean; accountPresent: boolean };
+  signed: Array<{ label: string; version: string | null; acceptedAt: string }>;
+  deletionRequestedAt: string | null;
+}
+
+export const fetchCreatorSettings = (): Promise<{ settings: CreatorSettingsView }> =>
+  sessionCall('/api/creator/settings');
+
+export const saveCreatorSetting = (
+  fieldId: string,
+  body: { value: string; reason: string },
+): Promise<{ settings: CreatorSettingsView }> =>
+  sessionCall(`/api/creator/settings/${encodeURIComponent(fieldId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export const requestAccountDeletion = (
+  detail: string,
+): Promise<{ settings: CreatorSettingsView }> =>
+  sessionCall('/api/creator/settings/delete-account', {
+    method: 'POST',
+    body: JSON.stringify({ detail }),
+  });
+
+export const requestPartnershipEnd = (
+  associationId: string,
+  body: { reasonId: string; detail: string },
+): Promise<{ reference: string; acknowledgement: string }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/end-request`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const discloseOwnPreorder = (
+  associationId: string,
+  body: { intentNote: string; selfFundedCertified: boolean; identityDisclosed: boolean },
+): Promise<{ recorded: true }> =>
+  sessionCall(
+    `/api/creator/campaigns/${encodeURIComponent(associationId)}/self-preorder-disclosure`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+
+export const discloseConflict = (
+  associationId: string,
+  body: { relationshipKind: string; detail: string },
+): Promise<{ recorded: true }> =>
+  sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/conflict-disclosure`, {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
