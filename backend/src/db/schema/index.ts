@@ -166,3 +166,8 @@ export * from './admin-tasks.js';
 // The campaign follow record (campaign-page-v2 Session C — a recorded §1 rule 6
 // deviation; see the file header and migration 0050).
 export * from './followers.js';
+// Creator Flow v2 (2026-08-19): the recorded tone and per-channel metrics, the
+// three deviation records — a standing that binds nothing, a referral that pays
+// nothing, and a resource list holding no campaign material — and the two that
+// close §5.3's never-implemented settings right.
+export * from './creator-flow.js';

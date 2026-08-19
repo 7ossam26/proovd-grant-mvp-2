@@ -138,6 +138,26 @@ export const affiliateSignupProfiles = pgTable(
     audienceSizeSupplier: fieldSupplier('audience_size_supplier'),
     audienceSizeEditedAt: timestamp('audience_size_edited_at', { withTimezone: true }),
 
+    /*
+     * The Creator's OWN channel answer — Creator Flow v2, migration 0055.
+     *
+     * One of the nine tiles in `CREATOR_CHANNEL_TILES`, and **not**
+     * `affiliate_prospects.subtype`, which is the Admin's §5.3 classification
+     * and is what the recorded verification evidence was gathered against. The
+     * two may disagree, and a disagreement is a fact for Admin rather than
+     * something the product resolves — overwriting the classification would
+     * silently invalidate a verification, which is why the subtype has rendered
+     * read-only since Phase 08b (see the header above).
+     *
+     * It carries the full triple because the screen arrives pre-selected from
+     * the Admin's subtype, and §11 requires a source label on prefilled public
+     * information plus the ability to correct it.
+     */
+    channelType: text('channel_type'),
+    channelTypePrefilled: text('channel_type_prefilled'),
+    channelTypeSupplier: fieldSupplier('channel_type_supplier'),
+    channelTypeEditedAt: timestamp('channel_type_edited_at', { withTimezone: true }),
+
     /** §8's Admin-written bio. §11 lets the Creator correct how they are described. */
     bio: text('bio'),
     bioPrefilled: text('bio_prefilled'),
@@ -148,6 +168,22 @@ export const affiliateSignupProfiles = pgTable(
     dateOfBirth: text('date_of_birth'),
     country: text('country'),
     stateRegion: text('state_region'),
+    /** Creator Flow v2 screen 3: free-text "what you cover". */
+    nicheDescription: text('niche_description'),
+    /**
+     * Creator Flow v2 screen 3, student-only: "how you reach your network".
+     * §5.3's `student_affiliate` evidence input is literally `promotion_plan`;
+     * this is the Creator's own statement of it, and the evidence record stays
+     * Admin's.
+     */
+    outreachPlan: text('outreach_plan'),
+    /**
+     * Creator Flow v2 screen 5. An R2 object key, never bytes and never a URL —
+     * the `campaign_assets` arrangement. R2 is unconfigured (Track A4), so this
+     * is NULL for every row today and the surface renders a named absence
+     * rather than a dead control.
+     */
+    profilePhotoKey: text('profile_photo_key'),
 
     /* ── §11's five confirmations, §28.4's five separate unchecked controls ─*/
     /** "at least 18" */

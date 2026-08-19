@@ -178,8 +178,9 @@ verifier and evidence, and no code path can satisfy one by inference.
 Work since Phase 24 is not numbered. Each piece is built from a supplied
 reference plus the decisions that reference cannot make for itself, and each is
 recorded in [CLAUDE.md](CLAUDE.md) with its date. The Admin panel's five
-workspaces, its floating task list, and the public campaign page came that way;
-the current one is the Founder's own onboarding.
+workspaces, its floating task list, the public campaign page, and the Founder's
+own onboarding all came that way. The current one is the Creator's, and one of
+its six sessions has landed — the one that writes no screen.
 
 **The campaign page was rebuilt in three sessions, all of which have landed.** Spec §18 defines that page's *content* and hands presentation to the
 DNA document by name — "the DNA UX document controls presentation" — so a
@@ -581,6 +582,123 @@ of them is stubbed: the eight policy documents are still in legal review so the
 account step refuses in the open and says why, and file storage and the
 scheduling provider are both unconfigured so the upload and interview steps
 render a named absence rather than a dead control.
+
+### The Creator's, next — the first of six sessions has landed
+
+The same treatment is now under way on the other side of the product: the path
+a Creator walks from opening a private campaign invitation to promoting a live
+campaign becomes nine full-screen steps and a five-section app. The brief is
+[docs/phases/creator-flow-v2.md](docs/phases/creator-flow-v2.md) and the walk
+behind it is
+[docs/phases/creator-flow-reconciliation.md](docs/phases/creator-flow-reconciliation.md).
+
+**The first session writes no screen. It is the record**, and its whole output
+is the set of guarantees the five later sessions have to build inside: the
+tables, the closed vocabularies, and a written list of everything the prototype
+draws that the Spec forbids. Nothing a Creator can see has changed yet.
+
+It also settled a question by trying it. A table was drafted for "please delete
+my account", and it turned out one already exists — built with the Admin
+Creators workspace, in the right shape, with no column that promises erasure
+the product cannot perform. What is missing there is not a record but a
+**route**: only an Admin can file one today, which is why that record has a
+column for how the request reached us. The last session adds the Creator's own
+way in, writing the same record. A second table would have been two copies of
+somebody's erasure request, which is the worst possible thing to have two
+copies of.
+
+Unlike every rebuild before it, this one replaces a working, acceptance-tested
+surface whose own source file argues against the design that replaces it. Spec
+§11 asks for one compact page with one primary action and forbids a multi-page
+sequence by name. The nine screens are the first of the five departures, and
+what has to stay true is the part that protects people rather than the part
+about page count: every question §11 asks is still asked, the five things a
+Creator confirms stay five separate unticked boxes writing five separate
+columns, there is still no public way in, and there is still nowhere on any
+screen — and no route behind one — that could accept a bank account, a tax
+number, or an identity document.
+
+The other four are each narrowed by what a table cannot hold rather than by
+intention:
+
+- **A standing score that binds nothing.** The prototype shows a score, a
+  percentile, a Gold-to-Platinum tier, a streak, and a leaderboard, and promises
+  "higher floors and early access" for climbing. That promise is the part that
+  cannot ship: whether a Creator may bid is already decided by recorded
+  enforcement, so a tier that also decided it would be a second and contradictory
+  answer to one question. A check confirms that nothing which computes pay,
+  readiness, or eligibility reads the standing tables at all. The streak goes
+  outright, and a Creator sees of another Creator exactly what a Founder sees of
+  them — a public handle, and nothing about their money.
+- **A referral that pays nothing.** It records an introduction and produces a
+  task for a person; it creates no account, admits nobody, and has no column
+  anywhere for an amount or a percentage. Recruitment stays a private,
+  campaign-specific invitation.
+- **A resources list that holds no campaign material.** The Spec requires all
+  campaign material to live in the one Campaign kit, so what keeps that true is
+  structural: the record has a name, a subject, and a timestamp, and no column
+  that could hold a file, a link, or a campaign.
+- **A home that is not a dashboard.** No tile wall, no counters table, no claim
+  that anything is live, and every empty block naming what it is waiting for
+  rather than showing a zero.
+
+**The prototype and the Spec disagree in twenty-four places, and each is decided
+in writing.** The two that matter most are about money. It draws a `Withdraw`
+button twice, and Creators do not request withdrawals — Proovd creates exactly
+one transfer for each partnership, after the campaign closes, after the earnings
+are finalized and signed off by a named person, and no earlier than the third
+day. So what replaces the button is the exact status block the Spec already
+specifies, from the resolver that already renders it everywhere else.
+
+And above the agreement, on the screen where somebody is consenting, it prints
+"Your money is guaranteed" and "No
+clawbacks" — which is not true, because invalid or fraudulent earnings can be
+cancelled and recovered, and the machinery for doing that has existed since the
+refund work. The honest version is close to the Spec's own and is stronger copy:
+what is agreed is locked when both sides accept it, and completed verified work
+is paid even if sales were poor.
+
+**One thing in the brief is not a departure at all — it is a right the product
+has never implemented.** The Spec lists what a Creator may change about
+themselves: name, phone, channel, handles, audience numbers, niche, bio,
+password, notification preferences, and a request to delete the account. None of
+it is editable today. The only routes that write a Creator's profile are the
+signup form, which stops working the moment the account exists, and an Admin
+correction. An Admin can email a Creator asking them to review a field, and the
+Creator has no way to review it. The settings
+screen closes that, with the same discipline the Admin path already has: a
+reason is required, the previous value is read from the row inside the same
+transaction that changes it, and every change writes an audit record. The
+delete-account request is recorded rather than executed, because retention
+obligations outlive the account.
+
+The same three environment gaps apply here as everywhere else, and none of them
+will be stubbed: the two agreements a Creator signs are still in legal review so
+the account step refuses in the open, and file storage is unconfigured so the
+photo and the proof-of-channel uploads render a named absence rather than a
+control that does nothing.
+
+**What the first session can prove, it proves as an absence.** Each of the three
+new records is kept honest by what its table cannot hold rather than by a rule
+somebody has to remember, so the tests read the database's own column lists back
+and check what is missing: no rate or eligibility value anywhere near the
+standing score — and no column for it anywhere in the database, since whether a
+Creator may bid is already decided by recorded enforcement; no amount or
+percentage on a referral; nothing on the resources list that could hold a file
+or name a campaign; and, across all of them, no bank account, no tax number, and
+no column that says when to chase somebody.
+
+The vocabularies get the same treatment from the other side. Four closed lists
+live in three places at once — the shared register, a runtime copy, and a
+database constraint — and a test compares all three, because a disagreement
+there does not surface as a failing test somebody reads at leisure. It surfaces
+as a Creator picking an option the register gained last week and being refused
+by a constraint that names nothing they can act on.
+
+One check in that suite flagged a column that was correct: a `percentile` is a
+rank position, and it contains the word `percent`. The fix names that one column
+as an exception rather than loosening the pattern, because a scan tuned until it
+stops flagging a right answer is one that would also stop flagging a wrong one.
 
 ## Layout
 
@@ -1106,6 +1224,16 @@ exact words, which live in one exported constant that the surface and the
 confirmation email both read. Accept, decline, propose, and link activation are
 unreachable: none of them exists yet, and the formal opportunity only opens
 after the listing fee is paid.
+
+**This page is due to be replaced, and one thing it does not do is a real gap.**
+The nine-screen rebuild described under "The Creator's, next" above takes over
+this flow; everything on this page that protects somebody — the five separate
+confirmations, the absence of any bank or tax field, the honest refusal while
+the agreements are drafts — survives it unchanged, and is tested. What does not
+survive contact with the Spec is a silence in the current design: the profile a
+Creator fills in here becomes read-only the moment the account exists, and the
+Spec gives them the right to change most of it. Today a correction has to go
+through Admin, including when Admin is the one asking for it.
 
 ## The preparing pre-view
 

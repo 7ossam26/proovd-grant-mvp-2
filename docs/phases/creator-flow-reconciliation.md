@@ -216,7 +216,78 @@ prototype draws.
 
 ## 4. What Session A built, and what it deliberately did not
 
-*To be filled by Session A.*
+**Landed 2026-08-19.** No screen, no route, no service. The output is the
+guarantee, not the content.
+
+### Built
+
+| Thing | Where |
+|---|---|
+| Migration `0055_creator_flow_v2.sql` | four columns on `affiliate_signup_profiles`, five new tables |
+| The shared registers | `shared/src/creator-flow/{flow,voice,standing,referrals,resources,channels,settings}.ts` |
+| The backend restatement | `backend/src/creator-flow/logic.ts`, drift-tested |
+| The Drizzle schema | `backend/src/db/schema/creator-flow.ts` |
+| The suite | `backend/src/tests/creator-flow.test.ts` — 33 tests |
+
+Two files the brief's A3 did not name were added, each because a register in
+the list needed one and putting it elsewhere would have made a second copy:
+
+- **`channels.ts`** — the nine tiles and the per-subtype metric selection. The
+  metric register is what migration 0055's CHECK pins, so it needed a home, and
+  it is DERIVED from `AFFILIATE_SUBTYPE_DEFINITIONS` rather than listed, so
+  there is still exactly one subtype register.
+- **`settings.ts`** — the §5.3 editable-field register. A2 item 7 is the
+  correction record, and a record whose field ids are free text is the
+  overridable-field mistake 16a already made once.
+
+### The three findings
+
+1. **The delete-account request already exists, and the gap is a ROUTE.**
+   Session A drafted `affiliate_deletion_requests` and then hit a name
+   collision: 0044 shipped it with the Creators workspace on 2026-08-11, in the
+   right shape — the record is of the ASK, with no `deleted_at`, no purge
+   schedule, and no `approved` state. What is missing is that only an Admin can
+   file one, which is why its `received_via` column exists at all. Session F
+   adds the Creator's own route onto the SAME record with
+   `received_via = CREATOR_DELETION_RECEIVED_VIA`. A second table would have
+   been the duplicate this codebase refuses everywhere else, and on a person's
+   erasure request two copies disagreeing is the worst version of that failure.
+   **The brief's A2 item list said seven things; six were built.**
+
+2. **`PHASE 37` was already gone before the brief was written, and `PHASE 38`
+   went while Session A was running.** Today claimed 37 on 2026-08-19; an
+   Admin-shell narrow-width fix claimed 38 hours later. The next free number is
+   **39** at the time of writing, and the brief's own trap list is right that it
+   must be re-derived rather than read: it has now moved twice in one day. Run
+   the grep. `.crf-` is confirmed free (zero occurrences).
+
+3. **The suite's first draft flagged a correct column.** The standing table's
+   forbidden-substring scan caught `percentile`, which contains `percent` and is
+   a rank position rather than a rate. The fix excludes that one column BY NAME
+   rather than narrowing the pattern — a scan tuned until it stops flagging a
+   correct column is a scan that would also stop flagging a wrong one, and the
+   exact-column-set assertion beside it is what actually holds the line.
+
+### Deliberately NOT built
+
+- **Any surface.** `CREATOR_FLOW_PAGES` ships **empty**, and a test asserts it.
+  `events.ts`' rule applied to a screen: a page appears in the register when
+  something renders it, never before — otherwise every "is this reachable"
+  check answers yes about surfaces that do not exist.
+- **Any service, route, or job.** Nothing reads the five new tables yet, and a
+  test asserts no file under `backend/src/jobs/` names one.
+- **A second subtype register.** The nine tiles map onto §5.3's seven, and the
+  metric ids are asserted to be evidence inputs `AFFILIATE_SUBTYPE_DEFINITIONS`
+  already names — in **both** directions, so a renamed input fails the suite
+  rather than orphaning a CHECK.
+- **A `proposal_access` column, or anything shaped like one.** Asserted absent
+  across the whole database, not just the new tables.
+- **Any amount, percentage, rate, floor, multiplier, or commission column** on
+  any new table, and nothing that could hold a bank account, tax id, or identity
+  document.
+- **The two `never` copies.** The prose — help text, explanations, the absence
+  register — is NOT restated in the backend. Only the four vocabularies a CHECK
+  hardcodes are, because those are the only ones whose drift a person meets.
 
 ---
 
@@ -235,6 +306,24 @@ prototype draws.
 
 *Per session, as each lands.* Baseline before Session A: **122 files, 3,350 tests, green in one
 run.**
+
+**After Session A: 127 files, 3,470 tests, 0 failures** — backend 1,697 (66
+files), shared 465 (31 files), frontend 1,308 (30 files). Session A's own suite
+is 33 of those. Nothing existing was changed to make it pass: the four suites
+most exposed to the schema change (`affiliate-signup`, `creator-workspace`,
+`creator-relationship`, and the new one) were run together and pass at 152/152.
+
+**A note on how that number was obtained, because the next session will hit
+it.** This machine cannot run `npm test` as one command: esbuild intermittently
+fails to read `tsconfig.base.json` with *"Access is denied"*, which aborts
+project setup before any test runs. It is **concurrency-dependent and
+pre-existing** — verified by stashing every Session A change and reproducing it
+on a clean tree in 2 of 3 attempts. Four test files at a time is reliable;
+twelve is not, and the whole project never is. The signature is unmistakable
+once seen: **many failed FILES and zero failed TESTS**, because the failure is
+at collection. So the suite was run in batches of five with retries and the
+counts aggregated. Do not read a batch failure as a code failure without
+checking that line first.
 
 ---
 
