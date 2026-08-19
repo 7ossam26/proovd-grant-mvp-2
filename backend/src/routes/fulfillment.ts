@@ -346,3 +346,158 @@ export function createFounderFulfillmentRouter(deps: FulfillmentRouterDeps): Rou
 
   return router;
 }
+
+/* ── The Admin surface ─────────────────────────────────────────────────────── */
+
+export function createAdminFulfillmentRouter(deps: FulfillmentRouterDeps): Router {
+  const { db, auth, audit } = deps;
+  const router = Router();
+  const admin = requireAdmin(auth);
+  const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
+  const json: RequestHandler = express.json({ limit: '64kb' });
+
+  const fulfillmentDeps = (): FulfillmentDeps => ({
+    db,
+    audit,
+    notifier: deps.notifier,
+    context: deps.notificationContext,
+    tokens: deps.tokens,
+  });
+  const day14Deps = (): Day14Deps => ({
+    db,
+    audit,
+    notifier: deps.notifier,
+    context: deps.notificationContext,
+    tokens: deps.tokens,
+  });
+  const banDeps = (): GhostBanDeps => ({ db, audit });
+
+  /** The Day 14 queue: overdue first (16b's rule). */
+  router.get('/day-14', admin, async (_req, res) => {
+    const queue = await readDay14Queue(db);
+    res.json({
+      queue,
+      failureReasons: DAY_14_FAILURE_REASONS.map((key) => ({
+        key,
+        label: DAY_14_FAILURE_LABELS[key],
+      })),
+    });
+  });
+
+  router.get('/campaigns/:campaignId', admin, async (req, res) => {
+    const campaignId = req.params.campaignId as string;
+    const [status, checklist, ban] = await Promise.all([
+      readFulfillmentStatus(db, campaignId),
+      readDay14Checklist(db, campaignId),
+      gatherGhostBanFacts(db, campaignId),
+    ]);
+    if (!status || !checklist) return res.status(404).json({ error: 'not_found' });
+
+    res.json({
+      fulfillment: status,
+      day14: checklist,
+      ghostBan: ban
+        ? {
+            triggersMet: ban.triggersMet,
+            labels: ban.labels,
+            alreadyBanned: ban.alreadyBanned !== null,
+            // §22.7's five recorded facts, so the form cannot omit one.
+            requiredFields: GHOST_BAN_RECORD_FIELDS,
+            permanentSentence: GHOST_BAN_PERMANENT_SENTENCE,
+            triggers: GHOST_BAN_TRIGGERS.map((key) => ({
+              key,
+              label: GHOST_BAN_TRIGGER_LABELS[key],
+              met: ban.triggersMet.includes(key),
+            })),
+          }
+        : null,
+    });
+  });
+
+  router.post('/campaigns/:campaignId/day-14/open', admin, fresh, json, async (req, res) => {
+    const outcome = await openDay14Review(day14Deps(), {
+      campaignId: req.params.campaignId as string,
+    });
+    if (outcome.status === 'opened') return res.status(201).json({ status: outcome.status });
+    if (outcome.status === 'already_open') return res.json({ status: outcome.status });
+    return res.status(outcome.status === 'campaign_not_found' ? 404 : 400).json({ error: outcome.status });
+  });
+
+  router.post('/campaigns/:campaignId/day-14/clarification', admin, fresh, json, async (req, res) => {
+    const parsed = z.object({ question: z.string().min(1) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid' });
+
+    const outcome = await requestDay14Clarification(day14Deps(), {
+      campaignId: req.params.campaignId as string,
+      question: parsed.data.question,
+      actor: actorOf(req),
+    });
+    if (outcome.status === 'requested') return res.status(201).json(outcome);
+    return res.status(400).json({ error: outcome.status });
+  });
+
+  router.post('/campaigns/:campaignId/day-14/decide', admin, fresh, json, async (req, res) => {
+    const parsed = day14DecisionSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid', issues: parsed.error.issues });
+
+    const outcome = await decideDay14Review(day14Deps(), {
+      campaignId: req.params.campaignId as string,
+      actor: actorOf(req),
+      ...parsed.data,
+    });
+    if (outcome.status === 'decided') return res.status(201).json(outcome);
+    return res.status(outcome.status === 'campaign_not_found' ? 404 : 400).json(outcome);
+  });
+
+  router.post('/delivery-changes/:requestId/decide', admin, fresh, json, async (req, res) => {
+    const parsed = z
+      .object({
+        decision: z.enum(['approved', 'rejected']),
+        baitAndSwitchFinding: z.string().min(1),
+        paymentImpactFinding: z.string().min(1),
+        internalReason: z.string().min(1),
+        customerExplanation: z.string().min(1),
+        commitmentText: z.string().min(1).optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid', issues: parsed.error.issues });
+
+    const outcome = await decideDeliveryChange(fulfillmentDeps(), {
+      requestId: req.params.requestId as string,
+      actor: actorOf(req),
+      ...parsed.data,
+    });
+    if (outcome.status === 'approved' || outcome.status === 'rejected') return res.json(outcome);
+    return res.status(outcome.status === 'not_found' ? 404 : 400).json(outcome);
+  });
+
+  /**
+   * The ban candidates. Every row has at least one MET trigger — the queue
+   * cannot suggest a ban the record would not support (§33.10.4).
+   */
+  router.get('/ghost-ban/candidates', admin, async (_req, res) => {
+    const candidates = await readGhostBanCandidates(db);
+    res.json({
+      candidates,
+      triggers: GHOST_BAN_TRIGGERS.map((key) => ({ key, label: GHOST_BAN_TRIGGER_LABELS[key] })),
+      requiredFields: GHOST_BAN_RECORD_FIELDS,
+      permanentSentence: GHOST_BAN_PERMANENT_SENTENCE,
+    });
+  });
+
+  router.post('/campaigns/:campaignId/ghost-ban', admin, fresh, json, async (req, res) => {
+    const parsed = banSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid', issues: parsed.error.issues });
+
+    const outcome = await recordGhostBan(banDeps(), {
+      campaignId: req.params.campaignId as string,
+      actor: actorOf(req),
+      ...parsed.data,
+    });
+    if (outcome.status === 'banned') return res.status(201).json(outcome);
+    if (outcome.status === 'already_banned') return res.status(409).json(outcome);
+    return res.status(outcome.status === 'campaign_not_found' ? 404 : 400).json(outcome);
+  });
+
+  return router;
+}

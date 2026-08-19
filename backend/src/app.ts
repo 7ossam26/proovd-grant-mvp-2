@@ -47,9 +47,12 @@ import { createBackerRouter } from './routes/backer.js';
 import { createAdminLiveModeRouter } from './routes/admin-live-mode.js';
 import {
   createFounderFulfillmentRouter,
+  createAdminFulfillmentRouter,
   FOUNDER_FULFILLMENT_BASE_PATH,
+  ADMIN_FULFILLMENT_BASE_PATH,
 } from './routes/fulfillment.js';
 import { createAdminDisputesRouter } from './routes/admin-disputes.js';
+import { createAdminRefundsRouter } from './routes/admin-refunds.js';
 import {
   createAdminCompletionRouter,
   createFounderCompletionRouter,
@@ -80,6 +83,7 @@ import { createNotifier, type EmailTransport, type Notifier } from './notificati
 import { sendPasswordReset } from './notifications/customer-remaining.js';
 import { unconfiguredTransport } from './notifications/resend-transport.js';
 import type { LiveModeEnvironment } from './live-mode/gate.js';
+import type { PrerequisiteEnvironment } from './admin/prerequisites.js';
 import type { InvitationContext } from './invitations/service.js';
 
 export interface AppConfig {
@@ -123,6 +127,16 @@ export interface AppConfig {
   trustProxyHops: number;
   /** Observable facts the §34 live-mode gate reads about this deployment. */
   liveModeEnvironment: LiveModeEnvironment;
+  /**
+   * Observable facts for the §6 prerequisites panel.
+   *
+   * A superset of `liveModeEnvironment` — it additionally carries whether a
+   * transactional email provider is configured, which §6 blocks on and §34
+   * does not name. Both are produced by one `prerequisiteFacts(env)` call, so
+   * the panel and the gate can never disagree about the deployment they are
+   * both describing.
+   */
+  prerequisiteEnvironment: PrerequisiteEnvironment;
   /**
    * §27.2 transactional email. Defaults to the transport that refuses loudly:
    * an unconfigured deployment must fail visibly rather than report an
@@ -397,7 +411,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Phase 06 (§6, §26). The first product routes any guard is mounted on:
   // everything under /api/admin requires a session and the admin role, and
   // every write additionally requires a recent sign-in.
-  app.use(createAdminRouter({ db, auth }));
+  app.use(createAdminRouter({ db, auth, environment: config.prerequisiteEnvironment }));
   // Phase 24 (§34, Appendix C). The live-mode gate: the eleven conditions with
   // their filed evidence, the one named pilot enablement and its rollback, the
   // three pre-first-reservation confirmations, and the recorded Appendix C
@@ -411,12 +425,27 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       environment: config.liveModeEnvironment,
     }),
   );
-  // Phase 16a (§26.6, §33.12.4). The general high-impact/override machine:
-  // preview the customer consequences, consume the preview exactly once, and
-  // record the override against the prior value read from the row itself.
-  // Listing the overrides is `admin`; the preview and the execution take the
-  // freshness gate, because both are §5.1 high-impact actions.
-  app.use(createAdminOperationsRouter({ db, auth }));
+  // Phase 16a (§26.5, §26.6, §31.7, §33.12.4) and Phase 23b (§31.9). The §26.5
+  // ledger with its eleven filters and §25.7 export, the §26.6 nine money-control
+  // lines, the ten §31.7 risk signals, the §31.9 first-cohort scoreboard, and the
+  // general high-impact/override machine: preview the customer consequences,
+  // consume the preview exactly once, and record the override against the prior
+  // value read from the row itself.
+  //
+  // Every read is `admin`; the seller-tax record, the preview, and the execution
+  // take the freshness gate, because all three are §5.1 high-impact actions.
+  //
+  // `mode` is what makes risk and seller-tax readiness mode-scoped (§32.2). It
+  // falls back to `test` rather than to the live side: a deployment with no
+  // gateway has not configured live money, and the readiness record that gates
+  // live tax collection must never be read out of the wrong mode.
+  app.use(
+    createAdminOperationsRouter({
+      db,
+      auth,
+      mode: config.stripeGateway?.mode ?? 'test',
+    }),
+  );
   // Phase 16b (§26.7, §26.8, §27.8). Support cases with their business-day
   // response promise and daily due/overdue queue, the four-field handoff note,
   // suspend/kill with its complete behaviour, and the read-only timeline
@@ -518,10 +547,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // is keyed on one campaign relationship, and both are mounted because they
   // answer different questions. Nothing here reimplements recruitment,
   // verification, or the invitation: the surface calls both routers.
-  // §22.3, §33.8.13. The Admin half of "one source, many renderers" — restored
-  // because a named acceptance test drives it and the dashboard replacement
-  // deleted the router along with its screen. See `routes/admin-close.ts`.
-  app.use(createAdminCloseRouter({ db, auth }));
   app.use(
     createAdminCreatorsRouter({
       db,
@@ -765,6 +790,28 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       tokens,
     }),
   );
+  /*
+    Phase 21a (§22.4–§22.7). The Admin half of the same records, restored
+    2026-08-19 with the console that operates it.
+
+    §22.4 requires the Founder and the Admin to see the SAME checklist and the
+    same evidence list, and both routers call one `day14Checklist(campaignType)`
+    — which is why they live in one module and why deleting one half left the
+    guarantee half-proved. Every decision takes the freshness gate: the Day 14
+    outcome blocks a remaining payment, a delivery approval moves a promise, and
+    the ban is permanent.
+  */
+  app.use(
+    ADMIN_FULFILLMENT_BASE_PATH,
+    createAdminFulfillmentRouter({
+      db,
+      auth,
+      audit,
+      notifier,
+      notificationContext: launchContext,
+      tokens,
+    }),
+  );
   // Phase 21b (§22.8–§22.11, §31.8, §33.10.5–10). The last of the lifecycle:
   // the Creator's completion status against its five criteria, the work-again
   // request that creates nothing, the Founder's two independent next-campaign
@@ -956,6 +1003,45 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         gateway: config.stripeGateway,
         notifier,
         notificationContext: launchContext,
+      }),
+    );
+    /*
+      Phase 18b/19a/19b (§21, §22.1, §22.2, §22.3) and Phase 20a (§24.8, §24.9).
+      The close and refund consoles' routers, restored 2026-08-19 with the
+      Money & Fulfillment screens that operate them.
+
+      They were deleted with the old dashboard (`2f7aeed`) and that contradicted
+      this repository's own rule — a deleted screen keeps its backend, because
+      the backend encodes acceptance-tested machinery. One route came back early
+      because §33.8.13 drives it; the rest waited here, as CLAUDE.md said they
+      would, because a mounted money-moving route nobody can see is worse than
+      an absent one. There is now a surface for every one of them.
+
+      Inside the gateway block, beside disputes, because the money acts they
+      perform — the §21 capture retry, the §22.1 Transfer, the §24.8 Refund —
+      are provider calls. A deployment with no gateway has no close operations
+      to run rather than a console that would fail at the last step.
+    */
+    app.use(
+      createAdminCloseRouter({
+        db,
+        auth,
+        audit,
+        gateway: config.stripeGateway,
+        notifier,
+        notificationContext: launchContext,
+        tokens,
+      }),
+    );
+    app.use(
+      createAdminRefundsRouter({
+        db,
+        auth,
+        audit,
+        gateway: config.stripeGateway,
+        notifier,
+        notificationContext: launchContext,
+        tokens,
       }),
     );
   }

@@ -36,12 +36,19 @@ import {
   updateSetting,
   readAdminReauthWindowSeconds,
 } from '../settings/service.js';
+import {
+  readPrerequisites,
+  recordPrerequisite,
+  type PrerequisiteEnvironment,
+} from '../admin/prerequisites.js';
 
 export const ADMIN_BASE_PATH = '/api/admin';
 
 export interface AdminRouterDeps {
   db: Database;
   auth: Auth;
+  /** Observable environment facts for the §6 prerequisites panel. */
+  environment: PrerequisiteEnvironment;
 }
 
 /**
@@ -76,7 +83,7 @@ function securityContext(req: express.Request): {
   };
 }
 
-export function createAdminRouter({ db, auth }: AdminRouterDeps): Router {
+export function createAdminRouter({ db, auth, environment }: AdminRouterDeps): Router {
   const router = Router();
   const admin = requireAdmin(auth);
 
@@ -168,6 +175,136 @@ export function createAdminRouter({ db, auth }: AdminRouterDeps): Router {
       updatedAt: result.row.updatedAt.toISOString(),
     });
   });
+
+  router.put(`${ADMIN_BASE_PATH}/settings/:key`, admin, fresh, json, async (req, res) => {
+    const body = req.body as { value?: unknown; reason?: unknown };
+
+    if (typeof body?.value !== 'string' || typeof body?.reason !== 'string') {
+      res.status(400).json({
+        error: 'invalid_request',
+        title: 'That change could not be saved',
+        whatHappened: 'A new value and a reason are both required.',
+        next: 'Enter a value and say why it is changing, then save again.',
+      });
+      return;
+    }
+
+    const result = await updateSetting(db, {
+      key: req.params['key'] as string,
+      value: body.value,
+      reason: body.reason,
+      actor: actorOf(req),
+      ...securityContext(req),
+    });
+
+    if (!result.ok) {
+      res.status(422).json({
+        error: 'setting_rejected',
+        title: 'That change could not be saved',
+        whatHappened: result.message,
+        next: 'Correct the value and save again. Nothing has changed.',
+      });
+      return;
+    }
+
+    res.json({
+      key: result.row.key,
+      value: result.row.value,
+      version: result.row.version,
+      changed: result.changed,
+      updatedBy: result.row.updatedBy,
+      updateReason: result.row.updateReason,
+      updatedAt: result.row.updatedAt.toISOString(),
+    });
+  });
+
+  /* ── Production prerequisites (§6) ─────────────────────────────────────── */
+
+  router.get(`${ADMIN_BASE_PATH}/prerequisites`, admin, async (_req, res) => {
+    const panel = await readPrerequisites(db, environment);
+    res.json({
+      blocking: panel.blocking,
+      unsatisfiedKeys: panel.unsatisfiedKeys,
+      items: panel.items.map((item) => ({
+        key: item.definition.key,
+        label: item.definition.label,
+        specRef: item.definition.specRef,
+        verification: item.definition.verification,
+        requirement: item.definition.requirement,
+        satisfied: item.satisfied,
+        detail: item.detail,
+        subjectKeys: item.subjectKeys,
+        attestation: item.attestation
+          ? {
+              status: item.attestation.status,
+              recordedBy: item.attestation.recordedBy,
+              recordedAt: item.attestation.recordedAt.toISOString(),
+              note: item.attestation.note,
+              evidenceLinks: item.attestation.evidenceLinks,
+            }
+          : null,
+      })),
+    });
+  });
+
+  router.post(
+    `${ADMIN_BASE_PATH}/prerequisites/:key`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = req.body as {
+        status?: unknown;
+        note?: unknown;
+        evidenceLinks?: unknown;
+      };
+
+      const status = body?.status;
+      if (status !== 'satisfied' && status !== 'not_satisfied') {
+        res.status(400).json({
+          error: 'invalid_request',
+          title: 'That could not be recorded',
+          whatHappened: 'A prerequisite is either satisfied or it is not.',
+          next: 'Choose one and record what you checked.',
+        });
+        return;
+      }
+      if (typeof body?.note !== 'string') {
+        res.status(400).json({
+          error: 'invalid_request',
+          title: 'That could not be recorded',
+          whatHappened: 'A note describing what you checked is required.',
+          next: 'Describe the check, then record it.',
+        });
+        return;
+      }
+
+      const evidenceLinks = Array.isArray(body.evidenceLinks)
+        ? body.evidenceLinks.filter((v): v is string => typeof v === 'string')
+        : undefined;
+
+      const result = await recordPrerequisite(db, {
+        prerequisiteKey: req.params['key'] as string,
+        status,
+        note: body.note,
+        recordedBy: actorOf(req),
+        ...(evidenceLinks ? { evidenceLinks } : {}),
+      });
+
+      if (!result.ok) {
+        res.status(422).json({
+          error: 'prerequisite_rejected',
+          title: 'That could not be recorded',
+          whatHappened: result.message,
+          next: 'Correct it and record again. Nothing has changed.',
+        });
+        return;
+      }
+
+      const panel = await readPrerequisites(db, environment);
+      res.status(201).json({ blocking: panel.blocking, unsatisfiedKeys: panel.unsatisfiedKeys });
+    },
+  );
 
   /* ── Who am I ─────────────────────────────────────────────────────────── */
 

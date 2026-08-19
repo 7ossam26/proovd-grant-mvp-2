@@ -172,6 +172,7 @@ async function main() {
     adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
     trustProxyHops: env.TRUST_PROXY_HOPS,
     liveModeEnvironment: prerequisiteFacts(env),
+    prerequisiteEnvironment: prerequisiteFacts(env),
     emailTransport,
     objectStorage,
     interviewScheduler,
