@@ -104,6 +104,26 @@ export const ACCOUNT_ROUTES: readonly PublicRoute[] = [
 export const ACCOUNT_ROUTE_PATHS: readonly string[] = ACCOUNT_ROUTES.map((r) => r.path);
 
 /**
+ * `/support` — §27.1's sixth question, given an address (Founder Dashboard
+ * Session B).
+ *
+ * Its own entry rather than a fifteenth `PUBLIC_ROUTES` row, for the reason
+ * `ACCOUNT_ROUTES` records: that list is §18's inventory of the public site,
+ * its length is fixed at fourteen, and the acceptance suite sweeps every entry
+ * as a marketing page. A support page has no §18 content requirement.
+ *
+ * Not in `HEADER_ROUTES` or `REQUIRED_FOOTER_LINKS` either: §31.4 fixes what
+ * the footer must carry, and §27.8's contact block — which is what this page
+ * renders — is already there. It is reached from the `getHelp` control on the
+ * state panel that needed it, which is what "without losing context" means.
+ */
+export const SUPPORT_ROUTE: PublicRoute = {
+  path: '/support',
+  label: 'Support',
+  kind: 'site',
+} as const;
+
+/**
  * Every in-app path a rendered link may legitimately point at. The §33.11.6
  * broken-link scan reads this rather than `PUBLIC_ROUTE_PATHS`, so a link to a
  * real route is not reported as broken and a link to a route that does not
@@ -112,6 +132,7 @@ export const ACCOUNT_ROUTE_PATHS: readonly string[] = ACCOUNT_ROUTES.map((r) => 
 export const LINKABLE_ROUTE_PATHS: readonly string[] = [
   ...PUBLIC_ROUTE_PATHS,
   ...ACCOUNT_ROUTE_PATHS,
+  SUPPORT_ROUTE.path,
 ];
 
 /** The primary wayfinding row in the header — the rest lives in the footer. */

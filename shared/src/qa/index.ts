@@ -74,6 +74,24 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: false,
   },
   {
+    /*
+      Founder Dashboard Session B (2026-08-19). `/support` is §27.1's sixth
+      question given an address — it was the `getHelp` target throughout the
+      product and it 404ed, because the only `support` path in the router was
+      inside the `admin` group.
+
+      Its own flow rather than a fifth `public_site` route: that flow is §18's
+      site and its policies, and this is neither. `keyboardPathRequired` is
+      true because §28.5 names "support" among its own five by name.
+    */
+    key: 'support_page',
+    label: 'Getting help without losing context',
+    specRef: '§27.1, §27.8, §28.5',
+    audience: 'public',
+    routes: ['/support'],
+    keyboardPathRequired: true,
+  },
+  {
     key: 'founder_vetting',
     label: 'The invited Founder: the invite, §9’s answers, and the account claim',
     specRef: '§7, §9, §10',

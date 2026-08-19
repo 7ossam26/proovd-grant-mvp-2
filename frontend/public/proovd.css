@@ -94,15 +94,26 @@
 
 
 /* ───────────────────────────────────────────── §2 BORDER + RADIUS TOKENS
-   Desktop defaults; phone values via the ≤600px query (§8 breakpoints). */
+   Desktop defaults; phone values via the ≤600px query (§8 breakpoints).
+
+   OWNER RULING 2026-08-19 (supersedes DNA §2), recorded in CLAUDE.md:
+   radius is 2px on BOTH postures. Was 1px desktop / 0.5px phone, and the
+   comment on it read "sharp. everywhere." — deleted rather than left
+   describing a value that is no longer here.
+
+   The border widths still halve on a phone and the radius deliberately does
+   NOT: "on both postures" is the whole content of that clause, and the
+   supplied reference declares --br:2px in its own ≤600px override beside a
+   --bw that halves. The brief's derivation table halved the radius too; the
+   ruling and the reference are what this follows. */
 
 :root {
   --bw:      2px;   /* outside border (cards, inputs, tags, calendar…) */
   --bw-btn:  2px;   /* outline buttons — USER REVISION: was 4px */
-  --radius:  1px;   /* sharp. everywhere. */
+  --radius:  2px;   /* OWNER RULING — see above */
 }
 @media (max-width: 600px) {
-  :root { --bw: 1px; --bw-btn: 1px; --radius: 0.5px; }
+  :root { --bw: 1px; --bw-btn: 1px; --radius: 2px; }  /* radius does not halve */
 }
 
 
@@ -155,7 +166,13 @@
 
   /* variant 1 — brand fill */
   --btn1-bg:      var(--brand);
-  --btn1-text:    var(--mint);         /* hard rule: brand fill → #E9FFE1 */
+  --btn1-text:    var(--white);        /* OWNER RULING 2026-08-19 (supersedes
+                                          DNA §1, which called brand fill →
+                                          #E9FFE1 an absolute rule): brand
+                                          fill takes #FAFAFA. Recorded in
+                                          CLAUDE.md and in tech-stack §3.6.
+                                          Every brand fill in this file moves
+                                          together — see the §2 note. */
   --btn1-border:  var(--brand);
   --btn1-hbg:     var(--brand-0);      /* hover = variant 2 */
   --btn1-htext:   var(--brand);
@@ -165,7 +182,7 @@
   --btn2-text:    var(--brand);
   --btn2-border:  var(--brand);
   --btn2-hbg:     var(--brand);        /* hover = variant 1 */
-  --btn2-htext:   var(--mint);
+  --btn2-htext:   var(--white);        /* that hover IS a brand fill */
   --btn2-hborder: var(--brand);
 
   --btn3-text:    var(--darker);       /* §7.1 tertiary: plain #012D10 bold */
@@ -180,13 +197,21 @@
   --mode-icon:  var(--mint);
 
   --btn1-bg:      var(--white);
-  --btn1-text:    var(--dark);
+  --btn1-text:    var(--dark);         /* KEPT. This is a WHITE fill, not a
+                                          brand one, so the ruling does not
+                                          reach it — and #013F17 on #FAFAFA
+                                          (11.7:1) is the one high-contrast
+                                          primary in the system. Considered
+                                          and left, so the next reader knows
+                                          it was a decision. */
   --btn1-border:  var(--white);
-  --btn1-hbg:     var(--brand);        /* hover: #41ED98 fill; text follows
-                                          the §1 hard rule — a brand-filled
-                                          button always uses #E9FFE1 text
-                                          (doc corrected; was #FAFAFA). */
-  --btn1-htext:   var(--mint);
+  --btn1-hbg:     var(--brand);        /* the hover IS a brand fill, so the
+                                          ruling reaches the hover text. The
+                                          comment that stood here recorded the
+                                          kit "correcting" the design doc from
+                                          #FAFAFA to #E9FFE1; the ruling puts
+                                          the doc's own value back. */
+  --btn1-htext:   var(--white);
   --btn1-hborder: var(--brand);
 
   /* DERIVED: dark sections list only one button, and the hard rules forbid
@@ -213,18 +238,22 @@
   --mode-icon:  var(--sage);           /* small icons: use .icon--sm → brand */
 
   --btn1-bg:      var(--dark);
-  --btn1-text:    var(--mint);
+  --btn1-text:    var(--white);        /* a DARK-green fill, not a brand one,
+                                          so the ruling does not reach it —
+                                          this one moves on the brief's own
+                                          product direction. Not a contrast
+                                          regression either way: #FAFAFA on
+                                          #013F17 is 11.7:1 against the
+                                          #E9FFE1 it replaces at 11.5:1. */
   --btn1-border:  var(--dark);
-  --btn1-hbg:     var(--brand);        /* hover: #41ED98 fill; text follows
-                                          the §1 hard rule (brand fill →
-                                          #E9FFE1 — doc corrected). */
-  --btn1-htext:   var(--mint);
+  --btn1-hbg:     var(--brand);        /* the hover IS a brand fill */
+  --btn1-htext:   var(--white);
   --btn1-hborder: var(--brand);
 
   --btn2-text:    var(--brand);        /* §7.1 universal secondary */
   --btn2-border:  var(--brand);
   --btn2-hbg:     var(--brand);
-  --btn2-htext:   var(--mint);         /* hard rule: brand fill → #E9FFE1 */
+  --btn2-htext:   var(--white);        /* that hover IS a brand fill */
   --btn2-hborder: var(--brand);
 
   --btn3-text:    var(--darker);
@@ -394,6 +423,13 @@ button { cursor: pointer; }              /* §8.2 pointer on everything tappable
   background: var(--r-bg);
   color: var(--r-text);
   outline-color: var(--r-border);
+  /* OWNER RULING 2026-08-19, clause 3: the inset highlight ships on the
+     primary tier. It reads as a top-edge gloss on the brand and dark-green
+     fills and is invisible on .mode-dark's white one, which is why it sits on
+     the tier rather than in a fourth slot per mode. An inset shadow paints
+     above the background and below child content, so .btn__fill covers it
+     during the §6.5 progress morph — which is what should happen. */
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
 }
 
 .btn--secondary {
@@ -442,7 +478,7 @@ button { cursor: pointer; }              /* §8.2 pointer on everything tappable
   outline-color: var(--brand);
   color: var(--darker);
 }
-.btn.is-done .btn__label { color: var(--mint); }   /* check on full brand fill */
+.btn.is-done .btn__label { color: var(--white); }  /* check on full brand fill */
 
 /* ---- Text input / textarea — the ONLY grey-bordered tappable (§7.1).
    Never a silent box: always placeholder or a label directly above. */
@@ -6829,9 +6865,18 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
         .dock, .update, .consent, .sample-banner — are reused, never restyled
         in place.
 
-     3. BRAND FILL TAKES --mint. proovd.css:158's hard rule, and the reason the
-        reference's own --white on brand is NOT carried over: #FAFAFA on
-        #41ED98 is imperceptible. Every brand fill below reads --mint.
+     3. BRAND FILL TAKES --mint.  ← SUPERSEDED 2026-08-19 by the owner ruling
+        (see §1/§2 above and CLAUDE.md). Brand fill now takes --white, and the
+        six brand-filled rules below — .pc-avatars, .pc-demo__action,
+        .pc-moment.is-active, .pc-benefit--check, .pc-reward__badge and
+        .checkout__done-icon — were moved with it.
+
+        This convention was written because the reference's own --white on
+        brand was judged imperceptible: #FAFAFA on #41ED98 is 1.46:1 against
+        #E9FFE1's 1.44:1, which was and remains true. The ruling makes it the
+        product's answer anyway, on every brand fill, and one convention that
+        holds everywhere beats two that each hold somewhere. Left here struck
+        rather than deleted so the reasoning survives the reversal.
 
    The two breakpoints are the reference's own (1099.98px and 599.98px) and
    each rule names the overflow it answers.
@@ -6965,7 +7010,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   font-style: normal;
   font-weight: 900;
 }
-.pc-avatars i + i { margin-left: -0.55rem; background: var(--brand); color: var(--mint); }
+.pc-avatars i + i { margin-left: -0.55rem; background: var(--brand); color: var(--white); }
 
 @media (min-width: 1100px) {
   .pc-hero { min-height: calc(100svh - 4.75rem); }
@@ -7037,7 +7082,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   display: inline-flex;
   align-items: center;
   background: var(--brand);
-  color: var(--mint);
+  color: var(--white);
   font-size: 1rem;
   font-weight: 900;
 }
@@ -7061,7 +7106,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   cursor: pointer;
 }
 .pc-moment + .pc-moment { border-left: 1px solid var(--dark); }
-.pc-moment.is-active { background: var(--brand); color: var(--mint); }
+.pc-moment.is-active { background: var(--brand); color: var(--white); }
 .pc-moment span { font-size: 0.8rem; font-weight: 900; }
 .pc-moment strong { margin-top: var(--sp-8); font-size: 1rem; line-height: 1.15; }
 .pc-moment small { margin-top: auto; padding-top: var(--sp-8); font-size: 0.78rem; font-weight: 750; }
@@ -7095,7 +7140,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   line-height: 1;
 }
 .pc-benefit--bars  { background: var(--accent-blue);   color: var(--dark); }
-.pc-benefit--check { background: var(--brand); color: var(--mint); border-color: var(--brand); }
+.pc-benefit--check { background: var(--brand); color: var(--white); border-color: var(--brand); }
 .pc-benefit--dots  { background: var(--accent-yellow); color: var(--dark); }
 
 .pc-benefit__bars { margin: auto 0; display: grid; gap: var(--sp-12); }
@@ -7297,7 +7342,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.is-selected .pc-reward__badge { background: var(--brand); color: var(--mint); }
+.is-selected .pc-reward__badge { background: var(--brand); color: var(--white); }
 .pc-reward__mark {
   width: 2rem;
   height: 2rem;
@@ -7604,7 +7649,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   display: grid;
   place-items: center;
   background: var(--brand);
-  color: var(--mint);
+  color: var(--white);
 }
 .checkout__done-icon svg {
   width: 2.2rem;
@@ -7715,8 +7760,18 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
    33.11.1's 320px reflow is not satisfiable by a scaled fixed stage.
 
    Border radius is var(--radius). The reference's "2px everywhere. Never
-   rounded." and this file's "--radius: 1px - sharp. everywhere." are the same
-   design intent, and one of them is already the system.
+   rounded." and this file's "sharp. everywhere." were the same design intent,
+   and one of them was already the system.
+
+   RESOLVED 2026-08-19 by the owner ruling: --radius is 2px on both postures,
+   so the token now carries the reference's own number and this paragraph is
+   history rather than a live decision.
+
+   It is also, almost certainly, what the ruling meant by "those three come
+   from the shipped Founder Flow". The flow's REFERENCE asked for 2px; this
+   note is where the flow recorded declining it in favour of the token. The
+   shipped flow used 1px like everything else, which is why that premise reads
+   as inaccurate against the code and as reasonable against the reference.
    ═════════════════════════════════════════════════════════════════════════ */
 
 /* Local display recipes. Both bounds always ship. These are the reference's
@@ -9724,3 +9779,176 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
    holds once they wrap. */
 .cf-foot,
 .cf-foot__actions { flex-wrap: wrap; }
+
+
+/* ═══════════════════════ PHASE 39 — the Founder dashboard shell
+   Spec §20, §26, §33.11, DNA §5.2, §5.12, added 2026-08-19.
+   Founder Dashboard Session B — the chrome, not the chapters.
+
+   The number is the GREP's, not the brief's. `founder-dashboard.md` proposed
+   `PHASE 40` and told the reader twice to verify it instead of trusting it;
+   the highest section in this file was 38. The Creator flow's own brief had
+   reserved 39, but its Session A built no surface and wrote no CSS, so 39 was
+   never taken — a contiguous number that every session derives the same way
+   beats a reserved one that only one document knows about.
+
+   The three conventions PHASE 25 set, and 26–34 restated, bind here too:
+
+     1. TOKENS ONLY. The reference's chrome maps onto this file's slots rather
+        than being copied: its `--br` is `--radius`, its `--white` page ground
+        is `--white`, and its current-chapter fill is `--brand-5`, which this
+        palette already defines for exactly that job ("selection / loading /
+        live"). No hex literal and no arbitrary spacing value.
+
+     2. SCOPED OVERRIDES. Everything new is prefixed `.fd-` — checked against
+        `.pc-` (33), `.ff-` (34), `.cr-` (26/32), `.cf-` (31), `.mny-` (36) and
+        `.tdy-` (37), and against `.fd` itself, which appeared nowhere. `.btn`,
+        `.tag`, `.doc-list`, `.kicker` and the drawer are reused untouched.
+
+     3. THIS IS NOT ADMIN CHROME. §26 licenses dashboard density in the Admin
+        panel and nowhere else. The rail is four words on one line; there is no
+        environment chip, no section grid, and no dense table treatment here,
+        and none should be added — the Founder surface it wraps is a
+        chronological workspace (DNA §5.2, §5.3).
+
+   ── The rail WRAPS, it does not scroll ────────────────────────────────────
+   PHASE 38's finding, applied before it can become a defect: a horizontal
+   scroller with no visible scrollbar gives no sign the rest of the tabs exist,
+   and this rail has four items that must all be reachable at 320px. A second
+   line is legible; a hidden chapter is a missing chapter.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.fd {
+  display: block;
+}
+
+/* ── The band ─────────────────────────────────────────────────────────────
+   Sticky, like the reference's. It needs its own ground: a sticky element
+   over scrolling content with a transparent background lets the content run
+   through it, which is the defect PHASE 33 recorded on the campaign header. */
+.fd-band {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-16);
+  padding: var(--sp-16) var(--gutter);
+  background: var(--white);
+  border-bottom: 1px solid var(--grey-light);
+}
+
+.fd-band__brand {
+  font-weight: 900;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+  color: var(--darker);
+  text-decoration: none;
+}
+.fd-band__brand:hover { color: var(--brand); }
+
+.fd-band__name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-width: 0;                     /* the title may be long; let it shrink */
+}
+
+.fd-band__title {
+  font-weight: 800;
+  color: var(--dark);
+  /* A campaign title is Founder-supplied free text and can be one long token
+     at 320 — the same class of defect PHASE 36 fixed on the money console. */
+  overflow-wrap: anywhere;
+}
+
+/* Pushed to the end on a wide band, and simply next in flow once it wraps. */
+.fd-band__more { margin-left: auto; }
+
+/* ── The chapter rail ─────────────────────────────────────────────────── */
+
+.fd-rail {
+  padding: var(--sp-12) var(--gutter) 0;
+}
+
+.fd-rail ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;                  /* see the header note — never a scroller */
+  gap: var(--sp-8);
+}
+
+.fd-chapter {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);         /* §33.11: the 44px minimum, from the token */
+  padding: var(--sp-8) var(--sp-16);
+  border: var(--bw) solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  color: var(--dark);
+  cursor: pointer;
+}
+
+.fd-chapter:hover { border-color: var(--sage); }
+
+/* The reference's own current treatment: brand ring over the selection fill. */
+.fd-chapter.is-current {
+  border-color: var(--brand);
+  background: var(--brand-5);
+  color: var(--darker);
+}
+
+/*
+  A locked chapter reads as unavailable and STAYS focusable — it is
+  `aria-disabled`, never `disabled`, so a keyboard user reaches it and hears
+  the reason in its accessible name. `cursor: not-allowed` is the sighted half
+  of the same message.
+
+  Opacity rather than a colour swap, deliberately: the reference dims to .45,
+  and a dimmed dark-green on white still clears AA for a label at this weight,
+  where re-toning to `--grey` (2.18:1 on white) would not.
+*/
+.fd-chapter.is-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.fd-chapter.is-locked:hover { border-color: transparent; }
+
+/* ── The drawer's chapter list ────────────────────────────────────────────
+   `.doc-list` supplies the list treatment; these three are the row's own
+   parts. The drawer itself is `Drawer.tsx` — Radix Dialog with the portal,
+   focus trap, Escape, backdrop dismiss and GSAP open/close already working. */
+
+.fd-drawer__list li {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.fd-drawer__tag {
+  font-size: var(--fs-tag, 0.75rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  /* The reference uses its own grey here. `--grey` is 2.18:1 on white in this
+     palette, and this line carries the chapter's state — `--moss` is what
+     PHASE 33 and 36 both settled on for small type that has to be read. */
+  color: var(--moss);
+}
+
+.fd-drawer__title { font-weight: 800; }
+
+.fd-drawer__note { color: var(--moss); }
+
+@media (max-width: 600px) {
+  /* The band's three parts stack rather than compete for one line, and the
+     drawer control loses its auto margin so it sits with them. */
+  .fd-band { gap: var(--sp-8); }
+  .fd-band__more { margin-left: 0; }
+  .fd-chapter { padding: var(--sp-8) var(--sp-12); }
+}

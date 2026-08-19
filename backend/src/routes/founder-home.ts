@@ -30,6 +30,7 @@ import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { findFounderCampaign } from '../workspace/service.js';
+import { readFounderDashboard } from '../founder-dashboard/service.js';
 import { readCampaignHome } from '../live/home.js';
 import { readFounderResults } from '../close/results.js';
 import { readFounderPaymentStatus, requestEarlyRemaining } from '../close/founder-payments.js';
@@ -94,6 +95,29 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
     }
     return campaign.campaignId;
   }
+
+  /* ── The dashboard shell's rail (Founder Dashboard Session B) ───────────── */
+
+  /**
+   * The five facts the four-chapter rail is drawn from. Its own read, beside
+   * §20's rather than inside it: `readCampaignHome` issues a delivery receipt
+   * and the shell re-reads on every chapter change (§33.6.6).
+   *
+   * Deliberately readable for a campaign in ANY §23.1 state, including the
+   * pre-live ones. Chapter one is always open, so a Founder whose campaign has
+   * not launched still has a home — which is the whole point of the address.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/dashboard`, founder, async (req, res) => {
+    const dashboard = await readFounderDashboard(db, {
+      campaignId: String(req.params['campaignId'] ?? ''),
+      founderUserId: req.authUser?.id ?? '',
+    });
+    if (!dashboard) {
+      notFound(res);
+      return;
+    }
+    res.json({ dashboard });
+  });
 
   /* ── Glance, Act, Explore — one read (§20) ──────────────────────────────── */
 

@@ -933,6 +933,28 @@ export interface CampaignHomeView {
   milestoneHistory: { kind: string; occurredAt: string; acknowledgedAt: string | null }[];
 }
 
+/**
+ * The dashboard shell's five facts — Founder Dashboard Session B.
+ *
+ * Its own read rather than a slice of `fetchCampaignHome`, because that one
+ * issues a §33.6.6 delivery receipt and the shell re-reads on every chapter
+ * change. See `backend/src/founder-dashboard/service.ts`.
+ */
+export interface FounderDashboardView {
+  campaignId: string;
+  status: string;
+  type: string | null;
+  campaignLiveAt: string | null;
+  campaignCloseAt: string | null;
+  listingPaidAt: string | null;
+  highEffort: boolean;
+  title: string | null;
+}
+
+export const fetchFounderDashboard = (
+  campaignId: string,
+): Promise<{ dashboard: FounderDashboardView }> => call(`${base(campaignId)}/dashboard`);
+
 export const fetchCampaignHome = (campaignId: string): Promise<{ home: CampaignHomeView }> =>
   call(`${base(campaignId)}/home`);
 

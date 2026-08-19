@@ -9,6 +9,7 @@ import { Home } from './features/public/Home.js';
 import { About } from './features/public/About.js';
 import { HowPaymentsWork } from './features/public/HowPaymentsWork.js';
 import { Safety } from './features/public/Safety.js';
+import { SupportPage } from './features/public/SupportPage.js';
 import { PolicyPage } from './features/public/PolicyPage.js';
 import { NotFoundSurface, PageLoading } from './features/public/states.js';
 import { CampaignPage } from './features/public/campaign/CampaignPage.js';
@@ -37,7 +38,7 @@ import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
 import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
-import { CampaignHome } from './surfaces/founder/CampaignHome.js';
+import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
 import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
 import { CampaignResults } from './surfaces/founder/CampaignResults.js';
@@ -205,6 +206,19 @@ const rootChildren: RouteObject[] = [
       { path: 'about', element: <About /> },
       { path: 'how-payments-work', element: <HowPaymentsWork /> },
       { path: 'safety', element: <Safety /> },
+      /*
+        §27.1, §27.8 — Founder Dashboard Session B (B5). `/support` was the
+        `getHelp` target in every Founder Flow step, in `ErrorBoundary`, in
+        §20's Act ranks and in the founder-home 404 body, and it 404ed: the
+        only `support` path in this file was inside the `admin` group below,
+        which makes it `/admin/support`.
+
+        Inside `PublicLayout` and outside every guard, because the pages that
+        link to it include the draft-token flow (no session until §10's claim)
+        and a global error boundary that can catch anything. Sending somebody
+        whose page just broke to a sign-in form is not a support path.
+      */
+      { path: 'support', element: <SupportPage /> },
       ...policyRoutes,
       {
         path: 'campaign/sample-pre-build',
@@ -764,12 +778,23 @@ const rootChildren: RouteObject[] = [
     element: <CampaignUpdates />,
   },
   {
-    // Phase 17a (§20, DNA §5.2, §5.3). The Founder's live campaign home —
-    // Glance, one ranked Act, Explore. Beside the other campaign surfaces,
-    // outside both shells: §26 licenses dashboard density in Admin only, and
-    // this is deliberately a chronological workspace rather than a widget grid.
+    /*
+      Founder Dashboard Session B (2026-08-19). The Founder's home, and the
+      product's first non-Admin authenticated shell: four chapters — Choose,
+      Live, Get paid, Wrap — at ONE address.
+
+      The address does not move. `LiveStep`'s "Go to your campaign home" link,
+      every §27 email that points here, and any bookmark all keep working; the
+      chapter is `?chapter=` beneath it (DNA §5.12), so a position survives a
+      reload without minting a second address for one campaign.
+
+      Phase 17a's §20 surface is not replaced — `FounderDashboard` renders
+      `CampaignHome` as the Live chapter. Session D rebuilds that content to the
+      reference; the other three chapters name the surfaces that own their work
+      today until Sessions C, E and F move it here.
+    */
     path: 'campaigns/:campaignId/home',
-    element: <CampaignHome />,
+    element: <FounderDashboard />,
   },
   {
     // Phase 18b (§21, §33.7.11). The Founder's campaign results — the waiting

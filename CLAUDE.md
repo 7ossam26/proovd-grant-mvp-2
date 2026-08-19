@@ -21,7 +21,7 @@ You are building this one phase at a time. **Read the phase file you were given,
 
 ## Repository state — read this before looking for a file
 
-**Phases 00–24 are complete.** All 131 acceptance tests have been written and passed, and they pass in a single run. Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation — Phase 08 in three: 08a recruitment, 08b the compact signup, 08c the preparing reveal — Phase 09 in two: 09a the workspace, 09b the interview integration — Phase 10 in two: 10a the payments substrate, 10b hosted onboarding and the tax gate — Phase 12 in two on the same precedent (its own brief named the seam): **12a** the formal opportunity, the three §14.2 decisions, the immutable proposal versions, and the §14.6 deadline evaluation; **12b** §14.4 campaign building, §15 roster readiness, review, and the general materiality machine — **Phase 14** on the §17/§18 seam: **14a** the coordinated launch (§17), first-post verification, and the §29.6 required-Creator failure; **14b** the live public campaign page, the §18 attribution contract, discovery timing, and the outcome-specific ended state; **14c** the §18 updates; **14d** the Creator active-partnership surface — **Phase 15** on the seam its own brief named: **15a** the pre-order flow, eligibility, the atomic cap, reservation-time tax, the SetupIntent and consent; **15b** the magic-link page, cancellation, the deduplication queue, and the pre-charge reminder — **Phase 16** on the seam between read-and-reconcile surfaces and case-and-action operations: **16a** the §26.5 ledger, §26.6 money controls, §31.7 risk inventory, and the general high-impact/override machine; **16b** §26.7/§27.8 support operations, suspend/kill, and the §26.8 chronological timeline. **Phase 13** (§16) fit one session: the optional fixed Creator payment as a fourth money stream and the §16 Creator-readiness checklist. And **Phase 17**, split on the seam added to its brief between the campaign as it is observed and the changes people make while it runs: **17a** the §20 Founder campaign home — Glance, one ranked Act, Explore — and the threshold/campaign event substrate underneath it; **17b** §20's three live-editing tiers, mid-campaign Creator addition, the Creator live surface, and the Backer before close including the §18 comment thread 14c left for the Backer identity. And **Phase 20b** — disputes, descriptors, post-capture enforcement, ended pages, and §29 — completing Phase 20 and §33.9. And **Phase 18** — `docs/master-plan.md` §6's "**the critical phase**" — split on the seam its own brief named: **18a** the §21 close batch, the Idea threshold decision, tax-usability validation, off-session capture, and the opening of the one 48-hour window; **18b** the retry window's end, the B.5 update-card recovery, results preparation with the Admin-reviewed narrative, and Admin reconciliation with the visibly-recoverable batch surface. And **Phase 19**, split on the Creator-money/Founder-money seam this session added to its brief: **19a** the §22.1 completion decisions and the five fixed-payment outcomes, earnings finalization with the §24.4 provisional/earned reconciliation, the one idempotent Affiliate Transfer under the §11 tax gate, and the §22.2 thank-you; **19b** the §22.3 W-9 block, the Idea single payment and the Product 40%/60% schedule, evidence-gated early remaining release that never skips Day 14, and the money-surface consistency pass. §33.1.1 through §33.1.9 all pass, §33.2.1 through §33.2.13 all pass, §33.3.1 through §33.3.11 all pass, §33.4.1 through §33.4.9 all pass, §33.5.1 through §33.5.13 all pass, **§33.6.1 through §33.6.13 all pass — §33.6 is complete**, **§33.7.1 through §33.7.12 all pass — §33.7 is complete** (1–2 built in 15b, 3–8 in 18a, 9–12 in 18b), **§33.8.1 through §33.8.14 all pass — §33.8 is complete** (1–8 and 14 built in 19a, 9–13 in 19b), and §33.12.4, §33.9.10, and §33.9.11 all pass. And **Phase 20**, split on the seam this session added to its brief (master-plan §1.3 step 6) between the refund money machine and the operations and enforcement that invoke it: **20a** the §24.8 cause register and allocation records, the reservation-refund lifecycle with Appendix B.6, the §24.9 Idea exceptions with no voluntary path, §24.10 hardening, the per-cause earnings treatments, `charge.refunded` on both endpoints, and the Admin refund surface; **20b** the §24.11 dispute records with the 24-hour Admin task and the assembled evidence packet, `charge.dispute.*` on both endpoints + `transfer.reversed` on Connect, the §24.12 descriptor consolidation (one kernel, suffix at capture, display everywhere), §26.7/§29.7 post-capture suspension/kill invoking 20a's machinery with the read-side funds hold, the outcome-specific ended pages, the §29.1–29.5/§29.8–29.10 enforcement records including the Backer support path and escalation, and the §33.9.12 timeline suppression record. **§33.9.1 through §33.9.13 all pass — §33.9 and Phase 20 are complete.** And **Phase 21a** — the first half of the last lifecycle phase, split on the seam this session added to its brief (master-plan §1.3 step 6) between what the Founder owes and what happens when they don't, and completion and what follows: §22.5 fulfillment with its four obligations and the Backer delivery notice, §22.6 delivery-date changes and their two approval paths, the §22.4 Day 14 Progress Check with its checklist, durable receipt, and per-type consequences, and the §22.7 one-strike ghost ban. **§33.10.1 through §33.10.4 pass**; 21b closed §33.10.5–§33.10.10. And **Phase 22a** — the first third of the notification sweep, split on the seam this session added to its brief (master-plan §1.3 step 6) between the coverage machine and the messages it governs: the deliberate-absence register that partitions all 121 §27 keys into 77 sent and 44 recorded-with-a-reason, the render catalog, the coverage suite, §27.2's rules and §3.3's money facts proved against every rendered message, §27.1's timezone rule, the §3 copy pass, the §30 absence tests, and the preview with its contract report. **§33.6.11 is reconfirmed and §33.9.10/§33.9.12 re-proved through the catalog**. And **Phase 22c** — the last third of the notification sweep, built out of order because it does not depend on 22b: §27.7's optional daily/weekly digest for all three roles, composed from activity records rather than deliveries so it can never carry a transactional message; the preference that no code path can set without a person choosing it; and the authenticated Founder/Creator/Admin notification history with the four ways it would have become a dashboard each asserted absent — plus §27.2's message preview, which 22a's machine had been waiting for a surface. **The §27.7 done-when passes.** And **Phase 22b** — the middle third, built last: all 44 missing senders, the §14.5 word-change derivation that decides which of nineteen association states earns a §27.3 roster message, the three §27.6 queue notices whose services carried no notifier, the §27.8 promise sweep, and §5.5's magic-link reissue with its non-enumerating public ask. **The register empties to the genuinely deferred: 3 `never` decisions and Phase 21b's 5 capabilities, with no `message` entry left. §27 is complete and Phase 22 is done.** And **Phase 23a** — the first half of the P0 pass, split on the line its own acceptance draws (§33.11 is what a person sees; §33.12 is what the system does under replay, a clock, and a stale session): the §33.11 registers, the principal-flow sweep that renders every customer and Admin surface with real data, the built-bundle scan, and the seven-surface cross-surface contract over one pre-order. **§33.11.1 through §33.11.7 all pass — §33.11 is complete**. And **Phase 23b** — the other half: the §33.12 registers (every deadline and the instant it is anchored on, the lifecycle/payment-flag separation, what makes an Admin action sensitive, and the state-changing paths with their mechanisms), the §32.5 test-card matrix with its retained §32.6 evidence log, the §32.7 direct-architecture test over one campaign, the §31.9 first-cohort scoreboard whose baseline is `not measured` until ten Founders, and the three adversarial idempotency cases on the money path. **§33.12.1 through §33.12.7 all pass — §33.12 and Phase 23 are complete, and with them all 131 §33 tests.** And **Phase 24** — the live-mode gate, which builds almost nothing and whose out-of-scope section is one word: §34's eleven conditions as a register with how each is decided and the Track A item behind it, the fail-closed refusal at the ONE Stripe gateway every service shares (which throws at boot on an operation nobody has classified), the campaign-scoped pilot check at every money entry point that creates exposure, the one named pilot enablement with its two owners and its five NOT NULL rollback-plan columns, the rollback that is one statement and takes effect on the next call, and Appendix C's four statements as recorded walks. **The gate is shut: ten of eleven conditions are unsatisfied and eight of those wait on Track A, which is not a coding task.** Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present, alongside the un-numbered post-Phase-24 briefs. **One of those is six sessions and only the first has landed:** `creator-flow-v2.md` and `creator-flow-reconciliation.md` describe the Creator signup and dashboard rebuild, and Session A built the record, the registers, and migration `0055` — **and no surface at all**. See the last section of this file, which says exactly what exists and what each later session owns.
+**Phases 00–24 are complete.** All 131 acceptance tests have been written and passed, and they pass in a single run. Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation — Phase 08 in three: 08a recruitment, 08b the compact signup, 08c the preparing reveal — Phase 09 in two: 09a the workspace, 09b the interview integration — Phase 10 in two: 10a the payments substrate, 10b hosted onboarding and the tax gate — Phase 12 in two on the same precedent (its own brief named the seam): **12a** the formal opportunity, the three §14.2 decisions, the immutable proposal versions, and the §14.6 deadline evaluation; **12b** §14.4 campaign building, §15 roster readiness, review, and the general materiality machine — **Phase 14** on the §17/§18 seam: **14a** the coordinated launch (§17), first-post verification, and the §29.6 required-Creator failure; **14b** the live public campaign page, the §18 attribution contract, discovery timing, and the outcome-specific ended state; **14c** the §18 updates; **14d** the Creator active-partnership surface — **Phase 15** on the seam its own brief named: **15a** the pre-order flow, eligibility, the atomic cap, reservation-time tax, the SetupIntent and consent; **15b** the magic-link page, cancellation, the deduplication queue, and the pre-charge reminder — **Phase 16** on the seam between read-and-reconcile surfaces and case-and-action operations: **16a** the §26.5 ledger, §26.6 money controls, §31.7 risk inventory, and the general high-impact/override machine; **16b** §26.7/§27.8 support operations, suspend/kill, and the §26.8 chronological timeline. **Phase 13** (§16) fit one session: the optional fixed Creator payment as a fourth money stream and the §16 Creator-readiness checklist. And **Phase 17**, split on the seam added to its brief between the campaign as it is observed and the changes people make while it runs: **17a** the §20 Founder campaign home — Glance, one ranked Act, Explore — and the threshold/campaign event substrate underneath it; **17b** §20's three live-editing tiers, mid-campaign Creator addition, the Creator live surface, and the Backer before close including the §18 comment thread 14c left for the Backer identity. And **Phase 20b** — disputes, descriptors, post-capture enforcement, ended pages, and §29 — completing Phase 20 and §33.9. And **Phase 18** — `docs/master-plan.md` §6's "**the critical phase**" — split on the seam its own brief named: **18a** the §21 close batch, the Idea threshold decision, tax-usability validation, off-session capture, and the opening of the one 48-hour window; **18b** the retry window's end, the B.5 update-card recovery, results preparation with the Admin-reviewed narrative, and Admin reconciliation with the visibly-recoverable batch surface. And **Phase 19**, split on the Creator-money/Founder-money seam this session added to its brief: **19a** the §22.1 completion decisions and the five fixed-payment outcomes, earnings finalization with the §24.4 provisional/earned reconciliation, the one idempotent Affiliate Transfer under the §11 tax gate, and the §22.2 thank-you; **19b** the §22.3 W-9 block, the Idea single payment and the Product 40%/60% schedule, evidence-gated early remaining release that never skips Day 14, and the money-surface consistency pass. §33.1.1 through §33.1.9 all pass, §33.2.1 through §33.2.13 all pass, §33.3.1 through §33.3.11 all pass, §33.4.1 through §33.4.9 all pass, §33.5.1 through §33.5.13 all pass, **§33.6.1 through §33.6.13 all pass — §33.6 is complete**, **§33.7.1 through §33.7.12 all pass — §33.7 is complete** (1–2 built in 15b, 3–8 in 18a, 9–12 in 18b), **§33.8.1 through §33.8.14 all pass — §33.8 is complete** (1–8 and 14 built in 19a, 9–13 in 19b), and §33.12.4, §33.9.10, and §33.9.11 all pass. And **Phase 20**, split on the seam this session added to its brief (master-plan §1.3 step 6) between the refund money machine and the operations and enforcement that invoke it: **20a** the §24.8 cause register and allocation records, the reservation-refund lifecycle with Appendix B.6, the §24.9 Idea exceptions with no voluntary path, §24.10 hardening, the per-cause earnings treatments, `charge.refunded` on both endpoints, and the Admin refund surface; **20b** the §24.11 dispute records with the 24-hour Admin task and the assembled evidence packet, `charge.dispute.*` on both endpoints + `transfer.reversed` on Connect, the §24.12 descriptor consolidation (one kernel, suffix at capture, display everywhere), §26.7/§29.7 post-capture suspension/kill invoking 20a's machinery with the read-side funds hold, the outcome-specific ended pages, the §29.1–29.5/§29.8–29.10 enforcement records including the Backer support path and escalation, and the §33.9.12 timeline suppression record. **§33.9.1 through §33.9.13 all pass — §33.9 and Phase 20 are complete.** And **Phase 21a** — the first half of the last lifecycle phase, split on the seam this session added to its brief (master-plan §1.3 step 6) between what the Founder owes and what happens when they don't, and completion and what follows: §22.5 fulfillment with its four obligations and the Backer delivery notice, §22.6 delivery-date changes and their two approval paths, the §22.4 Day 14 Progress Check with its checklist, durable receipt, and per-type consequences, and the §22.7 one-strike ghost ban. **§33.10.1 through §33.10.4 pass**; 21b closed §33.10.5–§33.10.10. And **Phase 22a** — the first third of the notification sweep, split on the seam this session added to its brief (master-plan §1.3 step 6) between the coverage machine and the messages it governs: the deliberate-absence register that partitions all 121 §27 keys into 77 sent and 44 recorded-with-a-reason, the render catalog, the coverage suite, §27.2's rules and §3.3's money facts proved against every rendered message, §27.1's timezone rule, the §3 copy pass, the §30 absence tests, and the preview with its contract report. **§33.6.11 is reconfirmed and §33.9.10/§33.9.12 re-proved through the catalog**. And **Phase 22c** — the last third of the notification sweep, built out of order because it does not depend on 22b: §27.7's optional daily/weekly digest for all three roles, composed from activity records rather than deliveries so it can never carry a transactional message; the preference that no code path can set without a person choosing it; and the authenticated Founder/Creator/Admin notification history with the four ways it would have become a dashboard each asserted absent — plus §27.2's message preview, which 22a's machine had been waiting for a surface. **The §27.7 done-when passes.** And **Phase 22b** — the middle third, built last: all 44 missing senders, the §14.5 word-change derivation that decides which of nineteen association states earns a §27.3 roster message, the three §27.6 queue notices whose services carried no notifier, the §27.8 promise sweep, and §5.5's magic-link reissue with its non-enumerating public ask. **The register empties to the genuinely deferred: 3 `never` decisions and Phase 21b's 5 capabilities, with no `message` entry left. §27 is complete and Phase 22 is done.** And **Phase 23a** — the first half of the P0 pass, split on the line its own acceptance draws (§33.11 is what a person sees; §33.12 is what the system does under replay, a clock, and a stale session): the §33.11 registers, the principal-flow sweep that renders every customer and Admin surface with real data, the built-bundle scan, and the seven-surface cross-surface contract over one pre-order. **§33.11.1 through §33.11.7 all pass — §33.11 is complete**. And **Phase 23b** — the other half: the §33.12 registers (every deadline and the instant it is anchored on, the lifecycle/payment-flag separation, what makes an Admin action sensitive, and the state-changing paths with their mechanisms), the §32.5 test-card matrix with its retained §32.6 evidence log, the §32.7 direct-architecture test over one campaign, the §31.9 first-cohort scoreboard whose baseline is `not measured` until ten Founders, and the three adversarial idempotency cases on the money path. **§33.12.1 through §33.12.7 all pass — §33.12 and Phase 23 are complete, and with them all 131 §33 tests.** And **Phase 24** — the live-mode gate, which builds almost nothing and whose out-of-scope section is one word: §34's eleven conditions as a register with how each is decided and the Track A item behind it, the fail-closed refusal at the ONE Stripe gateway every service shares (which throws at boot on an operation nobody has classified), the campaign-scoped pilot check at every money entry point that creates exposure, the one named pilot enablement with its two owners and its five NOT NULL rollback-plan columns, the rollback that is one statement and takes effect on the next call, and Appendix C's four statements as recorded walks. **The gate is shut: ten of eleven conditions are unsatisfied and eight of those wait on Track A, which is not a coding task.** Every path this file names exists at the path it names. `docs/phases/phase-00.md` … `phase-24.md` are all present, alongside the un-numbered post-Phase-24 briefs. **Two of those are multi-session and only the first session of each has landed:** `creator-flow-v2.md` and `creator-flow-reconciliation.md` describe the Creator signup and dashboard rebuild, and Session A built the record, the registers, and migration `0055` — **and no surface at all**; `founder-dashboard.md` describes the Founder's home after the flow in seven sessions, and Sessions A and B have landed — the owner ruling, then the shell, the four-chapter address and the `/support` route the whole product had been pointing at — **and no chapter content at all**. See the last three sections of this file, which say exactly what exists and what each later session owns.
 
 What exists on disk:
 
@@ -1050,7 +1050,7 @@ Session B is the surface: `CampaignPage.tsx` rewritten (not patched) to the refe
 - **The campaign panel is a real `<section>` with a name**, not a styled div — which is also what keeps `#campaign-dates`'s own §27.1 test meaningful, since it reads the nearest section.
 - **The updates archive is a genuine disclosure, and one Phase 14b assertion moved with it.** The latest update is the feature and the rest sit one gesture below (DNA §5.12); Radix unmounts a closed panel, so `campaign-live.test.tsx` now opens the archive before asserting the earlier update — a deliberate change, not an adjustment, because the alternative was a "disclosure" whose content was always in the DOM.
 - **The metric renders as value and label together.** 0049 made it both halves or neither; the page makes the label the number's accessible name rather than a caption floating beside it, because a bare `86%` reads as nothing at all (§28.5).
-- **`PHASE 33` records the reference's `:root` mapping rather than guessing it**, reuses `.btn`, `.kv`, `.doc-list`, `.accordion`, `.progress`, `.dock`, `.update`, `.consent` and `.sample-banner` untouched, and takes `--mint` on every brand fill (proovd.css:158's hard rule — `#FAFAFA` on `#41ED98` is imperceptible, which is why the reference's own `--white` is not carried over). The prefix is `.pc-`: `.cmp-` is PHASE 28's Campaigns Admin and `.site-nav` is the site header's own.
+- **`PHASE 33` records the reference's `:root` mapping rather than guessing it**, reuses `.btn`, `.kv`, `.doc-list`, `.accordion`, `.progress`, `.dock`, `.update`, `.consent` and `.sample-banner` untouched, and took `--mint` on every brand fill (proovd.css:158's hard rule — `#FAFAFA` on `#41ED98` is imperceptible, which is why the reference's own `--white` was not carried over). **That last decision was superseded on 2026-08-19 by the owner ruling** — brand fill takes `--white` now, and this page's six brand-filled rules moved with the token; see the Founder Dashboard Session A section at the end of this file. The observation that made it is still true (1.46:1 against 1.44:1); the ruling makes it the product's answer anyway. The prefix is `.pc-`: `.cmp-` is PHASE 28's Campaigns Admin and `.site-nav` is the site header's own.
 
 
 ### The prospect intake is two acts, not one (§7, post-Phase-24 change)
@@ -2257,4 +2257,261 @@ this is the second time that number has moved — which is the argument for the 
   its own defect rather than masked by the shell's. §33.11's manual gate is untouched: real focus
   visibility, 44px tap targets, colour contrast, and an actual screen-reader pass still need a
   person, and `.btn--primary`'s 1.44:1 remains the documented, scoped tech-stack §3.6 exception it
-  has always been.
+  has always been. **(That pair is 1.46:1 as of 2026-08-19 — the owner ruling below moved the text
+  from `#E9FFE1` to `#FAFAFA`. Still the same exception, still scoped the same way.)**
+
+### The owner ruling — Founder Dashboard Session A of seven (DNA §1/§2/§10.1, §33.11, 2026-08-19)
+
+`docs/phases/founder-dashboard.md` is the Founder's home after the flow — four chapters, settings
+and a Backers page, built from `docs/design-refrence/Proovd_Founder_Dashboard_v5.html`. **It is
+seven sessions and only A has landed: the owner ruling. It writes no dashboard code**, and B–G are
+the shell, the four chapters, the Backers page, and §5.2's settings panel.
+
+The reference's application header carries an owner ruling, quoted here as it is written:
+
+> OWNER RULING (supersedes DNA 2 / 1 / 10.1): radius is 2px on both postures, brand-green fill
+> takes #FAFAFA text, and the inset highlight ships on brand-filled primaries. Those three come
+> from the shipped Founder Flow. Every other DNA rule stands.
+
+It is **product direction**, taken as such, and it is the only change in this product that has
+moved a design token — nothing had touched `:root` since the file was written. Two `--radius`
+declarations and thirteen colour declarations changed value, and one `box-shadow` was added.
+Nothing else in the session is code.
+
+- **Three premises in the chain were not accurate, and each is recorded rather than quietly fixed.**
+  The pattern matters more than any one of them: a ruling is transcribed into a brief, the brief
+  derives an edit list mechanically, and the derivation drops what the ruling actually said.
+  - **"Those three come from the shipped Founder Flow" is not true of the code**, which the brief
+    already says: `--radius` was `1px` and `radius: 2px` appeared zero times in the whole
+    stylesheet. What the brief did not have is *why* somebody would believe it — `PHASE 34`'s own
+    header records the flow's REFERENCE asking for "2px everywhere. Never rounded." and the flow
+    declining it because "one of them is already the system." So the ruling promotes the Founder
+    Flow reference's own number to the token, which is a much better description of it than "an
+    alignment to something that is not there". That paragraph is now marked resolved.
+  - **"It is a slot change, not a hunt through selectors… three edits reach the whole product"** is
+    not accurate, and the brief's table is a grep rather than a derivation. It names `--btn1-text`
+    in `:root, .mode-none` and in `.mode-light`, and misses **four hover slots that are genuine
+    brand fills** — `--btn2-htext` in `.mode-none` and `.mode-light`, `--btn1-htext` in `.mode-dark`
+    and `.mode-light` — plus `.btn.is-done .btn__label` and **six hardcoded `PHASE 33` rules**.
+    Applying only the two named would have left the ruling's own hard rule untrue in eleven places
+    the moment it was written down, which is the failure the brief warns about one level up ("a rule
+    that is no longer true is worse than no rule").
+  - **The brief's table halves the phone radius to `1px`**, against the ruling's "2px on **both
+    postures**" — a phrase that is redundant under any other reading — and against the reference,
+    which declares `--br:2px` inside its own `@media (max-width:600px)` block beside a `--bw` that
+    does halve. The ruling and the reference win: **2px in both blocks**, and the border widths
+    still halve while the radius deliberately does not.
+- **Two of the brief's targets are not brand fills, and the distinction decided what moved.**
+  `.mode-light`'s primary is a **dark-green** fill and `.mode-dark`'s is a **white** one. The ruling
+  reaches neither. `.mode-light`'s moved anyway on the brief's own explicit product direction, and
+  is not a regression in either direction (`#FAFAFA` on `#013F17` is 11.7:1 against the `#E9FFE1` it
+  replaces at 11.5:1). `.mode-dark`'s `--btn1-text: var(--dark)` was **kept** — the brief says keep
+  it, and the better reason is that it is not a brand fill at all, so the comment on it now records
+  that it was considered.
+- **The browser pass found a third pairing nobody had listed, and it was kept for the same reason.**
+  `.ff-splash` puts `--dark` on brand — 8.0:1, plainly deliberate. Blanket-applying the ruling would
+  have taken a genuinely readable pairing down to 1.46:1. The ruling replaces `#E9FFE1`; it is not a
+  mandate to destroy the two deliberate high-contrast pairings on brand.
+- **The inset highlight sits on the tier, not in a fourth per-mode slot.** It reads as a top-edge
+  gloss on the brand and dark-green fills and is invisible on `.mode-dark`'s white one, so a slot
+  would have bought four declarations and a hover complication for a clause the ruling states in six
+  words. An inset shadow paints above the background and below child content, so `.btn__fill` covers
+  it during the §6.5 progress morph — which is what should happen.
+- **Three records that were no longer true were edited, not left standing.** `proovd.css:158`'s hard
+  rule; `PHASE 33`'s third convention, struck in place with its reasoning kept because the
+  observation that produced it is still true (`#FAFAFA` on brand really is imperceptible against
+  `#E9FFE1` — 1.46:1 against 1.44:1 — and the ruling makes it the product's answer anyway); and
+  campaign-page-v2's own line in this file. Tech-stack §3.6 is re-recorded with the new value.
+- **§3.6 was also narrower than the product, and now says so.** It ended "the exception covers the
+  one button pair, nothing else", and that had been untrue since 2026-08-18: campaign-page-v2
+  shipped five non-button brand fills carrying text at the same ratio — the avatar initial, the
+  illustrated demo control, the active demo moment, the check benefit card, and the selected reward
+  badge. Same exception, unrecorded. The exception is **brand fill**, wherever it appears.
+
+**The verification was measured, not eyeballed, and that is what makes the claims here checkable.**
+120 page loads — every §33.11 principal flow plus the public site and both samples — at 1280 and at
+a **true** 320 through `Emulation.setDeviceMetricsOverride` rather than `--window-size`, which is the
+trap `PHASE 38` records. Zero unmatched fixtures, so every surface rendered its real content rather
+than an error state (§33.11.1's own rule, applied to a browser).
+
+- **The whole run was done three times: once on the pre-change stylesheet, twice on the new one.** A
+  picture cannot tell "the change did this" from "this was already so", and this change had the
+  largest blast radius in the product.
+- **`--radius` reads `1px`/`0.5px` before and `2px` at both widths after. Brand-fill text reads
+  `rgb(233,255,225)` before and `rgb(250,250,250)` after, across 192 brand-filled elements, with the
+  two deliberate `rgb(1,63,23)` pairings surviving both runs.** All 166 sampled `.btn--primary`s
+  carry the inset. Measured at runtime, so a brand fill missed in the stylesheet would have surfaced
+  here rather than in a later session.
+- **The change is layout-neutral, and that is proved rather than argued.** `var(--radius)` appears in
+  `border-radius` and nowhere else; colour and inset shadows never affect layout. The empirical half:
+  nine routes' overflow numbers differed between the pre- and post-change runs, and **eleven differed
+  between two runs of the *identical* stylesheet** — the wobble is the probe sampling mid-animation
+  on the flow's GSAP entry transitions, not the token. More variance from no change than from the
+  change is the cleanest form that proof takes.
+- **No new low-contrast pair appeared anywhere outside the brand-fill exception**, compared as a set
+  against the baseline rather than spot-checked.
+
+**Two pre-existing defects the pass surfaced, deterministic across all three runs, and deliberately
+NOT fixed here.** Session A is a token change; fixing an unrelated layout bug in `PHASE 34` — whose
+clearance media queries Session C already got wrong once — is not "one token change, one rule edit",
+and the 2026-08-17 Affiliate-shell entry is the precedent for recording rather than absorbing one.
+
+- **`.ff__badge` overflows the right edge at 320** on eleven Founder Flow pages (+15 to +28px). It is
+  `position: fixed`, so it escapes every stacking fix around it — and it is the same control Session
+  C already caught at 1280×520, where "its stage clearance was inside the mobile media query while
+  the badge is fixed at every width." Same element, same class of bug, other axis. **Session B owns
+  the flow's landing and should take it.**
+- **`/safety` reports a 1401px scroll width at 1280.** Nothing is past the viewport once the page
+  settles, so it is an entry animation leaving scrollable overflow behind rather than a static
+  layout defect. Unchanged by this session and unrelated to it.
+
+**Where the pass does NOT reach, stated rather than implied.** It walks `PRINCIPAL_FLOWS`, and that
+register names six Admin ADDRESSES across four sections — Today, Founders, Money and Live mode.
+**Campaigns, Backers, Creators and Support were not rendered**, because §33.11 does not register
+them and no QA fixture answers their reads. Writing four fixture sets would be adding flows to an
+acceptance register, which is not a token session's work. What carries the claim for those four is
+that the change is at the SLOT level and was measured at runtime across 192 brand-filled elements
+and 166 primaries — they read the same `--btn1-*` slots as the four that were rendered. If a later
+session wants them covered visually, the fixtures are the thing to build, and they belong to
+§33.11 rather than here.
+
+**What Session A deliberately did not do:** write any dashboard code; touch `.mode-dark`'s
+`--btn1-text` or `--btn2-htext`, or any other non-brand fill; add a `--btn1-inset` slot; change a
+`border-radius` that was not reading the token (fourteen are `50%`, `99px`, `12px`, `14px`, `4px` or
+`0`, all deliberate); extend `PRINCIPAL_FLOWS`; or fix either pre-existing defect above.
+
+**`npm test` is 127 files and 3,470 tests, green in one run** — backend 1,697, shared 465, frontend
+1,308 — including `a11y.test.tsx`'s stylesheet scans, the §33.11 sweep over every principal flow,
+and §33.11.3's scan of a freshly built bundle. **Export `TEST_DATABASE_URL` first.** It lives in
+`.env` and `.env` is not loaded into the shell, so without it `app-harness.ts` falls back to
+Testcontainers, finds no Docker, and the run reports ~61 failed FILES and 0 failed TESTS — which is
+the identical summary line to the intermittent esbuild `tsconfig.base.json` flake this file already
+documents, with a different fix. Look for `PostgreSqlContainer.start` in the stack before batching
+anything.
+
+### …and the shell, and the address — Session B of seven (§20, §26, §27.1, §27.8, §33.11, DNA §5.12, 2026-08-19)
+
+Session B is the chrome: the Founder's first authenticated shell, four chapters at one address, and
+the route `/support` never had. **It writes no chapter content** — C–F own that, and G owns §5.2's
+settings panel.
+
+`shared/src/founder-dashboard/index.ts` owns the chapter register; `backend/src/founder-dashboard/
+service.ts` the shell's own read with one route on `founder-home.ts`; `frontend/src/surfaces/
+founder/FounderDashboard.tsx` the shell; `frontend/src/features/public/SupportPage.tsx` the support
+page; `PHASE 39` the styles; `founder-dashboard.test.tsx` (17) and two new `live-operations`
+tests are the artifact. **`npm test` is 128 files and 3,498 tests, green in one run** (was 127 and
+3,470). No migration — nothing about the shell is a new fact about a campaign.
+
+- **`/support` was a live bug, and it was the largest thing in this session.** `support` was
+  declared INSIDE the `admin` route group, so the only address it ever had was `/admin/support`.
+  Meanwhile `/support` is the `getHelp` target in every Founder Flow step, in the global
+  `ErrorBoundary`, in §20's Act ranks, and in the 404 body `founder-home.ts` returns — twelve-plus
+  call sites. §27.1's sixth question, "how do I get help without losing context", was answered
+  product-wide with a link to nothing.
+- **It is public, and that is forced rather than chosen.** The flow's stage-1 and stage-2 pages are
+  behind a DRAFT TOKEN rather than a session (§10's claim is what creates the account), and
+  `ErrorBoundary` wraps routes nobody is signed in for. A `/support` behind `RequireRole` would send
+  exactly the people whose page just broke to a sign-in form.
+- **There is no intake form on it, and the absence is asserted.** §26.7's case machinery — the
+  `PVD-…` reference, the owner, §27.8's business-day deadline stored beside its calendar version —
+  is reached today by an Admin and by a Backer holding a magic link. There is **no Founder or
+  Creator intake route on the server**. Rendering a form over an endpoint that does not exist would
+  be the §1.4 failure this page was written to fix, one layer down; building that endpoint is
+  §26.7's work. What ships is the commitment that IS published: `SERVICE_SLA_BLOCK`, the same
+  constant the footer renders, so the promise on the page and the promise in the footer are
+  literally the same string.
+- **It is not a fifteenth `PUBLIC_ROUTES` row.** That list is §18's inventory of the public site,
+  its length is fixed at fourteen, and the suite sweeps every entry as a marketing page. `/support`
+  has no §18 content requirement — it is its own `SUPPORT_ROUTE` entry, in `LINKABLE_ROUTE_PATHS` so
+  §33.11.6's broken-link scan accepts links to it, and in neither the header nav nor
+  `REQUIRED_FOOTER_LINKS`. It is reached from the `getHelp` control on the panel that needed it,
+  which is what "without losing context" means.
+- **`support_page` is a sixteenth principal flow with `keyboardPathRequired: true`**, because §28.5
+  names "support" among its own five by name. It is also the first entry in the sweep's
+  `READS_NOTHING` set since `token_unavailable` — that set was two literals written twice, in the
+  failure filter and the loading filter, and is now one named constant. A static page has no failure
+  state and no loading state, so asserting §27.1's six questions against one would be asserting them
+  against the page's ordinary content.
+
+**The shell, and the two things about it that are decisions rather than markup.**
+
+- **It is neither of the two shells that already exist.** Not `AdminFrame` — §26 licenses dashboard
+  density in Admin and NOWHERE else, and shared chrome is exactly how that density leaks into a
+  Founder surface; the rail here is four words, not eight sections. Not `PublicLayout` — a signed-in
+  Founder reading their own campaign does not need a marketing nav, and the §31.4 footer sitemap is
+  wayfinding for somebody who is not signed in. It is the product's **first non-Admin authenticated
+  chrome**, and the Creator dashboard is the obvious next tenant.
+- **The address does not move, and the chapter is a search parameter under it.**
+  `/campaigns/:campaignId/home` is what `LiveStep`'s "Go to your campaign home" links to and what
+  §27's emails point at, so all of it keeps working; `?chapter=` beneath it is the position (DNA
+  §5.12), the reasoning `routes.tsx` already records for the draft flow and the Admin record tabs.
+  A fresh router with the address as its only entry IS a reload, and that is how the suite proves
+  the position survives one.
+- **Phase 17a's §20 surface is not replaced.** The Live chapter renders `CampaignHome` — Glance, the
+  ranked Act and Explore, swept by §33.11 since Phase 23a. Rendering a placeholder over a working
+  surface would be a regression dressed as progress, so the suite asserts the Act's own label is on
+  the page. Session D rebuilds that content to the reference.
+- **The three unbuilt chapters name the surface that owns their work today**, with real routes — the
+  arrangement the Admin rebuilds established for their un-rebuilt sections. Not an apology and not
+  an empty frame.
+- **The shell renders no `h1`; whichever chapter is showing supplies it.** §33.11.2 requires exactly
+  one, `CampaignHome` has had its own since Phase 23a, and the browser pass confirms every one of
+  116 route-widths renders exactly one.
+
+**B4 is where the reference and production actually diverge, and it is a column rather than a
+parameter.** The supplied reference drives its whole state from `?phase=`, `?type=`, `?effort=`,
+`?upfront=` and `?day=`. Every one is a column here, read on the server.
+
+- **`campaigns.status` decides which chapter a campaign is IN.** `CAMPAIGN_STATUS_CHAPTER` is total
+  over §23.1's 27 values by `satisfies`, on the `CAMPAIGN_STATUS_LABELS` precedent: a 28th state
+  fails the BUILD rather than quietly falling into chapter one.
+- **`campaign_live_at` decides whether the money chapters may open at all, and it is the whole
+  reason the shell reads a column rather than counting statuses.** §31.6's pre-live cancellation and
+  §14.6's no-Creator failure both END a campaign that never opened, so both land in Wrap — and
+  without this, "every chapter up to the current one is open" would hand that Founder a Live chapter
+  and a Get-paid chapter for a campaign with no Backers and no charge. `campaign_close_at` cannot
+  stand in: §17 stamps that at LAUNCH, as a schedule.
+- **A locked chapter asked for by URL falls back rather than refusing.** A stale bookmark is not an
+  attack. `founderChapterOrDefault` sends the request to the campaign's real chapter, and the
+  browser pass caught this working by accident — the `?chapter=payouts` screenshot of a live
+  campaign renders Live.
+- **`aria-disabled`, never `disabled`, on a locked chapter**, with the reason on the accessible name
+  — so the announcement is "Get paid, Opens when the campaign closes…" rather than a mystery tab a
+  keyboard user cannot even reach (§28.5, the Support workspace's own rule).
+- **The shell's read is its OWN read, and that is the trap this session had to avoid.** `readGlance`
+  issues a `campaign_home_deliveries` receipt carrying the count it rendered (§33.6.6), and the
+  shell re-reads on every chapter change — a shell that minted a receipt per chapter switch would
+  advance last-seen for deltas the Founder never saw. `GET …/dashboard` touches no delivery record
+  and writes nothing, and the backend test reads it four times and asserts the receipt count did not
+  move.
+
+**`PHASE 39`, not the brief's `PHASE 40`, and the brief said to check.** The highest section in
+`proovd.css` was 38. The Creator flow's brief had reserved 39, but its Session A built no surface
+and wrote no CSS, so 39 was never taken — a contiguous number every session derives the same way
+beats a reserved one only one document knows about. `.fd-` was checked against `.pc-` (33), `.ff-`
+(34), `.cr-` (26/32), `.cf-` (31), `.mny-` (36) and `.tdy-` (37). **The rail WRAPS rather than
+scrolling**, PHASE 38's own finding applied before it could become a defect: a horizontal scroller
+with no visible scrollbar gives no sign the rest exist, and all four chapters must be reachable at
+320.
+
+**The browser pass found one defect and confirmed two pre-existing ones.** 116 route-widths at 1280
+and a true 320, zero unmatched fixtures.
+
+- **`Get help` rendered beside the second bullet of a list.** The interim chapter put a block `<ul>`
+  in `StatePanel`'s `action` slot, which the panel lays out in a row with `getHelp`. It is one
+  control now — the chapter's primary surface, DNA §5.6 — with any others below the panel. jsdom has
+  no layout, so nothing but a screenshot could have caught it. Ninth rebuild in a row.
+- **All four chapters and `/support` measure 0px document overflow at both widths**, and the rail
+  and band both wrap cleanly at 320.
+- **The `.ff__badge` overflow Session A recorded is unchanged**, on the same eleven Founder Flow
+  pages. It is `position: fixed` and belongs to `PHASE 34`; this session touched no flow page.
+- **A new pre-existing finding, recorded and NOT fixed: `.mode-light`'s body slot is 3.33:1.**
+  `--moss` (#669370) on `--mint` (#E9FFE1) is below AA's 4.5:1 for body text, and it is the slot
+  every light-green section in the product uses — About, Safety, the campaign page, and now this
+  support page. Changing it is a product-wide design decision with its own six-surface screenshot
+  pass, not a chrome session's. tech-stack §3.6's exception covers brand fill and does not reach it.
+
+**What Session B deliberately did not do:** write any chapter content; replace `CampaignHome`; add a
+migration; build a Founder support-case intake (§26.7 owns that, and there is no server route);
+put `/support` in the header nav or the §18 fourteen; or touch §15's review, §16's readiness, §17's
+launch, or §14's Creator decisions — the dashboard waits on all four and renders their state.

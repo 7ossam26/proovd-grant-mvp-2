@@ -2206,6 +2206,30 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/founder\/campaigns\/[^/]+\/review$/, body: { review: latestReview } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/creator-readiness$/, body: { readiness } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/updates$/, body: updates },
+  /*
+    The dashboard shell's rail (Founder Dashboard Session B). The SAME campaign
+    every other fixture describes — §33.11.5's rule: a fixture set where each
+    surface invents its own facts cannot notice a disagreement.
+
+    `campaignLiveAt` is set because this campaign is `live`, and it is what
+    unlocks the Live chapter. A fixture that left it null while claiming `live`
+    would render a rail whose current chapter was locked.
+  */
+  {
+    match: /\/api\/founder\/campaigns\/[^/]+\/dashboard$/,
+    body: {
+      dashboard: {
+        campaignId: QA.campaignId,
+        status: 'live',
+        type: 'pre_launch',
+        campaignLiveAt: '2026-08-20T17:00:00.000Z',
+        campaignCloseAt: QA.closesAt,
+        listingPaidAt: '2026-08-01T12:00:00.000Z',
+        highEffort: false,
+        title: QA.title,
+      },
+    },
+  },
   { match: /\/api\/founder\/campaigns\/[^/]+\/home$/, body: { home } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/home\/seen$/, body: { acknowledged: true, advanced: true } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/results$/, body: { results } },
