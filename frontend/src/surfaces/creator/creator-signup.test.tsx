@@ -184,7 +184,14 @@ function stubInvitation(options: {
 
 async function renderSignup() {
   const router = createMemoryRouter(appRoutes, {
-    initialEntries: [`/creator-invitation/${TOKEN}`],
+    // MOVED (Creator Flow v2 Session B, 2026-08-19). `/creator-invitation/:token`
+    // is screen 0 of the flow now; this page is its interim tail at `/finish`
+    // until Session C builds screens 4–8 and retires the address to a redirect.
+    //
+    // Only the ENTRY POINT moved. Every assertion below is the one it always
+    // was, and §33.2.2's own claim — one page, one primary action — is
+    // re-authored in Session C, which is the session that removes the page.
+    initialEntries: [`/creator-invitation/${TOKEN}/finish`],
   });
   const view = render(<RouterProvider router={router} />);
   return view;
@@ -249,12 +256,26 @@ describe('§33.2.2 — the compact flow', () => {
     expect(await screen.findByText(/^you wrote this\.$/i)).toBeTruthy();
   });
 
-  it('says the phone is never verified, and offers no way to verify it', async () => {
+  it('does not re-ask what the flow already collected, and names it instead', async () => {
+    // MOVED (Creator Flow v2 Session B, 2026-08-19). The phone, the legal name,
+    // the email and the channel are screens 2–3's now, and the assertion that
+    // the phone is labelled unverified moved with them to
+    // `creator-flow.test.tsx`. A record collected on two screens is a record
+    // whose two copies eventually disagree, and a suite testing both copies
+    // would have made that look correct.
+    //
+    // What is tested here is the other half: this page asks for none of them
+    // and names each with a link back to the page that owns it (§1.4).
     stubInvitation();
     await renderSignup();
-    await screen.findByLabelText(/^phone$/i);
+    await screen.findByRole('button', { name: /confirm and create account/i });
 
-    expect(screen.getByText(/we never verify it and never send codes to it/i)).toBeTruthy();
+    for (const label of [/^phone$/i, /full legal name/i, /^email$/i, /audience niche/i]) {
+      expect(screen.queryByLabelText(label)).toBeNull();
+    }
+    expect(screen.getByRole('heading', { name: /what you told us/i })).toBeTruthy();
+
+    // Still nowhere to verify a phone number, on any surface (§33.1.8).
     expect(screen.queryByRole('button', { name: /verify/i })).toBeNull();
   });
 

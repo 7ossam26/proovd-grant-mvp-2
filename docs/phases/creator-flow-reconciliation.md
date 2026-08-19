@@ -313,6 +313,12 @@ is 33 of those. Nothing existing was changed to make it pass: the four suites
 most exposed to the schema change (`affiliate-signup`, `creator-workspace`,
 `creator-relationship`, and the new one) were run together and pass at 152/152.
 
+**After Session B: 128 files, 3,540 tests, 0 failures** — backend 1,697 (66
+files), shared 465 (31 files), frontend 1,378 (31 files). Session B's own suite
+is 25 of those, and it added no backend test: everything it built is a surface,
+a register entry, a stylesheet section, or a column reader whose write path the
+existing `affiliate-signup` suite already drives.
+
 **A note on how that number was obtained, because the next session will hit
 it.** This machine cannot run `npm test` as one command: esbuild intermittently
 fails to read `tsconfig.base.json` with *"Access is denied"*, which aborts
@@ -327,13 +333,154 @@ checking that line first.
 
 ---
 
-## 7. Session screen orders, as built
+## 7. Session B's screen order, as built
 
-*Sections 7, 9, 11, 13, 15, 17 — `## N. Session X's screen order, as built` — to be appended in
-forward order by each session.*
+| # | Address | Screen | What it owns |
+|---|---|---|---|
+| 0 | `/creator-invitation/:token` | the invitation | The recorded name, the re-authored promise, §8's no-obligation sentence, and the splash |
+| 1 | `/creator-invitation/:token/password` | the password | One requirement, the confirm that grows in, and the credential that is written nowhere |
+| 2 | `/creator-invitation/:token/you` | you | Legal name, email (**editable**), phone (**labelled unverified**) |
+| 3 | `/creator-invitation/:token/channel` | your channel | Nine tiles, handle, niche, niche description, and the student-only promotion plan |
+| — | `/creator-invitation/:token/finish` | *(interim)* | Phase 08b's compact signup, moved down one segment. **Not in the register.** Session C replaces it and retires the address to a redirect |
 
-## 8. Browser-pass findings
+**Screen 0 does not move addresses.** `AFFILIATE_CLAIM_PATH` is
+`/creator-invitation` and it is what the §8 invitation email points at, so every
+later page hangs below it and the token travels in the path and nowhere else
+(§28.1).
 
-*Sections 8, 10, 12, 14, 16, 18 — `## N. What the Session X browser pass found, and nothing else
-could` — to be appended by each session. Nine rebuilds in a row have found defects invisible to
-jsdom, axe, and the type checker; assume this one will too.*
+**The interim is deliberately not a registered page.** It has no help card, no
+`CREATOR_FLOW_PAGES` entry, and `ChannelStep` addresses it directly rather than
+through `creatorFlowPath`. A register entry for a page about to be deleted is a
+register that lies — and the help drawer's "everything before it" would start
+listing a page that is going away. The Founder flow's Session B did exactly this
+with `/draft/:token/vetting` and Session C retired it.
+
+**The interim stopped asking what screens 2–3 own.** The legal name, the email,
+the phone, the channel and its niche are gone from it; what is still asked there
+is the public handle (screen 5's) and the audience size (screen 6's), which are
+Session C's. Anything missing is NAMED with a link back to the page that owns it
+rather than re-asked — a record collected on two screens is a record whose two
+copies eventually disagree, and a suite testing both copies would have made that
+look correct.
+
+### What Session B built
+
+| Thing | Where |
+|---|---|
+| `CreatorFlowPage` + the help drawer | `frontend/src/surfaces/creator-flow/CreatorFlowPage.tsx` |
+| The four screens | `WelcomeStep` · `PasswordStep` · `ProfileStep` · `ChannelStep` |
+| The walk's in-memory state | `creator-flow/draft.ts` — the password and whether the splash has played |
+| The one read and the one save | `creator-flow/useInvitation.ts` |
+| The four registered pages | `CREATOR_FLOW_PAGES`, which shipped empty from Session A |
+| The load-bearing copy | `shared/src/creator-flow/onboarding.ts` |
+| The twelve niches | `CREATOR_AUDIENCE_NICHES`, beside the tiles that already lived there |
+| `playSplash` | `frontend/src/components/anim.ts` |
+| `PHASE 39` | `frontend/public/proovd.css`, prefix `.crf-` |
+| The suite | `creator-flow/creator-flow.test.tsx` — 25 tests |
+
+### The three columns the backend gained a reader for
+
+`channel_type` (with its full supplier triple), `niche_description` and
+`outreach_plan` were added by migration 0055 in Session A and **nothing read
+them**. A column in Drizzle and in the migration does nothing on its own: there
+is no Zod schema for an invitation patch and no route-layer whitelist, so the
+`text(...)` calls inside `saveSignupProfile` and the `str(...)` calls in
+`routes/affiliate-invitation.ts` **are** the entire allowlist. Each column is
+therefore wired in four places — the state shape, `toState`, `SaveSignupInput`,
+and the write — plus the route and the client's `CreatorPatch`. This is the
+finding Founder Flow's own Session A recorded, and it holds here.
+
+`profile_photo_key` is deliberately still unread: it is screen 5's, and R2 is
+unconfigured anyway.
+
+### Three decisions worth carrying forward
+
+- **The password requirement list has ONE entry**, and the server was not
+  changed to match the reference. `completeAffiliateSignup` enforces twelve
+  characters and nothing else; the reference draws four ticks starting at eight.
+  Shipping its list would tick everything green and then be refused six screens
+  later. The Founder and the Admin have no composition rule either, Session F's
+  password change goes through Better Auth's own route, and a checklist where
+  three of four ticks decide nothing teaches people that ticks are decorative.
+- **The password is module state, and a reload loses it.** There is no account
+  to send it to and it must not go into browser storage, where a credential
+  outlives the tab and is readable by anything running in the page. A reload
+  costs one re-ask at the end and nothing else, because every profile answer is
+  saved as it is typed — so position survives while the credential does not, and
+  the screen that sets it says so. **Session C's Agree screen asks again rather
+  than sending anybody backwards.**
+- **The `channelType` tile never resolves the §5.3 subtype.** Nothing sends a
+  subtype under any key, and the suite asserts the absence in the serialized
+  patches. The disagreement is reported with `CHANNEL_TYPE_IS_ADMIN_CLASSIFICATION`
+  and left alone: overwriting it would silently invalidate a verification
+  recorded against it.
+
+### One Session A assertion was consciously inverted
+
+`creator-flow.test.ts`'s *"is empty, because Session A builds no screen"* now
+reads *"holds exactly the screens a session has rendered"*, with a dated comment
+naming the direction. The rule it protected is unchanged and is what is checked:
+a page appears when something renders it, never before. The test additionally
+asserts that none of Sessions C–F's screens is registered, so the register
+cannot rot in the other direction either.
+
+## 8. What the Session B browser pass found, and nothing else could
+
+Four defects, and **two of them are pre-existing and belong to no session** —
+which is the tenth rebuild in a row where the browser pass found something jsdom,
+axe and the type checker all agreed was fine.
+
+The pass renders each address at 1280 and inside a **320px iframe** (Chrome
+reports `clientWidth: 489` for `--window-size=320` on Windows, so the naive form
+shows the left 320px of a 489px render and reads as overflow). It reports
+measurements as well as pictures: for every box, whether the content is wider
+than the box and whether that box **scrolls** (designed) or **clips** (content
+gone).
+
+1. **`.wrap` is a viewport width, and `Section` renders one — so `<Measure><Section>`
+   spilled 430px.** `.wrap` is `min(90vw, 1600px)`, correct for a top-level band
+   and wrong for anything nested; `.measure` caps at the reading measure. The
+   Creator's compact signup has nested them since **Phase 08b**, so it has been
+   losing its right-hand 430px at 1280 for as long as it has existed, and at 320
+   it pushed the document sideways — a §33.11.1 failure on a shipped page.
+   PHASE 38 found the same thing inside the Admin view four days ago and fixed
+   it there; this is the general form, `:where(.measure) .wrap { width: 100% }`,
+   so it contributes no specificity and corrects every other call site at once.
+
+2. **A `.kv` value holding a URL or an address is one unbreakable token**, and at
+   320 it pushed the page sideways. PHASE 36 made this exact decision twice for
+   `.mny-facts dd` and `.mny-head__title`; fixed at the definition this time,
+   because a `dd` that overflows rather than wrapping is a defect at every one of
+   its call sites and — unlike a colour — it changes nothing where the content
+   already fits.
+
+3. **The interim rendered the raw tile id.** `Channel` read `student`, which is
+   an internal identifier on a customer surface — §3.1's whole risk. The register
+   that owns the tiles owns their words, so the label is resolved from
+   `CREATOR_CHANNEL_TILES`. Invisible to every scan: `student` is a real English
+   word, so no naming check would ever flag it.
+
+4. **`.field-hint` is `--grey`, about 2.18:1 on white**, and on these screens it
+   carries which address every message goes to and §33.1.8's own promise that the
+   phone is never verified. PHASE 34 made this correction for the Founder flow
+   and recorded why it is scoped rather than global; `:where(.crf) .field-hint`
+   is the same correction, for the same reason.
+
+**One measurement is a false positive and is recorded rather than tuned away.**
+An `<input>` whose value is longer than its box reports `scrollWidth > clientWidth`
+and no `overflow-x` — which is how a text input works, not a defect. The probe
+skips it by hand, the way PHASE 38's skipped `span.sr-only` (a 1px box whose
+content overflows IS the visually-hidden mechanism). A scan tuned until it stops
+flagging a correct case is one that would also stop flagging a wrong one.
+
+**What the pass could not decide, and stays on the manual list:** real focus
+visibility, 44px tap targets against a finger, an actual screen-reader pass, and
+`.btn--primary`'s 1.44:1 — the documented, scoped tech-stack §3.6 exception that
+every primary in the product carries.
+
+---
+
+*Sections 9, 11, 13, 15, 17 — `## N. Session X's screen order, as built` — and 10, 12, 14, 16, 18 —
+`## N. What the Session X browser pass found, and nothing else could` — to be appended in forward
+order by Sessions C–F. Ten rebuilds in a row have now found defects invisible to jsdom, axe, and the
+type checker; assume the next one will too.*

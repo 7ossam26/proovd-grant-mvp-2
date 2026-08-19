@@ -583,7 +583,7 @@ account step refuses in the open and says why, and file storage and the
 scheduling provider are both unconfigured so the upload and interview steps
 render a named absence rather than a dead control.
 
-### The Creator's, next — the first of six sessions has landed
+### The Creator's, next — two of six sessions have landed
 
 The same treatment is now under way on the other side of the product: the path
 a Creator walks from opening a private campaign invitation to promoting a live
@@ -595,7 +595,16 @@ behind it is
 **The first session writes no screen. It is the record**, and its whole output
 is the set of guarantees the five later sessions have to build inside: the
 tables, the closed vocabularies, and a written list of everything the prototype
-draws that the Spec forbids. Nothing a Creator can see has changed yet.
+draws that the Spec forbids.
+
+**The second session is the first four screens** — the invitation, the password,
+who you are, and your channel — and the page shell every later screen renders
+inside. Each is its own address, so closing the tab and coming back puts you
+where you were. The old single-page signup did not disappear: it moved one step
+down the path and finishes the account exactly as it did, minus the questions the
+four new screens now ask. Asking the same thing on two screens is how the two
+copies come to disagree, so anything the new screens own is shown there read-only
+with a link back to the page that owns it.
 
 It also settled a question by trying it. A table was drafted for "please delete
 my account", and it turned out one already exists — built with the Admin
@@ -677,6 +686,32 @@ will be stubbed: the two agreements a Creator signs are still in legal review so
 the account step refuses in the open, and file storage is unconfigured so the
 photo and the proof-of-channel uploads render a named absence rather than a
 control that does nothing.
+
+**Two small decisions from the second session are worth reading, because both
+are cases where the prototype was followed by not following it.** It draws four
+live password requirements — a length, an uppercase, a lowercase, a symbol — and
+the server checks exactly one thing: twelve characters. Shipping the prototype's
+list would have ticked all four boxes green for an eight-character password and
+then refused it six screens later, so the list says what the server actually
+enforces. A checklist where three of four ticks decide nothing teaches people
+that ticks are decorative.
+
+And the password itself is held in memory and written nowhere — not to the
+server, because there is no account to attach it to yet, and not into browser
+storage, where it would outlive the tab. Reloading loses it, which is the point;
+what it costs is being asked once more at the end, because everything else was
+saved as it was typed. The screen that asks for it says so, rather than leaving
+somebody to discover it.
+
+**The browser pass found four defects and two of them were nobody's.** Every
+rebuild in this repo has ended with a person looking at the pages in a real
+browser at two widths, and ten in a row have turned up something the tests and
+the accessibility scanner both called fine. This time two of the four had been
+shipping since the Creator signup page was first built: a layout container was
+being asked for a screen-width inside a reading-width box, so the page had been
+losing its right-hand edge on a wide screen and pushing sideways on a phone. It
+was fixed where the containers are defined rather than on the one page that
+showed it.
 
 **What the first session can prove, it proves as an absence.** Each of the three
 new records is kept honest by what its table cannot hold rather than by a rule

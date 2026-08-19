@@ -922,14 +922,23 @@ const creatorInvitation: CreatorInvitationState = {
       email: { value: 'wren@example.com', supplier: 'proovd', prefilled: 'wren@example.com', editedAt: null },
       phone: { value: null, supplier: null, prefilled: null, editedAt: null },
       channelReference: { value: 'https://example.com/solderandsawdust', supplier: 'proovd', prefilled: 'https://example.com/solderandsawdust', editedAt: null },
+      // The Creator's own tile (0055), and it AGREES with the recorded §5.3
+      // subtype below — the disagreement banner is a real state and a fixture
+      // that tripped it on every sweep would report a warning nobody has.
+      channelType: { value: 'youtube', supplier: 'affiliate', prefilled: null, editedAt: null },
       audienceNiche: { value: 'Electronics workbench builds', supplier: 'proovd', prefilled: 'Electronics workbench builds', editedAt: null },
+      nicheDescription: { value: 'Bench builds, wiring, and shop-made jigs.', supplier: 'affiliate', prefilled: null, editedAt: null },
+      outreachPlan: { value: null, supplier: null, prefilled: null, editedAt: null },
       audienceSize: { value: '48000', supplier: 'proovd', prefilled: '48000', editedAt: null },
       bio: { value: 'Weekly bench-build videos.', supplier: 'affiliate', prefilled: null, editedAt: null },
       dateOfBirth: { value: null, supplier: null, prefilled: null, editedAt: null },
       country: { value: 'US', supplier: 'affiliate', prefilled: null, editedAt: null },
       stateRegion: { value: 'OR', supplier: 'affiliate', prefilled: null, editedAt: null },
     },
-    channelSubtype: 'youtube_channel',
+    // A real §5.3 subtype. It read `youtube_channel`, which is not one of the
+    // seven and is not a value `affiliate_prospects.subtype` can hold — so
+    // nothing keying off the register could ever have matched it.
+    channelSubtype: 'social_creator',
     phoneVerified: false,
     confirmations: {
       age18Plus: false,

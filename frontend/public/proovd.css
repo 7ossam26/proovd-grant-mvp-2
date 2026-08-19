@@ -9724,3 +9724,499 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
    holds once they wrap. */
 .cf-foot,
 .cf-foot__actions { flex-wrap: wrap; }
+
+
+/* ══════════════════════ PHASE 39 — the Creator onboarding flow
+   (Creator Flow v2, Session B, 2026-08-19)
+
+   The Creator's path from a private invitation to a live campaign, redrawn to
+   the supplied reference as a sequence OF pages rather than one compact form.
+   Four of nine onboarding screens are built; every later screen renders inside
+   what is here.
+
+   The conventions PHASE 25 set and 26–34 restated bind here too:
+
+     1. TOKENS ONLY. Read a token or a mode slot, never a raw value. px is
+        legal for hairlines, radii, and the 44px minimum (via --touch).
+
+     2. SCOPED REUSE. .btn, .input, .field-label, .field-hint, .kv, .drawer,
+        .wordmark and .sr-only are reused rather than restyled. Everything new
+        is prefixed .crf-.
+
+     3. RESPONSIVE IS A CORRECTION. Each media rule names the overflow it
+        answers. Wide content scrolls inside its own container; the body never
+        scrolls sideways.
+
+   THE PREFIX IS .crf-, AND IT IS THE FOURTH CANDIDATE. The obvious three are
+   all taken and none is related to this:
+     .cr-   PHASE 26/32 — the Affiliate ADMIN workspace
+     .cf-   PHASE 31 — the Create Founder compose page
+     .ff-   PHASE 34 — the Founder onboarding flow
+     .mny-  PHASE 36 — the Money & Fulfillment console
+
+   ── COLOUR RESOLUTION ──────────────────────────────────────────────────────
+   The reference declares eleven `--p-*` tokens plus a border width and a
+   radius. NOTHING IS MINTED: ten of the eleven are byte-identical to a token
+   this file already has, and the eleventh resolves by role.
+
+     --p-brand   #41ED98  →  --brand          identical
+     --p-white   #FAFAFA  →  --white          identical
+     --p-dark    #013F17  →  --dark           identical
+     --p-darker  #012D10  →  --darker         identical
+     --p-light   #E9FFE1  →  --mint           identical
+     --p-mid     #669370  →  --moss           identical
+     --p-soft    #F1F3F2  →  --grey-light     identical
+     --p-visual  #F7F7F7  →  --grey-lightest  identical
+     --p-blue    #DEFAFC  →  --accent-blue    identical
+     --p-yellow  #F7FF9E  →  --accent-yellow  identical
+
+     --p-muted   #A2AFA8  →  BY ROLE. It is --grey, and --grey on --white is
+       about 2.18:1. The reference uses it for two different things: field
+       labels and placeholder ink, where it is correct and is what --grey is
+       for; and body sentences, where it is not. PHASE 34 moved five sentences
+       off it for exactly this reason and PHASE 36 re-toned nine more. Here,
+       every sentence a person has to READ takes --moss or --darker, and --grey
+       is left to rest states.
+
+     --bw 2px  →  --bw, which is already 2px (and 1px under 600px).
+     --br 2px  →  --radius, which is 1px. "sharp. everywhere." is this file's
+       own decision and the reference does not override it.
+
+   Local display recipes are --crf-* on the root class, never new :root
+   entries. Cross-component overrides use :where() so they add no specificity —
+   the trap PHASE 34's Session C hit, where `.ff .field-hint` beat
+   `.ff-panel .field-hint` on source order and painted a hint into its own
+   background.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+.crf {
+  --crf-measure: 34rem;
+  --crf-gap: var(--sp-24);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--white);
+  color: var(--darker);
+}
+
+.crf__stage {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-24) var(--gutter) var(--sp-48);
+}
+
+/* The top bar: wordmark left, the quiet meta line and Help right. Not a link —
+   an invitation address is not a site, and the way out of a half-finished form
+   should not be the brand. */
+.crf__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  flex: none;
+  flex-wrap: wrap;
+}
+
+.crf__mark { font-size: 1.125rem; }
+
+.crf__top-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  flex-wrap: wrap;
+}
+
+.crf__meta {
+  font-size: 0.875rem;
+  color: var(--moss);
+}
+
+.crf__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: min(var(--crf-measure), 100%);
+  margin: 0 auto;
+  padding: var(--sp-48) 0;
+}
+
+/* The invitation page owns its whole viewport, so it renders its own top row
+   inside its own lockup rather than inheriting the bar. */
+.crf--bare .crf__stage { padding: 0; }
+.crf--bare .crf__body {
+  width: 100%;
+  padding: 0;
+  justify-content: stretch;
+}
+
+/* ─────────────────────────────────────────────────────── the nav row */
+
+/* Reused by every screen. `.btn` is inline-flex, and a flex item in a COLUMN
+   is stretched to full width by the default align-items — the defect Founder
+   Flow Session D found on a .tag, Session E found on a .btn, and PHASE 36
+   found again. This row is horizontal, so the stretch does not apply; it is
+   noted because the next screen to put a lone button in a column will hit it. */
+.crf-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-16);
+  flex-wrap: wrap;
+  margin-top: var(--sp-32);
+}
+
+.crf-nav .btn:last-child { margin-left: auto; }
+
+.crf-nav__status {
+  font-size: 0.875rem;
+  color: var(--moss);
+}
+
+/* ─────────────────────────────────────────────────── screen 0, the invitation */
+
+.crf-welcome {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-24) var(--gutter) var(--sp-48);
+  position: relative;
+}
+
+.crf-welcome__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-16);
+  flex-wrap: wrap;
+  flex: none;
+}
+
+.crf-welcome__lockup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: min(46rem, 100%);
+  margin: 0 auto;
+  padding: var(--sp-48) 0;
+}
+
+.crf-welcome__head {
+  font-size: var(--fs-h2);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  margin: 0 0 var(--sp-24);
+}
+
+.crf-welcome__copy {
+  font-size: 1.125rem;
+  line-height: 1.5;
+  color: var(--moss);
+  margin: 0 0 var(--sp-16);
+  max-width: 42ch;
+}
+
+.crf-welcome__note {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--moss);
+  margin: 0;
+  max-width: 46ch;
+}
+
+.crf-welcome__cta { margin-top: var(--sp-32); }
+
+/* The splash. A full-bleed overlay with the Skip control present from the
+   first frame — it is a real button, not something the animation reveals, and
+   it is what makes §28.5 true of the first thing this flow shows. */
+.crf-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: var(--white);
+  display: grid;
+  place-items: center;
+}
+
+.crf-splash__sticker {
+  width: clamp(6rem, 22vw, 12rem);
+  aspect-ratio: 1;
+  background: var(--brand);
+  border-radius: var(--radius);
+}
+
+.crf-splash__flash {
+  position: absolute;
+  inset: 0;
+  background: var(--mint);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.crf-splash__skip {
+  position: absolute;
+  right: var(--gutter);
+  bottom: var(--sp-32);
+}
+
+/* ────────────────────────────────────────────────────── screen 1, the password */
+
+.crf-pw__head,
+.crf-you__head,
+.crf-channel__head {
+  font-size: var(--fs-step);
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  margin: 0 0 var(--sp-12);
+}
+
+.crf-pw__lede,
+.crf-you__lede,
+.crf-channel__lede {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--moss);
+  margin: 0 0 var(--sp-32);
+  max-width: 42ch;
+}
+
+.crf-pw__field { display: grid; gap: var(--sp-16); }
+
+.crf-pw__reqs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-8);
+}
+
+.crf-pw__req {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  font-size: 0.9375rem;
+  color: var(--moss);
+}
+
+/* The tick is decoration and the state is in the text (`.sr-only`), because a
+   requirement conveyed by colour alone is conveyed to nobody using a screen
+   reader — and this palette has no error hue to convey it with (DNA §1). */
+.crf-pw__tick {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  border: var(--bw) solid var(--grey);
+  border-radius: var(--radius);
+  background: transparent;
+}
+
+.crf-pw__req.is-met { color: var(--darker); }
+.crf-pw__req.is-met .crf-pw__tick {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.crf-pw__confirm { margin-top: var(--sp-24); }
+
+.crf-pw__note {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--moss);
+  margin: var(--sp-24) 0 0;
+  max-width: 46ch;
+}
+
+/* ─────────────────────────────────────────────────────────── screen 2, you */
+
+.crf-you__fields,
+.crf-channel__fields {
+  display: grid;
+  gap: var(--sp-24);
+}
+
+/* ─────────────────────────────────────────────────── screen 3, the channel */
+
+.crf-channel__tiles {
+  border: 0;
+  margin: 0 0 var(--sp-24);
+  padding: 0;
+  min-width: 0;
+}
+
+/* A <legend> loses its size to UA styling — the defect Founder Flow Session F
+   found on the one screen whose legend asks the question. */
+.crf-channel__legend {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--moss);
+  padding: 0;
+  margin-bottom: var(--sp-12);
+}
+
+.crf-channel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: var(--sp-8);
+}
+
+.crf-tile {
+  min-height: var(--touch);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--darker);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.crf-tile:hover { border-color: var(--brand); }
+.crf-tile.is-on {
+  border-color: var(--brand);
+  background: var(--brand-5);
+}
+
+.crf-channel__disagree {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--darker);
+  background: var(--accent-yellow);
+  border-radius: var(--radius);
+  padding: var(--sp-12) var(--sp-16);
+  margin: 0 0 var(--sp-24);
+}
+
+.crf-channel__student {
+  border-left: 3px solid var(--brand);
+  padding-left: var(--sp-16);
+}
+
+.crf-channel__note {
+  font-size: 0.875rem;
+  color: var(--moss);
+  margin: var(--sp-16) 0 0;
+}
+
+/* ──────────────────────────────────────────────────────── the help drawer */
+
+.crf-help__sub {
+  font-size: 0.9375rem;
+  color: var(--moss);
+  margin: 0 0 var(--sp-16);
+}
+
+.crf-help__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-12);
+}
+
+.crf-help__card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-4) var(--sp-12);
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--darker);
+  font: inherit;
+  cursor: pointer;
+}
+
+button.crf-help__card:hover { border-color: var(--brand); }
+
+.crf-help__card.is-current {
+  border-color: var(--brand);
+  background: var(--brand-5);
+}
+
+/* Not a button, so it must not read as one. */
+.crf-help__card.is-closed { cursor: default; }
+
+.crf-help__title { font-weight: 700; }
+
+.crf-help__state {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--moss);
+  align-self: start;
+}
+
+.crf-help__body,
+.crf-help__closed {
+  grid-column: 1 / -1;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--moss);
+}
+
+.crf-help__closed {
+  margin-top: var(--sp-8);
+  color: var(--darker);
+}
+
+/* `.field-hint` is `--grey`, about 2.18:1 on `--white` — the token for
+   placeholder and disabled ink, and correct there. On these screens it carries
+   sentences that change what somebody types: which address every message goes
+   to, and §33.1.8's own promise that the phone is never verified.
+
+   PHASE 34 made exactly this correction for the Founder flow and recorded why
+   it is scoped rather than global — `.field-hint` renders on every form in the
+   product, and moving the token there is its own change with its own
+   screenshot pass. `:where()` so it adds no specificity and cannot outrank a
+   panel's own override. */
+:where(.crf) .field-hint { color: var(--moss); }
+
+/* ──────────────────────────────────── two defects the browser pass found,
+   both PRE-EXISTING and neither belonging to this flow.
+
+   1. `.wrap` is `width: min(90vw, 1600px)` — a VIEWPORT width, correct for a
+      top-level band and wrong for anything nested. `Section` renders one, so
+      any `<Measure><Section>` renders a 1152px child inside a 799px box: at
+      1280 the Creator's signup page spilled 430px, and it has done since
+      Phase 08b. PHASE 38 found the same thing inside the Admin view and fixed
+      it there; this is the general form of it.
+
+      `:where()` so it contributes no specificity — the trap PHASE 34's
+      Session C hit. A `.wrap` inside a `.measure` never wants a viewport
+      width, whoever nested them, so this is a correction rather than an
+      override.
+
+   2. A `.kv` value holding a URL, an address, or an id is one unbreakable
+      token, and at 320 it pushed the document sideways (§33.11.1). PHASE 36
+      made this decision twice for `.mny-facts dd` and `.mny-head__title`;
+      fixed at the definition here, because a `dd` that overflows rather than
+      wrapping is a defect at every one of its call sites. Unlike a colour, it
+      changes nothing where the content already fits. */
+:where(.measure) .wrap { width: 100%; }
+.kv__row dd { overflow-wrap: anywhere; }
+
+/* ─────────────────────────────────────────────────────────────── narrow */
+
+/* At 320 the nav row's `margin-left: auto` would push the primary onto its own
+   line with the status stranded beside it. Stacking is legible; a row that
+   wraps unpredictably is not. */
+@media (max-width: 600px) {
+  .crf-nav { flex-direction: column; align-items: stretch; }
+  .crf-nav .btn:last-child { margin-left: 0; }
+  .crf-channel__grid { grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); }
+}

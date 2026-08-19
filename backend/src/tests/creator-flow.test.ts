@@ -566,11 +566,39 @@ describe('every refused element is written down with the rule that refuses it', 
 /* ══ The page register is empty until a session renders one ═════════════════ */
 
 describe('the page register holds only what exists', () => {
-  it('is empty, because Session A builds no screen', () => {
-    // `events.ts`' rule applied to a surface: a page appears when something
-    // renders it, never before. A pre-populated register would make every
-    // "is this reachable" check answer yes about surfaces that do not exist.
-    expect(CREATOR_FLOW_PAGES).toEqual([]);
+  it('holds exactly the screens a session has rendered', () => {
+    // DELIBERATELY INVERTED (Creator Flow v2 Session B, 2026-08-19). Session A
+    // asserted this was EMPTY, because it built no screen; Session B built four
+    // and appended them, so the empty assertion would now be asserting that
+    // Session B did not happen.
+    //
+    // The rule it was protecting is unchanged and is what is checked here:
+    // `events.ts`' rule applied to a surface — a page appears when something
+    // renders it, never before. A register pre-populated with the fourteen
+    // screens the reference draws would make every "is this reachable" check
+    // answer yes about surfaces that do not exist, and the help drawer's
+    // "everything before it" would be an aspiration rather than a fact.
+    expect(CREATOR_FLOW_PAGES.map((page) => page.id)).toEqual([
+      'welcome',
+      'password',
+      'profile',
+      'channel',
+    ]);
+
+    // Every one is on the invitation token and in stage 1. The claim is the
+    // boundary, and no page may sit one stage earlier than the mechanism that
+    // authorises it.
+    for (const page of CREATOR_FLOW_PAGES) {
+      expect(page.param).toBe('token');
+      expect(page.stage).toBe(1);
+      expect(page.path.startsWith('/creator-invitation/:token')).toBe(true);
+      expect(page.help.length).toBeGreaterThan(20);
+    }
+
+    // Sessions C–F have not run: none of the screens they own is registered.
+    for (const id of ['voice', 'presence', 'verify', 'agree', 'allset', 'home']) {
+      expect(CREATOR_FLOW_PAGES.some((page) => page.id === id)).toBe(false);
+    }
   });
 
   it('refuses to build a path for a page nobody registered', () => {

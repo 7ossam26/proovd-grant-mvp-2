@@ -99,8 +99,24 @@ export interface SignupProfileState {
     email: SignupFieldState;
     phone: SignupFieldState;
     channelReference: SignupFieldState;
+    /**
+     * Screen 3's nine tiles, as the Creator's own answer.
+     *
+     * Deliberately NOT `channelSubtype`, which stays read-only below: that is
+     * §5.3's Admin classification, and the verification evidence on file was
+     * recorded against it. A tile that disagrees is a fact for an Admin
+     * (`creator-flow/channels.ts`), never a value this surface resolves.
+     */
+    channelType: SignupFieldState;
     audienceNiche: SignupFieldState;
     audienceSize: SignupFieldState;
+    /** 0055. What the channel is about, in the Creator's own words. */
+    nicheDescription: SignupFieldState;
+    /**
+     * 0055. §5.3's `student_affiliate` evidence input is literally
+     * `promotion_plan`, so this IS that field and is asked only of a student.
+     */
+    outreachPlan: SignupFieldState;
     bio: SignupFieldState;
     dateOfBirth: SignupFieldState;
     country: SignupFieldState;
@@ -148,9 +164,15 @@ function toState(row: AffiliateSignupProfile, channelSubtype: string | null): Si
       email: field(row.email, row.emailSupplier, row.emailPrefilled, row.emailEditedAt),
       phone: field(row.phone, row.phoneSupplier, row.phonePrefilled, row.phoneEditedAt),
       channelReference: field(row.channelReference, row.channelReferenceSupplier, row.channelReferencePrefilled, row.channelReferenceEditedAt),
+      channelType: field(row.channelType, row.channelTypeSupplier, row.channelTypePrefilled, row.channelTypeEditedAt),
       audienceNiche: field(row.audienceNiche, row.audienceNicheSupplier, row.audienceNichePrefilled, row.audienceNicheEditedAt),
       audienceSize: field(row.audienceSize, row.audienceSizeSupplier, row.audienceSizePrefilled, row.audienceSizeEditedAt),
       bio: field(row.bio, row.bioSupplier, row.bioPrefilled, row.bioEditedAt),
+      // The Creator's own words and never Proovd's, so `prefilled` is honestly
+      // null rather than a copy of what they typed — the `dateOfBirth`
+      // arrangement immediately below.
+      nicheDescription: field(row.nicheDescription, row.nicheDescription === null ? null : 'affiliate', null, null),
+      outreachPlan: field(row.outreachPlan, row.outreachPlan === null ? null : 'affiliate', null, null),
       // Never prefilled — Proovd does not learn these at recruitment, so
       // `prefilled` is honestly null rather than a copy of what they typed.
       dateOfBirth: field(row.dateOfBirth, row.dateOfBirth === null ? null : 'affiliate', null, null),
@@ -271,8 +293,11 @@ export interface SaveSignupInput {
   email?: string | null;
   phone?: string | null;
   channelReference?: string | null;
+  channelType?: string | null;
   audienceNiche?: string | null;
   audienceSize?: string | null;
+  nicheDescription?: string | null;
+  outreachPlan?: string | null;
   bio?: string | null;
   dateOfBirth?: string | null;
   country?: string | null;
@@ -360,9 +385,12 @@ export async function saveSignupProfile(
   text('publicHandle', 'publicHandle', 'publicHandleSupplier', 'publicHandleEditedAt', f.publicHandle.prefilled, f.publicHandle.value);
   text('phone', 'phone', 'phoneSupplier', 'phoneEditedAt', f.phone.prefilled, f.phone.value);
   text('channelReference', 'channelReference', 'channelReferenceSupplier', 'channelReferenceEditedAt', f.channelReference.prefilled, f.channelReference.value);
+  text('channelType', 'channelType', 'channelTypeSupplier', 'channelTypeEditedAt', f.channelType.prefilled, f.channelType.value);
   text('audienceNiche', 'audienceNiche', 'audienceNicheSupplier', 'audienceNicheEditedAt', f.audienceNiche.prefilled, f.audienceNiche.value);
   text('audienceSize', 'audienceSize', 'audienceSizeSupplier', 'audienceSizeEditedAt', f.audienceSize.prefilled, f.audienceSize.value);
   text('bio', 'bio', 'bioSupplier', 'bioEditedAt', f.bio.prefilled, f.bio.value);
+  text('nicheDescription', 'nicheDescription', null, null, null, f.nicheDescription.value);
+  text('outreachPlan', 'outreachPlan', null, null, null, f.outreachPlan.value);
   text('dateOfBirth', 'dateOfBirth', null, null, null, f.dateOfBirth.value);
   text('country', 'country', null, null, null, f.country.value);
   text('stateRegion', 'stateRegion', null, null, null, f.stateRegion.value);

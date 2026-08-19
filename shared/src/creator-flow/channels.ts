@@ -107,6 +107,38 @@ export function creatorChannelDisagreesWithSubtype(
   return tile.subtype !== recordedSubtype;
 }
 
+/* ── The audience niches (screen 3) ───────────────────────────────────────── */
+
+/**
+ * The twelve options behind `audience_niche`.
+ *
+ * The reference draws a closed select and the column is free text with a full
+ * supplier triple. Both survive: the register owns the options, the column
+ * stays `text`, and the §8 recruitment record's own prefilled value renders
+ * even when it is not one of the twelve — an Admin who wrote "B2B SaaS
+ * founders" during research has said something more useful than any list
+ * entry, and a select that silently dropped it would lose §11's prefill.
+ *
+ * `Other` is the twelfth and is deliberately kept. It is a niche somebody
+ * chooses, not a subtype that maps to nothing — which is why the ninth CHANNEL
+ * tile is `niche_marketer` (a real §5.3 subtype) rather than the reference's
+ * own `Other`.
+ */
+export const CREATOR_AUDIENCE_NICHES: readonly string[] = [
+  'Finance content',
+  'Gym & fitness',
+  'Fashion & style',
+  'Beauty & skincare',
+  'Tech & gadgets',
+  'Food & cooking',
+  'Travel',
+  'Gaming',
+  'Home & lifestyle',
+  'Health & wellness',
+  'Parenting & family',
+  'Other',
+];
+
 /* ── The per-channel metrics (screen 6) ───────────────────────────────────── */
 
 /**

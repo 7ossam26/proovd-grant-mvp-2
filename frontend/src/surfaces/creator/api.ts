@@ -140,8 +140,13 @@ export interface CreatorPatch {
   email?: string | null;
   phone?: string | null;
   channelReference?: string | null;
+  /** The Creator's own tile (0055). Never `channelSubtype`, which is Admin's. */
+  channelType?: string | null;
   audienceNiche?: string | null;
   audienceSize?: string | null;
+  nicheDescription?: string | null;
+  /** §5.3's `promotion_plan`, asked only of a student channel (0055). */
+  outreachPlan?: string | null;
   bio?: string | null;
   dateOfBirth?: string | null;
   country?: string | null;

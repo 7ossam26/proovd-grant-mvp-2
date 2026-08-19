@@ -34,10 +34,27 @@
  * placeholder or a summary standing in for a policy document, and asking
  * someone to accept text still with the lawyers records agreement to nothing.
  * The honest state, not a bug to route around.
+ *
+ * ── It is the INTERIM tail of the flow now (Creator Flow v2 Session B) ──────
+ * It moved to `/creator-invitation/:token/finish` and stopped asking what
+ * screens 0–3 own — the legal name, the email, the phone, the channel and its
+ * niche. A record collected on two screens is a record whose two copies
+ * eventually disagree, and a suite testing both copies would make that look
+ * correct. Anything still missing is NAMED here with a link back to the page
+ * that owns it, rather than re-asked.
+ *
+ * §11's "one compact flow with one primary action" is not weakened by the
+ * split: there is still exactly one `Confirm and create account`, and it is
+ * still here. What the nine screens are, and the deviation that authorises
+ * them, is `docs/phases/creator-flow-v2.md`.
+ *
+ * Session C replaces this with screens 4–8 and retires the address to a
+ * redirect, the way the Founder flow retired `/draft/:token/vetting`.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
+import { CREATOR_CHANNEL_TILES, creatorFlowPath } from '@proovd/shared';
 import {
   Button,
   Card,
@@ -229,14 +246,37 @@ function PayoutPanel() {
 
 /* ── §11's compact flow ───────────────────────────────────────────────────── */
 
+/**
+ * What this interim still asks, after Session B took screens 0–3.
+ *
+ * `legalName`, `email`, `phone`, `channelReference` and `audienceNiche` are
+ * gone from here because the flow's own pages own them. The two that remain are
+ * Session C's — the public handle is screen 5's and the audience size is screen
+ * 6's — so they stay until that session builds those screens.
+ */
 const TEXT_FIELDS = [
-  { key: 'legalName', label: 'Full legal name', hint: 'The name on your government ID. Only Proovd sees it.' },
   { key: 'publicHandle', label: 'Public name or handle', hint: 'What your audience knows you as. This is the only name the Founder sees.' },
-  { key: 'email', label: 'Email', hint: 'Where Proovd writes to you.' },
-  { key: 'phone', label: 'Phone', hint: 'For support only. We never verify it and never send codes to it.' },
-  { key: 'channelReference', label: 'Primary URL or handle', hint: 'The channel you would promote from.' },
-  { key: 'audienceNiche', label: 'Audience niche', hint: 'Who your audience is.' },
   { key: 'audienceSize', label: 'Audience size', hint: 'In whatever unit your channel measures — followers, subscribers, members.' },
+] as const;
+
+/**
+ * The answers screens 2–3 own, shown read-only with the page that owns each.
+ *
+ * A missing one is named rather than re-asked (§1.4): the control that fixes it
+ * is one link away and lives on exactly one screen. `required` below still
+ * counts them, so the claim refuses while one is blank — this is what tells
+ * somebody WHERE.
+ */
+const EARLIER_ANSWERS = [
+  // `page` is the register's page ID, not its path segment — screen 2's id is
+  // `profile` and its address is `/you`. `creatorFlowPath` throws on an unknown
+  // id rather than building a wrong URL, which is what caught the confusion.
+  { key: 'legalName', label: 'Full legal name', page: 'profile', pageTitle: 'You' },
+  { key: 'email', label: 'Email', page: 'profile', pageTitle: 'You' },
+  { key: 'phone', label: 'Phone', page: 'profile', pageTitle: 'You' },
+  { key: 'channelType', label: 'Channel', page: 'channel', pageTitle: 'Your channel' },
+  { key: 'channelReference', label: 'Handle or link', page: 'channel', pageTitle: 'Your channel' },
+  { key: 'audienceNiche', label: 'Audience niche', page: 'channel', pageTitle: 'Your channel' },
 ] as const;
 
 const CONFIRMATIONS = [
@@ -352,6 +392,44 @@ function SignupForm({
       </Section>
 
       <Card>
+        <h2>What you told us</h2>
+        <p className="field-hint">
+          From the pages you have already been through. Anything blank is still needed — the
+          link beside it opens the page that asks for it.
+        </p>
+        <dl className="kv">
+          {EARLIER_ANSWERS.map((answer) => {
+            const stored = (profile.fields[answer.key]?.value ?? '').trim();
+            // The channel is stored as a tile ID and must never render as one.
+            // `student` is an internal identifier, and §3.1's whole risk is an
+            // internal name reaching a customer surface — the register that
+            // owns the tiles owns their words too.
+            const value =
+              answer.key === 'channelType'
+                ? (CREATOR_CHANNEL_TILES.find((t) => t.id === stored)?.label ?? '')
+                : stored;
+            return (
+              <div key={answer.key} className="kv__row">
+                <dt>{answer.label}</dt>
+                <dd>
+                  {value !== '' ? (
+                    value
+                  ) : (
+                    <>
+                      Not filled in yet.{' '}
+                      <Link to={creatorFlowPath(answer.page, token)}>
+                        Go to {answer.pageTitle}
+                      </Link>
+                    </>
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </Card>
+
+      <Card>
         <h2>About you</h2>
         <p className="field-hint">
           We filled in what we found publicly. Anything we got wrong, correct it here — what
@@ -372,7 +450,6 @@ function SignupForm({
             >
               <Input
                 value={field?.value ?? ''}
-                type={f.key === 'email' ? 'email' : 'text'}
                 onChange={(event) => setField(f.key, event.target.value)}
               />
             </Field>

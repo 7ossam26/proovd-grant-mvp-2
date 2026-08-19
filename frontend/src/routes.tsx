@@ -48,6 +48,10 @@ import {
 } from './surfaces/notifications/NotificationSettings.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
+import { WelcomeStep } from './surfaces/creator-flow/WelcomeStep.js';
+import { PasswordStep } from './surfaces/creator-flow/PasswordStep.js';
+import { ProfileStep } from './surfaces/creator-flow/ProfileStep.js';
+import { ChannelStep } from './surfaces/creator-flow/ChannelStep.js';
 import {
   CreatorCampaigns,
   CreatorCampaignKit,
@@ -530,16 +534,52 @@ const rootChildren: RouteObject[] = [
     path: 'draft/:token/claim',
     element: <ClaimStep />,
   },
+  /*
+   * The Creator onboarding flow — Creator Flow v2 Session B (2026-08-19).
+   *
+   * One address per page, outside every shell and every guard, for
+   * `CreatorFlowPage`'s reasons. `/creator-invitation/:token` does not move: it
+   * is `AFFILIATE_CLAIM_PATH`, it is what the §8 invitation email points at,
+   * and every later page hangs below it so the token travels in the path and
+   * nowhere else (§28.1).
+   *
+   * `CREATOR_FLOW_PAGES` is the one list of these, read by the router, the help
+   * drawer, and §33.11's flow register. A page here and not there has no help
+   * card; a page there and not here is an address that 404s.
+   */
   {
-    // Phase 08b (§11, §33.2.2, §33.2.3). The Creator's compact signup — ONE
-    // address, because §11 gives it one flow with one primary action and
-    // forbids a multi-page sequence. The same address serves the waiting state
-    // after the account exists: §11 says "the same surface confirms signup",
-    // and a redirect to a second page would be the sequence it rules out.
-    //
-    // Outside the public shell and outside the Admin shell, for the reasons the
-    // Founder draft route documents.
     path: 'creator-invitation/:token',
+    element: <WelcomeStep />,
+  },
+  {
+    path: 'creator-invitation/:token/password',
+    element: <PasswordStep />,
+  },
+  {
+    path: 'creator-invitation/:token/you',
+    element: <ProfileStep />,
+  },
+  {
+    path: 'creator-invitation/:token/channel',
+    element: <ChannelStep />,
+  },
+  {
+    /*
+     * Phase 08b's compact signup (§11, §33.2.2, §33.2.3), as the INTERIM tail
+     * of the flow until Session C builds screens 4–8 and the claim.
+     *
+     * It moved down one path segment and nothing about it changed: the same
+     * five §28.4 confirmations, the same two policy acceptances, the same
+     * `completeAffiliateSignup`, and the same surface confirming signup
+     * afterwards. What changed is that the four pages above it now own the
+     * first half of what it used to ask on one screen, so it asks that half no
+     * longer — see `CreatorSignup`'s own header.
+     *
+     * The Founder flow's Session B did exactly this with `/draft/:token/vetting`
+     * and Session C retired it. Session C retires this one the same way: a
+     * redirect, because the address is one somebody may have open.
+     */
+    path: 'creator-invitation/:token/finish',
     element: <CreatorSignup />,
   },
   {

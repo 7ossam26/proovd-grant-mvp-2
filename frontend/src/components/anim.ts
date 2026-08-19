@@ -25,6 +25,17 @@ type GSAP = {
   timeline: (v?: Record<string, unknown>) => {
     from: (t: unknown, v: Record<string, unknown>, p?: string | number) => unknown;
     to: (t: unknown, v: Record<string, unknown>, p?: string | number) => unknown;
+    // Both real members of a GSAP timeline, declared here when the first
+    // caller needed them (Creator Flow v2 Session B). The shim describes the
+    // vendored runtime rather than a subset somebody happened to use, so
+    // widening it is a correction and not a new capability.
+    fromTo: (
+      t: unknown,
+      from: Record<string, unknown>,
+      to: Record<string, unknown>,
+      p?: string | number,
+    ) => unknown;
+    kill: () => unknown;
   };
   killTweensOf: (t: unknown) => unknown;
 };
@@ -541,4 +552,89 @@ export function flipHome(state: unknown, done?: () => void): void {
     absolute: true,
     onComplete: done,
   });
+}
+
+/**
+ * The invitation splash — Creator Flow v2, Session B, 2026-08-19.
+ *
+ * The reference plays a 2.6-second hand-written `requestAnimationFrame` track
+ * with a 1.2s safety timeout, and it plays it every time the screen mounts.
+ * Three things about that do not survive contact with the Spec, so three things
+ * are different here and each is a mechanism rather than a promise:
+ *
+ * 1. **It is capped at `grand`.** DNA §6.1 fixes 0.90s as the ceiling nothing
+ *    exceeds, and §30 forbids countdown pressure — an animation that holds
+ *    somebody for two and a half seconds before they may act is a countdown
+ *    with better typography. The whole track runs inside one `grand`.
+ * 2. **The skip control is present from the first frame**, and it is a real
+ *    button rendered by the surface rather than something this helper reveals.
+ *    That is why `onDone` is called on skip too: there is exactly one way the
+ *    splash ends, so a skipped one cannot leave the page in a half-entered
+ *    state (§28.5 — the whole walk is reachable by keyboard, including out of
+ *    the first thing it shows).
+ * 3. **`reduced()` short-circuits it before it starts.** Not a faster version:
+ *    the caller gets `false` back and never mounts it at all, which is the
+ *    jump-cut rather than a second animated path to maintain.
+ *
+ * Playing it once per token is the SURFACE's decision, not this helper's — the
+ * helper animates, and the record of whether somebody has already seen it is
+ * `hasSeenSplash` in the flow's own module state.
+ *
+ * Returns whether it actually ran. `false` means the caller should treat the
+ * splash as already finished.
+ */
+export function playSplash(
+  scene: HTMLElement | null,
+  onDone: () => void,
+): { ran: boolean; stop: () => void } {
+  const g = gsap();
+  if (!g || !scene || !motionLive()) return { ran: false, stop: () => {} };
+
+  const sticker = scene.querySelector('[data-splash="sticker"]');
+  const flash = scene.querySelector('[data-splash="flash"]');
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    onDone();
+  };
+
+  const tl = g.timeline({ onComplete: finish });
+  if (sticker) {
+    tl.fromTo(
+      sticker,
+      { scale: 0.72, rotate: -8, autoAlpha: 0 },
+      {
+        scale: 1,
+        rotate: 0,
+        autoAlpha: 1,
+        duration: dur('slow'), // 0.60 — the reference's peel-in beat
+        ease: ease('snap'), // back.out(1.4) for its own back.out
+      },
+    );
+  }
+  if (flash) {
+    tl.fromTo(
+      flash,
+      { autoAlpha: 0 },
+      { autoAlpha: 1, duration: dur('instant'), ease: ease('out') },
+      '>-0.10',
+    );
+    tl.to(flash, { autoAlpha: 0, duration: dur('quick'), ease: ease('exit') });
+  }
+
+  // The reference's 1.2s safety timeout, kept and tightened to the §6.1
+  // ceiling. A tween in a backgrounded tab does not progress, and without this
+  // the splash is a full-screen overlay that never lifts — which is a locked
+  // page rather than a missing animation. It drives only the reveal.
+  const safety = window.setTimeout(finish, 900 + 300);
+
+  return {
+    ran: true,
+    stop: () => {
+      window.clearTimeout(safety);
+      tl.kill();
+      finish();
+    },
+  };
 }

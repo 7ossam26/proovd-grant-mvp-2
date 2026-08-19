@@ -11,8 +11,8 @@
  *
  * ── It holds only the pages a session has BUILT ─────────────────────────────
  * `events.ts`'s rule, applied to a surface: a page appears here when something
- * renders it, never before. Session A builds no screen, so this register ships
- * complete and unused — the router that reads it is Session B's. What it must
+ * renders it, never before. Session A shipped it empty because it built no
+ * screen; Session B added the four the invitation token opens. What it must
  * never do is list a page nobody can reach, because the help drawer's
  * "everything before it" is then an aspiration rather than a fact.
  *
@@ -68,14 +68,55 @@ export interface CreatorFlowPage {
 }
 
 /**
- * Session A builds no screen, so this is deliberately empty.
+ * The pages a session has actually built.
  *
- * Session B appends screens 0–3, Session C screens 4–8, Session D the app
- * shell. Each session adds only what it renders. The emptiness is the point:
- * a register pre-populated with twenty pages would make every "is this page
- * reachable" check answer yes about surfaces that do not exist.
+ * Session A shipped this empty and a test asserted it. Session B appends
+ * screens 0–3; Session C appends 4–8, Session D the app shell. Each session
+ * adds only what it renders, because a register pre-populated with fourteen
+ * pages would make every "is this page reachable" check answer yes about
+ * surfaces that do not exist — and the help drawer's "everything before it"
+ * would be an aspiration rather than a fact.
+ *
+ * ── The addresses (Session B, 2026-08-19) ───────────────────────────────────
+ * `/creator-invitation/:token` is the invitation's own address and screen 0 is
+ * what the §8 email points at. Every later stage-1 page hangs below it, so the
+ * token travels in the path and nowhere else (§28.1) and a Creator's position
+ * is a URL they can reload (DNA §5.12).
  */
-export const CREATOR_FLOW_PAGES: readonly CreatorFlowPage[] = [];
+export const CREATOR_FLOW_PAGES: readonly CreatorFlowPage[] = [
+  {
+    id: 'welcome',
+    path: '/creator-invitation/:token',
+    param: 'token',
+    title: 'Your invitation',
+    help: 'Who invited you, and what promoting a Proovd campaign involves.',
+    stage: 1,
+  },
+  {
+    id: 'password',
+    path: '/creator-invitation/:token/password',
+    param: 'token',
+    title: 'Your password',
+    help: 'The password for the account you are about to create. We never store it in plain text.',
+    stage: 1,
+  },
+  {
+    id: 'profile',
+    path: '/creator-invitation/:token/you',
+    param: 'token',
+    title: 'You',
+    help: 'Your name, the address we write to, and your phone. We filled in what we already knew.',
+    stage: 1,
+  },
+  {
+    id: 'channel',
+    path: '/creator-invitation/:token/channel',
+    param: 'token',
+    title: 'Your channel',
+    help: 'What a Founder sees when they look at you: where you post, who watches, and what about.',
+    stage: 1,
+  },
+];
 
 /** Every page's route pattern, for the §33.11 flow register and its fixtures. */
 export const CREATOR_FLOW_ROUTES: readonly string[] = CREATOR_FLOW_PAGES.map(

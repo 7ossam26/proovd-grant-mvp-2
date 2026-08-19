@@ -188,11 +188,37 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: true,
   },
   {
-    key: 'creator_signup',
-    label: 'The Creator invitation, signup, and payout setup',
-    specRef: '§11, §13',
+    key: 'creator_onboarding',
+    label: 'The Creator invitation: the account, who they are, and their channel',
+    specRef: '§11, §5.3, §28.4',
     audience: 'creator',
-    routes: ['/creator-invitation/:token', '/creator/campaigns'],
+    // Creator Flow v2 (2026-08-19) split the compact signup onto one address
+    // per screen. Session B built the first four; the fifth is Phase 08b's own
+    // page at its interim address, which Session C replaces with screens 4–8
+    // and retires to a redirect.
+    //
+    // Restated from `CREATOR_FLOW_PAGES` rather than spread, for the reason
+    // `founder_vetting` records: this register is `as const` and a spread would
+    // widen every route to `string`. Drift-tested against it.
+    //
+    // Split from the session-scoped Creator surfaces below because these four
+    // are reached with an invitation token and NO account — which is the whole
+    // of §11, and is a different auth regime rather than a different topic.
+    routes: [
+      '/creator-invitation/:token',
+      '/creator-invitation/:token/password',
+      '/creator-invitation/:token/you',
+      '/creator-invitation/:token/channel',
+      '/creator-invitation/:token/finish',
+    ],
+    keyboardPathRequired: true,
+  },
+  {
+    key: 'creator_campaigns',
+    label: 'The signed-in Creator: their campaigns and payout setup',
+    specRef: '§10, §13, §31.5',
+    audience: 'creator',
+    routes: ['/creator/campaigns'],
     keyboardPathRequired: false,
   },
   {
