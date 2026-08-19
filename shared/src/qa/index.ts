@@ -269,10 +269,13 @@ export const PRINCIPAL_FLOWS = [
     // product is made and §27.1's six questions matter most on the screen that
     // says what somebody is owed.
     //
-    // The panel's remaining section (Today) is parked in the shell and has no
-    // route, so listing it here would sweep a surface that does not exist —
-    // and the register is what "every principal flow" is counted from.
+    // Nothing in this shell is parked any more: Today was the last section
+    // without a route and it was built on 2026-08-19, so every address the nav
+    // offers is swept.
     routes: [
+      // Today, built 2026-08-19 — the shell's index and the first Admin screen
+      // anybody sees, so it is swept first.
+      '/admin/today',
       '/admin/founders',
       '/admin/founders/:prospectId',
       '/admin/money',

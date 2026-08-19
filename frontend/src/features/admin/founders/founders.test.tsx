@@ -968,22 +968,28 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
     expect(container.querySelectorAll('.navlink.is-active')).toHaveLength(1);
   });
 
-  it('keeps the parked sections operable rather than removing them', async () => {
+  it('has no parked section left, and every entry is reachable', async () => {
     await renderList();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
 
-    // Creators left this list on 2026-08-11, Support on 2026-08-13, and
-    // Campaigns on 2026-08-15, each when its workspace was built. Today is the
-    // one that remains, and it genuinely does not exist.
-    for (const label of ['Today']) {
-      const control = within(nav).getByRole('button', { name: label });
-      // `aria-disabled`, never `disabled`: a disabled button leaves a keyboard
-      // user with nothing at all where a sighted user sees a greyed section and
-      // can find out why (§28.5, §33.11.2).
-      expect(control.tagName).toBe('BUTTON');
-      expect(control).toHaveAttribute('aria-disabled', 'true');
-      expect(control).not.toBeDisabled();
-      expect(control).not.toHaveAttribute('tabindex', '-1');
+    /*
+      Creators left this list on 2026-08-11, Support on 2026-08-13, Campaigns on
+      2026-08-15, and Today on 2026-08-19 — each when its workspace was built.
+      Today was the last, so the register's own rule has run to its end: an
+      entry leaves the moment its control works.
+
+      What this test was protecting survives in a different form. The old rule
+      was `aria-disabled`, never `disabled`, because a disabled button leaves a
+      keyboard user with nothing at all where a sighted user sees a greyed
+      section and can find out why (§28.5, §33.11.2). With nothing parked, the
+      equivalent is that every entry is a real anchor with a real href — which
+      is reachable by the same keyboard for the same reason.
+    */
+    expect(within(nav).queryAllByRole('button')).toHaveLength(0);
+    for (const entry of within(nav).getAllByRole('link')) {
+      expect(entry.getAttribute('href')).toMatch(/^\/admin\//);
+      expect(entry).not.toHaveAttribute('aria-disabled');
+      expect(entry).not.toHaveAttribute('tabindex', '-1');
     }
 
     // The topbar's other parked control, on the same terms.
@@ -992,7 +998,7 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
     expect(explore).not.toBeDisabled();
   });
 
-  it('reaches the parked sections by keyboard, behind the skip link', async () => {
+  it('reaches the sections by keyboard, behind the skip link', async () => {
     const user = userEvent.setup();
     await renderList();
 
@@ -1002,14 +1008,26 @@ describe('§26, §1.4 — the Admin shell says what exists and what does not', (
     expect(document.activeElement).toHaveTextContent('Today');
   });
 
-  it('answers a parked section with what it is, and does not navigate', async () => {
-    const user = userEvent.setup();
-    const { router } = await renderList();
+  /**
+   * Today was the last parked section and it was built on 2026-08-19, so this
+   * asserts the opposite of what it used to.
+   *
+   * The register's own rule is that an entry leaves the moment its control
+   * works — a parked message on a working control is §1.4's failure in reverse
+   * — so `PARKED_MESSAGES.today` is gone and the nav's first entry is a real
+   * link. What survives is the SHAPE of the check: no section of this shell is
+   * a button that explains itself instead of going somewhere.
+   */
+  it('has no parked section left — every nav entry is a real link', async () => {
+    await renderList();
+    const nav = screen.getByRole('navigation', { name: 'Admin sections' });
 
-    await user.click(screen.getByRole('button', { name: 'Today' }));
-
-    expect(toastMessages()).toContain(PARKED_MESSAGES.today);
-    expect(router.state.location.pathname).toBe('/admin/founders');
+    expect(within(nav).queryAllByRole('button')).toHaveLength(0);
+    expect(within(nav).getByRole('link', { name: 'Today' })).toHaveAttribute(
+      'href',
+      '/admin/today',
+    );
+    expect(Object.keys(PARKED_MESSAGES)).not.toContain('today');
   });
 
   /**

@@ -744,11 +744,29 @@ function composeContext(
     });
   }
   if (row.reservationId) {
+    /*
+     * The last shown-but-unavailable link in the product, closed 2026-08-19.
+     *
+     * A pre-order still has no record page of its OWN, and that is the Backers
+     * reference's own promise — "One row per Backer. No extra record page." —
+     * rather than a gap: everything a pre-order holds is on its row. What was
+     * missing was a POSITION, and the Backers workspace has had one since it
+     * was built: the campaign, the Backers view, and the requester's own
+     * address as the search term land on that row.
+     *
+     * The Tasks panel resolves its Backer reference the same way. Scoping to
+     * the campaign as well as the address matters: the same person may hold
+     * pre-orders on two campaigns, and this case is about one of them.
+     */
+    const scoped = new URLSearchParams({ view: 'backers' });
+    if (row.campaignId) scoped.set('campaignId', row.campaignId);
+    if (row.requesterKind === 'backer' && row.requesterEmail) {
+      scoped.set('backerSearch', row.requesterEmail);
+    }
     links.push({
       label: 'Pre-order',
-      href: null,
-      unavailableBecause:
-        'A pre-order has no Admin workspace of its own. Its facts are on this case and in the §26.5 ledger.',
+      href: `/admin/backers?${scoped.toString()}`,
+      unavailableBecause: null,
     });
   }
 

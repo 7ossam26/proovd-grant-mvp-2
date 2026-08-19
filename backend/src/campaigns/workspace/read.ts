@@ -287,7 +287,7 @@ export async function readCampaignRecord(
     `${activeCount} active pre-orders`,
     `/admin/backers?view=backers&campaignId=${encodeURIComponent(campaign.id)}`,
   );
-  const moneyLink = link('money_admin', moneyLine(entry), null);
+  const moneyLink = link('money_admin', moneyLine(entry), `/admin/money/${entry.campaign.id}`);
   /* Built 2026-08-16. Tasks is a panel, not an address, so the honest deep
      link is this campaign's own record with `?tasks=new` — the shell reads the
      parameter and opens the panel with the campaign already chosen as the

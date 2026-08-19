@@ -241,10 +241,13 @@ export const CAMPAIGN_DESTINATIONS = [
     key: 'money_admin',
     label: 'Money & Fulfillment',
     mark: '$',
-    built: false,
-    /* Supplied separately. Every amount on this page is read from the records
-       that console will operate, so nothing here will disagree with it. */
-    absentBecause: 'Money console not built yet — the amounts here come from its records.',
+    /* Built 2026-08-19. This entry carried "Money console not built yet — the
+       amounts here come from its records" from the day the hub shipped, and
+       that sentence was the promise the console was written to keep: every
+       amount there is READ from the record the service wrote, so the hub and
+       the console cannot disagree. The link lands on this campaign's own money
+       record. */
+    built: true,
   },
   {
     key: 'tasks',

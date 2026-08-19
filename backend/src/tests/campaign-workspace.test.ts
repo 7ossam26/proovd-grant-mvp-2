@@ -723,7 +723,7 @@ describe('the record', () => {
     expect(result.waitingOn).toMatch(/close batch has not run/);
   });
 
-  it('the two unbuilt destinations are shown and say why; the four built ones link', async () => {
+  it('every destination links — the last unbuilt one landed 2026-08-19', async () => {
     const { campaignId, prospectId } = await seedCampaign('links');
     const res = await get(`/api/admin/campaigns/${campaignId}`).expect(200);
 
@@ -745,12 +745,17 @@ describe('the record', () => {
        opens the panel with the campaign preselected. */
     expect(byKey.get('tasks')!['href']).toBe(`/admin/campaigns/${campaignId}?tasks=new`);
 
-    for (const key of ['money_admin']) {
-      const link = byKey.get(key)!;
-      expect(link['href'], `${key} must not fabricate a destination`).toBeNull();
-      expect(String(link['unavailableBecause']).length).toBeGreaterThan(40);
-    }
-    // Never both, in either direction.
+    /*
+      Built 2026-08-19. This was the last destination carrying `absentBecause`,
+      and its sentence — "the amounts here come from its records" — was the
+      promise the console was written to keep: every amount there is READ from
+      the record the service wrote, so the two pages cannot disagree.
+    */
+    expect(byKey.get('money_admin')!['href']).toBe(`/admin/money/${campaignId}`);
+
+    // Never both, in either direction. With nothing unbuilt left, this is now
+    // the whole check: every link has an address and no reason, or the reverse
+    // — and a destination added later belongs to neither until somebody decides.
     for (const link of res.body.overview.links) {
       expect(Boolean(link.href) === Boolean(link.unavailableBecause)).toBe(false);
     }

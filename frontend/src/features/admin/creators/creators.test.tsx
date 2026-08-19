@@ -592,12 +592,12 @@ describe('§26.1 — Creators is a real section of the Admin shell now', () => {
     expect(creators.getAttribute('aria-disabled')).toBeNull();
     expect(creators.className).toContain('is-active');
 
-    // Campaigns became a real link on 2026-08-15. Today is the one section that
-    // genuinely does not exist, and it is still parked and still says so.
-    for (const parkedName of ['Today']) {
-      const control = within(nav).getByRole('button', { name: parkedName });
-      expect(control.getAttribute('aria-disabled')).toBe('true');
-    }
+    /*
+      Campaigns became a real link on 2026-08-15 and Today on 2026-08-19, which
+      was the last one. Every section of this shell now goes somewhere, so the
+      check is that none of them is a control instead.
+    */
+    expect(within(nav).queryAllByRole('button')).toHaveLength(0);
     expect(within(nav).getByRole('link', { name: 'Campaigns' })).toHaveAttribute(
       'href',
       '/admin/campaigns',

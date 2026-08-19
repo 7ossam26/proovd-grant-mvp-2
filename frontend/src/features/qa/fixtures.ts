@@ -55,6 +55,7 @@ import {
   REFUND_CAUSES,
   RESULTS_NARRATIVE_FIELDS,
   THANK_YOU_ELIGIBILITY_FACTS,
+  TODAY_SOURCES,
 } from '@proovd/shared';
 import type { PayoutState } from '../../surfaces/payouts/PayoutOnboarding.js';
 import type {
@@ -2236,6 +2237,26 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/link\/[^/]+\/comments/, body: { thread: commentThread } },
   { match: /\/api\/link\/[^/]+\/support$/, body: backerSupport },
   { match: /\/api\/link\/[^/]+\/digest-preference$/, body: { preference: digestPreference } },
+
+  /* Today (§26) — the overview, in the state that renders every row: two
+     lapsed deadlines and two pieces of open work nobody is late for. A cleared
+     fixture would sweep the done-moment and never render a count. */
+  {
+    match: /\/api\/admin\/today$/,
+    body: {
+      counts: [
+        { key: 'support_overdue', count: 2, kind: 'overdue' },
+        { key: 'dispute_tasks', count: 1, kind: 'overdue' },
+        { key: 'close_incomplete', count: 0, kind: 'overdue' },
+        { key: 'retry_window', count: 1, kind: 'waiting' },
+        { key: 'day_14_overdue', count: 0, kind: 'overdue' },
+        { key: 'reconciling', count: 3, kind: 'waiting' },
+      ],
+      clear: false,
+      overdueTotal: 3,
+      sourceKeys: TODAY_SOURCES.map((s) => s.key),
+    },
+  },
 
   /* Admin (§26.1) — the session, every Founder, and one Founder's workspace */
   { match: /\/api\/admin\/me$/, body: adminIdentity },

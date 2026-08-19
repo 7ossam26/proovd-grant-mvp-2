@@ -28,13 +28,12 @@
  * `/admin/signin` — its own address, its own minimal shell. The absence of the
  * branch is what keeps the leak from coming back: there is nowhere to put it.
  *
- * ── One of the five sections is parked, and it is still shown ───────────────
- * Today has no workspace yet. Hiding it would make the shell describe a smaller
- * product; showing it enabled would claim a capability that does not exist
- * (§1.4). So it is `aria-disabled`, still reachable by keyboard, and names what
- * it is when pressed.
- *
- * Founders, Creators, Support, and Campaigns are real links to real workspaces.
+ * ── Nothing is parked any more (2026-08-19) ─────────────────────────────────
+ * Today was the last section without a workspace, and it now has one. Every
+ * entry in this nav is a real link to a real address, and `useParkedControl`
+ * survives here for the Explore control alone — the §26.5 ledger, §26.6 money
+ * controls, and §31.7 risk panels are supplied separately, and their APIs and
+ * §33 suites are live behind them.
  *
  * ── The environment chip never claims a mode it did not check ───────────────
  * `TEST MODE` is the single most consequential sentence this page could say,
@@ -232,9 +231,17 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
         </span>
 
         <nav className="topnav" aria-label="Admin sections">
-          <button type="button" className="navlink" {...parked('today')}>
+          {/*
+            §26, §1.4 — Today, built 2026-08-19. It was the last parked section,
+            and it is a REAL link now: the Glance layer over the six workspaces'
+            own queues, composed from records that already carry deadlines.
+          */}
+          <NavLink
+            to="/admin/today"
+            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
+          >
             Today
-          </button>
+          </NavLink>
           {/* The two sections that exist, and therefore the two real links. */}
           <NavLink
             to="/admin/founders"

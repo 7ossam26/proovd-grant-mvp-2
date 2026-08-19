@@ -41,6 +41,7 @@ import {
   recordPrerequisite,
   type PrerequisiteEnvironment,
 } from '../admin/prerequisites.js';
+import { readToday, TODAY_SOURCE_KEYS } from '../admin/today.js';
 
 export const ADMIN_BASE_PATH = '/api/admin';
 
@@ -305,6 +306,26 @@ export function createAdminRouter({ db, auth, environment }: AdminRouterDeps): R
       res.status(201).json({ blocking: panel.blocking, unsatisfiedKeys: panel.unsatisfiedKeys });
     },
   );
+
+  /* ── Today (§26, §1.4) ─────────────────────────────────────────────────── */
+
+  /**
+   * The overview, composed from four queues that already exist.
+   *
+   * A read, so `admin` only. It writes nothing, records no visit, and has no
+   * write route at all — §30's prohibition on manufactured engagement is
+   * strongest as an absence: there is nowhere to record that somebody looked.
+   */
+  router.get(`${ADMIN_BASE_PATH}/today`, admin, async (_req, res, next) => {
+    try {
+      const view = await readToday(db);
+      // The keys travel so the surface can assert it rendered all six rather
+      // than however many the payload happened to carry.
+      res.json({ ...view, sourceKeys: TODAY_SOURCE_KEYS });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   /* ── Who am I ─────────────────────────────────────────────────────────── */
 

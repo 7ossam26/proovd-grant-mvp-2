@@ -107,13 +107,10 @@ export const CAMPAIGN_DESTINATIONS: readonly CampaignDestination[] = [
      to this campaign; a pre-order still has no address of its own, which is the
      Backers reference's own promise rather than a gap. */
   { key: 'backer_admin', label: 'Backer Admin', mark: 'B', built: true },
-  {
-    key: 'money_admin',
-    label: 'Money & Fulfillment',
-    mark: '$',
-    built: false,
-    absentBecause: 'Money console not built yet — the amounts here come from its records.',
-  },
+  /* Built 2026-08-19. The entry's own `absentBecause` was the promise the
+     console keeps: every amount there is read from the record the service
+     wrote, so this page and that one cannot disagree. */
+  { key: 'money_admin', label: 'Money & Fulfillment', mark: '$', built: true },
   /* Built 2026-08-16. Not a queue: nobody is assigned, nothing is scheduled,
      and no message is sent — the §30 reasoning that parked this entry ruled
      out a queue that chases, and the panel that shipped is not one. The

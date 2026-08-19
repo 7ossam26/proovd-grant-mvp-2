@@ -942,7 +942,7 @@ describe('the record', () => {
 /* ── 3. The shell ──────────────────────────────────────────────────────────── */
 
 describe('the Admin shell', () => {
-  it('Campaigns is a real link now, and Today is still honestly parked', async () => {
+  it('Campaigns is a real link, and so is every other section now', async () => {
     serve(routes());
     await renderAt('/admin/campaigns');
     await screen.findByRole('heading', { level: 1 });
@@ -952,7 +952,11 @@ describe('the Admin shell', () => {
     expect(campaigns).toHaveAttribute('href', '/admin/campaigns');
     expect(campaigns).toHaveAttribute('aria-current', 'page');
 
-    const today = within(nav).getByRole('button', { name: 'Today' });
-    expect(today).toHaveAttribute('aria-disabled', 'true');
+    /*
+      Today was the last parked section and was built on 2026-08-19, so this
+      asserts the opposite of what it used to. The shape survives: no entry in
+      this nav is a control that explains itself instead of going somewhere.
+    */
+    expect(within(nav).queryAllByRole('button')).toHaveLength(0);
   });
 });

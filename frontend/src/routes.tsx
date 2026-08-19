@@ -29,6 +29,7 @@ import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirector
 import { CampaignRecord } from './features/admin/campaigns/CampaignRecord.js';
 import { BackersWorkspace } from './features/admin/backers/BackersWorkspace.js';
 import { LiveModePage } from './features/admin/live-mode/LiveModePage.js';
+import { TodayPage } from './features/admin/today/TodayPage.js';
 import { MoneyQueue } from './features/admin/money/MoneyQueue.js';
 import { MoneyRecord } from './features/admin/money/MoneyRecord.js';
 import { FounderRoster } from './surfaces/founder/RosterView.js';
@@ -297,7 +298,21 @@ const rootChildren: RouteObject[] = [
       </RequireRole>
     ),
     children: [
-      { index: true, element: <Navigate to="/admin/founders" replace /> },
+      { index: true, element: <Navigate to="/admin/today" replace /> },
+      /*
+        §26, §1.4 — Today, built 2026-08-19. The last parked section.
+
+        It was parked for a real reason: §26 names eight sub-sections and none
+        of them is an overview, so there was nothing to build FROM until the
+        workspaces existed. All six now do, so this is the Glance layer over
+        their queues — six counts, each read from a record with a deadline
+        somebody agreed to, each opening the workspace that owns it.
+
+        It decides nothing, stores nothing, and records no visit. §30's
+        prohibition on manufactured engagement is strongest as an absence:
+        there is no write route at all.
+      */
+      { path: 'today', element: <TodayPage /> },
       // §26.1. Two addresses: everybody, and one person. The workspace is keyed
       // on the PROSPECT rather than on a draft or a campaign, because a Founder
       // whose campaign was archived-and-restarted (§9's wrong-type path) has

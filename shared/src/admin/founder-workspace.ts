@@ -885,9 +885,15 @@ export const HISTORY_AUDIT_NOTE =
  * action, and its sentence ("Parked while the Founder workspace is built")
  * had been false since 2026-08-10. It is split into `today` and `w9Close`.
  */
+/**
+ * What is still parked.
+ *
+ * `today` LEFT this register on 2026-08-19, when the overview was built — the
+ * rule this register has always run under is that an entry leaves the moment
+ * its control works, because a parked message on a working control is the §1.4
+ * failure in reverse. Every section of the Admin shell is now a real link.
+ */
 export const PARKED_MESSAGES = {
-  today:
-    'The Today overview is parked. Founders, Creators, Campaigns, Support, and Backers are the sections that exist.',
   explorePanels:
     'This opens the reservation ledger, money controls, and risk panels — their screens are not rebuilt yet; their APIs and §33 suites are live.',
   w9Close:
