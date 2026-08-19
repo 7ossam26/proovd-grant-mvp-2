@@ -96,6 +96,10 @@ import {
   MEETING_REQUEST_IS_NOT_A_SCHEDULER,
   MEETING_REQUEST_NO_PENALTY,
 } from '../affiliates/meeting-logic.js';
+import {
+  ACKNOWLEDGEMENT_HAS_NO_MESSAGE,
+  ACKNOWLEDGEMENT_IS_ONE_WAY,
+} from '../live/post-logic.js';
 import { renderDigest } from './templates/digest.js';
 
 export interface RenderedMessage {
@@ -1460,6 +1464,24 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       ],
       paragraphs: [MEETING_REQUEST_IS_NOT_A_SCHEDULER, MEETING_REQUEST_CHANGES_NOTHING],
       action: { label: 'Open the opportunity', url: `${APP}/creator/campaigns/a1/opportunity` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  /* ── Founder Dashboard Session D, deviation 2 (§30, §11) ─────────────── */
+
+  affiliate_post_acknowledged: () =>
+    renderPlainNotice({
+      subject: `The Founder saw your post — ${CAMPAIGN}`,
+      headline: 'The Founder acknowledged your post.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'From', value: 'Ada' },
+        { label: 'The post', value: 'https://example.social/@kettlehead/p/1' },
+        { label: 'What it changes', value: 'Nothing — this is them saying they saw it' },
+      ],
+      paragraphs: [ACKNOWLEDGEMENT_HAS_NO_MESSAGE, ACKNOWLEDGEMENT_IS_ONE_WAY],
+      action: { label: 'Open your campaign', url: `${APP}/creator/campaigns/a1/partnership` },
       reference: REF,
       supportEmail: SUPPORT,
     }),

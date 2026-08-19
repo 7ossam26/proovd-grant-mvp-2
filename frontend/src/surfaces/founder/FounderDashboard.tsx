@@ -57,8 +57,8 @@ import {
 } from '@proovd/shared';
 import { Drawer, Measure, NO_ACTION, Section, StatePanel, Tag } from '../../components/index.js';
 import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
-import { CampaignHome } from './CampaignHome.js';
 import { ChooseChapter } from './chapters/ChooseChapter.js';
+import { LiveChapter } from './chapters/LiveChapter.js';
 import {
   fetchFounderDashboard,
   FounderRequestError,
@@ -80,11 +80,11 @@ function ChapterBody({
   campaignId: string;
   campaignType: string | null;
 }) {
-  // §20's Glance, ranked Act and Explore have existed since Phase 17a, are
-  // swept by §33.11, and are what this chapter is FOR. Rendering a placeholder
-  // over a working surface would be a regression dressed as progress; Session D
-  // rebuilds it to the reference.
-  if (chapter === 'live') return <CampaignHome />;
+  // Session D: §20's Glance, the one ranked Act, Explore's eleven sections, the
+  // three live-editing tiers' first UI, §18's updates, and deviation 2's post
+  // acknowledgement. Phase 17a's `CampaignHome` is what it grew out of and is
+  // retired with `/updates` — one surface over one live campaign.
+  if (chapter === 'live') return <LiveChapter campaignId={campaignId} />;
   // Session C: §14.5's roster, §14.2's three responses, §14.3's bonus, and
   // deviation 1's meeting request.
   if (chapter === 'choose') {

@@ -1060,6 +1060,144 @@ export const recordActCorrection = (
     body: JSON.stringify(body),
   });
 
+/**
+ * Explore on its own — Founder Dashboard Session D.
+ *
+ * §33.6.6: `GET .../home` issues a `campaign_home_deliveries` receipt carrying
+ * the count it rendered. This route exists so a refresh AFTER a mutation does
+ * not mint a second one: the chapter fetches `home` once when it mounts, and
+ * every later refresh comes through here. The route has existed since Phase 17a
+ * and had no caller until now.
+ */
+export const fetchExplore = (campaignId: string): Promise<{ explore: ExploreView }> =>
+  call(`${base(campaignId)}/home/explore`);
+
+/* ── §17's posts, and deviation 2's acknowledgement (Session D) ────────────── */
+
+export interface CreatorPostView {
+  submissionId: string;
+  associationId: string;
+  /** §11: the public handle, never the person behind it. */
+  publicHandle: string | null;
+  postUrl: string;
+  channel: string | null;
+  submittedAt: string;
+  status: string;
+  acknowledgedAt: string | null;
+  /** False while §17 has an open correction or an enforcement on this post. */
+  acknowledgeable: boolean;
+}
+
+export const fetchCreatorPosts = (campaignId: string): Promise<{ posts: CreatorPostView[] }> =>
+  call(`${base(campaignId)}/home/posts`);
+
+/**
+ * Founder Dashboard Session D, deviation 2 — a RECORDED deviation from §1
+ * rule 6, by explicit product direction.
+ *
+ * It takes a submission id and NOTHING else. There is no note parameter here,
+ * no column behind one, and the route ignores the body — a free-text field
+ * would be the direct Founder–Affiliate messaging §30 defers wearing a smaller
+ * control. `created` is false on a repeat, and no second message is sent.
+ */
+export const acknowledgeCreatorPost = (
+  campaignId: string,
+  submissionId: string,
+): Promise<{ acknowledged: boolean; created: boolean; acknowledgedAt: string }> =>
+  call(`${base(campaignId)}/home/posts/${encodeURIComponent(submissionId)}/acknowledge`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+/* ── §20's three live-editing tiers (Phase 17b's API, Session D's first UI) ── */
+
+export interface EditableFieldView {
+  field: string;
+  tier: 'direct_versioned' | 'requires_review' | 'never_direct';
+  label: string;
+  surface:
+    | 'build'
+    | 'faq'
+    | 'reward_package'
+    | 'reservation'
+    | 'agreement'
+    | 'campaign'
+    | 'demo_moment'
+    | 'benefit_card';
+  reason: string;
+  specRef: string;
+}
+
+export interface LiveEditRow {
+  id: string;
+  surface: string;
+  field: string;
+  priorValue: unknown;
+  newValue: unknown;
+  targetId: string | null;
+  occurredAt: string;
+}
+
+export interface ChangeRequestRow {
+  id: string;
+  surface: string;
+  field: string;
+  targetId: string | null;
+  currentValue: unknown;
+  requestedValue: unknown;
+  reason: string;
+  status: string;
+  decisionReason: string | null;
+  createdAt: string;
+}
+
+export type LiveEditApplied =
+  | { ok: true; tier: 'direct_versioned'; edit: LiveEditRow }
+  | {
+      ok: true;
+      tier: 'requires_review';
+      request: ChangeRequestRow;
+      /**
+       * Named when a COLUMN-ONE edit was redirected here by §20's loophole
+       * check. `faq_commitment` is §20's own example; `field_commitment` is the
+       * same rule on another column-one free-text field.
+       */
+      redirectedBy: 'faq_commitment' | 'field_commitment' | null;
+      commitments: string[];
+    };
+
+export interface LiveEditHistory {
+  edits: LiveEditRow[];
+  requests: ChangeRequestRow[];
+}
+
+export const fetchEditableFields = (
+  campaignId: string,
+): Promise<{ fields: EditableFieldView[] }> => call(`${base(campaignId)}/live-edit/fields`);
+
+/**
+ * The ONE Founder edit route (§20). There is deliberately no `tier` in the body
+ * and none in this signature: the field's own tier decides whether the value is
+ * written, routed to Admin review, or refused. A route per tier — or a tier
+ * parameter — would let a caller choose which rules apply to their edit by
+ * choosing what to send, which is exactly what §20's three columns exist to
+ * prevent (§15: materiality is an Admin judgement, never the Founder's).
+ */
+export const applyLiveEdit = (
+  campaignId: string,
+  body: {
+    surface: EditableFieldView['surface'];
+    field: string;
+    value: unknown;
+    targetId?: string;
+    reason?: string;
+  },
+): Promise<LiveEditApplied> =>
+  call(`${base(campaignId)}/live-edit`, { method: 'POST', body: JSON.stringify(body) });
+
+export const fetchLiveEditHistory = (campaignId: string): Promise<LiveEditHistory> =>
+  call(`${base(campaignId)}/live-edit/history`);
+
 /* ── §21 Founder results (Phase 18b) ───────────────────────────────────────── */
 
 export interface FounderResultsView {

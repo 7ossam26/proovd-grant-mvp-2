@@ -690,6 +690,22 @@ a::after, .u::after {
   white-space: nowrap;
 }
 
+/* The copy button is a flex item beside a shrinkable URL, and a button hides
+   its own overflow because it hosts the fill sweep — so at a narrow width the
+   row squeezed the control and it clipped its own label by 8px. The URL is the
+   part with somewhere to go (it ellipsises); the control is not. Found by the
+   Session D browser pass; fixed at the primitive, so every Copylink in the
+   product inherits it. */
+.copylink > .btn { flex: 0 0 auto; }
+
+/* And at a phone width the label ellipsised to `Your camp…`, which names
+   nothing. It wraps onto its own line instead — PHASE 38's own call on the
+   Admin nav: a second line is legible, and a truncated label is a missing one. */
+@media (max-width: 600px) {
+  .copylink { flex-wrap: wrap; justify-content: flex-start; }
+  .copylink__url { flex: 1 0 100%; }
+}
+
 /* ---- Selection / live treatment as a composable state (§1, §5.5) */
 .is-live, .is-selected-surface {
   background: var(--brand-5);
@@ -10119,4 +10135,157 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
 
 @media (max-width: 900px) {
   .fd-choose__split { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* ── PHASE 39 — Chapter 2, Live ────────────────────────────────────────────
+   Founder Dashboard Session D, added 2026-08-19. §20, §18, §30.
+
+   The reference's shape, kept: a moment at the top and a stack of sections
+   under it, each one openable. What is NOT kept is what it puts in the moment
+   — `$12,840 Money made`, `128% Threshold progress`, and a Creator podium
+   headed "Farah Nassar is leading." §20 names Glance's one large number and it
+   is the active pre-order count; §30 defers public leaderboards; and during a
+   live campaign nothing has been charged at all, which is why the reserved
+   totals live in Explore beside the sentence that says so.
+
+   Every grid below declares `minmax(0, 1fr)` from the start rather than
+   waiting for a browser pass to find it: an implicit `auto` track sizes to the
+   widest item's MIN-content, and this chapter is full of URLs, handles and a
+   45-option select — Session C's finding, applied before it could recur.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.fd-live__glance,
+.fd-live__act,
+.fd-live__page,
+.fd-live__updates,
+.fd-live__posts,
+.fd-live__explore {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-end: var(--sp-24);
+}
+
+/* The moment. One number, then the sentences that qualify it — the
+   not-yet-charged notice is `.notice`, which is already the loud slot. */
+.fd-live__glance { gap: var(--sp-16); }
+
+/* One ranked action, in the brand-ringed treatment Chapter 1's Act panel uses,
+   so the two chapters agree about what "the thing to do" looks like. */
+.fd-live__act {
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--brand-5);
+}
+.fd-live__act .lede { margin: 0; }
+
+/* The three-tier edit form. It appears under the picker rather than in a
+   dialog: every submission here can be refused by the server, and `Modal`
+   closes on its own primary action (Session C's reasoning, unchanged). */
+.fd-live__edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+
+/* Updates. The list is a disclosure below the composer (DNA §5.12): the thing
+   a Founder came to do is post one, and reading the old ones is the Explore
+   altitude of the same panel. */
+.fd-live__posted { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-16); }
+
+.fd-live__update {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+  padding-block-end: var(--sp-16);
+  border-block-end: var(--bw) solid var(--grey-light);
+}
+.fd-live__update:last-child { border-block-end: 0; padding-block-end: 0; }
+.fd-live__updatemeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: center;
+  margin: 0;
+  color: var(--moss);
+  font-size: 0.875rem;
+}
+
+/* §18's prior/revised pairing. Two rows, so the change is legible as a change
+   rather than as two facts that happen to be adjacent. */
+.fd-live__change { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); margin: 0; }
+.fd-live__change > div {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  gap: var(--sp-8);
+}
+.fd-live__change dt { color: var(--moss); margin: 0; }
+.fd-live__change dd { margin: 0; overflow-wrap: anywhere; }
+
+/* The Creators' posts. A flat list in the server's stated order — no rank
+   badge, no podium, no medal, and nothing sorted by a metric (§30). */
+.fd-live__postlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-16);
+}
+.fd-live__post {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-live__posthead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+}
+/* A post URL is one unbreakable token and is wider than the column at 320 —
+   PHASE 36 made this call twice on the Money console, and Session C once here. */
+.fd-live__post a,
+.fd-live__posthead strong { overflow-wrap: anywhere; }
+
+.fd-live__acked { display: flex; flex-wrap: wrap; gap: var(--sp-8); align-items: center; margin: 0; }
+
+/* Explore's own data rows. A definition list rather than a table: §20 puts the
+   definition beside every number, and a two-column table has nowhere to say
+   what a number counts. */
+.fd-live__data {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  margin: var(--sp-8) 0;
+}
+.fd-live__data > div {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: var(--sp-8);
+}
+.fd-live__data dt { color: var(--moss); margin: 0; overflow-wrap: anywhere; }
+.fd-live__data dd { margin: 0; overflow-wrap: anywhere; }
+
+/* A `.btn` is inline-flex, and a DIRECT flex/grid child in a column is
+   stretched to the container — the defect Founder Flow Sessions D and E, the
+   Money console and Session C each recorded. Scoped to a direct child so the
+   composer's own wrapped rows are untouched. */
+.fd-live__post > .btn { justify-self: start; }
+
+@media (max-width: 600px) {
+  .fd-live__change > div,
+  .fd-live__data > div { grid-template-columns: minmax(0, 1fr); }
 }

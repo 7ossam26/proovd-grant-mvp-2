@@ -19,6 +19,12 @@
  * There is also no route that posts an update on the Founder's behalf, and none
  * that dismisses an action without a reason. §20 asks for the reason, actor, and
  * time on every correction, and §31.9 counts them.
+ *
+ * ── One write was added here, and it is a recorded deviation ────────────────
+ * Founder Dashboard Session D, deviation 2: the post acknowledgement. It is on
+ * this router because it is scoped to the campaign home and reads §17's own
+ * record; it carries no note, changes no §17 outcome, and moves no money. See
+ * `live/posts.ts` and `db/schema/posts.ts` for the four absences that narrow it.
  */
 
 import { Router } from 'express';
@@ -36,6 +42,8 @@ import { readFounderResults } from '../close/results.js';
 import { readFounderPaymentStatus, requestEarlyRemaining } from '../close/founder-payments.js';
 import { readExplore } from '../live/explore.js';
 import { acknowledgeDelivery } from '../live/glance.js';
+import { acknowledgeCreatorPost, listCreatorPosts } from '../live/posts.js';
+import { notifyPostAcknowledged } from '../live/post-notifications.js';
 import { acknowledgeMilestone } from '../live/thresholds.js';
 import {
   recordActCorrection,
@@ -386,6 +394,91 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
       const campaignId = await resolve(req, res);
       if (!campaignId) return;
       res.json({ corrections: await listActCorrections(db, campaignId) });
+    },
+  );
+
+  /* ── §17's posts, and deviation 2's acknowledgement ─────────────────────── */
+
+  /**
+   * The Creator posts on this campaign, through §11's public-handle projection.
+   * Carries the outcome §17 recorded and never the checklist, the correction
+   * detail, or the enforcement reason — see `live/posts.ts`.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/home/posts`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+    res.json({
+      posts: await listCreatorPosts(db, {
+        campaignId,
+        founderUserId: req.authUser?.id ?? '',
+      }),
+    });
+  });
+
+  /**
+   * Founder Dashboard Session D, deviation 2 — a RECORDED deviation from §1
+   * rule 6, by explicit product direction.
+   *
+   * The body is deliberately IGNORED. There is no note to read, no column to
+   * write one to, and no parameter the service would take — a caller posting
+   * `{ note: '…' }` is answered exactly as one posting `{}`. That absence is the
+   * whole of what keeps this from being the direct Founder–Affiliate messaging
+   * §30 defers.
+   *
+   * It answers 200 on a repeat rather than an error: a client retrying after a
+   * dropped connection has done nothing wrong, and the unique index has already
+   * made the second one a no-op. `created` tells the caller whether a message
+   * went out.
+   */
+  router.post(
+    `${FOUNDER_HOME_PATH}/campaigns/:campaignId/home/posts/:submissionId/acknowledge`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const outcome = await acknowledgeCreatorPost(
+        db,
+        { audit },
+        {
+          campaignId,
+          submissionId: String(req.params['submissionId'] ?? ''),
+          founderUserId: req.authUser?.id ?? '',
+        },
+      );
+
+      if (!outcome.ok) {
+        res.status(outcome.code === 'not_found' ? 404 : 409).json({
+          error: outcome.code,
+          title: 'That was not sent',
+          whatHappened: outcome.whatHappened,
+          next: outcome.next,
+          support: '/support',
+        });
+        return;
+      }
+
+      // After the record commits, outside it — 08c's shape, for its reason: the
+      // send is idempotent through `notification_deliveries`, so a crash between
+      // the two costs a retry rather than correctness, and holding a row lock
+      // across a provider call would be a much more expensive way to be no safer.
+      if (outcome.created) {
+        await notifyPostAcknowledged(
+          {
+            db,
+            notifier: deps.notifier,
+            ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+          },
+          { submissionId: outcome.acknowledgement.submissionId },
+        );
+      }
+
+      res.json({
+        acknowledged: true,
+        created: outcome.created,
+        acknowledgedAt: outcome.acknowledgement.acknowledgedAt.toISOString(),
+      });
     },
   );
 

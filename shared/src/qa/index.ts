@@ -204,12 +204,17 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_live',
-    label: 'The live campaign home, updates, results, and fulfillment',
-    specRef: '§20, §21, §22.5',
+    label: 'Running the campaign: Glance, the one Act, Explore, the page, updates, and posts',
+    specRef: '§20, §18, §21, §22.5',
     audience: 'founder',
     routes: [
-      '/campaigns/:campaignId/home',
-      '/campaigns/:campaignId/updates',
+      /*
+        Chapter 2 (Founder Dashboard Session D). The updates address retired
+        into it and redirects, the way the roster address retired into Chapter
+        1 — the old address stays because §27 emails point at it, and the sweep
+        follows the content rather than the redirect.
+      */
+      '/campaigns/:campaignId/home?chapter=live',
       '/campaigns/:campaignId/results',
       '/campaigns/:campaignId/fulfillment',
     ],

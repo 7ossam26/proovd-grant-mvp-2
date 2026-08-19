@@ -176,3 +176,8 @@ export * from './creator-flow.js';
 // Session C — a recorded §1 rule 6 deviation on §22.9's shape; see the file
 // header for the four absences that keep it from being a scheduler or a thread).
 export * from './meetings.js';
+
+// The Founder's acknowledgement of a Creator's post (migration 0057, Founder
+// Dashboard Session D — a recorded §1 rule 6 deviation; see the file header for
+// the four absences, the strongest being that it carries no free text at all).
+export * from './posts.js';

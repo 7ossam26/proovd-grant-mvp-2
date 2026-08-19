@@ -30,6 +30,7 @@ import type {
   BuildState,
   CampaignHomeView,
   CampaignPreview,
+  CreatorPostView,
   Day14ChecklistView,
   FounderPaymentStatusView,
   FounderReadiness,
@@ -47,6 +48,7 @@ import {
   COMPLETION_OUTCOMES,
   DISPUTE_EVIDENCE_ITEMS,
   EARLY_RELEASE_EVIDENCE_FACTS,
+  EDITABLE_FIELDS,
   FOUNDER_PAYMENT_STATUS_FACTS,
   IDEA_REFUND_EXCEPTIONS,
   LIVE_MODE_CONDITIONS,
@@ -656,6 +658,38 @@ const updates: FounderUpdatesView = {
   campaignStatus: 'live',
   model: 'product',
 };
+
+/*
+  §17's post submissions as the Founder sees them (Session D). Two rows, on
+  purpose: one acknowledgeable and one under correction, so the sweep renders
+  BOTH halves of deviation 2 — the control, and the sentence that replaces it
+  when Proovd has asked for a change. In a fixed order that is not a metric,
+  matching `explore.ts`'s own stated ordering (§30: no ranking).
+*/
+const creatorPosts: CreatorPostView[] = [
+  {
+    submissionId: 'post-qa-1',
+    associationId: QA.associationId,
+    publicHandle: '@solderandsawdust',
+    postUrl: 'https://example.social/@solderandsawdust/p/1',
+    channel: 'social',
+    submittedAt: '2026-08-24T09:00:00.000Z',
+    status: 'passed',
+    acknowledgedAt: null,
+    acknowledgeable: true,
+  },
+  {
+    submissionId: 'post-qa-2',
+    associationId: 'assoc-qa-2',
+    publicHandle: '@nostanding',
+    postUrl: 'https://example.social/@nostanding/p/7',
+    channel: 'social',
+    submittedAt: '2026-08-23T09:00:00.000Z',
+    status: 'correction_needed',
+    acknowledgedAt: null,
+    acknowledgeable: false,
+  },
+];
 
 const home: CampaignHomeView = {
   campaignId: QA.campaignId,
@@ -2267,8 +2301,18 @@ export const QA_ROUTES: StubRoute[] = [
       },
     },
   },
+  /* Session D. `/home/explore` and `/home/posts` sit UNDER `/home`, and the
+     `$` on that matcher is what keeps it from swallowing them — the ordering
+     trap the money console's own comment records. */
+  { match: /\/api\/founder\/campaigns\/[^/]+\/home\/explore$/, body: { explore: home.explore } },
+  { match: /\/api\/founder\/campaigns\/[^/]+\/home\/posts$/, body: { posts: creatorPosts } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/home$/, body: { home } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/home\/seen$/, body: { acknowledged: true, advanced: true } },
+  /* §20's tier register, served exactly as the route serves it: the register
+     itself, so the surface can never carry a second copy of which column a
+     field is in. */
+  { match: /\/api\/founder\/campaigns\/[^/]+\/live-edit\/fields$/, body: { fields: EDITABLE_FIELDS } },
+  { match: /\/api\/founder\/campaigns\/[^/]+\/live-edit\/history$/, body: { edits: [], requests: [] } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/results$/, body: { results } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/payments$/, body: { payments: founderPayments } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/fulfillment$/, body: fulfillment },

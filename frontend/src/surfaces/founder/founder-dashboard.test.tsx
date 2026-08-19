@@ -16,6 +16,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import {
+  ACKNOWLEDGEMENT_HAS_NO_MESSAGE,
+  ACKNOWLEDGEMENT_NOT_WHILE_UNDER_CORRECTION,
   BASE_CUT_IS_NOT_YOURS_TO_SET,
   BONUS_AFTER_ACCEPTANCE,
   BONUS_COUNTS_TOWARD_THE_CEILING,
@@ -23,10 +25,14 @@ import {
   CAMPAIGN_STATUS_CHAPTER,
   CHOOSE_ABSENCES,
   COMMUNITY_IS_YOURS_TO_RUN,
+  EDITABLE_FIELDS,
+  EDIT_TIER_GROUPS,
   FOUNDER_CHAPTERS,
+  LIVE_ABSENCES,
   MEETING_REQUEST_IS_NOT_A_SCHEDULER,
   MEETING_REQUEST_ONE_MESSAGE,
   NO_DOWNWARD_BID,
+  liveAbsence,
 } from '@proovd/shared';
 import { SERVICE_SLA_BLOCK } from '../../features/public/site.js';
 import { QA, QA_ROUTES } from '../../features/qa/fixtures.js';
@@ -90,7 +96,7 @@ function dashboardBody(overrides: DashboardOverrides = {}) {
 /**
  * The dashboard read, then the §33.11 fixture set for everything else.
  *
- * The Live chapter renders `CampaignHome` — a real §20 surface with its own
+ * The Live chapter is a real §20 surface with its own
  * reads — so this suite would otherwise need a second hand-written copy of
  * `CampaignHomeView`. Reusing the fixtures the sweep already maintains means
  * this file cannot drift from the shapes the API actually returns, which is
@@ -470,5 +476,220 @@ describe('the retired addresses', () => {
       .getAllByRole('button')
       .find((b) => b.getAttribute('aria-current') === 'page');
     expect(current?.textContent?.trim()).toBe('Choose');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session D — Chapter 2, Live
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const live = () => `/campaigns/${CAMPAIGN}/home?chapter=live`;
+
+describe('D1 — Glance, and the hero that is a count rather than money', () => {
+  it('leads with the active pre-order count and the permanent not-charged notice', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeTruthy());
+
+    // §20 names Glance's one large number: the active pre-order count.
+    expect(screen.getByText('active pre-orders')).toBeTruthy();
+    // §20's permanent clarification, not a tooltip and not below a fold.
+    expect(screen.getByText(/No card has been charged/)).toBeTruthy();
+  });
+
+  it('renders no money hero and no ranking — four mechanisms, all absent', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeTruthy());
+    const body = document.body.textContent ?? '';
+
+    // The reference's hero: `$12,840 Money made`. Nothing has been captured
+    // during a live campaign — capture is §21's close batch (§30).
+    expect(body).not.toMatch(/money made/i);
+    expect(body).not.toMatch(/gross raised/i);
+    expect(body).not.toMatch(/checkout sentiment/i);
+
+    // Disagreement 2: a ranking is four mechanisms, not one. The h1 claim, the
+    // numbered badges, the podium's medal, and the sort.
+    expect(body).not.toMatch(/is leading/i);
+    expect(body).not.toMatch(/leaderboard/i);
+    expect(body).not.toMatch(/\bpodium\b/i);
+    expect(screen.queryByText(/^#[0-9]+$/)).toBeNull();
+  });
+
+  it('mints ONE home read and refreshes through explore (§33.6.6)', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByText('active pre-orders')).toBeTruthy());
+
+    const homeReads = seen.filter((url) => /\/home$/.test(url.split('?')[0] ?? ''));
+    expect(homeReads).toHaveLength(1);
+    // And the acknowledgement went out — after the render committed, which is
+    // the whole reason it lives in an effect rather than in the fetch.
+    await waitFor(() => expect(seen.some((url) => url.includes('/home/seen'))).toBe(true));
+  });
+
+  it('copies the campaign’s own address, never a Creator’s /c/ link', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByText('active pre-orders')).toBeTruthy());
+
+    // The label is short so it does not ellipsise at 320 (the browser pass's
+    // finding); the ADDRESS is what the control carries and copies, so that is
+    // what this asserts.
+    const url = document.querySelector('.copylink__url')?.getAttribute('title') ?? '';
+    expect(url).toContain(`/campaign/${CAMPAIGN}`);
+    // `/c/…` is §18's per-Creator tracking ingest. Sharing one would credit a
+    // Creator for people the Founder brought in themselves.
+    expect(url).not.toMatch(/\/c\//);
+    expect(screen.getByText(liveAbsence('creator_tracking_link').sentence)).toBeTruthy();
+  });
+});
+
+describe('D2 — §20’s three tiers get their first UI', () => {
+  it('groups the picker by tier and never lets the surface choose one', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByLabelText(/What do you want to change/)).toBeTruthy());
+
+    const picker = screen.getByLabelText(/What do you want to change/) as HTMLSelectElement;
+    const groups = [...picker.querySelectorAll('optgroup')].map((g) => g.getAttribute('label'));
+    expect(groups).toEqual(EDIT_TIER_GROUPS.map((group) => group.label));
+
+    // §15: materiality is an Admin judgement. There is no control anywhere on
+    // this surface that could name a tier.
+    expect(screen.queryByLabelText(/tier/i)).toBeNull();
+    expect(screen.queryByRole('radio', { name: /publish directly/i })).toBeNull();
+  });
+
+  it('a locked field renders its reason and offers nothing to submit', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByLabelText(/What do you want to change/)).toBeTruthy());
+
+    const locked = EDITABLE_FIELDS.find((f) => f.tier === 'never_direct')!;
+    await userEvent.selectOptions(
+      screen.getByLabelText(/What do you want to change/),
+      `${locked.surface}:${locked.field}`,
+    );
+
+    // §20's third column. The refusal replaces the control, and no request is
+    // opened — the route refuses independently, which the backend suite drives.
+    await waitFor(() => expect(screen.getByText(locked.reason)).toBeTruthy());
+    expect(screen.queryByRole('button', { name: /Save the change/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Send it to Proovd/ })).toBeNull();
+  });
+
+  it('a column-two field asks for a reason before it will send', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByLabelText(/What do you want to change/)).toBeTruthy());
+
+    const review = EDITABLE_FIELDS.find(
+      (f) => f.tier === 'requires_review' && f.surface === 'build',
+    )!;
+    await userEvent.selectOptions(
+      screen.getByLabelText(/What do you want to change/),
+      `${review.surface}:${review.field}`,
+    );
+    await waitFor(() => expect(screen.getByLabelText(/Why are you changing it/)).toBeTruthy());
+
+    // §15 records a reason with every material change; the control cannot send
+    // without one, and the server refuses without one regardless (§1.1).
+    const send = screen.getByRole('button', { name: /Send it to Proovd/ });
+    expect(send.hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('D3 and deviation 2 — updates, and the post acknowledgement', () => {
+  it('offers only the audiences §18 allows for this campaign model', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByLabelText(/Who sees this/)).toBeTruthy());
+
+    const audiences = [...(screen.getByLabelText(/Who sees this/) as HTMLSelectElement).options].map(
+      (option) => option.value,
+    );
+    // The fixture campaign is a Product one, so §18's Idea-only milestone
+    // audience is absent — the server's rule, rendered rather than restated.
+    expect(audiences).toContain('general_public');
+    expect(audiences).toContain('backer_only');
+    expect(audiences).not.toContain('milestone_progress');
+  });
+
+  it('offers the acknowledgement with no note field anywhere', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() => expect(screen.getByRole('button', { name: /Tell them you saw it/ })).toBeTruthy());
+
+    // The reference's toast reads "Liked — creator will see it", which makes it
+    // a message; §30 defers direct Founder–Affiliate messaging, so it carries
+    // no free text and the record has no column for one.
+    expect(screen.getByText(ACKNOWLEDGEMENT_HAS_NO_MESSAGE)).toBeTruthy();
+    expect(screen.queryByLabelText(/note/i)).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /message|note|say/i })).toBeNull();
+  });
+
+  it('replaces the control with its reason on a post Proovd has queried', async () => {
+    installShell();
+    renderAt(live());
+    await waitFor(() =>
+      expect(screen.getByText(ACKNOWLEDGEMENT_NOT_WHILE_UNDER_CORRECTION)).toBeTruthy(),
+    );
+
+    // The second fixture post is `correction_needed`: acknowledging it would
+    // tell the Creator their Founder liked work Proovd asked them to change.
+    expect(screen.getAllByRole('button', { name: /Tell them you saw it/ })).toHaveLength(1);
+  });
+
+  it('routes a problem with a post to Proovd rather than to the Creator', async () => {
+    installShell();
+    renderAt(live());
+    // Wait on something only the posts panel renders. `@solderandsawdust` also
+    // appears in the Act panel's detail, which resolves from the EARLIER `home`
+    // read — so waiting on the handle passes before the posts have arrived, and
+    // the assertion below then races them. It passed alone and failed under the
+    // full suite's load, which is exactly what that shape looks like.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Tell them you saw it/ })).toBeTruthy(),
+    );
+
+    // The reference draws "I have an issue" with a free-text box that goes to
+    // the Creator. §20 makes post review Proovd's, and §26.7's case machinery
+    // is where a problem belongs.
+    expect(screen.queryByRole('button', { name: /I have an issue/i })).toBeNull();
+    expect(screen.getByText(liveAbsence('post_issue').sentence)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Get help with a post/ })).toBeTruthy();
+  });
+});
+
+describe('the Live chapter’s absences', () => {
+  it('renders every register entry’s sentence somewhere on the chapter', async () => {
+    installShell();
+    renderAt(live());
+
+    // The absences are spread across four panels with four independent reads,
+    // so waiting on any ONE of them resolves before the rest have arrived —
+    // the race that made this pass alone and fail under the full suite's load.
+    // Waiting on the assertion is what makes it a fact rather than a timing bet.
+    await waitFor(() => {
+      const body = document.body.textContent ?? '';
+      for (const absence of LIVE_ABSENCES) {
+        expect(body).toContain(absence.sentence);
+      }
+    });
+  });
+});
+
+describe('the retired updates address', () => {
+  it('/updates lands in Chapter 2 rather than 404ing', async () => {
+    installShell();
+    renderAt(`/campaigns/${CAMPAIGN}/updates`);
+    // §27's campaign emails point at it, so the address survives its component.
+    await waitFor(() => expect(rail()).toBeTruthy());
+    const current = within(rail())
+      .getAllByRole('button')
+      .find((button) => button.getAttribute('aria-current') === 'page');
+    expect(current?.textContent?.trim()).toBe('Live');
   });
 });

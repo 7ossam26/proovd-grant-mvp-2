@@ -27,7 +27,7 @@
  * downloaded, exactly as 16a's ledger export does.
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { campaigns, campaignAffiliateAssociations, reservations } from '../db/schema/domain.js';
 import { trackingLinkClicks } from '../db/schema/attribution.js';
@@ -179,7 +179,20 @@ export async function readExplore(
       creatorPostSubmissions,
       eq(creatorPostSubmissions.associationId, campaignAffiliateAssociations.id),
     )
-    .where(eq(campaignAffiliateAssociations.campaignId, input.campaignId));
+    .where(eq(campaignAffiliateAssociations.campaignId, input.campaignId))
+    /*
+      A STATED order, and deliberately not a metric.
+
+      §30 defers public leaderboards and the Creator close view ships with no
+      rank on that basis; the supplied Founder Dashboard reference (2026-08-19)
+      sorts this list by backers and calls the first entry "leading". Removing
+      the crown and keeping the sort would still be a ranking — the order IS the
+      claim. No ORDER BY at all is not the answer either: Postgres would then
+      pick one, and an arbitrary order that happens to look sorted is worse than
+      a stated one nobody can read anything into. Alphabetical by public handle
+      is transparently not about performance.
+    */
+    .orderBy(asc(affiliateProspects.publicHandle));
 
   /* 6 — survey answers, only where the Backer consented (§19 step 8). */
   const surveys = await db

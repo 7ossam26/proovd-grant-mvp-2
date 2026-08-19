@@ -385,6 +385,14 @@ export const AFFILIATE_WORK_AGAIN_REQUEST = 'affiliate_work_again_request' as co
   and §22.9's three keys exist because that ask fires after a campaign ended.
 */
 export const AFFILIATE_MEETING_REQUEST = 'affiliate_meeting_request' as const;
+/*
+  Founder Dashboard Session D, deviation 2 — a RECORDED deviation, by explicit
+  product direction. Deduped on the `creator_post_submissions` ROW rather than on
+  the acknowledgement: the record is one-way and insert-only, so there is no
+  second deliberate act for a second message to belong to. No response key —
+  the Founder is looking at the post when they send it.
+*/
+export const AFFILIATE_POST_ACKNOWLEDGED = 'affiliate_post_acknowledged' as const;
 export const FOUNDER_WORK_AGAIN_RESPONSE = 'founder_work_again_response' as const;
 export const INTERNAL_WORK_AGAIN_REQUEST = 'internal_work_again_request' as const;
 export const FOUNDER_READY_NEXT_CAMPAIGN = 'founder_ready_next_campaign' as const;
@@ -665,6 +673,7 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   BACKER_MAGIC_LINK_REISSUE,
   AFFILIATE_WORK_AGAIN_REQUEST,
   AFFILIATE_MEETING_REQUEST,
+  AFFILIATE_POST_ACKNOWLEDGED,
   FOUNDER_WORK_AGAIN_RESPONSE,
   INTERNAL_WORK_AGAIN_REQUEST,
   FOUNDER_READY_NEXT_CAMPAIGN,

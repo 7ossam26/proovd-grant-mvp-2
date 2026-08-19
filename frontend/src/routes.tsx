@@ -35,7 +35,6 @@ import { MoneyQueue } from './features/admin/money/MoneyQueue.js';
 import { MoneyRecord } from './features/admin/money/MoneyRecord.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
-import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
 import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
 import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
@@ -130,6 +129,19 @@ function WorkspaceRedirect() {
 function ChooseChapterRedirect() {
   const { campaignId = '' } = useParams();
   return <Navigate to={founderDashboardPath(campaignId, 'choose')} replace />;
+}
+
+/**
+ * `/updates` retired into Chapter 2 (Founder Dashboard Session D, 2026-08-19).
+ *
+ * Two Founder surfaces over one live campaign would be two places to post the
+ * same update — the reasoning that retired `/roster` into Chapter 1, `/vetting`
+ * in the flow's Session C, and `/workspace` in its Session E. The address
+ * survives its component because §27's campaign emails point at it.
+ */
+function LiveChapterRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderDashboardPath(campaignId, 'live')} replace />;
 }
 
 /*
@@ -790,10 +802,14 @@ const rootChildren: RouteObject[] = [
     element: <ChooseChapterRedirect />,
   },
   {
-    // Phase 14c (§18). The Founder posts and reviews campaign updates once live.
-    // Beside the other campaign surfaces, outside both shells.
+    /*
+      Retired into Chapter 2 (Session D, 2026-08-19). Phase 14c's §18 authoring
+      surface is now a panel of the Live chapter, beside the Glance it belongs
+      under; the address survives its component because §27's campaign emails
+      point at it.
+    */
     path: 'campaigns/:campaignId/updates',
-    element: <CampaignUpdates />,
+    element: <LiveChapterRedirect />,
   },
   {
     /*
@@ -806,10 +822,10 @@ const rootChildren: RouteObject[] = [
       chapter is `?chapter=` beneath it (DNA §5.12), so a position survives a
       reload without minting a second address for one campaign.
 
-      Phase 17a's §20 surface is not replaced — `FounderDashboard` renders
-      `CampaignHome` as the Live chapter. Session D rebuilds that content to the
-      reference; the other three chapters name the surfaces that own their work
-      today until Sessions C, E and F move it here.
+      Chapter 1 (Session C) and Chapter 2 (Session D) are built; `/roster`,
+      `/creator-readiness` and `/updates` redirect into them. Get paid and Wrap
+      name the surfaces that own their work today until Sessions E and F move
+      it here.
     */
     path: 'campaigns/:campaignId/home',
     element: <FounderDashboard />,

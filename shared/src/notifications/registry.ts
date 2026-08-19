@@ -488,6 +488,32 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.4',
     description: 'Founder asks to meet before deciding',
   },
+  /*
+    Founder Dashboard Session D, deviation 2 — a RECORDED DEVIATION from §1
+    rule 6, by explicit product direction. See `shared/src/founder-dashboard/
+    live.ts` and `backend/src/db/schema/posts.ts` for the full statement.
+
+    The reference's toast reads "Liked — creator will see it", which makes the
+    control a message rather than a private bookmark. §30 defers direct
+    Founder–Affiliate messaging and §11 says the Founder cannot contact the
+    Affiliate directly, so it takes §22.9's treatment: recorded, routed through
+    Proovd, and carrying NO free text — the record has no column one could be
+    written to, which is the whole of the narrowing.
+
+    ONE key, and there is deliberately no `founder_post_acknowledged` beside it:
+    the Founder is looking at the post when they send it, so a receipt for their
+    own click is a message §27 does not name for a fact already on screen.
+
+    Deduped on the `creator_post_submissions` ROW rather than on the
+    acknowledgement, so a Founder who somehow reaches the route twice for one
+    post sends once. The record is one-way and insert-only, so there is no
+    second deliberate act for a second message to belong to.
+  */
+  affiliate_post_acknowledged: {
+    audience: 'affiliate',
+    specRef: '§27.4',
+    description: 'Founder acknowledged your campaign post',
+  },
   /** §27.7's other half of the same capability. See `founder_activity_digest`. */
   affiliate_activity_digest: {
     audience: 'affiliate',
