@@ -976,7 +976,7 @@ The Creators workspace is being rebuilt to a second supplied reference (`docs/de
 - **The three retired addresses redirect rather than 404.** `/relationships/:associationId` → `?tab=campaigns&rel=…`, `/history` → `?tab=history`, `/controls` → `?tab=support&section=enforcement`. The Support workspace's context link and the Tasks reference pattern were both moved to the `?rel=` shape at the same time — the Support link had been shown-but-unavailable since 2026-08-13 and is now a real href, resolved through the association's PROSPECT id. The §17 review keeps its own address: its decision is its own act, and an Admin part-way through seven checks who reloads gets them back.
 - **The screenshot pass caught three defects again, and one was a class-name confusion.** (1) The Relationship ID rendered inside `cr-mono` — which is the monogram AVATAR square, a 3rem mint tile — so the id broke mid-word into two green boxes; it now uses a real id treatment, and the dead `.cr-interim*` family went with the deleted component. (2) `.cr-version` is `auto | 1fr | auto` and expects a version badge first, so every Session C row without one (a mediation note, a case, an enforcement relationship, a delivery record) put its trailing state or control hard against the label at a different x per row — one rule fixes all of them. (3) `AVAILABILITY_TERM_IS_AGREED` said "the term below", which is true in the dialog and false on the section, where the term renders above it; the sentence is placement-neutral now. axe cannot see any of the three: the text is present and correct in every case.
 - **Eight `h3`s became `h2`s, and axe is what said so.** The absorbed panes' task and post cards were third-level under the old relationship page's own `h2` state band; a tab's `h1` has no such band, so the same markup jumped a heading level. The two PHASE 26 selectors moved with them — nothing outside the Session C files uses either class now.
-- **What is NOT built, and stays recorded:** the pre-existing 320px reflow of the record shell (the shell header and the tab rails overflow at 320 on EVERY tab, Session B's included — a PHASE 25/26 shell change with its own six-workspace screenshot pass, not a Session C regression); the Today tab, which was still the one parked section of the Admin shell at the time (built 2026-08-19); and the Backer pre-order's own record page, which the Backers reference refuses by name — the Tasks panel's Backer reference resolves to that Backer's ROW instead.
+- **What is NOT built, and stays recorded:** the pre-existing 320px reflow of the record shell (the shell header and the tab rails overflow at 320 on EVERY tab, Session B's included — a PHASE 25/26 shell change with its own six-workspace screenshot pass, not a Session C regression) — **the SHELL half of that was fixed on 2026-08-19 in `PHASE 38`; every Admin route now measures clean at 320, so anything still overflowing inside this record is its own defect and no longer masked by the shell's**; the Today tab, which was still the one parked section of the Admin shell at the time (built 2026-08-19); and the Backer pre-order's own record page, which the Backers reference refuses by name — the Tasks panel's Backer reference resolves to that Backer's ROW instead.
 
 ### The public campaign page was rebuilt — Session A of three, the record (§14.4, §18, §20, §30, §3.2, post-Phase-24 change, 2026-08-18)
 
@@ -1874,6 +1874,11 @@ the read Phase 24 already served.
   wordmark and nav clip along with the content, exactly as the Affiliate record shell does — a
   PHASE 25/26 shell change with its own six-workspace screenshot pass, not a defect of a surface
   mounted inside it.
+  **Fixed 2026-08-19 in `PHASE 38` — and the diagnosis above is half wrong, which is why it is kept.**
+  The topbar and wordmark never clipped and the document never scrolled sideways. What actually
+  happened was the nav SCROLLING with no affordance from 900px down, and this page's own
+  `Section`/`.wrap` computing wider than `.views` and being clipped. See the last section of this
+  file: a guess about what a picture showed, versus a measurement of every box.
 - **The `Blocking` tag is the prominent one, and that is the opposite of the Founder flow's choice
   on purpose.** On §20's waiting screen the affirmative state is what a Founder is looking for; here
   the outstanding condition is what an Admin is looking for. Same reasoning, opposite outcome.
@@ -2119,3 +2124,99 @@ The Campaigns hub named this destination the day it shipped and carried `absentB
 - **Four assertions were consciously inverted, across four suites.** They asserted Today was a parked button, which is what they existed to catch. What they were protecting survives in a different form: the old rule was `aria-disabled` never `disabled`, so a keyboard user meets what a sighted user sees; with nothing parked, the equivalent is that every entry is a real anchor with a real href.
 
 **And the last two shown-but-unavailable links closed on the same day.** The Campaigns hub's `money_admin` destination became `/admin/money/:id` — `built: true`, and the register's `absentBecause` deleted with it. And the §26.8 support context's `Pre-order` link, shown-but-unavailable since 2026-08-13, became `/admin/backers?view=backers&campaignId=…&backerSearch=…`: a pre-order still has no record page of its OWN — that is the Backers reference's own promise, *"One row per Backer. No extra record page."*, not a gap — but it has a POSITION, and scoping to both the campaign and the address matters because the same person may hold pre-orders on two campaigns and a case is about one of them. **Nothing in the product now renders a control that explains why it does not work.**
+
+### The Admin shell's 320px overflow was fixed, and the recorded diagnosis was half wrong (§33.11.1, §26.1, DNA §5.12, post-Phase-24 change, 2026-08-19)
+
+Carried as a known gap since 2026-08-17 and restated twice — "the topbar, wordmark and nav clip
+along with the content" — this is the fix. It is `PHASE 38` in `proovd.css` and **nothing else**: no
+component changed, no route, no register, no test file. 132 lines of stylesheet, purely additive.
+
+**`PHASE 38` and not the 38 the Creator-flow brief expects.** `docs/phases/creator-flow-v2.md`
+reserves that number; PHASE 37 was already taken by Today on the same day, and the brief's own trap
+list says to re-derive the heading by grep rather than trust it. That number has now moved twice in
+one day, which is the argument for the grep rather than against it — and the Creator-flow session
+re-derived to 39 independently, so the two agree.
+
+- **The recorded diagnosis was a guess from a screenshot, and half of it was wrong.** The topbar and
+  the wordmark never clipped, and the document never scrolled sideways at any width. What was
+  actually happening was two different defects that a picture cannot tell apart from each other, and
+  the reason both survived three sessions of screenshot passes is that a screenshot shows you a
+  symptom and not a box. The fix started by building a probe instead: every Admin route rendered
+  inside a real 320px iframe, walked element by element, reporting for each box whether its content
+  is wider than the box and whether that box **scrolls** (designed) or **clips** (content gone).
+  Chrome will not give a real 320px viewport — `--window-size=320` reports 489px on Windows — so the
+  iframe is not a convenience, it is the only way the numbers mean anything.
+
+- **Defect 1: the nav has been hiding sections since long before 320px.** `.topnav` is
+  `flex: 1 1 auto; min-width: 0; overflow-x: auto`, so wherever the bar is tight it shrinks to a
+  sliver and scrolls rather than wrapping. Measured, with eight sections: clean at 1024 and at 900,
+  **79px hidden at 768** — Live mode simply gone — and **438px hidden at 320**, six of eight gone.
+  A horizontal scroller with no visible scrollbar gives no sign the rest exist. So this was never a
+  320px curiosity: every tablet and every phone has been losing Admin sections, and the gap note
+  filed it under a width nobody uses.
+
+- **`.topbar`'s own comment had promised the fix since PHASE 25, and the CSS never did it.** "At a
+  narrow width the nav takes its own line and the brand keeps its position." It never took its own
+  line, because `min-width: 0` lets a flex item shrink below its content instead of wrapping.
+  `flex: 1 1 100%` is what makes that sentence true. Below 900px the nav now takes its own row and
+  **wraps** — PHASE 32's own recorded decision on the Affiliate tab rail, reused: "a second line is
+  legible and a hidden tab is a missing tab."
+
+- **It wraps and `.tabs` still scrolls, and the difference is the mechanism rather than a
+  preference.** `.navlink::after` is a per-link underline and follows its own link onto row two.
+  `.tabs` uses `.tabline` — ONE absolutely-positioned indicator — which a second row would strand,
+  and that is exactly the reason PHASE 25 already recorded for scrolling there. Two rules that look
+  contradictory are the same rule applied to two different mechanisms.
+
+- **No `order`, deliberately.** Putting the nav visually after the environment cluster would have
+  kept the brand and the cluster on one line and made the tab path disagree with the reading path
+  (§28.5, §33.11.4). Three rows in DOM order is the honest layout.
+
+- **Defect 2: a `.wrap` inside the Admin view was clipped away entirely.** `.wrap` is
+  `width: min(90vw, 1600px)` — a VIEWPORT-relative width, correct for a top-level public section and
+  wrong for anything nested. `.views` is already `--wrap` wide and `.view` has already spent a
+  `--gutter` on each side, so any Admin surface reaching for the product's own layout components
+  computes a child wider than the box containing it. `.views` is `overflow-x: clip`, so the excess
+  does not scroll — it is gone. Measured on `/admin/live-mode`: **48px clipped**, taking the right
+  edge of the state panel's values with it.
+
+- **Fixed at the primitive rather than at the call site, because the trap is in the primitive.**
+  `LiveModePage` is the only in-shell user today; the next surface to use `Section` inherits the
+  same clip, and a design system whose parts do not compose is the thing being fixed. `.view .wrap`
+  is full-width and `.view .section` does not re-apply a gutter the view already has — scoped to the
+  Admin view, which is PHASE 25's convention 2 verbatim. Only the inline axis is touched;
+  `.section`'s block padding is vertical rhythm, not overflow.
+
+- **Two more clips the same pass found, both inside workspaces rather than the shell.** The §22.4
+  Day 14 receipt prints an evidence URL as plain text, and a URL is one unbreakable token: 52px past
+  its list item at 320. PHASE 36 had already made this decision twice — `.mny-facts dd` and
+  `.mny-head__title` both carry `overflow-wrap: anywhere`, the second noting that "a campaign id
+  wraps badly at 320" — and the evidence list did not get it. Applied to every `li` in the console,
+  because a reference, an id, a provider object and a URL all appear in those lists.
+  And the Create Founder footer is a flex row that never wrapped: a `.btn` is `overflow: hidden`
+  because it hosts the fill-sweep, so when the row squeezed it, **`Create prospect` lost the
+  right-hand 5px of its own label** rather than wrapping.
+
+- **That footer fix has no media query, and the first attempt is why.** It was written as
+  `max-width: 600px`, and the label was still clipped at 768 — a guessed breakpoint, wrong in the
+  usual direction. `flex-wrap: wrap` does nothing at a width where the row fits and everything at a
+  width where it does not, so there is no number to get wrong. Verified clean at nine widths from
+  1440 down to 320.
+
+- **The result is measured, not asserted.** Fourteen Admin routes at 320px: every one clean. Three
+  routes at 1440 / 1280 / 1024 / 900 / 768 / 600 / 480 / 375 / 320: every one clean. Desktop is
+  visually unchanged — the nav is still one line at 1280 — and the frontend project passes whole:
+  **30 files, 1308 tests**, including the three `proovd.css` scans, the §33.11 sweep over every
+  principal flow, and §33.11.3's scan of a freshly built bundle.
+
+- **One probe finding was a false positive and is worth keeping written down.** `span.sr-only`
+  reports as a clipping box on every route, because it *is* one — a 1px box whose content overflows
+  is the visually-hidden mechanism, not a defect. The probe skips boxes narrower than 2px. A scan
+  that flagged it would have had to be silenced, and a silenced check is worse than none.
+
+- **What this does not fix.** The Affiliate record shell's own 320px reflow is a separate item and
+  stays recorded — the shell half is now clean, so anything still overflowing inside that record is
+  its own defect rather than masked by the shell's. §33.11's manual gate is untouched: real focus
+  visibility, 44px tap targets, colour contrast, and an actual screen-reader pass still need a
+  person, and `.btn--primary`'s 1.44:1 remains the documented, scoped tech-stack §3.6 exception it
+  has always been.

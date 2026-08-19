@@ -9589,3 +9589,138 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
   .tdy-row { grid-template-columns: auto 1fr; }
   .tdy-row__kind { grid-column: 1 / -1; justify-self: start; }
 }
+
+
+/* ════════════════════════ PHASE 38 — the Admin shell at narrow widths
+   Spec §33.11.1, §26.1, DNA §5.12, added 2026-08-19.
+
+   Two measured defects in PHASE 25's shell, both of them narrow-width and
+   neither of them visible to jsdom, axe, or a typecheck. They were found by
+   rendering every Admin route inside a real 320px iframe and reporting, per
+   box, whether its content is wider than the box and whether that box scrolls
+   or clips.
+
+   This section corrects the shell WITHOUT rewriting PHASE 25 in place: those
+   selectors are shared by seven workspaces, and an edit up there is an edit to
+   all of them at once. Convention 2, as PHASE 25 stated it and 26–31 restated
+   it — qualify by element, or scope to the Admin view.
+
+   ── 1. The nav hid sections behind a scroll with no affordance ─────────────
+   `.topnav` is `flex: 1 1 auto; min-width: 0; overflow-x: auto`, so at any
+   width where the bar is tight it shrinks to a sliver and scrolls instead of
+   wrapping. Measured, with eight sections:
+
+       1024px  clean          768px   79px hidden — Live mode is gone
+        900px  clean          320px  438px hidden — six of eight are gone
+
+   So this was never a 320px curiosity: every tablet and every phone has been
+   losing sections, and a horizontal scroller with no visible scrollbar gives no
+   sign the rest exist. PHASE 32 met this exact defect on the Affiliate tab rail
+   and recorded the answer — the rail WRAPS, "because a second line is legible
+   and a hidden tab is a missing tab."
+
+   `.topbar`'s own comment has promised since PHASE 25 that "at a narrow width
+   the nav takes its own line and the brand keeps its position". It never did:
+   `min-width: 0` lets a flex item shrink below its content rather than wrap.
+   Giving it `flex-basis: 100%` is what makes that sentence true.
+
+   Reading order is preserved and no `order` is used. The bar becomes brand,
+   then nav, then the environment cluster — three rows in DOM order, so the tab
+   path and the visual path still agree (§28.5, §33.11.4).
+
+   Why this wraps and `.tabs` deliberately does not: `.navlink::after` is a
+   per-link underline and follows its own link onto the second row. `.tabs` uses
+   `.tabline`, ONE absolutely-positioned indicator, which a second row would
+   strand — which is the reason PHASE 25 already recorded for scrolling there.
+   The two are different mechanisms, and that is why they get different answers.
+
+   ── 2. A `.wrap` inside the Admin view was clipped away ────────────────────
+   `.wrap` is `width: min(90vw, 1600px)` — a VIEWPORT-relative width, correct
+   for a top-level public section and wrong for anything nested. `.views` is
+   already `--wrap` wide and `.view` has already spent a `--gutter` on each
+   side, so a `Section` rendered inside the shell computes its `.wrap` child
+   wider than the box that contains it.
+
+   `.views` is `overflow-x: clip`, so the excess does not scroll. It is gone.
+   Measured on `/admin/live-mode` at 320px: 48px clipped, taking the right edge
+   of the state panel's values with it.
+
+   The fix is at the primitive rather than at the two call sites, because the
+   trap is in the primitive: the next Admin surface to reach for the product's
+   own layout components inherits it, and a design system whose parts do not
+   compose is the thing being fixed. Inside `.view` the shell already owns the
+   page width and the gutter, so a nested `.wrap` is simply full-width and a
+   nested `.section` does not re-apply a gutter that is already there.
+
+   Only the inline axis is touched. `.section`'s block padding is vertical
+   rhythm, not overflow, and is left exactly as it is.
+   ──────────────────────────────────────────────────────────────────────── */
+
+
+/* ── 2. Nested layout primitives compose inside the shell ──────────────── */
+
+/* `width` and not `max-width`: `.wrap` sets an explicit width, so a max alone
+   would leave the declared 90vw in place and lose the fight. */
+.view .wrap { width: 100%; }
+
+/* The view's own `padding-inline: var(--gutter)` is the Admin gutter. A section
+   inside it adding a second one is what pushed `.wrap` past the clip edge, and
+   at any width it indents Admin content away from every other Admin surface. */
+.view .section { padding-inline: 0; }
+
+
+/* ── 1. The nav takes its own line, and wraps rather than hiding ───────── */
+
+/* 900px is where it was measured to still fit, and is the breakpoint PHASE 25
+   and its successors already use ten times over — not a new number. */
+@media (max-width: 900px) {
+  .topnav {
+    /* The whole point: a basis of 100% cannot share a row, so the nav genuinely
+       takes its own line instead of shrinking to a sliver. */
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    /* Wrapping and scrolling are mutually exclusive. `visible` also restores a
+       visible Y axis, which is what PHASE 25's padding-block/negative
+       margin-block pair on this selector was compensating for: `overflow-x:
+       auto` forces the Y axis to `auto` too, which would shave the focus ring
+       off a focused nav item. That pair is harmless here and is left alone, so
+       the ring clearance is the same in both modes. */
+    overflow-x: visible;
+    /* Tighter than the desktop --sp-24 so a 320px line carries three sections
+       rather than two. The row gap is smaller again: wrapped rows of the same
+       control read as one group, not as separate bands. */
+    gap: var(--sp-8) var(--sp-16);
+  }
+}
+
+
+/* ── 3. Two workspace clips the same pass found ────────────────────────────
+   Not the shell, but the same defect class and the same measurement, so they
+   are recorded here rather than left for the next person to re-find.
+
+   The Day 14 receipt prints an evidence URL as plain text, and a URL is one
+   unbreakable token: at 320px it ran 52px past its list item, and `.views`
+   clipped it. PHASE 36 already made this decision twice — `.mny-facts dd` and
+   `.mny-head__title` both carry `overflow-wrap: anywhere`, the second with the
+   note that "a campaign id wraps badly at 320" — and the evidence list simply
+   did not get it. Applied to every list item in the console rather than to the
+   one list, because a reference, an id, a provider object and a URL all appear
+   in these lists and all of them are unbreakable.
+
+   And the Create Founder footer is a flex row that never wraps, holding a
+   link, a sentence, and two buttons. A `.btn` is `overflow: hidden` — it hosts
+   the fill-sweep — so when the row squeezed it, `Create prospect` lost the
+   right-hand 5px of its own label rather than wrapping. A control whose label
+   is cut is a control nobody can be sure of, which is worse at 320px than the
+   extra line wrapping costs.
+   ──────────────────────────────────────────────────────────────────────── */
+
+.mny li { overflow-wrap: anywhere; }
+
+/* No media query, deliberately. `flex-wrap: wrap` does nothing at a width
+   where the row fits and everything at a width where it does not, so there is
+   no breakpoint here to get wrong — the first attempt guessed 600px and the
+   label was still clipped at 768. `margin-left: auto` on the actions still
+   holds once they wrap. */
+.cf-foot,
+.cf-foot__actions { flex-wrap: wrap; }
