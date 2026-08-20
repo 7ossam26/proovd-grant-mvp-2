@@ -84,7 +84,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { founderFlowPath } from '@proovd/shared';
 import { Measure, Section, StatePanel } from '../../components/index.js';
 import { problemIntro, problemToggle } from '../../components/anim.js';
@@ -127,6 +127,21 @@ const CONFIG: Record<AnswerField, Config> = {
     nextPageId: 'reach',
     label: 'How we understood your solution',
   },
+};
+
+/**
+ * What `Next` says when the box is empty, per answer.
+ *
+ * Written so it is true whether Proovd drafted this answer or not: an Admin who
+ * recorded nothing at intake and a Founder who deleted what was drafted arrive
+ * at the same empty box, and a sentence naming a draft that never existed would
+ * be wrong for one of them.
+ */
+const EMPTY_ANSWER: Record<AnswerField, string> = {
+  problem:
+    'Your campaign cannot be submitted without the problem, so this one cannot be skipped. Write it in your own words — a sentence or two is plenty.',
+  solution:
+    'Your campaign cannot be submitted without the solution, so this one cannot be skipped. Write it in your own words — a sentence or two is plenty.',
 };
 
 /* ── The stage ─────────────────────────────────────────────────────────────
@@ -239,14 +254,30 @@ function PaperScreen({
   initial: string;
 }) {
   const { leave } = useFlowNav();
+  const [params] = useSearchParams();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const head = useRef<HTMLHeadingElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
 
+  /**
+   * Where `Next` goes when Positioning sent somebody here to fill this in.
+   *
+   * `AnswerPage`'s `?from=review` contract, applied to the one other place in
+   * the flow that sends a Founder back for an answer. Without it, filling the
+   * problem costs seven screens to return — solution, reach, the campaign path,
+   * the address, a NEW six-digit code, and both confirms — which is the ring
+   * again, walked by hand rather than by the router.
+   *
+   * In the address rather than in state, for the reason Session D records: it
+   * survives a reload in the middle of the edit.
+   */
+  const returnTo = params.get('from') === 'positioning' ? 'positioning' : null;
+
   const [value, setValue] = useState(initial);
   const [editing, setEditing] = useState(false);
   const [rail, setRail] = useState<RailState>(RAIL_REST);
+  const [alert, setAlert] = useState<string | null>(null);
 
   const autosave = useAutosave<VettingPatch>(
     useCallback((patch: VettingPatch) => saveVetting(token, patch), [token]),
@@ -350,15 +381,44 @@ function PaperScreen({
 
   function update(next: string) {
     setValue(next);
+    // The refusal is about an empty box, so typing into it answers it. Leaving
+    // it up while somebody writes would be the product arguing with them.
+    if (alert && next.trim()) setAlert(null);
     autosave.queue({ [config.field]: next } as VettingPatch);
     measureRail();
   }
 
   async function next() {
+    /*
+      An empty answer does not go past this screen, and that is a routing fix
+      rather than a new rule.
+
+      §9 submits all three answers together and `submitVetting` refuses a short
+      set by name, so letting an empty one through here saved nobody a step — it
+      deferred the refusal to Positioning, six pages later, which answered it by
+      navigating BACKWARD to this page. That closed a ring: problem → solution →
+      reach → campaign type → email → code → the two confirms → positioning →
+      back to problem, and `visuals` was never reached. The refusal belongs
+      where the empty box is.
+
+      It opens the editor rather than sitting under an inert button: the field
+      is read-only until Edit, so a refusal with the box still closed names a
+      control the person cannot see. The editing effect focuses it and puts the
+      caret at the end.
+    */
+    if (!value.trim()) {
+      setAlert(EMPTY_ANSWER[config.field]);
+      setEditing(true);
+      return;
+    }
+
+    setAlert(null);
     // Land what is typed before moving. Nothing here depends on the answer
-    // having reached the server, but the next page reads it back.
+    // having reached the server, but the next page reads it back — and when
+    // Positioning is the next page, it reads it back as `completeness`, which
+    // is the whole point of the flush.
     await autosave.flush();
-    leave(founderFlowPath(config.nextPageId, token), 1);
+    leave(founderFlowPath(returnTo ?? config.nextPageId, token), 1);
   }
 
   const status = describeSaveState(autosave.state);
@@ -471,15 +531,25 @@ function PaperScreen({
           </button>
 
           {/* Absolutely positioned under the column, so it can never move the
-              composition. Announced in every state and drawn in one. */}
-          <p
-            className={loud ? 'ff-prob__save is-loud' : 'ff-prob__save sr-only'}
-            role="status"
-            aria-live="polite"
-            data-state={autosave.state.status}
-          >
-            {status}
-          </p>
+              composition. Announced in every state and drawn in one.
+
+              The refusal replaces it rather than stacking beside it: they share
+              one absolute slot, and it is its own element so mounting it is
+              what announces it — swapping `role` on a live region does not. */}
+          {alert ? (
+            <p className="ff-prob__save is-loud" role="alert" data-state="blocked">
+              {alert}
+            </p>
+          ) : (
+            <p
+              className={loud ? 'ff-prob__save is-loud' : 'ff-prob__save sr-only'}
+              role="status"
+              aria-live="polite"
+              data-state={autosave.state.status}
+            >
+              {status}
+            </p>
+          )}
         </div>
       </div>
     </div>

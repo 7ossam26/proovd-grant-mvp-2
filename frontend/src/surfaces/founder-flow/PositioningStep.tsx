@@ -318,6 +318,8 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
+  /** The first empty earlier answer's link — where `Next` puts focus. */
+  const missingLink = useRef<HTMLAnchorElement>(null);
 
   // Read once, during the first render: `FlowPage` resets the module value in
   // its own layout effect, and a later re-render would read the reset.
@@ -847,10 +849,23 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
     }
 
     if (nextMissing) {
-      // The line below the column already names every empty answer and links
-      // to it, so this carries somebody there rather than repeating it at
-      // them. Backwards, because that is the direction it is going.
-      leave(founderFlowPath(nextMissing.pageId, token), -1);
+      /*
+        Answered by moving focus to the link that resolves it — not by
+        navigating, and not by a second paragraph.
+
+        It used to `leave` for the page owning the empty answer, and that closed
+        a ring: problem → solution → reach → campaign type → email → code → the
+        two confirms → positioning → back to problem, round for as long as
+        somebody kept pressing Next, and `visuals` was never reached.
+
+        The first correction stated the refusal in an alert of its own, and a
+        Founder reported the result: two messages saying the same thing, because
+        the list below the column already names every empty answer and is
+        rendered before Next is ever pressed. So that list is the one message —
+        it says what it blocks — and Next puts the caret on the way out of it.
+        Announced to a screen reader, visible to everybody else.
+      */
+      missingLink.current?.focus();
       return;
     }
 
@@ -1107,6 +1122,11 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
             ) : null}
 
             {missing.length > 0 ? (
+              /* The one message about this, and it says what it BLOCKS rather
+                 than only what is missing — Next has nothing else to add.
+                 `?from=positioning` is the return contract: filling the answer
+                 comes straight back here instead of walking the seven screens
+                 between them, one of which mints a new six-digit code. */
               <p className="ff-compet__alert" role="alert">
                 One earlier answer is still empty:{' '}
                 {missing.map((entry, index) => {
@@ -1114,13 +1134,18 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
                   return (
                     <span key={entry.key}>
                       {index > 0 ? ', ' : null}
-                      <a href={founderFlowPath(entry.pageId, token)}>
+                      <a
+                        ref={index === 0 ? missingLink : undefined}
+                        href={`${founderFlowPath(entry.pageId, token)}?from=positioning`}
+                      >
                         {page?.title ?? entry.pageId}
                       </a>
                     </span>
                   );
                 })}
-                . Everything you have written here is saved.
+                . Your three answers are submitted together, so Next cannot go
+                until it is filled in — it brings you straight back here, and
+                everything you have written is saved.
               </p>
             ) : null}
 

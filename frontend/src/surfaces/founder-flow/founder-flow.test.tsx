@@ -378,13 +378,61 @@ describe('confirming what Proovd understood', () => {
     expect(screen.getByRole('status').textContent).not.toMatch(/retrying/i);
   });
 
-  it('will not continue from an empty answer', async () => {
+  /*
+    REWRITTEN 2026-08-20. It asserted a DISABLED forward control, and the screen
+    was rebuilt to the reference's own `Next`, which is never disabled — the
+    file's header records why: `.ff-prob__cta:disabled` renders identically to
+    the live control, so a Founder pressed a button that looked exactly as
+    pressable as it ever does and nothing happened.
+
+    What it was protecting is what it still asserts, and more of it: an empty
+    answer does not go past this screen. That is now load-bearing rather than
+    tidy — letting one through deferred the refusal to Positioning six pages
+    later, which answered it by navigating BACKWARD to here, and that closed the
+    ring this test's neighbour below now covers.
+  */
+  it('will not continue from an empty answer, and says why at the control', async () => {
+    const user = userEvent.setup();
     stubVetting({ selectedType: 'pre_launch' });
     renderAt(at('problem'));
     await screen.findByRole('heading', { level: 1 });
-    expect(
-      screen.getByRole('button', { name: /continue to your solution/i }).hasAttribute('disabled'),
-    ).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Still here, and told why — never an inert button and never a silent one.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/cannot be skipped/i);
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute(
+      'data-flow-page',
+      'problem',
+    );
+    // And the box is open, because it is read-only until Edit: a refusal about
+    // an empty field with the field still closed names a control nobody sees.
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('readonly');
+  });
+
+  it('returns to Positioning when Positioning is what sent you here', async () => {
+    // Without the return contract, filling the answer Positioning is waiting on
+    // costs seven screens to get back — solution, reach, the campaign path, the
+    // address, a NEW six-digit code, and both confirms. That is the ring again,
+    // walked by hand. `AnswerPage`'s `?from=review`, for the other place in the
+    // flow that sends somebody back for an answer.
+    const user = userEvent.setup();
+    stubVetting({ selectedType: 'pre_launch' });
+    renderAt(`${at('problem')}?from=positioning`);
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getByRole('button', { name: 'edit' }));
+    await user.type(screen.getByRole('textbox'), 'Benches are lit from the ceiling.');
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Straight back, not on to Your solution.
+    await waitFor(() =>
+      expect(document.querySelector('[data-flow-page]')).toHaveAttribute(
+        'data-flow-page',
+        'positioning',
+      ),
+    );
   });
 });
 
@@ -1003,18 +1051,25 @@ describe('positioning', () => {
     await screen.findByText(FLOW_COMPLETION_IS_DECIDED);
   });
 
-  it('never answers Next with silence — an empty earlier answer sends you to it', async () => {
+  it('never answers Next with silence, and never with a step backwards', async () => {
     /*
-      The bug this replaces, reported 2026-08-20: `Next` was `disabled` while an
-      earlier §9 answer was empty, and `.ff-compet__next:disabled` renders
-      identically to the live control — same brand fill, same opacity. So the
-      button looked exactly as pressable as it ever does and did nothing at all.
+      Two bugs, and this test is the second half of the correction.
 
-      The guard is right: §9 submits all three answers together and
-      `submitVetting` refuses a short set by name, so there is genuinely nothing
-      to submit. What was wrong was expressing that as an inert control. Next
-      now goes to the screen that owns the empty answer, which is the only
-      direction that still carries the flow forward.
+      The first, reported 2026-08-20: `Next` was `disabled` while an earlier §9
+      answer was empty, and `.ff-compet__next:disabled` renders identically to
+      the live control — same brand fill, same opacity. The button looked
+      exactly as pressable as it ever does and did nothing at all. That half
+      stands: the control is enabled and it answers.
+
+      The second, reported the same day and REWRITTEN here: the answer it gave
+      was to navigate to the page owning the empty answer. Walking forward from
+      there arrives back here — problem → solution → reach → campaign type →
+      email → code → the two confirms → positioning — so Next went round for
+      ever and `visuals` was never reached. The guard is still right; §9 submits
+      all three together and `submitVetting` refuses a short set by name. What
+      it owes is the reason, said here, beside the links that were always on
+      this page. An empty answer no longer gets past the screen that owns it
+      either, which is what stops anybody arriving here in this state at all.
     */
     const user = userEvent.setup();
     stubVetting({
@@ -1030,11 +1085,22 @@ describe('positioning', () => {
     await user.type(screen.getByRole('textbox'), 'Spreadsheets, mostly.');
     await user.click(next);
 
-    // The problem page — its field's own accessible name, which nothing else
-    // in the flow renders. Somewhere, rather than nowhere.
-    expect(
-      await screen.findByLabelText('How we understood your problem'),
-    ).toBeInTheDocument();
+    // Still here, and the one message says what it blocks rather than only
+    // what is missing — a second paragraph repeating it is what the first
+    // correction shipped and a Founder reported.
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute(
+      'data-flow-page',
+      'positioning',
+    );
+    const missing = screen.getByText(/one earlier answer is still empty/i);
+    expect(missing).toHaveTextContent(/Next cannot go until it is filled in/i);
+    expect(screen.queryAllByText(/is still empty/i)).toHaveLength(1);
+
+    // And Next answers by putting the caret on the way out — a link that comes
+    // back here rather than seven screens away, one of which mints a new code.
+    const link = within(missing).getByRole('link', { name: /your problem/i });
+    expect(link).toHaveAttribute('href', `${at('problem')}?from=positioning`);
+    expect(link).toHaveFocus();
   });
 
   it('renders the dictation absence rather than a microphone that refuses', async () => {
