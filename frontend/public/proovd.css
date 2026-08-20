@@ -14714,6 +14714,11 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   background: #FAFAFA;
   z-index: 25;
   font-family: 'Satoshi', sans-serif;
+  /* The reference's page inherits the UA's own root metrics; ours inherits
+     `body`'s 18px/1.6. Restated here so the chrome outside the stage measures
+     against what it was authored against. */
+  font-size: 16px;
+  line-height: normal;
 }
 
 /* The read failed, so there is no composition to draw. It keeps the layer's
@@ -14828,8 +14833,13 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   position: absolute;
   left: -10%;
   top: -16%;
+  /* `width: 31%; aspect-ratio: 1` there, over a one-digit number. Ours is a
+     count of reading cards and is legitimately two digits, so the box grows
+     rather than clipping — and the aspect keeps a one-digit badge identical to
+     the reference's own 19.38 square. */
   min-width: 31%;
-  height: 31%;
+  min-height: 31%;
+  aspect-ratio: 1;
   padding: 0 2px;
   display: flex;
   align-items: center;
@@ -16871,6 +16881,15 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   .crf-agree__cta:active:not(:disabled),
   .crf-agree__back:hover,
   .crf-agree__back:active { scale: 1; }
+}
+/* ^ That closing brace was MISSING, and had been since PHASE 46 shipped. An
+   unclosed `@media` swallows the rest of the file, so PHASE 61's `.ff-password`
+   and everything after it were parsed INSIDE `prefers-reduced-motion: reduce`
+   and applied to nobody with motion on. Found by reading `document.styleSheets`
+   rather than the source: the CSSOM stopped at 2698 rules and the last one was
+   this block. `a11y.test.tsx`'s two stylesheet scans check comment balance and
+   `var()` definitions and not brace balance, which is why it survived — a
+   silently-invalid stylesheet has now shipped three times. */
 
 /* ══════════════════════════════════════════════════════════════════════════
    PHASE 61 — the Founder flow's last page: your password (2026-08-20)
@@ -16941,4 +16960,526 @@ html.no-motion .ff-reach__cta { opacity: 1; }
      fill sweep, and a clipped label is a missing one. */
   .ff-password__nav { display: block; }
   .ff-password__nav > .btn { width: 100%; }
+}
+
+/* ═══════════════════════════ PHASE 62 — YOUR STORY, rebuilt 2026-08-20 from
+   the supplied reference (`Proovd Founder Flow v2.dc.html`, `[data-story]` /
+   `kindWide`) and its screenshot.
+
+   ── The layout model ──────────────────────────────────────────────────────
+   Not responsive. Authored once on a fixed 2496x1542 stage and scaled to the
+   viewport by `fitStages()`:
+
+       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
+
+   No branch of that function names this screen, so it takes `pageScale` alone
+   — exactly 0.4 at 1280x800, which is what the reference measures at.
+   `StoryStep.tsx` sets the transform in a layout effect and on resize; the
+   `0.37` below is the reference's own placeholder for the frame before that
+   runs.
+
+   Measured against the running prototype at 1280x800: scale 0.4, column
+   720x477.5 at (272.5, 161.25), headline 47.1 tall on an 1800x118 box, field
+   720x316 (1800x790), the row 60 tall (150) with `Say it instead` 264 wide
+   (660) and `Next` 441.6 (1104), Back at (38.39, 731.61), the badge 66.55
+   square at (1160.06, 695.06). Recording: the column rises to y 126.65, the
+   control row is 254.4x105.2 at (505.3, 568.15), the waveform 717.6x41.6, and
+   the field's ink and ground both turn brand.
+
+   PHASE 25's conventions bind everywhere else in this file; this section is
+   the same knowing exception PHASES 34 and 48-53 already are, and for the same
+   reason — a supplied reference is the specification here, so its 2px radius,
+   its #41ED98 and its 92px ship as written rather than as the nearest token.
+   The owner ruling's 2px radius happens to agree.
+
+   The project's global type rules DO reach in here — h1..h6 margin,
+   line-height 1.18 and font-weight 900; p margin and max-width 65ch;
+   button/textarea font: inherit, which inherits line-height 1.6 from body
+   where the reference's page inherits the UA's normal; and img/svg max-width
+   100% with height auto — so every one of them is overridden explicitly below
+   rather than left to win.
+
+   ── The one reference rule deliberately NOT reproduced ────────────────────
+   The prototype's page carries html{scrollbar-gutter:stable}, which reserves
+   15px down the right of every screen and therefore centres this lockup 7.5px
+   left of the viewport's own centre. That is host chrome for a prototype whose
+   other screens genuinely scroll, and PHASES 51-53 already recorded the
+   decision not to adopt it: our own body has never had it, and adding it on
+   one page would put that page off-centre against the six beside it.       */
+
+/* `FlowPage`'s chrome is not drawn on this screen — but the reason is not that
+   the reference has none. It has four controls, and they are drawn INSIDE the
+   z-index 25 fixed layer below, where the reference puts them. Left in place
+   they would sit under that layer and be unreachable, so both are hidden and
+   both leave the tab order with it. */
+.ff[data-flow-page='story'] .ff__top,
+.ff[data-flow-page='story'] .ff__badge { display: none; }
+
+/* The reference's `[data-story]`: position fixed, inset 0, overflow hidden.
+   Nothing scrolls — the stage scales instead, which is why the composition is
+   identical at every viewport and why this page can never reflow (§33.11.1). */
+.ff-story {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+}
+
+/* The read failed, so there is no composition to draw. It keeps the layer's
+   ground and centres the panel; nothing here is the reference's, because the
+   reference holds its record in memory and has no failure to render. */
+.ff-story__failure {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-24);
+}
+
+/* ── The chrome. Its clamp()s are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-story__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-story__back:hover { color: #013F17; }
+/* The reference has no focus treatment at all. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11) and it costs the composition nothing. */
+.ff-story__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-story__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-story__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-story__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-story__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-story__help:hover { background: #E9FFE1; }
+.ff-story__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* The message bell. Its geometry is the reference's; its number is not, and
+   `StoryStep`'s header says what the difference is. It does not shake. */
+.ff-story__mailbtn {
+  position: absolute;
+  right: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13.3333px;
+  line-height: normal;
+  cursor: pointer;
+  outline: none;
+}
+.ff-story__mailbtn:focus-visible { outline: 2px solid #013F17; outline-offset: 4px; }
+.ff-story__mail {
+  position: relative;
+  width: clamp(58px, 5.2vw, 78px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  box-sizing: border-box;
+}
+.ff-story__mail img { width: 68%; height: auto; max-width: none; display: block; }
+.ff-story__mailcount {
+  position: absolute;
+  left: -10%;
+  top: -16%;
+  min-width: 31%;
+  height: 31%;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  background: #FAFAFA;
+  box-sizing: border-box;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, 0.9vw, 13px);
+  line-height: 1;
+  font-weight: 700;
+  color: #41ED98;
+}
+
+/* ── The stage, and the 1800px column inside it ──────────────────────────── */
+
+.ff-story__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.37);
+  transform-origin: center center;
+  /* The reference's body sets neither of these and ours sets both, so the
+     stage restates the UA values it is authored against. */
+  font-size: 16px;
+  line-height: normal;
+  color: #013F17;
+}
+.ff-story__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1800px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ff-story__head {
+  margin: 0;
+  width: 100%;
+  font-size: 92px;
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: -0.03em;
+  color: #013F17;
+  text-align: center;
+}
+
+.ff-story__panel {
+  margin-top: 100px;
+  position: relative;
+  width: 100%;
+}
+
+.ff-story__field {
+  display: block;
+  width: 100%;
+  height: 790px;
+  max-width: none;
+  resize: none;
+  box-sizing: border-box;
+  background: transparent;
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  outline: none;
+  padding: 96px 108px 210px;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 56px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.012em;
+  color: #013F17;
+  /* [data-slim-scroll] in the reference's own style block: the brand
+     scrollbar, which cannot be written inline and so is not in the markup. */
+  scrollbar-width: thin;
+  scrollbar-color: #41ED98 transparent;
+}
+/* The reference's placeholder ink, measured at rgb(162,175,168). Without it
+   this box takes the UA's own #757575, which is a different grey and a
+   different weight of voice on the one field the whole screen is about. */
+.ff-story__field::placeholder { color: #A2AFA8; opacity: 1; }
+.ff-story__field::-webkit-scrollbar { width: 6px; }
+.ff-story__field::-webkit-scrollbar-track { background: transparent; margin: 14px 0; }
+.ff-story__field::-webkit-scrollbar-thumb {
+  background: #41ED98;
+  border-radius: 99px;
+  min-height: 34px;
+  max-height: 56px;
+}
+.ff-story__field::-webkit-scrollbar-thumb:hover { background: #3BDC8C; }
+/* cTaBg / cTaFg — while a recording is running the field is the recording. */
+.ff-story__panel[data-rec='on'] .ff-story__field {
+  background: rgba(65, 237, 152, 0.06);
+  color: #41ED98;
+}
+
+/* ── The recording overlay, sitting inside the field's own border ────────── */
+
+.ff-story__overlay {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  pointer-events: none;
+}
+/* The words run under the waveform rather than stopping above it, so the
+   gradient is what keeps the last line readable. */
+.ff-story__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 130px;
+  background: linear-gradient(
+    180deg,
+    rgba(250, 250, 250, 0) 0%,
+    rgba(250, 250, 250, 0.18) 40%,
+    rgba(250, 250, 250, 0.5) 68%,
+    rgba(250, 250, 250, 0.86) 88%,
+    #FAFAFA 100%
+  );
+}
+.ff-story__meter {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 22px 12px;
+}
+.ff-story__level {
+  font-size: 26px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: 0.16em;
+  color: #41ED98;
+}
+.ff-story__wave {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 9px;
+  height: 104px;
+  padding: 0 8px;
+  overflow: hidden;
+}
+.ff-story__bar {
+  width: 15px;
+  flex: none;
+  background: #41ED98;
+  /* recIntro scales these up from nothing. Without this they would grow out
+     from their own middles, which reads as a row of dashes appearing rather
+     than as a level arriving. */
+  transform-origin: bottom;
+}
+
+/* ── The idle row: the microphone, and the one control that moves on ─────── */
+
+.ff-story__row {
+  margin-top: 36px;
+  width: 100%;
+  display: flex;
+  gap: 36px;
+}
+.ff-story__say {
+  width: 660px;
+  height: 150px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 56px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ff-story__say:hover { transform: scale(1.03); }
+.ff-story__say:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+.ff-story__say:disabled { cursor: default; transform: none; }
+.ff-story__say svg { flex: none; height: 64px; width: auto; max-width: none; }
+html.no-motion .ff-story__say { transition: none; }
+
+.ff-story__next {
+  flex: 1 1 auto;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 70px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-story__next:hover { background: #3BDC8C; }
+.ff-story__next:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+
+/* ── The recording row ───────────────────────────────────────────────────── */
+
+.ff-story__rec {
+  margin-top: 96px;
+  display: flex;
+  align-items: flex-start;
+  gap: 44px;
+}
+.ff-story__ctl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.ff-story__ctl-label {
+  font-size: 36px;
+  font-weight: 500;
+  line-height: normal;
+  color: #41ED98;
+}
+.ff-story__ghost {
+  width: 176px;
+  height: 176px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  background: #013F17;
+  color: #41ED98;
+  cursor: pointer;
+  outline: none;
+}
+/* Retry's glyph is white where Pause's is brand — the reference's own pair. */
+.ff-story__ghost.is-retry { color: #FAFAFA; }
+.ff-story__ghost:hover { background: #012D10; }
+.ff-story__ghost:focus-visible { outline: 6px solid #41ED98; outline-offset: 6px; }
+.ff-story__ghost svg { flex: none; width: 82px; height: 82px; max-width: none; }
+
+.ff-story__done {
+  width: 196px;
+  height: 196px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-story__done:hover { background: #3BDC8C; }
+.ff-story__done:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+.ff-story__done svg { flex: none; width: 96px; height: auto; max-width: none; }
+
+/* ── Everything the reference does not draw ──────────────────────────────────
+   Absolutely positioned below the column, so none of it can move the
+   composition by a pixel. It scales with the stage like everything else on the
+   page — the reference's own model — so the sizes here are stage units: at this
+   page's own 0.4 they read at roughly 13-14px, and the approval's target is
+   sized so it lands at a real 44px (§33.11).                               */
+
+.ff-story__sub {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.ff-story__sub p { margin: 0; max-width: 1500px; }
+
+/* `.ff-story__approve` and `.ff-story__check` stood here — the §12 approval
+   checkbox and its label. Removed 2026-08-20 by explicit product direction,
+   along with the control in `StoryStep.tsx`; see that file for what is lost. */
+
+.ff-story__note {
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #013F17;
+}
+
+/* §9's autosave vocabulary. Announced always, and visible only when it is a
+   failure or when a recording is being turned into words — the two states the
+   reference has no need of and this screen does (§1.1). */
+.ff-story__status {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: normal;
+  color: #013F17;
+}
+.ff-story__status[data-state='failed'],
+.ff-story__status[data-state='working'] {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+.ff-story__alert {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #013F17;
+}
+
+/* §12's helper resources, inside the drawer the reference's HELP opens. */
+.ff-help__extra { margin: 0 0 var(--sp-24); }
+
+/* The reference's own one media query for this screen. Everything else is the
+   stage, and the stage scales rather than reflowing. */
+@media (max-width: 600px) {
+  .ff-story__back { bottom: 92px; padding: 8px 14px; }
 }

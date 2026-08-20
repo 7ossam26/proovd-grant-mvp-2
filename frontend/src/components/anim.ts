@@ -1877,7 +1877,15 @@ export function sayHandoff(root: HTMLElement | null, onStart: () => void): void 
   tl.to(btn, { width: full, duration: refDur(0.28) }, 0);
   tl.to(
     btn,
-    { opacity: 0, duration: refDur(0.12), ease: ease('exit') }, // power2.in
+    // `power1.in`, WRITTEN OUT rather than read from a token. §6.1's `exit`
+    // is `power2.in`, which is what stood here and what a runtime capture of
+    // this timeline reported — but the reference's own line is
+    // `.to(btn,{opacity:0,duration:.12,ease:'power1.in'},.26)`, and over 0.12s
+    // the difference between a squared and a linear ease-in is the difference
+    // between the mic vanishing and the mic leaving. Corrected 2026-08-20
+    // against the story screen; the positioning screen shares this helper and
+    // takes the same correction.
+    { opacity: 0, duration: refDur(0.12), ease: 'power1.in' },
     refDur(0.26),
   );
   tl.add(onStart);

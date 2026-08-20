@@ -223,11 +223,23 @@ export function HelpDrawer({
   pageId,
   param,
   trigger,
+  extra,
 }: {
   pageId: string;
   /** The value for this page's own route parameter. */
   param: string;
   trigger: ReactElement;
+  /**
+   * Page-specific reading, above the flow's own cards.
+   *
+   * §12's helper resources are four subjects of static, copy-ready guidance,
+   * and the pages rebuilt to the reference have no room in their composition
+   * for a four-section accordion — HELP is where the reference puts help. This
+   * is how that guidance stays in the product without a box being added to a
+   * screen the reference draws without one. Optional, so every other page's
+   * drawer is byte-for-byte what it was.
+   */
+  extra?: ReactNode;
 }) {
   const navigate = useNavigate();
   const index = founderFlowIndex(pageId);
@@ -240,6 +252,7 @@ export function HelpDrawer({
       eyebrow={FOUNDER_FLOW_HELP_SUBHEAD}
     >
       <p className="ff-help__sub">{FOUNDER_FLOW_HELP_SUBHEAD}</p>
+      {extra ? <div className="ff-help__extra">{extra}</div> : null}
       <ul className="ff-help__list">
         {visible.map((page) => {
           const current = page.id === pageId;
