@@ -1003,6 +1003,40 @@ describe('positioning', () => {
     await screen.findByText(FLOW_COMPLETION_IS_DECIDED);
   });
 
+  it('never answers Next with silence — an empty earlier answer sends you to it', async () => {
+    /*
+      The bug this replaces, reported 2026-08-20: `Next` was `disabled` while an
+      earlier §9 answer was empty, and `.ff-compet__next:disabled` renders
+      identically to the live control — same brand fill, same opacity. So the
+      button looked exactly as pressable as it ever does and did nothing at all.
+
+      The guard is right: §9 submits all three answers together and
+      `submitVetting` refuses a short set by name, so there is genuinely nothing
+      to submit. What was wrong was expressing that as an inert control. Next
+      now goes to the screen that owns the empty answer, which is the only
+      direction that still carries the flow forward.
+    */
+    const user = userEvent.setup();
+    stubVetting({
+      ...ANSWERED,
+      problem: null,
+      completeness: { problem: false, solution: true, competition: false },
+    });
+    renderAt(at('positioning'));
+
+    const next = await screen.findByRole('button', { name: /next/i });
+    expect(next).toBeEnabled();
+
+    await user.type(screen.getByRole('textbox'), 'Spreadsheets, mostly.');
+    await user.click(next);
+
+    // The problem page — its field's own accessible name, which nothing else
+    // in the flow renders. Somewhere, rather than nowhere.
+    expect(
+      await screen.findByLabelText('How we understood your problem'),
+    ).toBeInTheDocument();
+  });
+
   it('renders the dictation absence rather than a microphone that refuses', async () => {
     stubVetting({
       ...ANSWERED,
