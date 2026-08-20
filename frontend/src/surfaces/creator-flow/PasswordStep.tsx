@@ -7,8 +7,8 @@
  * structure (`.obrow` → `.obhead` / `.obbody` / `.ob-inline-action`), the copy,
  * the four live checks, the confirm field that appears once all four pass, and
  * the relay that carries the heading in from the right. PHASE 50 in
- * `proovd.css` carries the declarations; `creatorPasswordIn` carries the
- * timeline.
+ * `proovd.css` carries the declarations; `creatorMomentIn` carries the timeline
+ * — shared with screen 2, which is the same composition and the same relay.
  *
  * ── It renders `bare`, and owns its own header ──────────────────────────────
  * PHASE 49's precedent, one screen later. The shell's top bar is a wordmark and
@@ -64,7 +64,7 @@ import {
   CREATOR_PASSWORD_REQUIREMENTS,
   creatorPasswordMeetsRequirements,
 } from '@proovd/shared';
-import { creatorPasswordIn } from '../../components/anim.js';
+import { creatorMomentIn } from '../../components/anim.js';
 import { LinkUnavailable } from '../LinkUnavailable.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { CreatorFlowPage, useCreatorFlowNav } from './CreatorFlowPage.js';
@@ -166,7 +166,7 @@ function Body() {
   // The relay: head, then lede, then the CTA when it is enabled. Re-run when
   // the CTA's enabled-ness changes would restart the entry mid-typing, so it is
   // keyed on nothing — it plays once per mount, as the reference's does.
-  useLayoutEffect(() => creatorPasswordIn(stageRef.current, 1), []);
+  useLayoutEffect(() => creatorMomentIn(stageRef.current, 1, 'pw'), []);
 
   function advance() {
     if (!ready) return;
@@ -201,6 +201,11 @@ function Body() {
         >
           <BackArrow />
           Back
+          {/* §33.11.4 refuses a bare `Back`: an objectless CTA names nothing.
+              The visible word stays the reference's and the destination rides
+              in an `sr-only` span, so the rendered pixels do not move. Added
+              2026-08-20 with screen 7's own rebuild, which hit the same check. */}
+          <span className="sr-only"> to Your invitation</span>
         </button>
       </header>
 

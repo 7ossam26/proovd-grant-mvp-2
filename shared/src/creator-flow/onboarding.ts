@@ -127,18 +127,45 @@ export const CREATOR_PASSWORD_NOT_KEPT =
 
 /* ── Screen 2, you ────────────────────────────────────────────────────────── */
 
+/* Every string below is read out of the v11 reference's `moment-profile` markup
+ * rather than retyped (2026-08-20). The apostrophe in the lede is the straight
+ * `'` the reference file actually contains, verified at the byte level. */
+
+export const CREATOR_PROFILE_HEAD = 'Make sure we got you right.';
+
 /** §11's source label, and the reference wrote it well. */
 export const CREATOR_PROFILE_PREFILL_NOTE =
-  'We filled this in from what we already knew. Change anything that is wrong.';
+  "We prefilled this from what we know. Fix anything that's off.";
+
+/** The reference's three field labels, in its own casing. */
+export const CREATOR_PROFILE_NAME_LABEL = 'Legal name';
+export const CREATOR_PROFILE_EMAIL_LABEL = 'Email';
+export const CREATOR_PROFILE_PHONE_LABEL = 'Phone';
+
+/** The chip on the right of the email row. */
+export const CREATOR_PROFILE_EMAIL_LOCKED_TAG = 'Locked';
+
+/** `obLabels[2]` — the reference's label for this step's forward control. */
+export const CREATOR_PROFILE_CTA = 'Continue';
 
 /**
- * The email is editable, and the reference renders it `Locked`.
+ * Why the email is read-only HERE, and where §11's right is exercised instead.
  *
- * §11 gives a Creator the right to correct prefilled public information, the
- * column carries a full supplier triple, and `saveSignupProfile` has accepted
- * the key since Phase 08b. Locking it would be the product declining a right
- * the Spec grants — and it is the address every transactional message goes to,
- * so getting it wrong is the most expensive field on the screen to leave wrong.
+ * DELIBERATELY INVERTED (2026-08-20). This screen was rebuilt 1:1 from the v11
+ * reference, whose email row is a value and a `Locked` chip rather than an
+ * input — so the field is read-only on this screen, and the CTA is gated on the
+ * name alone (`nameOk()`), which is what the reference gates on.
+ *
+ * §11's right to correct prefilled public information is not withdrawn by that,
+ * because it is not exercised here any more: `CREATOR_SETTINGS_FIELDS` carries
+ * `email` and Session F built the correction path behind it, with the reason,
+ * the prior value read under lock, and the audit row §25.6 wants. What changes
+ * is which surface takes the correction, and the address every transactional
+ * message goes to is a better fit for a recorded correction than for a box that
+ * saves on every keystroke of a half-typed address.
+ *
+ * The column keeps its full supplier triple and `saveSignupProfile` still
+ * accepts the key — nothing about the record moved.
  */
 export const CREATOR_EMAIL_IS_WHERE_WE_WRITE =
   'This is where we send everything about your campaigns and your money.';
@@ -263,71 +290,97 @@ export const CREATOR_VERIFY_READ_ONLY =
 
 /* ── Screen 7: the agreement ──────────────────────────────────────────────── */
 
-/**
- * The re-authored head and lede.
+/* Every string in this block is read out of the v11 reference's `moment-agree`
+ * markup rather than retyped (2026-08-20). All of it is ASCII — the apostrophes
+ * in the legal line are the straight `'` the reference file actually contains,
+ * verified at the byte level, not the typographic `’` a copy pass reaches for.
  *
- * The reference draws *"You stay in control. Your pay is guaranteed."* over
- * *"As long as you follow the rules below, your earnings lock in. No
- * clawbacks."* — on the screen where somebody is consenting, which is where an
- * untrue promise costs the most. The first half is true and is kept; the second
- * is not, and `CREATOR_FLOW_ABSENCES` carries the full argument.
+ * ── DELIBERATELY INVERTED (2026-08-20) ─────────────────────────────────────
+ * Session C re-authored the head, the lede and both promise cards, on the
+ * grounds that "Your pay is guaranteed" / "No clawbacks" is untrue on the one
+ * screen where somebody is consenting: §22.1 provides for cancelling unpaid
+ * invalid amounts and creating a contractual recovery record, §29.5 protects
+ * only VALID FINALIZED commission and only absent Creator-caused invalidity,
+ * and 20a's `applyCauseBasedAffiliateAdjustment` exists because clawbacks
+ * happen. That reasoning is not withdrawn and it is not wrong.
+ *
+ * What changed is the instruction: this screen was rebuilt 1:1 from the
+ * reference by explicit product direction, and copy is named in that direction
+ * as something to reproduce rather than re-author. The reference's own words
+ * ship. `CREATOR_FLOW_ABSENCES` keeps both entries with the inversion recorded
+ * on them, so a later session meets the argument rather than rediscovering it.
  */
-export const CREATOR_AGREE_HEAD = 'You stay in control.';
+
+/** `.obhead h1` and the `<p>` under it. */
+export const CREATOR_AGREE_HEAD = 'You stay in control. Your pay is guaranteed.';
 export const CREATOR_AGREE_LEDE =
-  'Two things worth knowing before you create the account. Neither is fine print.';
+  'As long as you follow the rules below, your earnings lock in. No clawbacks.';
 
-/**
- * §17, §14.2. The reference's first promise, which is true as drawn.
- *
- * Nothing publishes for a Creator: §14.2's acceptance is theirs, §17's post is
- * written and published by them, and Admin verifies what they submitted rather
- * than producing it.
- */
-export const CREATOR_AGREE_CONTROL_TITLE = 'You decide what you post';
+/** The first `.agreement-promise`. */
+export const CREATOR_AGREE_CONTROL_TITLE = 'You control what you post';
 export const CREATOR_AGREE_CONTROL_BODY =
-  'Nothing goes out in your name. You write the post, you publish it, and you choose which campaigns to take at all — turning one down does not count against you.';
+  'Nothing goes out without your say. You approve every post.';
 
-/**
- * §22.1, §29.5, §24.8. The re-authored second promise.
- *
- * §29.5 protects VALID FINALIZED commission, and only absent Creator-caused
- * invalidity. §22.1 provides for cancelling unpaid invalid amounts and creating
- * a contractual recovery record on fraud, fake traffic, self-dealing, false
- * claims, invalid proof, or material breach — and 20a's
- * `applyCauseBasedAffiliateAdjustment` exists because that happens.
- *
- * So the guarantee is real and it is narrower than "no clawbacks": what is
- * protected is valid earnings against the campaign going badly, which is the
- * thing a Creator is actually worried about. Saying which is stronger copy than
- * saying neither.
- */
-export const CREATOR_AGREE_MONEY_TITLE = 'Valid earnings are not clawed back for performance';
+/** The second `.agreement-promise`. */
+export const CREATOR_AGREE_MONEY_TITLE = 'Your money is guaranteed';
 export const CREATOR_AGREE_MONEY_BODY =
-  'Once pre-orders you brought in are charged and your commission is finalized, it is not reduced because the campaign did less well than hoped or because a Founder changed their mind. Earnings from invalid activity — fake traffic, self-dealing, or breaking the agreement — can be reversed, and that is a recorded decision with a reason behind it.';
+  'Follow the agreement and your pay is locked. We handle the payouts.';
+
+/** `.agreement-legal--primary` — four of §11's five representations, stated. */
+export const CREATOR_AGREE_LEGAL_PRIMARY =
+  "You agree you're the real creator behind this channel, this is your only Proovd account, and you're US-based and not sanctioned.";
 
 /**
- * Above the five §28.4 controls.
+ * `.agreement-legal--terms`, in the pieces the reference sets in `<b>`.
  *
- * The reference bundles four representations into one sentence and one button.
- * §28.4 forbids bundling and requires the 18+ confirmation unchecked, and §11
- * names five things rather than four.
+ * The reference marks all three documents up as bold underlined text with no
+ * `href` — an affordance with nothing behind it. The two Proovd actually takes
+ * a consent for have published routes (`AFFILIATE_CLAIM_POLICY_SLUGS`), so they
+ * render as real links in the same treatment; §31.4 wants the document readable
+ * before it is accepted, and an underline that does nothing is the §1.4 failure
+ * in miniature. The third has no route because §31.5's IP agreement is PER
+ * CAMPAIGN and is collected at §14.2 acceptance, so it stays a `<b>`.
  */
-export const CREATOR_AGREE_CONFIRMATIONS_LABEL = 'Five things you are telling us';
-export const CREATOR_AGREE_CONFIRMATIONS_HELP =
-  'Each one is a separate statement and none of them is ticked for you.';
+export const CREATOR_AGREE_TERMS_LEAD = 'Tapping agree accepts the ';
+export const CREATOR_AGREE_TERMS_TERMS = 'Terms';
+export const CREATOR_AGREE_TERMS_SEP = ', ';
+export const CREATOR_AGREE_TERMS_AUP = 'Acceptable Use Policy';
+export const CREATOR_AGREE_TERMS_LAST_SEP = ', and ';
+export const CREATOR_AGREE_TERMS_IP = 'IP & NDA Agreement';
+export const CREATOR_AGREE_TERMS_TAIL = ', and confirms everything above.';
+
+/** `obLabels[6]` — the reference's label for this step's forward control. */
+export const CREATOR_AGREE_CTA = 'Agree and enter';
+
+/* ── The completion state the reference has no drawing for ────────────────── */
 
 /**
- * §11's two acceptances, and why there is no third.
+ * Why a second panel can open under the agreement, and what it asks for.
  *
- * The reference's single button accepts *"the Terms, Acceptable Use Policy, and
- * IP & NDA Agreement"*. §31.5's IP agreement is PER CAMPAIGN and is due before
- * WORK — it is collected at §14.2 acceptance, on the campaign it belongs to —
- * so taking it here would collect it for a campaign this Creator has not been
- * offered yet. `AFFILIATE_CLAIM_POLICY_SLUGS` has held exactly two since Phase
- * 08b and does not change.
+ * `completeAffiliateSignup` gates on `dateOfBirth`, `country` and `stateRegion`
+ * and on all five §11 confirmations. The reference's screen states four of the
+ * five in its legal line — real creator, only account, US-based, not sanctioned
+ * — and collects none of the three facts anywhere in its nine screens. So the
+ * one thing this screen cannot do is press the button and have it work for
+ * somebody whose record is short.
+ *
+ * The answer is a state rather than a redesign: the screen renders the
+ * reference exactly, and the missing facts appear only when they are missing —
+ * which on a completed walk is never. §1.1 asks every surface for its states,
+ * and this is one of them.
+ *
+ * The 18+ statement is here rather than in the legal line because the
+ * reference's sentence does not make it, and recording an age representation
+ * nobody stated is the one thing worse than asking for it.
  */
-export const CREATOR_AGREE_IP_LATER =
-  'The intellectual-property and confidentiality agreement is per campaign, so we ask for it when you accept a campaign rather than now.';
+export const CREATOR_AGREE_MORE_TITLE = 'A little more before we can create it';
+export const CREATOR_AGREE_MORE_BODY =
+  'Your account has to say where you are and that you are old enough to be paid. Nothing here is shown to a Founder.';
+export const CREATOR_AGREE_MORE_DOB_LABEL = 'Date of birth';
+export const CREATOR_AGREE_MORE_COUNTRY_LABEL = 'Country';
+export const CREATOR_AGREE_MORE_COUNTRY_HINT =
+  'Proovd works with US-based Creators only at launch.';
+export const CREATOR_AGREE_MORE_STATE_LABEL = 'State';
 
 /**
  * §11's five confirmations, as a register.
@@ -429,7 +482,13 @@ export const CREATOR_PROOVD_OWNS_THE_WAIT =
  * behaviour this screen does not have (§1.4). Found by the browser pass.
  *
  * What is true here is the half that matters either way: §11 records what
- * somebody states, and the confirmation below is the statement.
+ * somebody states, and the confirmation IS the statement.
+ *
+ * The sentence is placement-neutral (2026-08-20). It used to say "your own
+ * confirmation below", which was true while the control sat under it and
+ * stopped being true when the rebuilt screen put the tick first. Copy that
+ * names a direction is copy that goes stale the next time a layout moves —
+ * Session C recorded the same correction for `AVAILABILITY_TERM_IS_AGREED`.
  */
 export const CREATOR_AGE_IS_YOUR_STATEMENT =
-  'We do not work out your age from this and we do not verify it. What stands on your record is your own confirmation below.';
+  'We do not work out your age from this and we do not verify it. What stands on your record is your own confirmation.';
