@@ -93,8 +93,8 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_vetting',
-    label: 'The invited Founder: the invite, §9’s answers, and the account claim',
-    specRef: '§7, §9, §10',
+    label: 'The invited Founder: the invite and §9’s answers',
+    specRef: '§7, §9',
     audience: 'founder',
     // Founder Flow v2 (2026-08-18) split the flow onto one address per screen:
     // Session B built the first four, Session C the four that finish the draft
@@ -105,16 +105,30 @@ export const PRINCIPAL_FLOWS = [
     //
     // `/draft/:token/vetting` left this list with Session C: Positioning is
     // its own page now and the address is a redirect, not a surface.
+    //
+    // `/draft/:token/match` and `/draft/:token/claim` left it on 2026-08-20,
+    // when both screens were removed from the flow outright — routes,
+    // components and register entries together.
     routes: [
       '/draft/:token',
       '/draft/:token/problem',
       '/draft/:token/solution',
+      // The reach orbit, built 2026-08-20 between the solution and the
+      // campaign path. Restated from `FOUNDER_FLOW_PAGES` like the rest of
+      // this list, and drift-tested against it.
+      '/draft/:token/reach',
       '/draft/:token/campaign-type',
       '/draft/:token/email',
       '/draft/:token/code',
+      // The reference's `probConfirm`, built 2026-08-20 between the code and
+      // Positioning — the last look at the problem before the rest of the
+      // questions build on it. Restated from `FOUNDER_FLOW_PAGES` like the
+      // rest of this list, and drift-tested against it.
+      '/draft/:token/confirm-problem',
+      // The same reference component at `vStep` 1 — the last look at the
+      // solution, built 2026-08-20 between the problem and Positioning.
+      '/draft/:token/confirm-solution',
       '/draft/:token/positioning',
-      '/draft/:token/match',
-      '/draft/:token/claim',
     ],
     keyboardPathRequired: true,
   },

@@ -10,12 +10,13 @@
  * somewhere that does not exist.
  *
  * ── It holds only the pages that EXIST ──────────────────────────────────────
- * Twenty-six were planned and twenty-four are built. The two that are not
- * are the reference's screens 7 and 8, which ask Problem and Solution a
- * SECOND time — §9 has one of each, and Session C built nothing for them
- * rather than a second surface over one record. So this is every page the
- * flow has, and the help drawer's "everything before it" is a fact rather
- * than an aspiration.
+ * Twenty-six were planned and twenty-four are here. On 2026-08-20, by
+ * explicit product direction, the reach orbit and the problem confirm were
+ * added from the reference, and two pages were removed outright — the §10
+ * relevance signal (`match`) and the account-claim screen (`claim`) —
+ * screens and register entries both. So this is every page the flow has,
+ * and the help drawer's "everything before it" is a fact rather than an
+ * aspiration.
  *
  * ── The order is the reconciliation's, not the reference's ──────────────────
  * `docs/phases/founder-flow-reconciliation.md` §1 is the canonical order, and
@@ -26,15 +27,21 @@
  */
 
 /**
- * The five auth regimes of the flow, from `founder-flow-reconciliation.md` §1.
+ * The auth regimes of the flow, from `founder-flow-reconciliation.md` §1.
  *
  * 1 — the draft token (`requireDraftToken`). No account exists.
- * 2 — the claim itself. `completeClaim`, once.
  * 3 — a Founder session (`requireRole('founder')`).
  * 4 — a Founder session, money. A complete `founder_seller` account.
  * 5 — post-fee. Phase 11's effect 4 has opened the formal Creator opportunity.
+ *
+ * Regime 2 was the account-claim screen — the one stage-2 page there was. That
+ * screen was removed on 2026-08-20 (with the §10 relevance signal), so no page
+ * carries the value any more and it left the union rather than staying as a
+ * stage nothing occupies. The numbering of 3–5 deliberately does not close the
+ * gap: stage numbers appear in comments across the tree, and renumbering them
+ * would put every one of those out of step with the code beside it.
  */
-export type FounderFlowStage = 1 | 2 | 3 | 4 | 5;
+export type FounderFlowStage = 1 | 3 | 4 | 5;
 
 export interface FounderFlowPage {
   /** Stable id. The help drawer, the router, and the tests all key on it. */
@@ -49,7 +56,7 @@ export interface FounderFlowPage {
   /**
    * Which value that parameter is.
    *
-   * Stage 1 and 2 are addressed by the draft token; stage 3 onward by the
+   * Stage-1 pages are addressed by the draft token; stage 3 onward by the
    * campaign, because §10's claim invalidates the token and every route past it
    * is behind `requireRole('founder')`. Naming it here is what lets one
    * `founderFlowPath` serve both without a call site guessing — and it is what
@@ -90,6 +97,37 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 1,
   },
   {
+    /*
+      The reach orbit — built 2026-08-20, on explicit product direction, from
+      the reference's own `[data-reach]`. Its screen order is
+      `['claim','problem','solution','reach','kind', ...]`, so it sits here.
+
+      It is the one page in this register whose matching `FOUNDER_FLOW_ABSENCES`
+      entry was DELETED rather than never written. The reasons that entry gave
+      are recorded on `ReachStep.tsx`, together with the two mechanisms that
+      keep the reversal narrow: this screen reads no record and stores nothing,
+      and §10's relevance signal — the honest version of the same beat — is
+      untouched two pages later.
+    */
+    id: 'reach',
+    path: '/draft/:token/reach',
+    param: 'token',
+    title: 'Your reach',
+    /*
+      The reference's own help entry is
+      `{id:'reach', t:'Your reach', b:'The audience our creators can put in
+      front of your campaign. No action needed, just have a look.'}`.
+
+      The title and the second sentence are verbatim. The first clause is not:
+      "our creators can put in front of your campaign" states what Proovd's
+      Creators WILL do, which is the §7 promise the screen was refused over.
+      Changing one clause and leaving the rest is the smallest edit that
+      removes it.
+    */
+    help: 'The audience a campaign like yours can reach. No action needed, just have a look. It is a typical figure rather than a promise, and nobody has agreed to anything.',
+    stage: 1,
+  },
+  {
     id: 'campaign-type',
     path: '/draft/:token/campaign-type',
     param: 'token',
@@ -114,6 +152,48 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 1,
   },
   {
+    /*
+      The reference's `probConfirm` — its `vetting` screen at `vStep` 0, which
+      is exactly where its `type` screen sends somebody once the code lands
+      (`this.step({si:this.I('vetting'), vStep:0})`). Its own DOCS entry is
+      `{t:'Confirm the basics', b:'Last look at the problem and the solution
+      before the rest of the questions build on them.'}`; the title is verbatim
+      and the line is narrowed to the one answer this screen shows, because
+      §9 has one Problem and the reference asks the pair.
+    */
+    id: 'confirm-problem',
+    path: '/draft/:token/confirm-problem',
+    param: 'token',
+    title: 'Confirm the basics',
+    help: 'Last look at the problem before the rest of the questions build on it. Change it here if it is not right any more.',
+    stage: 1,
+  },
+  {
+    /*
+      The same screen at `vStep` 1 — built 2026-08-20, by explicit product
+      direction, from the reference's own `[data-pconfirm]`.
+
+      One component there, two pages here. The reference's `isProbConfirm` is
+      `n==='vetting' && !vReviewing && vStep<2`, so both the problem and the
+      solution are `probConfirm`, and every difference between them is a
+      ternary on `vStep`: `pcHead`, `pcText`, `pcCta`, and which answer
+      `setProbText`/`stillMine` write. A register whose entries are ADDRESSES
+      cannot hold one page at two, so the pair is two entries — which is also
+      what lets the drawer name and mark them separately, and what lets Back
+      from here land on the problem exactly as `back()`'s `vStep>0` branch
+      does.
+
+      The DOCS entry is shared there and covers both answers; the title is
+      narrowed to this one for the same reason the problem's line was.
+    */
+    id: 'confirm-solution',
+    path: '/draft/:token/confirm-solution',
+    param: 'token',
+    title: 'Confirm the solution',
+    help: 'Last look at the solution before the rest of the questions build on it. Change it here if it is not right any more.',
+    stage: 1,
+  },
+  {
     id: 'positioning',
     path: '/draft/:token/positioning',
     param: 'token',
@@ -122,30 +202,9 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 1,
   },
   {
-    id: 'match',
-    path: '/draft/:token/match',
-    param: 'token',
-    title: 'Creators who may fit',
-    help: 'How many Creators in your category might be a fit for what you just described. It is a relevance signal, not a roster, and nobody has agreed to anything.',
-    stage: 1,
-  },
-  {
-    /*
-      Session D (2026-08-18). §10's account claim — the only stage-2 page there
-      is, and the boundary the whole flow turns on. Its address does not move:
-      it shipped in Phase 07 and the match screen has pointed at it since C.
-    */
-    id: 'claim',
-    path: '/draft/:token/claim',
-    param: 'token',
-    title: 'Your details',
-    help: 'The last of what we need before your account exists: your name, when you were born, where you are, and the three agreements. Nothing is charged and no card is asked for.',
-    stage: 2,
-  },
-  {
     /*
       Stage 3 — the five §12 answers and the review over all eight. Addressed by
-      CAMPAIGN, because the claim just invalidated the token and every route
+      CAMPAIGN, because §10's claim invalidated the token and every route
       behind these is `requireRole('founder')`.
     */
     id: 'visuals',
@@ -381,13 +440,25 @@ export interface FounderFlowAbsence {
  * to delete the entry that refuses it.
  */
 export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
-  {
-    element:
-      'The reach screen — a full page of orbiting phones behind "We can get [product] in front of [N] new people", between Solution and campaign type',
-    absentBecause:
-      'It promises a result. §7 forbids Admin promising acceptance, results, reward pricing, or a named Creator\'s participation, and no record holds an audience number — the prototype\'s own is the constant 10,000. §10\'s relevance signal is the honest version of this beat: it counts Creators who might be a fit, carries six sentences saying what the number is not, and names nobody.',
-    specRef: '§7, §10, §1 rule 6',
-  },
+  /*
+    The reach screen's entry left this register on 2026-08-20, when the screen
+    was built on explicit product direction. It is recorded here rather than
+    silently deleted, because a later reader meeting a missing refusal would
+    conclude nobody had ever considered it — the opposite happened.
+
+    What it said: the screen promises a result; §7 forbids Admin promising
+    acceptance, results, reward pricing, or a named Creator's participation;
+    and no record holds an audience number, the prototype's own being the
+    constant 10,000. Every word of that is still true of the FIGURE. What
+    holds it there is that `ReachStep.tsx` reads no record and stores nothing:
+    a caveat sentence beneath the headline was added and then removed the same
+    day by product direction, so the absence of anything behind the number is
+    the whole of the guarantee rather than half of it.
+
+    A later phase asked to make the number dynamic, per-campaign, or derived
+    from §10's count is asking for the promise this entry refused. This note is
+    not the licence for it.
+  */
   {
     element:
       'The same "in front of [N] new people" line on the invite page, above the claim button',
@@ -408,46 +479,17 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
       'Those are internal values and never reach a Founder. `CAMPAIGN_PATH_CHOICES[].name` — Idea Campaign, Product Campaign — is the only thing that renders.',
     specRef: '§3.1',
   },
-  {
-    element:
-      'The match screen’s sub-line, `In your category are ready to promote this`',
-    absentBecause:
-      '§10 forbids exactly this claim: the number "guarantees neither that anyone will take part nor what results they would produce" and "is not the recruited/accepted roster". "Ready to promote this" says people who have agreed to nothing are ready to promote something. `POSSIBLE_CREATOR_RESULT_DISCLOSURES` is the honest version of the same beat, and it is six sentences long because every one of them is a limit the number needs.',
-    specRef: '§10, §30',
-  },
-  {
-    element:
-      'The match screen’s breakdown — `1 Newsletter / blog operator`, `2 Community owners`',
-    absentBecause:
-      '`possible_creator_results` holds a count, a basis, and who recorded it. There is no category breakdown to render, so drawing one would mean inventing a fact (§1 rule 6) about people the Founder may not be shown — and §11’s boundary is why: describing them by kind is a step from "names no Creator" toward a roster. The `basis` never leaves Admin.',
-    specRef: '§10, §11, §1 rule 6',
-  },
-  {
-    element: 'The email screen’s headline, `To save your progress verify your email:`',
-    absentBecause:
-      'Progress is already saved. §9’s autosave writes every answer through the draft token, and the link in the invitation is what brings a Founder back to it — verifying an address changes none of that. A sentence naming the wrong mechanism is the §1.4 failure in one line, and it is the line somebody reads while deciding whether they can close the tab.',
-    specRef: '§1.4, §9',
-  },
-  {
-    element:
-      'The email field’s ink turning `#A2AFA8` while the field has focus, returning to `#013F17` on blur',
-    absentBecause:
-      'That is `--grey` on `--white`, about 2.2:1, applied to the text a person is actively typing. It is the token for placeholders and disabled ink, and Session B moved five sentences off it for the same reason. The dashed brand underline is what marks focus here; the ink stays legible.',
-    specRef: '§28.5, §33.11',
-  },
-  {
-    element: 'The legal-name field labelled `Username:` on the details screen',
-    absentBecause:
-      'It writes `founder_claim_profiles.legal_name`, which is what §10 collects and what Stripe is later given. Calling it a username misnames the record on the one screen that creates it — and it invites a nickname into the field the seller of record is identified by.',
-    specRef: '§10',
-  },
-  {
-    element:
-      'The details screen collecting three fields — legal name, phone, birthdate — and nothing else',
-    absentBecause:
-      'It is not an absence in the reference so much as a gap: §10 lists nine contents for this surface, and the prototype has no account behind it to need the rest. Country and state, sole-proprietor or entity, the password, the three agreements and the three representations are all here, because the account cannot exist without them and `completeClaim` refuses by name for each.',
-    specRef: '§10, §28.4',
-  },
+  /* The email screen's headline and its focus ink both used to be recorded
+     here. Both now SHIP, verbatim, by explicit product direction (2026-08-20) —
+     see the two recorded deviations at the top of `EmailStep.tsx`. The entries
+     are removed rather than left standing, because a register saying an element
+     is absent while the page renders it is worse than no register.
+
+     Four more entries left on 2026-08-20, when the match and claim screens
+     were removed from the flow outright: the match sub-line and its category
+     breakdown, the `Username:` label, and the three-field details screen. A
+     refusal about an element of a screen that no longer exists refuses
+     nothing, so the entries went with the screens. */
   {
     element:
       'The interview screen’s own platform tiles (Meet / Zoom / Teams) and time-slot chips',
@@ -556,7 +598,7 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
   },
 ];
 
-/* ── The four sentences Session D pins ────────────────────────────────────── */
+/* ── The sentences Session D pins ─────────────────────────────────────────── */
 
 /**
  * Rendered on every one of the five optional answers, and on Last look.
@@ -592,17 +634,6 @@ export const FLOW_LAST_LOOK_RETURNS =
  */
 export const FLOW_AGE_IS_YOUR_STATEMENT =
   'We check the date adds up to 18 or over as you type. That is a courtesy, not a verification — what stands on your record is your own confirmation below.';
-
-/**
- * Rendered under the claim's primary control.
- *
- * The pair of facts somebody wants before they hand over a password: what this
- * costs, and what happens to the link they arrived on (§10: the claim
- * "invalidates the draft token").
- */
-export const FLOW_CLAIM_USES_THE_LINK =
-  'This creates your account and uses up your invitation link. Nothing is charged and no card is asked for.';
-
 
 /* ── The two sentences the shell itself pins ────────────────────── */
 

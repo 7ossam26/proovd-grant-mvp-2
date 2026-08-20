@@ -126,24 +126,6 @@ export interface VettingPatch {
   resumeStep?: string;
 }
 
-/* ── §10 the possible-creator result ──────────────────────────────────────── */
-
-/**
- * §10's relevance signal.
- *
- * `with_admin` is the answer for a zero result AND for one nobody has recorded
- * yet — the server collapses them before serializing, so there is no field here
- * that could tell them apart.
- */
-export interface CreatorSignal {
-  status: 'available' | 'with_admin';
-  count: number | null;
-  recordedAt: string | null;
-}
-
-export const fetchCreatorSignal = (token: string): Promise<CreatorSignal> =>
-  call(`${base(token)}/creator-signal`);
-
 /* ── §5.2 the six-digit email code (Founder Flow v2, Session C) ─────────── */
 
 /**
@@ -274,9 +256,3 @@ export const fetchClaim = (token: string): Promise<ClaimView> => call(`${base(to
 
 export const saveClaim = (token: string, patch: ClaimPatch): Promise<ClaimProfileState> =>
   call(`${base(token)}/claim`, { method: 'PATCH', body: JSON.stringify(patch) });
-
-export const completeClaim = (
-  token: string,
-  body: { password?: string; acceptedPolicySlugs: string[] },
-): Promise<{ ok: true; campaignId: string }> =>
-  call(`${base(token)}/claim`, { method: 'POST', body: JSON.stringify(body) });

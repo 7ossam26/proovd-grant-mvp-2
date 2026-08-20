@@ -125,6 +125,30 @@ const schema = z.object({
     .min(0, 'TRUST_PROXY_HOPS must be 0 or a positive number of proxy hops')
     .default(0),
 
+  /**
+   * The §28.1 limit on draft-token verification, raised for local work.
+   *
+   * The production values are 20 opens and 600 saves per quarter-hour per
+   * address, and they are what a keyspace sweep runs into. They are also what
+   * somebody reloading their own screen forty times an hour runs into, and the
+   * refusal is deliberately the ORDINARY dead-link answer — §5.5 forbids a
+   * limiter that announces itself, since one that did would be the enumeration
+   * oracle wearing a different hat. So a developer meets "We can't open this
+   * link" with no way to tell it from a real expiry, which is correct for a
+   * stranger and useless for the person who minted the token a minute ago.
+   *
+   * Raising it is therefore a development affordance and nothing else. It is
+   * **refused outright when `NODE_ENV` is `production`** (see the refinement
+   * below) rather than merely defaulted away: a limit that a deployment can
+   * widen from its own environment is not a limit, and the one environment
+   * where that matters is the one where the tokens are real.
+   */
+  DRAFT_VERIFY_LIMIT: z.coerce
+    .number()
+    .int()
+    .positive('DRAFT_VERIFY_LIMIT must be a positive number of attempts')
+    .optional(),
+
   // ── Transactional email (§27.2) ──────────────────────────────────────────
   // Optional to boot, because the app has to start before an Admin can look at
   // the §6 prerequisites panel and see that it is missing. Absent, the panel's
@@ -523,6 +547,23 @@ export function prerequisiteFacts(env: Env): {
 }
 
 /**
+ * §28.1's token-verification limit may be relaxed for local work and NEVER in
+ * production. It refuses to boot rather than quietly ignoring the value: an
+ * operator who set it meant to change something, and a deployment that starts
+ * while silently discarding a security setting is the worse of the two
+ * failures — the same reasoning `startScheduler` uses for the retention sweep.
+ */
+function checkDraftVerifyLimit(data: Env): void {
+  if (data.NODE_ENV === 'production' && data.DRAFT_VERIFY_LIMIT !== undefined) {
+    throw new Error(
+      'DRAFT_VERIFY_LIMIT is set but NODE_ENV=production. §28.1 rate-limits ' +
+        'token verification and that limit is not configurable in production. ' +
+        'Remove the variable.',
+    );
+  }
+}
+
+/**
  * Validates raw environment variables and returns the typed result.
  * Throws on schema failure or Stripe mode mismatch.
  * Tests import this directly; `loadEnv` is what triggers process.exit.
@@ -540,6 +581,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
   checkObjectStorage(result.data);
   checkScheduler(result.data);
   checkTranscription(result.data);
+  checkDraftVerifyLimit(result.data);
   return result.data;
 }
 

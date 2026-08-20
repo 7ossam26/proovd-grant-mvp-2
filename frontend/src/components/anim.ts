@@ -42,20 +42,33 @@ type GSAP = {
     // that would lose the overlap the whole sequence is built on.
     add: (t: unknown, p?: string | number) => unknown;
     set: (t: unknown, v: Record<string, unknown>, p?: string | number) => unknown;
+    // `call` is likewise a real timeline member, declared when the Founder
+    // Flow v2 reach orbit needed it (2026-08-20). The reference reveals its
+    // CTA from inside the same timeline that runs the count and the collapse
+    // (`this._rtl.call(...)`), which is what puts the button on screen at the
+    // exact frame the last phone leaves; a `setTimeout` beside the timeline
+    // would drift the moment a frame is dropped.
+    call: (fn: () => void, params?: unknown[], p?: string | number) => unknown;
     kill: () => unknown;
   };
   killTweensOf: (t: unknown) => unknown;
+  /*
+    GSAP's own ticker. The reach orbit is driven by it rather than by a second
+    `requestAnimationFrame` loop — the reference's own comment says why: "the
+    whole thing driven by GSAP's existing ticker rather than a second animation
+    loop", so the orbit's frames and the tweens that pop each phone are the
+    same clock and cannot drift apart.
+  */
+  ticker: {
+    add: (fn: (time: number, deltaTime: number) => void) => unknown;
+    remove: (fn: (time: number, deltaTime: number) => void) => unknown;
+  };
 };
 
-/** GSAP Flip, vendored at `public/vendor/gsap/Flip.min.js` and on window. */
-type FlipPlugin = {
-  getState: (t: unknown, v?: Record<string, unknown>) => unknown;
-  from: (state: unknown, v: Record<string, unknown>) => unknown;
-};
-
-function flip(): FlipPlugin | null {
-  return (window as unknown as { Flip?: FlipPlugin }).Flip ?? null;
-}
+/* GSAP Flip is vendored at `public/vendor/gsap/Flip.min.js` and stays loaded,
+   but nothing in this file reaches for it any more: the campaign type's travel
+   is the reference's own hand-written FLIP (`kindLand` below), and `Flip.from`
+   does not produce the same movement. */
 
 function gsap(): GSAP | null {
   const g = (window as unknown as { gsap?: GSAP }).gsap;
@@ -494,74 +507,6 @@ export function pageExit(stage: HTMLElement | null, done: () => void): void {
 }
 
 /**
- * Campaign type, phase 1: the chosen sticker swells while the rest fades.
- *
- * The reference scales the sticker to 1.55 over 0.26s `power2.out` while the
- * headline, copy and CTA fade out (`opacity 0, y −10`, 0.18s). `done` runs when
- * the swell finishes and is what swaps the stage — so with motion off the swap
- * is immediate and the FLIP that follows is a no-op, which is the jump-cut DNA
- * §6.6 asks for rather than a second code path.
- */
-export function swellChoice(
-  sticker: HTMLElement | null,
-  fading: Element[],
-  done: () => void,
-): void {
-  const g = gsap();
-  if (!g || !sticker || !motionLive()) {
-    done();
-    return;
-  }
-  if (fading.length) {
-    g.to(fading, { autoAlpha: 0, y: -10, duration: dur('instant'), ease: ease('exit') });
-  }
-  g.to(sticker, {
-    scale: 1.55,
-    duration: dur('quick'), // 0.20 stands in for the reference's 0.26
-    ease: ease('out'),
-    onComplete: done,
-  });
-}
-
-/**
- * Campaign type, phase 2: the sticker flips from where it was into its row.
- *
- * Two calls, either side of a React state change. `captureFlip` runs before the
- * stage swaps and `flipHome` in the layout effect after — which is the
- * reference's "invert is set synchronously before paint; the tween starts on
- * the next frame", expressed in React's own ordering rather than reproduced by
- * hand.
- *
- * The pick stage's sticker and the confirm row's sticker are different DOM
- * nodes, so they are matched by `data-flip-id` rather than by identity. Without
- * that the state captured before the swap describes an element that no longer
- * exists and Flip animates nothing.
- *
- * Returns null — and `flipHome` runs `done` immediately — whenever Flip is
- * absent or motion is off, so the caller never waits on a tween that will not
- * happen.
- */
-export function captureFlip(selector: string): unknown | null {
-  const F = flip();
-  if (!F || !motionLive()) return null;
-  return F.getState(selector);
-}
-
-export function flipHome(state: unknown, done?: () => void): void {
-  const F = flip();
-  if (!F || !state || !motionLive()) {
-    done?.();
-    return;
-  }
-  F.from(state, {
-    duration: dur('slow'), // 0.60 stands in for the reference's 0.52
-    ease: ease('move'), // power2.inOut for the reference's power3.inOut
-    absolute: true,
-    onComplete: done,
-  });
-}
-
-/**
  * The invitation splash — Creator Flow v2, Session B, 2026-08-19.
  *
  * The reference plays a 2.6-second hand-written `requestAnimationFrame` track
@@ -922,4 +867,1718 @@ export function inviteIntro(
       band.style.overflow = '';
     }
   };
+}
+
+/* ── Founder Flow v2 — screens 2 and 3, the confirmations ──────────────────
+   Rebuilt 2026-08-20 to the supplied reference's own `problemIntro`,
+   `revealHead` and `probToggle`.
+
+   Like screen 1, these screens do NOT use `relayIn`. The reference gives them
+   a bespoke entrance — the headline arrives word by word while the dark panel
+   is a 4%-wide sliver, and the panel then opens sideways with the field, the
+   edit control and the CTA rising behind it. A page that slid in sideways with
+   everything at once would lose the beat the whole screen is built around. The
+   markers are `data-prob-part`, not `data-anim`, which is what makes `relayIn`
+   a no-op here rather than something to switch off.
+
+   ── The durations are the reference's own numbers, not §6.1 tokens ─────────
+   A DELIBERATE departure from this file's convention, and the only one.
+   Elsewhere a reference number is rounded to the nearest token and recorded in
+   a comment; here the brief is a 1:1 behavioural reproduction, and this
+   sequence's beats (0.05, 0.24, 0.26, 0.28, 0.36, 0.38, 0.42) fall between
+   `quick` 0.20 and `base` 0.35 in a way that rounding visibly flattens — the
+   panel's 0.36 open and the field's 0.28 rise would become one duration and
+   stop reading as two moves. The token each sits between is recorded beside
+   it. The phone factor (§6.1: ×0.85) still applies, through the same `t()`
+   every other helper uses, because that is the reference's own `k()`. Nothing
+   exceeds §6.1's `grand: 0.90` ceiling. */
+
+/** The reference's `k()`: its literal duration, with §6.1's phone factor. */
+function refDur(seconds: number): number {
+  return t(seconds);
+}
+
+/**
+ * The scale a `[data-page-stage]` is currently rendered at.
+ *
+ * Read from the stage's own matrix rather than from the headline's box: a
+ * shrink-to-fit or zero-width `h1` measures as ratio 1, and the reveal copy
+ * then renders at full stage size and re-wraps — the reference records hitting
+ * exactly that.
+ */
+function stageRatio(el: Element): number {
+  const stage = el.closest('[data-page-stage]');
+  if (!stage) return 1;
+  const value = getComputedStyle(stage).transform;
+  if (!value || value === 'none') return 1;
+  const m = /matrix\(([^,]+)/.exec(value);
+  const ratio = m?.[1] ? Number.parseFloat(m[1]) : 1;
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+}
+
+/**
+ * The word-by-word headline reveal, run on a detached copy.
+ *
+ * Splitting needs spans, and the `h1` belongs to React's render — mutating it
+ * leaves the next reconciliation diffing against foreign nodes. So the split
+ * runs on a clone pinned over the real headline, which is never touched. That
+ * is the reference's own reasoning, and it holds identically here.
+ *
+ * The sticker is filtered out of the words and animated separately: it is an
+ * image inside the sentence, and a 175px picture rising 70% of its own height
+ * alongside the text reads as a different element arriving late rather than as
+ * one line landing.
+ *
+ * Returns a teardown. `onDone` runs exactly once — from the timeline, from the
+ * fallback, or immediately when motion is off.
+ */
+function revealHead(head: HTMLElement, onDone: () => void): () => void {
+  const g = gsap();
+  let called = false;
+  const finish = () => {
+    if (called) return;
+    called = true;
+    onDone();
+  };
+  if (!g || !motionLive()) {
+    finish();
+    return () => {};
+  }
+
+  let clone: HTMLElement | null = null;
+  let split: { words: Element[]; revert: () => void } | null = null;
+  const drop = () => {
+    try {
+      split?.revert();
+    } catch {
+      /* a reverted split is not worth a broken page */
+    }
+    split = null;
+    clone?.remove();
+    clone = null;
+  };
+
+  const S = splitText();
+  let words: Element[] = [];
+  if (S) {
+    try {
+      const r = head.getBoundingClientRect();
+      const ratio = stageRatio(head);
+      // +2px slack: a shrink-to-fit headline measures exactly as wide as its
+      // own text, and sub-pixel rounding alone was enough to wrap the copy.
+      const w = Math.ceil(r.width / ratio) + 2;
+      if (!w) throw new Error('unmeasurable');
+      clone = head.cloneNode(true) as HTMLElement;
+      clone.removeAttribute('data-prob-part');
+      clone.setAttribute('aria-hidden', 'true');
+      Object.assign(clone.style, {
+        position: 'fixed',
+        left: r.left + 'px',
+        top: r.top + 'px',
+        width: w + 'px',
+        margin: '0',
+        zIndex: '40',
+        pointerEvents: 'none',
+        opacity: '1',
+        visibility: 'visible',
+        transform: 'scale(' + ratio + ')',
+        transformOrigin: '0 0',
+      });
+      document.body.appendChild(clone);
+      split = new S(clone, { type: 'words' });
+      words = split.words.filter(
+        (el) => el.tagName !== 'IMG' && !el.querySelector('img'),
+      );
+    } catch {
+      drop();
+      words = [];
+    }
+  }
+
+  if (!clone || !words.length) {
+    drop();
+    g.fromTo(
+      head,
+      { autoAlpha: 0, y: 22 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: refDur(0.3), // between quick 0.20 and base 0.35
+        ease: ease('out'),
+        onComplete: finish,
+      },
+    );
+    return () => {
+      drop();
+      g.killTweensOf(head);
+    };
+  }
+
+  g.set(head, { autoAlpha: 0 });
+  const tl = g.timeline({
+    onComplete: () => {
+      drop();
+      g.set(head, { clearProps: 'opacity,visibility,transform' });
+      finish();
+    },
+  });
+  g.set(words, { autoAlpha: 0, yPercent: 70 });
+  tl.to(words, {
+    autoAlpha: 1,
+    yPercent: 0,
+    duration: refDur(0.38), // between base 0.35 and slow 0.60
+    ease: ease('hero'), // power4.out
+    stagger: 0.026,
+  });
+
+  const img = clone.querySelector('img');
+  if (img) {
+    g.set(img, { scale: 0, transformOrigin: '50% 50%' });
+    tl.to(
+      img,
+      {
+        scale: 1,
+        duration: refDur(0.36), // base 0.35, one hundredth away
+        ease: 'back.out(1.6)', // its own, between snap's 1.4 and the match's 1.9
+      },
+      '-=0.24',
+    );
+  }
+
+  // The reference's own backstop, on the one failure that matters here: a
+  // clone that never animated leaves the real headline hidden behind it.
+  const fallback = window.setTimeout(() => {
+    tl.kill();
+    drop();
+    g.set(head, { clearProps: 'opacity,visibility,transform' });
+    finish();
+  }, 3400);
+
+  return () => {
+    window.clearTimeout(fallback);
+    tl.kill();
+    drop();
+    g.set(head, { clearProps: 'opacity,visibility,transform' });
+  };
+}
+
+/**
+ * Screens 2 and 3 — the entrance.
+ *
+ * `root` is the screen's own stage. Everything the timeline touches carries a
+ * `data-prob-part` marker inside it.
+ *
+ * The panel opens from `scaleX: 0.04` — a sliver the width of a rule, widening
+ * into the card. Everything is staged synchronously, before this frame paints,
+ * so the card can never flash at full size before its own expand.
+ *
+ * `onSettled` runs once the headline has landed and the panel timeline has
+ * been built: it is where the surface measures its scroll rail, because the
+ * rail's geometry is only true once the field is at its real size.
+ */
+export function problemIntro(
+  root: HTMLElement | null,
+  onSettled: () => void,
+): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) {
+    onSettled();
+    return () => {};
+  }
+
+  const pick = (name: string) =>
+    root.querySelector<HTMLElement>('[data-prob-part="' + name + '"]');
+  const head = pick('head');
+  const panel = pick('panel');
+  const field = pick('field');
+  const edit = pick('edit');
+  const cta = pick('cta');
+  const staged = [head, panel, field, edit, cta].filter(
+    (el): el is HTMLElement => !!el,
+  );
+
+  g.killTweensOf(staged);
+  // Synchronously, before paint.
+  if (head) g.set(head, { autoAlpha: 0 });
+  if (panel) {
+    g.set(panel, {
+      scaleX: 0.04,
+      autoAlpha: 0,
+      transformOrigin: '50% 50%',
+      force3D: true,
+    });
+  }
+  if (field) g.set(field, { autoAlpha: 0, y: 14 });
+  if (edit) g.set(edit, { autoAlpha: 0, y: 12 });
+  if (cta) g.set(cta, { autoAlpha: 0, y: 18 });
+
+  let rest: ReturnType<GSAP['timeline']> | null = null;
+  const runRest = () => {
+    const tl = g.timeline({ defaults: { ease: ease('out') } }); // power3.out
+    rest = tl;
+    if (panel) {
+      tl.to(panel, { autoAlpha: 1, duration: refDur(0.05), ease: 'none' });
+      tl.to(
+        panel,
+        {
+          scaleX: 1,
+          duration: refDur(0.36), // base 0.35, one hundredth away
+          // The reference's power3.inOut. `move` is the system's one in-out
+          // (power2.inOut); a second in-out would be a second answer to what
+          // an in-out is.
+          ease: ease('move'),
+          clearProps: 'transform',
+        },
+        '<',
+      );
+    }
+    if (field) {
+      tl.to(
+        field,
+        { autoAlpha: 1, y: 0, duration: refDur(0.28), clearProps: 'transform' },
+        '-=0.16',
+      );
+    }
+    if (edit) {
+      tl.to(
+        edit,
+        { autoAlpha: 1, y: 0, duration: refDur(0.24), clearProps: 'transform' },
+        '-=0.2',
+      );
+    }
+    if (cta) {
+      tl.to(
+        cta,
+        { autoAlpha: 1, y: 0, duration: refDur(0.28), clearProps: 'transform' },
+        '-=0.2',
+      );
+    }
+    onSettled();
+  };
+
+  let stopHead: () => void = () => {};
+  if (head) stopHead = revealHead(head, runRest);
+  else runRest();
+
+  // `relayIn`'s own stuck sweep, for a set the runtime cannot see: `holdHidden`
+  // registers `[data-reveal]` and these are staged by an inline `set`. A
+  // dropped tween would otherwise leave a blank page with a working keyboard
+  // path, which is the worst failure this flow has.
+  const sweep = window.setTimeout(() => {
+    for (const el of staged) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility' });
+      }
+    }
+  }, 3400);
+
+  return () => {
+    window.clearTimeout(sweep);
+    stopHead();
+    rest?.kill();
+    g.killTweensOf(staged);
+  };
+}
+
+/**
+ * Screens 2 and 3 — the read/edit swap.
+ *
+ * The reference's `probToggle`: the headline is the only thing that moves, and
+ * it moves in the direction of travel — down into edit, up back out. The panel
+ * and the CTA are not tweened at all, because their change is a height and a
+ * margin the stylesheet transitions (`.5s` and `.45s` on the reference's own
+ * `cubic-bezier(.22,1,.36,1)`). That is the one place this flow uses CSS
+ * rather than GSAP, and it is the reference's own implementation rather than a
+ * simplification of it.
+ *
+ * It kills whatever the entrance left running on the same elements first: a
+ * toggle two hundred milliseconds into the arrival would otherwise have two
+ * owners of one transform.
+ */
+export function problemToggle(
+  root: HTMLElement | null,
+  head: HTMLElement | null,
+  entering: boolean,
+): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const parts = Array.from(
+    root.querySelectorAll<HTMLElement>('[data-prob-part]'),
+  );
+  g.killTweensOf(parts);
+  g.set(parts, { clearProps: 'opacity,visibility,transform' });
+
+  if (!head) return () => {};
+  g.from(head, {
+    autoAlpha: 0,
+    y: entering ? 10 : -10,
+    duration: refDur(0.42), // between base 0.35 and slow 0.60
+    ease: ease('out'), // power3.out
+    clearProps: 'opacity,visibility,transform',
+  });
+
+  return () => {
+    g.killTweensOf(head);
+  };
+}
+
+/* ── Screen 4 — the campaign type ─────────────────────────────────────────
+   REBUILT 2026-08-20 to the supplied reference's `[data-kind]` screen, and,
+   like `inviteIntro` and `problemIntro` above, its durations are its own
+   literals rather than the nearest token. Three of this sequence's beats are
+   the whole point of it — the sticker's 0.58s `back.out(1.7)` drop, the
+   travel's 0.55s + 0.20s two-keyframe landing, and the confirm stage's
+   0.80/0.84/0.95 holds — and rounding any of them to `base`/`slow` collapses
+   moves the eye reads as separate. The token each sits between is recorded
+   beside it, `refDur` still applies §6.1's phone factor (the reference's own
+   `k()`), and nothing exceeds §6.1's `grand: 0.90` ceiling.
+
+   Every marker is `data-kind-part` / `data-kind-art` / `data-kind-row` /
+   `data-kind-flip-art`, never `data-anim` — so `FlowPage`'s `relayIn` finds
+   nothing on this page and these helpers own it outright. That is the same
+   mechanism `InviteClaim` and `ConfirmAnswer` use, and it is why there is no
+   flag in `FlowPage` to keep in step.                                       */
+
+function kindPart(root: HTMLElement, name: string): HTMLElement | null {
+  return root.querySelector<HTMLElement>('[data-kind-part="' + name + '"]');
+}
+
+/**
+ * The pick stage's entrance — the reference's `kindIntro`, pick branch.
+ *
+ * The headline reveals word by word (the same private `revealHead` screens 1–3
+ * use), and only when it has landed does the rest follow: the sticker drops in
+ * and settles while the arrows spread out from behind it, then the copy and
+ * the CTA. The reference's own comment for it — "the sticker is the
+ * personality here" — is why it gets a `back.out(1.7)` over more than half a
+ * second while everything around it moves in a quarter of one.
+ *
+ * Everything is staged synchronously, before this frame paints, so nothing can
+ * flash at full opacity ahead of its own entrance.
+ */
+export function kindIntro(root: HTMLElement | null): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const head = kindPart(root, 'head');
+  const art = kindPart(root, 'art');
+  const body = kindPart(root, 'body');
+  const cta = kindPart(root, 'cta');
+  const others = [art, body, cta].filter((el): el is HTMLElement => !!el);
+  const sticker = art?.querySelector<HTMLElement>('[data-kind-art]') ?? null;
+  const arrows = art
+    ? Array.from(art.querySelectorAll<HTMLElement>('button'))
+    : [];
+  const staged = [
+    ...others,
+    ...(head ? [head] : []),
+    ...(sticker ? [sticker] : []),
+    ...arrows,
+  ];
+
+  g.killTweensOf(staged);
+  if (head) g.set(head, { autoAlpha: 0 });
+  if (others.length) g.set(others, { autoAlpha: 0, y: 20 });
+  if (cta) g.set(cta, { scale: 0.94, transformOrigin: '50% 50%' });
+  if (sticker) {
+    g.set(sticker, {
+      autoAlpha: 0,
+      scale: 0.4,
+      rotate: -14,
+      y: -40,
+      transformOrigin: '50% 100%',
+    });
+  }
+  if (arrows.length) g.set(arrows, { autoAlpha: 0, scale: 0.6 });
+
+  let rest: ReturnType<GSAP['timeline']> | null = null;
+  const runRest = () => {
+    const tl = g.timeline({ defaults: { ease: ease('out') } }); // power3.out
+    rest = tl;
+    if (art) tl.to(art, { autoAlpha: 1, y: 0, duration: refDur(0.22) });
+    if (sticker) {
+      tl.to(
+        sticker,
+        {
+          autoAlpha: 1,
+          scale: 1,
+          rotate: 0,
+          y: 0,
+          duration: refDur(0.58), // between base 0.35 and slow 0.60
+          ease: 'back.out(1.7)', // its own, between snap's 1.4 and the arrows' 1.9
+          clearProps: 'transform',
+        },
+        '-=0.18',
+      );
+    }
+    if (arrows.length) {
+      tl.to(
+        arrows,
+        {
+          autoAlpha: 1,
+          scale: 1,
+          duration: refDur(0.34), // base 0.35, one hundredth away
+          ease: 'back.out(1.9)',
+          stagger: 0.05,
+          clearProps: 'transform',
+        },
+        '-=0.34',
+      );
+    }
+    if (body) {
+      tl.to(body, { autoAlpha: 1, y: 0, duration: refDur(0.24) }, '-=0.2');
+    }
+    if (cta) {
+      tl.to(
+        cta,
+        {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: refDur(0.3), // between quick 0.20 and base 0.35
+          ease: 'back.out(1.6)',
+        },
+        '-=0.18',
+      );
+    }
+  };
+
+  let stopHead: () => void = () => {};
+  if (head) stopHead = revealHead(head, runRest);
+  else runRest();
+
+  // The reference's own 3400ms backstop. `relayIn` cannot see this set —
+  // `holdHidden` registers `[data-reveal]` and these are staged by an inline
+  // `set` — so a dropped tween would otherwise leave a blank page with a
+  // working keyboard path, the worst failure this flow has.
+  const sweep = window.setTimeout(() => {
+    for (const el of staged) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility' });
+      }
+    }
+  }, 3400);
+
+  return () => {
+    window.clearTimeout(sweep);
+    stopHead();
+    rest?.kill();
+    g.killTweensOf(staged);
+  };
+}
+
+/**
+ * The confirm stage's entrance — the reference's `kindIntro`, confirm branch.
+ *
+ * Only reached when the confirm stage arrives WITHOUT the select choreography
+ * having produced it (the reference's "coming back from sign-in: the rows are
+ * the page"). Arriving through `Select` runs `kindLand` instead, which is a
+ * different sequence entirely because one of the stickers is already in flight.
+ */
+export function kindRowsIntro(root: HTMLElement | null): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+  const rows = [
+    ...Array.from(root.querySelectorAll<HTMLElement>('[data-kind-row]')),
+    kindPart(root, 'confirm'),
+  ].filter((el): el is HTMLElement => !!el);
+  if (!rows.length) return () => {};
+  g.fromTo(
+    rows,
+    { y: 20, autoAlpha: 0 },
+    {
+      y: 0,
+      autoAlpha: 1,
+      duration: refDur(0.46), // between base 0.35 and slow 0.60
+      ease: ease('out'), // power3.out
+      stagger: 0.08,
+      clearProps: 'transform,opacity,visibility',
+    },
+  );
+  return () => g.killTweensOf(rows);
+}
+
+/**
+ * Paging between the two types — the reference's `kindGo`.
+ *
+ * The art slides in from the side it was paged from and the copy lifts under
+ * it. The headline is deliberately NOT animated: one word of it changes ("a" /
+ * "an"), and re-revealing a sentence for one letter reads as the page having
+ * changed rather than the choice.
+ */
+export function kindSlide(root: HTMLElement | null, direction: 1 | -1): void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return;
+  const art = root.querySelector<HTMLElement>('[data-kind-art]');
+  const body = kindPart(root, 'body');
+  if (art) {
+    g.fromTo(
+      art,
+      { x: 34 * direction, autoAlpha: 0, scale: 0.94 },
+      {
+        x: 0,
+        autoAlpha: 1,
+        scale: 1,
+        duration: refDur(0.45), // between base 0.35 and slow 0.60
+        ease: ease('out'), // power3.out
+        clearProps: 'opacity,visibility,transform',
+      },
+    );
+  }
+  if (body) {
+    g.fromTo(
+      body,
+      { autoAlpha: 0, y: 8 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: refDur(0.36), // base 0.35, one hundredth away
+        // The reference's own `power2.out`. The token set has `out`
+        // (power3.out) and `move` (power2.inOut) and no power2.out, and over
+        // an 8px settle the difference is visible.
+        ease: 'power2.out',
+        clearProps: 'opacity,visibility,transform',
+      },
+    );
+  }
+}
+
+/**
+ * Changing the answer on the confirm stage — the reference's `rowPick`.
+ *
+ * The row itself barely moves; the sticker is what answers. The outline and
+ * the fill are a CSS transition on the row, exactly as there.
+ */
+export function kindRowPick(root: HTMLElement | null, index: number): void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return;
+  const row = root.querySelectorAll<HTMLElement>('[data-kind-row]')[index];
+  const art = root.querySelectorAll<HTMLElement>('[data-kind-flip-art]')[index];
+  if (row) {
+    g.fromTo(
+      row,
+      { scale: 0.985 },
+      {
+        scale: 1,
+        duration: refDur(0.38), // between base 0.35 and slow 0.60
+        ease: 'power2.out', // its own; see `kindSlide`
+        clearProps: 'transform',
+      },
+    );
+  }
+  if (art) {
+    g.fromTo(
+      art,
+      { scale: 0.9 },
+      {
+        scale: 1,
+        duration: refDur(0.44), // between base 0.35 and slow 0.60
+        ease: 'back.out(2)',
+        clearProps: 'transform',
+      },
+    );
+  }
+}
+
+/**
+ * `Select`, phase 1 — the reference's `kindSelect`, up to its commit.
+ *
+ * The headline, copy and CTA fade out while the chosen sticker SWELLS, and the
+ * stage is swapped 0.14s into that swell rather than after it. The reference's
+ * own reasoning: "grow, and commit mid-grow — the re-render happens while the
+ * eye tracks the swell, so grow and travel read as one continuous move instead
+ * of grow-freeze-travel."
+ *
+ * `commit` is handed the sticker's rect at the moment of the swap, which is the
+ * FIRST half of the manual FLIP `kindLand` completes. It runs exactly once —
+ * from the timeline, from the reference's own 600ms backstop, or immediately
+ * when motion is off, in which case the rect is null and there is no travel.
+ * That is the jump-cut DNA §6.6 asks for rather than a second code path.
+ */
+export function kindSelect(
+  root: HTMLElement | null,
+  commit: (first: DOMRect | null) => void,
+): void {
+  const g = gsap();
+  const art = root?.querySelector<HTMLElement>('[data-kind-art]') ?? null;
+  if (!g || !root || !art || !motionLive()) {
+    commit(null);
+    return;
+  }
+
+  let ran = false;
+  const go = () => {
+    if (ran) return;
+    ran = true;
+    const first = art.getBoundingClientRect();
+    art.style.willChange = '';
+    commit(first);
+  };
+
+  const outs = [
+    kindPart(root, 'head'),
+    kindPart(root, 'body'),
+    kindPart(root, 'cta'),
+  ].filter((el): el is HTMLElement => !!el);
+  g.killTweensOf([art, ...outs]);
+  art.style.willChange = 'transform';
+
+  const tl = g.timeline({ defaults: { ease: ease('move') } }); // power2.inOut
+  if (outs.length) {
+    tl.to(outs, { autoAlpha: 0, y: -10, duration: refDur(0.18) }, 0);
+  }
+  tl.to(
+    art,
+    {
+      scale: 1.45,
+      duration: refDur(0.3), // between quick 0.20 and base 0.35
+      ease: 'power2.out', // its own; see `kindSlide`
+      force3D: true,
+    },
+    0,
+  );
+  tl.add(go, 0.14);
+  window.setTimeout(go, 600);
+}
+
+/**
+ * `Select`, phase 2 — the reference's `kindSelect`, after its commit.
+ *
+ * A hand-written FLIP rather than GSAP's Flip plugin, because the reference's
+ * is hand-written and the two do not produce the same movement: this one
+ * inverts the sticker to where it already was and tweens it home through a
+ * 1.05 overshoot and a `back.out(2.2)` settle, while `Flip.from` would take it
+ * out of flow with `absolute` and land it on a single ease.
+ *
+ * Two things about it are easy to get wrong and are the reference's own notes:
+ *
+ *   1. The rects are viewport pixels and GSAP's `x`/`y` are LOCAL pixels.
+ *      Inside a stage scaled to ~0.5 the delta has to be divided by the
+ *      ancestor scale, or the invert lands short and the sticker jumps.
+ *   2. The invert is set NOW, before this frame paints, and the tween plays on
+ *      the next one — so the sticker never flashes in its landed spot, and the
+ *      first frames of the travel do not drop while React finishes committing.
+ *
+ * The rest of the stage holds until the sticker has finished travelling: the
+ * other row at 0.80, its sticker at 0.84, `Confirm` at 0.95. The chosen row
+ * fades in immediately underneath, because the sticker is landing INTO it.
+ */
+export function kindLand(
+  root: HTMLElement | null,
+  index: number,
+  first: DOMRect | null,
+): void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return;
+
+  const rows = Array.from(root.querySelectorAll<HTMLElement>('[data-kind-row]'));
+  const arts = Array.from(
+    root.querySelectorAll<HTMLElement>('[data-kind-flip-art]'),
+  );
+  const cta = kindPart(root, 'confirm');
+  const selRow = rows[index];
+  const selArt = arts[index];
+  const otherRows = rows.filter((_, i) => i !== index);
+  const otherArts = arts.filter((_, i) => i !== index);
+
+  if (selRow) {
+    g.fromTo(
+      selRow,
+      { autoAlpha: 0 },
+      {
+        autoAlpha: 1,
+        duration: refDur(0.24), // between quick 0.20 and base 0.35
+        ease: 'power2.out', // its own; see `kindSlide`
+        clearProps: 'opacity,visibility',
+      },
+    );
+  }
+  if (otherRows.length) {
+    g.fromTo(
+      otherRows,
+      { y: 16, autoAlpha: 0 },
+      {
+        y: 0,
+        autoAlpha: 1,
+        duration: refDur(0.3), // between quick 0.20 and base 0.35
+        ease: ease('out'), // power3.out
+        delay: 0.8,
+        stagger: 0.06,
+        clearProps: 'transform,opacity,visibility',
+      },
+    );
+  }
+  if (otherArts.length) {
+    g.fromTo(
+      otherArts,
+      { scale: 0.72, autoAlpha: 0 },
+      {
+        scale: 1,
+        autoAlpha: 1,
+        duration: refDur(0.34), // base 0.35, one hundredth away
+        ease: 'back.out(1.7)',
+        delay: 0.84,
+        clearProps: 'transform,opacity,visibility',
+      },
+    );
+  }
+  if (cta) {
+    g.fromTo(
+      cta,
+      { y: 14, autoAlpha: 0 },
+      {
+        y: 0,
+        autoAlpha: 1,
+        duration: refDur(0.28), // between quick 0.20 and base 0.35
+        ease: ease('out'), // power3.out
+        delay: 0.95,
+        clearProps: 'transform,opacity,visibility',
+      },
+    );
+  }
+
+  if (!selArt || !first) return;
+  const last = selArt.getBoundingClientRect();
+  g.killTweensOf(selArt);
+  const ps = selArt.offsetWidth ? last.width / selArt.offsetWidth : 1;
+  g.set(selArt, {
+    x: (first.left + first.width / 2 - (last.left + last.width / 2)) / ps,
+    y: (first.top + first.height / 2 - (last.top + last.height / 2)) / ps,
+    scale: last.height ? first.height / last.height : 1,
+    transformOrigin: '50% 50%',
+    autoAlpha: 1,
+    force3D: true,
+    willChange: 'transform',
+  });
+  requestAnimationFrame(() => {
+    g.to(selArt, {
+      keyframes: [
+        {
+          x: 0,
+          y: 0,
+          scale: 1.05,
+          duration: refDur(0.55), // between base 0.35 and slow 0.60
+          ease: ease('move'), // power2.inOut
+        },
+        {
+          scale: 1,
+          duration: refDur(0.2), // quick 0.20, exactly
+          ease: 'back.out(2.2)',
+        },
+      ],
+      force3D: true,
+      onComplete: () => g.set(selArt, { clearProps: 'transform,willChange' }),
+    });
+  });
+}
+
+/**
+ * `Confirm` — the reference's `kindConfirmGo`.
+ *
+ * Its own fade, rather than `pageExit`'s: this screen leaves at 0.28s where
+ * every other page leaves at `quick`, and the element that fades is the scaled
+ * stage rather than the whole page. `pageExit` is shared by twenty-four routes
+ * and re-tuning it here would re-tune all of them.
+ *
+ * The 520ms backstop is the reference's own and exists for the reason
+ * `pageExit`'s does: a tween in a backgrounded tab does not progress, and
+ * without it somebody who switched tabs mid-transition comes back to a page
+ * that faded and never left. It drives a NAVIGATION and never a record.
+ */
+export function kindExit(stage: HTMLElement | null, done: () => void): void {
+  const g = gsap();
+  if (!g || !stage || !motionLive()) {
+    done();
+    return;
+  }
+  let ran = false;
+  const fallback = window.setTimeout(() => {
+    if (ran) return;
+    ran = true;
+    done();
+  }, 520);
+  g.to(stage, {
+    autoAlpha: 0,
+    duration: refDur(0.28), // between quick 0.20 and base 0.35
+    ease: ease('exit'), // power2.in
+    overwrite: 'auto',
+    onComplete: () => {
+      if (ran) return;
+      ran = true;
+      window.clearTimeout(fallback);
+      done();
+    },
+  });
+}
+
+/* ── Founder Flow v2 — screen 5, the address ───────────────────────────────
+   Rebuilt 2026-08-20 to the supplied reference's own `verifyIntro`. */
+
+/**
+ * The relay entrance for a page authored on the reference's fixed stage.
+ *
+ * `relayIn` is the same motion for a page laid out in CSS pixels: it converts
+ * the reference's 150px travel down to ~56 CSS px, because 150 is a value on a
+ * 2496px stage rendered at a fraction of its size, and 150 real pixels at 320
+ * would be half the screen.
+ *
+ * A fixed-stage page needs the raw number instead. Its children live INSIDE
+ * the scaled stage, so a transform of 150 there is already 150 × the stage's
+ * own scale on screen — about 68px at 1440 — which is what the reference
+ * actually renders. Converting a second time would relay a quarter of the
+ * distance.
+ *
+ * That is the whole difference, and it is why this is a separate helper rather
+ * than a flag on `relayIn`: the two take their travel from different coordinate
+ * systems, and a caller that passed the wrong one would get a motion that looks
+ * plausible and is not the reference's.
+ *
+ * The markers are `data-stage-anim`, not `data-anim`, which is what makes
+ * `FlowPage`'s own `relayIn` a no-op on these pages rather than something to
+ * switch off — the `data-invite` / `data-prob-part` arrangement screens 1–3
+ * already use.
+ *
+ * The reference's own tween, from `verifyIntro`:
+ *
+ *     g.fromTo(relay, { x: 150 * d, opacity: 0 },
+ *       { x: 0, opacity: 1, duration: .62, ease: 'power3.out',
+ *         stagger: { each: .085, from: back ? 'end' : 'start' } })
+ *
+ * `order` is the reference's own fixed list — `pill, head, field, boxes, note,
+ * fee, sub, hint, panel, art, art2, cta, edit` — filtered to what is present.
+ * It is passed in rather than read from the DOM because the stagger follows
+ * THAT order and not document order, and on a page whose markers happen to be
+ * written out of sequence the two are different animations.
+ */
+export function stageRelayIn(
+  root: HTMLElement | null,
+  direction: 1 | -1,
+  order: readonly string[],
+): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const relay = order
+    .map((name) =>
+      root.querySelector<HTMLElement>('[data-stage-anim="' + name + '"]'),
+    )
+    .filter((el): el is HTMLElement => !!el);
+  if (!relay.length) return () => {};
+
+  g.killTweensOf(relay);
+  g.fromTo(
+    relay,
+    { x: 150 * direction, autoAlpha: 0 },
+    {
+      x: 0,
+      autoAlpha: 1,
+      // The reference's literal numbers, through `refDur`, on the same
+      // `problemIntro` licence recorded above: this file's convention is to
+      // round to the nearest §6.1 token, and the brief for these pages is a
+      // 1:1 behavioural reproduction. `slow` 0.60 and `stagger.base` 0.08 were
+      // what stood here, and against a frame-by-frame capture of the reference
+      // the three elements land 20ms and 15ms early — small, but the whole
+      // point of a relay is when each piece arrives. 0.62 is inside §6.1's
+      // `grand: 0.90` ceiling, and §6.1's phone factor still applies.
+      duration: refDur(0.62), // between slow 0.60 and grand 0.90
+      ease: ease('out'), // power3.out
+      force3D: true,
+      stagger: {
+        each: refDur(0.085), // its own number; stagger.base 0.08 is the token
+        // Back navigation relays from the LAST child, so the element the
+        // person is returning toward is the one that arrives first.
+        from: direction === -1 ? 'end' : 'start',
+      },
+      clearProps: 'transform,opacity,visibility',
+      overwrite: 'auto',
+    },
+  );
+
+  // The reference's own `this.later(... clearProps ...)` backstop, and
+  // `relayIn`'s stuck sweep: the runtime's 3s force-reveal only registers
+  // `[data-reveal]`, and these are staged by an inline `fromTo`. A dropped
+  // tween would otherwise leave a blank page with a working keyboard path.
+  const sweep = window.setTimeout(() => {
+    for (const el of relay) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility' });
+      }
+    }
+  }, 3400);
+
+  return () => {
+    window.clearTimeout(sweep);
+    g.killTweensOf(relay);
+  };
+}
+
+/* ── Screen 7 — "Say it instead", and the recording controls ───────────────
+   REBUILT 2026-08-20 to the supplied reference's `[data-compet]` screen
+   (`Proovd Founder Flow v2.dc.html`, `kindWide`). Both helpers below are the
+   reference's own `sayHandoff` and `recIntro`, tween for tween.
+
+   Their durations are the reference's literals rather than the nearest §6.1
+   token, on the licence `problemIntro`, `stageRelayIn` and `kindIntro` above
+   already carry: the brief for these pages is a 1:1 behavioural reproduction,
+   and these two numbers in particular are the beat — 0.24/0.28 is one
+   continuous move that reads as the microphone TAKING the row, and rounding
+   either to `quick` 0.20 or `base` 0.35 turns it into two separate gestures.
+   `refDur` still applies §6.1's phone factor and nothing here approaches
+   §6.1's `grand: 0.90` ceiling.
+
+   The markers are `data-say-row` / `data-say-btn` / `data-say-next` /
+   `data-rec-row` / `data-wave`, which are the reference's own attribute names,
+   and none of them is `data-anim` — so `FlowPage`'s `relayIn` still finds
+   nothing on this page and these helpers own it outright.                  */
+
+/**
+ * "Say it instead" grows to take the row, then hands off to the recorder.
+ *
+ * The reference's own comment for it: *one continuous move: Next collapses as
+ * the mic takes the row, then a single fade out*. So `Next` loses its width and
+ * its opacity while the row's gap closes and the mic button widens to the row's
+ * FULL width — all three starting together at 0 — and only once the mic has
+ * arrived at that width does it fade, at 0.26s, over 0.12s.
+ *
+ * `onStart` runs when the timeline ends (0.38s), which is where the reference
+ * calls `startDict`. It is the caller's business what that means: there, a
+ * simulated transcript begins typing itself; here, a real recorder starts. The
+ * animation is identical either way, which is the point of taking a callback
+ * rather than knowing.
+ *
+ * The width is read from `row.offsetWidth` — LAYOUT width, so it is in the
+ * stage's own 1660px coordinate system rather than in rendered CSS pixels. That
+ * is what makes one number correct at every viewport: the stage scales it.
+ *
+ * With motion off, `onStart` is called immediately. That is the jump-cut rather
+ * than a second code path, and it is also what happens when the reference
+ * cannot find GSAP (`if(!g||!row||!btn){ this.startDict(id); return; }`).
+ */
+export function sayHandoff(root: HTMLElement | null, onStart: () => void): void {
+  const g = gsap();
+  const row = root?.querySelector<HTMLElement>('[data-say-row]') ?? null;
+  const btn = row?.querySelector<HTMLElement>('[data-say-btn]') ?? null;
+  if (!g || !row || !btn || !motionLive()) {
+    onStart();
+    return;
+  }
+
+  const next = row.querySelector<HTMLElement>('[data-say-next]');
+  const full = row.offsetWidth;
+  g.killTweensOf([row, btn, next].filter(Boolean));
+
+  // Every leg is added to the same timeline at an explicit position rather than
+  // chained: the shim's `to` returns `unknown`, and the positions are what
+  // carry the choreography anyway — three of these start together at 0.
+  const tl = g.timeline({ defaults: { ease: ease('move') } }); // power2.inOut
+  if (next) tl.to(next, { width: 0, opacity: 0, duration: refDur(0.24) }, 0);
+  tl.to(row, { gap: 0, duration: refDur(0.24) }, 0);
+  tl.to(btn, { width: full, duration: refDur(0.28) }, 0);
+  tl.to(
+    btn,
+    { opacity: 0, duration: refDur(0.12), ease: ease('exit') }, // power2.in
+    refDur(0.26),
+  );
+  tl.add(onStart);
+}
+
+/**
+ * The recording controls announce themselves, the waveform draws itself up, and
+ * then the waveform stays alive for as long as the recording does.
+ *
+ * The reference's `recIntro` plus the `[data-wave]` leg of its `loops()`, which
+ * `startDict` reaches through `rebind()`'s `requestAnimationFrame` on the frame
+ * after the entrance — so the two are one behaviour and are written as one here.
+ *
+ *   1. The three columns rise 14px and fade in 0.05s apart.
+ *   2. Every bar scales up from its own base 0.003s apart, outward from the
+ *      centre of the row. 72 × 0.003 is a 0.21s sweep that reads as the level
+ *      arriving rather than as 72 things animating.
+ *   3. From the next frame every bar breathes between `scaleY .28` and `1` on a
+ *      0.45s yoyo, phased by `(i % 8) * .09`. The reference's own comment says
+ *      why it is modulo rather than cumulative: *"the delay used to accumulate
+ *      across all 72 bars, so the far end sat still for seconds — phase it in a
+ *      repeating cycle instead: the whole strip is alive at once"*.
+ *
+ * `transform-origin: bottom` is on the bars in CSS, so a bar grows up from the
+ * baseline instead of out from its middle. Without it the sweep reads as a row
+ * of dashes appearing, which is a different picture entirely.
+ *
+ * The loop is indefinite, which everywhere else in this product is the pattern
+ * DNA §5.10 and §30 name — and this is the one shape that is not it. It is a
+ * live readout of a recording that is running, it is `aria-hidden`, it asks for
+ * nothing, and it stops the moment the recording does. The reference's OTHER
+ * indefinite loop on this page, the message badge's six-second shake, IS that
+ * pattern and is refused (`FOUNDER_FLOW_ABSENCES`).
+ *
+ * `power2.out` and `power2.inOut` are the reference's own eases here; `out` is
+ * `power3.out` and `move` is `power2.inOut`, so the second reads from the token
+ * and the first is written literally. Returns a teardown, because an infinite
+ * tween that outlives its element is a leak.
+ */
+export function recIntro(root: HTMLElement | null): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const row = root.querySelector<HTMLElement>('[data-rec-row]');
+  if (row) {
+    const cols = Array.from(row.children);
+    g.killTweensOf(cols);
+    g.fromTo(
+      cols,
+      { y: 14, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        duration: refDur(0.26), // between quick 0.20 and base 0.35
+        ease: ease('out'), // power3.out
+        stagger: refDur(0.05),
+        clearProps: 'transform,opacity',
+      },
+    );
+  }
+
+  const bars = Array.from(root.querySelectorAll<HTMLElement>('[data-wave]'));
+  if (!bars.length) {
+    return () => {
+      if (row) g.killTweensOf(Array.from(row.children));
+    };
+  }
+
+  g.killTweensOf(bars);
+  g.fromTo(
+    bars,
+    { scaleY: 0 },
+    {
+      scaleY: 1,
+      duration: refDur(0.3), // between quick 0.20 and base 0.35
+      ease: 'power2.out', // its own; `out` is power3.out
+      stagger: { each: refDur(0.003), from: 'center' },
+      // `proovd-motion.js` sets `gsap.defaults({ overwrite: 'auto' })`
+      // globally and the reference does not, so without this the two tweens
+      // below fight: `from: 'center'` makes the OUTERMOST bars' legs start
+      // last, at ~0.21s, by which time their loop is already rendering — and
+      // `auto` kills it. Bars 0, 1 and 71 then sat flat at full height over a
+      // live microphone while the middle of the strip breathed. Measured, not
+      // reasoned: it is invisible to jsdom and to a still screenshot.
+      overwrite: false,
+      // The reference clears the transform here. It is NOT cleared, and the
+      // difference is a defect a frame-by-frame capture found: `from: 'center'`
+      // means the OUTERMOST bars finish last, by which time the loop below is
+      // already writing their transform — and the clear wipes it, leaving bars
+      // 0, 1 and 71 flat over a live microphone while the middle of the strip
+      // breathes. There is nothing to clear anyway: the loop owns the property
+      // from the next frame, and the whole row unmounts when recording stops.
+    },
+  );
+
+  // The frame after, exactly as `rebind()` schedules `loops()`. Started here
+  // rather than in a second helper because nothing else could start it at the
+  // right moment, and a caller that forgot would leave a dead waveform over a
+  // live microphone.
+  const frame = window.requestAnimationFrame(() => {
+    bars.forEach((bar, i) => {
+      g.fromTo(
+        bar,
+        { scaleY: 0.28 },
+        {
+          scaleY: 1,
+          duration: refDur(0.45), // between base 0.35 and slow 0.60
+          ease: ease('move'), // power2.inOut
+          repeat: -1,
+          yoyo: true,
+          delay: refDur((i % 8) * 0.09),
+          overwrite: false, // the other half of the pair above
+
+        },
+      );
+    });
+  });
+
+  return () => {
+    window.cancelAnimationFrame(frame);
+    g.killTweensOf(bars);
+    if (row) g.killTweensOf(Array.from(row.children));
+  };
+}
+
+/* ── Founder Flow v2 — the reach orbit ─────────────────────────────────────
+   Built 2026-08-20 from the supplied reference's `reachIntro` / `reachLayout`
+   / `reachFrame` / `reachPlay` / `reachFinish`, which are reproduced here
+   whole rather than approximated.
+
+   ── Why the arithmetic is transcribed and not re-derived ──────────────────
+   This is not a CSS animation with a duration to copy. It is a hand-written
+   3D layout: two tilted rings of phones, positioned per frame in a perspective
+   space whose depth, radius, card size, per-ring speed and per-card opacity
+   are all functions of ONE derived `unit` — itself a function of the viewport.
+   Change any constant and the composition is a different picture at every
+   window size, not a slightly different one at the reference's. So every
+   number below is the reference's own, and the two places its own comments
+   explain a choice are quoted rather than paraphrased.
+
+   ── The one deliberate departure, and it is `prefers-reduced-motion` ──────
+   In the reference the ticker is added BEFORE `reachPlay` checks the media
+   query, so a reduced-motion reader gets no count-up and no pop-in and still
+   gets a 3D carousel rotating indefinitely. That reads as an oversight rather
+   than an intention — `reachFinish()` exists precisely to describe the end
+   state, and it is what the no-GSAP branch already uses. Here `reduced()`
+   takes that same branch: the orbit is laid out at full size, the number reads
+   its target, the CTA is present, and no ticker is ever added. Everything with
+   motion enabled — which is the reference viewport, and the screenshot — gets
+   the reference's own behaviour frame for frame.
+
+   ── Nothing here counts anything ──────────────────────────────────────────
+   `REACH_TARGET` is the reference's own `RTARGET` constant. It is a
+   presentation figure the surface labels as such; no record is read, no
+   audience is measured, and there is no path from this file to one. */
+
+/** The reference's `RTARGET`. */
+export const REACH_TARGET = 10000;
+
+/**
+ * The reference's `RRINGS`, verbatim.
+ *
+ * Two rings, and each is five numbers rather than a name, exactly as there:
+ * `t` the ring's tilt in degrees, `y` its yaw, `l` its lift as a percentage of
+ * `unit`, `s` the card scale as a percentage, `r` the radius as a percentage.
+ * They are percentages because every one is multiplied by `unit`, which is
+ * derived from the viewport — that is what makes the composition hold its
+ * proportions at any window size instead of only at the authored one.
+ */
+const REACH_RINGS = [
+  { t: 90, y: 0, l: 0, s: 109, r: 131 },
+  { t: 83, y: 18, l: 7, s: 122, r: 120 },
+] as const;
+
+interface ReachRing {
+  R: number;
+  ct: number;
+  st: number;
+  cy: number;
+  sy: number;
+  lift: number;
+  spd: number;
+  base: number;
+  cap: number;
+}
+
+interface ReachCard {
+  /** Which ring. `0` is the front ring, which never dims — see the frame loop. */
+  ri: number;
+  ring: ReachRing;
+  /** Angle around the ring at t=0. */
+  a: number;
+  /** This card's own slight tilt, from the deterministic jitter below. */
+  rot: number;
+  /** 0 → 1 → 0. Both the scale and the visibility read it. */
+  pop: number;
+  popped: boolean;
+  /** Radius multiplier. The collapse pushes it to 1.24 as the card leaves. */
+  rMul: number;
+  /** Last written opacity, and last written visibility. `-1` is "never". */
+  op: number;
+  vis: number;
+  /** The count progress at which this card pops. */
+  thr: number;
+}
+
+/** The reference's `rnd` — cheap deterministic jitter, so each card sits at
+ *  its own slight angle and does so identically on every render. */
+function reachRnd(i: number): number {
+  const s = Math.sin(i * 12.9898 + 7.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/**
+ * The orbit.
+ *
+ * `onCta` is called at the moment the reference calls
+ * `setState({reachCta:true})` — the surface renders the button and animates it
+ * in with `reachCtaIn`, which is the reference's own two-step (its `setState`
+ * callback is where the button's `fromTo` lives, because the element does not
+ * exist until the render lands).
+ *
+ * Returns the teardown — `reachStop`, which removes the ticker, kills the
+ * timeline and every per-card tween, and drops the resize listener.
+ */
+export function reachIntro(root: HTMLElement | null, onCta: () => void): () => void {
+  if (!root) return () => {};
+
+  const stage = root.querySelector<HTMLElement>('[data-reach-stage]');
+  const group = root.querySelector<HTMLElement>('[data-reach-group]');
+  const num = root.querySelector<HTMLElement>('[data-reach-num]');
+  const head = root.querySelector<HTMLElement>('[data-reach-head]');
+  const els = Array.from(root.querySelectorAll<HTMLElement>('[data-rphone]'));
+  if (!stage || !group || !els.length) return () => {};
+
+  let cards: ReachCard[] = [];
+  let clock = 0;
+
+  const setNum = (v: number) => {
+    if (num) num.textContent = v.toLocaleString('en-US');
+  };
+
+  /* ── `reachFrame` ───────────────────────────────────────────────────────
+     One card, one write. The reference's own economies are kept because they
+     are what make forty perspective-transformed elements affordable: the
+     opacity is quantised to twentieths so most frames skip the write
+     entirely, `visibility` is only touched when it actually flips, and the
+     front ring is never dimmed at all. */
+  const frame = (dt: number) => {
+    if (!cards.length) return;
+    clock += dt > 0.05 ? 0.05 : dt || 0;
+    const T = clock;
+    const DEG = 57.29578;
+    const sa = -0.24192; // sin of the fixed -14deg tilt
+    const ca = 0.9703; //  cos of the same
+    for (let i = 0; i < cards.length; i++) {
+      const p = cards[i]!;
+      const el = els[i];
+      if (!el) continue;
+      if (p.pop <= 0.001) {
+        if (p.vis !== 0) {
+          p.vis = 0;
+          el.style.visibility = 'hidden';
+        }
+        continue;
+      }
+      if (p.vis !== 1) {
+        p.vis = 1;
+        el.style.visibility = 'visible';
+      }
+      const ring = p.ring;
+      const th = p.a + ring.spd * T;
+      const Rp = ring.R * (p.rMul || 1);
+      const x0 = Math.cos(th) * Rp;
+      const y0 = Math.sin(th) * Rp;
+      const y = y0 * ring.ct - ring.lift;
+      const z1 = y0 * ring.st;
+      const x = x0 * ring.cy + z1 * ring.sy;
+      const z = z1 * ring.cy - x0 * ring.sy;
+      const r = Math.sqrt(x * x + y * y + z * z) || 1;
+      el.style.transform =
+        'translate3d(' +
+        x.toFixed(1) +
+        'px,' +
+        y.toFixed(1) +
+        'px,' +
+        z.toFixed(1) +
+        'px) rotateY(' +
+        (Math.atan2(-x, -z) * DEG).toFixed(1) +
+        'deg) rotateX(' +
+        (Math.asin(y / r) * DEG).toFixed(1) +
+        'deg) rotateZ(' +
+        p.rot.toFixed(1) +
+        'deg) scale(' +
+        (ring.base * p.pop).toFixed(3) +
+        ')';
+      if (p.ri) {
+        const zw = y * sa + z * ca;
+        const far = zw < 0 ? -zw / ring.R : 0;
+        const op = Math.round((1 - 0.34 * (0.6 + 0.4 * far)) * 20) / 20;
+        if (p.op !== op) {
+          p.op = op;
+          el.style.opacity = String(op);
+        }
+      } else if (p.op !== 1) {
+        p.op = 1;
+        el.style.opacity = '1';
+      }
+    }
+  };
+
+  /* ── `reachLayout` ──────────────────────────────────────────────────────
+     Runs once on arrival and again on every resize. Everything that does not
+     change per frame is computed here: the ring trigonometry, the perspective,
+     the card box, how many cards each ring can hold, and each card's pop
+     threshold. The camera never moves, so the group transform is written here
+     too rather than sixty times a second. */
+  const layout = () => {
+    const vw = stage.clientWidth || 900;
+    const vh = stage.clientHeight || 600;
+    const narrow = vw <= 700 || vw / vh < 1.1;
+    const unit = narrow
+      ? Math.min(vh * 0.62, vw * 1.2 * 0.96)
+      : Math.min(vh, vw / (924 / 540)) * 0.96;
+    const cardW = unit * 0.074;
+    const cardH = (cardW * 8.97) / 7.4;
+    stage.style.perspective = (1.75 * unit).toFixed(0) + 'px';
+
+    const rings: ReachRing[] = REACH_RINGS.map((d, r) => {
+      const R = unit * (0.36 + 0.2 * r + (r ? 0.07 : 0)) * 1.35 * (d.r / 100);
+      const tilt = (d.t * Math.PI) / 180;
+      const yaw = (d.y * Math.PI) / 180;
+      const base = d.s / 100;
+      return {
+        R,
+        ct: Math.cos(tilt),
+        st: Math.sin(tilt),
+        cy: Math.cos(yaw),
+        sy: Math.sin(yaw),
+        lift: (unit * d.l) / 100,
+        spd: (r % 2 ? -1 : 1) * (0.15 - 0.025 * r),
+        base,
+        cap: Math.max(4, Math.floor((2 * Math.PI * R) / (cardW * base * 1.02))),
+      };
+    });
+
+    // Distribute the cards across the rings in proportion to circumference,
+    // then push the remainder into whichever ring has the most room. The two
+    // guarded loops are the reference's own, counts and all.
+    const total = Math.min(narrow ? 26 : 40, els.length);
+    const sum = rings.reduce((a, r) => a + r.R, 0);
+    const counts = rings.map((r) =>
+      Math.min(r.cap, Math.max(4, Math.round((total * r.R) / sum))),
+    );
+    let diff = total - counts.reduce((a, b) => a + b, 0);
+    let guard = 0;
+    while (diff > 0 && guard++ < 80) {
+      let bi = -1;
+      let room = 0;
+      counts.forEach((n, i) => {
+        const q = rings[i]!.cap - n;
+        if (q > room) {
+          room = q;
+          bi = i;
+        }
+      });
+      if (bi < 0) break;
+      counts[bi] = counts[bi]! + 1;
+      diff--;
+    }
+    while (diff < 0 && guard++ < 160) {
+      let bi = -1;
+      let most = 4;
+      counts.forEach((n, i) => {
+        if (n > most) {
+          most = n;
+          bi = i;
+        }
+      });
+      if (bi < 0) break;
+      counts[bi] = counts[bi]! - 1;
+      diff++;
+    }
+
+    // A resize mid-flight must not restart the pop: each card inherits the
+    // previous layout's `pop` / `popped` / `rMul` by index, so the orbit
+    // re-proportions without the phones flashing back in.
+    const prev = cards;
+    const next: ReachCard[] = [];
+    let i = 0;
+    rings.forEach((ring, ri) => {
+      const n = counts[ri]!;
+      for (let k = 0; k < n; k++) {
+        const old = prev[i];
+        next.push({
+          ri,
+          ring,
+          a: ri * 0.63 + (k / n) * Math.PI * 2,
+          rot: (reachRnd(i + 99) - 0.5) * 10,
+          pop: old ? old.pop : 0,
+          popped: old ? old.popped : false,
+          rMul: old ? old.rMul || 1 : 1,
+          op: -1,
+          vis: -1,
+          thr: 0,
+        });
+        i++;
+      }
+    });
+    next.forEach((p, k) => {
+      p.thr = 1 - Math.pow(1 - (k + 1) / next.length, 1.9);
+    });
+
+    const w = cardW.toFixed(1) + 'px';
+    const h = cardH.toFixed(1) + 'px';
+    const ml = (-cardW / 2).toFixed(1) + 'px';
+    const mt = (-cardH / 2).toFixed(1) + 'px';
+    for (let j = 0; j < els.length; j++) {
+      const on = j < next.length;
+      const el = els[j]!;
+      el.style.display = on ? '' : 'none';
+      if (on) {
+        el.style.width = w;
+        el.style.height = h;
+        el.style.marginLeft = ml;
+        el.style.marginTop = mt;
+      }
+    }
+    cards = next;
+    group.style.transform =
+      'translateY(' + (-unit * 0.03).toFixed(1) + 'px) rotateX(-14deg)';
+    frame(0);
+  };
+
+  /* ── `reachFinish` — the end state, and the whole of the no-motion path ── */
+  const finish = () => {
+    for (const p of cards) {
+      p.pop = 1;
+      p.popped = true;
+    }
+    setNum(REACH_TARGET);
+    frame(0);
+    onCta();
+  };
+
+  clock = 0;
+  layout();
+  const onResize = () => layout();
+  window.addEventListener('resize', onResize);
+
+  const g = gsap();
+  if (!g || !motionLive()) {
+    finish();
+    return () => window.removeEventListener('resize', onResize);
+  }
+
+  /* The centring is NOT in this tween, and that is a departure from the
+     reference's own line — forced by where the two files put the transform.
+
+     The reference authors `transform: translate(-50%,-50%)` as an INLINE
+     style, so GSAP parses the string, recognises the percentages, and stores
+     them as `xPercent`/`yPercent`; re-declaring them in the tween is then a
+     harmless overwrite, and its comment explains that dropping them would let
+     `clearProps` strip the centring. Here the transform lives in a stylesheet,
+     so GSAP has only `getComputedStyle().transform` to read — a MATRIX, in
+     pixels — and caches `x: -410px`. Adding `xPercent: -50` on top of that
+     centres the headline twice and hangs it a full width to the left of centre.
+     It reproduced at 375px and not at 320 or 390, which is the worst shape a
+     defect can have: present, and not everywhere somebody looks.
+
+     So `.ff-reach__head` centres with the CSS `translate` PROPERTY instead.
+     `translate` and `transform` are separate properties that compose, GSAP
+     writes only `transform`, and the rendered result is the reference's to the
+     pixel — with the centring now surviving a `clearProps` on `transform`
+     rather than depending on it. */
+  if (head) {
+    g.fromTo(
+      head,
+      { opacity: 0, y: 18 },
+      { opacity: 1, y: 0, duration: refDur(0.34), ease: 'power3.out' },
+    );
+  }
+
+  const tick = (_time: number, deltaTime: number) => frame(deltaTime / 1000);
+  g.ticker.add(tick);
+
+  /* ── `reachPlay` ────────────────────────────────────────────────────────
+     One timeline, three beats: the count, the collapse, the CTA. They are one
+     timeline rather than three because the second's `'+=0.35'` and the third's
+     position are measured from the first — chaining them with callbacks would
+     put a frame drop between the last phone leaving and the button arriving. */
+  for (const p of cards) {
+    g.killTweensOf(p);
+    p.pop = 0;
+    p.popped = false;
+    p.rMul = 1;
+  }
+  const counter = { v: 0 };
+  setNum(0);
+
+  const tl = g.timeline({ delay: 0.12 });
+
+  // The phones are popped BY the count rather than beside it: each card owns a
+  // threshold and pops when the number passes it, so the last phone lands on
+  // the last digit however long a frame took.
+  tl.to(counter, {
+    v: REACH_TARGET,
+    duration: refDur(1),
+    ease: 'power2.out',
+    snap: { v: 1 },
+    onUpdate: () => {
+      const v = Math.round(counter.v);
+      setNum(v);
+      const prog = v / REACH_TARGET;
+      for (let i = 0; i < cards.length; i++) {
+        const p = cards[i]!;
+        if (!p.popped && prog >= p.thr) {
+          p.popped = true;
+          g.to(p, { pop: 1, duration: refDur(0.32), ease: 'back.out(1.7)' });
+        }
+      }
+    },
+    onComplete: () => setNum(REACH_TARGET),
+  });
+
+  // The collapse. `rMul` widens the ring as the cards shrink, so they leave
+  // outward rather than falling into the middle of the headline.
+  tl.to(
+    cards,
+    {
+      pop: 0,
+      rMul: 1.24,
+      duration: refDur(0.26),
+      ease: 'power2.in',
+      stagger: { each: Math.min(0.008, 0.35 / cards.length), from: 'end' },
+    },
+    '+=0.35',
+  );
+
+  tl.call(() => onCta());
+
+  return () => {
+    g.ticker.remove(tick);
+    tl.kill();
+    window.removeEventListener('resize', onResize);
+    for (const p of cards) g.killTweensOf(p);
+  };
+}
+
+/**
+ * The CTA's arrival — the reference's `setState` callback, which is where its
+ * own `fromTo` lives because the button does not exist until the render lands.
+ *
+ * Its own comment, kept because the mistake it records is one line away: "the
+ * -50% centering already lives in the inline transform: re-declaring it here
+ * doubled it and pushed the button a half-width left". So this tweens
+ * `yPercent` and `scale` and never `x`.
+ */
+export function reachCtaIn(el: HTMLElement | null): void {
+  const g = gsap();
+  if (!el) return;
+  if (!g || !motionLive()) {
+    el.style.opacity = '1';
+    return;
+  }
+  g.fromTo(
+    el,
+    { opacity: 0, yPercent: 18, scale: 0.9 },
+    {
+      opacity: 1,
+      yPercent: 0,
+      scale: 1,
+      duration: refDur(0.36),
+      ease: 'back.out(1.7)',
+    },
+  );
+}
+
+/* ── The last look at the problem — `[data-pconfirm]`, 2026-08-20 ──────────
+   The reference's `pcToggle`, which is `probToggle`'s twin over a different
+   set of markers: this screen's parts are `data-stage-anim`, the same
+   attribute `stageRelayIn` reads, so the two helpers below and above cannot
+   reach into each other's page.                                            */
+
+/**
+ * The read/edit swap on a `[data-stage-anim]` page.
+ *
+ * `pcToggle`, tween for tween:
+ *
+ *     gsap.killTweensOf(els); g.set(els,{clearProps:'opacity,transform'});
+ *     ... setState ...
+ *     g.from(head,{opacity:0,y:on?10:-10,duration:.42,ease:'power3.out',
+ *                  clearProps:'opacity,transform'});
+ *
+ * The clear comes first and is not optional: the entrance leaves a finished
+ * `fromTo` on every part, and a `from` stacked on top of one reads its start
+ * value out of whatever that tween last wrote. The reference clears head, CTA
+ * and the field; clearing every part is the same thing once the relay has
+ * ended, and it is what `problemToggle` already does.
+ *
+ * `y: on ? 10 : -10` is the whole gesture — the headline arrives from below on
+ * the way into the editor and from above on the way out, so the direction of
+ * travel is legible without the words changing (they do not change here; the
+ * reference's `pcHead` is the same sentence in both states).
+ *
+ * 0.42s sits between §6.1's `base` 0.35 and `slow` 0.60, on the licence every
+ * other reference helper in this file carries: the brief for these pages is a
+ * 1:1 behavioural reproduction. `refDur` still applies §6.1's phone factor and
+ * nothing here approaches its `grand: 0.90` ceiling.
+ */
+export function stageToggleHead(
+  root: HTMLElement | null,
+  head: HTMLElement | null,
+  entering: boolean,
+): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const parts = Array.from(root.querySelectorAll<HTMLElement>('[data-stage-anim]'));
+  g.killTweensOf(parts);
+  g.set(parts, { clearProps: 'opacity,visibility,transform' });
+
+  if (!head) return () => {};
+  g.from(head, {
+    autoAlpha: 0,
+    y: entering ? 10 : -10,
+    duration: refDur(0.42), // between base 0.35 and slow 0.60
+    ease: ease('out'), // power3.out
+    clearProps: 'opacity,visibility,transform',
+  });
+
+  return () => {
+    g.killTweensOf(head);
+  };
+}
+
+/* ── The socials rows (Founder Flow v2, `[data-socials]`, 2026-08-20) ─────── */
+
+/**
+ * `addSocial`'s empty-field branch — the reference's own refusal.
+ *
+ *     if(!v){ const inp=row&&row.querySelector('input');
+ *             if(g&&inp)g.fromTo(inp,{x:-7},{x:0,duration:.45,
+ *               ease:'elastic.out(1.5,0.4)',clearProps:'transform'});
+ *             return; }
+ *
+ * A nudge rather than a message, and it is the whole of what an empty row gets
+ * there: nothing is written and nothing is said. Kept because it is honest —
+ * the field is where the answer goes and the field is what moves — and paired
+ * here with a live-region sentence the reference has no equivalent of, because
+ * a movement is not available to somebody who cannot see it (§28.5).
+ *
+ * The `-7` is a STAGE pixel: the element sits inside a `[data-page-stage]` that
+ * is scaled to the viewport, so the transform is scaled with everything else
+ * exactly as it is there. Both `elastic` parameters are its own — 1.5 amplitude
+ * and 0.4 period is a single overshoot and a quick settle, and a §6.1 token
+ * would be a different movement rather than a rounded one.
+ */
+export function socialNudge(input: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !input || !motionLive()) return;
+  g.fromTo(
+    input,
+    { x: -7 },
+    {
+      x: 0,
+      duration: refDur(0.45), // between base 0.35 and slow 0.60
+      ease: 'elastic.out(1.5,0.4)',
+      clearProps: 'transform',
+      overwrite: 'auto',
+    },
+  );
+}
+
+/**
+ * `addSocial`'s success branch — the button's own beat.
+ *
+ *     const btn=row&&row.querySelector('button');
+ *     if(g&&btn)g.fromTo(btn,{scale:.88},{scale:1,duration:.44,
+ *       ease:'back.out(2.4)',clearProps:'transform'});
+ *
+ * It runs BESIDE the colour, not instead of it: the button's own
+ * `transition:background .2s ease` carries `#013F17` to `#41ED98` while this
+ * carries the scale back from 0.88, so the two land within a fifth of a second
+ * of each other and the tick arrives on the first frame of both. `back.out(2.4)`
+ * is a harder overshoot than §6.1's `snap`, which is the point — it is the one
+ * thing on this screen that says something landed.
+ */
+export function socialAddPop(button: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !button || !motionLive()) return;
+  g.fromTo(
+    button,
+    { scale: 0.88 },
+    {
+      scale: 1,
+      duration: refDur(0.44), // between base 0.35 and slow 0.60
+      ease: 'back.out(2.4)',
+      transformOrigin: '50% 50%',
+      clearProps: 'transform',
+      overwrite: 'auto',
+    },
+  );
 }

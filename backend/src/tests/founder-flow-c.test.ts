@@ -162,41 +162,32 @@ describe('the email-code constants are restated, not re-decided', () => {
     expect(isCodeShaped(null)).toBe(false);
   });
 
-  it('registers Session C’s four pages, and they are the end of the draft token', () => {
+  it('registers the token pages, and Positioning is the end of the draft token', () => {
     /*
-      DELIBERATELY NARROWED (2026-08-18, Session D).
+      DELIBERATELY NARROWED (2026-08-18, Session D), and re-authored
+      (2026-08-20) when the reach orbit was added and the match and claim
+      screens were removed from the flow outright.
 
-      This asserted that EVERY registered page was stage 1, which was true
-      while the draft token was the only auth regime the flow had. Session D
-      added the claim (stage 2) and the six §12 pages behind it (stage 3), so
-      the register is no longer all one stage — and asserting that it is would
-      now be asserting that Session D did not happen.
-
-      What Session C actually owns survives verbatim: its four pages are
-      registered, in order, immediately after Session B’s four, and every one
-      of the eight is still reached on the invitation token. `match` is the
-      last of them, which is the sentence "the end of the draft token" means.
+      What survives: the token pages are registered, in order, every one of
+      them addressed by the invitation token — and Positioning, which
+      submits, is the last of them, which is the sentence "the end of the
+      draft token" means.
     */
     const stageOne = FOUNDER_FLOW_PAGES.filter((page) => page.stage === 1);
     expect(stageOne.map((page) => page.id)).toEqual([
       'invite',
       'problem',
       'solution',
+      'reach',
       'campaign-type',
       'email',
       'code',
       'positioning',
-      'match',
     ]);
     for (const page of stageOne) expect(page.param, page.id).toBe('token');
-    // The claim is the one page past them that the token still addresses, and
-    // it is where the token ends.
-    const claim = FOUNDER_FLOW_PAGES.find((page) => page.id === 'claim');
-    expect(claim?.stage).toBe(2);
-    expect(claim?.param).toBe('token');
     expect(
       FOUNDER_FLOW_PAGES.filter((page) => page.param === 'token').at(-1)?.id,
-    ).toBe('claim');
+    ).toBe('positioning');
   });
 });
 

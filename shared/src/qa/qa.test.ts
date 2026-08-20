@@ -301,22 +301,19 @@ describe('the Founder onboarding flow', () => {
   });
 
   it('holds only the pages that exist', () => {
-    // Twenty-six were planned and twenty-four are built. The two that are not
-    // are the reference's screens 7 and 8, which ask Problem and Solution a
-    // SECOND time — §9 has one of each, and Session C built nothing for them
-    // rather than a second surface over one record. So this is every page the
-    // flow has: B built four, C four, D seven, E two, F seven.
+    // Twenty-six were planned; on 2026-08-20 the reach orbit and the
+    // problem confirm were added, and the match and claim screens were
+    // removed outright. So this is every page the flow has.
     expect(FOUNDER_FLOW_PAGES).toHaveLength(24);
   });
 
   it('addresses a page by the parameter its own auth regime has', () => {
-    // The whole reason `param` exists. Stage 1 and 2 run on the draft token;
-    // §10's claim invalidates it, so stage 3 onward is addressed by campaign.
+    // The whole reason `param` exists. Stage 1 runs on the draft token;
+    // stage 3 onward is addressed by campaign, behind a Founder session.
     // A stage-3 page holding `:token` would be a page nobody could reach.
     for (const page of FOUNDER_FLOW_PAGES) {
-      expect(page.param, page.id).toBe(page.stage <= 2 ? 'token' : 'campaignId');
+      expect(page.param, page.id).toBe(page.stage === 1 ? 'token' : 'campaignId');
     }
-    expect(FOUNDER_FLOW_PAGES.filter((page) => page.stage === 2)).toHaveLength(1);
   });
 
   it('puts Stripe before the listing fee, because the server does', () => {
@@ -341,7 +338,7 @@ describe('the Founder onboarding flow', () => {
     // unusable-link page from their own help drawer.
     expect(founderFlowReachableFrom('problem', 'invite')).toBe(true);
     expect(founderFlowReachableFrom('story', 'visuals')).toBe(true);
-    expect(founderFlowReachableFrom('visuals', 'claim')).toBe(false);
+    expect(founderFlowReachableFrom('visuals', 'positioning')).toBe(false);
     expect(founderFlowReachableFrom('last-look', 'problem')).toBe(false);
     // An id nobody registered is not reachable from anywhere, rather than
     // throwing on a help drawer somebody opened.
