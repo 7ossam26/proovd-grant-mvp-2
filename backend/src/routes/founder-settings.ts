@@ -39,6 +39,8 @@ import {
   requestFounderDeletion,
 } from '../founder-dashboard/settings.js';
 import { FOUNDER_PASSWORD_CHANGED } from '../founder-dashboard/settings-logic.js';
+import { setFounderPassword } from '../vetting/claim.js';
+import { findFounderCampaign } from '../workspace/service.js';
 
 export const FOUNDER_SETTINGS_PATH = '/api/founder/settings';
 
@@ -149,6 +151,75 @@ export function createFounderSettingsRouter(deps: FounderSettingsRouterDeps): Ro
       actorId: req.authUser?.id ?? '',
       internalReason: 'password changed from the Founder settings page; other sessions revoked',
     });
+
+    res.json({ ok: true });
+  });
+
+  /**
+   * The password, chosen at the END of the onboarding flow (2026-08-20).
+   *
+   * ── Why this is not `changePassword` ────────────────────────────────────
+   * There is no current password to present. By product direction the flow
+   * creates the account at submission — §13's Stripe account needs a real user
+   * long before this screen — and `claimAndSignIn` gives it 32 random bytes
+   * that nobody, including this process afterwards, knows. `updatePassword` is
+   * exactly the call for that, and it is the one Better Auth's own reset flow
+   * makes.
+   *
+   * The proof of identity is the session, which is stronger here than a
+   * password would be: it was minted by the act that created the account, and
+   * it is the only way anybody has ever reached it.
+   *
+   * ── It is deliberately NOT gated on being first ─────────────────────────
+   * A Founder who reloads this screen, or comes back to it from the flow, sets
+   * their password again — which is what somebody who has forgotten what they
+   * just typed will do. Refusing the second attempt would strand them behind a
+   * credential nobody knows, and `changePassword` on the settings page covers
+   * the same ground for anyone who already has one.
+   *
+   * Other sessions are NOT revoked, and that is the difference from the
+   * settings-page change. There, a change is somebody securing an account they
+   * think is compromised, so `revokeOtherSessions` is the point of it. Here it
+   * is the first credential on a brand-new account, and the only session in
+   * existence is the one making the request — revoking would be a no-op with a
+   * chance of signing somebody out of their own flow.
+   */
+  router.post(`${FOUNDER_SETTINGS_PATH}/initial-password`, founder, json, async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const userId = req.authUser?.id ?? '';
+
+    // The campaign is checked rather than trusted: `findFounderCampaign` joins
+    // the caller's own claim inside the query, so somebody else's campaign id
+    // answers exactly what a non-existent one does (§1.1).
+    const campaign = await findFounderCampaign(db, {
+      campaignId: str(body['campaignId']) ?? '',
+      founderUserId: userId,
+    });
+    if (!campaign) {
+      res.status(404).json({
+        error: 'not_found',
+        title: 'That campaign is not on your account',
+        whatHappened: 'We could not find a campaign of yours with that id.',
+        next: 'Open your campaign from your own list and try again.',
+      });
+      return;
+    }
+
+    const result = await setFounderPassword(db, auth, {
+      userId,
+      campaignId: campaign.campaignId,
+      password: typeof body['password'] === 'string' ? body['password'] : '',
+    });
+
+    if (!result.ok) {
+      res.status(422).json({
+        error: 'password_rejected',
+        title: 'That password was not set',
+        whatHappened: result.message,
+        next: result.next,
+      });
+      return;
+    }
 
     res.json({ ok: true });
   });

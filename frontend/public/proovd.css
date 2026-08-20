@@ -16871,4 +16871,74 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   .crf-agree__cta:active:not(:disabled),
   .crf-agree__back:hover,
   .crf-agree__back:active { scale: 1; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PHASE 61 — the Founder flow's last page: your password (2026-08-20)
+   ══════════════════════════════════════════════════════════════════════════
+
+   §10 took the password at a screen near the beginning of the flow. By product
+   direction it is the LAST page now, and the account is created by submitting
+   the §9 answers instead — §13's Stripe onboarding is keyed to a real user, so
+   it could not wait. `backend/src/vetting/claim.ts` records the deviation.
+
+   Conventions, and the reason for each:
+
+   1. `.ff-password-` and not `.ff-pw-`. `.ff-` is PHASE 34's Founder flow and
+      this belongs to it; the long form is because `.ff-p…` already has three
+      neighbours (`.ff-pc-`, `.ff-prob-`, `.ff-panel`) and a two-letter prefix
+      would be one edit from colliding with one of them.
+
+   2. It reuses `.ff-build__title` for the headline rather than minting a size.
+      Every stage-5 page in this flow uses that scale and this is the last of
+      them; a bespoke rule here would be a rule written twice.
+
+   3. Anything that STATES A RULE takes `--dark`, and only a caption takes
+      `--moss`. `--moss` on white measures about 3.37:1, which is under AA, and
+      the lede on this page is the sentence explaining that the account has no
+      credential yet — Founder Flow Session E's finding, and it binds harder
+      here than anywhere else in the flow. The product-wide `--moss` gap is
+      recorded and is not this page's to close.
+*/
+
+.ff-password { display: flex; flex-direction: column; gap: var(--sp-24); max-width: 34rem; width: 100%; }
+
+/* The one sentence that says what this account is until somebody sets a
+   password. It states a fact about their account, so it is body ink. */
+.ff-password__lede {
+  margin: 0 0 var(--sp-24);
+  color: var(--dark);
+  max-width: var(--measure);
+}
+
+/* Appears only once somebody has typed. `min-height` so its arrival does not
+   move the button underneath it — a control that shifts as you type is one
+   people miss. */
+.ff-password__short {
+  margin: var(--sp-8) 0 0;
+  min-height: 1.25rem;
+  color: var(--moss);
+  font-size: 0.875rem;
+}
+
+/* The one requirement on the page, and it decides whether the control works —
+   so it is body ink rather than a caption. `--moss` measures ~3.37:1, and
+   Founder Flow Session E's rule is that a sentence which changes what somebody
+   TYPES is not a caption. Scoped, because re-toning `.field-hint` product-wide
+   is its own change with its own screenshot pass. */
+.ff-password .field-hint { color: var(--dark); }
+
+.ff-password__refusal { margin-top: var(--sp-24); }
+
+/* The button is `inline-flex` and a flex item in a column is stretched by the
+   default `align-items: stretch` — the trap Sessions D, E and F each lost a
+   pass to, and the Money console a fourth time. `flex-start` keeps it the
+   width of its own label. */
+.ff-password__nav { display: flex; justify-content: flex-start; }
+
+@media (max-width: 600px) {
+  /* At 320 the label is longer than the measure, so it takes the full width
+     rather than clipping — a `.btn` is `overflow: hidden` because it hosts the
+     fill sweep, and a clipped label is a missing one. */
+  .ff-password__nav { display: block; }
+  .ff-password__nav > .btn { width: 100%; }
 }
