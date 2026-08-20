@@ -8,7 +8,7 @@
  * every value here: the structure (`.claim-intro` → `.claim-wide` →
  * `.claim-wide-stage` → `.claim-wide-shell`), the copy, the 84px headline with
  * its 28px mint text stroke, the #DEFAFC band, the 122px CTA, and the four
- * animation beats. PHASE 49 in `proovd.css` carries the declarations.
+ * animation beats. PHASE 57 in `proovd.css` carries the declarations.
  *
  * ── The stage is scaled by measurement, not by a media query ────────────────
  * The reference authors this screen at a fixed 2496×1542 stage and then, in

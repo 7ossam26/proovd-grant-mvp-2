@@ -566,13 +566,18 @@ The dependency runs one way: §22.8's fourth criterion reads 21a's Day-14 failur
 
 ## How a session works
 
-One phase per session (`docs/master-plan.md` §1.3): read `docs/phases/phase-NN.md`, then read only the Spec sections it names — not from memory — build, run **that phase's named §33 acceptance tests**, and commit only when every one passes. Serial: never start a phase whose predecessors aren't green. If the phase is too large for one session, stop and say so; a truncated session produces code that looks finished and isn't. Phase sequencing and the 00–24 table live in `docs/master-plan.md` §6.
+**Verification is scaled to the change, and most changes are small.** Almost everything below this line in this file is a record of *phase* work — whole surfaces, money paths, acceptance suites, 1280/320 browser passes. Do not read that narrative as the bar for an ordinary edit. There are two kinds of work and they get different amounts of checking:
+
+- **A small change** — a copy fix, a style tweak, one component, one bug, a rename, a small refactor. Make the change, run `npm run typecheck`, and run **only** the one test file that directly covers what you touched (`npx vitest run <path>`). That is the whole verification. Do **not** run `npm test`, do not run a whole workspace project, do not run the §33.11 sweep or the bundle scan, do not do a browser or screenshot pass, and do not write a new test file — unless it is a bug fix whose bug a test would have caught, in which case one focused case is enough. If no test file covers what you touched, typecheck is the whole verification.
+- **Phase work** — a `docs/phases/phase-NN.md` brief, or a multi-session rebuild brief. One phase per session (`docs/master-plan.md` §1.3): read the phase file, then read only the Spec sections it names — not from memory — build, run **that phase's named §33 acceptance tests**, and commit only when every one passes. Serial: never start a phase whose predecessors aren't green. If the phase is too large for one session, stop and say so; a truncated session produces code that looks finished and isn't. Phase sequencing and the 00–24 table live in `docs/master-plan.md` §6.
+
+When in doubt about which kind of work you were handed, it is the small kind. If a small change looks like it puts something wider at risk, **say so in one sentence and let the user decide** — do not run the wider thing on your own initiative, and do not report a change as unverified because you chose not to run a suite nobody asked for.
 
 ## Toolchain (established Phase 1, per `docs/tech-stack-v2.md` §2, §11, §13)
 
 - **Repo:** npm workspaces — `frontend/` (React 19 + Vite), `backend/` (Express 5), `shared/` (Zod schemas, money waterfall, state machines, calendar). One root `package.json`, one multi-stage `Dockerfile`.
 - **DB:** Postgres 16 + Drizzle; `drizzle-kit` generates and applies migrations. Money is integer cents in `bigint`.
-- **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one test with Vitest's filter: `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`.
+- **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one file with `npx vitest run <path>`, one test with Vitest's filter `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`. **`npm test` is for phase work and for when the user asks for it** — an ordinary edit gets a typecheck and the one relevant file (see "How a session works").
 - **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11.
 - **Integration tests need a real Postgres.** `backend/src/tests/app-harness.ts` uses `TEST_DATABASE_URL` when set and otherwise starts a Testcontainers `postgres:16-alpine`, which needs Docker. The migrator runs `CREATE ROLE proovd_app`, so the connecting role needs `CREATEROLE` or superuser. With neither Docker nor a spare server, a throwaway cluster works: `initdb -D <tmp> -U postgres --auth=trust`, `pg_ctl -o "-p 55432"` start, `createdb`, point `TEST_DATABASE_URL` at it, and stop it afterwards.
 - **A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`**, one failing statement per transaction — the first error aborts the block, so a second assertion in the same one only observes the abort. `policy-versions.test.ts` is the pattern. A test that must commit restores what it changed in a `finally`.
@@ -2060,6 +2065,8 @@ A surface is complete only with all of §1.1: content and actions; loading, empt
 Every waiting, review, payment, recovery, or exception state answers the six questions (§27.1): what happened, what next, who owns it, when's the next update, what can I do now, how do I get help without losing context.
 
 **A phase is not done until its named §33 tests pass.** §33's own framing: these are requirements, not examples. Do not commit a phase with a failing named test.
+
+**This section describes a surface built in a phase, and nothing above applies to an ordinary edit.** A small change is done when it does what was asked, typechecks, and the one test file covering it passes — see "How a session works". Re-verifying an untouched guarantee, re-running a suite nobody asked for, or opening a browser pass for a copy fix is not thoroughness; it is a change the user has to wait for and did not want.
 
 ---
 
@@ -3914,3 +3921,171 @@ jsdom and axe cannot see. A settings page with a money block, a credential form,
 unbreakable-token values is exactly the shape that pass keeps catching, so it is an open item rather
 than a skipped one. **There is no `founder-dashboard-g.test.ts` and no Session G half of the surface
 suite; both are outstanding.**
+
+### The last look at the problem was inserted between the code and Positioning (§9, §33.11, 2026-08-20)
+
+> **Superseded in one detail on 2026-08-20**: the solution's own last look was
+> built the same day and now sits between this screen and Positioning, so the
+> order is `code → confirm-problem → confirm-solution → positioning`. Everything
+> below is otherwise unchanged and still true of the problem screen; the two
+> sentences naming its forward target are marked where they occur. See the
+> section after this one.
+
+One screen, built from scratch to the supplied reference's `probConfirm` (`Proovd Founder Flow v2.dc.html`,
+`[data-pconfirm]` / `kindWide`) and inserted into the Founder flow at the position the reference gives
+it: `code → confirm-problem → positioning`. **By explicit product direction, and it is the half of
+Session C's refusal that comes back.**
+
+`shared/src/vetting/flow.ts` gained the register entry; `shared/src/qa/index.ts` the route;
+`frontend/src/surfaces/founder-flow/ConfirmProblem.tsx` is the screen; `frontend/src/components/anim.ts`
+gained `stageToggleHead`; `frontend/src/routes.tsx` the route; `PHASE 54` in proovd.css the styles.
+**No migration, no service, no new record** — it reads and writes `campaign_vetting.problem_text`
+through the same `fetchVetting`/`saveVetting` the `problem` screen uses.
+
+- **It is a departure from Session C, and only the problem half of it.** Session C built nothing for
+  the reference's screens 7–8 because §9 has one `problem_text` and one `solution_text`, and a record
+  collected on two screens is a record whose two copies eventually disagree. What makes this narrow is
+  that the two screens are **one record**: this page edits `problem_text` through the same route, so
+  there is no second copy to drift — which is also exactly what the reference does (`pcText` reads
+  `st.probText`, the state `[data-problem]` writes). **The SOLUTION half is still not built**, for the
+  reason Session C recorded, and the register's header says so.
+- **This is not `ConfirmAnswer`, and the two prefixes exist because they are two screens.**
+  `.ff-prob` is `[data-problem]` — a 1304px column, a sticker in the headline, a scroll rail, a `Next`
+  CTA, and `fitStages`' `s *= 1.38`. `.ff-pc` is `[data-pconfirm]` — a 1760px column pushed 70px down,
+  no sticker, no rail, no boost, and a green `Still my problem` bar. Merging them would be one
+  component with a variant flag over two different compositions.
+- **The CTA is REMOVED in the editor rather than collapsed, and that is the composition.** The
+  reference's `sc-if value="{{ pcView }}"` wraps both the green button and the pencil, so entering the
+  editor unmounts the button and the panel grows 470 → 640px into the space it leaves. The two states
+  are 1260px and 1270px tall on the stage, which is why the screen does not jump; a
+  collapsed-to-zero button would leave a 0px control in the tab order AND animate a height the
+  reference does not. The `Save` label `pcCta` computes for the editing state is therefore unreachable
+  THERE too, and is not implemented here.
+- **`stageToggleHead` is `pcToggle`, tween for tween**, and it is a second helper rather than a
+  parameter on `problemToggle` because the two pages mark their parts with different attributes —
+  `data-prob-part` and `data-stage-anim`. That is the same mechanism every screen of this flow uses to
+  keep `FlowPage`'s `relayIn` off its page, and it is why neither helper can reach into the other's.
+- **Back goes to the code, not to the email.** The reference's own `back()` from `vetting` vStep 0
+  goes to the email-ENTER stage, skipping its code screen. Here the linear convention wins: `code` is
+  a real page in this product's register, `positioning` already had exactly this Back target before
+  the insert, and the help drawer lists everything behind. `positioning`'s Back moved onto this page
+  and its accessible name moved with it.
+- **The browser pass is the whole verification, and it is a measured 1:1.** The reference was served
+  with `startScreen` defaulted to `Vetting` and both were driven through headless Chrome at a TRUE
+  viewport (`Emulation.setDeviceMetricsOverride` — `--window-size` lies on Windows, which PHASE 38
+  already records). Every box matches on every number, at 1280 and at 320, offset only by the 7.5px
+  the reference's own canvas harness reserves for a scrollbar (`documentElement.scrollWidth` is 1265
+  there and 1280 here):
+
+  | | reference | this |
+  |---|---|---|
+  | stage | 998.4×616.8 @141.6 | 998.4×616.8 @141.6 |
+  | head | 704×84.5 @224, 80px/700/105.6/-2.4 | identical |
+  | panel | 704×241.2 @345.2 | identical |
+  | field, read | 684×188 @355.2, 55px/500/82.5/-0.66 | identical |
+  | field, edit | 684×256 @353.2 | identical |
+  | cta | 704×64 @586.4, 66px/900/-1.32 | identical |
+  | edit | 132.4×53.6 @678.4 → 146.1×53.6 @680.4 | identical |
+  | back | 74.2×30 @831.6 | identical |
+
+  Zero document overflow and exactly one `h1` at both widths. At 320 the whole composition scales to
+  a 249.6×154.2 stage in both — nothing reflows, which is the reference's own model.
+- **All three transitions were driven, not inferred.** A real six-digit code typed into `/code`
+  lands on `/confirm-problem` (the token row's `claimed_at` is the receipt); `Still my problem`
+  lands on `/positioning` with its real content rendered (**as of 2026-08-20 it lands on
+  `/confirm-solution`, which lands on Positioning**); and Positioning's Back lands back here with
+  the geometry unchanged, which also exercises the backward relay.
+- **The keyboard path is complete and every control is named**: Back (naming its destination), Help,
+  the field, `Still my problem`, `edit`. In the editor the CTA is absent from the DOM and therefore
+  from the tab order, the field is `readOnly=false`, focus is on it with the caret at the end
+  (111/111 on a 111-character answer — the reference's `setSelectionRange(n, n)`), and the label is
+  `Confirm`. One live region, one `h1`.
+- **One thing the reference has no need of, and one it refuses.** It holds a record in memory, so the
+  loading state is ours; and a save that FAILS says so, below the column and absolutely positioned so
+  it can never move the composition. It gives the field no focus ring at all — a keyboard user
+  tabbing onto a read-state field would have nothing — so one is drawn INSIDE the sheet
+  (`outline-offset: -6px`), because an outset ring would be laid over the dark card and read as a
+  second border on it.
+- **`Confirm` and `edit` are the reference's own labels and ship as they are.** `Confirm` is in
+  §33.11.4's `OBJECTLESS_CTA_LABELS`, so this is the same knowing exception `ConfirmAnswer` already
+  records — the copy is the specification on these pages. `Still my problem` is not objectless.
+
+**Testing was deliberately partial, at the user's request, and the gap is stated rather than
+implied.** `npm run typecheck` is clean for `shared` and `backend`; `frontend` reports four errors and
+all four are pre-existing in `founder-flow.test.tsx`, left by the same day's removal of the `claim`
+and `match` screens (`FLOW_AGE_IS_YOUR_STATEMENT`, `PUBLISHED_POLICIES`, `FLOW_CLAIM_USES_THE_LINK`,
+`stubSignal` — none from this screen). The stylesheet's comment balance and its `var()` definitions
+were both checked. **Not run:** `npm test`, the §33.11 sweep, and axe. **There is no test file for
+this screen and no `founder-flow.test.tsx` half for it; both are outstanding.**
+### …and the last look at the solution, between it and Positioning (§9, §33.11, 2026-08-20)
+
+One screen, built from scratch to the same reference component at `vStep` 1
+(`Proovd Founder Flow v2.dc.html`, `[data-pconfirm]` / `kindWide`) and inserted where the
+reference puts it: `confirm-problem → confirm-solution → positioning`. **By explicit product
+direction.**
+
+`shared/src/vetting/flow.ts` gained the register entry; `shared/src/qa/index.ts` the route;
+`frontend/src/surfaces/founder-flow/ConfirmSolution.tsx` is the screen; `frontend/src/routes.tsx`
+the route. **No migration, no service, no new record, and no new CSS** — it reads and writes
+`campaign_vetting.solution_text` through the same `fetchVetting`/`saveVetting` the problem screen
+uses, and renders into `PHASE 54`'s existing `.ff-pc` block.
+
+- **One component there, two pages here, and every difference is a ternary the reference already
+  writes.** `isProbConfirm` is `n==='vetting' && !vReviewing && vStep<2`, so both answers are
+  `probConfirm`; `pcHead`, `pcText`, `pcCta` and `setProbText` each branch on `vStep===1`. A page in
+  this product is an ADDRESS, so the pair is two register entries — which is also what lets the help
+  drawer name and mark them separately, and what puts the flow's forward and back targets in the
+  router rather than behind a prop. The stylesheet is deliberately NOT duplicated: a second copy of
+  those rules is how the two would come to differ by a pixel.
+- **The reference's own walk confirmed the position before anything was built.** A copy pinned to
+  `vStep:0`, driven in Chrome: one click on `Still my problem` gives the solution headline and
+  `Still my solution`; a second gives `[data-compet]` with the `h1` `Lets talk about your
+  competitors...`, which is Positioning. The insert is the reference's own sequence, not an
+  interpretation of it.
+- **The product name is the real one.** The reference hardcodes `Teeb`; the sentence structure is
+  kept and the value comes from `fetchDraftLanding`, the read the invite page and the reach orbit
+  already use. A draft with no product name renders `your solution` rather than an empty
+  possessive — this headline is the one string on the screen that cannot degrade to a blank.
+- **Measured 1:1 against the reference at 1280×800 and at a TRUE 320 viewport**, both states. Every
+  field compared — x, y, w, h, font, size, weight, line-height, letter-spacing, align, colour,
+  background, radius, padding, margin, box-shadow — and the ONLY difference anywhere is a uniform
+  **7.5px** on `x`, which is the reference's own canvas harness reserving a scrollbar
+  (`documentElement.scrollWidth` 1265 against clientWidth 1280). Stage 998.4×616.8 @141.6; head
+  704×42.2 @195.1, 80px/700/105.6/-2.4; panel 704×241.2 @274.1; field 684×188 @284.1,
+  55px/500/82.5/-0.66; cta 704×64 @515.3, 66px/900/-1.32; edit 132.4×53.6 @607.3; back 74.2×30
+  @731.6. At 320 the whole composition scales to a 249.6×154.2 stage in both, with zero document
+  overflow and one `h1`.
+- **The edit state matches on every field too, including focus and caret.** The CTA is absent from
+  the DOM in both — not collapsed — the panel grows 470 → 640px into the space it leaves, the label
+  is `Confirm`, and the field holds focus with the caret at 121/121 on a 121-character answer.
+- **The entry relay was sampled frame by frame rather than assumed.** Both run the same curve from
+  `x: 150` to 0 with opacity ramping and the same head → panel → cta → edit stagger, ending in
+  `clearProps` (transform back to `none`). It is `stageRelayIn`, the helper the problem screen
+  already uses, with the reference's own order passed in rather than read from the DOM.
+- **All three transitions were driven, not inferred.** `Still my problem` on the problem screen lands
+  on `/confirm-solution` with the solution headline, CTA and answer rendered; `Still my solution`
+  lands on `/positioning` with `Lets talk about your competitors...`; and Back lands on
+  `/confirm-problem` with `Still my problem`. Which is `back()`'s own `vStep>0` branch.
+- **The edit actually writes the record, checked at the database.** Typed in the browser, `Confirm`
+  pressed, autosave reported `saved`, the screen returned to read state at 470px — and
+  `campaign_vetting.solution_text` held the new text with `solution_supplier` still `founder`.
+- **The keyboard path is complete and every control is named**: Back (naming its destination), Help,
+  the field, `Still my solution`, `edit`. One `h1`, no heading-level jump, and the help drawer lists
+  this page marked `This page` above the eight before it marked `Done` — the register's three
+  readers agreeing without a second list.
+- **`Confirm` and `edit` are the reference's own labels and ship as they are.** `Confirm` is in
+  §33.11.4's `OBJECTLESS_CTA_LABELS`, so this is the same knowing exception `ConfirmProblem` and
+  `ConfirmAnswer` already record. `Still my solution` is not objectless and needs none.
+- **The §33.11 sweep needed no new fixture.** `fixtures.ts` already stubs both
+  `/api/draft/:token/vetting` and `/api/draft/:token`, and both carry real content, so the new route
+  renders its real headline and answer rather than an error state.
+- **One correct behaviour was hit while testing and is worth knowing about.** §28.1's token verify
+  limiter is 20 attempts per 15 minutes per address, and each load of this screen spends two — so a
+  run of browser probes exhausts it and every later load renders `LinkUnavailable`, which is the
+  frozen non-enumerating rejection working exactly as designed. It is not a bug and nothing was
+  changed for it; the in-memory limiter resets when the backend reloads.
+
+**What this deliberately did not do:** touch `completeClaim`, the §9 type lock, the retention sweep,
+the token model, `ConfirmAnswer`, or `PositioningStep` beyond its one back target; add a `Save`
+control (the reference's `pcCta` computes that label for a state whose button is not rendered);
+collect the solution on a third screen; or duplicate `PHASE 54`.

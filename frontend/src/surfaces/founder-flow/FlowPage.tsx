@@ -64,6 +64,23 @@ import { useProovdMotion } from '../../motion/MotionProvider.js';
  */
 let pendingDirection: 1 | -1 = 1;
 
+/**
+ * Which way THIS page's relay runs, for a page that owns its own entrance.
+ *
+ * Screens 1–3 and 5 are authored on the reference's fixed stage and stage
+ * their own children, so `FlowPage`'s `relayIn` finds nothing to do and the
+ * page needs the direction itself. Reading is safe and consuming would not be:
+ * `FlowPage` resets `pendingDirection` in its own layout effect, and React runs
+ * layout effects bottom-up, so a child's effect sees the incoming value and the
+ * parent's reset still happens exactly once.
+ *
+ * Capture it in a ref on first render rather than calling it again later — on a
+ * re-render that is not a mount it has already been reset to forward.
+ */
+export function flowDirection(): 1 | -1 {
+  return pendingDirection;
+}
+
 interface FlowNav {
   /** Fade this page out, then go. `direction` drives the next page's relay. */
   leave: (to: string, direction?: 1 | -1) => void;

@@ -56,13 +56,22 @@ export const EMAIL_CODE_TTL_MINUTES = 15;
 export const EMAIL_CODE_MAX_ATTEMPTS = 6;
 
 /**
- * Seconds before "send it again" is offered.
+ * Seconds before "send it again" is offered AGAIN, once it has been used.
  *
  * A countdown rather than a disabled control with no explanation: §27.1's
  * "when is the next update" answered on the one screen where a person is
  * waiting for an email that may already be in their spam folder.
+ *
+ * CHANGED 2026-08-20, with the screen-6 rebuild, in two ways. The number is
+ * the reference's own 49 — nothing on the server reads this (see
+ * `backend/src/vetting/email-code-logic.ts`, which records deliberately not
+ * restating it), so the reference is the only authority there is for it. And
+ * the clock now starts when a person ASKS for another code rather than when
+ * the screen opens, which is the reference's own `resendLeft: 0` initial
+ * state: counting down from mount put a timer in front of a Founder whose code
+ * had not arrived, before they could do anything about it.
  */
-export const EMAIL_CODE_RESEND_SECONDS = 45;
+export const EMAIL_CODE_RESEND_SECONDS = 49;
 
 /**
  * The one sentence that keeps this screen from reading as a sign-in.

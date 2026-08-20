@@ -26,9 +26,6 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import {
-  CAMPAIGN_PATH_CHOICES,
-  FLOW_AGE_IS_YOUR_STATEMENT,
-  FLOW_CLAIM_USES_THE_LINK,
   FLOW_COMPLETION_IS_DECIDED,
   FLOW_LAST_LOOK_RETURNS,
   FOUNDER_ANSWER_SEQUENCE,
@@ -50,7 +47,6 @@ import {
   LISTING_FEE_NEWSLETTER_LABEL,
   LISTING_FEE_STILL_LOWERABLE,
   PAYOUT_PREPARE_COLLECTS_NOTHING,
-  POSSIBLE_CREATOR_RESULT_DISCLOSURES,
   SEPARATE_FIVE_PERCENT_NOTE,
   STRIPE_PREPARE_ITEMS,
   founderAnswerLabel,
@@ -181,12 +177,6 @@ const ANSWERED = {
   completeness: { problem: true, solution: true, competition: false },
 };
 
-const IDEA = CAMPAIGN_PATH_CHOICES.find((c) => c.type === 'pre_build')!;
-const PRODUCT = CAMPAIGN_PATH_CHOICES.find((c) => c.type === 'pre_launch')!;
-
-/** A `Choice` radio's accessible name is its label AND its second line. */
-const pathRadio = (choice: { prompt: string }) =>
-  screen.getByRole('radio', { name: new RegExp(choice.prompt, 'i') });
 
 /* ══════════════════════════════════════════════════════════════════════════
    The four pages are four addresses
@@ -400,33 +390,67 @@ describe('confirming what Proovd understood', () => {
 
 /* ══════════════════════════════════════════════════════════════════════════
    Screen 4 — the campaign path, which locks nothing
+
+   REWRITTEN 2026-08-20 with the screen, which was rebuilt to the reference's
+   own `[data-kind]` pager (two arrows, one card, one `Select`, then a confirm
+   stage of two rows). The `Choice` radio group these tests were written
+   against no longer exists, so asserting against it would be asserting the
+   absence of the rebuild.
+
+   What they were PROTECTING survives, and is what they still assert: both
+   paths are explained before either is chosen (§9), the answer is written and
+   changeable, and NOTHING here locks anything (§33.1.7). One assertion is
+   deliberately gone — see the note on the lock test.
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('the campaign path', () => {
-  it('offers the two paths as one radio group and explains both before either is chosen', async () => {
-    stubVetting(ANSWERED);
+  /** The card on show: its headline, its sentence, and the sticker beside it. */
+  const card = () => ({
+    head: screen.getByRole('heading', { level: 1 }).textContent ?? '',
+    body: document.querySelector('.ff-kind__body')?.textContent ?? '',
+  });
+  const pageTo = async (user: ReturnType<typeof userEvent.setup>, dir: 'next' | 'previous') =>
+    user.click(screen.getByRole('button', { name: new RegExp(`show the ${dir} campaign type`, 'i') }));
+
+  it('explains each path in plain language before either is chosen (§9)', async () => {
+    const user = userEvent.setup();
+    stubVetting({ problem: 'p', solution: 's' });
     renderAt(at('campaign-type'));
     await screen.findByRole('heading', { level: 1 });
 
-    expect(screen.getAllByRole('radio')).toHaveLength(2);
-    for (const choice of CAMPAIGN_PATH_CHOICES) {
-      expect(pathRadio(choice)).toBeTruthy();
-      // §9: "the step must explain what is being chosen in plain language
-      // before it is chosen." Both, before the choice — not behind a pager.
-      for (const line of choice.commitments) {
-        expect(screen.getByText(line)).toBeTruthy();
-      }
-    }
+    // The reference opens on the Idea card. Both its headline and its own
+    // sentence are on the page before anything is chosen.
+    expect(card().head).toContain('working on an');
+    expect(card().body).toContain('Idea campaigns');
+    expect(card().body).toContain('turn it into a product');
+
+    // And the other one is one arrow away — the reference's answer to "explain
+    // before it is chosen" on a stage that cannot hold both at once.
+    await pageTo(user, 'next');
+    await waitFor(() => expect(card().head).toContain('working on a...'));
+    expect(card().body).toContain('Product campaigns');
+    expect(card().body).toContain('founding-member pre-sale');
+
+    // It wraps, so either arrow reaches either card.
+    await pageTo(user, 'next');
+    await waitFor(() => expect(card().body).toContain('Idea campaigns'));
   });
 
-  it('arrives pre-selected from Admin’s discovery answer, and the Founder may change it', async () => {
+  it('opens on Admin’s discovery answer, and the Founder’s own choice supersedes it', async () => {
     const user = userEvent.setup();
     const read = stubVetting({ ...ANSWERED, selectedType: 'pre_build' });
     renderAt(at('campaign-type'));
     await screen.findByRole('heading', { level: 1 });
 
-    expect(pathRadio(IDEA).getAttribute('aria-checked')).toBe('true');
-    await user.click(pathRadio(PRODUCT));
+    expect(card().body).toContain('Idea campaigns');
+
+    // Paging alone writes nothing — the reference sets the answer at `Select`,
+    // and looking at a card is not choosing it.
+    await pageTo(user, 'next');
+    await waitFor(() => expect(card().body).toContain('Product campaigns'));
+    expect(read()['selectedType']).toBe('pre_build');
+
+    await user.click(screen.getByRole('button', { name: /^select$/i }));
     await waitFor(() => expect(read()['selectedType']).toBe('pre_launch'));
   });
 
@@ -436,43 +460,64 @@ describe('the campaign path', () => {
     renderAt(at('campaign-type'));
     await screen.findByRole('heading', { level: 1 });
 
-    await user.click(pathRadio(IDEA));
-    await waitFor(() => expect(read()['selectedType']).toBe('pre_build'));
+    await user.click(screen.getByRole('button', { name: /^select$/i }));
+    await waitFor(() => expect(read()['selectedType']).toBe('pre_launch'));
 
-    // The permanence warning says when the lock happens, and this page is not
-    // it. Nothing here writes `lockedType`, `typeLockedAt`, or submits.
+    // The lock is at SUBMISSION and this page is not it. Nothing here writes
+    // `lockedType`, writes `typeLockedAt`, or submits.
+    //
+    // The permanence warning this test used to assert is deliberately no
+    // longer on the screen: the reference's `[data-kind]` does not draw one,
+    // and `CAMPAIGN_TYPE_LOCK_WARNING`'s own register entry says it is shown
+    // "at the campaign-path step and again before submission" — the second of
+    // which is where it now renders alone, which is also the only moment it is
+    // true. What the rule actually requires is asserted here instead, which is
+    // that this screen cannot lock anything.
     expect(read()['lockedType']).toBeNull();
     expect(read()['typeLockedAt']).toBeNull();
     for (const request of requests) {
       expect(request.url).not.toMatch(/\/submit$/);
       if (request.body) expect(Object.keys(request.body)).not.toContain('lockedType');
     }
-    expect(screen.getByText(/this choice is permanent/i)).toBeTruthy();
   });
 
-  it('confirms the chosen path and then continues', async () => {
+  it('confirms the chosen path on a second stage, and the rows can still change it', async () => {
     const user = userEvent.setup();
-    stubVetting(ANSWERED);
+    const read = stubVetting(ANSWERED);
     renderAt(at('campaign-type'));
     await screen.findByRole('heading', { level: 1 });
 
-    await user.click(pathRadio(IDEA));
-    await user.click(screen.getByRole('button', { name: new RegExp(`select ${IDEA.name}`, 'i') }));
+    await user.click(screen.getByRole('button', { name: /^select$/i }));
 
-    await screen.findByRole('heading', { name: new RegExp(`you are running an ${IDEA.name}`, 'i') });
-    expect(screen.getByText(/this choice is permanent/i)).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: /confirm and answer the last question/i }),
-    ).toBeTruthy();
+    // The pick stage's controls leave the tab order with it, and the confirm
+    // stage's arrive: two rows and one `Confirm`.
+    const chosen = await screen.findByRole('button', { name: /i have a product/i });
+    await waitFor(() => expect(chosen.getAttribute('aria-pressed')).toBe('true'));
+    const other = screen.getByRole('button', { name: /i have an idea/i });
+    expect(other.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: /^confirm$/i })).toBeTruthy();
+
+    // `rowPick`: the answer is still changeable here, and it writes.
+    await user.click(other);
+    await waitFor(() => expect(read()['selectedType']).toBe('pre_build'));
+    expect(other.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('cannot be selected before a path is chosen', async () => {
-    stubVetting({ problem: 'p', solution: 's' });
+  it('goes back to the two cards without losing the answer', async () => {
+    const user = userEvent.setup();
+    stubVetting({ ...ANSWERED, selectedType: 'pre_build' });
     renderAt(at('campaign-type'));
     await screen.findByRole('heading', { level: 1 });
-    expect(
-      screen.getByRole('button', { name: /select a campaign type/i }).hasAttribute('disabled'),
-    ).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: /^select$/i }));
+    await screen.findByRole('button', { name: /^confirm$/i });
+
+    await user.click(screen.getByRole('button', { name: /^back$/i }));
+
+    // The pick stage again, showing the card that was chosen — not reset to
+    // the first one.
+    await screen.findByRole('button', { name: /^select$/i });
+    expect(card().body).toContain('Idea campaigns');
   });
 });
 
@@ -609,7 +654,6 @@ describe('§33.11 the flow is operable', () => {
       stubAllRegimes();
       stubClaim();
       stubCode();
-      stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       for (const control of screen.getAllByRole('button')) {
@@ -638,7 +682,7 @@ describe('§33.11 the flow is operable', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   Session C — the address, the code, Positioning, and §10's signal
+   Session C — the address, the code, and Positioning
    ══════════════════════════════════════════════════════════════════════════ */
 
 const CLAIM_FIELD = {
@@ -652,9 +696,8 @@ const CLAIM_FIELD = {
  * The three §10 documents, as they actually ship: `draft`.
  *
  * A consent may cite only a PUBLISHED version (a trigger, not a service
- * rule), so `completeClaim` refuses and the claim screen renders the reason.
- * Stubbing an empty list instead would be stubbing a state the product does
- * not have, and the refusal is the thing worth testing.
+ * rule). Stubbing an empty list instead would be stubbing a state the
+ * product does not have.
  */
 const DRAFT_POLICIES = [
   { slug: 'terms', route: '/terms', title: 'Terms of Service', version: 'v1.0', status: 'draft' },
@@ -662,7 +705,6 @@ const DRAFT_POLICIES = [
   { slug: 'privacy', route: '/privacy', title: 'Privacy Policy', version: 'v1.0', status: 'draft' },
 ];
 
-const PUBLISHED_POLICIES = DRAFT_POLICIES.map((p) => ({ ...p, status: 'published' }));
 function claimView(
   overrides: Record<string, unknown> = {},
   policies: unknown[] = DRAFT_POLICIES,
@@ -742,12 +784,8 @@ function stubCode(accept = '418306') {
   return asked;
 }
 
-function stubSignal(body: Record<string, unknown>) {
-  handlers.push((url) => (/\/creator-signal$/.test(url) ? { status: 200, body } : undefined));
-}
-
 describe('the address', () => {
-  it('is prefilled from the invitation and says so', async () => {
+  it('is prefilled from the invitation, in a field a screen reader can name', async () => {
     stubClaim();
     renderAt(at('email'));
     // Wait for the page rather than the field: a loading panel is announced
@@ -755,17 +793,31 @@ describe('the address', () => {
     await screen.findByRole('heading', { level: 1 });
     const field = await screen.findByLabelText(/your email address/i);
     expect((field as HTMLInputElement).value).toBe('rowan@example.com');
-    expect(screen.getByText(/filled in from your invitation/i)).toBeInTheDocument();
+    // DELIBERATELY INVERTED (2026-08-20), with the rebuild to the supplied
+    // reference: the prefill NOTE is gone. The reference draws no label and no
+    // hint on this screen, and one is not invented for it — the address IS the
+    // prefill, in a field an `aria-label` names and a pencil marks as editable.
+    expect(screen.queryByText(/filled in from your invitation/i)).toBeNull();
   });
 
-  it('does not claim that confirming an address is what saves your progress', async () => {
-    // The reference's own headline is `To save your progress verify your email:`
-    // and it names the wrong mechanism: §9's autosave has been writing through
-    // the draft token since screen 2 (§1.4).
+  it('carries the reference’s own headline', async () => {
+    // DELIBERATELY INVERTED (2026-08-20). This asserted the opposite: the
+    // headline was refused because progress is already saved (§9's autosave has
+    // been writing through the draft token since screen 2), and it now ships
+    // verbatim by explicit product direction. That is a recorded deviation —
+    // see the header of `EmailStep.tsx` — and the BEHAVIOUR is unchanged: no
+    // save path moved, and confirming an address still saves nothing that was
+    // not already saved. The matching `FOUNDER_FLOW_ABSENCES` entry has gone
+    // with it, because a register naming an element the page renders is worse
+    // than no register.
     stubClaim();
     renderAt(at('email'));
-    await screen.findByRole('heading', { level: 1 });
-    expect(document.body.textContent).not.toMatch(/to save your progress/i);
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: /to save your progress verify your email:/i,
+      }),
+    ).toBeInTheDocument();
   });
 
   it('asks for a code and moves on, and nothing branches on the answer', async () => {
@@ -774,9 +826,10 @@ describe('the address', () => {
     const asked = stubCode();
     stubVetting(ANSWERED);
     renderAt(at('email'));
-    await user.click(await screen.findByRole('button', { name: /send me a code/i }));
+    // `Confirm email` is the reference's own label for this control.
+    await user.click(await screen.findByRole('button', { name: /confirm email/i }));
     await waitFor(() => expect(asked.length).toBe(1));
-    await screen.findByRole('heading', { name: /six-digit code/i });
+    await screen.findByRole('heading', { name: /six digit code/i });
   });
 
   it('will not send to something that is not an address', async () => {
@@ -787,7 +840,27 @@ describe('the address', () => {
     const field = await screen.findByLabelText(/your email address/i);
     await user.clear(field);
     await user.type(field, 'rowan');
-    expect(screen.getByRole('button', { name: /send me a code/i })).toBeDisabled();
+    // The reference's own click is a no-op on an address that is not one
+    // (`if(/.+@.+\..+/.test(st.email))`); this is that, with the browser
+    // announcing it, and it renders identically — there is no disabled
+    // treatment in the reference to contradict.
+    expect(screen.getByRole('button', { name: /confirm email/i })).toBeDisabled();
+  });
+
+  it('offers the reference’s one control, and it names where it goes', async () => {
+    stubClaim();
+    renderAt(at('email'));
+    await screen.findByRole('heading', { level: 1 });
+    // The reference draws `Back` bottom-left and nothing else — no wordmark, no
+    // HELP, no message badge. `FlowPage`'s top bar is hidden for this page the
+    // way it is for screens 1–4 and 6 (`.ff[data-flow-page='email'] .ff__top`),
+    // so it leaves the tab order too; that is a stylesheet fact and jsdom loads
+    // no stylesheet, which is why it is not asserted here. What IS asserted is
+    // the control's accessible name: the visible word is the reference's own,
+    // and §33.11.4's objectless-CTA rule is answered by the name.
+    expect(screen.getByRole('button', { name: /back to campaign type/i })).toBeInTheDocument();
+    // No badge is asked for at all, which is a fact about the markup.
+    expect(screen.queryByRole('button', { name: /reading for this step/i })).toBeNull();
   });
 });
 
@@ -904,7 +977,10 @@ describe('positioning', () => {
     );
   });
 
-  it('submits, then goes to the match', async () => {
+  it('submits, then goes straight to the first campaign-addressed page', async () => {
+    // The match and claim screens left the flow on 2026-08-20, so the
+    // submission continues to Your visuals with the campaign id the submit
+    // response carries.
     const user = userEvent.setup();
     // Registered BEFORE `stubVetting`, whose matcher is `url.includes('/vetting')`
     // and would otherwise answer the submit with the unsubmitted state.
@@ -917,11 +993,14 @@ describe('positioning', () => {
         : undefined,
     );
     stubVetting(ANSWERED);
-    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
+    stubStage3();
     renderAt(at('positioning'));
-    await user.type(await screen.findByLabelText(/positioning/i), 'Spreadsheets, mostly.');
-    await user.click(screen.getByRole('button', { name: /submit and see your creator match/i }));
-    await screen.findByRole('heading', { name: /3 creators/i });
+    await user.type(
+      await screen.findByLabelText(/who else is solving this/i),
+      'Spreadsheets, mostly.',
+    );
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await screen.findByText(FLOW_COMPLETION_IS_DECIDED);
   });
 
   it('renders the dictation absence rather than a microphone that refuses', async () => {
@@ -949,68 +1028,13 @@ describe('positioning', () => {
   });
 });
 
-describe('the relevance signal', () => {
-  it('renders Creators, never the internal word (§3.1)', async () => {
-    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
-    renderAt(at('match'));
-    await screen.findByRole('heading', { name: /3 creators/i });
-    expect(document.body.textContent).not.toMatch(/affiliate/i);
-  });
-
-  it('states every one of the limits, in full', async () => {
-    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
-    renderAt(at('match'));
-    await screen.findByRole('heading', { name: /3 creators/i });
-    for (const line of POSSIBLE_CREATOR_RESULT_DISCLOSURES) {
-      expect(screen.getByText(line)).toBeInTheDocument();
-    }
-  });
-
-  it('renders identically for a zero result and an unrecorded one', async () => {
-    // §10: "a zero result routes to Admin before the Founder proceeds", and
-    // distinguishing the two would show a Founder a number §10 forbids. The
-    // server collapses them before serializing; this compares what renders.
-    stubSignal({ status: 'with_admin', count: null, recordedAt: null });
-    const first = renderAt(at('match'));
-    await screen.findByRole('heading', { name: /working on your match/i });
-    const zero = document.body.textContent;
-    first.unmount();
-
-    handlers = [];
-    stubSignal({ status: 'with_admin', count: null, recordedAt: null });
-    renderAt(at('match'));
-    await screen.findByRole('heading', { name: /working on your match/i });
-    expect(document.body.textContent).toBe(zero);
-  });
-
-  it('promises nothing about what those Creators will do, and names none', async () => {
-    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
-    renderAt(at('match'));
-    await screen.findByRole('heading', { name: /3 creators/i });
-    const text = document.body.textContent ?? '';
-    // The reference's own sub-line. It claims people who have agreed to nothing
-    // are ready to promote something.
-    expect(text).not.toMatch(/ready to promote/i);
-    // And the breakdown, which no record holds.
-    expect(text).not.toMatch(/newsletter|community owners/i);
-  });
-
-  it('does not gate the claim: the way forward is offered in both states', async () => {
-    stubSignal({ status: 'with_admin', count: null, recordedAt: null });
-    renderAt(at('match'));
-    await screen.findByRole('heading', { name: /working on your match/i });
-    expect(screen.getByRole('button', { name: /set up your account/i })).toBeEnabled();
-  });
-});
-
 describe('the flow is operable over Session C pages', () => {
-  const PAGES = ['email', 'code', 'positioning', 'match'];
+  const PAGES = ['email', 'code', 'positioning'];
 
   function stubEverything() {
     stubClaim();
     stubCode();
     stubVetting(ANSWERED);
-    stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
   }
 
   it('has no axe violations on any of them', async () => {
@@ -1051,7 +1075,7 @@ describe('the flow is operable over Session C pages', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   SESSION D — the claim (16), the five §12 answers (10–14), and Last look (15)
+   SESSION D — the five §12 answers (10–14), and Last look (15)
    ══════════════════════════════════════════════════════════════════════════ */
 
 const CAMPAIGN = 'camp-d1';
@@ -1149,99 +1173,6 @@ function stubStage3(initial: Record<string, unknown> = {}) {
   stubPayouts({ state: 'complete', listingFeeEligible: true });
   stubListing();
 }
-
-describe('the claim (16)', () => {
-  it('renders §10’s contents, and the three representations as three controls', async () => {
-    stubClaim();
-    renderAt(at('claim'));
-    await screen.findByRole('heading', { name: /good to have you/i });
-
-    // §10's nine listed contents, each its own control.
-    expect(screen.getByLabelText(/legal name/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^phone/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/date of birth/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^country/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^state/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/choose a password/i)).toBeInTheDocument();
-
-    // §28.4: three separate, unchecked representations. Never one control.
-    for (const label of [/i am a us person/i, /i am 18 or older/i, /sanctions list/i]) {
-      const control = screen.getByRole('checkbox', { name: label });
-      expect(control).not.toBeChecked();
-    }
-    expect(screen.queryByRole('checkbox', { name: /accept all/i })).toBeNull();
-  });
-
-  it('refuses in the open while the agreements are drafts, and offers no button', async () => {
-    // All eight §31.4 documents are `draft`; a consent may cite only a
-    // published version (a trigger), so `completeClaim` returns
-    // `policies_unpublished`. The screen says why rather than showing a
-    // control that would be refused.
-    stubClaim();
-    renderAt(at('claim'));
-    await screen.findByRole('heading', { name: /good to have you/i });
-
-    expect(screen.getByText(/still with our lawyers/i)).toBeInTheDocument();
-    expect(screen.getByText(/no account has been created/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /create my account/i })).toBeNull();
-  });
-
-  it('collects a phone and says, in those words, that it is never verified', async () => {
-    // §33.1.8's surface half. There is no code to send to it and no control
-    // here that could add one.
-    stubClaim();
-    renderAt(at('claim'));
-    await screen.findByRole('heading', { name: /good to have you/i });
-
-    expect(screen.getByText(/never send codes to this number/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /verify (my )?phone/i })).toBeNull();
-  });
-
-  it('says the date check is a courtesy over what the Founder states (§10)', async () => {
-    const user = userEvent.setup();
-    stubClaim();
-    renderAt(at('claim'));
-    await screen.findByRole('heading', { name: /good to have you/i });
-
-    expect(screen.getByText(FLOW_AGE_IS_YOUR_STATEMENT)).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText(/date of birth/i), '1990-01-31');
-    expect(await screen.findByText(/^That is \d+ — 18 or over\.$/)).toBeInTheDocument();
-
-    // And it is advice, never a gate: nothing here refuses on the number.
-    await user.clear(screen.getByLabelText(/date of birth/i));
-    await user.type(screen.getByLabelText(/date of birth/i), '2020-01-31');
-    expect(await screen.findByText(/^That is \d+, which is under 18\.$/)).toBeInTheDocument();
-  });
-
-  it('opens a calendar that is operable from the keyboard, and closes on Escape', async () => {
-    const user = userEvent.setup();
-    stubClaim();
-    renderAt(at('claim'));
-    await screen.findByRole('heading', { name: /good to have you/i });
-
-    await user.click(screen.getByRole('button', { name: /pick it on a calendar/i }));
-    const grid = await screen.findByRole('grid');
-    expect(grid).toBeInTheDocument();
-
-    // One tab stop for the whole grid, arrows inside it (§28.5).
-    const focusable = within(grid).getAllByRole('button').filter((b) => b.tabIndex === 0);
-    expect(focusable).toHaveLength(1);
-
-    await user.click(screen.getByRole('button', { name: /change the year/i }));
-    expect(screen.queryByRole('grid')).toBeNull();
-    const years = screen.getAllByRole('button', { name: /^\d{4}$/ });
-    expect(years.length).toBeGreaterThan(0);
-  });
-
-  it('says what creating the account does to the invitation link', async () => {
-    stubClaim({}, PUBLISHED_POLICIES);
-    renderAt(at('claim'));
-    await screen.findByRole('heading', { name: /good to have you/i });
-    expect(screen.getByText(FLOW_CLAIM_USES_THE_LINK)).toBeInTheDocument();
-  });
-});
 
 describe('the five §12 answers (10–14)', () => {
   it('gives each one its own address and one question', async () => {
@@ -1402,7 +1333,7 @@ describe('Last look (15)', () => {
   });
 });
 
-describe('the help drawer across the claim', () => {
+describe('the help drawer across the stage boundary', () => {
   it('offers reading but no jump once the invitation link is spent', async () => {
     const user = userEvent.setup();
     stubStage3();
@@ -1425,7 +1356,7 @@ describe('the help drawer across the claim', () => {
 });
 
 describe('§33.11 the flow is operable over Session D pages', () => {
-  const PAGES = ['claim', 'visuals', 'branding', 'interview', 'story', 'socials', 'last-look'];
+  const PAGES = ['visuals', 'branding', 'interview', 'story', 'socials', 'last-look'];
 
   function stubAll() {
     stubClaim();
@@ -1482,7 +1413,6 @@ function stubAllRegimes() {
   stubVetting(ANSWERED);
   stubClaim();
   stubCode();
-  stubSignal({ status: 'available', count: 3, recordedAt: '2026-08-18T12:00:00.000Z' });
   stubStage3();
   // Session F's seven pages read the openness, the build and the roster.
   stubStage5();

@@ -6,12 +6,13 @@
  * The reference's `moment-password` is the authority for every value here: the
  * structure (`.obrow` → `.obhead` / `.obbody` / `.ob-inline-action`), the copy,
  * the four live checks, the confirm field that appears once all four pass, and
- * the relay that carries the heading in from the right. PHASE 50 in
+ * the relay that carries the heading in from the right. PHASE 58 in
  * `proovd.css` carries the declarations; `creatorMomentIn` carries the timeline
- * — shared with screen 2, which is the same composition and the same relay.
+ * — shared with screen 2 and screen 7, which are the same composition and the
+ * same relay.
  *
  * ── It renders `bare`, and owns its own header ──────────────────────────────
- * PHASE 49's precedent, one screen later. The shell's top bar is a wordmark and
+ * PHASE 57's precedent, one screen later. The shell's top bar is a wordmark and
  * a Help control; the reference's header on this step is one thing — `← Back`
  * on the left, with `showBrand` explicitly `!showBack` so the wordmark is
  * absent by design. Reproducing the screen means reproducing that, so the page
@@ -128,7 +129,7 @@ function ForwardArrow() {
   );
 }
 
-/** The tick: 12px in a 24 viewBox, stroke-width 3.4. Always present; PHASE 50
+/** The tick: 12px in a 24 viewBox, stroke-width 3.4. Always present; PHASE 58
  *  moves its stroke from transparent so the box never reflows as it fills. */
 function Tick() {
   return (

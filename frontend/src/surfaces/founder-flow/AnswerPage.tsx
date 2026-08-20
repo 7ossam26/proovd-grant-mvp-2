@@ -191,7 +191,7 @@ function Body({
      otherwise on through the sequence — and Last look is the end of it. */
   const forwardId = fromReview ? 'last-look' : (next?.pageId ?? 'last-look');
   const forwardTitle = founderFlowPage(forwardId)?.title ?? 'the next step';
-  const backId = previous?.pageId ?? 'claim';
+  const backId = previous?.pageId ?? 'last-look';
   const backTitle = founderFlowPage(backId)?.title ?? 'the previous step';
 
   return (
@@ -245,9 +245,9 @@ function Body({
               leaveToPage('last-look', -1);
               return;
             }
-            // Stage 2 is behind the draft token, which no longer exists, so the
-            // first optional answer's Back goes to Last look rather than to the
-            // claim it came from. `founderAnswerPrevious` returns null there.
+            // Everything before this page is behind the draft token, so the
+            // first optional answer's Back goes to Last look rather than out
+            // of the stage. `founderAnswerPrevious` returns null there.
             leaveToPage(previous ? backId : 'last-look', -1);
           }}
         >

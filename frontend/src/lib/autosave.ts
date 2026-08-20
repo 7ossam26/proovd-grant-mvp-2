@@ -66,6 +66,17 @@ export function describeSaveState(state: SaveState): string {
     case 'retrying':
       return `Could not save — retrying (attempt ${state.attempt} of ${MAX_SAVE_ATTEMPTS})`;
     case 'failed':
-      return `Not saved — ${state.title}`;
+      /*
+       * The server's own explanation, not just its headline.
+       *
+       * The title is the server naming the act that failed, so on its own this
+       * line read `Not saved — That was not saved` — the same thing twice, and
+       * an answer to nothing. `detail` is `whatHappened`, and on the refusal
+       * people actually hit it is `You have already submitted this form, so
+       * its answers are now read-only`: the whole reason, sitting in state and
+       * rendered by nobody. §1.1 and §27.1 both ask for it, and it belongs
+       * here rather than in each of the twelve surfaces that render this.
+       */
+      return state.detail ? `Not saved — ${state.title} ${state.detail}` : `Not saved — ${state.title}`;
   }
 }

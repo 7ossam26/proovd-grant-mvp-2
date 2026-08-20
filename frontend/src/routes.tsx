@@ -68,6 +68,7 @@ import {
   ProblemConfirm,
   SolutionConfirm,
 } from './surfaces/founder-flow/ConfirmAnswer.js';
+import { ReachStep } from './surfaces/founder-flow/ReachStep.js';
 import { CampaignTypeStep } from './surfaces/founder-flow/CampaignTypeStep.js';
 import { BackerPage } from './features/public/backer/BackerPage.js';
 import {
@@ -76,9 +77,9 @@ import {
 } from './features/public/campaign/FollowAction.js';
 import { EmailStep } from './surfaces/founder-flow/EmailStep.js';
 import { CodeStep } from './surfaces/founder-flow/CodeStep.js';
+import { ConfirmProblem } from './surfaces/founder-flow/ConfirmProblem.js';
+import { ConfirmSolution } from './surfaces/founder-flow/ConfirmSolution.js';
 import { PositioningStep } from './surfaces/founder-flow/PositioningStep.js';
-import { MatchStep } from './surfaces/founder-flow/MatchStep.js';
-import { ClaimStep } from './surfaces/founder-flow/ClaimStep.js';
 import { VisualsStep } from './surfaces/founder-flow/VisualsStep.js';
 import { BrandingStep } from './surfaces/founder-flow/BrandingStep.js';
 import { InterviewStep } from './surfaces/founder-flow/InterviewStep.js';
@@ -123,10 +124,14 @@ function CreatorFinishRedirect() {
   return <Navigate to={`/creator-invitation/${encodeURIComponent(token)}/agree`} replace />;
 }
 
-/** The old possible-creators result address, kept only as a way to the claim. */
+/**
+ * The old possible-creators result address. It pointed at the claim until
+ * 2026-08-20, when the match and claim screens were removed from the flow;
+ * a bookmarked address now lands on Positioning, the last page of the token.
+ */
 function DraftResultRedirect() {
   const { token = '' } = useParams();
-  return <Navigate to={`/draft/${encodeURIComponent(token)}/claim`} replace />;
+  return <Navigate to={founderFlowPath('positioning', token)} replace />;
 }
 
 /**
@@ -521,6 +526,14 @@ const rootChildren: RouteObject[] = [
     element: <SolutionConfirm />,
   },
   {
+    /*
+      The reach orbit (2026-08-20). Between the solution and the campaign
+      path, which is where the reference's own screen order puts it.
+    */
+    path: 'draft/:token/reach',
+    element: <ReachStep />,
+  },
+  {
     path: 'draft/:token/campaign-type',
     element: <CampaignTypeStep />,
   },
@@ -538,12 +551,31 @@ const rootChildren: RouteObject[] = [
     element: <CodeStep />,
   },
   {
-    path: 'draft/:token/positioning',
-    element: <PositioningStep />,
+    /*
+      The reference's `probConfirm` — its `vetting` screen at `vStep` 0, which
+      is where its `type` screen goes once the code lands. Built 2026-08-20 by
+      product direction, for the problem alone. Not `ConfirmAnswer`: that is
+      the reference's `[data-problem]`, a different composition over the same
+      record. See `ConfirmProblem.tsx`.
+    */
+    path: 'draft/:token/confirm-problem',
+    element: <ConfirmProblem />,
   },
   {
-    path: 'draft/:token/match',
-    element: <MatchStep />,
+    /*
+      The same reference component at `vStep` 1 — the last look at the
+      solution. Built 2026-08-20 by product direction, between the problem and
+      Positioning, which is where `stillMine`'s `afterSection({vStep:
+      st.vStep+1})` puts it. Two addresses because a page here is an address;
+      one component there because every difference is a ternary on `vStep`.
+      See `ConfirmSolution.tsx`.
+    */
+    path: 'draft/:token/confirm-solution',
+    element: <ConfirmSolution />,
+  },
+  {
+    path: 'draft/:token/positioning',
+    element: <PositioningStep />,
   },
   {
     // Phase 15 (§19, §20). The Backer's long-lived campaign-scoped magic-link
@@ -589,16 +621,6 @@ const rootChildren: RouteObject[] = [
     // lands on the claim, which is where the flow now goes after submission.
     path: 'draft/:token/result',
     element: <DraftResultRedirect />,
-  },
-  {
-    /*
-      Founder Flow v2 Session D (2026-08-18). The address does not move — it
-      shipped in Phase 07, the match screen has pointed at it since Session C,
-      and it is the one stage-2 page there is. What renders changed: the same
-      §10 claim, re-presented as a full-bleed flow page.
-    */
-    path: 'draft/:token/claim',
-    element: <ClaimStep />,
   },
   /*
    * The Creator onboarding flow — Creator Flow v2 Session B (2026-08-19).
