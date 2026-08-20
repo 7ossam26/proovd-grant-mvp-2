@@ -45,6 +45,7 @@ import {
 } from '@proovd/shared';
 import { Button, Field, Input, Textarea, useToast } from '../../../components/index.js';
 import { useProovdMotion } from '../../../motion/MotionProvider.js';
+import type { AdminError } from '../api.js';
 import {
   AdminRequestError,
   createProspect,
@@ -113,6 +114,19 @@ export function CreateFounder() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [busy, setBusy] = useState<'create' | 'send' | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * A prospect that exists whose invitation was refused.
+   *
+   * Kept in state rather than navigated past, because the refusal is the thing
+   * the Admin came here to hear and a toast is not a place to put it: `toast`
+   * is a no-op when the motion runtime is unavailable, and this page used to
+   * fire one and then immediately navigate, so a refused send looked exactly
+   * like nothing having happened at all. The record is created either way, so
+   * the create controls are replaced rather than left to fire twice.
+   */
+  const [refused, setRefused] = useState<
+    { prospectId: string; detail: AdminError } | null
+  >(null);
   /** Owner values already in use, offered as a datalist — never a closed list. */
   const [owners, setOwners] = useState<string[]>([]);
 
@@ -213,14 +227,26 @@ export function CreateFounder() {
           await sendInvite(created.prospectId);
           toast('Invitation sent');
         } catch (error) {
-          // The prospect exists; the record's Invite tab shows the server's
-          // own list of what is missing. The refusal is surfaced, not hidden.
-          toast('Prospect created — the invitation was not sent', {
-            sub:
+          // The prospect exists and the invitation does not. Stay here and say
+          // so in the page, carrying the server's own §27.1 answers verbatim —
+          // navigating away with only a toast is what made a refused send look
+          // like a button that did nothing.
+          setRefused({
+            prospectId: created.prospectId,
+            detail:
               error instanceof AdminRequestError
-                ? (error.detail.whatHappened ?? error.detail.title)
-                : 'The send was refused without an explanation.',
+                ? error.detail
+                : {
+                    error: 'send_failed',
+                    status: 0,
+                    title: 'The invitation was not sent',
+                    whatHappened:
+                      'The Founder record was created, but the send was refused without an explanation.',
+                    next: 'Open the record and send the invitation from its Invite tab.',
+                  },
           });
+          setBusy(null);
+          return;
         }
       } else {
         toast('Prospect created', { sub: 'Nothing has been sent.' });
@@ -453,19 +479,74 @@ export function CreateFounder() {
         </p>
       ) : null}
 
+      {/*
+        §27.1's six questions, answered in the server's own words. Rendered in
+        the page rather than announced and navigated past, because this is the
+        one outcome an Admin has to act on.
+      */}
+      {refused ? (
+        <section className="cf-refused" role="alert" aria-labelledby="cf-refused-title">
+          <h2 className="h3" id="cf-refused-title">
+            {refused.detail.title}
+          </h2>
+          <p>
+            <b>The Founder record was created and no invitation was sent.</b> Nothing has
+            reached them.
+          </p>
+          {refused.detail.whatHappened ? <p>{refused.detail.whatHappened}</p> : null}
+          {refused.detail.next ? <p>{refused.detail.next}</p> : null}
+          <p className="helper">
+            The record’s Invite tab lists anything still unfilled and carries the Send
+            control, so nothing typed here is lost.
+          </p>
+          <span className="cf-foot__actions">
+            <RouterLink
+              className="btn btn--primary"
+              to={`/admin/founders/${refused.prospectId}?section=onboarding`}
+            >
+              <span className="btn__label">Open the Founder record</span>
+            </RouterLink>
+            {refused.detail.action ? (
+              <RouterLink className="btn btn--secondary" to={refused.detail.action}>
+                <span className="btn__label">Confirm it is you</span>
+              </RouterLink>
+            ) : null}
+          </span>
+        </section>
+      ) : null}
+
       <footer className="cf-foot" data-scroll="rise">
         <RouterLink className="btn btn--tertiary" to="/admin/founders">
           <span className="btn__label">Cancel</span>
         </RouterLink>
-        <span className="grey">Saved when you create the prospect — nothing is stored before that.</span>
-        <span className="cf-foot__actions">
-          <Button tier="secondary" disabled={!creatable || busy !== null} onClick={() => void run('create')}>
-            {busy === 'create' ? 'Creating…' : 'Create prospect'}
-          </Button>
-          <Button tier="primary" disabled={!creatable || !allChecked || busy !== null} onClick={() => void run('send')}>
-            {busy === 'send' ? 'Sending…' : 'Create & send invitation'}
-          </Button>
-        </span>
+        {refused ? (
+          <span className="grey">
+            This Founder has been created. Continue on their record — creating again here
+            would make a second one.
+          </span>
+        ) : (
+          <>
+            <span className="grey">
+              Saved when you create the prospect — nothing is stored before that.
+            </span>
+            <span className="cf-foot__actions">
+              <Button
+                tier="secondary"
+                disabled={!creatable || busy !== null}
+                onClick={() => void run('create')}
+              >
+                {busy === 'create' ? 'Creating…' : 'Create prospect'}
+              </Button>
+              <Button
+                tier="primary"
+                disabled={!creatable || !allChecked || busy !== null}
+                onClick={() => void run('send')}
+              >
+                {busy === 'send' ? 'Sending…' : 'Create & send invitation'}
+              </Button>
+            </span>
+          </>
+        )}
       </footer>
     </div>
   );

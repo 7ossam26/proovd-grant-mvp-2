@@ -103,7 +103,6 @@ type Resolved = {
 const MARKERS: Record<string, string> = {
   recipientName: '[RECIPIENT NAME]',
   productName: '[PRODUCT NAME]',
-  productUrl: '[PRODUCT URL]',
   whatWeUnderstood: '[WHAT PROOVD UNDERSTOOD]',
   whyInvited: '[WHY THIS FOUNDER WAS INVITED]',
   senderName: '[SENDER NAME]',
@@ -111,11 +110,39 @@ const MARKERS: Record<string, string> = {
   expectedSetupTime: '[EXPECTED SETUP TIME]',
 };
 
+/**
+ * The one variable the message can do without, and why it is the only one.
+ *
+ * Every other variable here is a sentence the invitation is built out of — a
+ * blank one leaves a hole a Founder would read, so it resolves to a marker and
+ * the §7 preview gate refuses the send. The product URL is not a sentence: it
+ * is a quiet supporting line under what Proovd understood, and the message
+ * reads correctly without it.
+ *
+ * It is optional because a great many invitable Founders genuinely have no URL
+ * — an Idea Campaign exists precisely for a product that is not built yet — and
+ * a required box with nothing true to put in it is a box an Admin types
+ * something into to get past the form. That is §5.3's reasoning, already
+ * recorded for `campaign_fit`: an honestly incomplete record beats a
+ * placeholder somebody invented. Until 2026-08-20 a blank URL resolved to
+ * `[PRODUCT URL]`, which meant Send was refused for every Founder without a
+ * website — and `Website` is not on the compose page's checklist, so the
+ * button enabled and the refusal only arrived from the server.
+ *
+ * Adding anything to this set weakens the preview gate. Nothing belongs here
+ * that a Founder would notice the absence of.
+ */
+const OPTIONAL_VARIABLES: ReadonlySet<string> = new Set(['productUrl']);
+
 function resolve(variables: InvitationVariables): Resolved {
   const out = {} as Resolved;
   for (const [key, value] of Object.entries(variables)) {
     const trimmed = typeof value === 'string' ? value.trim() : '';
-    out[key as keyof InvitationVariables] = trimmed || MARKERS[key] || `[${key.toUpperCase()}]`;
+    out[key as keyof InvitationVariables] = trimmed
+      ? trimmed
+      : OPTIONAL_VARIABLES.has(key)
+        ? ''
+        : (MARKERS[key] ?? `[${key.toUpperCase()}]`);
   }
   return out;
 }
@@ -148,7 +175,8 @@ function InvitationEmail({ v }: { v: Resolved }) {
           <Section style={section}>
             <Text style={label}>What we understood about {v.productName}</Text>
             <Text style={text}>{v.whatWeUnderstood}</Text>
-            <Text style={quiet}>{v.productUrl}</Text>
+            {/* Optional — an empty line here would read as a missing fact. */}
+            {v.productUrl ? <Text style={quiet}>{v.productUrl}</Text> : null}
           </Section>
 
           {/* §7 item 3 — why this Founder. */}
@@ -228,7 +256,9 @@ function plainText(v: Resolved): string {
     '',
     `WHAT WE UNDERSTOOD ABOUT ${v.productName.toUpperCase()}`,
     v.whatWeUnderstood,
-    v.productUrl,
+    // Optional — spread rather than a blank line, so a Founder with no site
+    // does not read a stray gap where a URL would have been.
+    ...(v.productUrl ? [v.productUrl] : []),
     '',
     'WHY WE ARE WRITING TO YOU',
     v.whyInvited,

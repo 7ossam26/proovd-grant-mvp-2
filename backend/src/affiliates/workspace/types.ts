@@ -270,9 +270,18 @@ export interface CreatorInvitationView {
   signupStartedAt: string | null;
   tokenExpiresAt: string | null;
   sends: { at: string; by: string; to: string; status: string; confirmed: boolean }[];
-  /** What §8's preview gate currently refuses, if anything. */
+  /**
+   * Why §8's preview gate would refuse, if anything — a hint, not the gate.
+   *
+   * `previewAffiliateInvitation` is the gate and it scans the rendered message;
+   * this is an input check so a surface can explain a control before it is
+   * pressed. It includes the message variables the compose dialog cannot write,
+   * naming where each lives, because a blocker with no route is a dead end.
+   */
   unresolved: string[];
   canSend: boolean;
+  /** The campaign this invitation belongs to, for routing to its record. */
+  campaignId: string;
 }
 
 /* ── Evidence files and the per-metric trail (Session B) ────────────────────*/

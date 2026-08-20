@@ -366,6 +366,7 @@ function mayaDetail(
       invitations: [
         {
           associationId: ASSOCIATION,
+          campaignId: CAMPAIGN,
           campaignName: 'Teeb Founding Launch',
           state: 'sent',
           stateLabel: 'Sent',
