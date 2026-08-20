@@ -2891,3 +2891,38 @@ export function pressUp(el: HTMLElement | null): void {
     overwrite: 'auto',
   });
 }
+
+/** The reference's newly-added logo row: 30ms after render, then one back-out. */
+export function fileRowIn(root: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return;
+  const rows = root.querySelectorAll<HTMLElement>('[data-brandlogo-file-row]');
+  const row = rows[rows.length - 1];
+  if (!row) return;
+  g.fromTo(
+    row,
+    { y: -14, autoAlpha: 0, scale: 0.94, transformOrigin: '50% 50%' },
+    {
+      y: 0,
+      autoAlpha: 1,
+      scale: 1,
+      duration: refDur(0.4),
+      ease: 'back.out(1.7)',
+      clearProps: 'transform,opacity,visibility',
+      overwrite: 'auto',
+    },
+  );
+}
+
+/** The mail badge's exact 0.46s shake followed by the reference's 6s rest. */
+export function mailBellLoop(el: HTMLElement | null): () => void {
+  const g = gsap();
+  if (!g || !el || !motionLive()) return () => {};
+  const tl = g.timeline({ repeat: -1, repeatDelay: 6, defaults: { ease: 'power2.out' } });
+  tl.to(el, { rotation: -9, duration: refDur(0.07) });
+  tl.to(el, { rotation: 8, duration: refDur(0.09) });
+  tl.to(el, { rotation: -6, duration: refDur(0.09) });
+  tl.to(el, { rotation: 4, duration: refDur(0.09) });
+  tl.to(el, { rotation: 0, duration: refDur(0.12), ease: 'power2.inOut' });
+  return () => tl.kill();
+}

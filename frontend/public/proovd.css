@@ -17783,3 +17783,304 @@ html.no-motion .ff-story__say { transition: none; }
     bottom: calc(clamp(20px, 3vw, 40px) + 34px);
   }
 }
+
+/* ═════════════════ FOUNDER FLOW V2 — BRAND LOGO (`[data-brandlogo]`) ═══ */
+.ff[data-flow-page='branding'] .ff__top,
+.ff[data-flow-page='branding'] .ff__badge { display: none; }
+.ff[data-flow-page='branding'] .ff__stage { padding: 0; }
+.ff[data-flow-page='branding'] .ff__body { display: block; }
+
+.ff-brandlogo {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 25;
+  background: #FAFAFA;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 16px;
+  line-height: normal;
+}
+.ff-brandlogo button { font-family: 'Satoshi', sans-serif; }
+.ff-brandlogo__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+  z-index: 5;
+}
+.ff-brandlogo__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  display: block;
+}
+.ff-brandlogo__help {
+  min-height: 40px;
+  padding: 10px 22px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-brandlogo__help:hover { background: #E9FFE1; }
+.ff-brandlogo__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-weight: 900;
+  font-size: clamp(10px, .8vw, 12px);
+  line-height: normal;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-brandlogo__back:hover { color: #013F17; }
+.ff-brandlogo__mailbtn {
+  position: absolute;
+  right: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.ff-brandlogo__mail {
+  position: relative;
+  width: clamp(58px, 5.2vw, 78px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  box-sizing: border-box;
+}
+.ff-brandlogo__mail img { width: 68%; height: auto; display: block; }
+.ff-brandlogo__mailcount {
+  position: absolute;
+  left: -10%;
+  top: -16%;
+  width: 31%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  background: #FAFAFA;
+  box-sizing: border-box;
+  color: #41ED98;
+  font-size: clamp(10px, .9vw, 13px);
+  font-weight: 700;
+}
+.ff-brandlogo__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(.37);
+  transform-origin: center center;
+}
+.ff-brandlogo__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: fit-content;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-brandlogo__measure {
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  white-space: nowrap;
+  font-size: 112px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+}
+.ff-brandlogo__pill {
+  padding: 26px 46px;
+  background: #FBFFD4;
+  color: #013F17;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-brandlogo__head {
+  margin: 72px 0 0;
+  color: #013F17;
+  font-size: 136px;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -.03em;
+  white-space: nowrap;
+}
+.ff-brandlogo__panel { margin-top: 110px; width: 100%; }
+.ff-brandlogo__fileinput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ff-brandlogo__drop {
+  width: 100%;
+  height: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 44px;
+  border: 5px solid transparent;
+  border-radius: 2px;
+  background-image:
+    repeating-linear-gradient(90deg, #8FCBA3 0 15px, transparent 15px 30px),
+    repeating-linear-gradient(90deg, #8FCBA3 0 15px, transparent 15px 30px),
+    repeating-linear-gradient(0deg, #8FCBA3 0 15px, transparent 15px 30px),
+    repeating-linear-gradient(0deg, #8FCBA3 0 15px, transparent 15px 30px),
+    linear-gradient(#E9FFE1, #E9FFE1);
+  background-size: 100% 5px, 100% 5px, 5px 100%, 5px 100%, 100% 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0, 0 0;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  background-clip: border-box, border-box, border-box, border-box, padding-box;
+  cursor: pointer;
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1);
+}
+.ff-brandlogo__drop:hover { transform: scale(1.012); }
+.ff-brandlogo__upload {
+  color: #8FCBA3;
+  font-size: 52px;
+  font-weight: 500;
+  letter-spacing: -.02em;
+}
+.ff-brandlogo__dropcopy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.ff-brandlogo__dropcopy > :first-child {
+  color: #8FCBA3;
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-brandlogo__dropcopy > :last-child {
+  color: #A2AFA8;
+  font-size: 30px;
+  font-weight: 500;
+}
+.ff-brandlogo__list {
+  margin: 34px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  list-style: none;
+}
+.ff-brandlogo__file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 30px 36px;
+  background: #DEF6FF;
+  color: #013F17;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-brandlogo__file > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-brandlogo__file button {
+  flex: none;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: #013F17;
+  font-size: 38px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-brandlogo__file button:hover { color: #41ED98; }
+.ff-brandlogo__cta {
+  margin-top: 130px;
+  width: 100%;
+  height: 165px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-size: 70px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -.02em;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, .42) inset;
+}
+.ff-brandlogo__cta:hover { background: #3BDC8C; }
+.ff-brandlogo__help:focus-visible,
+.ff-brandlogo__back:focus-visible,
+.ff-brandlogo__mailbtn:focus-visible,
+.ff-brandlogo__drop:focus-visible,
+.ff-brandlogo__file button:focus-visible,
+.ff-brandlogo__cta:focus-visible {
+  outline: 6px solid #013F17;
+  outline-offset: 6px;
+}
+.ff-brandlogo__failure {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 174px;
+  margin: 0;
+  color: #013F17;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+}
+.ff-brandlogo__state {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(90vw, 34rem);
+  transform: translate(-50%, -50%);
+}
+.ff-brandlogo__state .wrap { width: 100%; }
+.ff-brandlogo__state .section { padding-block: 0; }
+@media (max-width: 600px) {
+  .ff-brandlogo__back { bottom: 92px; padding: 8px 14px; }
+}
