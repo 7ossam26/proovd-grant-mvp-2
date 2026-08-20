@@ -62,7 +62,9 @@ import type {
   CreatorCloseView,
   CreatorInvitationState,
   CreatorPartnership,
+  CreatorPitchesView,
   FormalOpportunity,
+  PitchContent,
   CreatorEarningsView as CreatorOwnEarningsView,
   CreatorHomeView,
   CreatorResourcesView,
@@ -1022,6 +1024,131 @@ const opportunity: FormalOpportunity = {
   ],
   agreement: null,
   trackingLink: null,
+};
+
+/**
+ * §14.1's material behind the pitch — Session E.
+ *
+ * Every `PITCH_RECAP_SECTIONS` entry whose source is `payload` resolves against
+ * this, so a section that stopped being served fails the shared walk before the
+ * sweep ever renders it.
+ */
+const pitchContent: PitchContent = {
+  brief: {
+    audience: null,
+    productPromise: 'A clamp lamp that holds its position.',
+    campaignType: 'Product Campaign',
+    requiredPromotion:
+      'One first post that Proovd verifies, then keep promoting through the channels you told us about until the campaign closes.',
+    compensation:
+      'A percentage of every captured, validly attributed pre-order, and — if you request one and the Founder accepts it — an optional fixed Creator payment beside it.',
+    keyDate: '2026-09-12T17:00:00.000Z',
+    mainRisk: 'The arm is machined to order, so a supplier delay moves the delivery month.',
+  },
+  founder: {
+    displayName: QA.founderDisplayName,
+    entity: QA.founderLegalName,
+    soleProprietor: false,
+    profileUrl: 'https://example.com/harlow',
+    priorCampaigns: 1,
+    payoutReadiness: 'ready',
+  },
+  positioning: {
+    productName: QA.title,
+    category: null,
+    problem: 'Benches are badly lit.',
+    solution: 'A clamp lamp that holds its position.',
+    competition: 'Two incumbents at US$300.',
+  },
+  chargeRule: {
+    campaignType: 'Product Campaign',
+    rule: 'Backers save a card now and are charged when the campaign closes. There is no threshold to reach.',
+  },
+  materials: {
+    story: 'Built on a bench with one bad lamp.',
+    socials: [{ platform: 'youtube', url: 'https://youtube.com/@harlow' }],
+    visuals: { count: 0, available: false, unavailableBecause: 'The Founder has not uploaded visuals for this campaign yet.' },
+    interview: {
+      status: 'confirmed',
+      available: false,
+      unavailableBecause:
+        'Proovd records whether the Founder interview happened, and does not keep a recording of it.',
+    },
+  },
+  rewards: [
+    {
+      title: 'The bench lamp',
+      priceCents: '12000',
+      contents: ['One lamp', 'One clamp'],
+      delivery: 'March 2027',
+      fulfillment: 'Shipped from Portland.',
+      limitedQuantity: 40,
+    },
+  ],
+  threshold: {
+    label: 'The Founder’s internal target',
+    value: '400000',
+    note: 'The Founder’s own target. It is not a public number, it is not shown on the campaign page, and no charge depends on it.',
+  },
+  dates: { opensAt: '2026-08-12T17:00:00.000Z', closesAt: '2026-09-12T17:00:00.000Z', durationDays: 31 },
+  brandNotes: { brandVoice: 'Plain sentences. No superlatives.', brandPerception: null },
+  claims: {
+    requiredWording: 'Say the arm is machined aluminium.',
+    prohibitedClaims: 'Do not claim a delivery date earlier than March 2027.',
+    unconfirmedClaimWarning:
+      'Everything the Founder says about this product is the Founder’s own claim. Proovd has not tested it.',
+  },
+  refundPolicy: {
+    applicable: true,
+    title: 'Harlow returns policy',
+    text: 'Thirty days from delivery.',
+    note: 'This is the Founder’s own policy. It is snapshotted onto every pre-order at the moment it is placed.',
+  },
+  deliverables: {
+    deliveryWindow: 'March 2027',
+    obligations: [
+      {
+        key: 'disclosure',
+        statement: 'Include the FTC disclosure on every post about this campaign.',
+        enforcement: 'A post without it is a correction, and your link pauses until it is fixed.',
+      },
+    ],
+  },
+  midCampaign: null,
+};
+
+const creatorPitchList: CreatorPitchesView = {
+  pitches: [
+    {
+      associationId: QA.associationId,
+      campaignId: QA.campaignId,
+      productName: QA.title,
+      kind: 'opportunity',
+      whyThisFitsYourAudience: 'Your viewers already own the iron this lamp is for.',
+      highEffort: false,
+      basePercent: 20,
+      bidAllowed: true,
+      fixedPaymentAvailable: true,
+      ceilingPercent: 50,
+      campaignType: 'pre_launch',
+      responseDeadlineAt: '2026-08-08T10:00:00.000Z',
+      invitedAt: '2026-08-05T10:00:00.000Z',
+    },
+  ],
+  active: [
+    {
+      associationId: QA.associationId,
+      campaignId: QA.campaignId,
+      productName: QA.title,
+      status: 'active',
+      label: 'Active — your link is live',
+      ready: true,
+      trackingLinkUrl: 'abc123',
+      trackingLinkActive: true,
+      firstPostStatus: 'passed',
+      destination: 'work',
+    },
+  ],
 };
 
 const partnership: CreatorPartnership = {
@@ -2396,7 +2523,8 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/affiliate-invitation\/[^/]+\/payout$/, body: { status: 'not_started', connectedAccountId: null, requirements: null, updatedAt: null, onboardingAvailable: false } },
   { match: /\/api\/affiliate-invitation\/[^/?]+(\?.*)?$/, body: creatorInvitation },
   { match: /\/api\/creator\/home$/, body: { home: creatorHome } },
-  { match: /\/api\/creator\/campaigns\/[^/]+\/opportunity$/, body: { opportunity } },
+  { match: /\/api\/creator\/campaigns\/[^/]+\/opportunity$/, body: { opportunity, content: pitchContent } },
+  { match: /\/api\/creator\/pitches(\?.*)?$/, body: { pitches: creatorPitchList, sort: 'deadline' } },
   { match: /\/api\/creator\/campaigns\/[^/]+\/partnership$/, body: { partnership } },
   { match: /\/api\/creator\/campaigns\/[^/]+\/close$/, body: { close: creatorClose } },
   { match: /\/api\/creator\/campaigns\/[^/?]+(\?.*)?$/, body: { kit: { associationId: QA.associationId, campaignId: QA.campaignId, campaignStatus: 'preparing', associationStatus: 'preparing', founder: { name: QA.founderDisplayName, entity: QA.founderLegalName, soleProprietor: false }, productName: QA.title, problem: 'Benches are badly lit.', solution: 'A clamp lamp that holds its position.', competition: 'Two incumbents at US$300.', campaignType: 'pre_launch', notYetAvailable: [{ item: 'Reward packages', because: 'The Founder has not built them yet.' }], workPermitted: false, decisionsAvailable: false } } },

@@ -68,7 +68,6 @@ import { Button } from '../../components/Button.js';
 import { Field } from '../../components/Input.js';
 import { StatePanel } from '../../components/StatePanel.js';
 import { SurfaceLoading } from '../../features/public/states.js';
-import { CreatorAppShell } from './CreatorAppShell.js';
 import {
   CreatorRequestError,
   fetchCreatorHome,
@@ -107,7 +106,7 @@ export function CreatorHome() {
 
   if (failed) {
     return (
-      <CreatorAppShell>
+      <>
         <div className="cra-page">
           {/* §27.1's six questions, on a failure. Nothing was lost, because
               nothing on this page is a draft — it is all a read. */}
@@ -126,22 +125,22 @@ export function CreatorHome() {
             getHelp={{ href: '/support' }}
           />
         </div>
-      </CreatorAppShell>
+      </>
     );
   }
 
   if (!home) {
     return (
-      <CreatorAppShell>
+      <>
         <div className="cra-page">
           <SurfaceLoading subject="your home" reference="Your Creator account" />
         </div>
-      </CreatorAppShell>
+      </>
     );
   }
 
   return (
-    <CreatorAppShell>
+    <>
       <div className="cra-page">
         <p className="cra-home__greeting">{creatorHomeGreeting(home.firstName)}</p>
         <Hero home={home} />
@@ -158,7 +157,7 @@ export function CreatorHome() {
           </div>
         </div>
       </div>
-    </CreatorAppShell>
+    </>
   );
 }
 

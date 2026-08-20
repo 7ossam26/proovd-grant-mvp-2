@@ -1,5 +1,9 @@
 /**
- * Phase 08c surfaces — §33.2.4, the half a Creator can see.
+ * The preparing Campaign kit — Phase 08c, §33.2.4, the half a Creator can see.
+ *
+ * The LIST that stood beside it, and the sign-in form it fell back to, are
+ * Session E's `CreatorPitches` as of 2026-08-20 and are tested in
+ * `creator-app/creator-pitches.test.tsx`. What is left here is the kit.
  *
  *   33.2.4  Campaign kit is complete, private, logged, scoped, revocable.
  *
@@ -12,7 +16,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import { appRoutes } from '../../routes.js';
@@ -71,22 +74,6 @@ const KIT = {
   decisionsAvailable: false,
 };
 
-const CAMPAIGN_ROW = {
-  associationId: ASSOCIATION,
-  campaignId: 'campaign-1',
-  productName: 'Waitlist',
-  status: 'preparing',
-  revealedAt: '2026-08-01T09:00:00.000Z',
-  revoked: false,
-  reviewAvailable: true,
-};
-
-function stubList(rows: unknown[] = [CAMPAIGN_ROW]) {
-  handlers.push((url) =>
-    url === '/api/creator/campaigns' ? { status: 200, body: { campaigns: rows } } : undefined,
-  );
-}
-
 function stubKit(kit: Record<string, unknown> = {}) {
   handlers.push((url) =>
     url.startsWith(`/api/creator/campaigns/${ASSOCIATION}`)
@@ -99,65 +86,6 @@ async function renderAt(path: string) {
   const router = createMemoryRouter(appRoutes, { initialEntries: [path] });
   return render(<RouterProvider router={router} />);
 }
-
-/* ══ The list ════════════════════════════════════════════════════════════ */
-
-describe('the Creator campaign list', () => {
-  it('offers Review campaign once the campaign is revealed (§10)', async () => {
-    stubList();
-    await renderAt('/creator/campaigns');
-    expect(await screen.findByRole('button', { name: /review campaign/i })).toBeTruthy();
-    expect(screen.getByText('Waitlist')).toBeTruthy();
-  });
-
-  it('offers no review action while the campaign is still preparing', async () => {
-    stubList([{ ...CAMPAIGN_ROW, reviewAvailable: false, revealedAt: null, status: 'signed_up_waiting_for_founder' }]);
-    await renderAt('/creator/campaigns');
-
-    expect(await screen.findByText(/still being prepared/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /review campaign/i })).toBeNull();
-    expect(screen.getAllByText(NO_ACTION).length).toBeGreaterThan(0);
-  });
-
-  it('keeps a revoked campaign visible but not reviewable (§10)', async () => {
-    stubList([{ ...CAMPAIGN_ROW, revoked: true, reviewAvailable: false }]);
-    await renderAt('/creator/campaigns');
-
-    expect(await screen.findByText(/no longer available to you/i)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /review campaign/i })).toBeNull();
-  });
-
-  it('shows the sign-in form when the session has gone', async () => {
-    handlers.push((url) =>
-      url === '/api/creator/campaigns' ? { status: 401, body: { error: 'unauthenticated' } } : undefined,
-    );
-    await renderAt('/creator/campaigns');
-    expect(await screen.findByRole('heading', { name: /sign in/i })).toBeTruthy();
-    // §5.3 gives the Creator email + password. No second factor is asked for.
-    expect(screen.queryByLabelText(/authenticator|code/i)).toBeNull();
-  });
-
-  it('refuses sign-in without confirming whether the account exists (§5.5)', async () => {
-    handlers.push((url, init) => {
-      if (url === '/api/creator/campaigns') return { status: 401, body: { error: 'unauthenticated' } };
-      if (url === '/api/auth/sign-in/email' && init?.method === 'POST') {
-        return { status: 401, body: { error: 'invalid' } };
-      }
-      return undefined;
-    });
-    const user = userEvent.setup();
-    await renderAt('/creator/campaigns');
-
-    await user.type(await screen.findByLabelText(/email/i), 'sam@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'wrong-password-here');
-    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
-
-    const message = await screen.findByText(/not accepted/i);
-    expect(message.textContent).toMatch(/nothing about the account is confirmed or denied/i);
-  });
-});
-
-/* ══ §33.2.4 — the kit ═══════════════════════════════════════════════════ */
 
 describe('§33.2.4 — the preparing Campaign kit', () => {
   it('shows the four areas §10 names as currently available', async () => {
@@ -280,14 +208,6 @@ describe('§33.2.4 — the preparing Campaign kit', () => {
 /* ══ §33.11 — accessibility ══════════════════════════════════════════════ */
 
 describe('§33.11 — the Creator surfaces are accessible', () => {
-  it('has no axe violations on the campaign list', async () => {
-    stubList();
-    const { container } = await renderAt('/creator/campaigns');
-    await screen.findByRole('button', { name: /review campaign/i });
-    const results = await axe(container);
-    expect(results.violations).toEqual([]);
-  }, 30_000);
-
   it('has no axe violations on the kit', async () => {
     stubKit();
     const { container } = await renderAt(`/creator/campaigns/${ASSOCIATION}`);

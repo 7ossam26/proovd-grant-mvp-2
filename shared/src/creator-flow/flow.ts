@@ -465,6 +465,28 @@ export const CREATOR_FLOW_ABSENCES: readonly CreatorFlowAbsence[] = [
     session: 'F',
   },
   {
+    element:
+      'The pitch-card badge announcing a fixed Creator payment as something the Founder is offering',
+    absentBecause:
+      '§3.2 bans the reference’s own word for it in every audience including identifiers, and this register ships in the browser bundle §33.11.3 scans — the third supplied reference in a row to use that word. It is also not something a Founder offers on a card: §16 makes the fixed Creator payment the CREATOR’s request, accepted bilaterally through one §14.2 version.',
+    specRef: '§3.2, §16, §14.2',
+    session: 'E',
+  },
+  {
+    element: 'Tap-anywhere advance on the five-step reveal',
+    absentBecause:
+      '§28.5 names "Affiliate decisions" among the five flows that must be completely operable from a keyboard. Each step advances with a real control, and the recap is reachable without walking any of them — a decision behind a gesture is a decision some people cannot reach.',
+    specRef: '§28.5, §33.11.4, §14.2',
+    session: 'E',
+  },
+  {
+    element: '`Reject` as the label on the decline control',
+    absentBecause:
+      '§14.2’s own word is Decline, and `DECLINE_NO_PENALTY_NOTE` — which rides the control — says declining does not reduce standing. `Reject` reads as a judgement about the campaign in a product where the same word is §29.4’s vocabulary for an action against the Creator.',
+    specRef: '§14.2, §3.1',
+    session: 'E',
+  },
+  {
     element: 'The fixed `.claim-wide-stage` at a CSS `scale()`',
     absentBecause:
       '§33.11.1\'s 320px reflow is not satisfiable by a scaled fixed stage — it produces a smaller picture of an overflowing page, not a page that fits. Responsive units throughout.',

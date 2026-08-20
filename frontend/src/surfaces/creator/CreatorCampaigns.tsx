@@ -1,11 +1,9 @@
 /**
- * The signed-in Creator's campaigns and the preparing Campaign kit —
- * Spec §10, §31.5, §14.1, §33.2.4.
+ * The preparing Campaign kit — Spec §10, §31.5, §14.1, §33.2.4.
  *
- * §10 grants exactly one thing at this stage: the right to *read*. The named
- * campaign appears in `preparing`, with one action — `Review campaign` — and
- * the Creator may read the currently available Founder, Problem, Solution, and
- * Competition information plus the single Campaign kit.
+ * §10 grants exactly one thing at this stage: the right to *read*. The Creator
+ * may read the currently available Founder, Problem, Solution, and Competition
+ * information plus the single Campaign kit, and nothing else.
  *
  * ── What this surface must never offer ──────────────────────────────────────
  * §10: the Creator "cannot accept, decline, propose compensation, activate a
@@ -29,6 +27,13 @@
  * fee unpaid, the high-effort result uncomputed. Rendering empty sections would
  * read as a campaign offering nothing rather than one that is early, so the
  * server returns the list of what is missing and why, and this renders it.
+ *
+ * ── The LIST that used to be here is Session E's `CreatorPitches` ───────────
+ * Phase 08c's single list of campaigns, and the sign-in form it fell back to,
+ * were replaced on 2026-08-20 by the `Active`/`Pitches` surface at the same
+ * address. The sign-in went with it: `/creator/campaigns` has been inside
+ * `RequireRole allow={['affiliate']}` with its own `signInPath` since Session D,
+ * so a second credential form on the page behind that guard was unreachable.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -36,8 +41,6 @@ import { useParams, useNavigate } from 'react-router';
 import {
   Button,
   Card,
-  Field,
-  Input,
   Measure,
   NO_ACTION,
   Section,
@@ -45,15 +48,7 @@ import {
   Tag,
 } from '../../components/index.js';
 import { supportMailto } from '../../features/public/states.js';
-import {
-  fetchCreatorCampaigns,
-  fetchPreparingKit,
-  creatorSignIn,
-  creatorSignOut,
-  CreatorRequestError,
-  type CreatorCampaign,
-  type PreparingKit,
-} from './api.js';
+import { fetchPreparingKit, CreatorRequestError, type PreparingKit } from './api.js';
 
 /**
  * §31.5, said to the person it binds.
@@ -72,270 +67,6 @@ export const CONFIDENTIALITY_TERMS =
 export const NO_WORK_YET =
   'Reading this is not accepting it. You cannot accept, decline, or propose terms yet, and ' +
   'no promotion should start before the campaign formally opens. We will email you then.';
-
-/* ── The list ─────────────────────────────────────────────────────────────── */
-
-export function CreatorCampaigns() {
-  const [state, setState] = useState<
-    | { status: 'loading' }
-    | { status: 'signed_out' }
-    | { status: 'error'; detail: string }
-    | { status: 'ready'; rows: CreatorCampaign[] }
-  >({ status: 'loading' });
-
-  const load = useCallback(async () => {
-    try {
-      const { campaigns } = await fetchCreatorCampaigns();
-      setState({ status: 'ready', rows: campaigns });
-    } catch (caught) {
-      // §33.11.7, §1.4: only a refused session is a signed-out session. Showing
-      // the sign-in form when the server is unavailable asks a Creator to
-      // retype a password that will not help, and hides the real state.
-      const status =
-        caught instanceof CreatorRequestError ? caught.detail.status : 0;
-      if (status === 401 || status === 403) {
-        setState({ status: 'signed_out' });
-        return;
-      }
-      setState({
-        status: 'error',
-        detail:
-          caught instanceof CreatorRequestError
-            ? `${caught.detail.whatHappened ?? ''} ${caught.detail.next ?? ''}`.trim()
-            : 'The request did not complete, so nothing about your campaigns has changed.',
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (state.status === 'loading') {
-    return (
-      <Measure>
-        <StatePanel
-          state="Loading your campaigns"
-          whatHappened="Proovd is checking which campaigns you are part of."
-          next="They appear as soon as that comes back."
-          owner="Proovd"
-          nextUpdate="Within a few seconds"
-          action={NO_ACTION}
-          reference="Your campaigns"
-        />
-      </Measure>
-    );
-  }
-
-  if (state.status === 'signed_out') return <CreatorSignIn onSignedIn={load} />;
-
-  if (state.status === 'error') {
-    return (
-      <Measure>
-        <Section>
-          <h1>Your campaigns</h1>
-        </Section>
-        <StatePanel
-          state="We could not load your campaigns"
-          whatHappened={state.detail}
-          next="Reload the page. Nothing about your partnerships has changed — this was a read that did not complete."
-          owner="Proovd"
-          nextUpdate="As soon as you reload"
-          action={NO_ACTION}
-          reference="Your campaigns"
-          getHelp={{ href: supportMailto('Creator campaigns') }}
-        />
-      </Measure>
-    );
-  }
-
-  return (
-    <Measure>
-      <Section>
-        <h1>Your campaigns</h1>
-        <p>
-          Proovd recruits Creators for one campaign at a time. Everything you are part of is
-          here.
-        </p>
-      </Section>
-
-      {state.rows.length === 0 ? (
-        <StatePanel
-          state="Nothing here yet"
-          whatHappened="You are not part of any campaign that is ready to read."
-          next="We will email you as soon as one is."
-          owner="Proovd"
-          nextUpdate="When a campaign is ready"
-          action={NO_ACTION}
-          reference="Your campaigns"
-        />
-      ) : (
-        state.rows.map((row) => <CampaignRow key={row.associationId} row={row} />)
-      )}
-
-      <Button tier="tertiary" onClick={() => void creatorSignOut().then(load)}>
-        Sign out
-      </Button>
-    </Measure>
-  );
-}
-
-/** §14.2's window and its afterstates — where the list routes to the decision. */
-const FORMAL_STATUSES = new Set([
-  'formal_decision_open',
-  'reviewing',
-  'proposal_pending',
-  'accepted',
-  'declined',
-  'expired_no_acceptance',
-]);
-
-function CampaignRow({ row }: { row: CreatorCampaign }) {
-  const navigate = useNavigate();
-  const name = row.productName ?? 'A campaign';
-
-  if (row.revoked) {
-    // §10: revocation removes access immediately. The campaign still appears —
-    // a row that silently vanished would be more alarming than one that says
-    // what happened — but it carries no action.
-    return (
-      <StatePanel
-        state={`${name} is no longer available to you`}
-        whatHappened="Your access to this campaign was withdrawn."
-        next="Nothing you did necessarily caused this. Reply to the email we sent you and we will explain."
-        owner="Proovd"
-        nextUpdate="When you contact us"
-        action={NO_ACTION}
-        reference={row.campaignId}
-        getHelp={{ href: supportMailto(`Campaign access — ${row.campaignId}`) }}
-      />
-    );
-  }
-
-  if (!row.reviewAvailable) {
-    return (
-      <StatePanel
-        state={`${name} is still being prepared`}
-        whatHappened="The Founder is finishing their setup, so there is nothing to read yet."
-        next="Proovd owns this step. We will email you as soon as it is ready."
-        owner="Proovd"
-        nextUpdate="When the campaign is ready to read"
-        action={NO_ACTION}
-        reference={row.campaignId}
-      />
-    );
-  }
-
-  if (FORMAL_STATUSES.has(row.status)) {
-    // Phase 12a (§14.2): listing payment made the opportunity actionable, so
-    // the row's action is the formal decision. The kit stays one gesture away
-    // inside it.
-    return (
-      <Card>
-        <Tag variant="mint">
-          {row.status === 'accepted'
-            ? 'Accepted'
-            : row.status === 'declined'
-              ? 'Declined'
-              : row.status === 'expired_no_acceptance'
-                ? 'Ended'
-                : 'Formal decision open'}
-        </Tag>
-        <h2>{name}</h2>
-        <div className="claim__actions">
-          <Button
-            tier="primary"
-            onClick={() => void navigate(`/creator/campaigns/${row.associationId}/opportunity`)}
-          >
-            Open the formal opportunity
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <Tag variant="mint">Preparing</Tag>
-      <h2>{name}</h2>
-      <p className="field-hint">
-        Ready for you to read. Nothing to decide yet.
-      </p>
-      {/* §10's ONE action. */}
-      <div className="claim__actions">
-        <Button
-          tier="primary"
-          onClick={() => void navigate(`/creator/campaigns/${row.associationId}`)}
-        >
-          Review campaign
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-/* ── Sign-in (§5.3: email + password, no second factor) ───────────────────── */
-
-/** One refusal for every credential failure, for §5.5's non-enumeration rule. */
-const CREDENTIAL_REFUSAL =
-  'That email address and password combination was not accepted. Nothing about the account is confirmed or denied by this message.';
-
-function CreatorSignIn({ onSignedIn }: { onSignedIn: () => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await creatorSignIn(email.trim(), password);
-      onSignedIn();
-    } catch {
-      // §5.3 gives the Affiliate email + password only — there is no second
-      // factor here, and §5.1's mandatory MFA is Admin's rule. Requiring one
-      // would lock out every Creator who has already signed up.
-      setError(CREDENTIAL_REFUSAL);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Measure>
-      <Section>
-        <h1>Sign in</h1>
-        <p>Use the email address and password you set when you created your account.</p>
-      </Section>
-
-      <Card>
-        <form className="admin-form" onSubmit={submit} noValidate>
-          <Field label="Email">
-            <Input
-              type="email"
-              value={email}
-              autoComplete="username"
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </Field>
-          <Field label="Password" {...(error ? { error } : {})}>
-            <Input
-              type="password"
-              value={password}
-              autoComplete="current-password"
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </Field>
-          <Button tier="primary" type="submit" disabled={busy || !email || !password}>
-            {busy ? 'Signing in…' : 'Sign in'}
-          </Button>
-        </form>
-      </Card>
-    </Measure>
-  );
-}
 
 /* ── The kit (§10, §14.1's preparing subset, §31.5) ───────────────────────── */
 

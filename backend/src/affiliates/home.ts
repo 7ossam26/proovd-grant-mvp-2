@@ -48,6 +48,7 @@ import {
   type StandingInputs,
   type StandingLeaderRow,
 } from './standing.js';
+import { PITCH_DECISION_OPEN_STATES, pitchKindFor } from './creator-pitches.js';
 import { listCreatorReferrals } from './referrals.js';
 import { STANDING_COHORT_MINIMUM } from '../creator-flow/logic.js';
 
@@ -60,7 +61,13 @@ import { STANDING_COHORT_MINIMUM } from '../creator-flow/logic.js';
  * on the FOUNDER is not something the Creator can act on, and counting it would
  * put a number on the hero that no control can reduce.
  */
-const DECISION_OPEN_STATES = ['formal_decision_open', 'reviewing'] as const;
+/*
+ * Session E moved this to `creator-pitches.ts` and imports it back, so §20's
+ * hero count here and the Pitches tab's count there read one derivation. A copy
+ * would have been two answers to "what is waiting for me", on two surfaces one
+ * tap apart.
+ */
+const DECISION_OPEN_STATES = PITCH_DECISION_OPEN_STATES;
 
 export interface CreatorHomePitch {
   associationId: string;
@@ -204,7 +211,7 @@ export async function readCreatorHome(db: Database, userId: string): Promise<Cre
       associationId: a.associationId,
       campaignId: a.campaignId,
       productName: a.productName,
-      kind: awaitingIds.has(a.associationId) ? ('proposal' as const) : ('opportunity' as const),
+      kind: pitchKindFor(awaitingIds.has(a.associationId)),
     }));
 
   // §22.9's asks that are still open. The Founder's, always — nothing on this

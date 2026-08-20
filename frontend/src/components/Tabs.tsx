@@ -29,10 +29,25 @@ interface TabsProps {
   defaultValue?: string;
   /** Accessible name for the tab list. */
   label: string;
+  /**
+   * Controlled selection — optional, and additive.
+   *
+   * Supplied together, these hand the selection to the caller, which is what a
+   * surface keeping its tab in the URL needs (DNA §5.12: a reload gets the same
+   * view back). Omit both and the component keeps its own state exactly as it
+   * did before Session E, so every existing caller is unchanged.
+   */
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
-export function Tabs({ items, defaultValue, label }: TabsProps) {
-  const [value, setValue] = useState(defaultValue ?? items[0]?.value ?? '');
+export function Tabs({ items, defaultValue, label, value: controlled, onValueChange }: TabsProps) {
+  const [uncontrolled, setUncontrolled] = useState(defaultValue ?? items[0]?.value ?? '');
+  const value = controlled ?? uncontrolled;
+  const setValue = (next: string) => {
+    if (onValueChange) onValueChange(next);
+    if (controlled === undefined) setUncontrolled(next);
+  };
   const listRef = useRef<HTMLDivElement>(null);
   const underlineRef = useRef<HTMLSpanElement>(null);
   const first = useRef(true);

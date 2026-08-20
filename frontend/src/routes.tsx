@@ -61,11 +61,10 @@ import { CreatorWork } from './surfaces/creator-app/CreatorWork.js';
 import { CreatorEarnings } from './surfaces/creator-app/CreatorEarnings.js';
 import { CreatorResources } from './surfaces/creator-app/CreatorResources.js';
 import { CreatorSettings } from './surfaces/creator-app/CreatorSettings.js';
-import {
-  CreatorCampaigns,
-  CreatorCampaignKit,
-} from './surfaces/creator/CreatorCampaigns.js';
-import { FormalOpportunity } from './surfaces/creator/FormalOpportunity.js';
+import { CreatorAppShell } from './surfaces/creator-app/CreatorAppShell.js';
+import { CreatorCampaignKit } from './surfaces/creator/CreatorCampaigns.js';
+import { CreatorPitches } from './surfaces/creator-app/CreatorPitches.js';
+import { CreatorPitch } from './surfaces/creator-app/CreatorPitch.js';
 import { CreatorCampaignClose } from './surfaces/creator/CreatorCampaignClose.js';
 import { InviteClaim } from './surfaces/founder-flow/InviteClaim.js';
 import {
@@ -640,17 +639,44 @@ const rootChildren: RouteObject[] = [
      * address, because the claim revokes the token: every stage-1 address
      * answers the one rejection from the instant the account exists. It is
      * `CREATOR_FLOW_PAGES`' one `param: 'none'` page for that reason.
+     *
+     * It is also the one signed-in Creator address deliberately OUTSIDE the app
+     * shell below: it is the last screen of a full-bleed nine-screen sequence,
+     * and a navigation rail on it would offer four ways out of a moment whose
+     * whole job is to hand over to Home.
      */
     path: 'creator/welcome',
     element: <DoneStep />,
   },
   {
-    // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator. Outside both
-    // shells: §26 licenses dashboard density in Admin only, and this is not a
-    // public page — it is reached by signing in, and everything on it is
-    // scoped to the session.
+    /*
+     * The Creator app, inside its own shell — Session E.
+     *
+     * A pathless layout route, the arrangement the guard above already uses and
+     * for the same reason: chrome that has to be remembered on each new surface
+     * is chrome that eventually is not. Session D built `CreatorAppShell` and
+     * `CreatorHome` rendered it itself, so the four surfaces Session F added
+     * shipped with no rail and no way back except the browser — a real defect,
+     * found by this session's walk and fixed here rather than by adding a fifth
+     * copy of the wrapper.
+     */
+    element: (
+      <CreatorAppShell>
+        <Outlet />
+      </CreatorAppShell>
+    ),
+    children: [
+  {
+    /*
+     * The Creator's two lists — `Active` and `Pitches` (Session E).
+     *
+     * Phase 08c's single list lived here and this replaces it at the same
+     * address: the rail, Home, and §27.3's emails all point at it. Outside the
+     * Admin shell and outside `PublicLayout` — §26 licenses dashboard density
+     * in Admin only, and there is nothing here to browse.
+     */
     path: 'creator/campaigns',
-    element: <CreatorCampaigns />,
+    element: <CreatorPitches />,
   },
   {
     /*
@@ -671,11 +697,15 @@ const rootChildren: RouteObject[] = [
     element: <CreatorCampaignKit />,
   },
   {
-    // Phase 12a (§14.1, §14.2, §33.2.6). The formal opportunity and the three
-    // decisions. Its own address beside the kit: the kit is reading material,
-    // this is a commercial decision, and a bookmark to either gets it back.
+    /*
+     * Phase 12a (§14.1, §14.2, §33.2.6). The formal opportunity and the three
+     * decisions, rebuilt in Session E as the reveal and the recap. Its own
+     * address beside the kit: the kit is reading material, this is a commercial
+     * decision, and a bookmark to either gets it back — including `?view=recap`,
+     * which is why the walk is not something a reload makes you repeat.
+     */
     path: 'creator/campaigns/:associationId/opportunity',
-    element: <FormalOpportunity />,
+    element: <CreatorPitch />,
   },
   {
     /*
@@ -723,6 +753,8 @@ const rootChildren: RouteObject[] = [
     path: 'creator/campaigns/:associationId/close',
     element: <CreatorCampaignClose />,
   },
+        ],
+      },
     ],
   },
   {

@@ -339,10 +339,119 @@ export interface FormalOpportunity {
   } | null;
 }
 
+/**
+ * §14.1's material, beside the decision facts — Session E.
+ *
+ * The opportunity read returns the §14.3 cell, high effort, the versions, the
+ * agreement and the link. It returns none of the Founder's content, which is
+ * most of what §14.1 puts on this surface, so the route composes this beside it
+ * from `buildCampaignPreview` and the records around it.
+ */
+export interface PitchContent {
+  brief: {
+    audience: string | null;
+    productPromise: string | null;
+    campaignType: string;
+    requiredPromotion: string;
+    compensation: string;
+    keyDate: string | null;
+    mainRisk: string | null;
+  };
+  founder: {
+    displayName: string;
+    entity: string;
+    soleProprietor: boolean | null;
+    profileUrl: string | null;
+    priorCampaigns: number;
+    payoutReadiness: 'ready' | 'in_progress' | 'not_started';
+  };
+  positioning: {
+    productName: string | null;
+    category: string | null;
+    problem: string | null;
+    solution: string | null;
+    competition: string | null;
+  };
+  chargeRule: { campaignType: string; rule: string };
+  materials: {
+    story: string | null;
+    socials: Array<{ platform: string | null; url: string }>;
+    visuals: { count: number; available: boolean; unavailableBecause: string | null };
+    interview: { status: string | null; available: boolean; unavailableBecause: string | null };
+  };
+  rewards: Array<{
+    title: string;
+    priceCents: string;
+    contents: string[];
+    delivery: string;
+    fulfillment: string;
+    limitedQuantity: number | null;
+  }>;
+  threshold: { label: string; value: string | null; note: string };
+  dates: { opensAt: string | null; closesAt: string | null; durationDays: number | null };
+  brandNotes: { brandVoice: string | null; brandPerception: string | null };
+  claims: {
+    requiredWording: string | null;
+    prohibitedClaims: string | null;
+    unconfirmedClaimWarning: string;
+  };
+  refundPolicy: { applicable: boolean; title: string | null; text: string | null; note: string };
+  deliverables: {
+    deliveryWindow: string | null;
+    obligations: Array<{ key: string; statement: string; enforcement: string }>;
+  };
+  midCampaign: {
+    joinedWithHoursRemaining: number;
+    adjustedDeliverables: string;
+    activationRule: string;
+  } | null;
+}
+
 export const fetchFormalOpportunity = (
   associationId: string,
-): Promise<{ opportunity: FormalOpportunity }> =>
+): Promise<{ opportunity: FormalOpportunity; content: PitchContent }> =>
   sessionCall(`/api/creator/campaigns/${encodeURIComponent(associationId)}/opportunity`);
+
+/* ── The two lists (§14.1, §17) — Session E ───────────────────────────────── */
+
+export interface CreatorPitchRow {
+  associationId: string;
+  campaignId: string;
+  productName: string | null;
+  kind: 'opportunity' | 'proposal';
+  whyThisFitsYourAudience: string | null;
+  highEffort: boolean;
+  basePercent: number;
+  bidAllowed: boolean;
+  fixedPaymentAvailable: boolean;
+  ceilingPercent: number;
+  campaignType: 'pre_build' | 'pre_launch';
+  responseDeadlineAt: string | null;
+  invitedAt: string;
+}
+
+export interface CreatorActiveRow {
+  associationId: string;
+  campaignId: string;
+  productName: string | null;
+  status: string;
+  label: string;
+  ready: boolean;
+  trackingLinkUrl: string | null;
+  trackingLinkActive: boolean;
+  firstPostStatus: string | null;
+  destination: 'work' | 'close';
+}
+
+export interface CreatorPitchesView {
+  pitches: CreatorPitchRow[];
+  active: CreatorActiveRow[];
+}
+
+export const fetchCreatorPitches = (
+  sort: string,
+): Promise<{ pitches: CreatorPitchesView; sort: string }> =>
+  sessionCall(`/api/creator/pitches?sort=${encodeURIComponent(sort)}`);
 
 /** §28.4: four separate confirmations from four separate controls. */
 export interface DecisionConfirmations {

@@ -219,14 +219,19 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'creator_campaigns',
-    label: 'The signed-in Creator: their account, their campaigns, and payout setup',
-    specRef: '§10, §13, §31.5, §33.2.3',
+    label: 'The signed-in Creator: the arrival, and their Active and Pitches lists',
+    specRef: '§10, §14.1, §17, §31.5, §33.2.3',
     audience: 'creator',
     // `/creator/welcome` is screen 8 of the flow and the one place §33.2.3's
     // named waiting state renders — it is here rather than with the seven above
     // because the claim revokes the invitation token (see `DoneStep`).
+    //
+    // Session E: `keyboardPathRequired` became true. `/creator/campaigns` is no
+    // longer a list of read-only rows — it is a tab switcher and the only route
+    // into §14.2's decisions, which §28.5 names among the five flows that must
+    // be completely operable from a keyboard.
     routes: ['/creator/welcome', '/creator/campaigns'],
-    keyboardPathRequired: false,
+    keyboardPathRequired: true,
   },
   {
     /*
@@ -245,11 +250,23 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: false,
   },
   {
+    /*
+     * §14.1's opportunity, rebuilt in Session E as the reveal and the recap.
+     *
+     * One address, two views. The sweep renders the default — which is the
+     * reveal while a decision is open — and `?view=recap` beside it, because
+     * the load-bearing accessibility claim of this session is that the recap is
+     * reachable WITHOUT walking the steps, and a sweep that only ever saw one
+     * of the two would prove nothing about the other.
+     */
     key: 'creator_decisions',
-    label: 'The formal opportunity and the three decisions',
-    specRef: '§14.1, §14.2',
+    label: 'The pitch: the reveal, the recap, and the three decisions',
+    specRef: '§14.1, §14.2, §28.5',
     audience: 'creator',
-    routes: ['/creator/campaigns/:associationId/opportunity'],
+    routes: [
+      '/creator/campaigns/:associationId/opportunity',
+      '/creator/campaigns/:associationId/opportunity?view=recap',
+    ],
     keyboardPathRequired: true,
   },
   {

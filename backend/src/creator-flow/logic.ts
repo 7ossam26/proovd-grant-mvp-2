@@ -300,3 +300,15 @@ export const TERMINATION_REASON_IDS = [
   'emergency_or_capacity',
   'other',
 ] as const;
+
+/**
+ * The two pitch sorts, and the default — Session E.
+ *
+ * Restated because the route validates against them and the backend cannot
+ * import `@proovd/shared` at runtime. Both are stored columns; an unrecognised
+ * value falls back to the default rather than reaching the query, so the sort
+ * is never a caller-shaped string. Drift-tested against `PITCH_SORTS`.
+ */
+export const PITCH_SORT_IDS = ['deadline', 'newest'] as const;
+
+export const DEFAULT_PITCH_SORT = 'deadline';

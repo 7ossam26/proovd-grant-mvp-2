@@ -767,7 +767,7 @@ export function FounderWorkspace() {
       </div>
 
       <nav
-        className="tabs frec-tabs"
+        className="frec-tabs"
         ref={tablistRef}
         role="tablist"
         aria-label="Founder record sections"

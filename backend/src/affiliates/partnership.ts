@@ -227,7 +227,14 @@ const FIXED_PAYMENT_LABELS: Record<string, string> = {
   paid: 'Paid',
 };
 
-const READINESS_LABELS: Record<string, { ready: boolean; label: string }> = {
+/**
+ * §23.4's post-acceptance states, in the words a Creator reads.
+ *
+ * Exported since Session E: the Active list and the work surface both render
+ * it, and a second map would be a second answer to what state a partnership is
+ * in — on two surfaces one tap apart.
+ */
+export const READINESS_LABELS: Record<string, { ready: boolean; label: string }> = {
   accepted: { ready: false, label: 'Accepted — getting ready' },
   readiness_blocked: { ready: false, label: 'Setup in progress' },
   ready: { ready: true, label: 'Ready — awaiting launch' },

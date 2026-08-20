@@ -179,8 +179,8 @@ Work since Phase 24 is not numbered. Each piece is built from a supplied
 reference plus the decisions that reference cannot make for itself, and each is
 recorded in [CLAUDE.md](CLAUDE.md) with its date. The Admin panel's five
 workspaces, its floating task list, the public campaign page, and the Founder's
-own onboarding all came that way. The current one is the Creator's, and one of
-its six sessions has landed — the one that writes no screen.
+own onboarding all came that way. The current one is the Creator's, and all six of its
+sessions have landed.
 
 **The campaign page was rebuilt in three sessions, all of which have landed.** Spec §18 defines that page's *content* and hands presentation to the
 DNA document by name — "the DNA UX document controls presentation" — so a
@@ -583,11 +583,11 @@ account step refuses in the open and says why, and file storage and the
 scheduling provider are both unconfigured so the upload and interview steps
 render a named absence rather than a dead control.
 
-### The Creator's, next — five of six sessions have landed
+### The Creator's, next — all six sessions have landed
 
-The same treatment is now under way on the other side of the product: the path
-a Creator walks from opening a private campaign invitation to promoting a live
-campaign becomes nine full-screen steps and a five-section app. The brief is
+The same treatment has now been applied to the other side of the product: the
+path a Creator walks from opening a private campaign invitation to promoting a
+live campaign is nine full-screen steps and a five-section app. The brief is
 [docs/phases/creator-flow-v2.md](docs/phases/creator-flow-v2.md) and the walk
 behind it is
 [docs/phases/creator-flow-reconciliation.md](docs/phases/creator-flow-reconciliation.md).
@@ -611,8 +611,8 @@ my account", and it turned out one already exists — built with the Admin
 Creators workspace, in the right shape, with no column that promises erasure
 the product cannot perform. What is missing there is not a record but a
 **route**: only an Admin can file one today, which is why that record has a
-column for how the request reached us. The last session adds the Creator's own
-way in, writing the same record. A second table would have been two copies of
+column for how the request reached us. The settings session added the Creator's
+own way in, writing the same record. A second table would have been two copies of
 somebody's erasure request, which is the worst possible thing to have two
 copies of.
 
@@ -691,6 +691,37 @@ Looking at all four pages in a browser found five more things nothing else
 could, including a container that let every card sit flush against the edge of
 the screen while the heading above it did not, and a page whose one large number
 pushed the whole layout sideways on a phone.
+
+**The sixth session is the offers themselves** — the two lists a Creator lands
+on, and the pitch behind one of them. `Active` is what they are working on;
+`Pitches` is what is still open to them, and it is deliberately not a
+marketplace: there is no wider list to look through, because Proovd recruits one
+campaign at a time and a person matched every invitation on the page. Where the
+mock-up predicts what a Creator would make, there is a sentence saying we do not
+estimate that and the real percentage beside it.
+
+The pitch itself is a four-step reveal — the campaign, the problem, what it
+does, what you earn — and then everything at once. The prototype advances it by
+tapping anywhere on the screen, which is not something a keyboard can do, and
+the Spec names Creator decisions among the flows that must work entirely from
+one. So each step has a real button, and — the part that matters — *"Read the
+whole pitch"* is on the first screen. Accepting, declining, and proposing
+different terms are never behind a walkthrough, and the full page has its own
+address, so a reload does not make anybody start again.
+
+Building it found that the full page had been serving about five of the
+twenty-two things the Spec puts on it. The read behind it returns the terms —
+the percentage, whether you may propose more, whether a fixed payment is
+available — and none of the Founder's own material: no problem, no solution, no
+rewards, no dates, no rules about what you may claim. The planning document had
+recorded the opposite, and the first thing to actually read it found out. That
+list is now a register walked against a real page, so it cannot quietly go
+short again.
+
+The browser pass found six things, and two of them were four months old: the
+design system's tab component has been broken product-wide since the Admin
+workspace took its CSS name for a different control, and nothing noticed because
+the only things using it were a gallery page and a test that does no layout.
 
 Unlike every rebuild before it, this one replaces a working, acceptance-tested
 surface whose own source file argues against the design that replaces it. Spec

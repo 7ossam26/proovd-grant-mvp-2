@@ -2151,8 +2151,18 @@ html.no-motion [data-splash] { display: none !important; }
 /* RESPONSIVE CORRECTION — five pane names do not fit at 320px. They scroll
    rather than wrap or clip: wrapping would move the underline onto a second row
    and clipping would make a pane unreachable. Same focus-ring padding as the
-   nav, for the same reason. */
-.tabs {
+   nav, for the same reason.
+
+   SCOPED 2026-08-20 (Session E). This was a bare `.tabs`, which is the design
+   system's own `Tabs` component container — so from the day it was written it
+   turned every `<Tabs>` in the product into a horizontal flex row with the
+   tablist and each tabpanel side by side. Nothing caught it because the only
+   users were the gallery and a jsdom test, and jsdom does no layout; the first
+   product surface to use the component since (the Creator's Pitches list) drew
+   its two panels down the left gutter. The markup already carries `.frec-tabs`,
+   so this is a selector change and no component moved. `.tabbtn`, `.tabline`
+   and `.tabpane` below are this workspace's own names and do not collide. */
+.frec-tabs {
   position: relative;
   display: flex;
   gap: var(--sp-24);
@@ -11216,5 +11226,201 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
 @media (max-width: 40rem) {
   .cra-acts > .btn {
     flex: 1 1 100%;
+  }
+}
+
+/* ══════════════════════ PHASE 42 — Pitches, the Active list, and the pitch
+   reveal (Creator Flow v2, Session E, 2026-08-20)
+
+   Session E's two surfaces render inside `CreatorAppShell`, so most of what
+   they need already exists: `.cra-page`, `.cra-lede`, `.cra-help`, `.cra-acts`,
+   `.card`, `.kv`, `.tag`, `.doc-list`, `.tabs` and `.state-panel` are all
+   reused. What is new is the tab count, the two list rows, and the reveal —
+   and the reveal is the only thing here with a shape of its own.
+
+   The prefix is `.crp-`. `.cra-` is PHASE 40/41 (the Creator app shell and its
+   pages) and this is a page family INSIDE that shell, but the reveal is a
+   full-bleed moment rather than a page — a distinction the markup makes and
+   the prefix keeps visible. `.cr-` is PHASE 26/32 (Affiliate Admin), `.crf-`
+   is PHASE 39 (the Creator onboarding flow).
+
+   Conventions, as PHASE 25 set them and 26–41 restated them:
+
+     1. TOKENS ONLY. Read a token or a mode slot, never a raw value.
+     2. SCOPED REUSE. Everything new is prefixed `.crp-`.
+     3. RESPONSIVE IS A CORRECTION. Each media rule names the overflow it
+        answers.
+
+   ── The two tones ─────────────────────────────────────────────────────────
+   PHASE 41's rule, unchanged: a sentence that states a RULE takes `--dark`
+   (`.cra-help` carries §22.2's no-prediction line, §14.2's decline promise,
+   and the walk-is-optional sentence), a caption that merely labels takes
+   `--moss`. `--grey` is ~2.18:1 on white and nothing here uses it.
+
+   ── The reveal segments are `aria-hidden`, and the count is not ───────────
+   `Step N of 4` is a real sentence in the accessibility tree; the four bars
+   beside it are decoration for the same fact. A progress bar whose only
+   expression is colour is not one (§28.5).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* The count beside a tab label. Never a badge — it is part of the name. */
+.crp-tab__count {
+  margin-left: var(--sp-8);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--moss);
+}
+
+.tab.is-active .crp-tab__count {
+  color: var(--brand);
+}
+
+/* A row's tags. Wraps, because two tags plus a long label overflow at 320. */
+.crp-row__top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-8);
+}
+
+.crp-row__why {
+  margin: 0 0 var(--sp-12);
+  max-width: var(--measure);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--dark);
+}
+
+.crp-row__link {
+  margin: 0 0 var(--sp-12);
+  font-size: 0.875rem;
+  color: var(--moss);
+}
+
+/* The sort controls. A group, wrapping — never a horizontal scroller. */
+.crp-sorts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  margin: var(--sp-16) 0;
+}
+
+/* ── The reveal ─────────────────────────────────────────────────────────── */
+
+.crp-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-12);
+  max-width: var(--measure);
+}
+
+.crp-step__count {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--moss);
+}
+
+/* Four bars for a fact the sentence above already states. */
+.crp-step__segments {
+  display: flex;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crp-step__segments li {
+  flex: 1;
+  height: 0.1875rem;
+  background: var(--sage);
+}
+
+.crp-step__segments li.is-done {
+  background: var(--brand);
+}
+
+.crp-step__eyebrow {
+  margin: var(--sp-8) 0 0;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--moss);
+}
+
+.crp-step h1 {
+  margin: 0;
+}
+
+/*
+ * One idea at a time, so the body may run larger than a paragraph — but not to
+ * `--fs-step`, which is a flow step TITLE. Session D lost a pass to reading
+ * that token as "one step down from a heading" and putting a 40px sentence in
+ * the rail; this is a body size, stated in rem like `--fs-body` is.
+ */
+.crp-step__body {
+  margin: 0;
+  font-size: 1.25rem;
+  line-height: 1.45;
+  color: var(--dark);
+}
+
+/*
+ * A `.btn` is inline-flex, and an inline-flex flex item in a COLUMN is
+ * stretched to the container width by the default `align-items: stretch` —
+ * three sessions have lost a browser pass to that. `.cra-acts` is already a
+ * wrapping row, and this only adds the top margin the step needs.
+ */
+.crp-step__acts {
+  margin-top: var(--sp-16);
+}
+
+/* 520px: the three reveal controls stop fitting on one line before the text
+   does, and a wrapped row of three is legible where a squeezed one clips a
+   label inside `.btn`'s own `overflow: hidden`. */
+@media (max-width: 520px) {
+  .crp-step__acts {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/*
+ * The chosen sort must be the readable one.
+ *
+ * `.btn--secondary` is `--brand` on white at about 1.46:1 — the documented,
+ * scoped tech-stack §3.6 exception, and a recorded product-wide gap since
+ * PHASE 36. Left alone it makes the SELECTED chip harder to read than the one
+ * beside it, which is Session D's `Accepted` reading quieter than `Reviewing`
+ * on a different surface. Fixed here rather than at the primitive: re-toning
+ * every secondary button in the product is its own change with its own
+ * screenshot pass.
+ */
+.crp-sorts .btn[aria-pressed='true'] {
+  color: var(--dark);
+  border-color: var(--brand);
+  font-weight: 900;
+}
+
+/*
+ * One label column per card, not one per row.
+ *
+ * `.kv__row` is `minmax(8rem, max-content) 1fr` and each row is its own grid,
+ * so a card with `Key date` and `What you would earn` in it draws two different
+ * value positions — a column that is not a column. Session F found the same
+ * thing on Settings and fixed it the same way; this scopes it to the pitch so
+ * the shared primitive is untouched, and it collapses at the same 600px
+ * `.kv__row` does.
+ */
+.crp-recap .kv__row {
+  grid-template-columns: 11rem 1fr;
+}
+
+@media (max-width: 600px) {
+  .crp-recap .kv__row {
+    grid-template-columns: 1fr;
   }
 }

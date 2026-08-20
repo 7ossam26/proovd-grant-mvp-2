@@ -21,8 +21,8 @@ import type { Auth } from '../auth/auth.js';
 import { requireRole } from '../auth/guards.js';
 import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
+import { readPitch } from '../affiliates/creator-pitches.js';
 import {
-  readFormalOpportunity,
   acceptStandardTerms,
   declineOpportunity,
   submitProposal,
@@ -107,8 +107,18 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
 
   /* ── The formal opportunity (§14.1) ─────────────────────────────────────── */
 
+  /*
+   * Session E: the response gained `content`, and the SERVICE did not change.
+   *
+   * `readPitch` calls `readFormalOpportunity` verbatim — including its §14.5
+   * side effect of recording `reviewing` on first read, because opening a
+   * pitch is the read that observes it — and composes §14.1's material beside
+   * the decision facts. §33.2.6–§33.2.13 drive the service directly and pass
+   * unchanged, which is the whole of what "no decision service was touched"
+   * can be proved by.
+   */
   router.get('/api/creator/campaigns/:associationId/opportunity', creator, async (req, res) => {
-    const result = await readFormalOpportunity(
+    const result = await readPitch(
       db,
       { appBaseUrl: context.appBaseUrl },
       {
@@ -121,7 +131,7 @@ export function createCreatorDecisionRouter(deps: CreatorDecisionDeps): Router {
       sendRefusal(res, result);
       return;
     }
-    res.json({ opportunity: result.opportunity });
+    res.json({ opportunity: result.opportunity, content: result.content });
   });
 
   /* ── Accept standard terms (§14.2) ──────────────────────────────────────── */

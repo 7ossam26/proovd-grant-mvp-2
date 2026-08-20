@@ -334,6 +334,13 @@ files), shared **465** (31 files), frontend **1,518** (33 files). Session F
 added one backend suite (22) and one frontend suite (21), inverted one Phase 14d
 assertion, and added no migration.
 
+**After Session E: 134 files, 3,801 tests, 0 failures** — backend **1,780** (69
+files), shared **465** (31 files), frontend **1,556** (34 files). Session E
+added one backend suite (23) and one frontend suite (32), trimmed Phase 08c's
+list tests to the kit they now cover, added no migration, and left
+`decisions.ts` byte-for-byte unchanged — §33.2.6–§33.2.13 pass as they were.
+**The rebuild is complete.**
+
 **One thing worth knowing about the batching itself.** The batch runner's own
 summary parse read *stderr* — which is where vitest writes the totals — and the
 first version redirected it to `/dev/null`, so every batch reported zero while
@@ -888,6 +895,193 @@ that one surface disagrees with the design system.
   Admin through the history it already writes to; a later phase asked to read
   the standing as a default, a filter, or an eligibility condition is asking for
   the §1 rule 6 violation the missing columns exist to prevent.
+
+---
+
+## 11. Session E — Pitches, the Active list, and the pitch
+
+**Landed 2026-08-20, after Session F.** Two surfaces, one route, one read
+module, no migration — and the last session of the rebuild.
+
+The suites after Session E: backend **1,780**, shared **465**, frontend
+**1,556**. §33.2.6–§33.2.13 pass **unchanged**, which is the only form the
+"no decision service was touched" claim can take.
+
+### It was built last, and Session F said so at the time
+
+Session F's own section records the departure: F was built before E because E
+replaces the Pitches LIST while F's four surfaces are reached from the rail and
+from the existing `/creator/campaigns`. That cost was one sentence — F5's
+end-to-end walk went through Phase 08c's list until E landed — and this is E
+landing. The rail's `pitches` href never moved.
+
+### The reconciliation was wrong about the recap, and the first read found it
+
+Section 2 recorded the recap's fields as *"All §14.1 kit fields that
+`readFormalOpportunity` already returns"*. That read returns the §14.3 cell,
+high effort, the versions, the agreement and the link — the DECISION facts — and
+none of the Founder's material: no Problem, no Solution, no rewards, no dates,
+no claims, no refund policy. §14.1's "complete opportunity/Campaign kit" is
+twenty-two bullets and the surface was serving about five of them.
+
+Session D found three register entries wrong the first time anything read them;
+this is the same finding one session later and the answer is the same. The
+register is corrected, and `PITCH_RECAP_SECTIONS` now carries §14.1's own
+bullets beside the payload field, the register constant, or the named absence
+that answers each — walked against a real read in both suites, so it cannot go
+stale again.
+
+**`readPitchContent` is the other half, and `decisions.ts` is untouched.** It
+reads `buildCampaignPreview` — the ONE assembly of a campaign's built content,
+which the public page and the Founder preview also read — and adds beside it
+what §14.1 asks a CREATOR for and a Backer is never shown: the internal target
+correctly labelled, the brand and claims notes, the Founder's prior Proovd
+history, and their connected-account readiness as a STATE (§13: never the
+documents).
+
+### The list does not record `reviewing`, and opening a pitch does
+
+`readFormalOpportunity` moves `formal_decision_open → reviewing` on first read,
+which is correct: opening a pitch is the act that observes it. Calling it from
+the LIST would mark every open invitation reviewed because somebody looked at a
+list of them — a fact the record did not observe. So the list is its own query
+and the detail calls the service verbatim. Both directions are asserted: the
+list leaves the status alone, and `readPitch` moves it.
+
+### One derivation for the count
+
+`PITCH_DECISION_OPEN_STATES` and `pitchKindFor` moved out of `home.ts` into
+`creator-pitches.ts`, and `home.ts` imports them back. §20's hero count and the
+Pitches tab are now the same answer rather than two that agree today — and the
+suite compares the two reads over one seeded Creator.
+
+`proposal_pending` is deliberately not in the state list: it counts only when
+the open version is `awaiting_creator`, because a version waiting on the FOUNDER
+is not something the Creator can act on, and counting it would put a number on a
+tab that no control can reduce.
+
+### The walk is optional, and that is the §28.5 decision
+
+The reference advances a five-step reveal by tapping anywhere on the screen.
+§28.5 names "Affiliate decisions" among the five flows that must be completely
+operable from a keyboard, and §14.2 forbids hiding any of the three outcomes — a
+walkthrough that must be completed before the decisions appear hides all three
+behind four gestures, which is worse than hiding one behind a menu.
+
+So: every step advances with a real, named control; `Read the whole pitch` is
+present from the FIRST step; `?view=recap` lives in the address, so a reload, a
+bookmark and the back button all land on the recap rather than restarting the
+walk; and a pitch with nothing left to decide opens on the recap, because a walk
+that introduces a campaign somebody already accepted is a delay rather than a
+reveal (DNA §5.4).
+
+It is four steps and a destination, not five steps. The reference draws five
+progress segments and calls the last one the full card; modelling the recap as a
+step would make it something a person has to walk TO rather than somewhere they
+can go.
+
+### Two sorts, both over a stored column
+
+The reference offers four. `Match fit` has no score behind it — §14.1's *"Why
+this fits your audience"* is two Admin-written sentences, not a number — so
+ordering by it would be inventing a rank. `Commission` and `Price` are
+marketplace sort keys: they invite a Creator to rank one Founder's terms against
+another's on a list, which is the comparison a private invitation does not have.
+
+What is left is real: §14.6's stored response deadline (immutable, and the thing
+that actually decides which pitch to open first) and when the invitation
+arrived. A pitch with no recorded deadline sorts LAST — an absent deadline is
+not an urgent one. The route validates the sort against the register rather than
+trusting it, and the suite asserts every `column` exists in
+`information_schema`.
+
+### What the Session E browser pass found, and nothing else could
+
+Six, and the fourteenth rebuild in a row where the pass found what jsdom, axe
+and the type checker all agreed was fine. Two of them are older than this
+session.
+
+1. **`.tabs` has been broken product-wide since PHASE 25.** The Founder Admin
+   workspace took the bare `.tabs` name for its own hand-built strip and made
+   it `display: flex; overflow-x: auto`, which turns the design system's `Tabs`
+   component into a horizontal row with the tablist and every tabpanel side by
+   side. Nothing caught it in four months because the only users were the
+   gallery and a jsdom test, and jsdom does no layout. The Creator's Pitches
+   list is the first product surface to use the component since, and it drew
+   `Active 2` and `Pitches 2` down the left gutter beside their panels. The
+   markup already carried `.frec-tabs`, so the fix is a selector change and the
+   bare name returns to the design system.
+2. **`Continue to The problem`, and `Continue to You earn`.** A nav label built
+   by concatenating a capitalised eyebrow. §33.11.4 wants the destination named;
+   it does not want it named badly. The register gained `navName` — the step as
+   a control refers to it, mid-sentence.
+3. **`Decide by  Aug 23, 2026, 8:00 PM`** — §27.1 asks for the timezone spelled
+   out on a deadline, and `toLocaleString` names none. This is §14.6's own
+   instant, after which an unfinished proposal expires. Local with UTC beside
+   it now, the pair the Founder flow's fee screen already renders.
+4. **The SELECTED sort chip was the harder one to read.** `.btn--secondary` is
+   `--brand` on white at about 1.46:1, so `Closing soonest` (chosen) rendered
+   quieter than `Newest` (not chosen) — Session D's `Accepted` reading quieter
+   than `Reviewing`, on a different control. Fixed scoped to `.crp-sorts`,
+   because re-toning every secondary button in the product is its own change
+   with its own screenshot pass.
+5. **`.kv__row` sizes per ROW, so one card drew four different value
+   positions.** Session F found the same thing on Settings; the fix is the same
+   and is scoped to the recap.
+6. **The ended campaign's row said its link was "not active YET".** True of a
+   campaign that has not launched and a promise about one that is over (§1.4).
+
+### One copy defect the pass found that a test then pinned
+
+`DECLINE_NO_PENALTY_NOTE` opens *"Your decline was recorded"* — it is the
+CONFIRMATION. Rendering it beside an open decision, and on the decline panel
+before anything is decided, tells somebody a decline happened that did not.
+`DECLINING_COSTS_YOU_NOTHING` is §14.2's promise said BEFORE a decision; the
+confirmation stays where a decline was actually recorded, and the suite asserts
+the words "Your decline was recorded" appear nowhere on either surface.
+
+### The banned-term register was a second copy, and the suite caught it
+
+`PITCH_BANNED_TERMS` was first written with `upfront` and `reservation` in it —
+and Session A's own scan failed, because this file ships in the browser bundle
+§33.11.3 reads, so a register naming the banned words puts them in the bundle to
+say they are banned. `UNIVERSALLY_BANNED_TERMS` and `CUSTOMER_ONLY_BANNED_TERMS`
+are the canonical registers and `namingViolations` is their scanner; both suites
+run it against the rendered surface and the payload. What is left in
+`PITCH_BANNED_TERMS` is this surface's own refusals — the marketplace framing §3
+has no opinion about.
+
+### One Session F defect this session's walk found and fixed
+
+Session D built `CreatorAppShell` and `CreatorHome` rendered it itself, so the
+four surfaces Session F added — the work surface, Earnings, Resources and
+Settings — shipped with **no rail and no way back except the browser**. It is a
+pathless layout route now, the arrangement the guard above it already uses and
+for the same reason: chrome that has to be remembered on each new surface is
+chrome that eventually is not. `/creator/welcome` is deliberately outside it —
+the last screen of a full-bleed nine-screen sequence, whose whole job is to hand
+over to Home.
+
+### Two contrast gaps that are pre-existing and were NOT changed here
+
+`.kv__row dt` at ~2.18:1 and `.btn--secondary` at ~1.46:1 — both shared
+primitives every workspace uses, both the documented tech-stack §3.6 territory.
+PHASE 42 uses neither for anything load-bearing: a sentence that states a rule
+takes `--dark`, a caption takes `--moss`.
+
+### What Session E deliberately did not build
+
+* **Any decision service, and any change to one.** The module has no `.insert(`,
+  `.update(` or `.delete(` at all, exports nothing matching accept/decline/
+  propose/respond/submit, and `decisions.ts` is untouched.
+* **A migration.** Every record it reads already existed.
+* **A second campaign-content assembly.** `buildCampaignPreview` is the one.
+* **A meeting request, a predicted amount, a popularity signal, a per-Creator
+  rate floor, or a counter recommendation.** All in `CREATOR_FLOW_ABSENCES`,
+  each rendering its refusal where the control would be.
+* **A product category.** §14.1 asks for one and no record holds it — not on the
+  prospect, not on the build. Null and named on the surface (§16a), rather than
+  a guess derived from the product name.
 
 ---
 

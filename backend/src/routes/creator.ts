@@ -51,6 +51,8 @@ import {
   requestOwnDeletion,
 } from '../affiliates/creator-settings.js';
 import { readCreatorEarnings } from '../affiliates/creator-money.js';
+import { readCreatorPitches } from '../affiliates/creator-pitches.js';
+import { DEFAULT_PITCH_SORT, PITCH_SORT_IDS } from '../creator-flow/logic.js';
 import { readCreatorResources, recordResourceInterest } from '../affiliates/creator-resources.js';
 import {
   discloseConflict,
@@ -130,6 +132,27 @@ export function createCreatorRouter(
         revealedAt: row.revealedAt?.toISOString() ?? null,
       })),
     });
+  });
+
+  /**
+   * Both of the Creator's lists — Session E.
+   *
+   * `Active` and `Pitches` in one read, so the two tabs and their counts cannot
+   * disagree about what is in each. The sort is the caller's, validated against
+   * `PITCH_SORTS` here rather than trusted: both values are stored columns and
+   * an unknown one falls back to the default rather than reaching the query.
+   *
+   * It deliberately does NOT call `readFormalOpportunity`, whose first read
+   * records §14.5's `reviewing`. Marking every pitch as reviewed because
+   * somebody opened a list of them would record a fact nobody observed.
+   */
+  router.get(`${CREATOR_PATH}/pitches`, creator, async (req, res) => {
+    const requested = typeof req.query['sort'] === 'string' ? req.query['sort'] : '';
+    const sort = (PITCH_SORT_IDS as readonly string[]).includes(requested)
+      ? requested
+      : DEFAULT_PITCH_SORT;
+    const view = await readCreatorPitches(db, actorId(req), { sort });
+    res.json({ pitches: view, sort });
   });
 
   /**
