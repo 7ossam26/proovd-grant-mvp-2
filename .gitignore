@@ -26,9 +26,24 @@ desktop.ini
 !.vscode/extensions.json
 !.vscode/settings.json
 
-# Licensed font binaries — self-hosted locally, never committed (redistribution).
-# Referenced woff2 live in frontend/public/fonts/; docs/fonts/ holds spare statics.
-frontend/public/fonts/*.woff2
+# Licensed font binaries.
+#
+# `frontend/public/fonts/*.woff2` was ignored here until 2026-08-20, and the two
+# Satoshi files are now COMMITTED instead. The rule was not wrong, it was
+# load-bearing in the wrong direction: every Dokploy build starts from a git
+# checkout, so ignoring the binaries shipped a production image with no fonts.
+# `/fonts/Satoshi-Variable.woff2` 404'd, the SPA fallback answered index.html,
+# and the browser reported `OTS parsing error: invalid sfntVersion: 1008821359`
+# — 0x3C21646F, the ASCII for `<!do`. Satoshi is load-bearing (DNA §3) and the
+# self-hosted @font-face in proovd.css is the required setup, so the font has to
+# be in the image.
+#
+# This rests on THIS REPOSITORY BEING PRIVATE. Self-hosting Satoshi is what the
+# Fontshare licence is for; publishing the binaries is redistribution and is
+# not. If this repo is ever made public, the files come out again and reach the
+# image another way (a build-time fetch from R2 is the shape that was costed).
+#
+# docs/fonts/ holds spare statics and stays out — nothing builds from it.
 docs/fonts/
 # Same rule for the fonts shipped inside a supplied design reference: the bundle
 # is kept on disk so the prototype runs standalone, but the binaries are not ours

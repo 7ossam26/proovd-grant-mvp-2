@@ -104,7 +104,17 @@
   const HAS_SCRAMBLE = !!window.ScrambleTextPlugin;
   const HAS_TEXT     = !!window.TextPlugin;
 
-  G.defaults({ ease: MOTION.ease.out, duration: MOTION.dur.base, overwrite: 'auto', force3D: true });
+  /* force3D belongs in config(), never in defaults(). defaults() copies its
+     keys onto EVERY tween's vars, including the internal zero-duration tween
+     gsap.delayedCall() builds on a plain callback object — and ScrollTrigger
+     calls delayedCall on enable. force3D is a CSSPlugin property, so on a
+     non-DOM target no plugin claims it and gsap warns, twice, on every page
+     load:  "Invalid property force3D set to true Missing plugin?"
+     config() is where the global lives (it ships as force3D:"auto"), and it is
+     read only where transforms are actually written, so DOM tweens behave
+     exactly as before and the dummy tweens stay quiet. */
+  G.config({ force3D: true });
+  G.defaults({ ease: MOTION.ease.out, duration: MOTION.dur.base, overwrite: 'auto' });
 
   /* ───────────────────────────────────────────── shared helpers */
   const RM    = window.matchMedia('(prefers-reduced-motion: reduce)');

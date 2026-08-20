@@ -1066,7 +1066,33 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // in production the built frontend is at backend/public/.
   app.use(express.static(config.publicDir));
 
-  app.use((_req, res) => {
+  // A path whose last segment carries a file extension is asking for a FILE.
+  // express.static above has already answered every file that exists, so
+  // arriving here means it does not — and the only honest answer is 404.
+  //
+  // Falling through to index.html instead is how a missing asset stops looking
+  // like a missing asset. `/fonts/Satoshi-Variable.woff2` answered 200 with
+  // `<!doctype html>` as its body, and the browser reported
+  //
+  //     OTS parsing error: invalid sfntVersion: 1008821359
+  //
+  // — which is 0x3C21646F, the ASCII for `<!do`. That reads as a corrupt font
+  // rather than an absent one, and it sent the investigation at the font
+  // binary instead of at the deploy. The same disguise applies to a missing
+  // JS chunk (surfacing as a MIME-type refusal) and a missing image. §1.4: a
+  // failure presents as what it is, and 404 is what this one is.
+  //
+  // Nothing the SPA router owns is caught by this: no path in either route
+  // inventory — `features/public/site.ts` or `routes.tsx` — ends in a
+  // dot-extension, and a query string is not part of `req.path`.
+  const ASSET_SHAPED_PATH = /\.[a-z0-9]{1,8}$/i;
+
+  app.use((req, res) => {
+    if (ASSET_SHAPED_PATH.test(req.path)) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+
     const indexPath = path.join(config.publicDir, 'index.html');
     res.sendFile(indexPath, (err) => {
       if (err) {
