@@ -49,6 +49,10 @@ type GSAP = {
     // exact frame the last phone leaves; a `setTimeout` beside the timeline
     // would drift the moment a frame is dropped.
     call: (fn: () => void, params?: unknown[], p?: string | number) => unknown;
+    // Likewise real, declared when Last look needed it (2026-08-20): its
+    // handoff sits at 55% of the word timeline's OWN length, which depends on
+    // how many words the headline split into.
+    duration: () => number;
     kill: () => unknown;
   };
   killTweensOf: (t: unknown) => unknown;
@@ -931,11 +935,35 @@ function stageRatio(el: Element): number {
  *
  * Returns a teardown. `onDone` runs exactly once — from the timeline, from the
  * fallback, or immediately when motion is off.
+ *
+ * `onNearly` is the reference's own fourth parameter (`revealHead(head, k,
+ * done, nearlyDone)`) and it fires at 55% of the word timeline — its comment:
+ * *let the page start moving before the last word lands*. Only Last look uses
+ * it, and the beat is the whole point of that screen's entrance: waiting for
+ * the reveal to finish leaves a visible dead frame between the title landing
+ * and the rest arriving. It runs exactly once, before `onDone`, and it runs
+ * even when there is nothing to split and even when motion is off — a caller
+ * that hangs its own sequence off it must never be stranded by a missing
+ * plugin.
  */
-function revealHead(head: HTMLElement, onDone: () => void): () => void {
+function revealHead(
+  head: HTMLElement,
+  onDone: () => void,
+  onNearly?: () => void,
+): () => void {
   const g = gsap();
+  let nearly = false;
+  const soon = () => {
+    if (nearly) return;
+    nearly = true;
+    onNearly?.();
+  };
   let called = false;
   const finish = () => {
+    // The reference's `fin`: `soon()` first, then `done()`. Order matters when
+    // the split never happened — the handoff must not arrive after the page
+    // has already been declared settled.
+    soon();
     if (called) return;
     called = true;
     onDone();
@@ -1008,7 +1036,13 @@ function revealHead(head: HTMLElement, onDone: () => void): () => void {
         onComplete: finish,
       },
     );
+    // The reference's own `this.later(soon, Math.round(260*k))` on this branch:
+    // with no words to split there is no timeline to hang the 55% call on, so
+    // the handoff is timed instead. A page whose SplitText failed still runs
+    // its sequence.
+    const early = window.setTimeout(soon, Math.round(refDur(0.26) * 1000));
     return () => {
+      window.clearTimeout(early);
       drop();
       g.killTweensOf(head);
     };
@@ -1030,6 +1064,10 @@ function revealHead(head: HTMLElement, onDone: () => void): () => void {
     ease: ease('hero'), // power4.out
     stagger: 0.026,
   });
+  // `tl.call(soon, null, tl.duration()*0.55)`. Positioned on the TIMELINE
+  // rather than on a `setTimeout` beside it, so the handoff and the last word
+  // share one clock: a dropped frame moves both or neither.
+  tl.call(soon, undefined, tl.duration() * 0.55);
 
   const img = clone.querySelector('img');
   if (img) {
@@ -1813,6 +1851,126 @@ export function stageRelayIn(
   };
 }
 
+/**
+ * Screen 15 — Last look's entrance, which is the flow's one headline-first page.
+ *
+ * REBUILT 2026-08-20 to the supplied reference's `[data-lastlook]`
+ * (`Proovd Founder Flow v2.dc.html`, `kindWide`). `verifyIntro` picks this
+ * branch for exactly one screen, by name:
+ *
+ *     const headFirst = !back && root.matches('[data-lastlook]');
+ *     const head  = headFirst ? root.querySelector('[data-anim="head"]') : null;
+ *     const relay = head ? els.filter(e => e !== head) : els;
+ *     …
+ *     } else if (head) {
+ *       g.set(head, {opacity: 0});
+ *       g.set(relay, {opacity: 0});
+ *       this.revealHead(head, this.k(), null, () => this.later(runRelay, 90));
+ *
+ * So the title opens word by word on its own, and the six things under it
+ * relay in 90ms after the reveal is 55% done — while the last word is still
+ * landing, which is the reference's own comment for why the call sits at 55%
+ * and not at the end.
+ *
+ * ── The 90ms is a real number and not a rounding ───────────────────────────
+ * Sampled frame by frame against the reference at 1320×900: the words start at
+ * 31ms, the relay starts at 333ms. The word timeline is 0.38 + 0.026 = 0.406s,
+ * 55% of it is 223ms, plus 90 is 313 — one frame before the 333 observed. Both
+ * halves have to be here or the beat is wrong in a way a screenshot cannot see.
+ *
+ * ── On BACK it is an ordinary relay, head included ─────────────────────────
+ * `headFirst` is `!back && …`, so `head` is null on a back navigation and
+ * `relay` is the whole list — the title relays with everything else, from the
+ * END, like every other page. Reproducing the reveal on the way back would
+ * re-introduce a page somebody is leaving.
+ *
+ * `order` is the reference's own `els` sequence for this screen, out of
+ * `verifyIntro`'s fixed list, and it is passed rather than read from the DOM
+ * because the 0.085s stagger follows THAT order and not document order.
+ */
+export function lastLookIntro(
+  root: HTMLElement | null,
+  direction: 1 | -1,
+  order: readonly string[],
+): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const pick = (name: string) =>
+    root.querySelector<HTMLElement>('[data-stage-anim="' + name + '"]');
+  const staged = order
+    .map(pick)
+    .filter((el): el is HTMLElement => !!el);
+  if (!staged.length) return () => {};
+
+  const head = direction === 1 ? pick('head') : null;
+  const relay = head ? staged.filter((el) => el !== head) : staged;
+
+  g.killTweensOf(staged);
+
+  const runRelay = () => {
+    if (!relay.length) return;
+    g.fromTo(
+      relay,
+      { x: 150 * direction, autoAlpha: 0 },
+      {
+        x: 0,
+        autoAlpha: 1,
+        duration: refDur(0.62), // between slow 0.60 and grand 0.90
+        ease: ease('out'), // power3.out
+        force3D: true,
+        stagger: {
+          each: refDur(0.085), // its own number; stagger.base 0.08 is the token
+          from: direction === -1 ? 'end' : 'start',
+        },
+        clearProps: 'transform,opacity,visibility',
+        overwrite: 'auto',
+      },
+    );
+  };
+
+  let handoff = 0;
+  let stopHead: () => void = () => {};
+  if (head) {
+    // Synchronously, before paint: the title and everything under it are
+    // hidden in the same frame the page mounts, so nothing can flash at full
+    // opacity ahead of its own entrance.
+    g.set(head, { autoAlpha: 0 });
+    g.set(relay, { autoAlpha: 0 });
+    stopHead = revealHead(
+      head,
+      () => {
+        /* the reference passes `null` here: the reveal owns only the title */
+      },
+      () => {
+        handoff = window.setTimeout(runRelay, 90);
+      },
+    );
+  } else {
+    runRelay();
+  }
+
+  // `relayIn`'s stuck sweep, for a set the runtime cannot see: `holdHidden`
+  // registers `[data-reveal]` and these are staged by an inline `set`. A
+  // dropped tween would otherwise leave a blank page with a working keyboard
+  // path — and on this page that is a Founder looking at nothing while every
+  // control still answers the keyboard.
+  const sweep = window.setTimeout(() => {
+    for (const el of staged) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility' });
+      }
+    }
+  }, 3400);
+
+  return () => {
+    window.clearTimeout(handoff);
+    window.clearTimeout(sweep);
+    stopHead();
+    g.killTweensOf(staged);
+  };
+}
+
 /* ── Screen 7 — "Say it instead", and the recording controls ───────────────
    REBUILT 2026-08-20 to the supplied reference's `[data-compet]` screen
    (`Proovd Founder Flow v2.dc.html`, `kindWide`). Both helpers below are the
@@ -1877,7 +2035,15 @@ export function sayHandoff(root: HTMLElement | null, onStart: () => void): void 
   tl.to(btn, { width: full, duration: refDur(0.28) }, 0);
   tl.to(
     btn,
-    { opacity: 0, duration: refDur(0.12), ease: ease('exit') }, // power2.in
+    // `power1.in`, WRITTEN OUT rather than read from a token. §6.1's `exit`
+    // is `power2.in`, which is what stood here and what a runtime capture of
+    // this timeline reported — but the reference's own line is
+    // `.to(btn,{opacity:0,duration:.12,ease:'power1.in'},.26)`, and over 0.12s
+    // the difference between a squared and a linear ease-in is the difference
+    // between the mic vanishing and the mic leaving. Corrected 2026-08-20
+    // against the story screen; the positioning screen shares this helper and
+    // takes the same correction.
+    { opacity: 0, duration: refDur(0.12), ease: 'power1.in' },
     refDur(0.26),
   );
   tl.add(onStart);

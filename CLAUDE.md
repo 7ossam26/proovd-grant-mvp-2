@@ -4090,75 +4090,111 @@ the token model, `ConfirmAnswer`, or `PositioningStep` beyond its one back targe
 control (the reference's `pcCta` computes that label for a state whose button is not rendered);
 collect the solution on a third screen; or duplicate `PHASE 54`.
 
-### Screen 10, the visuals, was rebuilt to the reference (§12, §28.4, §28.5, §33.11, 2026-08-20)
+### Last look was rebuilt 1:1 from the reference (§12, §9, §14.3, §33.11, 2026-08-20)
 
-`/campaigns/:campaignId/setup/visuals` was rebuilt from scratch against the supplied reference
-(`Proovd Founder Flow v2.dc.html`, `[data-visuals]` / `kindWide`) and its screenshot. What stood
-there was Session D's `AnswerPage` layout — a trail line, the optional tag, the §12 question as the
-heading, a stacked file list, a dashed `UploadZone`, the helper accordion and a nav row. None of it
-is left. `VisualsStep.tsx` is the surface, `PHASE 62` the styles. **No route, table, register entry
-or migration changed**; every control drives the Phase 09a upload path unchanged.
+Screen 15 — `/campaigns/:campaignId/setup/review` — rebuilt from scratch to the supplied
+reference's `[data-lastlook]` (`Proovd Founder Flow v2.dc.html`, `kindWide`), by explicit
+product direction, on the terms every other 1:1 screen of this flow ships under: the
+reference outranks the design system HERE, and nowhere else. The Session D surface it
+replaces was a token-scale card list; `.ff-look` and `.ff-card` are deleted with their
+component, and `.ff-ll` / `PHASE 63` is the reference's own stylesheet.
 
-- **The composition is measured, not approximated.** Driven in headless Chrome against the reference
-  at 1860×922 and 1280×800, box by box — x, y, w, h, offsetW/H, font, weight, line-height,
-  letter-spacing, colour, background, radius, border, padding, margin, gap, display, alignment and
-  shadow. Every one matches: stage scale 0.4664 and 0.4, column 1491px, panel `860px 551.062px`,
-  drop zone 500px, input 544×112 beside a 290×112 `Add`, CTA 1491×165. The remaining reported
-  differences are the reference's zone being a `<button>` (its UA font-size, `buttontext` and
-  `buttonface` under a gradient stack that paints over all three) and the DC harness reserving a
-  15px scrollbar, which shifts its right-anchored chrome by exactly that.
-- **The relay is the reference's, frame for frame.** `verifyIntro`'s `runRelay` over
-  `pill, head, panel, cta` — 620ms `power3.out` from `x:150`, 85ms stagger. Sampled every animation
-  frame on both sides: ref starts 0/74/158/241ms and settles 524/607/691/774; app starts
-  2/78/162/245 and settles 529/612/695/778. Hover, the `data-press` 0.94 and the focus rings were
-  driven with real pointer events.
-- **Three fixes came out of the measurement and none was visible in a screenshot.** The zone's two
-  lines had `line-height` 1.2 and 1.34 where the reference sets none, which made the label 6px short
-  and lifted the arrow 3px on the stage; the zone carried a 60px inline padding where the reference
-  has the UA button's `1px 6px`; and the stage transform is written through `toFixed(4)` now, which
-  is the reference's own rounding rather than a number that agrees to five decimal places.
-- **The link row is drawn and it is not wired, and the row says so before anybody types.** The
-  reference's `addLink` appends the URL to the same `files` list an upload lands in.
-  `campaign_assets.storage_key` is NOT NULL, so a visual is an object we fetched and read, and §12's
-  evidence rule for this item is exactly that. A URL would have to be fetched from wherever a
-  Founder pointed, on a schedule nobody defined, and could change after approval into something they
-  never approved — a §12 evidence decision and a migration, not a surface rebuild.
-  `VISUALS_LINK_ABSENT` sits in the 130px gap the composition already leaves above the CTA, so not
-  one reference box moves for it, and the field keeps what was typed.
-- **Two §12 facts live inside the reference's own file row.** Its row is a label and an `x`; §12
-  needs the object's state (and the reason when it did not count) and §28.4 forbids folding the
-  Founder's approval into the upload. Both are a second line INSIDE the `#DEF6FF` block, so the list
-  keeps its width, its 34px gap and its position, and the CTA does not move.
-- **Enter presses Add rather than leaving the page.** The reference binds Enter GLOBALLY
-  (`enterAdvance`) and excludes only a `TEXTAREA`, so pressing it in the link field navigates to the
-  next screen — somebody who typed an address and expected to add it ends up on Branding. Every
-  other rebuilt screen in this flow binds Enter to its own field's control (`EmailStep` sends,
-  `BrandingStep` adds a swatch) and nothing binds it to navigation.
-- **The zone is a `label` over a real file input**, so the keyboard path is the browser's own picker
-  (§28.5) and the box is identical. Both unavailable states — Track A4 uploads and §12's post-payment
-  lock — render their reason INSIDE the reference's 500px box rather than as a disabled control.
-- **`Next` is the reference's word and it is in §33.11.4's `OBJECTLESS_CTA_LABELS`** — the same
-  knowing exception `Socials`, `ConfirmProblem` and `ConfirmAnswer` already carry, where the
-  reference's copy is the specification. What costs the composition nothing is the accessible name,
-  which adds the destination and contains the visible word (WCAG 2.5.3).
-- **There is still no Back on a plain arrival**, and `AnswerPage`'s header records why: everything
-  behind this page is on the draft token §10's claim invalidated, and sending Back to Last look —
-  five pages forward — closed a ring. An edit opened from Last look still returns there, and there
-  the control is drawn exactly as the reference draws it.
-- **The pill's number is the §6 setting.** The reference hardcodes `FEE_PER=2`; this renders
-  `fee.itemDiscountCents` in the reference's own `$2 discount` shape, and `optional: discount` when
-  there is no calculation to read. No fee arithmetic exists in the file.
+`lastLookIntro` in `components/anim.ts` is the entrance; `LastLook.tsx` the screen;
+`PHASE 63` the styles. **No route, no register, no service and no migration** — the data
+is the same `useSetupWorkspace` read Session D used.
 
-**A pre-existing defect was found and fixed, and it was not this screen's.** PHASE 46's last
-`@media (prefers-reduced-motion: reduce)` block was never closed. An unterminated at-rule does not
-fail — the parser swallows everything after it into the block — so **PHASE 61 in full was in the
-served stylesheet and in no stylesheet the browser had, and the password page had been rendering
-unstyled since it shipped**. `a11y.test.tsx`'s two stylesheet scans cannot see it: the comments were
-balanced and every token was defined. A third scan is added there for brace balance, on the
-comments-stripped copy.
-
-**Three assertions in `founder-flow.test.tsx` were consciously changed**, each with a dated comment:
-the Track A4 absence now reads the reference's box copy, `offers copy, never generate` moved to
-`branding` (whose helper block still exists — this page's does not), and the sequence walk clicks
-`Next` by its accessible name. **They were not run**: this session's instruction was no test suites.
-`npm run typecheck` is clean across all three workspaces.
+- **The stage model is the reference's, including the branch that names this screen.**
+  `s = min(innerWidth/2496, innerHeight/1542) * .78 * .9`, and the `.9` is `fitStages`'
+  own `if (!hero && c === 'vetting' && vReviewing)` with its own reason: *"Last look
+  carries the whole answer grid, so it sits a notch under the other pages."* Measured
+  against the reference in a real browser at 1320×900 — its matrix reads `0.3713`, ours
+  `0.37125`. Nothing reflows; the stage scales, so the composition is identical at every
+  viewport and `isClaimPhone()` is `false` there, so there is no phone posture to build.
+- **The column measures itself, and that is reproduced as the mechanism rather than as
+  the number.** `width: fit-content` over a hidden, zero-height, `aria-hidden`, `nowrap`
+  span at 112px/700 reading *"We want to see your product..."* — in the reference the
+  column and that span are both 1521.34px and the grid inside is 100% of it. With the
+  product's **variable** Satoshi the same span measures 1491.06px, a 2% difference that
+  is the font cut and not the layout. A hardcoded 1521.34 would be right for one cut and
+  quietly wrong for the next.
+- **The entrance is the flow's one headline-first page, and it was sampled frame by
+  frame.** `verifyIntro`'s `headFirst = !back && root.matches('[data-lastlook]')`: the
+  title splits and reveals word by word, and the six things under it relay in 90ms after
+  the word timeline is 55% done — *"let the page start moving before the last word
+  lands"*. Against the reference at 1320×900, aligned on the frame the split clone
+  appears: relay start Δ302 vs Δ307ms, clone dropped Δ402 vs Δ406, and the per-element
+  stagger Δ0/100/183/266/349/433 vs Δ0/99/182/266/348/432. `revealHead` gained the
+  reference's own fourth parameter (`nearlyDone`) for it; every existing caller passes
+  none and is unchanged. On BACK there is no reveal — `headFirst` is `!back` — and the
+  title relays from the end with everything else.
+- **Three of the eight cards are not buttons, and that is §1.4 rather than a style.**
+  The reference makes all eight clickable because in the prototype all eight have
+  somewhere to go. §9's three answers are locked at submission and their route is behind
+  the draft token §10's claim invalidated, so there is no address to send anybody to —
+  they render the same box with no hover scale, no cursor, `SUBMITTED` rather than
+  `ADDED`, and the reason on an `sr-only` line. `FOUNDER_ANSWER_SEQUENCE`'s
+  `editableAfterClaim` decides it, not an index.
+- **The money is the server's and the reference's `$` goes with its variable.**
+  `FEE_BASE=35 / FEE_PER=2 / FEE_FLOOR=25` are three §6 settings; `${{ feeNow }}` becomes
+  `formatUsd(subtotalCents)`, which is what screen 20 already does for the same template.
+  `$US$33.00` is not a price. No arithmetic on a fee exists under `frontend/src/surfaces/`.
+- **One tile's label is longer than the reference's, deliberately.** Its sixth card reads
+  `Interview`; `OPTIONAL_ITEMS` calls the item `Founder interview`, which wraps to two
+  lines at 44px in a 340px tile. Not forked to match the picture — `founderAnswerLabel`'s
+  own header records why, and §3.1's risk model is two customer-facing names for one
+  thing. The card absorbs it (96.8 + 16 + 35 of 184px used).
+- **§12's high-effort note rides the CHROME band, not the stage.** The reference draws
+  nothing for it and the column is a fixed vertical rhythm, so one more line moves
+  everything. It is one line at the furniture scale beside the return contract — screen
+  1's own legal-line treatment — and it is now a COUNT of three named criteria rather
+  than a verdict with a disclaimer under it, which is §12's "neutrally, not as a quality
+  judgment" in one sentence instead of four.
+- **A pre-existing stylesheet defect was found by this rebuild and fixed — and found
+  independently by the Story session on the same day.** An `@media (prefers-reduced-motion:
+  reduce)` opened in PHASE 46 and was never closed, so **every rule after it — the whole of
+  PHASE 61, the Founder flow's password page — applied only to people who had turned motion
+  off.** The file is still valid CSS, which is why nothing caught it: `a11y.test.tsx`'s two
+  scans check comment balance and `var()` definitions, and neither counts braces. Found here
+  by rendering the new block and getting browser defaults; found there by reading
+  `document.styleSheets` and seeing the CSSOM stop at 2698 rules. Both sessions wrote the
+  same `}`; the Story session's comment is the one that survives the merge, because it names
+  the phase that opened it.
+- **The merge of the two sessions was committed WITH conflict markers, and that is what a
+  Founder saw.** `e9e71bf` carried ten unresolved `<<<<<<< / ======= / >>>>>>>` regions in
+  `proovd.css` — nowhere else in the repo — which cut `.ff-story {` off mid-rule and left six
+  unclosed braces. Everything after line 16956 was swallowed, so **neither** rebuilt screen
+  had any of its own CSS: the reference's `<img>` wordmark rendered at intrinsic size, the
+  in-layer HELP fell into the flow beside `FlowPage`'s, and the stage never scaled. Recovered
+  by splitting the file into its two sides, checking each is brace-balanced on its own, and
+  concatenating them — Story first, since it was pushed first, and Last look renumbered to
+  **PHASE 63** because both sessions had independently taken 62. A brace-balance scan belongs
+  in `a11y.test.tsx` beside the other two; it would have caught this and both `@media` bugs.
+- **Measured clean at 1440, 1320, 1280 and a true 320:** zero document overflow, nothing
+  past the viewport, exactly one `h1`. The keyboard path is complete and every control
+  names itself — Back names its destination, five cards are named by title and tag, `All
+  good` is not in §33.11.4's `OBJECTLESS_CTA_LABELS`. Hover is the reference's own
+  `scale(1.06)` and `#3BDC8C`. With `prefers-reduced-motion` the page renders whole and
+  no split clone is created.
+- **Three `founder-flow.test.tsx` tests fail on this machine and did so BEFORE this
+  change** — verified by stashing and re-running: identical 3 failed / 4 passed. They are
+  react-router navigations dying on `TypeError: RequestInit: Expected signal
+  ("AbortSignal {}") to be an instance of AbortSignal` under Node 25, not this rebuild.
+  Five assertions in that file were updated to describe the rebuilt surface rather than
+  the retired one.
+- **Thirteen axe colour-contrast findings, and every one is the reference's own pair.**
+  `#41ED98` on `#FAFAFA` for Back and HELP (1.45) is byte-identical to `.ff-pc__back` /
+  `.ff-pc__help`, which PHASE 54 already ships on the two screens before this one;
+  `#FAFAFA` on `#41ED98` for the CTA (1.45) is the brand-fill pair the owner ruling
+  re-recorded as tech-stack §3.6's documented, scoped exception; `#7FD9A4` on the fee
+  label (1.62), `#A2AFA8` on the hint (2.17) and `#41ED98` / `#7FA98D` on the card tags
+  (1.41 / 2.52) are `lastLookCards`' own `tagFg` and the reference's own copy colours.
+  Nothing was re-toned: doing it here would make one screen disagree with both the
+  reference and the rest of the flow, and it is a flow-wide decision with its own
+  screenshot pass — which is how PHASE 36, 45 and 46 each recorded the same finding.
+- **The §33.11 sweep could not be run on this machine and that is not this change.**
+  `qa.test.tsx` fails all 719 in its own `beforeEach` with `TypeError:
+  localStorage.clear is not a function` — a jsdom/Node 25 interop failure, before any
+  surface renders. The equivalent was done in a real browser instead: axe over the
+  rendered page at 1320 and a true 320, zero document overflow at four widths, one `h1`,
+  the complete keyboard path with every control named, the failure state answering
+  §27.1's six questions, and `prefers-reduced-motion` rendering the page whole.

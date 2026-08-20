@@ -1424,8 +1424,12 @@ describe('Last look (15)', () => {
     }
     expect(screen.getByText('US$33.00')).toBeInTheDocument();
     // Nothing computed here: the reference's FEE_BASE / FEE_PER / FEE_FLOOR are
-    // four §6 settings and every amount arrives already worked out.
-    expect(screen.getByText(/down from US\$35\.00/i)).toBeInTheDocument();
+    // three §6 settings and every amount arrives already worked out. The
+    // sentence is the reference's own `lastLookNote`, with the per-item amount
+    // read from the server rather than from its hardcoded `$2`.
+    expect(
+      screen.getByText(/bonus answers left, each one drops the fee US\$2\.00\./i),
+    ).toBeInTheDocument();
   });
 
   it('offers no way to change a §9 answer, because there is no address left', async () => {
@@ -1434,9 +1438,11 @@ describe('Last look (15)', () => {
     await screen.findByRole('heading', { name: /last look/i });
 
     // §9's route is behind the draft token and §10's claim invalidated it.
+    // Not a disabled button — no button at all, which is what the reference's
+    // own clickable card becomes when there is nowhere for it to go.
     for (const entry of FOUNDER_ANSWER_SEQUENCE.filter((e) => e.owner === 'vetting')) {
       const label = founderAnswerLabel(entry);
-      expect(screen.queryByRole('button', { name: new RegExp(`change ${label}`, 'i') })).toBeNull();
+      expect(screen.queryByRole('button', { name: new RegExp(`^${label}`, 'i') })).toBeNull();
     }
     expect(screen.getAllByText(/submitted with your answers/i).length).toBe(3);
   });
@@ -1447,12 +1453,13 @@ describe('Last look (15)', () => {
     renderAt(at('last-look'));
     await screen.findByRole('heading', { name: /last look/i });
 
-    expect(screen.getByText(FLOW_LAST_LOOK_RETURNS)).toBeInTheDocument();
+    expect(screen.getByText(FLOW_LAST_LOOK_RETURNS, { exact: false })).toBeInTheDocument();
 
     const brandLabel = founderAnswerLabel(
       FOUNDER_ANSWER_SEQUENCE.find((entry) => entry.key === 'branding')!,
     );
-    await user.click(screen.getByRole('button', { name: `Add ${brandLabel}` }));
+    // The reference's card is a title and a tag, and that pair is its name.
+    await user.click(screen.getByRole('button', { name: new RegExp(`^${brandLabel}`, 'i') }));
     await screen.findByRole('heading', { name: /logo and a written brand direction/i });
 
     // The contract is in the ADDRESS, so it survives a reload mid-edit — and
@@ -1941,7 +1948,7 @@ describe('what Session E moved', () => {
     renderAt(at('last-look'));
     await screen.findByRole('heading', { name: /last look/i });
 
-    await userEvent.click(screen.getByRole('button', { name: /set up how you get paid/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'All good' }));
     // Which §13 state greets them depends on their account; that it is the
     // payouts PAGE is the claim, and `data-flow-page` is what says so.
     await waitFor(() =>
@@ -1960,15 +1967,19 @@ describe('what Session E moved', () => {
       },
     });
     renderAt(at('last-look'));
-    await screen.findByText('What Creators will see about preparation');
+    await screen.findByRole('heading', { name: /last look/i });
 
     // §12: "Present the criteria neutrally, not as a quality judgment."
-    // DNA §5.10 and §30 forbid copy implying the Founder underperformed.
+    // DNA §5.10 and §30 forbid copy implying the Founder underperformed. Since
+    // the 1:1 rebuild (2026-08-20) it is a COUNT of three named criteria rather
+    // than a verdict with a disclaimer under it — neutral on its own, and one
+    // line instead of four at the foot of the reference's composition.
     const body = document.body.textContent ?? '';
-    expect(body).toMatch(/not a judgement of your campaign/);
-    expect(body).toMatch(/no effect on\s+whether a fixed payment is available/);
+    expect(body).toMatch(/visuals, branding and an interview are in place/i);
+    expect(body).toMatch(/you have 1 of the three/i);
     expect(body.toLowerCase()).not.toContain('low effort');
     expect(body.toLowerCase()).not.toContain('poor');
+    expect(body.toLowerCase()).not.toContain('judgement');
   });
 });
 

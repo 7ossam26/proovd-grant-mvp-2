@@ -8793,67 +8793,10 @@ html.no-motion .ff-prob__rail { transition: none; }
 .ff-helper__head { margin: 0; font-size: 1.125rem; color: var(--dark); }
 
 /* ── Screen 15 — Last look ────────────────────────────────────────────────
-   Two things at the top, side by side: what this is, and what it costs. The
-   fee is the largest number on the page because it is the one the whole
-   sequence has been moving.                                                */
-.ff-look { display: flex; flex-direction: column; gap: var(--sp-24); }
-.ff-look__head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--ff-gap);
-  flex-wrap: wrap;
-}
-.ff-look__title {
-  margin: 0;
-  font-size: clamp(2rem, 6.4vw, 4rem);
-  line-height: 0.98;
-  letter-spacing: -0.03em;
-  color: var(--dark);
-}
-.ff-look__fee { display: flex; flex-direction: column; gap: var(--sp-4); max-width: 24rem; }
-.ff-look__fee-label {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--moss);
-}
-.ff-look__fee-value {
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--dark);
-}
-.ff-look__fee-note { color: var(--moss); font-size: 0.9375rem; }
-.ff-look__returns { margin: 0; max-width: var(--measure); color: var(--moss); }
-
-.ff-look__grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--sp-16);
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-}
-.ff-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-8);
-  align-items: flex-start;
-  padding: var(--sp-24);
-  background: var(--grey-lightest);
-  border: 1px solid var(--grey-light);
-  border-radius: var(--radius);
-}
-/* The three §9 answers. Locked at submission, so the card offers nothing —
-   the flatter fill is what says so before the sentence at the bottom does. */
-.ff-card--locked { background: var(--white); }
-.ff-card__title { font-weight: 900; font-size: 1.0625rem; color: var(--dark); }
-.ff-card__tag { display: block; }
-.ff-card__body { margin: 0; color: var(--moss); font-size: 0.9375rem; }
-.ff-card__closed { margin: 0; color: var(--grey); font-size: 0.875rem; }
+   Rebuilt 1:1 from the reference on 2026-08-20; the block is `PHASE 63` at the
+   bottom of this file, under the `.ff-ll` prefix. The token-scale card list
+   that stood here is gone with its component — dead CSS ships in every
+   browser, and §33.11.3 reads what ships.                                   */
 
 /* ── The help drawer, from a page the earlier ones cannot be reached from ──
    §10's claim invalidates the draft token, so from stage 3 an earlier card is
@@ -8871,7 +8814,6 @@ html.no-motion .ff-prob__rail { transition: none; }
 }
 
 @media (max-width: 599.98px) {
-  .ff-look__head { align-items: flex-start; }
   .ff-hexrow .btn { width: 100%; justify-content: center; }
   .ff-cal { max-width: none; padding: var(--sp-12); }
   .ff-cal__years { grid-template-columns: repeat(3, 1fr); }
@@ -9055,28 +8997,9 @@ html.no-motion .ff-prob__rail { transition: none; }
   font-size: 0.9375rem;
 }
 
-/* ── §12's high-effort note, which moved onto Last look with Session E ──── */
-.ff-look__effort {
-  padding: var(--sp-16) var(--sp-24);
-  border: 1px solid var(--grey-light);
-  border-radius: var(--radius);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-8);
-}
-.ff-look__effort-title {
-  margin: 0;
-  font-size: 1rem;
-  letter-spacing: -0.01em;
-  color: var(--dark);
-}
-.ff-look__effort-body { margin: 0; max-width: var(--measure); color: var(--moss); }
-.ff-look__effort-fine {
-  margin: 0;
-  max-width: var(--measure);
-  color: var(--moss);
-  font-size: 0.875rem;
-}
+/* §12's high-effort note lived here from Session E until 2026-08-20, when Last
+   look was rebuilt to the reference. It has no room in that composition, so it
+   rides the chrome band instead — `.ff-ll__foot`, in PHASE 63. */
 
 @media (max-width: 599.98px) {
   .ff-money__fields { grid-template-columns: 1fr; }
@@ -14714,6 +14637,11 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   background: #FAFAFA;
   z-index: 25;
   font-family: 'Satoshi', sans-serif;
+  /* The reference's page inherits the UA's own root metrics; ours inherits
+     `body`'s 18px/1.6. Restated here so the chrome outside the stage measures
+     against what it was authored against. */
+  font-size: 16px;
+  line-height: normal;
 }
 
 /* The read failed, so there is no composition to draw. It keeps the layer's
@@ -14828,8 +14756,13 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   position: absolute;
   left: -10%;
   top: -16%;
+  /* `width: 31%; aspect-ratio: 1` there, over a one-digit number. Ours is a
+     count of reading cards and is legitimately two digits, so the box grows
+     rather than clipping — and the aspect keeps a one-digit badge identical to
+     the reference's own 19.38 square. */
   min-width: 31%;
-  height: 31%;
+  min-height: 31%;
+  aspect-ratio: 1;
   padding: 0 2px;
   display: flex;
   align-items: center;
@@ -16872,14 +16805,14 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   .crf-agree__back:hover,
   .crf-agree__back:active { scale: 1; }
 }
-/* ↑ This closing brace was missing, and it cost every rule below it (2026-08-20).
-   An unterminated at-rule does not fail — the parser swallows everything after
-   it into the block, so PHASE 61 in full, and PHASE 62 after it, were in the
-   served stylesheet and in no stylesheet the browser had. The password page had
-   been rendering unstyled since it shipped. `a11y.test.tsx` scans this file for
-   comment balance and for `var()`s naming a property nothing defines — both
-   added after a silently-invalid stylesheet shipped — and neither can see an
-   unbalanced brace. A third scan is added there for it. */
+/* ^ That closing brace was MISSING, and had been since PHASE 46 shipped. An
+   unclosed `@media` swallows the rest of the file, so PHASE 61's `.ff-password`
+   and everything after it were parsed INSIDE `prefers-reduced-motion: reduce`
+   and applied to nobody with motion on. Found by reading `document.styleSheets`
+   rather than the source: the CSSOM stopped at 2698 rules and the last one was
+   this block. `a11y.test.tsx`'s two stylesheet scans check comment balance and
+   `var()` definitions and not brace balance, which is why it survived — a
+   silently-invalid stylesheet has now shipped three times. */
 
 /* ══════════════════════════════════════════════════════════════════════════
    PHASE 61 — the Founder flow's last page: your password (2026-08-20)
@@ -16952,76 +16885,63 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   .ff-password__nav > .btn { width: 100%; }
 }
 
-/* ═════════════════════════════════════════════════════════════════════════
-   PHASE 62 — the Founder flow, screen 10: we want to see your product
-   (2026-08-20)
+/* ═══════════════════════════ PHASE 62 — YOUR STORY, rebuilt 2026-08-20 from
+   the supplied reference (`Proovd Founder Flow v2.dc.html`, `[data-story]` /
+   `kindWide`) and its screenshot.
 
-   REBUILT FROM SCRATCH against the supplied reference
-   (`Proovd Founder Flow v2.dc.html`, `[data-visuals]` / `kindWide`) and its
-   screenshot. `VisualsStep.tsx`'s header is the reasoning; this is the
-   composition. Every number is the reference's own, on its own 2496x1542
-   stage — `VisualsStep` owns the scale and writes the whole transform on mount
-   and on resize; the `scale(0.37)` below is the reference's own placeholder and
-   is what renders for the one frame before the layout effect runs. Nothing here
-   reflows: the stage scales, which is why the composition is identical at every
-   viewport (§33.11.1).
+   ── The layout model ──────────────────────────────────────────────────────
+   Not responsive. Authored once on a fixed 2496x1542 stage and scaled to the
+   viewport by `fitStages()`:
 
-   `isClaimPhone()` returns `false` in the reference — "one composition
-   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
-   code and this composition is what every viewport gets, exactly as there.
+       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
 
-   ── The column has no width of its own ────────────────────────────────────
-   `width: fit-content` over `align-items: flex-start`, and what fits it is this
-   screen's own 112px headline: 1491px at Satoshi's metrics, measured in Chrome
-   against the reference. The SOCIALS screen borrows the same sentence hidden
-   (`.ff-soc__measure`) so the two share one column; here it is the real
-   heading, so nothing is hidden and nothing is hardcoded — the number is a
-   property of the face, not of the layout.
+   No branch of that function names this screen, so it takes `pageScale` alone
+   — exactly 0.4 at 1280x800, which is what the reference measures at.
+   `StoryStep.tsx` sets the transform in a layout effect and on resize; the
+   `0.37` below is the reference's own placeholder for the frame before that
+   runs.
 
-   ── The two suspended conventions, as on screens 1–15 ─────────────────────
-     - HEX LITERALS, not tokens. `#41ED98`, `#013F17`, `#FAFAFA`, `#E9FFE1`,
-       `#8FCBA3`, `#A2AFA8`, `#FBFFD4`, `#DEF6FF`, `#defafc`, `#012D10` and
-       `#3BDC8C` are the reference's own; mixing literal and token would leave
-       half the screen able to drift with a token change and half not.
-     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
-       owner ruling, so the two agree today; the literal is here for the same
-       reason the colours are.
+   Measured against the running prototype at 1280x800: scale 0.4, column
+   720x477.5 at (272.5, 161.25), headline 47.1 tall on an 1800x118 box, field
+   720x316 (1800x790), the row 60 tall (150) with `Say it instead` 264 wide
+   (660) and `Next` 441.6 (1104), Back at (38.39, 731.61), the badge 66.55
+   square at (1160.06, 695.06). Recording: the column rises to y 126.65, the
+   control row is 254.4x105.2 at (505.3, 568.15), the waveform 717.6x41.6, and
+   the field's ink and ground both turn brand.
 
-   ── The dashed rules are gradients, not `border-style: dashed` ────────────
-   Both boxes are the reference's own four-layer repeating gradient over a
-   transparent border — 15px on / 15px off at 5px for the drop zone, 43/43 at
-   10px for the empty list. A `dashed` border would round its own dash length to
-   fit each edge, so the two boxes would disagree with each other and with the
-   reference at every viewport; a gradient dash is exact and scales with the
-   stage. The drop zone's fill is that stack's last layer
-   (`linear-gradient(#E9FFE1,#E9FFE1)`, clipped to `padding-box`), which is why
-   `background-color` is never set on it.
+   PHASE 25's conventions bind everywhere else in this file; this section is
+   the same knowing exception PHASES 34 and 48-53 already are, and for the same
+   reason — a supplied reference is the specification here, so its 2px radius,
+   its #41ED98 and its 92px ship as written rather than as the nearest token.
+   The owner ruling's 2px radius happens to agree.
 
-   ── What the project's globals do to this screen, overridden explicitly ───
-   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the headline,
-   `p { margin; max-width: var(--measure) }` reaches the two added lines, `ul`
-   carries a list style and padding, `input` inherits the design system's own
-   field treatment, and `body`'s 18px / line-height 1.6 reaches the whole stage
-   — the reference's own body sets neither, so the stage resets both.
+   The project's global type rules DO reach in here — h1..h6 margin,
+   line-height 1.18 and font-weight 900; p margin and max-width 65ch;
+   button/textarea font: inherit, which inherits line-height 1.6 from body
+   where the reference's page inherits the UA's normal; and img/svg max-width
+   100% with height auto — so every one of them is overridden explicitly below
+   rather than left to win.
 
-   ── The two blocks the reference does not draw ────────────────────────────
-   `.ff-vis__note` (why the link row is drawn and not wired) and
-   `.ff-vis__filemeta` (§12's state and §28.4's approval). The first is
-   ABSOLUTELY positioned inside the 130px gap the composition already leaves
-   above the CTA; the second is INSIDE the reference's own `#DEF6FF` block. Not
-   one reference box moves for either.
-   ═════════════════════════════════════════════════════════════════════════ */
+   ── The one reference rule deliberately NOT reproduced ────────────────────
+   The prototype's page carries html{scrollbar-gutter:stable}, which reserves
+   15px down the right of every screen and therefore centres this lockup 7.5px
+   left of the viewport's own centre. That is host chrome for a prototype whose
+   other screens genuinely scroll, and PHASES 51-53 already recorded the
+   decision not to adopt it: our own body has never had it, and adding it on
+   one page would put that page off-centre against the six beside it.       */
 
-/* `FlowPage`'s chrome is not drawn on this screen — and the reason is not that
-   the reference has none. It has a wordmark, a HELP and a message bell, and it
-   draws all three INSIDE the `z-index: 25` fixed layer below. Left in place
+/* `FlowPage`'s chrome is not drawn on this screen — but the reason is not that
+   the reference has none. It has four controls, and they are drawn INSIDE the
+   z-index 25 fixed layer below, where the reference puts them. Left in place
    they would sit under that layer and be unreachable, so both are hidden and
    both leave the tab order with it. */
-.ff[data-flow-page='visuals'] .ff__top,
-.ff[data-flow-page='visuals'] .ff__badge { display: none; }
+.ff[data-flow-page='story'] .ff__top,
+.ff[data-flow-page='story'] .ff__badge { display: none; }
 
-/* The reference's `[data-visuals]`. Nothing scrolls. */
-.ff-vis {
+/* The reference's `[data-story]`: position fixed, inset 0, overflow hidden.
+   Nothing scrolls — the stage scales instead, which is why the composition is
+   identical at every viewport and why this page can never reflow (§33.11.1). */
+.ff-story {
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -17033,7 +16953,7 @@ html.no-motion .ff-reach__cta { opacity: 1; }
 /* The read failed, so there is no composition to draw. It keeps the layer's
    ground and centres the panel; nothing here is the reference's, because the
    reference holds its record in memory and has no failure to render. */
-.ff-vis__failure {
+.ff-story__failure {
   min-height: 60vh;
   display: flex;
   align-items: center;
@@ -17041,11 +16961,11 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   padding: var(--sp-24);
 }
 
-/* ── The chrome. Its clamps are the reference's own, and they are
+/* ── The chrome. Its clamp()s are the reference's own, and they are
    viewport-relative there too: this is furniture rather than part of the
    composition, so it does not scale with the stage. ─────────────────────── */
 
-.ff-vis__back {
+.ff-story__back {
   position: absolute;
   left: clamp(20px, 3vw, 46px);
   bottom: clamp(20px, 3vw, 40px);
@@ -17068,14 +16988,14 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   cursor: pointer;
   outline: none;
 }
-.ff-vis__back:hover { color: #013F17; }
+.ff-story__back:hover { color: #013F17; }
 /* The reference has no focus treatment at all. A visible one is added rather
    than reproduced, because a control a keyboard user cannot locate is not the
    same control (§28.5, §33.11) and it costs the composition nothing. */
-.ff-vis__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
-.ff-vis__back svg { width: 11px; height: 11px; flex: none; }
+.ff-story__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-story__back svg { width: 11px; height: 11px; flex: none; }
 
-.ff-vis__top {
+.ff-story__top {
   position: absolute;
   left: 0;
   right: 0;
@@ -17086,13 +17006,13 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   justify-content: space-between;
   padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
 }
-.ff-vis__logo {
+.ff-story__logo {
   height: clamp(26px, 2.4vw, 36px);
   width: auto;
   max-width: none;
   display: block;
 }
-.ff-vis__help {
+.ff-story__help {
   padding: 10px 22px;
   min-height: 40px;
   border: 2px solid #41ED98;
@@ -17108,12 +17028,12 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   cursor: pointer;
   outline: none;
 }
-.ff-vis__help:hover { background: #E9FFE1; }
-.ff-vis__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-story__help:hover { background: #E9FFE1; }
+.ff-story__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
 
 /* The message bell. Its geometry is the reference's; its number is not, and
-   `VisualsStep`'s header says what the difference is. It does not shake. */
-.ff-vis__mailbtn {
+   `StoryStep`'s header says what the difference is. It does not shake. */
+.ff-story__mailbtn {
   position: absolute;
   right: clamp(20px, 3vw, 46px);
   bottom: clamp(20px, 3vw, 40px);
@@ -17126,8 +17046,8 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   cursor: pointer;
   outline: none;
 }
-.ff-vis__mailbtn:focus-visible { outline: 2px solid #013F17; outline-offset: 4px; }
-.ff-vis__mail {
+.ff-story__mailbtn:focus-visible { outline: 2px solid #013F17; outline-offset: 4px; }
+.ff-story__mail {
   position: relative;
   width: clamp(58px, 5.2vw, 78px);
   aspect-ratio: 1;
@@ -17137,8 +17057,8 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   border: 2px solid #41ED98;
   box-sizing: border-box;
 }
-.ff-vis__mail img { width: 68%; height: auto; max-width: none; display: block; }
-.ff-vis__mailcount {
+.ff-story__mail img { width: 68%; height: auto; max-width: none; display: block; }
+.ff-story__mailcount {
   position: absolute;
   left: -10%;
   top: -16%;
@@ -17158,9 +17078,9 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   color: #41ED98;
 }
 
-/* ── The stage, and the fit-content column inside it ─────────────────────── */
+/* ── The stage, and the 1800px column inside it ──────────────────────────── */
 
-.ff-vis__stage {
+.ff-story__stage {
   width: 2496px;
   height: 1542px;
   position: absolute;
@@ -17168,315 +17088,179 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   top: 50%;
   transform: translate(-50%, -50%) scale(0.37);
   transform-origin: center center;
-  /* See the header: the reference's body sets neither, and this file's does. */
+  /* The reference's body sets neither of these and ours sets both, so the
+     stage restates the UA values it is authored against. */
   font-size: 16px;
   line-height: normal;
   color: #013F17;
 }
-
-.ff-vis__col {
+.ff-story__col {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: fit-content;
+  width: 1800px;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
-  /* The reference's own, and the reason the pill needs align-self. */
-  align-items: flex-start;
+  align-items: center;
 }
 
-.ff-vis__pill {
-  align-self: center;
-  padding: 26px 46px;
-  background: #FBFFD4;
-  font-size: 44px;
+.ff-story__head {
+  margin: 0;
+  width: 100%;
+  font-size: 92px;
   font-weight: 700;
-  line-height: normal;
-  letter-spacing: -0.02em;
-  color: #013F17;
-}
-
-.ff-vis__head {
-  margin: 72px 0 0;
-  font-size: 112px;
-  font-weight: 700;
-  line-height: 1.22;
+  line-height: 1.28;
   letter-spacing: -0.03em;
   color: #013F17;
-  white-space: nowrap;
+  text-align: center;
 }
 
-.ff-vis__panel {
-  margin-top: 120px;
+.ff-story__panel {
+  margin-top: 100px;
+  position: relative;
   width: 100%;
-  display: grid;
-  grid-template-columns: 860px 1fr;
-  gap: 80px;
-  align-items: stretch;
 }
 
-.ff-vis__left {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-
-/* ── The drop zone ───────────────────────────────────────────────────────── */
-
-/* Focusable, and off-screen rather than display:none — a hidden input is not in
-   the tab order at all, and this control's whole keyboard path is the real file
-   picker (§28.5). */
-.ff-vis__fileinput {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.ff-vis__drop {
+.ff-story__field {
+  display: block;
   width: 100%;
-  height: 500px;
+  height: 790px;
+  max-width: none;
+  resize: none;
   box-sizing: border-box;
+  background: transparent;
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  outline: none;
+  padding: 96px 108px 210px;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 56px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.012em;
+  color: #013F17;
+  /* [data-slim-scroll] in the reference's own style block: the brand
+     scrollbar, which cannot be written inline and so is not in the markup. */
+  scrollbar-width: thin;
+  scrollbar-color: #41ED98 transparent;
+}
+/* The reference's placeholder ink, measured at rgb(162,175,168). Without it
+   this box takes the UA's own #757575, which is a different grey and a
+   different weight of voice on the one field the whole screen is about. */
+.ff-story__field::placeholder { color: #A2AFA8; opacity: 1; }
+.ff-story__field::-webkit-scrollbar { width: 6px; }
+.ff-story__field::-webkit-scrollbar-track { background: transparent; margin: 14px 0; }
+.ff-story__field::-webkit-scrollbar-thumb {
+  background: #41ED98;
+  border-radius: 99px;
+  min-height: 34px;
+  max-height: 56px;
+}
+.ff-story__field::-webkit-scrollbar-thumb:hover { background: #3BDC8C; }
+/* cTaBg / cTaFg — while a recording is running the field is the recording. */
+.ff-story__panel[data-rec='on'] .ff-story__field {
+  background: rgba(65, 237, 152, 0.06);
+  color: #41ED98;
+}
+
+/* ── The recording overlay, sitting inside the field's own border ────────── */
+
+.ff-story__overlay {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  pointer-events: none;
+}
+/* The words run under the waveform rather than stopping above it, so the
+   gradient is what keeps the last line readable. */
+.ff-story__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 130px;
+  background: linear-gradient(
+    180deg,
+    rgba(250, 250, 250, 0) 0%,
+    rgba(250, 250, 250, 0.18) 40%,
+    rgba(250, 250, 250, 0.5) 68%,
+    rgba(250, 250, 250, 0.86) 88%,
+    #FAFAFA 100%
+  );
+}
+.ff-story__meter {
+  position: relative;
   display: flex;
-  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 22px 12px;
+}
+.ff-story__level {
+  font-size: 26px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: 0.16em;
+  color: #41ED98;
+}
+.ff-story__wave {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 9px;
+  height: 104px;
+  padding: 0 8px;
+  overflow: hidden;
+}
+.ff-story__bar {
+  width: 15px;
+  flex: none;
+  background: #41ED98;
+  /* recIntro scales these up from nothing. Without this they would grow out
+     from their own middles, which reads as a row of dashes appearing rather
+     than as a level arriving. */
+  transform-origin: bottom;
+}
+
+/* ── The idle row: the microphone, and the one control that moves on ─────── */
+
+.ff-story__row {
+  margin-top: 36px;
+  width: 100%;
+  display: flex;
+  gap: 36px;
+}
+.ff-story__say {
+  width: 660px;
+  height: 150px;
+  flex: none;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 22px;
-  /* The reference's own — it is a `<button>` there, so this is the UA's
-     padding, measured rather than assumed. The zone's copy is centred and the
-     box is 860px wide, so it governs nothing except the one state whose
-     sentence is long, and `.ff-vis__droptypes` has its own measure for that. */
-  padding: 1px 6px;
+  gap: 26px;
+  border: 3px solid #41ED98;
   border-radius: 2px;
-  border: 5px solid transparent;
-  background-image:
-    repeating-linear-gradient(90deg, #8FCBA3 0 15px, transparent 15px 30px),
-    repeating-linear-gradient(90deg, #8FCBA3 0 15px, transparent 15px 30px),
-    repeating-linear-gradient(0deg, #8FCBA3 0 15px, transparent 15px 30px),
-    repeating-linear-gradient(0deg, #8FCBA3 0 15px, transparent 15px 30px),
-    linear-gradient(#E9FFE1, #E9FFE1);
-  background-size: 100% 5px, 100% 5px, 5px 100%, 5px 100%, 100% 100%;
-  background-position: 0 0, 0 100%, 0 0, 100% 0, 0 0;
-  background-repeat: no-repeat;
-  background-origin: border-box;
-  background-clip: border-box, border-box, border-box, border-box, padding-box;
-  cursor: pointer;
+  background: transparent;
+  color: #41ED98;
   font-family: 'Satoshi', sans-serif;
-  text-align: center;
-  /* The reference's own hover, on its own curve. */
+  font-size: 56px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
   transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.ff-vis__drop:hover { transform: scale(1.015); }
-.ff-vis__fileinput:focus-visible + .ff-vis__drop {
-  outline: 3px solid #013F17;
-  outline-offset: 4px;
-}
-/* Unavailable rather than disabled-looking: the box is the reference's and the
-   words inside it are the reason (§1.4). There is nothing to press, so it does
-   not offer a pointer. */
-.ff-vis__drop.is-off { cursor: default; }
-.ff-vis__drop.is-off:hover { transform: none; }
+.ff-story__say:hover { transform: scale(1.03); }
+.ff-story__say:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+.ff-story__say:disabled { cursor: default; transform: none; }
+.ff-story__say svg { flex: none; height: 64px; width: auto; max-width: none; }
+html.no-motion .ff-story__say { transition: none; }
 
-.ff-vis__drop svg { width: 126px; height: 126px; flex: none; display: block; }
-
-/* `line-height: normal` on both, and it is not a shortcut: the reference sets
-   none, so these two lines are 59px and 40px at Satoshi's own metrics. A 1.2
-   here made the label 6px shorter and lifted the arrow above it by 3px on the
-   stage — which is what a measured comparison catches and a screenshot does
-   not. This file's `body` sets 1.6, so `normal` has to be said. */
-.ff-vis__droplabel {
-  font-size: 44px;
-  font-weight: 700;
-  line-height: normal;
-  letter-spacing: -0.02em;
-  color: #8FCBA3;
-}
-.ff-vis__droptypes {
-  max-width: 700px;
-  font-size: 30px;
-  font-weight: 500;
-  line-height: normal;
-  color: #A2AFA8;
-}
-
-/* ── The link row ────────────────────────────────────────────────────────── */
-
-.ff-vis__linkrow {
-  display: flex;
-  gap: 26px;
-}
-
-.ff-vis__link {
+.ff-story__next {
   flex: 1 1 auto;
-  min-width: 0;
-  width: auto;
-  height: 112px;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0 32px;
-  background: #FAFAFA;
-  border: 4px solid #41ED98;
-  border-radius: 2px;
-  outline: none;
-  font-family: 'Satoshi', sans-serif;
-  font-size: 38px;
-  font-weight: 500;
-  line-height: normal;
-  color: #013F17;
-}
-/* The reference's own rule, and it is a global there:
-   input::placeholder,textarea::placeholder{color:#A2AFA8;opacity:1;} */
-.ff-vis__link::placeholder { color: #A2AFA8; opacity: 1; }
-.ff-vis__link:focus,
-.ff-vis__link:focus-visible {
-  border-color: #41ED98;
-  outline: 2px solid #013F17;
-  outline-offset: 3px;
-}
-
-.ff-vis__add {
-  flex: none;
-  width: 290px;
-  height: 112px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  border: none;
-  border-radius: 2px;
-  background: #013F17;
-  color: #FAFAFA;
-  font-family: 'Satoshi', sans-serif;
-  font-size: 42px;
-  font-weight: 700;
-  line-height: normal;
-  letter-spacing: -0.02em;
-  cursor: pointer;
-  outline: none;
-  /* bind()'s hover pair — M.dur.instant in, M.dur.quick out — and its
-     data-press scale, which is .94 held while the pointer is down and .25s
-     back. GSAP owns everything React state drives on this screen
-     (stageRelayIn, socialNudge, socialAddPop); these two are pure CSS states
-     with no state behind them, which is how every other reference rebuild in
-     this flow carries a hover. */
-  transition: background 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.ff-vis__add:hover { background: #012D10; }
-.ff-vis__add:active { transform: scale(0.94); transition-duration: 0.12s; }
-.ff-vis__add:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
-
-/* ── The right-hand column: the empty rule, then the list ────────────────── */
-
-.ff-vis__empty {
-  height: 100%;
-  border-radius: 2px;
-  border: 10px solid transparent;
-  box-sizing: border-box;
-  background-image:
-    repeating-linear-gradient(90deg, #defafc 0 43px, transparent 43px 86px),
-    repeating-linear-gradient(90deg, #defafc 0 43px, transparent 43px 86px),
-    repeating-linear-gradient(0deg, #defafc 0 43px, transparent 43px 86px),
-    repeating-linear-gradient(0deg, #defafc 0 43px, transparent 43px 86px);
-  background-size: 100% 10px, 100% 10px, 10px 100%, 10px 100%;
-  background-position: 0 0, 0 100%, 0 0, 100% 0;
-  background-repeat: no-repeat;
-  background-origin: border-box;
-}
-
-.ff-vis__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  min-width: 0;
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: 34px;
-}
-
-.ff-vis__file {
-  padding: 30px 36px;
-  background: #DEF6FF;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.ff-vis__filetop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-.ff-vis__filename {
-  min-width: 0;
-  font-size: 38px;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  color: #013F17;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ff-vis__filex {
-  flex: none;
-  padding: 0 8px;
-  border: none;
-  background: none;
-  font-family: 'Satoshi', sans-serif;
-  font-size: 38px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: #013F17;
-  cursor: pointer;
-  outline: none;
-}
-.ff-vis__filex:hover { color: #41ED98; }
-.ff-vis__filex:focus-visible { outline: 3px solid #013F17; outline-offset: 3px; }
-
-/* §12's state and §28.4's approval, inside the reference's own block. */
-.ff-vis__filemeta { display: flex; }
-.ff-vis__filenote {
-  font-size: 28px;
-  font-weight: 500;
-  line-height: 1.3;
-  /* A sentence that states a rule takes the dark ink; #A2AFA8 is a caption tone
-     and this decides whether a file counts. */
-  color: #013F17;
-}
-.ff-vis__filenote.is-ok { color: #0B6B33; }
-.ff-vis__approve {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  font-size: 28px;
-  font-weight: 500;
-  line-height: 1.3;
-  color: #013F17;
-  cursor: pointer;
-}
-.ff-vis__approve input {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  margin: 0;
-  accent-color: #013F17;
-  cursor: pointer;
-}
-
-/* ── The CTA, and the two lines the reference does not draw ──────────────── */
-
-.ff-vis__cta {
-  margin-top: 130px;
-  width: 100%;
-  height: 165px;
+  height: 150px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17491,133 +17275,218 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   letter-spacing: -0.02em;
   cursor: pointer;
   outline: none;
-  box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
-  transition: background 0.2s ease;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
 }
-.ff-vis__cta:hover { background: #3BDC8C; }
-.ff-vis__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+.ff-story__next:hover { background: #3BDC8C; }
+.ff-story__next:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
 
-/* Inside the 130px gap the CTA's own margin already leaves — so the note and
-   any failure sit between the panel and the button without moving either. */
-.ff-vis__note,
-.ff-vis__failline {
+/* ── The recording row ───────────────────────────────────────────────────── */
+
+.ff-story__rec {
+  margin-top: 96px;
+  display: flex;
+  align-items: flex-start;
+  gap: 44px;
+}
+.ff-story__ctl {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.ff-story__ctl-label {
+  font-size: 36px;
+  font-weight: 500;
+  line-height: normal;
+  color: #41ED98;
+}
+.ff-story__ghost {
+  width: 176px;
+  height: 176px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  background: #013F17;
+  color: #41ED98;
+  cursor: pointer;
+  outline: none;
+}
+/* Retry's glyph is white where Pause's is brand — the reference's own pair. */
+.ff-story__ghost.is-retry { color: #FAFAFA; }
+.ff-story__ghost:hover { background: #012D10; }
+.ff-story__ghost:focus-visible { outline: 6px solid #41ED98; outline-offset: 6px; }
+.ff-story__ghost svg { flex: none; width: 82px; height: 82px; max-width: none; }
+
+.ff-story__done {
+  width: 196px;
+  height: 196px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-story__done:hover { background: #3BDC8C; }
+.ff-story__done:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+.ff-story__done svg { flex: none; width: 96px; height: auto; max-width: none; }
+
+/* ── Everything the reference does not draw ──────────────────────────────────
+   Absolutely positioned below the column, so none of it can move the
+   composition by a pixel. It scales with the stage like everything else on the
+   page — the reference's own model — so the sizes here are stage units: at this
+   page's own 0.4 they read at roughly 13-14px, and the approval's target is
+   sized so it lands at a real 44px (§33.11).                               */
+
+.ff-story__sub {
   position: absolute;
+  top: 100%;
   left: 0;
-  top: calc(100% - 165px - 130px + 10px);
-  margin: 0;
-  width: 1491px;
-  max-width: none;
+  right: 0;
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.ff-story__sub p { margin: 0; max-width: 1500px; }
+
+/* `.ff-story__approve` and `.ff-story__check` stood here — the §12 approval
+   checkbox and its label. Removed 2026-08-20 by explicit product direction,
+   along with the control in `StoryStep.tsx`; see that file for what is lost. */
+
+.ff-story__note {
   font-size: 30px;
   font-weight: 500;
-  line-height: 1.28;
+  line-height: 1.45;
   color: #013F17;
 }
-.ff-vis__failline {
-  top: calc(100% - 165px - 130px + 74px);
-  color: #B3261E;
+
+/* §9's autosave vocabulary. Announced always, and visible only when it is a
+   failure or when a recording is being turned into words — the two states the
+   reference has no need of and this screen does (§1.1). */
+.ff-story__status {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: normal;
+  color: #013F17;
+}
+.ff-story__status[data-state='failed'],
+.ff-story__status[data-state='working'] {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+.ff-story__alert {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #013F17;
 }
 
-/* Announced, never drawn: it would otherwise be a second copy of the note. */
-.ff-vis__live { position: absolute; }
+/* §12's helper resources, inside the drawer the reference's HELP opens. */
+.ff-help__extra { margin: 0 0 var(--sp-24); }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   PHASE 63 — the Founder flow, screen 11: more about your brand
-   (2026-08-20)
+/* The reference's own one media query for this screen. Everything else is the
+   stage, and the stage scales rather than reflowing. */
+@media (max-width: 600px) {
+  .ff-story__back { bottom: 92px; padding: 8px 14px; }
+}
 
-   BUILT FROM SCRATCH against the supplied reference
-   (`Proovd Founder Flow v2.dc.html`, `[data-brand]` / `kindWide`) and its
-   screenshot, and inserted between the branding screen and the interview.
-   `ColorStep.tsx`'s header is the reasoning; this is the composition.
+/* ══════════════════════ PHASE 63 — screen 15, Last look, rebuilt 1:1 from
+   the reference (Founder Flow v2, `[data-lastlook]` / `kindWide`), 2026-08-20.
 
-   Every number below is the reference's own, on its own 2496x1542 stage —
-   `ColorStep` owns the scale and writes the whole transform on mount and on
-   resize; the `scale(0.37)` here is the reference's own placeholder and is what
-   renders for the one frame before the layout effect runs. Nothing reflows: the
-   stage scales, which is why the composition is identical at every viewport
-   (§33.11.1). `isClaimPhone()` returns `false` in the reference — "one
-   composition everywhere: the phone posture stays off" — so its `kindPhone`
-   branch is dead code there and this is what every viewport gets.
+   Drawn to the supplied reference (`Proovd Founder Flow v2.dc.html`) and
+   measured against it in a real browser at 1320x900, on the terms every other
+   1:1 screen of this flow ships under: the reference outranks the design
+   system HERE, and nowhere else.
 
-   ── The column is the VISUALS headline wide, and that is on purpose ───────
-   `width: fit-content` over a column whose widest child is a hidden 112px span
-   reading `We want to see your product...` — 1491px at Satoshi's metrics. This
-   screen's own 136px headline is narrower, so without that span the panel and
-   the CTA would be a different width here than on the screens either side. The
-   number is a property of the face, so nothing is hardcoded except the two
-   places that have to name it (`__note`, `__status`) and they name the same
-   1491 `.ff-vis` already does.
+   ── This is not `.ff-look` ────────────────────────────────────────────────
+   `.ff-look` was the Session D surface — a token-scale card list at the
+   product's own sizes. It is gone with its component. `.ff-ll` is a different
+   composition over the same record, so it is a different prefix, the way
+   `.ff-pc` is not `.ff-prob`.
 
-   Unlike the visuals screen this column is `align-items: center` — the
-   reference's own — so the pill needs no `align-self` and the nowrap headline
-   centres over the panel.
+   ── The layout model is the reference's, literally ────────────────────────
+   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
+   scaled to the viewport by `fitStages()`:
 
-   ── The two suspended conventions, as on screens 1–15 ─────────────────────
-     - HEX LITERALS, not tokens. `#41ED98`, `#013F17`, `#FAFAFA`, `#E9FFE1`,
-       `#8FCBA3`, `#A2AFA8`, `#FBFFD4`, `#7FD9A4`, `#012D10` and `#3BDC8C` are
-       the reference's own; mixing literal and token would leave half the screen
-       able to drift with a token change and half not.
-     - RADIUS 2px, literal, and 0 on everything the reference leaves square —
-       which here is everything except the CTA. It is what `var(--radius)`
-       resolves to under the owner ruling, so the two agree today; the literal
-       is here for the same reason the colours are.
+       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
+       if (!hero && c === 'vetting' && vReviewing) s *= .9;
 
-   ── The empty slot's dash is a gradient, not `border-style: dashed` ───────
-   The reference's own four-layer repeating gradient over a transparent border:
-   18px on / 28px off at 4px, one layer per edge. A `dashed` border rounds its
-   dash length to fit each edge, so three slots side by side would disagree with
-   each other and with the reference at every viewport; a gradient dash is exact
-   and scales with the stage. Same decision `.ff-vis` records for its drop zone.
+   The `.9` is this screen's own branch, with the reference's own reason:
+   "Last look carries the whole answer grid, so it sits a notch under the other
+   pages." The component owns the scale and writes the whole transform on mount
+   and on resize; the `scale(0.3713)` below is what renders for the one frame
+   before the layout effect runs, and is the value measured at 1320x900.
+   Nothing here reflows — the stage scales instead, which is why the
+   composition is identical at every viewport (§33.11.1).
+
+   `isClaimPhone()` returns `false` in the reference — "one composition
+   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+   code and this composition is what every viewport gets, exactly as there.
+
+   ── The column measures itself ────────────────────────────────────────────
+   `width: fit-content`, and its first child is a hidden `nowrap` span at
+   112px/700. That span IS the width: measured in the reference, the column and
+   the span both read 1521.34px and the grid inside is 100% of it. The
+   mechanism is reproduced rather than the number, because a literal 1521.34
+   would be right for one font cut and quietly wrong for the next.
+
+   ── The two suspended conventions, as on screens 1–8 ──────────────────────
+     - HEX LITERALS, not tokens. Six of the reference's colours here have exact
+       or near tokens; mixing literal and token would leave half the screen able
+       to drift with a token change and half not.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are.
 
    ── What the project's globals do to this screen, overridden explicitly ───
    `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the headline,
-   `p { margin; max-width: var(--measure) }` reaches the two added lines, `ul`
-   carries a list style and padding, `input` inherits the design system's own
-   field treatment, `img` carries `max-width:100%`, and `body`'s 18px /
-   line-height 1.6 reaches the whole stage — the reference's own body sets
-   neither, so the stage resets both.
+   `p { margin; max-width: var(--measure) }` reaches the foot line, `button`'s
+   own reset reaches the cards and the CTA, and `body`'s 18px / line-height 1.6
+   reaches the whole stage — the reference's own body sets neither, so the stage
+   resets both.
+   ═════════════════════════════════════════════════════════════════════════ */
 
-   ── The two blocks the reference does not draw ────────────────────────────
-   `.ff-col__note` (what the picker is for, and the full-slots sentence) and
-   `.ff-col__status` (§9's autosave vocabulary — this screen writes a record and
-   the reference holds its own in memory). Both are ABSOLUTELY positioned inside
-   the 130px gap the composition already leaves above the CTA, so not one
-   reference box moves for either.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* `FlowPage`'s chrome is not drawn on this screen, and the reason is not that
+   the reference has none. It has a wordmark and a HELP, and it draws them
+   INSIDE the `z-index: 25` fixed layer below. Left in place they would sit
+   under that layer and be unreachable. There is no message badge on this
+   screen at all: the reference draws none. */
+.ff[data-flow-page='last-look'] .ff__top,
+.ff[data-flow-page='last-look'] .ff__badge { display: none; }
 
-/* `FlowPage`'s chrome is not drawn on this screen — and the reason is not that
-   the reference has none. It has a wordmark, a HELP and a message bell, and it
-   draws all three INSIDE the `z-index: 25` fixed layer below. Left in place
-   they would sit under that layer and be unreachable, so both are hidden and
-   both leave the tab order with it. */
-.ff[data-flow-page='color'] .ff__top,
-.ff[data-flow-page='color'] .ff__badge { display: none; }
-
-/* The reference's `[data-brand]`. Nothing scrolls. */
-.ff-col {
+/* The reference's `[data-lastlook]`. Nothing scrolls. */
+.ff-ll {
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: #FAFAFA;
   z-index: 25;
   font-family: 'Satoshi', sans-serif;
+  color: #013F17;
 }
 
-/* The read failed, so there is no composition to draw. It keeps the layer's
-   ground and centres the panel; nothing here is the reference's, because the
-   reference holds its record in memory and has no failure to render. */
-.ff-col__failure {
-  min-height: 60vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--sp-24);
-}
-
-/* ── The chrome. Its clamps are the reference's own, and they are
+/* ── The chrome. Its `clamp()`s are the reference's own, and they are
    viewport-relative there too: this is furniture rather than part of the
    composition, so it does not scale with the stage. ─────────────────────── */
 
-.ff-col__back {
+.ff-ll__back {
   position: absolute;
   left: clamp(20px, 3vw, 46px);
   bottom: clamp(20px, 3vw, 40px);
@@ -17640,14 +17509,14 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   cursor: pointer;
   outline: none;
 }
-.ff-col__back:hover { color: #013F17; }
+.ff-ll__back:hover { color: #013F17; }
 /* The reference has no focus treatment at all. A visible one is added rather
    than reproduced, because a control a keyboard user cannot locate is not the
    same control (§28.5, §33.11) and it costs the composition nothing. */
-.ff-col__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
-.ff-col__back svg { width: 11px; height: 11px; flex: none; }
+.ff-ll__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-ll__back svg { width: 11px; height: 11px; flex: none; }
 
-.ff-col__top {
+.ff-ll__top {
   position: absolute;
   left: 0;
   right: 0;
@@ -17658,13 +17527,13 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   justify-content: space-between;
   padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
 }
-.ff-col__logo {
+.ff-ll__logo {
   height: clamp(26px, 2.4vw, 36px);
   width: auto;
   max-width: none;
   display: block;
 }
-.ff-col__help {
+.ff-ll__help {
   padding: 10px 22px;
   min-height: 40px;
   border: 2px solid #41ED98;
@@ -17680,89 +17549,40 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   cursor: pointer;
   outline: none;
 }
-.ff-col__help:hover { background: #E9FFE1; }
-.ff-col__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-ll__help:hover { background: #E9FFE1; }
+.ff-ll__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
 
-/* The message bell. Its geometry is the reference's; its number is not, and
-   `ColorStep`'s header says what the difference is. It does not shake. */
-.ff-col__mailbtn {
-  position: absolute;
-  right: clamp(20px, 3vw, 46px);
-  bottom: clamp(20px, 3vw, 40px);
-  z-index: 6;
-  padding: 0;
-  border: none;
-  background: none;
-  font-size: 13.3333px;
-  line-height: normal;
-  cursor: pointer;
-  outline: none;
-}
-.ff-col__mailbtn:focus-visible { outline: 2px solid #013F17; outline-offset: 4px; }
-.ff-col__mail {
-  position: relative;
-  width: clamp(58px, 5.2vw, 78px);
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #41ED98;
-  box-sizing: border-box;
-}
-.ff-col__mail img { width: 68%; height: auto; max-width: none; display: block; }
-.ff-col__mailcount {
-  position: absolute;
-  left: -10%;
-  top: -16%;
-  min-width: 31%;
-  height: 31%;
-  padding: 0 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #41ED98;
-  background: #FAFAFA;
-  box-sizing: border-box;
-  font-family: 'Satoshi', sans-serif;
-  font-size: clamp(10px, 0.9vw, 13px);
-  line-height: 1;
-  font-weight: 700;
-  color: #41ED98;
-}
+/* ── The stage, and the column inside it ─────────────────────────────────── */
 
-/* ── The stage, and the fit-content column inside it ─────────────────────── */
-
-.ff-col__stage {
+.ff-ll__stage {
   width: 2496px;
   height: 1542px;
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) scale(0.37);
+  transform: translate(-50%, -50%) scale(0.3713);
   transform-origin: center center;
-  /* See the header: the reference's body sets neither, and this file's does. */
+  color: #013F17;
   font-size: 16px;
   line-height: normal;
-  color: #013F17;
 }
 
-.ff-col__col {
+/* `translate(-50%, calc(-50% + 70px))` — its own offset, and the column is
+   CENTRED on the stage rather than pinned to it. */
+.ff-ll__col {
   position: absolute;
   left: 50%;
   top: 50%;
   width: fit-content;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, calc(-50% + 70px));
   display: flex;
   flex-direction: column;
-  /* The reference's own, and why nothing here needs `align-self`. */
   align-items: center;
 }
 
-/* The reference's own hidden measure — it is what makes this column 1491px,
-   the same width as the screens either side. `visibility: hidden` rather than
-   `display: none`, because a `display:none` child contributes no width and the
-   whole point of it is the width. */
-.ff-col__measure {
+/* The measurement. Zero-height, clipped, and hidden — it renders nothing and
+   is `aria-hidden` in the markup, so it is a width and never content. */
+.ff-ll__measure {
   height: 0;
   overflow: hidden;
   font-size: 112px;
@@ -17772,293 +17592,120 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   visibility: hidden;
 }
 
-.ff-col__pill {
-  padding: 26px 46px;
-  background: #FBFFD4;
+.ff-ll__head {
+  margin: 0;
+  font-size: 112px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: #013F17;
+}
+
+.ff-ll__label {
+  margin-top: 70px;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7FD9A4;
+}
+
+.ff-ll__fee {
+  margin-top: 22px;
+  font-size: 240px;
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  color: #013F17;
+}
+
+.ff-ll__sub {
+  margin-top: 34px;
+  font-size: 44px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: #013F17;
+}
+
+.ff-ll__hint {
+  margin-top: 96px;
+  font-size: 44px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: #A2AFA8;
+}
+
+/* Eight cards, four to a row. `1fr` columns over a column whose width the
+   measuring span fixes, so every card is the same size whatever its label. */
+.ff-ll__grid {
+  margin-top: 88px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 36px;
+}
+
+.ff-ll__card {
+  height: 184px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0;
+  border: 3px solid #A2AFA8;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Satoshi', sans-serif;
+  text-align: center;
+  /* The reference's own curve, and its own 0.25s. */
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  outline: none;
+}
+.ff-ll__card:hover { transform: scale(1.06); }
+.ff-ll__card:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+/* `filled` — the reference's three paired values, together so they cannot be
+   set apart. */
+.ff-ll__card.is-added {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.06);
+}
+.ff-ll__card.is-added .ff-ll__card-tag { color: #41ED98; }
+/* The three §9 answers. Not a button, so no hover and no pointer: the box is
+   the reference's, and the absence of the affordance is what says the card
+   does not open. */
+.ff-ll__card.is-locked {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.06);
+  cursor: default;
+}
+.ff-ll__card.is-locked .ff-ll__card-tag { color: #41ED98; }
+
+.ff-ll__card-title {
   font-size: 44px;
   font-weight: 700;
-  line-height: normal;
   letter-spacing: -0.02em;
+  line-height: 1.1;
   color: #013F17;
 }
-
-.ff-col__head {
-  margin: 72px 0 0;
-  font-size: 136px;
-  font-weight: 700;
-  line-height: 1.22;
-  letter-spacing: -0.03em;
-  color: #013F17;
-  white-space: nowrap;
-}
-
-.ff-col__panel {
-  margin-top: 100px;
-  width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1.53fr) minmax(0, 1fr);
-  gap: 100px;
-  /* `start`, not `stretch`: the card is as tall as its own content and the
-     left column ends wherever the swatches end. `margin-top:auto` on the Add
-     button is therefore inert, and it is inert in the reference too. */
-  align-items: start;
-}
-
-.ff-col__left { min-width: 0; }
-
-/* ── The saturation / brightness plane ───────────────────────────────────── */
-
-.ff-col__plane {
-  width: 100%;
-  height: 370px;
-  position: relative;
-  cursor: crosshair;
-  touch-action: none;
-  outline: none;
-}
-/* Added, not reproduced — see `.ff-col__back`. Offset outward so the ring sits
-   clear of the plane's own edge, where the handle can travel. */
-.ff-col__plane:focus-visible { outline: 5px solid #013F17; outline-offset: 6px; }
-.ff-col__planewhite,
-.ff-col__planeblack {
-  position: absolute;
-  inset: 0;
-}
-.ff-col__planewhite { background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0)); }
-.ff-col__planeblack { background: linear-gradient(0deg, #000, rgba(0, 0, 0, 0)); }
-.ff-col__planehandle {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: 34px;
-  height: 34px;
-  border: 5px solid #FAFAFA;
-  box-sizing: border-box;
-  pointer-events: none;
-}
-
-/* ── The hue bar ─────────────────────────────────────────────────────────── */
-
-.ff-col__hue {
-  width: 100%;
-  height: 34px;
-  margin-top: 52px;
-  position: relative;
-  cursor: pointer;
-  touch-action: none;
-  outline: none;
-  background: linear-gradient(90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
-}
-.ff-col__hue:focus-visible { outline: 5px solid #013F17; outline-offset: 10px; }
-.ff-col__huehandle {
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 52px;
-  height: 58px;
-  border: 4px solid #013F17;
-  background: #FAFAFA;
-  box-sizing: border-box;
-  pointer-events: none;
-}
-
-/* ── The three slots ─────────────────────────────────────────────────────── */
-
-.ff-col__slots {
-  margin: 90px 0 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 60px;
-}
-.ff-col__slots > li { min-width: 0; }
-
-.ff-col__slotempty {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 4px solid transparent;
-  box-sizing: border-box;
-  background-image:
-    repeating-linear-gradient(90deg, #8FCBA3 0 18px, transparent 18px 46px),
-    repeating-linear-gradient(90deg, #8FCBA3 0 18px, transparent 18px 46px),
-    repeating-linear-gradient(0deg, #8FCBA3 0 18px, transparent 18px 46px),
-    repeating-linear-gradient(0deg, #8FCBA3 0 18px, transparent 18px 46px);
-  background-size: 100% 4px, 100% 4px, 4px 100%, 4px 100%;
-  background-position: 0 0, 0 100%, 0 0, 100% 0;
-  background-repeat: no-repeat;
-  background-origin: border-box;
-}
-
-.ff-col__swatch {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1;
-  border: none;
-  border-radius: 0;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  outline: none;
-  /* The prototype harness's own `style-hover`. */
-  transition: filter 0.2s ease;
-}
-.ff-col__swatch:hover { filter: brightness(0.72); }
-.ff-col__swatch:disabled { cursor: default; }
-.ff-col__swatch:focus-visible { outline: 5px solid #013F17; outline-offset: 6px; }
-
-/* `[data-x]{opacity:0;transition:opacity .15s ease}` +
-   `[data-swatch]:hover [data-x]{opacity:1}` — the reference's own, plus its
-   `@media (hover:none)` rule, so a touch device is never left with a remove
-   control it cannot reveal. `:focus-visible` is added for the same reason on a
-   keyboard. */
-.ff-col__x {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44%;
-  height: 44%;
-  background: #FAFAFA;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-.ff-col__swatch:hover .ff-col__x,
-.ff-col__swatch:focus-visible .ff-col__x { opacity: 1; }
-@media (hover: none) {
-  .ff-col__x { opacity: 1; }
-}
-
-.ff-col__slothex {
-  display: block;
-  margin-top: 30px;
-  text-align: center;
-  font-size: 34px;
-  font-weight: 700;
+.ff-ll__card-tag {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
   line-height: normal;
-  letter-spacing: -0.02em;
-  color: #013F17;
+  text-transform: uppercase;
+  color: #7FA98D;
 }
 
-/* ── The selected-colour card ────────────────────────────────────────────── */
-
-.ff-col__card {
-  border: 5px solid #7FD9A4;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-}
-.ff-col__cardtop {
-  padding: 112px 0 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.ff-col__preview {
-  width: 66%;
-  aspect-ratio: 1;
-}
-.ff-col__selected {
-  margin-top: 58px;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: normal;
-  letter-spacing: -0.01em;
-  color: #013F17;
-}
-.ff-col__hexwrap {
-  margin: 26px 0 84px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.ff-col__hexrow {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-/* The design system's own field treatment reaches every `input`; the reference
-   draws a bare centred code with a rule under it, so all of it is undone. */
-.ff-col__hexinput {
-  width: 340px;
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  outline: none;
-  box-shadow: none;
-  text-align: center;
-  font-family: 'Satoshi', sans-serif;
-  font-size: 58px;
-  font-weight: 700;
-  line-height: normal;
-  letter-spacing: -0.02em;
-  color: #013F17;
-}
-.ff-col__hexinput:focus,
-.ff-col__hexinput:focus-visible {
-  outline: none;
-  border: none;
-  box-shadow: none;
-}
-.ff-col__pencil { flex: none; display: block; }
-.ff-col__hexrule {
-  margin-top: 18px;
-  width: 100%;
-  height: 3px;
-  background-image: repeating-linear-gradient(90deg, #A2AFA8 0 11px, transparent 11px 30px);
-}
-/* The field carries no border of its own, so the rule below it is what a
-   keyboard user has to see change: the reference's own dashed grey turns
-   SOLID, and nothing moves — the height stays 3px, so the card does not grow
-   by a pixel and no reference box shifts.
-
-   It goes to the page's own ink rather than to brand green. `#41ED98` on
-   `#FAFAFA` is 1.46:1 and the browser pass showed the result: a rule you have
-   to look for, as the only indicator on a text field. `#013F17` is 11.7:1, and
-   the change from dashed-grey to solid-dark is unmistakable at a glance. */
-.ff-col__hexwrap:focus-within .ff-col__hexrule {
-  background-image: none;
-  background-color: #013F17;
-}
-
-.ff-col__add {
-  margin-top: auto;
-  width: 100%;
-  height: 112px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 0;
-  background: #013F17;
-  color: #E9FFE1;
-  font-family: 'Satoshi', sans-serif;
-  font-size: 52px;
-  font-weight: 700;
-  line-height: normal;
-  letter-spacing: -0.02em;
-  cursor: pointer;
-  outline: none;
-  transition: background 0.2s ease;
-}
-.ff-col__add:hover { background: #012D10; }
-.ff-col__add:disabled { cursor: default; opacity: 0.55; }
-.ff-col__add:focus-visible { outline: 3px solid #41ED98; outline-offset: -8px; }
-
-/* ── The CTA, and the two lines the reference does not draw ──────────────── */
-
-.ff-col__cta {
-  margin-top: 130px;
+.ff-ll__cta {
+  margin-top: 150px;
   width: 100%;
   height: 165px;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   border: none;
   border-radius: 2px;
   background: #41ED98;
@@ -18069,57 +17716,70 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   line-height: normal;
   letter-spacing: -0.02em;
   cursor: pointer;
-  outline: none;
+  /* The owner ruling's inset highlight, at the reference's own values. */
   box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
-  transition: background 0.2s ease;
+  outline: none;
 }
-.ff-col__cta:hover { background: #3BDC8C; }
-.ff-col__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+.ff-ll__cta:hover { background: #3BDC8C; }
+.ff-ll__cta:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
 
-/* ONE block inside the 130px gap the CTA's own margin already leaves, so the
-   note and the save status sit between the panel and the button without moving
-   either. They stack in FLOW inside it rather than at two fixed offsets — the
-   first draft positioned each absolutely and the browser pass caught the
-   consequence: the note wrapped to two lines at this column width and `Saved
-   12:03 AM` printed on top of the second one. A flow block cannot do that
-   however either line grows.
+/* ── Chrome, not composition ─────────────────────────────────────────────── */
 
-   1491px is the column's own width, named here for the same reason `.ff-vis`
-   names it: an absolutely positioned child has no flow width to inherit. */
-.ff-col__gap {
+/* The return contract and §12's high-effort line. Bottom-centre, at the
+   furniture scale, between the Back control and the right edge — screen 1's
+   own legal-line treatment, which is why this is inside the reference's
+   vocabulary rather than an addition to the stage. Deep green rather than a
+   legal grey: it states rules a Founder acts on, and `#B4B4B5` on `#FAFAFA` is
+   2.3:1 (Founder Flow Session E's rule — a caption may be quiet, a sentence
+   that changes what somebody does may not). */
+.ff-ll__foot {
   position: absolute;
-  left: 0;
-  top: calc(100% - 165px - 130px + 8px);
-  width: 1491px;
-  /* No height and no `overflow` on purpose. The block is out of flow, so it can
-     never push the CTA; a fixed height with `overflow: hidden` would instead
-     SWALLOW a line that grew, which is the silent version of the defect the
-     browser pass just caught. The budget is 122px — the 130px gap less the 8px
-     above — and at this column width the note is one line (38px) and the status
-     one more (38px + 6px), so there is room to spare. Copy that needed more
-     than the budget would visibly crowd the CTA, which is a signal rather than
-     a disappearance. */
-}
-.ff-col__note,
-.ff-col__status {
+  left: 50%;
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 5;
+  transform: translateX(-50%);
   margin: 0;
-  width: 100%;
+  width: min(62vw, 900px);
   max-width: none;
-  font-size: 30px;
+  text-align: center;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, 0.78vw, 12px);
   font-weight: 500;
-  line-height: 1.28;
-  color: #013F17;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  text-wrap: pretty;
 }
-.ff-col__status {
-  margin-top: 6px;
-  font-weight: 700;
-  /* `--moss` is the caption tone and this is not a caption: it is the answer to
-     "did that save", at 12 CSS px. It takes the page's own ink, and the failure
-     states take `.ff-vis__failline`'s red. */
-  color: #013F17;
-}
-.ff-col__status[data-state='failed'],
-.ff-col__status[data-state='retrying'] { color: #B3261E; }
 
-/* Announced, never drawn: it would otherwise be a second copy of the note. */
-.ff-col__live { position: absolute; }
+/* The two states the reference never has, because it holds its record in
+   memory. Centred in the same field the stage occupies.
+
+   `.wrap` is a VIEWPORT width (`min(90vw, 1600px)`), so `SurfaceLoading`'s own
+   `Section` would compute wider than this box and spill — PHASE 38's finding,
+   in its general form. The section's vertical rhythm goes with it: this box is
+   already centred, so padding above and below only moves it off centre. */
+.ff-ll__state {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 34rem);
+  margin: 0;
+  max-width: none;
+  color: #013F17;
+}
+.ff-ll__state .wrap { width: 100%; }
+.ff-ll__state .section { padding-block: 0; }
+.ff-ll__state .measure { max-width: none; }
+
+/* ══════════════════════════════════════════ PHASE 63 — RESPONSIVE ══
+   One media query, and it is not a reflow: the stage is one composition at
+   every width (`isClaimPhone()` is `false` in the reference). What changes is
+   the furniture, which was never on the stage — at phone width the foot line
+   would sit under the Back control, so it clears it. */
+@media (max-width: 600px) {
+  .ff-ll__foot {
+    width: calc(100vw - 40px);
+    bottom: calc(clamp(20px, 3vw, 40px) + 34px);
+  }
+}
