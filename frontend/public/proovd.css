@@ -10289,3 +10289,200 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
   .fd-live__change > div,
   .fd-live__data > div { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* -- PHASE 39 -- Chapter 3, Get paid ---------------------------------------
+   Founder Dashboard Session E, added 2026-08-19. Spec 21, 22.3, 22.4, 22.5.
+
+   The reference's own shape, kept: a money moment, then an ordered list of
+   obligations, each openable. What is NOT kept is the spine it hangs them on
+   -- `Request payment` / `In review` / `Paid` -- because 22.3 has no Founder
+   request for a scheduled payment, and a control for one would say the money
+   is waiting on the person reading it.
+
+   Nor is the money block. The reference computes `net = gross - aff - proovd`
+   in the browser and splits it 40/60 with `Math.round`; the eligible share
+   subtracts five terms, the remaining payment is the exact remainder, and
+   `readFounderPaymentStatus` is the one place any of it is worked out. So the
+   hero here is that resolver's own number with its own note under it.
+
+   Every grid declares `minmax(0, 1fr)` from the start -- Session C's finding,
+   applied before a browser pass can rediscover it. This chapter carries
+   money strings, provider-shaped references, evidence text and a select.
+   -------------------------------------------------------------------------- */
+
+.fd-paid__retry,
+.fd-paid__payments,
+.fd-paid__results,
+.fd-paid__obligations,
+.fd-paid__day14 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-end: var(--sp-24);
+}
+
+/* The counts a Founder reads twice -- once for the retry window and once for
+   the results. A definition list rather than a table: every number here needs
+   a word beside it that says what it counts, and a table row has nowhere for
+   one. */
+.fd-paid__counts {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: var(--sp-4) var(--sp-12);
+  margin: var(--sp-8) 0;
+}
+.fd-paid__counts > div { display: contents; }
+.fd-paid__counts dt { color: var(--moss); margin: 0; overflow-wrap: anywhere; }
+.fd-paid__counts dd { margin: 0; overflow-wrap: anywhere; }
+
+/* The schedule. One row per 22.3 payment, in the order the settings put them,
+   with the blockers under the row they block rather than collected at the
+   bottom -- 22.3 asks for the requirement BY NAME beside the amount affected. */
+.fd-paid__schedule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fd-paid__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-paid__linehead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: baseline;
+  margin: 0;
+}
+.fd-paid__linemeta { color: var(--moss); margin: 0; }
+
+/* A named blocker and a missing early-release proof are the same shape: a
+   short list of things somebody has to act on. `--dark` rather than `--moss`
+   for the same reason `.fd-note` is -- these decide whether money moves. */
+.fd-paid__blockers {
+  margin: var(--sp-4) 0 0;
+  padding-left: var(--sp-16);
+  color: var(--dark);
+}
+.fd-paid__blockers li { overflow-wrap: anywhere; }
+
+/* 22.3's secure action. It is an instruction rather than a link -- Proovd
+   never collects the W-9 itself -- so it reads as copy and not as a control. */
+.fd-paid__action {
+  margin: 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-left: var(--bw) solid var(--brand);
+  background: var(--brand-5);
+  overflow-wrap: anywhere;
+}
+
+.fd-paid__early,
+.fd-paid__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-start: var(--sp-12);
+}
+
+/* A `.btn` is inline-flex and a DIRECT flex/grid child in a column is
+   stretched to the container -- the defect Founder Flow Sessions D and E, the
+   Money console, and Sessions C and D each recorded. Scoped to direct
+   children so nothing inside a wrapped row is touched. */
+.fd-paid__early > .btn,
+.fd-paid__form > .btn,
+.fd-paid__deliver > .btn { justify-self: start; }
+
+.fd-paid__narrative {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+}
+.fd-paid__creators {
+  margin: var(--sp-12) 0 0;
+  padding-left: var(--sp-16);
+}
+/* A public handle is one unbreakable token and is wider than the column at
+   320 -- PHASE 36 made this call twice on the Money console, and Sessions C
+   and D once each here. */
+.fd-paid__creators li { overflow-wrap: anywhere; }
+
+/* 22.5's four obligations, and the commitment sequence under them. The
+   original is row one and stays row one (33.10.2): it is what the delivery
+   notice, the 24.11 evidence packet and 22.7's third trigger all read. */
+.fd-paid__oblist,
+.fd-paid__commitments,
+.fd-paid__clarifications {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  list-style: none;
+  margin: var(--sp-8) 0 0;
+  padding: 0;
+}
+.fd-paid__ob,
+.fd-paid__commitment,
+.fd-paid__clarification {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-paid__obhead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: baseline;
+  margin: 0;
+}
+.fd-paid__obmeta { color: var(--moss); margin: 0; overflow-wrap: anywhere; }
+
+.fd-paid__deliver {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-start: var(--sp-16);
+}
+
+/* 22.4's durable receipt. A reference is a token nobody can break, and the
+   detail beside it is free text a Founder typed. */
+.fd-paid__receipt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+  margin-block-end: var(--sp-16);
+}
+
+@media (max-width: 600px) {
+  .fd-paid__counts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* -- Two fixes the browser pass found, and neither is visible to jsdom ------
+
+   1. `--fs-num` HAS A 2.5rem FLOOR, AND THIS IS THE FIRST HERO THAT IS MONEY.
+      `.stat__value` is the done-moment number slot, sized for a COUNT --
+      Chapter 2's Glance puts `44` in it. `US$4,180.80` is eleven glyphs of one
+      unbreakable token, and at 40px it ran 91px past its card at 320, which
+      then pushed the measure, the section, and the document sideways: one
+      defect reported as ten. The floor is lowered where the hero is a
+      currency, and only there, so every counting Stat in the product is
+      untouched. Not `overflow-wrap` -- breaking an amount across two lines is
+      worse than shrinking it.
+
+   2. `.stat__sub` IS `--grey`, WHICH IS 2.27:1 ON WHITE. It carries the label
+      of the largest money figure a Founder will read, which is the case
+      Founder Flow Session E's rule is about -- a line that says what a number
+      MEANS is not a caption. Scoped, for the reason Session C recorded: the
+      token's own ratio is a product-wide decision with its own pass. */
+.fd-paid__payments .stat__value { font-size: clamp(1.5rem, 7vw, 4.5rem); }
+.fd-paid__payments .stat__sub { color: var(--dark); }

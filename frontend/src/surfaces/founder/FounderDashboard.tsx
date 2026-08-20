@@ -59,6 +59,7 @@ import { Drawer, Measure, NO_ACTION, Section, StatePanel, Tag } from '../../comp
 import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
 import { ChooseChapter } from './chapters/ChooseChapter.js';
 import { LiveChapter } from './chapters/LiveChapter.js';
+import { PaidChapter } from './chapters/PaidChapter.js';
 import {
   fetchFounderDashboard,
   FounderRequestError,
@@ -90,6 +91,11 @@ function ChapterBody({
   if (chapter === 'choose') {
     return <ChooseChapter campaignId={campaignId} campaignType={campaignType} />;
   }
+  // Session E: §21's retry window, §22.3's W-9 and schedule through the ONE
+  // resolver, §22.4's Day 14 checklist, and §22.5's four obligations. Phase
+  // 18b's `CampaignResults` and Phase 21a's `Fulfillment` are what it grew out
+  // of; both addresses redirect here.
+  if (chapter === 'payouts') return <PaidChapter campaignId={campaignId} />;
 
   const build = FOUNDER_CHAPTER_BUILD[chapter];
   const meta = FOUNDER_CHAPTERS.find((c) => c.id === chapter)!;

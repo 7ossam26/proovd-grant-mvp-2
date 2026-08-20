@@ -35,3 +35,4 @@ export * from './creator-flow/index.js';
 export * from './founder-dashboard/index.js';
 export * from './founder-dashboard/choose.js';
 export * from './founder-dashboard/live.js';
+export * from './founder-dashboard/paid.js';

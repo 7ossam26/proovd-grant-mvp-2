@@ -92,6 +92,33 @@ export interface FounderResults {
   /** §21: failed, recovered, and dropped payments. */
   payments: { failed: number; recovered: number; dropped: number };
 
+  /**
+   * §21's one recovery window, READ from the batch row (Founder Dashboard
+   * Session E). Every field here is stored: the hours were read from the §6
+   * `capture_retry_window_hours` setting at batch start and written onto the
+   * row, `first_failure_at` is anchored once by a conditional UPDATE, and
+   * `retry_deadline_at` is CHECK-pinned to the two of them and refused any
+   * later edit by trigger (0028).
+   *
+   * It exists because until now the Founder's own read carried nothing about
+   * it. `prepareResults` refuses while the window is open and names the
+   * deadline in ITS refusal, which only an Admin ever sees — so the Founder
+   * waiting on their results was told reconciliation was happening with no
+   * instant attached, which is §27.1's "when's the next update" unanswered on
+   * the one screen where the answer is a stored, immutable fact.
+   *
+   * `null` when no close batch has run. `not_opened` is a batch that closed
+   * with nothing failing — deliberately distinct from `closed`, because "no
+   * card ever failed" and "the window ran and ended" are different facts about
+   * a campaign (§16a: not yet populated is not zero).
+   */
+  retryWindow: {
+    state: 'not_opened' | 'open' | 'closed';
+    windowHours: number;
+    firstFailureAt: string | null;
+    deadlineAt: string | null;
+  } | null;
+
   /** §21: conversion and drop-off. A rate over zero clicks is null, never 0%. */
   conversion: {
     clicks: number;
@@ -384,6 +411,24 @@ export async function readFounderResults(
       recovered: Number(paymentCounts?.recovered ?? 0),
       dropped: Number(statusCounts?.dropped ?? 0),
     },
+    retryWindow: batch
+      ? {
+          // The campaign's own lifecycle decides `open`, not a comparison of
+          // the deadline against this process's clock: `endRetryWindow` is
+          // what moves the campaign out, and a window whose deadline has
+          // passed but whose sweep has not run yet is still open — that is
+          // exactly when an in-flight attempt is resolved under its own key.
+          state:
+            campaign.status === 'capture_retry_window'
+              ? 'open'
+              : batch.firstFailureAt
+                ? 'closed'
+                : 'not_opened',
+          windowHours: batch.retryWindowHours,
+          firstFailureAt: batch.firstFailureAt?.toISOString() ?? null,
+          deadlineAt: batch.retryDeadlineAt?.toISOString() ?? null,
+        }
+      : null,
     conversion: {
       clicks,
       placed,

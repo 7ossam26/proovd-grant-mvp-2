@@ -1217,6 +1217,17 @@ export interface FounderResultsView {
     totalCapturedCents: string;
   };
   payments: { failed: number; recovered: number; dropped: number };
+  /**
+   * §21's one recovery window, read from the close batch (Session E). Every
+   * field is stored and immutable — the surface renders the deadline, never a
+   * duration it worked out from a start time.
+   */
+  retryWindow: {
+    state: 'not_opened' | 'open' | 'closed';
+    windowHours: number;
+    firstFailureAt: string | null;
+    deadlineAt: string | null;
+  } | null;
   conversion: {
     clicks: number;
     placed: number;
@@ -1472,4 +1483,24 @@ export const submitDay14Evidence = (
   call(`${base(campaignId)}/day-14/evidence`, {
     method: 'POST',
     body: JSON.stringify({ items }),
+  });
+
+/**
+ * §22.4's clarification answer (Founder Dashboard Session E).
+ *
+ * `POST …/day-14/clarification` has been mounted and driven by Phase 21a's own
+ * suite since it was built; it had no client and no control anywhere. The
+ * fulfillment surface rendered the question, told the Founder that not
+ * answering within five business days is one of the things that fails the
+ * review, and offered nothing to answer with — on a review whose failure
+ * blocks a payment.
+ */
+export const respondToDay14Clarification = (
+  campaignId: string,
+  requestId: string,
+  responseNote: string,
+): Promise<{ status: string }> =>
+  call(`${base(campaignId)}/day-14/clarification`, {
+    method: 'POST',
+    body: JSON.stringify({ requestId, responseNote }),
   });

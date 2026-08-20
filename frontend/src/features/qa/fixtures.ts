@@ -773,6 +773,13 @@ const results: FounderResultsView = {
     totalCapturedCents: '571560',
   },
   payments: { failed: 3, recovered: 2, dropped: 1 },
+  /* §21's window, closed — the state a `closed_reconciling` campaign is in. */
+  retryWindow: {
+    state: 'closed',
+    windowHours: 48,
+    firstFailureAt: '2026-09-12T17:20:00.000Z',
+    deadlineAt: '2026-09-14T17:20:00.000Z',
+  },
   conversion: { clicks: 1840, placed: 47, conversionRate: '2.6%', canceled: 3, dropOffRate: '6.4%' },
   survey: {
     consentedCount: 28,
@@ -963,12 +970,28 @@ const day14: Day14ChecklistView = {
     },
   ],
   reviewOpen: true,
-  outcome: 'open',
+  outcome: 'pending',
   decisionDueAt: '2026-09-26T17:00:00.000Z',
   blocksAPayment: true,
   enforcementOnly: false,
   submissions: [],
-  clarifications: [],
+  /*
+    One open clarification, so the sweep renders the answer control Session E
+    added. §22.4's five-business-day window has been on the surface since Phase
+    21a with nothing to answer it — a fixture with an empty list would have
+    swept a screen that never showed the gap.
+  */
+  clarifications: [
+    {
+      id: '00000000-0000-4000-8000-0000000000d1',
+      question: 'Which of the tooling photographs is the current one?',
+      requestedAt: '2026-09-20T17:00:00.000Z',
+      dueAt: '2026-09-27T17:00:00.000Z',
+      respondedAt: null,
+      responseNote: null,
+      overdue: false,
+    },
+  ],
 };
 
 /* ── §11/§14/§18/§21 the Creator's surfaces ────────────────────────────────── */
@@ -2282,16 +2305,26 @@ export const QA_ROUTES: StubRoute[] = [
     every other fixture describes — §33.11.5's rule: a fixture set where each
     surface invents its own facts cannot notice a disagreement.
 
-    `campaignLiveAt` is set because this campaign is `live`, and it is what
-    unlocks the Live chapter. A fixture that left it null while claiming `live`
-    would render a rail whose current chapter was locked.
+    `campaignLiveAt` is set because this campaign HAS been live, and it is what
+    unlocks the Live chapter. A fixture that left it null would render a rail
+    whose current chapter was locked.
+
+    THE STATUS IS `closed_reconciling`, NOT `live` (Session E, 2026-08-19), and
+    that is a correction rather than a preference. `founderChapterUnlocked`
+    opens the chapters a campaign has REACHED, so with `live` the sweep's own
+    `founder_paid` address fell back to Chapter 2 — §33.11 would have reported
+    Get paid as swept while rendering Live, which is §33.11.1's trap ("a
+    surface showing something else is not the flow") in its quietest form.
+    Past chapters stay open, so Choose and Live still render at their own
+    addresses; `qa.test.tsx` asserts the fixture unlocks every chapter the
+    register addresses, so this cannot rot back.
   */
   {
     match: /\/api\/founder\/campaigns\/[^/]+\/dashboard$/,
     body: {
       dashboard: {
         campaignId: QA.campaignId,
-        status: 'live',
+        status: 'closed_reconciling',
         type: 'pre_launch',
         campaignLiveAt: '2026-08-20T17:00:00.000Z',
         campaignCloseAt: QA.closesAt,

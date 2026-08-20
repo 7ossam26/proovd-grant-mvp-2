@@ -68,7 +68,16 @@ export const FOUNDER_CHAPTERS: readonly FounderChapter[] = [
     id: 'payouts',
     label: 'Get paid',
     title: 'Get paid',
-    note: 'Card retries, W-9, payout requests and delivery proof.',
+    /*
+      The reference's own line reads "Card retries, W-9, payout requests and
+      delivery proof." Session E replaced two thirds of it, deliberately:
+      §22.3 has no Founder request for a scheduled payment, and there is no
+      route that could take one, so a chapter note promising the control would
+      be §1.4's failure in the one sentence describing what the chapter is for.
+      "Delivery proof" went with it — §22.4's evidence is a recorded checklist
+      with a durable receipt, and R2 is unconfigured besides (Track A4).
+    */
+    note: 'Card retries, your W-9, when each payment lands, and what you owe your backers.',
     lockedLine: 'Opens when the campaign closes and the money is counted.',
   },
   {
@@ -249,16 +258,17 @@ export const FOUNDER_CHAPTER_BUILD = {
     ownedForNowBy: null,
   },
   payouts: {
+    // §21's retry window, §22.3's W-9 and schedule through the ONE resolver,
+    // §22.4's Day 14 checklist and its durable receipt, and §22.5's four
+    // obligations — built Session E. The retired `/results` and `/fulfillment`
+    // addresses redirect here.
     session: 'Session E',
-    ownedForNowBy: [
-      { label: 'Campaign results', path: '/campaigns/:campaignId/results' },
-      { label: 'Delivery and Day 14', path: '/campaigns/:campaignId/fulfillment' },
-    ],
+    ownedForNowBy: null,
   },
   after: {
     session: 'Session F',
     ownedForNowBy: [
-      { label: 'Campaign results', path: '/campaigns/:campaignId/results' },
+      { label: 'Get paid', path: '/campaigns/:campaignId/home?chapter=payouts' },
       { label: 'Your campaigns', path: '/campaigns' },
     ],
   },

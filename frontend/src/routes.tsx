@@ -38,8 +38,6 @@ import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
 import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
-import { CampaignResults } from './surfaces/founder/CampaignResults.js';
-import { Fulfillment } from './surfaces/founder/Fulfillment.js';
 import {
   CreatorNotificationSettings,
   FounderNotificationSettings,
@@ -142,6 +140,20 @@ function ChooseChapterRedirect() {
 function LiveChapterRedirect() {
   const { campaignId = '' } = useParams();
   return <Navigate to={founderDashboardPath(campaignId, 'live')} replace />;
+}
+
+/**
+ * `/results` and `/fulfillment` retired into Chapter 3 (Founder Dashboard
+ * Session E, 2026-08-19).
+ *
+ * Two Founder surfaces over one campaign's money would be two places to read
+ * an amount, which is the thing §33.8.13 exists to prevent. Both addresses
+ * survive their components because §27's close and Day-14 emails point at
+ * them, and because Appendix C's §34 walk steps name them.
+ */
+function PaidChapterRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderDashboardPath(campaignId, 'payouts')} replace />;
 }
 
 /*
@@ -822,29 +834,35 @@ const rootChildren: RouteObject[] = [
       chapter is `?chapter=` beneath it (DNA §5.12), so a position survives a
       reload without minting a second address for one campaign.
 
-      Chapter 1 (Session C) and Chapter 2 (Session D) are built; `/roster`,
-      `/creator-readiness` and `/updates` redirect into them. Get paid and Wrap
-      name the surfaces that own their work today until Sessions E and F move
-      it here.
+      Chapters 1–3 are built (Sessions C, D and E); `/roster`,
+      `/creator-readiness`, `/updates`, `/results` and `/fulfillment` all
+      redirect into them. Wrap names the surfaces that own its work today until
+      Session F moves it here.
     */
     path: 'campaigns/:campaignId/home',
     element: <FounderDashboard />,
   },
   {
-    // Phase 18b (§21, §33.7.11). The Founder's campaign results — the waiting
-    // state until `Results ready` fires, then every §21 number with the
-    // Admin-reviewed "what this does and does not prove" section.
+    /*
+      Retired into Chapter 3 (Session E, 2026-08-19). Phase 18b's §21 results —
+      the waiting state, every §21 number, and the Admin-reviewed "what this
+      does and does not prove" — are now a panel of the Get paid chapter, beside
+      the §22.3 schedule they decide. The address survives its component because
+      §27's `Results ready` message points at it.
+    */
     path: 'campaigns/:campaignId/results',
-    element: <CampaignResults />,
+    element: <PaidChapterRedirect />,
   },
   {
-    // Phase 21a (§22.4–§22.6). The Founder's fulfillment surface — the four
-    // §22.5 obligations with their real state, the delivery-commitment history
-    // with the original preserved first, the §22.6 change path that applies,
-    // and the Day 14 checklist. Beside the other campaign surfaces, outside
-    // both shells.
+    /*
+      Retired into Chapter 3 (Session E, 2026-08-19). Phase 21a's four §22.5
+      obligations, the commitment history with the original first, the §22.6
+      change path, and the §22.4 Day 14 checklist are panels of the Get paid
+      chapter. The address survives because §27's Day-14 and delivery messages
+      point at it.
+    */
     path: 'campaigns/:campaignId/fulfillment',
-    element: <Fulfillment />,
+    element: <PaidChapterRedirect />,
   },
   {
     // Phase 22c (§27.7). The first ACCOUNT-level address either role has had —

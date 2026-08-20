@@ -215,9 +215,25 @@ export const PRINCIPAL_FLOWS = [
         follows the content rather than the redirect.
       */
       '/campaigns/:campaignId/home?chapter=live',
-      '/campaigns/:campaignId/results',
-      '/campaigns/:campaignId/fulfillment',
     ],
+    keyboardPathRequired: true,
+  },
+  {
+    /*
+      Chapter 3, Get paid (Founder Dashboard Session E). `/results` and
+      `/fulfillment` retired into it and redirect; the sweep follows the
+      content, and both old addresses stay because §27's close, results, and
+      Day-14 messages point at them.
+
+      §28.5 names payment and recovery surfaces among its five keyboard paths,
+      and this is where a Founder answers a Day 14 clarification and asks for
+      an early release — both of which decide whether money moves.
+    */
+    key: 'founder_paid',
+    label: 'Getting paid: card retries, the W-9, the payment schedule, Day 14, and delivery',
+    specRef: '§21, §22.3, §22.4, §22.5',
+    audience: 'founder',
+    routes: ['/campaigns/:campaignId/home?chapter=payouts'],
     keyboardPathRequired: true,
   },
   {

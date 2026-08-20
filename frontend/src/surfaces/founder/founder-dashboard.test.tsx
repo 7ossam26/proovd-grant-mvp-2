@@ -24,7 +24,9 @@ import {
   CAMPAIGN_STATUSES,
   CAMPAIGN_STATUS_CHAPTER,
   CHOOSE_ABSENCES,
+  CLARIFICATION_IS_ANSWERED_HERE,
   COMMUNITY_IS_YOURS_TO_RUN,
+  EARLY_RELEASE_NEVER_SKIPS_DAY_14,
   EDITABLE_FIELDS,
   EDIT_TIER_GROUPS,
   FOUNDER_CHAPTERS,
@@ -32,6 +34,12 @@ import {
   MEETING_REQUEST_IS_NOT_A_SCHEDULER,
   MEETING_REQUEST_ONE_MESSAGE,
   NO_DOWNWARD_BID,
+  PRINCIPAL_FLOWS,
+  NO_PAYMENT_REQUEST,
+  PAID_ABSENCES,
+  RETRY_WINDOW_IS_STORED,
+  RETRY_WINDOW_OUTCOME,
+  W9_IS_NOT_UPLOADED_HERE,
   liveAbsence,
 } from '@proovd/shared';
 import { SERVICE_SLA_BLOCK } from '../../features/public/site.js';
@@ -254,14 +262,20 @@ describe('B1 — the shell wraps what already exists', () => {
   });
 
   it('an unbuilt chapter names the surface that owns its work today', async () => {
+    /*
+      DELIBERATELY MOVED (Session E, 2026-08-19). This asserted the shape on
+      the Get paid chapter, which is now built — so `after` (Wrap) is the one
+      interim chapter left, and it is what carries the arrangement Session B
+      established. Session F retires this test with the last `ownedForNowBy`.
+    */
     installShell({ status: 'closed_resolved' });
-    renderAt(`/campaigns/${CAMPAIGN}/home?chapter=payouts`);
+    renderAt(`/campaigns/${CAMPAIGN}/home?chapter=after`);
     await waitFor(() => expect(rail()).toBeTruthy());
 
     // Not an apology and not an empty frame: a real route to the surface that
     // does this work now.
-    const link = screen.getByRole('link', { name: /Campaign results/i });
-    expect(link.getAttribute('href')).toBe(`/campaigns/${CAMPAIGN}/results`);
+    const link = screen.getByRole('link', { name: /Your campaigns/i });
+    expect(link.getAttribute('href')).toBe('/campaigns');
   });
 });
 
@@ -691,5 +705,178 @@ describe('the retired updates address', () => {
       .getAllByRole('button')
       .find((button) => button.getAttribute('aria-current') === 'page');
     expect(current?.textContent?.trim()).toBe('Live');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session E — Chapter 3, Get paid
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+  Every test below opens a CLOSED campaign, because that is the only state in
+  which Chapter 3 is unlocked at all — `founderChapterUnlocked` reads
+  `campaigns.status` and `campaign_live_at`, and a live campaign's Get paid tab
+  is `aria-disabled` with its reason (B4, already asserted above).
+*/
+const paid = () => `/campaigns/${CAMPAIGN}/home?chapter=payouts`;
+
+function installClosed() {
+  installShell({ status: 'closed_reconciling' });
+}
+
+describe('E — §21’s retry window is read, never worked out', () => {
+  it('states the stored deadline and what the window decides', async () => {
+    installClosed();
+    renderAt(paid());
+
+    await waitFor(() => expect(screen.getByText(RETRY_WINDOW_IS_STORED)).toBeTruthy());
+    expect(screen.getByText(RETRY_WINDOW_OUTCOME)).toBeTruthy();
+    // The reference's "Three-day card retry window" is refused by name.
+    expect(document.body.textContent).not.toMatch(/three-day/i);
+  });
+});
+
+describe('E — §22.3 through the one resolver', () => {
+  it('leads with the resolved eligible share and its own note', async () => {
+    installClosed();
+    renderAt(paid());
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your payment' })).toBeTruthy());
+    // The fixture's share, formatted by the shared kernel and by nothing else.
+    expect(screen.getAllByText(/US\$/).length).toBeGreaterThan(0);
+  });
+
+  it('offers no control that would request a scheduled payment', async () => {
+    installClosed();
+    renderAt(paid());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your payment' })).toBeTruthy());
+
+    for (const control of screen.getAllByRole('button')) {
+      const label = control.textContent ?? '';
+      expect(label).not.toMatch(/request payment/i);
+      expect(label).not.toMatch(/request 40|request the rest|request the remaining/i);
+    }
+    expect(screen.getByText(NO_PAYMENT_REQUEST)).toBeTruthy();
+  });
+
+  it('renders §22.3’s never-skips sentence beside the early-release ask', async () => {
+    installClosed();
+    renderAt(paid());
+    await waitFor(() =>
+      expect(screen.getByText(EARLY_RELEASE_NEVER_SKIPS_DAY_14)).toBeTruthy(),
+    );
+  });
+
+  it('has no file input anywhere — the W-9 is a secure action (§11, §13)', async () => {
+    installClosed();
+    const { container } = renderAt(paid());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your payment' })).toBeTruthy());
+
+    expect(container.querySelectorAll('input[type="file"]')).toHaveLength(0);
+    expect(screen.getByText(W9_IS_NOT_UPLOADED_HERE)).toBeTruthy();
+  });
+});
+
+describe('E — §22.4’s clarification finally has somewhere to answer', () => {
+  it('renders the question, the deadline, and a control that posts the answer', async () => {
+    installClosed();
+    const posted: string[] = [];
+    handlers.unshift((url) => {
+      if (url.includes('/day-14/clarification')) {
+        posted.push(url);
+        return { status: 200, body: { status: 'recorded' } };
+      }
+      return undefined;
+    });
+    renderAt(paid());
+
+    await waitFor(() =>
+      expect(screen.getByText(/Which of the tooling photographs/)).toBeTruthy(),
+    );
+    expect(screen.getByText(CLARIFICATION_IS_ANSWERED_HERE)).toBeTruthy();
+
+    const answer = screen.getByRole('textbox', { name: /your answer/i });
+    await userEvent.type(answer, 'The one dated 14 September.');
+    await userEvent.click(screen.getByRole('button', { name: /send my answer/i }));
+
+    await waitFor(() => expect(posted.length).toBe(1));
+  });
+});
+
+describe('the Get paid chapter’s absences', () => {
+  it('renders every register entry’s sentence somewhere on the chapter', async () => {
+    installClosed();
+    renderAt(paid());
+
+    // Four independent reads again (Session D's finding): waiting on the
+    // assertion rather than on one panel's content is what makes this a fact
+    // rather than a bet on which read resolves first.
+    await waitFor(() => {
+      const body = document.body.textContent ?? '';
+      for (const absence of PAID_ABSENCES) {
+        expect(body).toContain(absence.sentence);
+      }
+    });
+  });
+});
+
+describe('the retired money addresses', () => {
+  it.each([
+    ['results', 'results'],
+    ['fulfillment', 'fulfillment'],
+  ])('/%s lands in Chapter 3 rather than 404ing', async (_name, segment) => {
+    installClosed();
+    renderAt(`/campaigns/${CAMPAIGN}/${segment}`);
+    // §27's close, results, and Day-14 messages point at both, so the address
+    // survives its component.
+    await waitFor(() => expect(rail()).toBeTruthy());
+    const current = within(rail())
+      .getAllByRole('button')
+      .find((button) => button.getAttribute('aria-current') === 'page');
+    expect(current?.textContent?.trim()).toBe('Get paid');
+  });
+});
+
+describe('the §33.11 fixture unlocks every chapter the register addresses', () => {
+  /*
+    Session E found this the hard way. The QA dashboard fixture said `live`,
+    and `founderChapterUnlocked` opens only the chapters a campaign has
+    REACHED — so the sweep's `founder_paid` address silently fell back to
+    Chapter 2 and reported Get paid as swept while rendering Live. That is
+    §33.11.1's own trap ("a surface showing something else is not the flow")
+    in its quietest form: nothing errored, nothing 404ed, and the flow's axe
+    and keyboard passes were run against the wrong page.
+
+    Asserting the agreement is what stops it rotting back, and it is what
+    Session F will trip on the day it addresses `?chapter=after`.
+  */
+  it('every ?chapter= a principal flow names is open on the fixture campaign', async () => {
+    // The QA fixtures ALONE — no local dashboard override — because the
+    // fixture's own `/dashboard` body is what the sweep serves, and it is the
+    // thing under test.
+    handlers = [
+      (url) => {
+        const hit = QA_ROUTES.find((route) => route.match.test(url));
+        if (!hit) return undefined;
+        const body = typeof hit.body === 'function' ? (hit.body as () => unknown)() : hit.body;
+        return { status: hit.status ?? 200, body };
+      },
+    ];
+    renderAt(`/campaigns/${CAMPAIGN}/home`);
+    await waitFor(() => expect(rail()).toBeTruthy());
+
+    const addressed = PRINCIPAL_FLOWS.flatMap((flow) => flow.routes)
+      .filter((route) => route.includes('/home?chapter='))
+      .map((route) => route.split('chapter=')[1]!);
+    expect(addressed.length).toBeGreaterThan(0);
+
+    for (const chapter of addressed) {
+      const label = FOUNDER_CHAPTERS.find((c) => c.id === chapter)!.label;
+      const control = within(rail()).getByRole('button', { name: new RegExp(`^${label}`) });
+      expect(
+        control.getAttribute('aria-disabled'),
+        `?chapter=${chapter} is addressed by a principal flow but locked on the fixture campaign`,
+      ).not.toBe('true');
+    }
   });
 });
