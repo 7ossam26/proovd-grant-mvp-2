@@ -14,12 +14,19 @@
  *
  * ── And the four steps do not complete a build ──────────────────────────────
  * Ten shared fields are required plus four for Idea or one for Product; these
- * four cover three of them. The last step's forward control goes to
- * `/campaigns/:campaignId/build`, which renders exactly what is left from the
- * server's own `missing` list — and `BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD` says
- * so before anybody gets there, because telling somebody their campaign is
- * built while `deriveBuildStatus` says `in_progress` is §1.4's failure with a
- * celebration on it.
+ * four cover three of them. So the last step carries `/campaigns/:campaignId/
+ * build` — which renders exactly what is left from the server's own `missing`
+ * list — beside `BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD`, because telling somebody
+ * their campaign is built while `deriveBuildStatus` says `in_progress` is
+ * §1.4's failure with a celebration on it.
+ *
+ * ── But it is not where the flow ENDS ───────────────────────────────────────
+ * That control was the last step's only forward control until 2026-08-20, and
+ * it leaves the flow: nothing in the product navigated into `in-review`, so
+ * `in-review`, `live` and `password` were an unreachable island and no Founder
+ * ever arrived at the screen where they choose a password. The reference's own
+ * chain is build → `campreview` → `live`, so the primary continues to
+ * `in-review` and the build page stays one control to the left of it.
  */
 
 import type { ReactNode } from 'react';
@@ -97,8 +104,9 @@ export function BuildStepPage({
 /**
  * Back and forward for one build step, from the register rather than by hand.
  *
- * The last step's forward control names the campaign build, which is where the
- * server's own list of what is still missing lives.
+ * The last step carries two forward controls and they go to different places:
+ * the campaign build, where the server's own list of what is still missing
+ * lives, and `in-review`, which is the next page of the flow.
  */
 export function buildStepNav(build: BuildFlowState, stepId: string): ReactNode {
   return <BuildStepNav build={build} stepId={stepId} />;
@@ -124,12 +132,28 @@ function BuildStepNav({ build, stepId }: { build: BuildFlowState; stepId: string
           {BACK_LABEL[previous!] ?? 'Back'}
         </Button>
         {last ? (
-          <Button
-            tier="primary"
-            onClick={() => leave(`/campaigns/${encodeURIComponent(param)}/build`)}
-          >
-            See what is left on your campaign
-          </Button>
+          <>
+            {/* Session F's destination, kept — the server's own list of what is
+                still missing — but as the SECONDARY control, because it leaves
+                the flow and the flow has three pages after this one. */}
+            <Button
+              tier="secondary"
+              onClick={() => leave(`/campaigns/${encodeURIComponent(param)}/build`)}
+            >
+              See what is left on your campaign
+            </Button>
+            {/* The reference's own next beat: its last build step goes to
+                `campreview`, and from there to `live`. Ours are `in-review`,
+                `live` and `password` — and until this edge existed nothing in
+                the product navigated into any of the three, so the flow ended
+                here and no Founder ever reached the screen where they choose a
+                password. `in-review` reads §23.1 rather than deciding it, so a
+                campaign that is still `affiliate_response_and_build` is told
+                exactly that and offered the build page again. */}
+            <Button tier="primary" onClick={() => leaveToPage('in-review')}>
+              See where your campaign stands
+            </Button>
+          </>
         ) : (
           <Button tier="primary" onClick={() => leaveToPage(next)}>
             {FORWARD_LABEL[next] ?? 'Next'}

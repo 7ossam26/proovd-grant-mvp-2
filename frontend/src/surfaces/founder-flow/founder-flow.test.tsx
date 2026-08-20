@@ -1219,6 +1219,26 @@ describe('the five §12 answers (10–14)', () => {
     }
   });
 
+  it('offers no Back on the first one, so Back can never walk forward', async () => {
+    // §10's claim invalidated the draft token, so nothing behind `visuals` has
+    // an address left. Its Back used to go to Last look — five pages FORWARD —
+    // and that closed a ring: Back from Last look walked socials → story →
+    // interview → branding → visuals and arrived at Last look again, round for
+    // as long as somebody kept pressing it.
+    stubStage3();
+    const view = renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: /^back to/i })).toBeNull();
+    view.unmount();
+
+    // And every later answer still steps back exactly one page.
+    handlers = [];
+    stubStage3();
+    renderAt(at('branding'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('button', { name: 'Back to Your visuals' })).toBeInTheDocument();
+  });
+
   it('names the saving from the SETTING, never from a hardcoded $2', async () => {
     // The reference hardcodes FEE_PER=2. §6 makes it a setting, and Phase 06's
     // rule is that a hardcoded number is a bug even when it is right.
@@ -2132,6 +2152,21 @@ describe('the build steps (21–24)', () => {
       screen.getByRole('button', { name: /see what is left on your campaign/i }),
     ).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/your campaign is (built|ready|complete)/i);
+  });
+
+  it('continues into the flow rather than ending at the campaign build', async () => {
+    // The last step's only forward control used to leave the flow for
+    // `/campaigns/:id/build`, and nothing in the product navigated into
+    // `in-review` — so `in-review`, `live` and `password` were an unreachable
+    // island and no Founder ever arrived at the screen that sets a password.
+    // The reference's own chain is build → `campreview` → `live`.
+    const user = userEvent.setup();
+    stubStage5();
+    renderAt(at('rewards'));
+    await screen.findByRole('heading', { name: /backer rewards/i });
+
+    await user.click(screen.getByRole('button', { name: /see where your campaign stands/i }));
+    await screen.findByRole('heading', { name: /where your campaign stands/i });
   });
 });
 
