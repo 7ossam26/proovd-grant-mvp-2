@@ -358,42 +358,54 @@ describe('screen 0 — the invitation', () => {
 /* ══ Screen 1 — the password ══════════════════════════════════════════════ */
 
 describe('screen 1 — the password', () => {
-  it('lists only what the server enforces', async () => {
+  it('draws the reference’s four checks, with the server’s own length', async () => {
     stubInvitation();
     await renderAt('password');
     await screen.findByRole('heading', { level: 1 });
 
-    // One requirement, because `completeAffiliateSignup` checks one thing.
-    expect(CREATOR_PASSWORD_REQUIREMENTS).toHaveLength(1);
-    expect(screen.getByText(new RegExp(`at least ${CREATOR_PASSWORD_MIN_LENGTH} characters`, 'i'))).toBeTruthy();
+    // Rebuilt 1:1 from the v11 reference (2026-08-20), whose `pwReqs()` is four
+    // live checks in this order. The order is load-bearing: they fill a 2×2
+    // grid row-major, so reordering moves the boxes.
+    expect(CREATOR_PASSWORD_REQUIREMENTS.map((r) => r.id)).toEqual([
+      'length',
+      'upper',
+      'lower',
+      'special',
+    ]);
 
-    // The three the reference draws and the server does not check. Shipping
-    // them would tick four boxes for an eight-character password and be
-    // refused at the claim.
-    const text = document.body.textContent ?? '';
-    expect(text).not.toMatch(/uppercase|lowercase|special character/i);
+    // The one number that is ours: the reference checks eight and
+    // `completeAffiliateSignup` refuses under twelve, so shipping the
+    // reference's own number would tick all four for a password the server
+    // rejects six screens later. The label reads the constant.
+    expect(
+      screen.getByText(new RegExp(`at least ${CREATOR_PASSWORD_MIN_LENGTH} characters`, 'i')),
+    ).toBeTruthy();
+    expect(screen.getByText(/an uppercase letter/i)).toBeTruthy();
+    expect(screen.getByText(/a lowercase letter/i)).toBeTruthy();
+    expect(screen.getByText(/a special character/i)).toBeTruthy();
   });
 
-  it('refuses to advance until the password meets the server’s rule and is confirmed', async () => {
+  it('refuses to advance until the password meets every check and is confirmed', async () => {
     stubInvitation();
     const user = userEvent.setup();
     await renderAt('password');
     await screen.findByRole('heading', { level: 1 });
 
-    const next = screen.getByRole('button', { name: /next: about you/i });
+    const next = screen.getByRole('button', { name: /continue/i });
     expect(next.hasAttribute('disabled')).toBe(true);
 
-    // Eleven characters: the reference's own list would call this strong.
+    // Ten characters, no uppercase, no special: three of four checks short.
     await user.type(screen.getByLabelText(/your password/i), 'short-elev');
     expect(screen.queryByLabelText(/confirm it/i)).toBeNull();
     expect(next.hasAttribute('disabled')).toBe(true);
 
-    await user.type(screen.getByLabelText(/your password/i), 'a-good-password');
+    // `pwStrong()` — all four — is what makes the confirm field appear.
+    await user.type(screen.getByLabelText(/your password/i), 'A-good-password');
     const confirm = await screen.findByLabelText(/confirm it/i);
     expect(next.hasAttribute('disabled')).toBe(true);
 
     await user.type(confirm, 'something-else-entirely');
-    expect(await screen.findByText(/those do not match yet/i)).toBeTruthy();
+    expect(await screen.findByText(/those don't match yet/i)).toBeTruthy();
     expect(next.hasAttribute('disabled')).toBe(true);
   });
 
@@ -403,20 +415,13 @@ describe('screen 1 — the password', () => {
     await renderAt('password');
     await screen.findByRole('heading', { level: 1 });
 
-    await user.type(screen.getByLabelText(/your password/i), 'a-perfectly-good-password');
+    await user.type(screen.getByLabelText(/your password/i), 'A-perfectly-good-password');
     await waitFor(() => expect(screen.queryByLabelText(/confirm it/i)).toBeTruthy());
 
     // No request at all carries it, under any key — there is no account to
     // attach it to until the claim, and §28.2 is why it is not autosaved.
     const serialized = JSON.stringify(requests);
-    expect(serialized).not.toContain('a-perfectly-good-password');
-  });
-
-  it('says the password is not kept, on the screen that sets it', async () => {
-    stubInvitation();
-    await renderAt('password');
-    await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByText(/we will ask for it again at the end/i)).toBeTruthy();
+    expect(serialized).not.toContain('A-perfectly-good-password');
   });
 
   it('writes it to no browser storage', async () => {

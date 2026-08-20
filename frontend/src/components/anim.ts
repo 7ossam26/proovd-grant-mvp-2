@@ -923,3 +923,79 @@ export function inviteIntro(
     }
   };
 }
+
+/* ── Creator flow screen 1, the password — the v11 reference's own relay ─────
+ *
+ * `relayIn` above is this codebase's generalisation of the same reference, and
+ * it rounds: 56px of travel where the reference tweens 52, `dur('slow')` (0.60)
+ * where the reference runs 0.62, and a 0.08 stagger against the reference's
+ * 0.085. Those are imperceptible on their own; what is NOT imperceptible is
+ * WHICH elements move. `relayIn` sweeps every `[data-anim]` node in the stage,
+ * and the reference moves only the heading block.
+ *
+ * The reference's `proovdAnimateMoment` picks three nodes:
+ *
+ *   head    `[data-anim="head"]`  → the `.obhead` block
+ *   panel   `[data-anim="panel"], .obbody, …, [style*="max-width"]`
+ *   primary the first enabled button whose computed background is the brand
+ *
+ * `querySelector` with a comma list returns the first match in DOCUMENT ORDER,
+ * not the first selector that matches — and the lede `<p>` carries an inline
+ * `max-width:34ch`, so it is reached before `.obbody` ever is. `panel` is
+ * therefore the LEDE, `.obbody` never animates, and the lede — nested inside
+ * the head — rides a compound transform and starts ~104px out rather than 52.
+ * Verified in Chrome against the reference rather than inferred: `.obbody`
+ * reports `transform: none; opacity: 1` for the whole entry.
+ *
+ * That is reproduced rather than corrected, because the brief is the reference
+ * as it behaves. The one thing not reproduced is the reference's dependence on
+ * a computed background colour to find its own CTA; the caller passes the nodes
+ * explicitly, so a restyle cannot silently drop the button out of the relay.
+ *
+ * `primary` is null while the CTA is disabled, which is the state every fresh
+ * arrival is in — so on a normal entry the form and the button are simply
+ * present and only the heading travels.
+ */
+export function creatorPasswordIn(
+  stage: HTMLElement | null,
+  direction: 1 | -1,
+): () => void {
+  const g = gsap();
+  if (!g || !stage || !motionLive()) return () => {};
+
+  // The reference's reduced-motion branch fades the whole moment and returns.
+  // `motionLive()` is already false under `prefers-reduced-motion`, so reaching
+  // this line means motion is live; the jump-cut is proovd.css's.
+  const pick = (name: string) =>
+    stage.querySelector<HTMLElement>('[data-pw="' + name + '"]');
+
+  const head = pick('head');
+  const lede = pick('lede');
+  const cta = stage.querySelector<HTMLElement>('[data-pw="cta"]:not([disabled])');
+
+  const els = [head, lede, cta].filter((el): el is HTMLElement => !!el);
+  if (!els.length) return () => {};
+
+  g.killTweensOf(els);
+  // The timeline is captured before the tween is added: `fromTo` on a timeline
+  // returns the timeline at runtime but is typed `unknown` here, and the
+  // teardown needs `kill()`.
+  const timeline = g.timeline();
+  timeline.fromTo(
+    els,
+    { x: 52 * direction, opacity: 0 },
+    {
+      x: 0,
+      opacity: 1,
+      duration: 0.62,
+      ease: 'power3.out',
+      stagger: { each: 0.085, from: direction === -1 ? 'end' : 'start' },
+      force3D: true,
+      clearProps: 'transform,opacity',
+    },
+  );
+
+  return () => {
+    timeline.kill();
+  };
+}
