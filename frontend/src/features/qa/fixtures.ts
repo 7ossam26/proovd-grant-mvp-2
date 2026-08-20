@@ -30,11 +30,15 @@ import type {
   BuildState,
   CampaignHomeView,
   CampaignPreview,
+  CreatorPostView,
   Day14ChecklistView,
   FounderPaymentStatusView,
   FounderReadiness,
+  FounderBackersView,
+  FounderSettingsView,
   FounderResultsView,
   FounderUpdatesView,
+  FounderWrapView,
   FulfillmentStatusView,
   LatestReview,
   ListingState,
@@ -46,12 +50,18 @@ import {
   BEST_EFFORT_RECOVERY_SENTENCE,
   COMPLETION_OUTCOMES,
   DISPUTE_EVIDENCE_ITEMS,
+  DO_NOT_FULFILL_LABEL,
   EARLY_RELEASE_EVIDENCE_FACTS,
+  EDITABLE_FIELDS,
+  FOUNDER_EXPORT_COLUMNS,
+  FOUNDER_EXPORT_WITHHELD,
   FOUNDER_PAYMENT_STATUS_FACTS,
   IDEA_REFUND_EXCEPTIONS,
   LIVE_MODE_CONDITIONS,
+  PREPARE_WITHOUT_OPENING,
   PROOVD_FEE_TREATMENTS,
   RECONCILIATION_ITEMS,
+  RESOLUTION_IS_NOT_FULFILLMENT,
   REFUND_CAUSES,
   RESULTS_NARRATIVE_FIELDS,
   THANK_YOU_ELIGIBILITY_FACTS,
@@ -553,6 +563,16 @@ const roster: RosterView = {
   fullRefundOutcome:
     'If no Creator accepts by the deadline, the campaign ends and your listing fee is refunded in full.',
   pendingProposalNote: 'A Creator has proposed different terms. Nothing is agreed until you both accept.',
+  /* §14.3's cell, as the server resolves it from the §6 settings. A bid above
+     base is high-effort-only, so the fixture is high-effort — otherwise the
+     revision control is correctly absent and the sweep would never render it. */
+  terms: {
+    basePercent: 30,
+    ceilingPercent: 50,
+    bidAllowed: true,
+    fixedPaymentAllowed: true,
+    highEffort: true,
+  },
   creators: [
     {
       associationId: QA.associationId,
@@ -565,12 +585,39 @@ const roster: RosterView = {
       openProposal: {
         versionId: 'ver-1',
         versionNumber: 2,
+        // Above the 30% base: `validateProposalAgainstCell` refuses anything at
+        // or below it, so a fixture below base would be a state the product
+        // cannot produce.
         awaitingYou: true,
-        bidTotalPercent: 24,
+        bidTotalPercent: 44,
         fixedPaymentRequestCents: '50000',
-        note: 'Asked for 24% and a fixed payment.',
+        note: 'Asked for 44% and a fixed Creator payment.',
       },
       lockedTerms: null,
+      meetingRequest: null,
+    },
+    {
+      // The other half of the chapter: somebody whose terms are LOCKED, which
+      // is what renders the §14.3 bonus control and §16's readiness section,
+      // plus deviation 1's answered request.
+      associationId: 'assoc-qa-2',
+      handle: '@benchtapes',
+      channelType: 'newsletter_operator',
+      audienceMetric: '9,200 subscribers',
+      niche: 'Weekend electronics',
+      bio: 'A Sunday newsletter about small builds.',
+      statusLabel: 'Accepted',
+      openProposal: null,
+      lockedTerms: { totalPercent: 35, fixedPaymentCents: null },
+      meetingRequest: {
+        id: 'meet-qa-1',
+        associationId: 'assoc-qa-2',
+        status: 'accepted',
+        message: 'Would love ten minutes on how you would introduce this.',
+        requestedAt: '2026-08-06T09:00:00.000Z',
+        respondedAt: '2026-08-06T15:30:00.000Z',
+        responseNote: 'Happy to talk.',
+      },
     },
   ],
 };
@@ -625,6 +672,38 @@ const updates: FounderUpdatesView = {
   campaignStatus: 'live',
   model: 'product',
 };
+
+/*
+  §17's post submissions as the Founder sees them (Session D). Two rows, on
+  purpose: one acknowledgeable and one under correction, so the sweep renders
+  BOTH halves of deviation 2 — the control, and the sentence that replaces it
+  when Proovd has asked for a change. In a fixed order that is not a metric,
+  matching `explore.ts`'s own stated ordering (§30: no ranking).
+*/
+const creatorPosts: CreatorPostView[] = [
+  {
+    submissionId: 'post-qa-1',
+    associationId: QA.associationId,
+    publicHandle: '@solderandsawdust',
+    postUrl: 'https://example.social/@solderandsawdust/p/1',
+    channel: 'social',
+    submittedAt: '2026-08-24T09:00:00.000Z',
+    status: 'passed',
+    acknowledgedAt: null,
+    acknowledgeable: true,
+  },
+  {
+    submissionId: 'post-qa-2',
+    associationId: 'assoc-qa-2',
+    publicHandle: '@nostanding',
+    postUrl: 'https://example.social/@nostanding/p/7',
+    channel: 'social',
+    submittedAt: '2026-08-23T09:00:00.000Z',
+    status: 'correction_needed',
+    acknowledgedAt: null,
+    acknowledgeable: false,
+  },
+];
 
 const home: CampaignHomeView = {
   campaignId: QA.campaignId,
@@ -708,6 +787,13 @@ const results: FounderResultsView = {
     totalCapturedCents: '571560',
   },
   payments: { failed: 3, recovered: 2, dropped: 1 },
+  /* §21's window, closed — the state a `closed_reconciling` campaign is in. */
+  retryWindow: {
+    state: 'closed',
+    windowHours: 48,
+    firstFailureAt: '2026-09-12T17:20:00.000Z',
+    deadlineAt: '2026-09-14T17:20:00.000Z',
+  },
   conversion: { clicks: 1840, placed: 47, conversionRate: '2.6%', canceled: 3, dropOffRate: '6.4%' },
   survey: {
     consentedCount: 28,
@@ -898,12 +984,184 @@ const day14: Day14ChecklistView = {
     },
   ],
   reviewOpen: true,
-  outcome: 'open',
+  outcome: 'pending',
   decisionDueAt: '2026-09-26T17:00:00.000Z',
   blocksAPayment: true,
   enforcementOnly: false,
   submissions: [],
-  clarifications: [],
+  /*
+    One open clarification, so the sweep renders the answer control Session E
+    added. §22.4's five-business-day window has been on the surface since Phase
+    21a with nothing to answer it — a fixture with an empty list would have
+    swept a screen that never showed the gap.
+  */
+  clarifications: [
+    {
+      id: '00000000-0000-4000-8000-0000000000d1',
+      question: 'Which of the tooling photographs is the current one?',
+      requestedAt: '2026-09-20T17:00:00.000Z',
+      dueAt: '2026-09-27T17:00:00.000Z',
+      respondedAt: null,
+      responseNote: null,
+      overdue: false,
+    },
+  ],
+};
+
+/* ── Chapter 4 and the Backers page (Session F) ────────────────────────────── */
+
+/*
+  §22.8's recorded completion, §22.9's ask, §22.11's resolution and §22.10's two
+  gates. The SAME association `roster` and `results` describe — §33.11.5's rule.
+
+  One Creator is completed and one is not, so the sweep renders both branches of
+  the recap: the §22.9 ask is offered on the recorded status and nothing else,
+  which is what keeps §22.8's decision out of a revenue figure (§33.10.6).
+*/
+const founderWrap: FounderWrapView = {
+  campaignId: QA.campaignId,
+  campaignStatus: 'closed_resolved',
+  closedAt: QA.closesAt,
+  resolution: {
+    resolved: true,
+    resolvedAt: '2026-09-20T12:00:00.000Z',
+    fulfillmentNote: RESOLUTION_IS_NOT_FULFILLMENT,
+    fulfillmentActive: true,
+    fulfilledAt: null,
+  },
+  creators: [
+    /* In the server's own order — by handle. `readFounderWrap` sorts, and the
+       surface renders what it is given, so a fixture in a different order
+       would be asserting the fixture rather than the surface. */
+    {
+      associationId: 'a1111111-1111-4111-8111-111111111111',
+      publicHandle: '@benchnotes',
+      subtype: 'newsletter_operator',
+      audienceNiche: 'Weekly tools newsletter',
+      adminBio: null,
+      status: 'active',
+      rosterMembership: 'included',
+      completion: null,
+      workAgain: { eligible: false, request: null },
+    },
+    {
+      associationId: QA.associationId,
+      publicHandle: '@solderandsawdust',
+      subtype: 'social_creator',
+      audienceNiche: 'Electronics workbench builds',
+      adminBio: 'Builds and films bench tooling on a weekly cadence.',
+      status: 'active',
+      rosterMembership: 'included',
+      completion: {
+        status: 'successfully_completed',
+        decidedAt: '2026-09-18T09:00:00.000Z',
+        reason: null,
+      },
+      workAgain: { eligible: true, request: null },
+    },
+  ],
+  nextCampaign: {
+    cooldown: {
+      months: 3,
+      closedAt: QA.closesAt,
+      earliestAt: '2026-12-12T17:00:00.000Z',
+      elapsed: false,
+      blocker: null,
+    },
+    adminReadiness: { decision: null, decidedAt: null, explanation: null },
+    readyForNextCampaign: false,
+    prepareNote: PREPARE_WITHOUT_OPENING,
+  },
+};
+
+/*
+  §19's operational share, and it is the only fixture in this file that carries
+  a Backer's email — which is exactly what §19 makes mandatory and §25.7 scopes
+  to fulfillment and support.
+
+  One row is withdrawn, so the sweep renders the `do_not_fulfill` branch. That
+  is the branch worth exercising: a row presented as deliverable when the money
+  never moved is a Founder shipping to somebody who was never charged.
+*/
+const founderBackers: FounderBackersView = {
+  campaignId: QA.campaignId,
+  sharedCount: 2,
+  activeCount: 1,
+  doNotFulfillCount: 1,
+  rows: [
+    {
+      preorderReference: QA.reservationId,
+      backerEmail: 'rowan@example.com',
+      rewardSku: QA.rewardSku,
+      rewardTitle: QA.rewardTitle,
+      fulfillmentState: 'active',
+      doNotFulfillLabel: null,
+      doNotFulfillAt: null,
+      sharedAt: '2026-08-22T14:05:00.000Z',
+      progressionStep: 'delivery_due',
+      progressionLabel: 'Delivery due',
+    },
+    {
+      preorderReference: 'r2222222-2222-4222-8222-222222222222',
+      backerEmail: 'quietcancel@example.com',
+      rewardSku: QA.rewardSku,
+      rewardTitle: QA.rewardTitle,
+      fulfillmentState: 'do_not_fulfill',
+      doNotFulfillLabel: DO_NOT_FULFILL_LABEL,
+      doNotFulfillAt: '2026-09-01T08:00:00.000Z',
+      sharedAt: '2026-08-24T09:30:00.000Z',
+      progressionStep: 'no_charge',
+      progressionLabel: 'No charge',
+    },
+  ],
+  exportColumns: [...FOUNDER_EXPORT_COLUMNS],
+  exportWithheld: [...FOUNDER_EXPORT_WITHHELD],
+  dataRequests: [],
+};
+
+/*
+  §5.2's eleven settings, Session G.
+
+  The account is CLAIMED and the campaign has closed with a charge, so the W-9
+  block renders the resolver's own line rather than the not-yet sentence — the
+  branch worth sweeping, since the other one has no state to get wrong. No
+  deletion request is on file, so the ask renders as a control rather than as a
+  receipt; the receipt branch is the surface suite's.
+*/
+const founderSettings: FounderSettingsView = {
+  campaignId: QA.campaignId,
+  campaignTitle: QA.title,
+  signInEmail: 'nadia@example.com',
+  accountCreatedAt: '2026-06-02T10:00:00.000Z',
+  fields: [
+    { id: 'preferred_name', value: 'Nadia', guarded: false },
+    { id: 'phone', value: '+1 503 555 0134', guarded: false },
+    { id: 'business_name', value: 'Solder & Sawdust LLC', guarded: false },
+    { id: 'business_entity_type', value: 'LLC', guarded: false },
+    { id: 'legal_name', value: 'Nadia Okonkwo', guarded: true },
+    { id: 'email', value: 'nadia@example.com', guarded: true },
+  ],
+  representations: [
+    { id: 'age_18_plus', label: 'I am 18 or older', confirmed: true },
+    { id: 'us_person', label: 'I am a US person', confirmed: true },
+    { id: 'sanctions', label: 'I am not on a sanctions list', confirmed: true },
+  ],
+  dateOfBirthOnFile: true,
+  country: 'US',
+  stateRegion: 'OR',
+  soleProprietor: false,
+  w9: {
+    state: 'verified',
+    line: 'Your W-9 is on file and verified.',
+    action: 'No action needed',
+    requestedAt: '2026-09-13T17:00:00.000Z',
+    submittedAt: '2026-09-14T09:12:00.000Z',
+    verifiedAt: '2026-09-15T11:40:00.000Z',
+    returnReason: null,
+    blocksPayments: false,
+  },
+  w9NotApplicableBecause: null,
+  deletionRequestedAt: null,
 };
 
 /* ── §11/§14/§18/§21 the Creator's surfaces ────────────────────────────────── */
@@ -2508,12 +2766,69 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/founder\/campaigns\/[^/]+\/review$/, body: { review: latestReview } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/creator-readiness$/, body: { readiness } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/updates$/, body: updates },
+  /*
+    The dashboard shell's rail (Founder Dashboard Session B). The SAME campaign
+    every other fixture describes — §33.11.5's rule: a fixture set where each
+    surface invents its own facts cannot notice a disagreement.
+
+    `campaignLiveAt` is set because this campaign HAS been live, and it is what
+    unlocks the Live chapter. A fixture that left it null would render a rail
+    whose current chapter was locked.
+
+    THE STATUS IS `closed_resolved`, NOT `live`, and that is a correction made
+    twice. `founderChapterUnlocked` opens the chapters a campaign has REACHED,
+    so with `live` the sweep's `founder_paid` address fell back to Chapter 2
+    (Session E) and with `closed_reconciling` `founder_wrap` would have fallen
+    back to Chapter 3 (Session F) — §33.11 reporting a chapter as swept while
+    rendering a different one, which is §33.11.1's trap ("a surface showing
+    something else is not the flow") in its quietest form: nothing errors,
+    nothing 404s, and axe runs happily against the wrong page.
+
+    Past chapters stay open, so all four render at their own addresses; the
+    guard `qa.test.tsx` gained in Session E walks `PRINCIPAL_FLOWS` for every
+    `?chapter=` it addresses and asserts each is unlocked on this fixture, so
+    this cannot rot back — it is what caught the Session F case.
+  */
+  {
+    match: /\/api\/founder\/campaigns\/[^/]+\/dashboard$/,
+    body: {
+      dashboard: {
+        campaignId: QA.campaignId,
+        status: 'closed_resolved',
+        type: 'pre_launch',
+        campaignLiveAt: '2026-08-20T17:00:00.000Z',
+        campaignCloseAt: QA.closesAt,
+        listingPaidAt: '2026-08-01T12:00:00.000Z',
+        highEffort: false,
+        title: QA.title,
+      },
+    },
+  },
+  /* Session D. `/home/explore` and `/home/posts` sit UNDER `/home`, and the
+     `$` on that matcher is what keeps it from swallowing them — the ordering
+     trap the money console's own comment records. */
+  { match: /\/api\/founder\/campaigns\/[^/]+\/home\/explore$/, body: { explore: home.explore } },
+  { match: /\/api\/founder\/campaigns\/[^/]+\/home\/posts$/, body: { posts: creatorPosts } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/home$/, body: { home } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/home\/seen$/, body: { acknowledged: true, advanced: true } },
+  /* §20's tier register, served exactly as the route serves it: the register
+     itself, so the surface can never carry a second copy of which column a
+     field is in. */
+  { match: /\/api\/founder\/campaigns\/[^/]+\/live-edit\/fields$/, body: { fields: EDITABLE_FIELDS } },
+  { match: /\/api\/founder\/campaigns\/[^/]+\/live-edit\/history$/, body: { edits: [], requests: [] } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/results$/, body: { results } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/payments$/, body: { payments: founderPayments } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/fulfillment$/, body: fulfillment },
   { match: /\/api\/founder\/campaigns\/[^/]+\/day-14$/, body: day14 },
+  /* Session F. `/backers/export` sits UNDER `/backers`, and the `$` on the
+     second matcher is what keeps it from swallowing the first — the ordering
+     trap `/home/explore` already records above. */
+  { match: /\/api\/founder\/campaigns\/[^/]+\/backers\/export$/, body: '' },
+  { match: /\/api\/founder\/campaigns\/[^/]+\/backers$/, body: { backers: founderBackers } },
+  { match: /\/api\/founder\/campaigns\/[^/]+\/wrap$/, body: { wrap: founderWrap } },
+  /* Session G. Account-level: no campaign id in the path, and no overlap with
+     the campaign-scoped matchers above it. */
+  { match: /\/api\/founder\/settings$/, body: { settings: founderSettings } },
   { match: /\/api\/founder\/notifications\/preferences$/, body: { preference: digestPreference } },
   { match: /\/api\/founder\/notifications\/history/, body: { history: notificationHistory } },
   { match: /\/api\/founder\/campaigns$/, body: { campaigns: [{ campaignId: QA.campaignId, status: 'live', type: 'pre_launch', listingPaid: true, highEffort: false }] } },

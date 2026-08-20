@@ -171,3 +171,20 @@ export * from './followers.js';
 // nothing, and a resource list holding no campaign material — and the two that
 // close §5.3's never-implemented settings right.
 export * from './creator-flow.js';
+
+// The Founder→Creator meeting request (migration 0056, Founder Dashboard
+// Session C — a recorded §1 rule 6 deviation on §22.9's shape; see the file
+// header for the four absences that keep it from being a scheduler or a thread).
+export * from './meetings.js';
+
+// The Founder's acknowledgement of a Creator's post (migration 0057, Founder
+// Dashboard Session D — a recorded §1 rule 6 deviation; see the file header for
+// the four absences, the strongest being that it carries no free text at all).
+export * from './posts.js';
+
+// The Founder's Backer data request (migration 0058, Founder Dashboard Session
+// F). NOT a deviation — §25.7 already permits Backer email and purchase details
+// for fulfillment and support, and refuses marketing and community. Both
+// refusals are in the CHECK; an approved request grants no access, because
+// `exportBackerRows` takes no argument one could arrive as.
+export * from './backer-data.js';

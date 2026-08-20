@@ -452,12 +452,43 @@ export interface RosterCreator {
     note: string;
   } | null;
   lockedTerms: { totalPercent: number; fixedPaymentCents: string | null } | null;
+  /** Deviation 1's latest ask, or null (Founder Dashboard Session C). */
+  meetingRequest: MeetingRequestView | null;
+}
+
+/**
+ * Deviation 1's record, as it reaches the browser. There is no time, no
+ * duration, no platform and no calendar link, because the record holds none —
+ * §12's Cal.com booking is the one scheduler (§30, tech-stack §12).
+ */
+export interface MeetingRequestView {
+  id: string;
+  associationId: string;
+  status: string;
+  message: string;
+  requestedAt: string;
+  respondedAt: string | null;
+  responseNote: string | null;
+}
+
+/**
+ * §14.3's cell for this campaign, read from the §6 settings by the server. The
+ * surface bounds its revision control with these and decides nothing — a second
+ * copy of the matrix in the browser is a second answer to what the base is.
+ */
+export interface RosterTerms {
+  basePercent: number;
+  ceilingPercent: number;
+  bidAllowed: boolean;
+  fixedPaymentAllowed: boolean;
+  highEffort: boolean;
 }
 
 export interface RosterView {
   responseDeadlineAt: string | null;
   fullRefundOutcome: string;
   pendingProposalNote: string;
+  terms: RosterTerms;
   creators: RosterCreator[];
 }
 
@@ -474,6 +505,36 @@ export const respondToProposal = (
   call(`/api/founder/proposals/${encodeURIComponent(versionId)}/respond`, {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+
+/** §14.3's Creator-specific bonus, offered once terms are locked. */
+export const offerCreatorBonus = (
+  campaignId: string,
+  associationId: string,
+  body: {
+    triggerUnit: 'attributed_subtotal_cents' | 'unique_attributed_backers';
+    threshold: string;
+    additionalPercent: number;
+  },
+): Promise<{ bonus: { id: string; additionalPercent: number; maxCombinedPercent: number } }> =>
+  call(`${base(campaignId)}/roster/${encodeURIComponent(associationId)}/bonus`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+/**
+ * Deviation 1. The body carries exactly one field — there is no `when`, no
+ * `slot` and no `duration` to send, which is what keeps this a request rather
+ * than the scheduler §30 defers.
+ */
+export const requestMeeting = (
+  campaignId: string,
+  associationId: string,
+  message: string,
+): Promise<{ meetingRequest: MeetingRequestView }> =>
+  call(`${base(campaignId)}/roster/${encodeURIComponent(associationId)}/meeting`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
   });
 
 /* ── Campaign building, preview, and review (§14.4, §15) — Phase 12b ─────────── */
@@ -933,6 +994,28 @@ export interface CampaignHomeView {
   milestoneHistory: { kind: string; occurredAt: string; acknowledgedAt: string | null }[];
 }
 
+/**
+ * The dashboard shell's five facts — Founder Dashboard Session B.
+ *
+ * Its own read rather than a slice of `fetchCampaignHome`, because that one
+ * issues a §33.6.6 delivery receipt and the shell re-reads on every chapter
+ * change. See `backend/src/founder-dashboard/service.ts`.
+ */
+export interface FounderDashboardView {
+  campaignId: string;
+  status: string;
+  type: string | null;
+  campaignLiveAt: string | null;
+  campaignCloseAt: string | null;
+  listingPaidAt: string | null;
+  highEffort: boolean;
+  title: string | null;
+}
+
+export const fetchFounderDashboard = (
+  campaignId: string,
+): Promise<{ dashboard: FounderDashboardView }> => call(`${base(campaignId)}/dashboard`);
+
 export const fetchCampaignHome = (campaignId: string): Promise<{ home: CampaignHomeView }> =>
   call(`${base(campaignId)}/home`);
 
@@ -977,6 +1060,144 @@ export const recordActCorrection = (
     body: JSON.stringify(body),
   });
 
+/**
+ * Explore on its own — Founder Dashboard Session D.
+ *
+ * §33.6.6: `GET .../home` issues a `campaign_home_deliveries` receipt carrying
+ * the count it rendered. This route exists so a refresh AFTER a mutation does
+ * not mint a second one: the chapter fetches `home` once when it mounts, and
+ * every later refresh comes through here. The route has existed since Phase 17a
+ * and had no caller until now.
+ */
+export const fetchExplore = (campaignId: string): Promise<{ explore: ExploreView }> =>
+  call(`${base(campaignId)}/home/explore`);
+
+/* ── §17's posts, and deviation 2's acknowledgement (Session D) ────────────── */
+
+export interface CreatorPostView {
+  submissionId: string;
+  associationId: string;
+  /** §11: the public handle, never the person behind it. */
+  publicHandle: string | null;
+  postUrl: string;
+  channel: string | null;
+  submittedAt: string;
+  status: string;
+  acknowledgedAt: string | null;
+  /** False while §17 has an open correction or an enforcement on this post. */
+  acknowledgeable: boolean;
+}
+
+export const fetchCreatorPosts = (campaignId: string): Promise<{ posts: CreatorPostView[] }> =>
+  call(`${base(campaignId)}/home/posts`);
+
+/**
+ * Founder Dashboard Session D, deviation 2 — a RECORDED deviation from §1
+ * rule 6, by explicit product direction.
+ *
+ * It takes a submission id and NOTHING else. There is no note parameter here,
+ * no column behind one, and the route ignores the body — a free-text field
+ * would be the direct Founder–Affiliate messaging §30 defers wearing a smaller
+ * control. `created` is false on a repeat, and no second message is sent.
+ */
+export const acknowledgeCreatorPost = (
+  campaignId: string,
+  submissionId: string,
+): Promise<{ acknowledged: boolean; created: boolean; acknowledgedAt: string }> =>
+  call(`${base(campaignId)}/home/posts/${encodeURIComponent(submissionId)}/acknowledge`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+/* ── §20's three live-editing tiers (Phase 17b's API, Session D's first UI) ── */
+
+export interface EditableFieldView {
+  field: string;
+  tier: 'direct_versioned' | 'requires_review' | 'never_direct';
+  label: string;
+  surface:
+    | 'build'
+    | 'faq'
+    | 'reward_package'
+    | 'reservation'
+    | 'agreement'
+    | 'campaign'
+    | 'demo_moment'
+    | 'benefit_card';
+  reason: string;
+  specRef: string;
+}
+
+export interface LiveEditRow {
+  id: string;
+  surface: string;
+  field: string;
+  priorValue: unknown;
+  newValue: unknown;
+  targetId: string | null;
+  occurredAt: string;
+}
+
+export interface ChangeRequestRow {
+  id: string;
+  surface: string;
+  field: string;
+  targetId: string | null;
+  currentValue: unknown;
+  requestedValue: unknown;
+  reason: string;
+  status: string;
+  decisionReason: string | null;
+  createdAt: string;
+}
+
+export type LiveEditApplied =
+  | { ok: true; tier: 'direct_versioned'; edit: LiveEditRow }
+  | {
+      ok: true;
+      tier: 'requires_review';
+      request: ChangeRequestRow;
+      /**
+       * Named when a COLUMN-ONE edit was redirected here by §20's loophole
+       * check. `faq_commitment` is §20's own example; `field_commitment` is the
+       * same rule on another column-one free-text field.
+       */
+      redirectedBy: 'faq_commitment' | 'field_commitment' | null;
+      commitments: string[];
+    };
+
+export interface LiveEditHistory {
+  edits: LiveEditRow[];
+  requests: ChangeRequestRow[];
+}
+
+export const fetchEditableFields = (
+  campaignId: string,
+): Promise<{ fields: EditableFieldView[] }> => call(`${base(campaignId)}/live-edit/fields`);
+
+/**
+ * The ONE Founder edit route (§20). There is deliberately no `tier` in the body
+ * and none in this signature: the field's own tier decides whether the value is
+ * written, routed to Admin review, or refused. A route per tier — or a tier
+ * parameter — would let a caller choose which rules apply to their edit by
+ * choosing what to send, which is exactly what §20's three columns exist to
+ * prevent (§15: materiality is an Admin judgement, never the Founder's).
+ */
+export const applyLiveEdit = (
+  campaignId: string,
+  body: {
+    surface: EditableFieldView['surface'];
+    field: string;
+    value: unknown;
+    targetId?: string;
+    reason?: string;
+  },
+): Promise<LiveEditApplied> =>
+  call(`${base(campaignId)}/live-edit`, { method: 'POST', body: JSON.stringify(body) });
+
+export const fetchLiveEditHistory = (campaignId: string): Promise<LiveEditHistory> =>
+  call(`${base(campaignId)}/live-edit/history`);
+
 /* ── §21 Founder results (Phase 18b) ───────────────────────────────────────── */
 
 export interface FounderResultsView {
@@ -996,6 +1217,17 @@ export interface FounderResultsView {
     totalCapturedCents: string;
   };
   payments: { failed: number; recovered: number; dropped: number };
+  /**
+   * §21's one recovery window, read from the close batch (Session E). Every
+   * field is stored and immutable — the surface renders the deadline, never a
+   * duration it worked out from a start time.
+   */
+  retryWindow: {
+    state: 'not_opened' | 'open' | 'closed';
+    windowHours: number;
+    firstFailureAt: string | null;
+    deadlineAt: string | null;
+  } | null;
   conversion: {
     clicks: number;
     placed: number;
@@ -1251,4 +1483,243 @@ export const submitDay14Evidence = (
   call(`${base(campaignId)}/day-14/evidence`, {
     method: 'POST',
     body: JSON.stringify({ items }),
+  });
+
+/**
+ * §22.4's clarification answer (Founder Dashboard Session E).
+ *
+ * `POST …/day-14/clarification` has been mounted and driven by Phase 21a's own
+ * suite since it was built; it had no client and no control anywhere. The
+ * fulfillment surface rendered the question, told the Founder that not
+ * answering within five business days is one of the things that fails the
+ * review, and offered nothing to answer with — on a review whose failure
+ * blocks a payment.
+ */
+export const respondToDay14Clarification = (
+  campaignId: string,
+  requestId: string,
+  responseNote: string,
+): Promise<{ status: string }> =>
+  call(`${base(campaignId)}/day-14/clarification`, {
+    method: 'POST',
+    body: JSON.stringify({ requestId, responseNote }),
+  });
+
+/* ── Chapter 4, Wrap, and the Backers page (Session F) ─────────────────────── */
+
+export interface WrapCreatorRow {
+  associationId: string;
+  publicHandle: string | null;
+  subtype: string | null;
+  audienceNiche: string | null;
+  adminBio: string | null;
+  status: string;
+  rosterMembership: string;
+  completion: {
+    status: 'successfully_completed' | 'completion_disqualified';
+    decidedAt: string;
+    reason: string | null;
+  } | null;
+  workAgain: {
+    eligible: boolean;
+    request: {
+      id: string;
+      status: string;
+      requestedAt: string;
+      responseNote: string | null;
+    } | null;
+  };
+}
+
+export interface FounderWrapView {
+  campaignId: string;
+  campaignStatus: string;
+  closedAt: string | null;
+  resolution: {
+    resolved: boolean;
+    resolvedAt: string | null;
+    fulfillmentNote: string;
+    fulfillmentActive: boolean;
+    fulfilledAt: string | null;
+  };
+  creators: WrapCreatorRow[];
+  nextCampaign: {
+    cooldown: {
+      months: number | null;
+      closedAt: string | null;
+      earliestAt: string | null;
+      elapsed: boolean;
+      blocker: string | null;
+    };
+    adminReadiness: {
+      decision: 'ready' | 'not_ready' | null;
+      decidedAt: string | null;
+      explanation: string | null;
+    };
+    readyForNextCampaign: boolean;
+    prepareNote: string;
+  };
+}
+
+export const fetchFounderWrap = (campaignId: string): Promise<{ wrap: FounderWrapView }> =>
+  call(`${base(campaignId)}/wrap`);
+
+/** §22.9's ask, on the Creator recap. `WORK_AGAIN_ACCEPTANCE_GRANTS_NOTHING` rides the answer. */
+export const requestWorkAgain = (
+  campaignId: string,
+  associationId: string,
+  message: string,
+): Promise<{ requestId: string; grantsNothing: readonly string[] }> =>
+  call(`/api/founder/campaigns/${encodeURIComponent(campaignId)}/work-again`, {
+    method: 'POST',
+    body: JSON.stringify({ associationId, message }),
+  });
+
+export interface FounderBackerRow {
+  preorderReference: string;
+  backerEmail: string;
+  rewardSku: string;
+  rewardTitle: string;
+  fulfillmentState: 'active' | 'do_not_fulfill';
+  doNotFulfillLabel: string | null;
+  doNotFulfillAt: string | null;
+  sharedAt: string;
+  progressionStep: string;
+  progressionLabel: string;
+}
+
+export interface BackerDataRequestRow {
+  id: string;
+  purpose: string;
+  detail: string;
+  status: string;
+  requestedAt: string;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+export interface FounderBackersView {
+  campaignId: string;
+  sharedCount: number;
+  activeCount: number;
+  doNotFulfillCount: number;
+  rows: FounderBackerRow[];
+  exportColumns: { key: string; header: string; definition: string }[];
+  exportWithheld: { header: string; reason: string }[];
+  dataRequests: BackerDataRequestRow[];
+}
+
+export const fetchFounderBackers = (
+  campaignId: string,
+): Promise<{ backers: FounderBackersView }> => call(`${base(campaignId)}/backers`);
+
+/**
+ * §25.7's ask. The purpose is one of §25.7's two; marketing and community are
+ * refused before the request is composed, and refused again by a 0058 CHECK.
+ */
+export const requestBackerData = (
+  campaignId: string,
+  purpose: string,
+  detail: string,
+): Promise<{ requestId: string }> =>
+  call(`${base(campaignId)}/backer-data-request`, {
+    method: 'POST',
+    body: JSON.stringify({ purpose, detail }),
+  });
+
+/**
+ * §20's Explore section 10. The address is a plain GET the browser follows —
+ * the CSV is composed on the SERVER from `FOUNDER_EXPORT_COLUMNS`, so there is
+ * nothing here that could choose a column, and no client-side assembly that
+ * could quietly include one the register withholds.
+ */
+export const founderBackerExportPath = (campaignId: string): string =>
+  `${base(campaignId)}/backers/export`;
+
+/* ── Session G: §5.2's account-level settings ─────────────────────────────── */
+
+export interface FounderSettingsFieldValue {
+  id: string;
+  value: string | null;
+  guarded: boolean;
+}
+
+export interface FounderSettingsView {
+  campaignId: string;
+  campaignTitle: string | null;
+  signInEmail: string | null;
+  accountCreatedAt: string | null;
+  fields: FounderSettingsFieldValue[];
+  representations: { id: string; label: string; confirmed: boolean }[];
+  dateOfBirthOnFile: boolean;
+  country: string | null;
+  stateRegion: string | null;
+  soleProprietor: boolean | null;
+  w9: {
+    state: string;
+    line: string;
+    action: string;
+    requestedAt: string | null;
+    submittedAt: string | null;
+    verifiedAt: string | null;
+    returnReason: string | null;
+    blocksPayments: boolean;
+  } | null;
+  w9NotApplicableBecause: string | null;
+  deletionRequestedAt: string | null;
+}
+
+/**
+ * Account-level, so no campaign id anywhere in the path.
+ *
+ * A Founder with two campaigns has two `founder_claim_profiles` rows; the
+ * server picks the most recent, which is the same row the Admin workspace
+ * edits. A campaign parameter here would let the two disagree about which
+ * record a phone number lives on.
+ */
+export const fetchFounderSettings = (): Promise<{ settings: FounderSettingsView }> =>
+  call('/api/founder/settings');
+
+/**
+ * One registered field, with the reason §25.6 requires on a claimed account.
+ *
+ * The field id is in the path and the server validates it against the register
+ * — there is no way to name a column from here, which is 16a's rule applied to
+ * a customer-facing correction.
+ */
+export const correctFounderField = (
+  fieldId: string,
+  value: string | null,
+  reason: string,
+): Promise<{ settings: FounderSettingsView }> =>
+  call(`/api/founder/settings/fields/${encodeURIComponent(fieldId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value, reason }),
+  });
+
+/**
+ * §5.2's password, through the wrapper that forces `revokeOtherSessions` and
+ * writes the §25.6 row. The browser never calls `/api/auth/change-password`
+ * directly, and it never calls `update-user` at all.
+ */
+export const changeFounderPassword = (
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: true }> =>
+  call('/api/founder/settings/password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+
+/**
+ * §5.2's delete-account request. It records an ask onto 0040's insert-only
+ * record and erases nothing — there is no approval state to poll and no purge
+ * date to render, because neither exists.
+ */
+export const requestFounderDeletion = (
+  requestDetail: string,
+): Promise<{ settings: FounderSettingsView }> =>
+  call('/api/founder/settings/deletion-request', {
+    method: 'POST',
+    body: JSON.stringify({ requestDetail }),
   });

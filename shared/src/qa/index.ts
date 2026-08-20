@@ -74,6 +74,24 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: false,
   },
   {
+    /*
+      Founder Dashboard Session B (2026-08-19). `/support` is §27.1's sixth
+      question given an address — it was the `getHelp` target throughout the
+      product and it 404ed, because the only `support` path in the router was
+      inside the `admin` group.
+
+      Its own flow rather than a fifth `public_site` route: that flow is §18's
+      site and its policies, and this is neither. `keyboardPathRequired` is
+      true because §28.5 names "support" among its own five by name.
+    */
+    key: 'support_page',
+    label: 'Getting help without losing context',
+    specRef: '§27.1, §27.8, §28.5',
+    audience: 'public',
+    routes: ['/support'],
+    keyboardPathRequired: true,
+  },
+  {
     key: 'founder_vetting',
     label: 'The invited Founder: the invite, §9’s answers, and the account claim',
     specRef: '§7, §9, §10',
@@ -167,24 +185,96 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: true,
   },
   {
+    /*
+      Founder Dashboard Session C (2026-08-19): the roster and the readiness
+      checklist moved into Chapter 1, and the two old addresses redirect there.
+      The route swept is the chapter, because that is what a Founder now opens —
+      a sweep of a redirect proves the redirect and nothing about the surface.
+
+      `keyboardPathRequired` becomes true with the move: this is now where a
+      Founder accepts, declines, and revises terms, and §28.5 names decision
+      surfaces. It was false while the chapter was a read-only roster card.
+    */
     key: 'founder_roster',
-    label: 'Watching the roster and the Creator readiness',
-    specRef: '§14.5, §16',
+    label: 'Choosing the launch team: the roster, the three responses, and readiness',
+    specRef: '§14.5, §14.2, §14.3, §16',
     audience: 'founder',
-    routes: ['/campaigns/:campaignId/roster', '/campaigns/:campaignId/creator-readiness'],
-    keyboardPathRequired: false,
+    routes: ['/campaigns/:campaignId/home?chapter=choose'],
+    keyboardPathRequired: true,
   },
   {
     key: 'founder_live',
-    label: 'The live campaign home, updates, results, and fulfillment',
-    specRef: '§20, §21, §22.5',
+    label: 'Running the campaign: Glance, the one Act, Explore, the page, updates, and posts',
+    specRef: '§20, §18, §21, §22.5',
     audience: 'founder',
     routes: [
-      '/campaigns/:campaignId/home',
-      '/campaigns/:campaignId/updates',
-      '/campaigns/:campaignId/results',
-      '/campaigns/:campaignId/fulfillment',
+      /*
+        Chapter 2 (Founder Dashboard Session D). The updates address retired
+        into it and redirects, the way the roster address retired into Chapter
+        1 — the old address stays because §27 emails point at it, and the sweep
+        follows the content rather than the redirect.
+      */
+      '/campaigns/:campaignId/home?chapter=live',
     ],
+    keyboardPathRequired: true,
+  },
+  {
+    /*
+      Chapter 3, Get paid (Founder Dashboard Session E). `/results` and
+      `/fulfillment` retired into it and redirect; the sweep follows the
+      content, and both old addresses stay because §27's close, results, and
+      Day-14 messages point at them.
+
+      §28.5 names payment and recovery surfaces among its five keyboard paths,
+      and this is where a Founder answers a Day 14 clarification and asks for
+      an early release — both of which decide whether money moves.
+    */
+    key: 'founder_paid',
+    label: 'Getting paid: card retries, the W-9, the payment schedule, Day 14, and delivery',
+    specRef: '§21, §22.3, §22.4, §22.5',
+    audience: 'founder',
+    routes: ['/campaigns/:campaignId/home?chapter=payouts'],
+    keyboardPathRequired: true,
+  },
+  {
+    /*
+      Chapter 4 and the Backers page (Founder Dashboard Session F).
+
+      Two addresses in one flow because they are one piece of work: the chapter
+      is what a Founder reads when the campaign is over, and the Backers page is
+      the list of people it is about — linked from the chapter, and from
+      Chapter 2 while a campaign is still live.
+
+      `keyboardPathRequired` because the page carries §19's operational share:
+      an email address per person, the export that hands them over, and §25.7's
+      request form. §28.5 names data and privacy surfaces among the five, and a
+      list a keyboard user cannot walk is a list they cannot fulfil from.
+    */
+    key: 'founder_wrap',
+    label: 'After the campaign: your creators, your backers, the export, and the next campaign',
+    specRef: '§19, §20, §22.8–§22.11, §25.7',
+    audience: 'founder',
+    routes: ['/campaigns/:campaignId/home?chapter=after', '/campaigns/:campaignId/backers'],
+    keyboardPathRequired: true,
+  },
+  {
+    /*
+      §5.2's eleven settings at one account-level address (Session G).
+
+      The only Founder flow with no campaign in its route, because
+      `founder_claim_profiles` is unique per campaign and these belong to the
+      person. `/settings/notifications` — Phase 22c's own address, and the one
+      account-level route the product had before this — redirects here.
+
+      `keyboardPathRequired` because §28.5 names account and privacy surfaces
+      among its five: this page changes a password, corrects the address every
+      transactional message goes to, and files an account-closure request.
+    */
+    key: 'founder_settings',
+    label: 'Your account: your details, your password, payouts, W-9, and closing the account',
+    specRef: '§5.2, §13, §22.3, §25.8, §27.7',
+    audience: 'founder',
+    routes: ['/settings'],
     keyboardPathRequired: true,
   },
   {

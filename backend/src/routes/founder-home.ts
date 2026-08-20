@@ -19,6 +19,12 @@
  * There is also no route that posts an update on the Founder's behalf, and none
  * that dismisses an action without a reason. §20 asks for the reason, actor, and
  * time on every correction, and §31.9 counts them.
+ *
+ * ── One write was added here, and it is a recorded deviation ────────────────
+ * Founder Dashboard Session D, deviation 2: the post acknowledgement. It is on
+ * this router because it is scoped to the campaign home and reads §17's own
+ * record; it carries no note, changes no §17 outcome, and moves no money. See
+ * `live/posts.ts` and `db/schema/posts.ts` for the four absences that narrow it.
  */
 
 import { Router } from 'express';
@@ -30,11 +36,20 @@ import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { findFounderCampaign } from '../workspace/service.js';
+import { readFounderDashboard } from '../founder-dashboard/service.js';
+import {
+  exportBackerRows,
+  readFounderBackers,
+  readFounderWrap,
+  requestBackerData,
+} from '../founder-dashboard/wrap.js';
 import { readCampaignHome } from '../live/home.js';
 import { readFounderResults } from '../close/results.js';
 import { readFounderPaymentStatus, requestEarlyRemaining } from '../close/founder-payments.js';
 import { readExplore } from '../live/explore.js';
 import { acknowledgeDelivery } from '../live/glance.js';
+import { acknowledgeCreatorPost, listCreatorPosts } from '../live/posts.js';
+import { notifyPostAcknowledged } from '../live/post-notifications.js';
 import { acknowledgeMilestone } from '../live/thresholds.js';
 import {
   recordActCorrection,
@@ -94,6 +109,29 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
     }
     return campaign.campaignId;
   }
+
+  /* ── The dashboard shell's rail (Founder Dashboard Session B) ───────────── */
+
+  /**
+   * The five facts the four-chapter rail is drawn from. Its own read, beside
+   * §20's rather than inside it: `readCampaignHome` issues a delivery receipt
+   * and the shell re-reads on every chapter change (§33.6.6).
+   *
+   * Deliberately readable for a campaign in ANY §23.1 state, including the
+   * pre-live ones. Chapter one is always open, so a Founder whose campaign has
+   * not launched still has a home — which is the whole point of the address.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/dashboard`, founder, async (req, res) => {
+    const dashboard = await readFounderDashboard(db, {
+      campaignId: String(req.params['campaignId'] ?? ''),
+      founderUserId: req.authUser?.id ?? '',
+    });
+    if (!dashboard) {
+      notFound(res);
+      return;
+    }
+    res.json({ dashboard });
+  });
 
   /* ── Glance, Act, Explore — one read (§20) ──────────────────────────────── */
 
@@ -365,6 +403,91 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
     },
   );
 
+  /* ── §17's posts, and deviation 2's acknowledgement ─────────────────────── */
+
+  /**
+   * The Creator posts on this campaign, through §11's public-handle projection.
+   * Carries the outcome §17 recorded and never the checklist, the correction
+   * detail, or the enforcement reason — see `live/posts.ts`.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/home/posts`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+    res.json({
+      posts: await listCreatorPosts(db, {
+        campaignId,
+        founderUserId: req.authUser?.id ?? '',
+      }),
+    });
+  });
+
+  /**
+   * Founder Dashboard Session D, deviation 2 — a RECORDED deviation from §1
+   * rule 6, by explicit product direction.
+   *
+   * The body is deliberately IGNORED. There is no note to read, no column to
+   * write one to, and no parameter the service would take — a caller posting
+   * `{ note: '…' }` is answered exactly as one posting `{}`. That absence is the
+   * whole of what keeps this from being the direct Founder–Affiliate messaging
+   * §30 defers.
+   *
+   * It answers 200 on a repeat rather than an error: a client retrying after a
+   * dropped connection has done nothing wrong, and the unique index has already
+   * made the second one a no-op. `created` tells the caller whether a message
+   * went out.
+   */
+  router.post(
+    `${FOUNDER_HOME_PATH}/campaigns/:campaignId/home/posts/:submissionId/acknowledge`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const outcome = await acknowledgeCreatorPost(
+        db,
+        { audit },
+        {
+          campaignId,
+          submissionId: String(req.params['submissionId'] ?? ''),
+          founderUserId: req.authUser?.id ?? '',
+        },
+      );
+
+      if (!outcome.ok) {
+        res.status(outcome.code === 'not_found' ? 404 : 409).json({
+          error: outcome.code,
+          title: 'That was not sent',
+          whatHappened: outcome.whatHappened,
+          next: outcome.next,
+          support: '/support',
+        });
+        return;
+      }
+
+      // After the record commits, outside it — 08c's shape, for its reason: the
+      // send is idempotent through `notification_deliveries`, so a crash between
+      // the two costs a retry rather than correctness, and holding a row lock
+      // across a provider call would be a much more expensive way to be no safer.
+      if (outcome.created) {
+        await notifyPostAcknowledged(
+          {
+            db,
+            notifier: deps.notifier,
+            ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+          },
+          { submissionId: outcome.acknowledgement.submissionId },
+        );
+      }
+
+      res.json({
+        acknowledged: true,
+        created: outcome.created,
+        acknowledgedAt: outcome.acknowledgement.acknowledgedAt.toISOString(),
+      });
+    },
+  );
+
   /* ── §20: moving a milestone to history ─────────────────────────────────── */
 
   router.post(
@@ -387,6 +510,88 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
         actor: actorId(req),
       });
       res.json({ movedToHistory: moved });
+    },
+  );
+
+  /* ── Chapter 4 and the Backers page (Session F) ─────────────────────────── */
+
+  /**
+   * F1. §22.8's recorded completion per Creator, §22.9's asks, §22.10's two
+   * gates and §22.11's resolution, in one read. Every one of those services has
+   * existed since Phase 21b and had no Founder route.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/wrap`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+    const wrap = await readFounderWrap(db, campaignId);
+    if (!wrap) {
+      notFound(res);
+      return;
+    }
+    res.json({ wrap });
+  });
+
+  /**
+   * F2. §19's operational share, which the Spec calls MANDATORY and which no
+   * Founder route has ever read. `do_not_fulfill` rows are returned rather than
+   * filtered: a Founder needs to see that a pre-order was shared and then
+   * withdrawn, and what they must NOT do about it.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/backers`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+    res.json({ backers: await readFounderBackers(db, campaignId) });
+  });
+
+  /**
+   * F3. §20's Explore section 10. The response is a CSV body, and the column
+   * list comes from the register — `exportBackerRows` takes no argument that
+   * could widen it, so there is no query parameter to police here either.
+   */
+  router.get(
+    `${FOUNDER_HOME_PATH}/campaigns/:campaignId/backers/export`,
+    founder,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+      const file = await exportBackerRows(db, campaignId);
+      res.setHeader('content-type', 'text/csv; charset=utf-8');
+      res.setHeader('content-disposition', `attachment; filename="${file.filename}"`);
+      res.send(file.csv);
+    },
+  );
+
+  /**
+   * F4. §25.7's ask. Ungated: it records what a Founder needs and grants
+   * nothing — there is no column an exporter reads and no parameter an approval
+   * could arrive as. Registered in `UNGATED_ADMIN_WRITES`' Founder-side
+   * equivalent by being a Founder route, which takes `requireRole` only.
+   */
+  router.post(
+    `${FOUNDER_HOME_PATH}/campaigns/:campaignId/backer-data-request`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await requestBackerData(
+        { db, audit },
+        {
+          campaignId,
+          founderUserId: req.authUser?.id ?? '',
+          purpose: String(body['purpose'] ?? ''),
+          detail: String(body['detail'] ?? ''),
+        },
+      );
+      if (!result.ok) {
+        res.status(result.code === 'already_open' ? 409 : 400).json({
+          error: result.code,
+          whatHappened: result.message,
+        });
+        return;
+      }
+      res.json({ requestId: result.requestId });
     },
   );
 

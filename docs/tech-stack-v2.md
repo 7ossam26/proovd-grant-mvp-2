@@ -167,13 +167,24 @@ Two structural consequences:
 
 ### 3.6 The contrast exception
 
-DNA §1 states as an absolute rule that a `#41ED98`-filled button uses `#E9FFE1` text. That pair measures **1.44:1**. WCAG AA requires 4.5:1 for body text and 3:1 for large text.
+**Owner ruling, 2026-08-19: brand-green fill takes `#FAFAFA` text.** DNA §1 had stated as an absolute rule that a `#41ED98`-filled surface uses `#E9FFE1`; the ruling supersedes it and `--btn1-text` now reads `--white`. The exception is unchanged in kind and barely changed in degree:
 
-Per the authority chain, DNA controls visual treatment and this pair therefore ships as specified. But Spec §1.3 requires every exception to be recorded, and §33.11 makes accessibility a mandatory acceptance test. So:
+| Pair | Ratio |
+|---|---|
+| `#FAFAFA` on `#41ED98` — **what ships now** | **1.46:1** |
+| `#E9FFE1` on `#41ED98` — what shipped until 2026-08-19 | 1.44:1 |
 
-- Record this as a named, dated, owner-attributed design exception in the audit trail before launch.
+WCAG AA requires 4.5:1 for body text and 3:1 for large text, so both fail and the ruling is a wash rather than a regression.
+
+Per the authority chain, DNA controls visual treatment and the owner controls DNA, so this pair ships as ruled. But Spec §1.3 requires every exception to be recorded, and §33.11 makes accessibility a mandatory acceptance test. So:
+
+- Record this as a named, dated, owner-attributed design exception in the audit trail before launch. The ruling is dated and attributed; the audit-trail record is still owed and is a Track A item.
 - Mitigate where the system already allows it: brand-filled buttons are used at button scale (`--fs-btn`, 700+ weight), and the `.btn--secondary` border-only tier — `#41ED98` border and text on `#FAFAFA`, which measures far better — is available for any action where the primary tier isn't required.
-- Keyboard focus rings, error text, and all body copy must independently pass AA. The exception covers the one button pair, nothing else.
+- Keyboard focus rings, error text, and all body copy must independently pass AA.
+
+**What the exception covers, stated accurately.** It used to end "the one button pair, nothing else", and that had not been true since 2026-08-18: campaign-page-v2 shipped five non-button brand fills carrying text at the same ratio — the avatar initial, the illustrated demo control, the active demo moment, the check benefit card, and the selected reward badge. They were the same exception, unrecorded. The exception is **brand fill**, wherever it appears, and it is a slot (`--btn1-text`) plus those five scoped rules. It does not license a low-contrast pair anywhere else.
+
+Two pairings people reach for here are **not** in the exception and must not be moved into it: `.mode-dark`'s primary is `#013F17` on a `#FAFAFA` fill (11.7:1) and `.mode-light`'s is `#FAFAFA` on `#013F17` (11.7:1). Both are white-or-dark fills rather than brand ones, and both are already good.
 
 Claude Code will "helpfully" substitute a darker text color here unless told not to. Tell it not to.
 

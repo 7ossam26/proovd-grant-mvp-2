@@ -115,8 +115,51 @@ const HISTORY = {
   nextCursor: null,
 };
 
+/**
+ * §5.2's settings page, which now HOSTS the Founder's §27.7 control.
+ *
+ * The Founder Dashboard's Session G retired `/settings/notifications` into
+ * `/settings` (2026-08-20) and this suite kept rendering the old address — so
+ * the redirect landed on a page whose own read was unstubbed, and every Founder
+ * case failed on a 404 rather than on anything about §27.7. The fixture is the
+ * minimum `SettingsPage` needs to render; what is asserted below is unchanged,
+ * and still the embedded control and the history beside it.
+ */
+const FOUNDER_SETTINGS = {
+  campaignId: 'camp-1',
+  campaignTitle: 'A campaign',
+  signInEmail: 'founder@example.com',
+  accountCreatedAt: '2026-08-01T10:00:00.000Z',
+  fields: [],
+  representations: [],
+  dateOfBirthOnFile: true,
+  country: 'US',
+  stateRegion: 'OR',
+  soleProprietor: true,
+  w9: null,
+  w9NotApplicableBecause: 'No captured charge on this campaign yet.',
+  deletionRequestedAt: null,
+};
+
 function stubServer(pref = preference()) {
   handlers.push((url, init) => {
+    if (url.includes('/api/founder/settings')) {
+      return { status: 200, body: { settings: FOUNDER_SETTINGS } };
+    }
+    if (url.includes('/api/founder/payouts') || url.includes('/api/creator/payouts')) {
+      return {
+        status: 200,
+        body: {
+          payouts: {
+            status: 'not_started',
+            connectedAccountId: null,
+            requirements: null,
+            updatedAt: null,
+            onboardingAvailable: false,
+          },
+        },
+      };
+    }
     if (url.includes('/notifications/preferences') && init?.method === 'PUT') {
       const body = JSON.parse(String(init.body)) as { frequency: string };
       return {
@@ -222,9 +265,15 @@ describe('§27.7 — notification history', () => {
 
     const text = container.textContent ?? '';
     expect(text.toLowerCase()).not.toContain('unread');
-    // A history with a primary action would be asking for something. The only
-    // primary button on the page is the preference's own Save.
-    expect(container.querySelectorAll('.btn--primary')).toHaveLength(1);
+    // A history with a primary action would be asking for something.
+    //
+    // Scoped to §27.7's own section since Session G embedded it in §5.2's
+    // settings page, which has primaries of its own. Narrowing it is stricter
+    // than the page-wide count it replaces: it names where the absence has to
+    // hold rather than counting whatever else happens to be on screen.
+    const section = container.querySelector('[aria-labelledby="notification-settings-heading"]');
+    expect(section).not.toBeNull();
+    expect(section!.querySelectorAll('.btn--primary')).toHaveLength(1);
   });
 
   it('has no axe violations', async () => {

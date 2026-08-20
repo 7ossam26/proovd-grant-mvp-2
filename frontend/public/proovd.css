@@ -94,15 +94,26 @@
 
 
 /* ───────────────────────────────────────────── §2 BORDER + RADIUS TOKENS
-   Desktop defaults; phone values via the ≤600px query (§8 breakpoints). */
+   Desktop defaults; phone values via the ≤600px query (§8 breakpoints).
+
+   OWNER RULING 2026-08-19 (supersedes DNA §2), recorded in CLAUDE.md:
+   radius is 2px on BOTH postures. Was 1px desktop / 0.5px phone, and the
+   comment on it read "sharp. everywhere." — deleted rather than left
+   describing a value that is no longer here.
+
+   The border widths still halve on a phone and the radius deliberately does
+   NOT: "on both postures" is the whole content of that clause, and the
+   supplied reference declares --br:2px in its own ≤600px override beside a
+   --bw that halves. The brief's derivation table halved the radius too; the
+   ruling and the reference are what this follows. */
 
 :root {
   --bw:      2px;   /* outside border (cards, inputs, tags, calendar…) */
   --bw-btn:  2px;   /* outline buttons — USER REVISION: was 4px */
-  --radius:  1px;   /* sharp. everywhere. */
+  --radius:  2px;   /* OWNER RULING — see above */
 }
 @media (max-width: 600px) {
-  :root { --bw: 1px; --bw-btn: 1px; --radius: 0.5px; }
+  :root { --bw: 1px; --bw-btn: 1px; --radius: 2px; }  /* radius does not halve */
 }
 
 
@@ -155,7 +166,13 @@
 
   /* variant 1 — brand fill */
   --btn1-bg:      var(--brand);
-  --btn1-text:    var(--mint);         /* hard rule: brand fill → #E9FFE1 */
+  --btn1-text:    var(--white);        /* OWNER RULING 2026-08-19 (supersedes
+                                          DNA §1, which called brand fill →
+                                          #E9FFE1 an absolute rule): brand
+                                          fill takes #FAFAFA. Recorded in
+                                          CLAUDE.md and in tech-stack §3.6.
+                                          Every brand fill in this file moves
+                                          together — see the §2 note. */
   --btn1-border:  var(--brand);
   --btn1-hbg:     var(--brand-0);      /* hover = variant 2 */
   --btn1-htext:   var(--brand);
@@ -165,7 +182,7 @@
   --btn2-text:    var(--brand);
   --btn2-border:  var(--brand);
   --btn2-hbg:     var(--brand);        /* hover = variant 1 */
-  --btn2-htext:   var(--mint);
+  --btn2-htext:   var(--white);        /* that hover IS a brand fill */
   --btn2-hborder: var(--brand);
 
   --btn3-text:    var(--darker);       /* §7.1 tertiary: plain #012D10 bold */
@@ -180,13 +197,21 @@
   --mode-icon:  var(--mint);
 
   --btn1-bg:      var(--white);
-  --btn1-text:    var(--dark);
+  --btn1-text:    var(--dark);         /* KEPT. This is a WHITE fill, not a
+                                          brand one, so the ruling does not
+                                          reach it — and #013F17 on #FAFAFA
+                                          (11.7:1) is the one high-contrast
+                                          primary in the system. Considered
+                                          and left, so the next reader knows
+                                          it was a decision. */
   --btn1-border:  var(--white);
-  --btn1-hbg:     var(--brand);        /* hover: #41ED98 fill; text follows
-                                          the §1 hard rule — a brand-filled
-                                          button always uses #E9FFE1 text
-                                          (doc corrected; was #FAFAFA). */
-  --btn1-htext:   var(--mint);
+  --btn1-hbg:     var(--brand);        /* the hover IS a brand fill, so the
+                                          ruling reaches the hover text. The
+                                          comment that stood here recorded the
+                                          kit "correcting" the design doc from
+                                          #FAFAFA to #E9FFE1; the ruling puts
+                                          the doc's own value back. */
+  --btn1-htext:   var(--white);
   --btn1-hborder: var(--brand);
 
   /* DERIVED: dark sections list only one button, and the hard rules forbid
@@ -213,18 +238,22 @@
   --mode-icon:  var(--sage);           /* small icons: use .icon--sm → brand */
 
   --btn1-bg:      var(--dark);
-  --btn1-text:    var(--mint);
+  --btn1-text:    var(--white);        /* a DARK-green fill, not a brand one,
+                                          so the ruling does not reach it —
+                                          this one moves on the brief's own
+                                          product direction. Not a contrast
+                                          regression either way: #FAFAFA on
+                                          #013F17 is 11.7:1 against the
+                                          #E9FFE1 it replaces at 11.5:1. */
   --btn1-border:  var(--dark);
-  --btn1-hbg:     var(--brand);        /* hover: #41ED98 fill; text follows
-                                          the §1 hard rule (brand fill →
-                                          #E9FFE1 — doc corrected). */
-  --btn1-htext:   var(--mint);
+  --btn1-hbg:     var(--brand);        /* the hover IS a brand fill */
+  --btn1-htext:   var(--white);
   --btn1-hborder: var(--brand);
 
   --btn2-text:    var(--brand);        /* §7.1 universal secondary */
   --btn2-border:  var(--brand);
   --btn2-hbg:     var(--brand);
-  --btn2-htext:   var(--mint);         /* hard rule: brand fill → #E9FFE1 */
+  --btn2-htext:   var(--white);        /* that hover IS a brand fill */
   --btn2-hborder: var(--brand);
 
   --btn3-text:    var(--darker);
@@ -394,6 +423,13 @@ button { cursor: pointer; }              /* §8.2 pointer on everything tappable
   background: var(--r-bg);
   color: var(--r-text);
   outline-color: var(--r-border);
+  /* OWNER RULING 2026-08-19, clause 3: the inset highlight ships on the
+     primary tier. It reads as a top-edge gloss on the brand and dark-green
+     fills and is invisible on .mode-dark's white one, which is why it sits on
+     the tier rather than in a fourth slot per mode. An inset shadow paints
+     above the background and below child content, so .btn__fill covers it
+     during the §6.5 progress morph — which is what should happen. */
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
 }
 
 .btn--secondary {
@@ -442,7 +478,7 @@ button { cursor: pointer; }              /* §8.2 pointer on everything tappable
   outline-color: var(--brand);
   color: var(--darker);
 }
-.btn.is-done .btn__label { color: var(--mint); }   /* check on full brand fill */
+.btn.is-done .btn__label { color: var(--white); }  /* check on full brand fill */
 
 /* ---- Text input / textarea — the ONLY grey-bordered tappable (§7.1).
    Never a silent box: always placeholder or a label directly above. */
@@ -652,6 +688,22 @@ a::after, .u::after {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The copy button is a flex item beside a shrinkable URL, and a button hides
+   its own overflow because it hosts the fill sweep — so at a narrow width the
+   row squeezed the control and it clipped its own label by 8px. The URL is the
+   part with somewhere to go (it ellipsises); the control is not. Found by the
+   Session D browser pass; fixed at the primitive, so every Copylink in the
+   product inherits it. */
+.copylink > .btn { flex: 0 0 auto; }
+
+/* And at a phone width the label ellipsised to `Your camp…`, which names
+   nothing. It wraps onto its own line instead — PHASE 38's own call on the
+   Admin nav: a second line is legible, and a truncated label is a missing one. */
+@media (max-width: 600px) {
+  .copylink { flex-wrap: wrap; justify-content: flex-start; }
+  .copylink__url { flex: 1 0 100%; }
 }
 
 /* ---- Selection / live treatment as a composable state (§1, §5.5) */
@@ -2153,15 +2205,16 @@ html.no-motion [data-splash] { display: none !important; }
    and clipping would make a pane unreachable. Same focus-ring padding as the
    nav, for the same reason.
 
-   SCOPED 2026-08-20 (Session E). This was a bare `.tabs`, which is the design
-   system's own `Tabs` component container — so from the day it was written it
-   turned every `<Tabs>` in the product into a horizontal flex row with the
-   tablist and each tabpanel side by side. Nothing caught it because the only
-   users were the gallery and a jsdom test, and jsdom does no layout; the first
-   product surface to use the component since (the Creator's Pitches list) drew
-   its two panels down the left gutter. The markup already carries `.frec-tabs`,
-   so this is a selector change and no component moved. `.tabbtn`, `.tabline`
-   and `.tabpane` below are this workspace's own names and do not collide. */
+   SCOPED 2026-08-20 (Creator Flow Session E). This was a bare `.tabs`, which is
+   the design system's own `Tabs` component container — so from the day it was
+   written it turned every `<Tabs>` in the product into a horizontal flex row
+   with the tablist and each tabpanel side by side. Nothing caught it because
+   the only users were the gallery and a jsdom test, and jsdom does no layout;
+   the first product surface to use the component since (the Creator's Pitches
+   list) drew its two panels down the left gutter. The markup already carries
+   `.frec-tabs`, so this is a selector change and no component moved. `.tabbtn`,
+   `.tabline` and `.tabpane` below are this workspace's own names and do not
+   collide. */
 .frec-tabs {
   position: relative;
   display: flex;
@@ -6839,9 +6892,18 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
         .dock, .update, .consent, .sample-banner — are reused, never restyled
         in place.
 
-     3. BRAND FILL TAKES --mint. proovd.css:158's hard rule, and the reason the
-        reference's own --white on brand is NOT carried over: #FAFAFA on
-        #41ED98 is imperceptible. Every brand fill below reads --mint.
+     3. BRAND FILL TAKES --mint.  ← SUPERSEDED 2026-08-19 by the owner ruling
+        (see §1/§2 above and CLAUDE.md). Brand fill now takes --white, and the
+        six brand-filled rules below — .pc-avatars, .pc-demo__action,
+        .pc-moment.is-active, .pc-benefit--check, .pc-reward__badge and
+        .checkout__done-icon — were moved with it.
+
+        This convention was written because the reference's own --white on
+        brand was judged imperceptible: #FAFAFA on #41ED98 is 1.46:1 against
+        #E9FFE1's 1.44:1, which was and remains true. The ruling makes it the
+        product's answer anyway, on every brand fill, and one convention that
+        holds everywhere beats two that each hold somewhere. Left here struck
+        rather than deleted so the reasoning survives the reversal.
 
    The two breakpoints are the reference's own (1099.98px and 599.98px) and
    each rule names the overflow it answers.
@@ -6975,7 +7037,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   font-style: normal;
   font-weight: 900;
 }
-.pc-avatars i + i { margin-left: -0.55rem; background: var(--brand); color: var(--mint); }
+.pc-avatars i + i { margin-left: -0.55rem; background: var(--brand); color: var(--white); }
 
 @media (min-width: 1100px) {
   .pc-hero { min-height: calc(100svh - 4.75rem); }
@@ -7047,7 +7109,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   display: inline-flex;
   align-items: center;
   background: var(--brand);
-  color: var(--mint);
+  color: var(--white);
   font-size: 1rem;
   font-weight: 900;
 }
@@ -7071,7 +7133,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   cursor: pointer;
 }
 .pc-moment + .pc-moment { border-left: 1px solid var(--dark); }
-.pc-moment.is-active { background: var(--brand); color: var(--mint); }
+.pc-moment.is-active { background: var(--brand); color: var(--white); }
 .pc-moment span { font-size: 0.8rem; font-weight: 900; }
 .pc-moment strong { margin-top: var(--sp-8); font-size: 1rem; line-height: 1.15; }
 .pc-moment small { margin-top: auto; padding-top: var(--sp-8); font-size: 0.78rem; font-weight: 750; }
@@ -7105,7 +7167,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   line-height: 1;
 }
 .pc-benefit--bars  { background: var(--accent-blue);   color: var(--dark); }
-.pc-benefit--check { background: var(--brand); color: var(--mint); border-color: var(--brand); }
+.pc-benefit--check { background: var(--brand); color: var(--white); border-color: var(--brand); }
 .pc-benefit--dots  { background: var(--accent-yellow); color: var(--dark); }
 
 .pc-benefit__bars { margin: auto 0; display: grid; gap: var(--sp-12); }
@@ -7307,7 +7369,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.is-selected .pc-reward__badge { background: var(--brand); color: var(--mint); }
+.is-selected .pc-reward__badge { background: var(--brand); color: var(--white); }
 .pc-reward__mark {
   width: 2rem;
   height: 2rem;
@@ -7614,7 +7676,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   display: grid;
   place-items: center;
   background: var(--brand);
-  color: var(--mint);
+  color: var(--white);
 }
 .checkout__done-icon svg {
   width: 2.2rem;
@@ -7725,8 +7787,18 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
    33.11.1's 320px reflow is not satisfiable by a scaled fixed stage.
 
    Border radius is var(--radius). The reference's "2px everywhere. Never
-   rounded." and this file's "--radius: 1px - sharp. everywhere." are the same
-   design intent, and one of them is already the system.
+   rounded." and this file's "sharp. everywhere." were the same design intent,
+   and one of them was already the system.
+
+   RESOLVED 2026-08-19 by the owner ruling: --radius is 2px on both postures,
+   so the token now carries the reference's own number and this paragraph is
+   history rather than a live decision.
+
+   It is also, almost certainly, what the ruling meant by "those three come
+   from the shipped Founder Flow". The flow's REFERENCE asked for 2px; this
+   note is where the flow recorded declining it in favour of the token. The
+   shipped flow used 1px like everything else, which is why that premise reads
+   as inaccurate against the code and as reasonable against the reference.
    ═════════════════════════════════════════════════════════════════════════ */
 
 /* Local display recipes. Both bounds always ship. These are the reference's
@@ -9736,7 +9808,1083 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
 .cf-foot__actions { flex-wrap: wrap; }
 
 
-/* ══════════════════════ PHASE 39 — the Creator onboarding flow
+/* ═══════════════════════ PHASE 39 — the Founder dashboard shell
+   Spec §20, §26, §33.11, DNA §5.2, §5.12, added 2026-08-19.
+   Founder Dashboard Session B — the chrome, not the chapters.
+
+   The number is the GREP's, not the brief's. `founder-dashboard.md` proposed
+   `PHASE 40` and told the reader twice to verify it instead of trusting it;
+   the highest section in this file was 38. The Creator flow's own brief had
+   reserved 39, but its Session A built no surface and wrote no CSS, so 39 was
+   never taken — a contiguous number that every session derives the same way
+   beats a reserved one that only one document knows about.
+
+   The three conventions PHASE 25 set, and 26–34 restated, bind here too:
+
+     1. TOKENS ONLY. The reference's chrome maps onto this file's slots rather
+        than being copied: its `--br` is `--radius`, its `--white` page ground
+        is `--white`, and its current-chapter fill is `--brand-5`, which this
+        palette already defines for exactly that job ("selection / loading /
+        live"). No hex literal and no arbitrary spacing value.
+
+     2. SCOPED OVERRIDES. Everything new is prefixed `.fd-` — checked against
+        `.pc-` (33), `.ff-` (34), `.cr-` (26/32), `.cf-` (31), `.mny-` (36) and
+        `.tdy-` (37), and against `.fd` itself, which appeared nowhere. `.btn`,
+        `.tag`, `.doc-list`, `.kicker` and the drawer are reused untouched.
+
+     3. THIS IS NOT ADMIN CHROME. §26 licenses dashboard density in the Admin
+        panel and nowhere else. The rail is four words on one line; there is no
+        environment chip, no section grid, and no dense table treatment here,
+        and none should be added — the Founder surface it wraps is a
+        chronological workspace (DNA §5.2, §5.3).
+
+   ── The rail WRAPS, it does not scroll ────────────────────────────────────
+   PHASE 38's finding, applied before it can become a defect: a horizontal
+   scroller with no visible scrollbar gives no sign the rest of the tabs exist,
+   and this rail has four items that must all be reachable at 320px. A second
+   line is legible; a hidden chapter is a missing chapter.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.fd {
+  display: block;
+}
+
+/* ── The band ─────────────────────────────────────────────────────────────
+   Sticky, like the reference's. It needs its own ground: a sticky element
+   over scrolling content with a transparent background lets the content run
+   through it, which is the defect PHASE 33 recorded on the campaign header. */
+.fd-band {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-16);
+  padding: var(--sp-16) var(--gutter);
+  background: var(--white);
+  border-bottom: 1px solid var(--grey-light);
+}
+
+.fd-band__brand {
+  font-weight: 900;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+  color: var(--darker);
+  text-decoration: none;
+}
+.fd-band__brand:hover { color: var(--brand); }
+
+.fd-band__name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  min-width: 0;                     /* the title may be long; let it shrink */
+}
+
+.fd-band__title {
+  font-weight: 800;
+  color: var(--dark);
+  /* A campaign title is Founder-supplied free text and can be one long token
+     at 320 — the same class of defect PHASE 36 fixed on the money console. */
+  overflow-wrap: anywhere;
+}
+
+/* Pushed to the end on a wide band, and simply next in flow once it wraps. */
+.fd-band__more { margin-left: auto; }
+
+/* ── The chapter rail ─────────────────────────────────────────────────── */
+
+.fd-rail {
+  padding: var(--sp-12) var(--gutter) 0;
+}
+
+.fd-rail ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;                  /* see the header note — never a scroller */
+  gap: var(--sp-8);
+}
+
+.fd-chapter {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);         /* §33.11: the 44px minimum, from the token */
+  padding: var(--sp-8) var(--sp-16);
+  border: var(--bw) solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font: inherit;
+  font-weight: 800;
+  color: var(--dark);
+  cursor: pointer;
+}
+
+.fd-chapter:hover { border-color: var(--sage); }
+
+/* The reference's own current treatment: brand ring over the selection fill. */
+.fd-chapter.is-current {
+  border-color: var(--brand);
+  background: var(--brand-5);
+  color: var(--darker);
+}
+
+/*
+  A locked chapter reads as unavailable and STAYS focusable — it is
+  `aria-disabled`, never `disabled`, so a keyboard user reaches it and hears
+  the reason in its accessible name. `cursor: not-allowed` is the sighted half
+  of the same message.
+
+  Opacity rather than a colour swap, deliberately: the reference dims to .45,
+  and a dimmed dark-green on white still clears AA for a label at this weight,
+  where re-toning to `--grey` (2.18:1 on white) would not.
+*/
+.fd-chapter.is-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.fd-chapter.is-locked:hover { border-color: transparent; }
+
+/* ── The drawer's chapter list ────────────────────────────────────────────
+   `.doc-list` supplies the list treatment; these three are the row's own
+   parts. The drawer itself is `Drawer.tsx` — Radix Dialog with the portal,
+   focus trap, Escape, backdrop dismiss and GSAP open/close already working. */
+
+.fd-drawer__list li {
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.fd-drawer__tag {
+  font-size: var(--fs-tag, 0.75rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  /* The reference uses its own grey here. `--grey` is 2.18:1 on white in this
+     palette, and this line carries the chapter's state — `--moss` is what
+     PHASE 33 and 36 both settled on for small type that has to be read. */
+  color: var(--moss);
+}
+
+.fd-drawer__title { font-weight: 800; }
+
+.fd-drawer__note { color: var(--moss); }
+
+@media (max-width: 600px) {
+  /* The band's three parts stack rather than compete for one line, and the
+     drawer control loses its auto margin so it sits with them. */
+  .fd-band { gap: var(--sp-8); }
+  .fd-band__more { margin-left: 0; }
+  .fd-chapter { padding: var(--sp-8) var(--sp-12); }
+}
+
+/* ── Chapter 1, Choose ─────────────────────────────────────────────────────
+   Founder Dashboard Session C, added 2026-08-19. §14.5, §14.2, §14.3, §16.
+
+   The reference's shape, kept: a reader on the left and the open Creator on
+   the right, two columns collapsing to one. What is NOT kept is its modal
+   treatment — every panel here can be refused by the server, and `Modal`
+   closes on its own primary action, which would put the refusal on a card
+   behind a panel that has just vanished. DNA §5.14's Act stage is exactly
+   this: the decision opens in place, beside the field that caused it.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.fd-choose { display: grid; gap: var(--sp-32); }
+.fd-choose__head { display: grid; gap: var(--sp-8); }
+
+.fd-choose__split {
+  display: grid;
+  gap: var(--sp-24);
+  align-items: start;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+}
+
+/* The reader. A `nav` of Creators — it decides which card is OPEN and nothing
+   about who is on the roster (§14.5: Proovd owns recruitment follow-up). */
+.fd-roster { display: grid; gap: var(--sp-8); align-content: start; }
+.fd-roster ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-4); }
+.fd-roster__count { margin: 0; font-size: 1.125rem; }
+.fd-roster__count strong { font-size: 2.5rem; font-weight: 500; line-height: 1; }
+.fd-roster__waiting { margin: 0 0 var(--sp-8); color: var(--moss); }
+
+.fd-roster__row {
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--darker);
+  cursor: pointer;
+  font: inherit;
+}
+.fd-roster__row:hover { border-color: var(--brand); }
+.fd-roster__row.is-open { border-color: var(--brand); background: var(--brand-5); }
+.fd-roster__who { font-weight: 700; overflow-wrap: anywhere; }
+.fd-roster__meta { color: var(--moss); font-size: 0.875rem; }
+
+/* The open Creator. */
+.fd-creator {
+  display: grid;
+  gap: var(--sp-16);
+  padding: var(--sp-24);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-creator__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fd-offer { display: grid; gap: var(--sp-12); }
+
+/* An Act panel: the decision, in place. */
+.fd-act {
+  display: grid;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--brand-5);
+}
+/* A `.btn` is inline-flex, and a flex item in a column is stretched to the
+   container by the default `align-items: stretch` — the defect Founder Flow
+   Sessions D and E each recorded, and the Money console a third time. */
+.fd-act__opener { display: flex; flex-wrap: wrap; gap: var(--sp-8); }
+
+.fd-fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: var(--sp-8); }
+.fd-fieldset legend { font-weight: 700; padding: 0; }
+.fd-radio { display: flex; gap: var(--sp-8); align-items: start; cursor: pointer; }
+.fd-radio > span { display: grid; gap: var(--sp-4); }
+
+/* The hero numeral on the read-only base-cut panel (DNA §5.1). */
+.fd-hero-num {
+  font-size: clamp(3rem, 9vw, 5rem);
+  font-weight: 500;
+  line-height: 0.9;
+  margin: 0;
+  color: var(--darker);
+}
+
+/* A refused control's reason, rendered where the control would have been.
+   `--moss` rather than `--grey`: PHASE 34's finding — `--grey` on `--white`
+   is about 2.2:1, and these sentences carry the rules. */
+.fd-note { color: var(--moss); margin: 0; }
+.fd-absence {
+  color: var(--moss);
+  margin: 0;
+  padding-left: var(--sp-12);
+  border-left: var(--bw) solid var(--grey-light);
+}
+.fd-done { color: var(--dark); font-weight: 700; margin: 0; }
+
+.fd-fields { display: grid; gap: var(--sp-16); }
+
+
+/* ── Two fixes the browser pass found, and neither is visible to jsdom ─────
+
+   1. `.wrap` IS VIEWPORT-RELATIVE, AND THAT IS WRONG TWICE HERE. It is
+      `width: min(90vw, 1600px)`, which is correct for a top-level public
+      section and wrong for anything inside a box that has already spent a
+      gutter. Measured: at 320 the shell's own wrap ran 13px past the
+      viewport, and at 1280 the SECOND one — Phase 13's Creator readiness
+      brings its own Measure/Section pair when rendered as a section of this
+      chapter — ran 77px past its parent and scrolled the document sideways.
+
+      PHASE 38 found and fixed exactly this inside the Admin view. `.fd .wrap`
+      is that fix for the Founder shell, so every chapter B–G inherits it; the
+      two `.fd-choose` rules below are the nested-surface half.
+
+   2. A SENTENCE THAT STATES A RULE TAKES `--dark`; A CAPTION STAYS `--moss`.
+      Founder Flow Session E's finding, and the Money console's after it.
+      `--moss` on white measures 3.37:1, under AA — and these sentences are
+      the load-bearing copy of the chapter, because they are what says why a
+      control does not exist. The status captions beside them
+      (`.fd-roster__meta`, `.fd-roster__waiting`) keep `--moss`: that token's
+      own ratio is the product-wide gap Session B recorded, and closing it is
+      a design decision with its own six-surface pass. */
+.fd .wrap { width: 100%; }
+.fd-choose .measure { max-width: none; }
+.fd-choose .section { padding-inline: 0; padding-block: var(--sp-16); }
+.fd-note, .fd-absence { color: var(--dark); }
+
+/* 3. `min-width: auto` ON A GRID ITEM IS WHY A SINGLE-COLUMN GRID CAN BE WIDER
+      THAN ITS CONTAINER. An implicit `auto` track is sized to the widest
+      item's MIN-content, and a text input carries an intrinsic one (its
+      default `size`) that ignores `width: 100%`. So at 320 the two URL fields
+      set a 309px floor, every sibling stretched to the track, and the page
+      scrolled sideways — while `.fd-choose` itself measured a correct 272.
+      `minmax(0, 1fr)` is the one-line fix, applied to every grid this chapter
+      declares rather than to the one that happened to hold an input. */
+.fd-choose,
+.fd-choose__head,
+.fd-roster,
+.fd-creator,
+.fd-offer,
+.fd-act,
+.fd-fields,
+.fd-fieldset { grid-template-columns: minmax(0, 1fr); }
+
+/* 4. A HANDLE, A URL AND A UTC INSTANT ARE EACH ONE UNBREAKABLE TOKEN, and at
+      320 each is wider than the column. `.fd-roster__who` already carried this;
+      the detail heading and the embedded readiness cards did not, and measured
+      37px and 13px over. PHASE 36 made the same decision twice on the Money
+      console for the same reason. */
+.fd-creator__head h2,
+.fd-choose .card h2,
+.fd-choose .card h3,
+.fd-choose .card dd,
+.fd-choose .card li { overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .fd-choose__split { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* ── PHASE 39 — Chapter 2, Live ────────────────────────────────────────────
+   Founder Dashboard Session D, added 2026-08-19. §20, §18, §30.
+
+   The reference's shape, kept: a moment at the top and a stack of sections
+   under it, each one openable. What is NOT kept is what it puts in the moment
+   — `$12,840 Money made`, `128% Threshold progress`, and a Creator podium
+   headed "Farah Nassar is leading." §20 names Glance's one large number and it
+   is the active pre-order count; §30 defers public leaderboards; and during a
+   live campaign nothing has been charged at all, which is why the reserved
+   totals live in Explore beside the sentence that says so.
+
+   Every grid below declares `minmax(0, 1fr)` from the start rather than
+   waiting for a browser pass to find it: an implicit `auto` track sizes to the
+   widest item's MIN-content, and this chapter is full of URLs, handles and a
+   45-option select — Session C's finding, applied before it could recur.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.fd-live__glance,
+.fd-live__act,
+.fd-live__page,
+.fd-live__updates,
+.fd-live__posts,
+.fd-live__explore {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-end: var(--sp-24);
+}
+
+/* The moment. One number, then the sentences that qualify it — the
+   not-yet-charged notice is `.notice`, which is already the loud slot. */
+.fd-live__glance { gap: var(--sp-16); }
+
+/* One ranked action, in the brand-ringed treatment Chapter 1's Act panel uses,
+   so the two chapters agree about what "the thing to do" looks like. */
+.fd-live__act {
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--brand-5);
+}
+.fd-live__act .lede { margin: 0; }
+
+/* The three-tier edit form. It appears under the picker rather than in a
+   dialog: every submission here can be refused by the server, and `Modal`
+   closes on its own primary action (Session C's reasoning, unchanged). */
+.fd-live__edit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+
+/* Updates. The list is a disclosure below the composer (DNA §5.12): the thing
+   a Founder came to do is post one, and reading the old ones is the Explore
+   altitude of the same panel. */
+.fd-live__posted { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-16); }
+
+.fd-live__update {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+  padding-block-end: var(--sp-16);
+  border-block-end: var(--bw) solid var(--grey-light);
+}
+.fd-live__update:last-child { border-block-end: 0; padding-block-end: 0; }
+.fd-live__updatemeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: center;
+  margin: 0;
+  color: var(--moss);
+  font-size: 0.875rem;
+}
+
+/* §18's prior/revised pairing. Two rows, so the change is legible as a change
+   rather than as two facts that happen to be adjacent. */
+.fd-live__change { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); margin: 0; }
+.fd-live__change > div {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  gap: var(--sp-8);
+}
+.fd-live__change dt { color: var(--moss); margin: 0; }
+.fd-live__change dd { margin: 0; overflow-wrap: anywhere; }
+
+/* The Creators' posts. A flat list in the server's stated order — no rank
+   badge, no podium, no medal, and nothing sorted by a metric (§30). */
+.fd-live__postlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-16);
+}
+.fd-live__post {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-live__posthead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+}
+/* A post URL is one unbreakable token and is wider than the column at 320 —
+   PHASE 36 made this call twice on the Money console, and Session C once here. */
+.fd-live__post a,
+.fd-live__posthead strong { overflow-wrap: anywhere; }
+
+.fd-live__acked { display: flex; flex-wrap: wrap; gap: var(--sp-8); align-items: center; margin: 0; }
+
+/* Explore's own data rows. A definition list rather than a table: §20 puts the
+   definition beside every number, and a two-column table has nowhere to say
+   what a number counts. */
+.fd-live__data {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  margin: var(--sp-8) 0;
+}
+.fd-live__data > div {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: var(--sp-8);
+}
+.fd-live__data dt { color: var(--moss); margin: 0; overflow-wrap: anywhere; }
+.fd-live__data dd { margin: 0; overflow-wrap: anywhere; }
+
+/* A `.btn` is inline-flex, and a DIRECT flex/grid child in a column is
+   stretched to the container — the defect Founder Flow Sessions D and E, the
+   Money console and Session C each recorded. Scoped to a direct child so the
+   composer's own wrapped rows are untouched. */
+.fd-live__post > .btn { justify-self: start; }
+
+@media (max-width: 600px) {
+  .fd-live__change > div,
+  .fd-live__data > div { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* -- PHASE 39 -- Chapter 3, Get paid ---------------------------------------
+   Founder Dashboard Session E, added 2026-08-19. Spec 21, 22.3, 22.4, 22.5.
+
+   The reference's own shape, kept: a money moment, then an ordered list of
+   obligations, each openable. What is NOT kept is the spine it hangs them on
+   -- `Request payment` / `In review` / `Paid` -- because 22.3 has no Founder
+   request for a scheduled payment, and a control for one would say the money
+   is waiting on the person reading it.
+
+   Nor is the money block. The reference computes `net = gross - aff - proovd`
+   in the browser and splits it 40/60 with `Math.round`; the eligible share
+   subtracts five terms, the remaining payment is the exact remainder, and
+   `readFounderPaymentStatus` is the one place any of it is worked out. So the
+   hero here is that resolver's own number with its own note under it.
+
+   Every grid declares `minmax(0, 1fr)` from the start -- Session C's finding,
+   applied before a browser pass can rediscover it. This chapter carries
+   money strings, provider-shaped references, evidence text and a select.
+   -------------------------------------------------------------------------- */
+
+.fd-paid__retry,
+.fd-paid__payments,
+.fd-paid__results,
+.fd-paid__obligations,
+.fd-paid__day14 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-end: var(--sp-24);
+}
+
+/* The counts a Founder reads twice -- once for the retry window and once for
+   the results. A definition list rather than a table: every number here needs
+   a word beside it that says what it counts, and a table row has nowhere for
+   one. */
+.fd-paid__counts {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: var(--sp-4) var(--sp-12);
+  margin: var(--sp-8) 0;
+}
+.fd-paid__counts > div { display: contents; }
+.fd-paid__counts dt { color: var(--moss); margin: 0; overflow-wrap: anywhere; }
+.fd-paid__counts dd { margin: 0; overflow-wrap: anywhere; }
+
+/* The schedule. One row per 22.3 payment, in the order the settings put them,
+   with the blockers under the row they block rather than collected at the
+   bottom -- 22.3 asks for the requirement BY NAME beside the amount affected. */
+.fd-paid__schedule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fd-paid__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-paid__linehead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: baseline;
+  margin: 0;
+}
+.fd-paid__linemeta { color: var(--moss); margin: 0; }
+
+/* A named blocker and a missing early-release proof are the same shape: a
+   short list of things somebody has to act on. `--dark` rather than `--moss`
+   for the same reason `.fd-note` is -- these decide whether money moves. */
+.fd-paid__blockers {
+  margin: var(--sp-4) 0 0;
+  padding-left: var(--sp-16);
+  color: var(--dark);
+}
+.fd-paid__blockers li { overflow-wrap: anywhere; }
+
+/* 22.3's secure action. It is an instruction rather than a link -- Proovd
+   never collects the W-9 itself -- so it reads as copy and not as a control. */
+.fd-paid__action {
+  margin: 0;
+  padding: var(--sp-8) var(--sp-12);
+  border-left: var(--bw) solid var(--brand);
+  background: var(--brand-5);
+  overflow-wrap: anywhere;
+}
+
+.fd-paid__early,
+.fd-paid__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-start: var(--sp-12);
+}
+
+/* A `.btn` is inline-flex and a DIRECT flex/grid child in a column is
+   stretched to the container -- the defect Founder Flow Sessions D and E, the
+   Money console, and Sessions C and D each recorded. Scoped to direct
+   children so nothing inside a wrapped row is touched. */
+.fd-paid__early > .btn,
+.fd-paid__form > .btn,
+.fd-paid__deliver > .btn { justify-self: start; }
+
+.fd-paid__narrative {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+}
+.fd-paid__creators {
+  margin: var(--sp-12) 0 0;
+  padding-left: var(--sp-16);
+}
+/* A public handle is one unbreakable token and is wider than the column at
+   320 -- PHASE 36 made this call twice on the Money console, and Sessions C
+   and D once each here. */
+.fd-paid__creators li { overflow-wrap: anywhere; }
+
+/* 22.5's four obligations, and the commitment sequence under them. The
+   original is row one and stays row one (33.10.2): it is what the delivery
+   notice, the 24.11 evidence packet and 22.7's third trigger all read. */
+.fd-paid__oblist,
+.fd-paid__commitments,
+.fd-paid__clarifications {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  list-style: none;
+  margin: var(--sp-8) 0 0;
+  padding: 0;
+}
+.fd-paid__ob,
+.fd-paid__commitment,
+.fd-paid__clarification {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+.fd-paid__obhead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-8);
+  align-items: baseline;
+  margin: 0;
+}
+.fd-paid__obmeta { color: var(--moss); margin: 0; overflow-wrap: anywhere; }
+
+.fd-paid__deliver {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+  margin-block-start: var(--sp-16);
+}
+
+/* 22.4's durable receipt. A reference is a token nobody can break, and the
+   detail beside it is free text a Founder typed. */
+.fd-paid__receipt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-8);
+  margin-block-end: var(--sp-16);
+}
+
+@media (max-width: 600px) {
+  .fd-paid__counts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* -- Two fixes the browser pass found, and neither is visible to jsdom ------
+
+   1. `--fs-num` HAS A 2.5rem FLOOR, AND THIS IS THE FIRST HERO THAT IS MONEY.
+      `.stat__value` is the done-moment number slot, sized for a COUNT --
+      Chapter 2's Glance puts `44` in it. `US$4,180.80` is eleven glyphs of one
+      unbreakable token, and at 40px it ran 91px past its card at 320, which
+      then pushed the measure, the section, and the document sideways: one
+      defect reported as ten. The floor is lowered where the hero is a
+      currency, and only there, so every counting Stat in the product is
+      untouched. Not `overflow-wrap` -- breaking an amount across two lines is
+      worse than shrinking it.
+
+   2. `.stat__sub` IS `--grey`, WHICH IS 2.27:1 ON WHITE. It carries the label
+      of the largest money figure a Founder will read, which is the case
+      Founder Flow Session E's rule is about -- a line that says what a number
+      MEANS is not a caption. Scoped, for the reason Session C recorded: the
+      token's own ratio is a product-wide decision with its own pass. */
+.fd-paid__payments .stat__value { font-size: clamp(1.5rem, 7vw, 4.5rem); }
+.fd-paid__payments .stat__sub { color: var(--dark); }
+
+/* ═══════════════════════ PHASE 41 — Chapter 4, Wrap, and the Backers page
+   Founder Dashboard Session F, 2026-08-20.
+
+   PHASE 41 and not the 40 a reader might assume: 39 was the shell and Chapters
+   2 and 3, 40 was taken elsewhere the same week, and the number has now moved
+   four times in three days. Derive it (`grep -oE "PHASE [0-9]+" | sort -u -V |
+   tail -1`), do not carry it forward from a brief.
+
+   Prefixes: `.fd-wrap__` and `.fd-backers__`, both free. `.fd-` is the Founder
+   dashboard's own family (PHASE 39); `.cr-` is the Affiliate ADMIN workspace,
+   `.mny-` the Money console, `.cmp-` the Campaigns hub.
+
+   Conventions carried from PHASE 39, and each one is a defect a browser pass
+   found on an earlier chapter:
+
+     * every grid is `minmax(0, 1fr)`. An implicit `auto` track is sized to the
+       widest item's MIN-content, and a text input carries an intrinsic one that
+       ignores `width: 100%` — which is how a single-column grid comes to be
+       wider than its own container at 320.
+     * an email, a reward SKU and a pre-order reference are each ONE unbreakable
+       token, so every cell that can hold one takes `overflow-wrap: anywhere`.
+     * a sentence that states a RULE takes `--dark`; a caption stays `--moss`.
+       `--moss` on white is 3.37:1 and these lines are what say why a control
+       does not exist (Founder Flow Session E's finding, Session C's scoping).
+     * a `.btn` is `inline-flex`, so a direct button child of a column flex is
+       stretched to the measure with its label centred unless it is told not to.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Chapter 4 ───────────────────────────────────────────────────────────── */
+
+.fd-wrap__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--sp-12);
+  margin-block: var(--sp-24);
+}
+
+/* §4.1: the threshold is a COUNT. Stated plainly, next to the numbers it is
+   about, rather than as a caption under them. */
+.fd-wrap__threshold {
+  margin-block: var(--sp-12);
+  color: var(--dark);
+}
+
+.fd-wrap__granted {
+  margin-block: var(--sp-12);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--mint);
+}
+
+.fd-wrap__creators {
+  list-style: none;
+  margin: var(--sp-24) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: var(--sp-12);
+}
+
+.fd-wrap__creators > li { min-width: 0; }
+
+/* A handle is one unbreakable token and can be long. */
+.fd-wrap__handle {
+  font-weight: 600;
+  color: var(--dark);
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+.fd-wrap__niche {
+  color: var(--moss);
+  margin-block: var(--sp-4) var(--sp-8);
+}
+
+.fd-wrap__decided {
+  color: var(--moss);
+}
+
+/* The ask's controls sit in a row that WRAPS rather than squeezing: a `.btn` is
+   `overflow: hidden` because it hosts the fill sweep, so a squeezed row clips a
+   label instead of shortening it (PHASE 38's Create Founder finding). No media
+   query — `flex-wrap` does nothing at a width where the row fits, so there is
+   no breakpoint to get wrong. */
+.fd-wrap__creators .btn {
+  align-self: start;
+  margin-top: var(--sp-8);
+  margin-right: var(--sp-8);
+}
+
+/* ── The Backers page ────────────────────────────────────────────────────── */
+
+.fd-backers__back {
+  margin-block: 0 var(--sp-12);
+}
+
+.fd-backers__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--sp-12);
+  margin-block: var(--sp-24);
+}
+
+/* §25.7's two refusals, where the reference put two more options. They read as
+   part of the choice, so they sit directly beneath it rather than in a note
+   further down the page. */
+.fd-backers__refused {
+  list-style: none;
+  margin: var(--sp-12) 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+}
+
+.fd-backers__refused-label {
+  display: block;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.fd-backers__rows {
+  list-style: none;
+  margin: var(--sp-12) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border-top: var(--bw) solid var(--grey-light);
+}
+
+.fd-backers__rows > li {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--sp-8) var(--sp-12);
+  align-items: baseline;
+  padding-block: var(--sp-12);
+  border-bottom: var(--bw) solid var(--grey-light);
+  min-width: 0;
+}
+
+/* Every one of these can hold a single unbreakable token: an address with no
+   spaces, a SKU, and a uuid. */
+.fd-backers__email,
+.fd-backers__reward,
+.fd-backers__ref {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.fd-backers__email {
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.fd-backers__reward { color: var(--moss); }
+
+/* The reference and the state both claim a row; on a narrow screen the id is
+   the least useful of the four, so it takes its own line last. */
+.fd-backers__ref {
+  grid-column: 1 / -1;
+  color: var(--moss);
+  font-size: var(--fs-body);
+}
+
+.fd-backers__step { justify-self: start; }
+
+@media (max-width: 600px) {
+  .fd-backers__rows > li { grid-template-columns: minmax(0, 1fr); }
+  .fd-backers__step { justify-self: start; }
+}
+
+/* -- The money hero, for the fourth time -----------------------------------
+
+   `--fs-num` has a 2.5rem floor because `.stat__value` is the done-moment
+   number slot, sized for a COUNT — Chapter 2's Glance puts `44` in it, and at
+   40px that is fine. `US$5,715.60` is eleven glyphs of one unbreakable token
+   and ran 108px past its card at 1280 here, pushing the figures row, the
+   measure and the section with it: one defect reported as four.
+
+   Session E lowered the floor on `.fd-paid__payments` and scoped it there so
+   every counting Stat in the product stayed untouched. Lowering it alone was
+   not enough here: this row was two auto-fit columns, so the amount had half
+   the measure and was still 11px over at 1280 — and a wider figure would put
+   it back however far the clamp came down. So the row is ONE column at every
+   width. The count and the amount are two facts about the same campaign and
+   read perfectly well stacked; sizing an unbreakable token to fit half a
+   measure is how this defect keeps coming back. Not `overflow-wrap` either:
+   breaking an amount across two lines is worse than shrinking it.
+
+   `.stat__sub` is `--grey` (2.27:1 on white) and here it carries the label of
+   the largest money figure a Founder reads — Founder Flow Session E's rule,
+   that a line saying what a number MEANS is not a caption. Scoped, because the
+   token's own ratio is a product-wide decision with its own pass. */
+.fd-wrap__figures { grid-template-columns: minmax(0, 1fr); }
+.fd-wrap__figures .stat--white .stat__value { font-size: clamp(1.5rem, 6vw, 3.5rem); }
+.fd-wrap__figures .stat__sub { color: var(--dark); }
+
+/* -- What is a caption and what is a rule, on these two surfaces -----------
+
+   Founder Flow Session E's finding and Session C's scoping, applied line by
+   line: `--moss` is 3.37:1 and `--grey` is ~2.2:1 on white, both under AA, and
+   both are product-wide decisions with their own pass. So a caption keeps the
+   quiet token and anything that CHANGES WHAT SOMEBODY DOES takes `--dark`.
+
+     * the do-not-fulfill note is a rule about money — the whole reason a row
+       stays on the list is to say nothing is owed;
+     * the `To deliver` sub says what the number a Founder packs against counts;
+     * the reward title is what they ship, and the pre-order reference is what
+       they read out to support — both are content, not decoration;
+     * §25.7's basis under each permitted purpose is why that purpose is the
+       one they may pick;
+     * a §22.8 disqualification reason is Proovd's recorded decision about
+       somebody's work.
+
+   `.fd-wrap__niche` stays `--moss`: a Creator's niche genuinely is a caption
+   beside their handle, and re-toning every quiet line would leave the surface
+   with no quiet lines at all. */
+.fd-backers__figures .stat__sub,
+.fd-backers__rows .fd-backers__reward,
+.fd-backers__rows .fd-backers__ref,
+.fd-backers__ask .choice__sub,
+.fd-wrap__decided { color: var(--dark); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 42 — The Founder's account settings (§5.2), Session G, 2026-08-20
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Eleven items at one account-level address, and the page Phase 22c's
+   `/settings/notifications` was always going to join. Nothing here mints a
+   colour: every rule reads a slot, and the two tone decisions below are the
+   same one PHASE 39 and PHASE 41 recorded — a sentence that states a rule
+   takes `--dark`, a caption keeps `--moss`.
+
+   `.fd-set-` and not `.fd-` bare: `.fd` is the dashboard SHELL, and this page
+   is deliberately outside it (a chapter belongs to a campaign; these belong to
+   the person). Scoping the shell's `.wrap` fix to `.fd` is what makes that
+   distinction matter, and this page uses `Section`/`Measure` at the top level
+   exactly as the notification page it absorbs always did.
+
+   Prefixes checked and free: `.pc-` (33), `.ff-` (34), `.cr-` (26/32), `.cf-`
+   (31), `.mny-` (36), `.tdy-` (37), `.fd-` (39/41). */
+
+.fd-set__kicker {
+  color: var(--moss);
+  margin: 0 0 var(--sp-24);
+}
+
+/* One block per §5.2 item, with a rule of its own so the sections read as a
+   list of eleven rather than as one long column of prose. */
+.fd-set__block {
+  display: grid;
+  gap: var(--sp-12);
+  padding-block: var(--sp-24);
+  border-top: var(--bw) solid var(--grey-light);
+}
+
+.fd-set__fields,
+.fd-set__confirmations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-16);
+}
+
+.fd-set__field {
+  display: grid;
+  gap: var(--sp-8);
+}
+
+/* The value and its control on one line where there is room, stacked where
+   there is not. `flex-wrap` rather than a breakpoint: PHASE 34's finding —
+   wrapping does nothing at a width where the row fits and everything at a
+   width where it does not, so there is no number to get wrong. The Button is
+   `flex: 0 0 auto` for the reason PHASE 39 recorded on `.copylink`: a `.btn`
+   is `overflow: hidden` because it hosts the fill sweep, so a squeezed row
+   clips the label rather than wrapping it. */
+.fd-set__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-12);
+}
+
+.fd-set__row > div {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.fd-set__row > .btn {
+  flex: 0 0 auto;
+}
+
+/* `.kicker`'s own treatment rather than a font-size token: there is no
+   `--fs-caption` in this file (the var scan in `a11y.test.tsx` said so, which
+   is what that scan is for), and the six that do exist are body, button, h2,
+   hero, number and step. Uppercase at the body size with tracking is what
+   every other label-above-a-value in the product does. */
+.fd-set__label {
+  color: var(--moss);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* An address, a phone number, and a legal name are each one unbreakable token
+   and each is wider than its column at 320. PHASE 36 made this call twice on
+   the Money console and PHASE 41 once on the Backers page; it is the same
+   defect and the same answer. */
+.fd-set__value {
+  color: var(--dark);
+  overflow-wrap: anywhere;
+}
+
+.fd-set__help {
+  color: var(--moss);
+  margin: 0;
+}
+
+.fd-set__edit {
+  display: grid;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+}
+
+.fd-set__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-12);
+}
+
+/* A `.btn` is inline-flex, and an inline-flex flex ITEM in a grid or column is
+   stretched to the container width by the default `align-items: stretch` —
+   Founder Flow Session D found it on a `.tag`, Session E on a `.btn`, and the
+   Money console a third time. A direct child of the block, so nothing inside
+   `.fd-set__acts` (already a row) is touched. */
+.fd-set__block > .btn {
+  justify-self: start;
+}
+
+.fd-set__confirmations li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  justify-content: space-between;
+}
+
+/* -- What is a caption and what is a rule, on this surface -----------------
+
+   PHASE 41's rule, third time. `--moss` is 3.37:1 on white and under AA, and
+   re-toning the token is a product-wide decision with its own pass — so a
+   caption keeps it and anything that CHANGES WHAT SOMEBODY DOES takes
+   `--dark`. Here that is:
+
+     * `.fd-set__rule` — the four pinned sentences. Every one of them states a
+       consequence somebody needs before they act: that changing a password
+       signs them out everywhere, that Proovd never sees their identity
+       documents, that a W-9 belongs to a campaign, and that closing an account
+       does not erase the records. Reading any of those as decoration is
+       exactly the §1.4 failure they exist to prevent.
+     * `.fd-set__consequence` — what changing a legal name or a contact address
+       actually moves, stated BEFORE the change rather than discovered after
+       it.
+
+   `.fd-set__label` and `.fd-set__help` stay `--moss`: a field's name beside
+   its value, and a hint under it, genuinely are captions. */
+.fd-set__rule,
+.fd-set__consequence {
+  color: var(--dark);
+  margin: 0;
+}
+
+.fd-set__consequence {
+  padding-left: var(--sp-12);
+  border-left: var(--bw) solid var(--accent-yellow);
+}
+
+
+/* ══════════════════════ PHASE 43 — the Creator onboarding flow
    (Creator Flow v2, Session B, 2026-08-19)
 
    The Creator's path from a private invitation to a live campaign, redrawn to
@@ -9744,7 +10892,7 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
    Four of nine onboarding screens are built; every later screen renders inside
    what is here.
 
-   The conventions PHASE 25 set and 26–34 restated bind here too:
+   The conventions PHASE 25 set and 26–42 restated bind here too:
 
      1. TOKENS ONLY. Read a token or a mode slot, never a raw value. px is
         legal for hairlines, radii, and the 44px minimum (via --touch).
@@ -10241,7 +11389,7 @@ button.crf-help__card:hover { border-color: var(--brand); }
   .crf-channel__grid { grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); }
 }
 
-/* ══════════════════════ PHASE 39 continued — screens 4–8
+/* ══════════════════════ PHASE 43 continued — screens 4–8
    (Creator Flow v2, Session C, 2026-08-19)
 
    The tone, the bio, the figures, the agreement, and the account. Everything
@@ -10536,7 +11684,7 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
   .crf-voice__add > *:first-child { flex: 1 1 100%; }
 }
 
-/* ══════════════════════ PHASE 40 — the Creator app shell and Home
+/* ══════════════════════ PHASE 44 — the Creator app shell and Home
    (Creator Flow v2, Session D, 2026-08-19)
 
    The first persistent chrome a Creator has ever had: a rail, two drawers, and
@@ -10545,7 +11693,7 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
    why it deliberately does NOT look like `AdminFrame`. No environment cluster,
    no Tasks launcher, no density.
 
-   The conventions PHASE 25 set and 26–39 restated bind here too:
+   The conventions PHASE 25 set and 26–43 restated bind here too:
 
      1. TOKENS ONLY. Read a token or a mode slot, never a raw value. px is
         legal for hairlines, radii, and the 44px minimum (via --touch).
@@ -10558,7 +11706,7 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
         answers. Wide content scrolls inside its own container; the body never
         scrolls sideways.
 
-   THE PREFIX IS .cra-, AND IT IS DELIBERATELY NOT .crf-. PHASE 39 is the
+   THE PREFIX IS .cra-, AND IT IS DELIBERATELY NOT .crf-. PHASE 43 is the
    onboarding FLOW, which is nine full-bleed pages under an invitation token;
    this is the app a Creator reaches after the claim, under a session. Sharing
    a prefix would mean one rule reaching across the auth boundary the two sides
@@ -10566,7 +11714,7 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
 
    The five prefixes already taken:
      .cr-   PHASE 26/32 — the Affiliate ADMIN workspace
-     .crf-  PHASE 39 — the Creator onboarding flow
+     .crf-  PHASE 43 — the Creator onboarding flow
      .cf-   PHASE 31 — the Create Founder compose page
      .ff-   PHASE 34 — the Founder onboarding flow
      .mny-  PHASE 36 — the Money & Fulfillment console
@@ -10977,15 +12125,15 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
 }
 
 
-/* ══════════════════════ PHASE 41 — the Creator's work surface, Earnings,
+/* ══════════════════════ PHASE 45 — the Creator's work surface, Earnings,
    Resources and Settings (Creator Flow v2, Session F, 2026-08-20)
 
    The four pages that fill the rail Session D built. They render INSIDE
    `CreatorAppShell`, so the prefix stays `.cra-` — a fifth family for pages
    that live in the same chrome would be a distinction nobody reading the
-   markup could act on. PHASE 40 owns the shell; this owns what sits in it.
+   markup could act on. PHASE 44 owns the shell; this owns what sits in it.
 
-   The conventions PHASE 25 set and 26–40 restated bind here too:
+   The conventions PHASE 25 set and 26–44 restated bind here too:
 
      1. TOKENS ONLY. Read a token or a mode slot, never a raw value.
 
@@ -11229,7 +12377,7 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
   }
 }
 
-/* ══════════════════════ PHASE 42 — Pitches, the Active list, and the pitch
+/* ══════════════════════ PHASE 46 — Pitches, the Active list, and the pitch
    reveal (Creator Flow v2, Session E, 2026-08-20)
 
    Session E's two surfaces render inside `CreatorAppShell`, so most of what
@@ -11238,13 +12386,13 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
    reused. What is new is the tab count, the two list rows, and the reveal —
    and the reveal is the only thing here with a shape of its own.
 
-   The prefix is `.crp-`. `.cra-` is PHASE 40/41 (the Creator app shell and its
+   The prefix is `.crp-`. `.cra-` is PHASE 44/41 (the Creator app shell and its
    pages) and this is a page family INSIDE that shell, but the reveal is a
    full-bleed moment rather than a page — a distinction the markup makes and
    the prefix keeps visible. `.cr-` is PHASE 26/32 (Affiliate Admin), `.crf-`
-   is PHASE 39 (the Creator onboarding flow).
+   is PHASE 43 (the Creator onboarding flow).
 
-   Conventions, as PHASE 25 set them and 26–41 restated them:
+   Conventions, as PHASE 25 set them and 26–45 restated them:
 
      1. TOKENS ONLY. Read a token or a mode slot, never a raw value.
      2. SCOPED REUSE. Everything new is prefixed `.crp-`.
@@ -11252,7 +12400,7 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
         answers.
 
    ── The two tones ─────────────────────────────────────────────────────────
-   PHASE 41's rule, unchanged: a sentence that states a RULE takes `--dark`
+   PHASE 45's rule, unchanged: a sentence that states a RULE takes `--dark`
    (`.cra-help` carries §22.2's no-prediction line, §14.2's decline promise,
    and the walk-is-optional sentence), a caption that merely labels takes
    `--moss`. `--grey` is ~2.18:1 on white and nothing here uses it.

@@ -69,6 +69,7 @@ import { createAdminLaunchRouter } from './routes/admin-launch.js';
 import { createFounderCreatorPaymentRouter } from './routes/founder-creator-payment.js';
 import { createAdminCreatorReadinessRouter } from './routes/admin-creator-readiness.js';
 import { createFounderHomeRouter } from './routes/founder-home.js';
+import { createFounderSettingsRouter } from './routes/founder-settings.js';
 import { createNotificationsRouter } from './routes/notifications.js';
 import {
   createFounderLiveEditRouter,
@@ -588,7 +589,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // fields on screen and out of every file, and the absence of the route is
   // what enforces it. `requireAdmin` refuses a Founder and a Creator by role
   // before any query runs.
-  app.use(createAdminBackersRouter({ db, auth }));
+  app.use(createAdminBackersRouter({ db, auth, audit }));
   // The Admin Tasks panel, built 2026-08-16. §26 names no task list and this
   // adds none of §1 rule 6's seven inventions: a private note an operator
   // writes to themselves, pointed at the record it belongs to. No assignee
@@ -759,6 +760,12 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // Admin as a change request, or refused outright. A route per tier would let a
   // caller pick which rules apply by picking a URL.
   app.use(createFounderLiveEditRouter({ db, auth, audit }));
+  // Session G (§5.2). The Founder's own settings, account-level rather than
+  // campaign-scoped: `founder_claim_profiles` is unique per campaign, so a
+  // Founder with two campaigns would otherwise have two settings pages. It
+  // absorbs Phase 22c's `/settings/notifications`, whose header has said since
+  // it shipped that a second account-level setting joins that page.
+  app.use(createFounderSettingsRouter({ db, auth, audit }));
   // Phase 22c (§27.7). The digest preference and the notification history, one
   // router mounted three times with the audience bound at construction — an
   // `?audience=` parameter would let a Creator ask for the Founder view. The

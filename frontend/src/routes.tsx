@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useParams, type RouteObject } from 'react-router';
 import { lazy, Suspense } from 'react';
-import { POLICY_DOCUMENTS, founderFlowPath } from '@proovd/shared';
+import { POLICY_DOCUMENTS, founderDashboardPath, founderFlowPath } from '@proovd/shared';
 import { MotionProvider } from './motion/MotionProvider.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { LinkUnavailable } from './surfaces/LinkUnavailable.js';
@@ -9,6 +9,7 @@ import { Home } from './features/public/Home.js';
 import { About } from './features/public/About.js';
 import { HowPaymentsWork } from './features/public/HowPaymentsWork.js';
 import { Safety } from './features/public/Safety.js';
+import { SupportPage } from './features/public/SupportPage.js';
 import { PolicyPage } from './features/public/PolicyPage.js';
 import { NotFoundSurface, PageLoading } from './features/public/states.js';
 import { CampaignPage } from './features/public/campaign/CampaignPage.js';
@@ -32,19 +33,15 @@ import { LiveModePage } from './features/admin/live-mode/LiveModePage.js';
 import { TodayPage } from './features/admin/today/TodayPage.js';
 import { MoneyQueue } from './features/admin/money/MoneyQueue.js';
 import { MoneyRecord } from './features/admin/money/MoneyRecord.js';
-import { FounderRoster } from './surfaces/founder/RosterView.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
-import { CreatorReadiness } from './surfaces/founder/CreatorReadiness.js';
-import { CampaignUpdates } from './surfaces/founder/CampaignUpdates.js';
-import { CampaignHome } from './surfaces/founder/CampaignHome.js';
+import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
+import { BackersPage } from './surfaces/founder/BackersPage.js';
+import { SettingsPage } from './surfaces/founder/SettingsPage.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
 import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
-import { CampaignResults } from './surfaces/founder/CampaignResults.js';
-import { Fulfillment } from './surfaces/founder/Fulfillment.js';
 import {
   CreatorNotificationSettings,
-  FounderNotificationSettings,
 } from './surfaces/notifications/NotificationSettings.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { WelcomeStep } from './surfaces/creator-flow/WelcomeStep.js';
@@ -146,6 +143,43 @@ function WorkspaceRedirect() {
   return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
 }
 
+/**
+ * The retired roster and Creator-readiness addresses (Founder Dashboard Session
+ * C, 2026-08-19). Chapter 1 absorbed both, so a §27 email or a bookmark minted
+ * before the rebuild lands on the chapter that now holds its content.
+ */
+function ChooseChapterRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderDashboardPath(campaignId, 'choose')} replace />;
+}
+
+/**
+ * `/updates` retired into Chapter 2 (Founder Dashboard Session D, 2026-08-19).
+ *
+ * Two Founder surfaces over one live campaign would be two places to post the
+ * same update — the reasoning that retired `/roster` into Chapter 1, `/vetting`
+ * in the flow's Session C, and `/workspace` in its Session E. The address
+ * survives its component because §27's campaign emails point at it.
+ */
+function LiveChapterRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderDashboardPath(campaignId, 'live')} replace />;
+}
+
+/**
+ * `/results` and `/fulfillment` retired into Chapter 3 (Founder Dashboard
+ * Session E, 2026-08-19).
+ *
+ * Two Founder surfaces over one campaign's money would be two places to read
+ * an amount, which is the thing §33.8.13 exists to prevent. Both addresses
+ * survive their components because §27's close and Day-14 emails point at
+ * them, and because Appendix C's §34 walk steps name them.
+ */
+function PaidChapterRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderDashboardPath(campaignId, 'payouts')} replace />;
+}
+
 /*
  * The Affiliate record's retired sibling addresses (Session C, 2026-08-17).
  * Each redirects into the tab that absorbed it, so a bookmark, a Support
@@ -228,6 +262,19 @@ const rootChildren: RouteObject[] = [
       { path: 'about', element: <About /> },
       { path: 'how-payments-work', element: <HowPaymentsWork /> },
       { path: 'safety', element: <Safety /> },
+      /*
+        §27.1, §27.8 — Founder Dashboard Session B (B5). `/support` was the
+        `getHelp` target in every Founder Flow step, in `ErrorBoundary`, in
+        §20's Act ranks and in the founder-home 404 body, and it 404ed: the
+        only `support` path in this file was inside the `admin` group below,
+        which makes it `/admin/support`.
+
+        Inside `PublicLayout` and outside every guard, because the pages that
+        link to it include the draft-token flow (no session until §10's claim)
+        and a global error boundary that can catch anything. Sending somebody
+        whose page just broke to a sign-in form is not a support path.
+      */
+      { path: 'support', element: <SupportPage /> },
       ...policyRoutes,
       {
         path: 'campaign/sample-pre-build',
@@ -892,10 +939,20 @@ const rootChildren: RouteObject[] = [
     element: <WorkspaceRedirect />,
   },
   {
-    // Phase 12a (§14.5). The Founder's roster view during the 72-hour clock.
-    // Beside the workspace, outside both shells, for the same reasons.
+    /*
+      Phase 12a's roster and Phase 13's Creator readiness, retired to redirects
+      (Founder Dashboard Session C, 2026-08-19).
+
+      Chapter 1 absorbed both: §14.5's card, the exact deadline, the full-refund
+      outcome and §14.2's three responses, plus §16's thirteen-item checklist
+      rendered as a section of the chapter. Two Founder surfaces over one roster
+      would be two places to answer one proposal — the reasoning that retired
+      `/draft/:token/vetting` in the flow's Session C and `/workspace` in its
+      Session E. The addresses survive their components because §27.3/§27.4
+      emails and Appendix C's §34 walk steps point at them.
+    */
     path: 'campaigns/:campaignId/roster',
-    element: <FounderRoster />,
+    element: <ChooseChapterRedirect />,
   },
   {
     // Phase 12b (§14.4, §15). The Founder's parallel campaign build and the
@@ -910,52 +967,105 @@ const rootChildren: RouteObject[] = [
     element: <CampaignPreview />,
   },
   {
-    // Phase 13 (§16). The Founder's Creator-readiness and fixed-payment funding.
-    // Beside the workspace, roster, build, and preview, outside both shells.
+    // Retired with `/roster` above — Chapter 1 renders §16's readiness as a
+    // section once somebody's terms are locked.
     path: 'campaigns/:campaignId/creator-readiness',
-    element: <CreatorReadiness />,
+    element: <ChooseChapterRedirect />,
   },
   {
-    // Phase 14c (§18). The Founder posts and reviews campaign updates once live.
-    // Beside the other campaign surfaces, outside both shells.
+    /*
+      Retired into Chapter 2 (Session D, 2026-08-19). Phase 14c's §18 authoring
+      surface is now a panel of the Live chapter, beside the Glance it belongs
+      under; the address survives its component because §27's campaign emails
+      point at it.
+    */
     path: 'campaigns/:campaignId/updates',
-    element: <CampaignUpdates />,
+    element: <LiveChapterRedirect />,
   },
   {
-    // Phase 17a (§20, DNA §5.2, §5.3). The Founder's live campaign home —
-    // Glance, one ranked Act, Explore. Beside the other campaign surfaces,
-    // outside both shells: §26 licenses dashboard density in Admin only, and
-    // this is deliberately a chronological workspace rather than a widget grid.
+    /*
+      Founder Dashboard Session B (2026-08-19). The Founder's home, and the
+      product's first non-Admin authenticated shell: four chapters — Choose,
+      Live, Get paid, Wrap — at ONE address.
+
+      The address does not move. `LiveStep`'s "Go to your campaign home" link,
+      every §27 email that points here, and any bookmark all keep working; the
+      chapter is `?chapter=` beneath it (DNA §5.12), so a position survives a
+      reload without minting a second address for one campaign.
+
+      All four chapters are built (Sessions C, D, E and F); `/roster`,
+      `/creator-readiness`, `/updates`, `/results` and `/fulfillment` all
+      redirect into them.
+    */
     path: 'campaigns/:campaignId/home',
-    element: <CampaignHome />,
+    element: <FounderDashboard />,
   },
   {
-    // Phase 18b (§21, §33.7.11). The Founder's campaign results — the waiting
-    // state until `Results ready` fires, then every §21 number with the
-    // Admin-reviewed "what this does and does not prove" section.
+    /*
+      Retired into Chapter 3 (Session E, 2026-08-19). Phase 18b's §21 results —
+      the waiting state, every §21 number, and the Admin-reviewed "what this
+      does and does not prove" — are now a panel of the Get paid chapter, beside
+      the §22.3 schedule they decide. The address survives its component because
+      §27's `Results ready` message points at it.
+    */
     path: 'campaigns/:campaignId/results',
-    element: <CampaignResults />,
+    element: <PaidChapterRedirect />,
   },
   {
-    // Phase 21a (§22.4–§22.6). The Founder's fulfillment surface — the four
-    // §22.5 obligations with their real state, the delivery-commitment history
-    // with the original preserved first, the §22.6 change path that applies,
-    // and the Day 14 checklist. Beside the other campaign surfaces, outside
-    // both shells.
+    /*
+      Retired into Chapter 3 (Session E, 2026-08-19). Phase 21a's four §22.5
+      obligations, the commitment history with the original first, the §22.6
+      change path, and the §22.4 Day 14 checklist are panels of the Get paid
+      chapter. The address survives because §27's Day-14 and delivery messages
+      point at it.
+    */
     path: 'campaigns/:campaignId/fulfillment',
-    element: <Fulfillment />,
+    element: <PaidChapterRedirect />,
   },
   {
-    // Phase 22c (§27.7). The first ACCOUNT-level address either role has had —
-    // every other authenticated route in the product is scoped to a campaign
-    // or an association, because until now everything a Founder or Creator did
-    // belonged to one campaign. The digest preference belongs to the person.
+    /*
+      §19's operational share, §20's Explore section 10, and §25.7's ask
+      (Founder Dashboard Session F, 2026-08-19).
+
+      A PAGE rather than a chapter, which is the supplied reference's own
+      architecture: a chapter's home is a hub, and the list of people behind the
+      numbers is its own page reached by a link and left by a back control. It
+      is linked from Chapter 2 (a live campaign has people to support) and from
+      Chapter 4 (a finished one has rewards to deliver), so it belongs to
+      neither and sits at its own address.
+    */
+    path: 'campaigns/:campaignId/backers',
+    element: <BackersPage />,
+  },
+  {
+    // Session G (§5.2). The eleven settings §5.2 names, at one address.
     //
-    // Deliberately NOT on the campaign home: §27.7 says notification history
-    // must not turn the Founder home into a widget dashboard or override the
-    // one ranked Act item, and its own address is what makes that structural.
+    // The ACCOUNT-level address Phase 22c opened, widened to what §5.2
+    // actually lists. Its reasoning is unchanged and still applies: it is
+    // deliberately not on the campaign home, because §27.7 says notification
+    // history must not turn the Founder home into a widget dashboard or
+    // override the one ranked Act item, and its own address is what makes
+    // that structural.
+    //
+    // Account-level rather than campaign-scoped, for the reason Phase 22c's
+    // page recorded when it was the only one: `founder_claim_profiles` is
+    // unique per campaign, so a Founder with two campaigns would otherwise
+    // have two settings pages and correcting a phone number on one would
+    // leave the other saying something else.
+    path: 'settings',
+    element: <SettingsPage />,
+  },
+  {
+    // Phase 22c's own address, retired to a redirect.
+    //
+    // The digest control and the notification history are now a section of
+    // `/settings` — two Founder surfaces over one preference would be two
+    // places to answer one question, the reasoning that retired `/roster`,
+    // `/updates`, `/results` and `/fulfillment` into the four chapters. The
+    // address survives its page because it is the one account-level route the
+    // product has had, and something may still point at it.
     path: 'settings/notifications',
-    element: <FounderNotificationSettings />,
+    element: <Navigate to="/settings" replace />,
   },
     ],
   },

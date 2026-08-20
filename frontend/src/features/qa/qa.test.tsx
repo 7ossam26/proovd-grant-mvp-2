@@ -195,6 +195,30 @@ const FLOW_ROUTES = PRINCIPAL_FLOWS.flatMap((flow) =>
   })),
 );
 
+/**
+ * The flows that perform no read.
+ *
+ * A refusing server and a server that never answers both change nothing about
+ * a page whose content is static, so there is no failure state and no loading
+ * state to check — and asserting §27.1's six questions against one would be
+ * asserting them against the page's ordinary content.
+ *
+ * `support_page` joined this set in the Founder Dashboard's Session B, which
+ * gave `/support` an address for the first time. It is the case that most
+ * looks like it should answer the six questions and least should: it renders
+ * §27.8's published contact block, and the six questions are what a surface
+ * owes when something has HAPPENED to a person's record. Nothing has.
+ *
+ * One set rather than the same three-name predicate written twice below —
+ * two copies of a list is one that eventually disagrees with itself.
+ */
+const READS_NOTHING = new Set(['public_site', 'token_unavailable', 'support_page']);
+
+/** Admin is swept separately; §33.11.7's states are the customer-facing ones. */
+const stateSweepRoutes = FLOW_ROUTES.filter(
+  (route) => route.audience !== 'admin' && !READS_NOTHING.has(route.flow),
+);
+
 describe('§33.11.1 — every principal flow renders its real content', () => {
   it.each(FLOW_ROUTES)('$flow · $path has no automatically detectable violation', async ({ path }) => {
     const { container } = await renderFlowRoute(path);
@@ -339,9 +363,7 @@ describe('§33.11.7 — every failure state answers the six questions', () => {
   // `public_site` and `token_unavailable` read nothing, so a refusing server
   // changes nothing about them — there is no failure state to check, and
   // asserting one would be asserting against the page's ordinary content.
-  const failingRoutes = FLOW_ROUTES.filter(
-    (route) => route.audience !== 'admin' && route.flow !== 'public_site' && route.flow !== 'token_unavailable',
-  );
+  const failingRoutes = stateSweepRoutes;
 
   it.each(failingRoutes)('$flow · $path', async ({ path }) => {
     installQaServer([{ match: /.*/, status: 503, body: { error: 'unavailable' } }]);
@@ -376,10 +398,7 @@ describe('§33.11.7 — every loading state answers the six questions', () => {
   // §33.11.7 names loading beside failure, and §27.1's list includes the
   // waiting state. A read that never resolves is what a person meets on a slow
   // connection, and "Loading…" answers one question of six.
-  const loadingRoutes = FLOW_ROUTES.filter(
-    (route) =>
-      route.audience !== 'admin' && route.flow !== 'public_site' && route.flow !== 'token_unavailable',
-  );
+  const loadingRoutes = stateSweepRoutes;
 
   it.each(loadingRoutes)('$flow · $path', async ({ path }) => {
     // A server that accepts the request and never answers.

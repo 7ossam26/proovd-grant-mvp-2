@@ -36,13 +36,23 @@ import {
 export interface NotificationSettingsProps {
   role: NotificationsRole;
   /**
-   * Rendered inside another page rather than as its own address.
+   * Rendered inside a larger settings page rather than as its own address.
    *
-   * Creator Flow v2 Session F embeds this on `/creator/settings` — the §5.3
-   * settings list — rather than duplicating §27.7's control, which would have
-   * been two places for one preference. An embedded copy takes an `h2`: two
-   * `h1`s on one page is a §33.11.2 failure, and the outer page has already
-   * named itself.
+   * Two sessions added this independently on 2026-08-20 and converged on the
+   * same prop: Creator Flow v2 Session F embeds it on `/creator/settings`
+   * (§5.3's list) and the Founder dashboard's Session G on §5.2's eleven.
+   * Neither duplicated §27.7's control, which would have been two places for
+   * one preference.
+   *
+   * `CreatorReadiness`'s arrangement, for its reason: §33.11.2 wants exactly
+   * one `h1` per surface, and this component's own is correct when the page IS
+   * notifications and one level too high when it is a section of something
+   * else. Embedding drops the headings a level and skips the outer
+   * `Section`/`Measure`, which the host already supplies — a nested `.wrap` is
+   * a viewport width inside a container that already spent one, which is
+   * PHASE 38's defect. Everything else — the loading state, the failure state
+   * and its six §27.1 answers, both controls — is identical, which is the
+   * point of a prop rather than a second component.
    */
   embedded?: boolean;
 }
@@ -96,12 +106,21 @@ export function NotificationSettings({ role, embedded = false }: NotificationSet
   }
 
   if (failure || !preference) {
-    return (
-      <Section aria-labelledby="notification-settings-error">
-        <Measure>
+    // §33.11.7's six answers, in whichever shell the host is using. Embedded,
+    // the heading drops a level and the outer Section is the page's — a second
+    // `h1` inside somebody else's page is the one thing this state must not
+    // add, since a failed read is exactly when the structure has to hold.
+    const panel = (
+      <>
+        {embedded ? (
+          <h2 className="h2" id="notification-settings-error">
+            We could not load your notification settings
+          </h2>
+        ) : (
           <h1 className="h2" id="notification-settings-error">
             We could not load your notification settings
           </h1>
+        )}
           {/* §33.11.7: all six of §27.1's questions, not just the one that
               matters most. The fact that matters most is still first: a failed
               read changed nothing about which emails you receive. */}
@@ -113,47 +132,61 @@ export function NotificationSettings({ role, embedded = false }: NotificationSet
             nextUpdate="As soon as you reload"
             action={NO_ACTION}
             reference="Your notification settings"
-            getHelp={{ href: supportMailto('Notification settings') }}
-          />
-        </Measure>
+          getHelp={{ href: supportMailto('Notification settings') }}
+        />
+      </>
+    );
+
+    if (embedded) {
+      return <section aria-labelledby="notification-settings-error">{panel}</section>;
+    }
+    return (
+      <Section aria-labelledby="notification-settings-error">
+        <Measure>{panel}</Measure>
       </Section>
     );
   }
 
+  const body = (
+    <>
+      {embedded ? (
+        <h2 className="h2" id="notification-settings-heading">
+          Notifications
+        </h2>
+      ) : (
+        <h1 className="h2" id="notification-settings-heading">
+          Notifications
+        </h1>
+      )}
+      <DigestPreference preference={preference} onSave={save} />
+
+      {/*
+        History sits BELOW the one control, on its own page, and never on the
+        campaign home — §27.7's own prohibition and DNA §5.2's. It renders no
+        count and there is nothing here that marks anything read.
+      */}
+      <section aria-labelledby="notification-history-heading">
+        {embedded ? (
+          <h3 className="h3" id="notification-history-heading">
+            What we have sent you
+          </h3>
+        ) : (
+          <h2 className="h2" id="notification-history-heading">
+            What we have sent you
+          </h2>
+        )}
+        <NotificationHistory entries={entries} {...(cursor ? { onLoadMore: loadMore } : {})} />
+      </section>
+    </>
+  );
+
+  if (embedded) {
+    return <section aria-labelledby="notification-settings-heading">{body}</section>;
+  }
+
   return (
     <Section aria-labelledby="notification-settings-heading">
-      <Measure>
-        {embedded ? (
-          <h2 className="h2" id="notification-settings-heading">
-            Notifications
-          </h2>
-        ) : (
-          <h1 className="h2" id="notification-settings-heading">
-            Notifications
-          </h1>
-        )}
-        <DigestPreference preference={preference} onSave={save} />
-
-        {/*
-          History sits BELOW the one control, on its own page, and never on the
-          campaign home — §27.7's own prohibition and DNA §5.2's. It renders no
-          count and there is nothing here that marks anything read.
-        */}
-        <section aria-labelledby="notification-history-heading">
-          {/* One level below whichever the title took, so an embedded copy does
-              not jump a heading level (§33.11.2). */}
-          {embedded ? (
-            <h3 className="h2" id="notification-history-heading">
-              What we have sent you
-            </h3>
-          ) : (
-            <h2 className="h2" id="notification-history-heading">
-              What we have sent you
-            </h2>
-          )}
-          <NotificationHistory entries={entries} {...(cursor ? { onLoadMore: loadMore } : {})} />
-        </section>
-      </Measure>
+      <Measure>{body}</Measure>
     </Section>
   );
 }

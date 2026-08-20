@@ -1,0 +1,304 @@
+/**
+ * The Founder's home — Founder Dashboard Session B (B1, B3, B4).
+ *
+ * `docs/phases/founder-dashboard.md`. Four chapters at ONE address, picking up
+ * where the Founder Flow's `You're live` leaves off. This session builds the
+ * chrome; the chapters' content is Sessions C–F.
+ *
+ * ── The first non-Admin authenticated shell in the product ──────────────────
+ * All 26 Founder routes were bare top-level pages. This is the first Founder
+ * chrome, and it is deliberately neither of the two that already exist:
+ *
+ *   - not `AdminFrame`. §26 licenses dashboard density in Admin and NOWHERE
+ *     else, and sharing that chrome is exactly how the density leaks into a
+ *     Founder surface. The rail here is four words, not eight sections.
+ *   - not `PublicLayout`. That carries the site header, the §31.4 footer
+ *     sitemap and the staffed-hours chat gate — a signed-in Founder reading
+ *     their own campaign does not need a marketing nav, and the footer's
+ *     fourteen public links are wayfinding for somebody who is not signed in.
+ *
+ * ── The chapter is in the ADDRESS ───────────────────────────────────────────
+ * `?chapter=` rather than component state (DNA §5.12), the reasoning
+ * `routes.tsx` already records for the draft flow and the Admin record tabs: a
+ * position that vanishes on reload is one nobody can bookmark or send. The
+ * path itself does not move — `/campaigns/:campaignId/home` is what the flow's
+ * `LiveStep` links to and what §27's emails point at, so the four chapters are
+ * a search parameter under an address that keeps working.
+ *
+ * ── Nothing arrives by query parameter except the chapter (B4) ──────────────
+ * The supplied reference reads `?phase=`, `?type=`, `?effort=`, `?upfront=` and
+ * `?day=` and drives its whole state from them. Here every one is a column,
+ * read on the server: `campaigns.status` decides which chapter a campaign is
+ * IN, and `campaign_live_at` decides whether the money chapters may open at
+ * all. `?chapter=` is the one parameter this surface reads, it names a POSITION
+ * rather than a fact, and a chapter that is not unlocked is not honoured —
+ * `founderChapterOrDefault` sends that request to the campaign's real chapter
+ * rather than refusing, because a URL somebody kept from last month is not an
+ * attack, it is a stale bookmark.
+ *
+ * ── One h1, and the chapter owns it ─────────────────────────────────────────
+ * §33.11.2 requires exactly one. The shell renders none: the band is a
+ * `<header>` and the rail is a `<nav>`, and whichever chapter is showing
+ * supplies the heading — `CampaignHome` has had its own since Phase 23a.
+ */
+
+import { useEffect, useState } from 'react';
+import { Link as RouterLink, useParams, useSearchParams } from 'react-router';
+import {
+  FOUNDER_CHAPTERS,
+  FOUNDER_CHAPTERS_INTRO,
+  campaignStatusLabel,
+  founderChapterForStatus,
+  founderChapterOrDefault,
+  founderChapterUnlocked,
+  type FounderChapterFacts,
+  type FounderChapterId,
+} from '@proovd/shared';
+import { Drawer, Measure, NO_ACTION, Section, StatePanel, Tag } from '../../components/index.js';
+import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
+import { ChooseChapter } from './chapters/ChooseChapter.js';
+import { LiveChapter } from './chapters/LiveChapter.js';
+import { PaidChapter } from './chapters/PaidChapter.js';
+import { WrapChapter } from './chapters/WrapChapter.js';
+import {
+  fetchFounderDashboard,
+  FounderRequestError,
+  type FounderDashboardView,
+} from './api.js';
+
+type State =
+  | { status: 'loading' }
+  | { status: 'error'; title: string; detail: string }
+  | { status: 'ready'; dashboard: FounderDashboardView };
+
+/**
+ * The chapter's own content.
+ *
+ * Every one of the four is built as of Session F, so there is no interim
+ * branch here and no `FOUNDER_CHAPTER_BUILD` lookup: an unbuilt chapter had a
+ * panel naming the surface that owned its work, and that panel now describes
+ * nothing. Leaving it would be a state the product cannot reach, rendered by
+ * code the type checker can no longer prove is dead — the chapter id is a
+ * closed union and the four cases exhaust it.
+ */
+function ChapterBody({
+  chapter,
+  campaignId,
+  campaignType,
+}: {
+  chapter: FounderChapterId;
+  campaignId: string;
+  campaignType: string | null;
+}) {
+  switch (chapter) {
+    // Session C: §14.5's roster, §14.2's three responses, §14.3's bonus, and
+    // deviation 1's meeting request.
+    case 'choose':
+      return <ChooseChapter campaignId={campaignId} campaignType={campaignType} />;
+    // Session D: §20's Glance, the one ranked Act, Explore's eleven sections,
+    // the three live-editing tiers' first UI, §18's updates, and deviation 2's
+    // post acknowledgement. Phase 17a's `CampaignHome` is what it grew out of
+    // and is retired with `/updates` — one surface over one live campaign.
+    case 'live':
+      return <LiveChapter campaignId={campaignId} />;
+    // Session E: §21's retry window, §22.3's W-9 and schedule through the ONE
+    // resolver, §22.4's Day 14 checklist, and §22.5's four obligations. Phase
+    // 18b's `CampaignResults` and Phase 21a's `Fulfillment` are what it grew
+    // out of; both addresses redirect here.
+    case 'payouts':
+      return <PaidChapter campaignId={campaignId} />;
+    // Session F: §22.8's recorded completion, §22.9's ask, §22.11's resolution,
+    // §22.10's two gates, and the link to §19's people on their own page.
+    // Phase 21b's `NextCampaign` had been built and routed nowhere.
+    case 'after':
+      return <WrapChapter campaignId={campaignId} />;
+  }
+}
+
+/** The drawer — every chapter, what it is, and why a locked one is locked. */
+function ChaptersDrawer({
+  facts,
+  viewing,
+  campaignId,
+}: {
+  facts: FounderChapterFacts;
+  viewing: FounderChapterId;
+  campaignId: string;
+}) {
+  const now = founderChapterForStatus(facts.status);
+  return (
+    <Drawer
+      trigger={
+        <button type="button" className="btn btn--tertiary fd-band__more">
+          The whole story
+        </button>
+      }
+      eyebrow="Your campaign"
+      title="The whole story."
+    >
+      <p>{FOUNDER_CHAPTERS_INTRO}</p>
+      <ul className="doc-list fd-drawer__list">
+        {FOUNDER_CHAPTERS.map((chapter, index) => {
+          const unlocked = founderChapterUnlocked(chapter.id, facts);
+          const status = !unlocked
+            ? 'Not yet'
+            : chapter.id === now
+              ? 'Now'
+              : chapter.id === viewing
+                ? 'Open'
+                : 'Available';
+          return (
+            <li key={chapter.id}>
+              <span className="fd-drawer__tag">
+                {`0${index + 1}`} · {status}
+              </span>
+              {unlocked ? (
+                <RouterLink to={`/campaigns/${campaignId}/home?chapter=${chapter.id}`}>
+                  {chapter.title}
+                </RouterLink>
+              ) : (
+                <span className="fd-drawer__title">{chapter.title}</span>
+              )}
+              {/*
+                A locked chapter shows its OWN reason rather than the note about
+                what it will contain. "Opens when the campaign closes" is the
+                answer to the question somebody clicking a dead tab is asking.
+              */}
+              <span className="fd-drawer__note">
+                {unlocked ? chapter.note : chapter.lockedLine}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </Drawer>
+  );
+}
+
+export function FounderDashboard() {
+  const { campaignId = '' } = useParams<{ campaignId: string }>();
+  const [params, setParams] = useSearchParams();
+  const [state, setState] = useState<State>({ status: 'loading' });
+
+  useEffect(() => {
+    let live = true;
+    setState({ status: 'loading' });
+    fetchFounderDashboard(campaignId)
+      .then((result) => {
+        if (live) setState({ status: 'ready', dashboard: result.dashboard });
+      })
+      .catch((error: unknown) => {
+        if (!live) return;
+        const failure =
+          error instanceof FounderRequestError
+            ? {
+                title: error.detail.title,
+                detail: `${error.detail.whatHappened ?? ''} ${error.detail.next ?? ''}`.trim(),
+              }
+            : {
+                title: 'We could not load your campaign',
+                detail: 'The request did not complete. Nothing about your campaign changed.',
+              };
+        setState({ status: 'error', ...failure });
+      });
+    return () => {
+      live = false;
+    };
+  }, [campaignId]);
+
+  if (state.status === 'loading') {
+    return <SurfaceLoading subject="your campaign" reference={campaignId} />;
+  }
+
+  if (state.status === 'error') {
+    // §33.11.7's six questions on the surface a Founder opens to find out what
+    // is happening. It is deliberately not a sign-in prompt: only a 401/403
+    // means the session is the problem, and asking somebody to retype a
+    // password that cannot help is §1.4's failure (`CreatorCampaigns`' rule).
+    return (
+      <Section aria-labelledby="fd-error">
+        <Measure>
+          <h1 className="h2" id="fd-error">
+            {state.title}
+          </h1>
+          <StatePanel
+            state={state.title}
+            whatHappened={state.detail}
+            next="Reload the page. Your campaign is read fresh every time this page opens, so nothing was lost."
+            owner="Proovd"
+            nextUpdate="As soon as you reload"
+            action={NO_ACTION}
+            reference={campaignId}
+            getHelp={{ href: supportMailto(`Campaign home — ${campaignId}`) }}
+          />
+        </Measure>
+      </Section>
+    );
+  }
+
+  const { dashboard } = state;
+  const facts: FounderChapterFacts = {
+    status: dashboard.status,
+    everLive: dashboard.campaignLiveAt !== null,
+  };
+  const chapter = founderChapterOrDefault(params.get('chapter'), facts);
+
+  function openChapter(next: FounderChapterId) {
+    // One write. Two sequential `setParams` calls each rebuild from the same
+    // closed-over snapshot and the second restores what the first removed —
+    // the defect `CreatorsDirectory` records.
+    const updated = new URLSearchParams(params);
+    updated.set('chapter', next);
+    setParams(updated);
+  }
+
+  return (
+    <div className="fd">
+      <header className="fd-band">
+        {/* The wordmark is the way back, as it is in every other shell. */}
+        <RouterLink to="/campaigns" className="fd-band__brand">
+          Proovd
+        </RouterLink>
+        <div className="fd-band__name">
+          {/* §14.4's title, or nothing. A campaign id is not a name (§1.4). */}
+          {dashboard.title ? <span className="fd-band__title">{dashboard.title}</span> : null}
+          <Tag>{campaignStatusLabel(dashboard.status)}</Tag>
+        </div>
+        <ChaptersDrawer facts={facts} viewing={chapter} campaignId={campaignId} />
+      </header>
+
+      <nav className="fd-rail" aria-label="Campaign chapters">
+        <ul>
+          {FOUNDER_CHAPTERS.map((entry) => {
+            const unlocked = founderChapterUnlocked(entry.id, facts);
+            const current = entry.id === chapter;
+            return (
+              <li key={entry.id}>
+                <button
+                  type="button"
+                  className={`fd-chapter${current ? ' is-current' : ''}${unlocked ? '' : ' is-locked'}`}
+                  /*
+                    `aria-disabled`, never `disabled`: a disabled control is
+                    removed from the tab order, so a keyboard user meets silence
+                    where a sighted user at least sees a dimmed tab. The reason
+                    rides the accessible name, so the announcement is "Get paid,
+                    Opens when the campaign closes…" rather than a mystery.
+                    (§28.5, and the Support workspace's own rule.)
+                  */
+                  aria-disabled={unlocked ? undefined : true}
+                  aria-current={current ? 'page' : undefined}
+                  aria-label={unlocked ? undefined : `${entry.label} — ${entry.lockedLine}`}
+                  onClick={unlocked ? () => openChapter(entry.id) : undefined}
+                >
+                  {entry.label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      <ChapterBody chapter={chapter} campaignId={campaignId} campaignType={dashboard.type} />
+    </div>
+  );
+}

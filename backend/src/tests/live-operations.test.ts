@@ -696,6 +696,64 @@ describe('§33.6.6 — the Glance delta is exact and a failed render does not ad
     expect(denied.status).toBe(404);
   });
 
+  /*
+    Founder Dashboard Session B (B4). The shell's own read, beside §20's rather
+    than inside it — the four-chapter rail needs the campaign's status and
+    whether it ever went live, and it re-reads on every chapter change.
+  */
+  it('serves the dashboard shell’s facts without minting a delivery receipt', async () => {
+    const fixture = await seedLiveCampaign('shell', { model: 'product' });
+    await addPreorder(fixture, 1);
+    const cookie = await founderCookie(fixture);
+
+    const before = await h.db
+      .select()
+      .from(campaignHomeDeliveries)
+      .where(eq(campaignHomeDeliveries.campaignId, fixture.campaignId));
+
+    // Four reads — the shell re-reads on every chapter change, and there are
+    // four chapters.
+    for (let i = 0; i < 4; i += 1) {
+      const read = await request(h.app)
+        .get(`/api/founder/campaigns/${fixture.campaignId}/dashboard`)
+        .set('cookie', cookie);
+      expect(read.status).toBe(200);
+      expect(read.body.dashboard.status).toBe('live');
+      // §17 stamps this at launch, and it is what unlocks the money chapters.
+      expect(read.body.dashboard.campaignLiveAt).not.toBeNull();
+    }
+
+    /*
+      The guarantee this endpoint exists for. `readGlance` issues a receipt
+      carrying the count it rendered (§33.6.6); a shell that minted one per
+      chapter switch would advance last-seen for deltas the Founder never saw.
+    */
+    const after = await h.db
+      .select()
+      .from(campaignHomeDeliveries)
+      .where(eq(campaignHomeDeliveries.campaignId, fixture.campaignId));
+    expect(after.length).toBe(before.length);
+  });
+
+  it('scopes the dashboard read to the session', async () => {
+    const fixture = await seedLiveCampaign('shell-own', { model: 'product' });
+    const cookie = await founderCookie(fixture);
+    const stranger = await seedLiveCampaign('shell-other', { model: 'product' });
+
+    // Another Founder's campaign answers the same 404 a missing one gets, so
+    // nothing can be enumerated.
+    const denied = await request(h.app)
+      .get(`/api/founder/campaigns/${stranger.campaignId}/dashboard`)
+      .set('cookie', cookie);
+    expect(denied.status).toBe(404);
+
+    const anonymous = await request(h.app).get(
+      `/api/founder/campaigns/${fixture.campaignId}/dashboard`,
+    );
+    expect(anonymous.status).toBeGreaterThanOrEqual(401);
+    expect(anonymous.status).toBeLessThan(404);
+  });
+
   it('refuses an anonymous read', async () => {
     const fixture = await seedLiveCampaign('anon', { model: 'product' });
     const response = await request(h.app).get(
