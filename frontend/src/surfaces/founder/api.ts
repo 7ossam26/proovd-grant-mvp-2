@@ -1723,3 +1723,21 @@ export const requestFounderDeletion = (
     method: 'POST',
     body: JSON.stringify({ requestDetail }),
   });
+
+/**
+ * The password, chosen at the END of the onboarding flow (2026-08-20).
+ *
+ * Not `changeFounderPassword`: there is no current password to present. The
+ * account was created by submitting the §9 answers — §13's Stripe account is
+ * keyed to a real user, so it could not wait for a credential — and the one it
+ * holds until this call is random bytes the server generated and discarded.
+ * `backend/src/vetting/claim.ts` records why in full.
+ */
+export const setInitialPassword = (
+  campaignId: string,
+  password: string,
+): Promise<{ ok: true }> =>
+  call('/api/founder/settings/initial-password', {
+    method: 'POST',
+    body: JSON.stringify({ campaignId, password }),
+  });

@@ -95,6 +95,7 @@ import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
 import { InReviewStep } from './surfaces/founder-flow/InReviewStep.js';
 import { LiveStep } from './surfaces/founder-flow/LiveStep.js';
+import { PasswordStep as FounderPasswordStep } from './surfaces/founder-flow/PasswordStep.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -942,6 +943,23 @@ const rootChildren: RouteObject[] = [
   {
     path: 'campaigns/:campaignId/setup/live',
     element: <LiveStep />,
+  },
+  {
+    /*
+      The last page of the flow (2026-08-20, product direction).
+
+      §10 took the password at a screen near the beginning; it is here now, and
+      the account is created by submitting the §9 answers instead — §13's
+      Stripe onboarding is keyed to a real user, so it could not wait.
+      `backend/src/vetting/claim.ts` records the deviation in full.
+
+      Inside the same Founder group as its twenty neighbours — no guard of its
+      own, because by the time anybody reaches it they have had a session since
+      submission, and a second `RequireRole` here would be a second answer to a
+      question the group already asks.
+    */
+    path: 'campaigns/:campaignId/setup/password',
+    element: <FounderPasswordStep />,
   },
   {
     /*

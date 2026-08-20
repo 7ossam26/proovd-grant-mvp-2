@@ -54,6 +54,7 @@ import {
   ensureClaimProfile,
   saveClaimProfile,
   completeClaim,
+  claimAndSignIn,
   FOUNDER_CLAIM_POLICY_SLUGS,
 } from '../vetting/claim.js';
 import {
@@ -165,6 +166,42 @@ export function createVettingRouter(
    */
   const actorOf = (draftId: string): string => `draft:${draftId}`;
 
+  /**
+   * §10's after-the-claim work, shared by the two doors into a claim.
+   *
+   * Both run AFTER the transaction commits, and neither is allowed to turn a
+   * successful claim into an error somebody sees. The reveal is idempotent by
+   * construction, so a crash between the commit and here costs a retry rather
+   * than correctness — which is why holding a row lock across an email provider
+   * call would be a more expensive way to be no safer (08c's precedent).
+   */
+  const runClaimHandoff = async (campaignId: string): Promise<void> => {
+    if (!handoff) return;
+    try {
+      await notifyInvitationClaimed(
+        {
+          db,
+          notifier: handoff.notifier,
+          context: handoff.context,
+          ...(internalRecipient ? { internalRecipient } : {}),
+        },
+        {
+          role: 'founder',
+          entityType: 'campaign_draft',
+          entityId: campaignId,
+          displayName: campaignId,
+        },
+      );
+    } catch {
+      /* An internal queue notice must never break a customer's claim. */
+    }
+    try {
+      await revealPreparingCampaign(handoff, campaignId);
+    } catch {
+      /* Admin can re-run the reveal; a Founder must not see it fail. */
+    }
+  };
+
   /* ── §9 — the vetting sequence ─────────────────────────────────────────── */
 
   router.get(`${base}/vetting`, openLimiter, draft, async (req, res) => {
@@ -239,23 +276,114 @@ export function createVettingRouter(
     res.json(result.state);
   });
 
+  /**
+   * Submit the answers — and, since 2026-08-20, get an account and a session.
+   *
+   * ── Why submission creates the account ──────────────────────────────────
+   * By product direction the password moved to the END of the flow, after
+   * `/setup/live`. Every page between here and there is behind
+   * `requireRole('founder')` and §13's Stripe account is keyed to a real user,
+   * so the account cannot wait for the credential — it has to exist the moment
+   * the token-addressed half of the flow ends, which is here.
+   *
+   * `claimAndSignIn` is where that is written down in full, including what it
+   * no longer asks for and why. This route's own job is small: submit, claim,
+   * carry the cookies out, run §10's handoff.
+   *
+   * A claim refusal after a SUCCESSFUL submit is reported as itself rather than
+   * as a submit failure. The answers really are submitted and the campaign type
+   * really is locked at that point; saying "that was not submitted" would send
+   * somebody back to re-answer questions that are already saved and locked.
+   */
   router.post(`${base}/vetting/submit`, saveLimiter, draft, json, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 
+    const tokenId = req.secureToken?.id;
+    if (!tokenId) {
+      res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
+      return;
+    }
+
     const result = await submitVetting(db, draftId, actorOf(draftId));
+
+    /*
+      ── The recovery path, and why it is not an indulgence ─────────────────
+      Submitting and claiming are two writes now, and the second can fail on
+      its own — a provider timeout, a restart, a deployment mid-request. When
+      it does, the answers are submitted and the campaign type is LOCKED
+      (§9's lock is at submission and is a database trigger, so it is not
+      coming back), while the account that every page after this needs does
+      not exist. Without this, that Founder is stuck behind a door with no
+      handle on either side: `submitVetting` refuses a second submit, so
+      nothing would ever reach the claim again.
+
+      So an already-submitted draft that is NOT yet claimed falls through to
+      the claim rather than being refused. Everything downstream is already
+      idempotent — the `founder_signup_complete` key, the conditional draft
+      claim, and the conditional status move all refuse a second run — so this
+      widens what can be retried without widening what can happen twice.
+    */
+    let state = result.ok ? result.state : null;
     if (!result.ok) {
+      const existing = await ensureVetting(db, draftId, actorOf(draftId));
+      if (!existing?.submittedAt) {
+        res.status(422).json({
+          error: 'submit_rejected',
+          title: 'That was not submitted',
+          whatHappened: result.message,
+          next: result.next,
+          ...(result.missing ? { missing: result.missing } : {}),
+        });
+        return;
+      }
+      state = existing;
+    }
+
+    const claimed = await claimAndSignIn(db, auth, tokens, {
+      draftId,
+      tokenId,
+      actor: actorOf(draftId),
+    });
+
+    if (!claimed.ok) {
+      /*
+        An account that already exists is not a failure to report as one. It is
+        the state a Founder reaches by coming back to a spent link, and what
+        they need is their campaign, not an error — so the campaign id goes
+        back with `signedIn: false` and the surface sends them to sign in.
+      */
+      if (claimed.code === 'already_claimed') {
+        res.status(200).json({ ...state, campaignId: state!.campaignId, signedIn: false });
+        return;
+      }
       res.status(422).json({
-        error: 'submit_rejected',
-        title: 'That was not submitted',
-        whatHappened: result.message,
-        next: result.next,
-        ...(result.missing ? { missing: result.missing } : {}),
+        error: claimed.code,
+        title: 'Your answers are saved, but your account was not created',
+        whatHappened: claimed.message,
+        next: claimed.next,
+        ...(claimed.missing ? { missing: claimed.missing } : {}),
       });
       return;
     }
 
-    res.status(201).json(result.state);
+    // Better Auth built these, signature and all. They are appended rather than
+    // set, so nothing already on the response is dropped.
+    for (const cookie of claimed.setCookie) res.append('Set-Cookie', cookie);
+
+    await runClaimHandoff(claimed.campaignId);
+
+    /*
+      `signedIn` is false when the account was created and the sign-in did not
+      land — a state that is recoverable (the password screen and a normal
+      sign-in both still work) but that the surface must not paper over. §1.4:
+      the two outcomes are different and the response says which happened.
+    */
+    res.status(201).json({
+      ...state,
+      campaignId: claimed.campaignId,
+      signedIn: claimed.setCookie.length > 0,
+    });
   });
 
   /* ── §5.2 — the six-digit email code (Founder Flow v2, Session C) ──────── */
@@ -619,51 +747,7 @@ export function createVettingRouter(
       return;
     }
 
-    // §10's Affiliate handoff. Runs after the claim transaction commits, for
-    // the same reason the signup confirmation does: revealing a campaign whose
-    // Founder account did not actually get created would grant access on the
-    // strength of an event that did not happen.
-    //
-    // It is idempotent by construction, so a crash between the commit and this
-    // line costs nothing — Admin can run it again and every Creator already
-    // revealed is skipped by their idempotency key. That is why this is not
-    // inside the transaction: holding a row lock across an email provider call
-    // would be a much more expensive way to be no safer.
-    // §27.6 (Phase 22b). The same after-the-transaction posture: the claim has
-    // committed, the delivery dedups on the draft, and a failure here is not
-    // allowed to turn a successful claim into an error the Founder sees.
-    if (handoff) {
-      try {
-        await notifyInvitationClaimed(
-          {
-            db,
-            notifier: handoff.notifier,
-            context: handoff.context,
-            ...(internalRecipient ? { internalRecipient } : {}),
-          },
-          {
-            role: 'founder',
-            // The campaign, which is claimed exactly once (the idempotency key
-            // and the conditional draft claim both guarantee it) and is what
-            // the result carries.
-            entityType: 'campaign_draft',
-            entityId: result.campaignId,
-            displayName: result.campaignId,
-          },
-        );
-      } catch {
-        /* An internal queue notice must never break a customer's claim. */
-      }
-    }
-    if (handoff) {
-      try {
-        await revealPreparingCampaign(handoff, result.campaignId);
-      } catch {
-        // The Founder's account exists and their claim succeeded. A handoff
-        // failure is Admin's to retry, and must not turn a successful claim
-        // into an error the Founder sees.
-      }
-    }
+    await runClaimHandoff(result.campaignId);
 
     // The raw token is now dead (§10: "invalidates the draft token"). The
     // response says so, so the surface stops offering to reload a link that

@@ -43,6 +43,7 @@
  * code, and `user.phone_verified` is CHECK-pinned false in the database.
  */
 
+import { randomBytes } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
@@ -508,89 +509,82 @@ export async function completeClaim(
   // directly here; the Admin assessment remains a recordable fact in the
   // workspace, it just does not stand between a person and their account.
 
-  const missing: string[] = [];
-  if (!profile.fields.legalName.value) missing.push('legalName');
-  if (!profile.fields.email.value) missing.push('email');
-  if (!profile.fields.dateOfBirth.value) missing.push('dateOfBirth');
-  if (!profile.fields.country.value) missing.push('country');
-  if (!profile.fields.stateRegion.value) missing.push('stateRegion');
-  if (profile.soleProprietor === null) missing.push('soleProprietor');
-  if (profile.soleProprietor === false && !profile.fields.businessName.value) {
-    missing.push('businessName');
-  }
-  if (missing.length > 0) {
+  /*
+    ── RECORDED DEVIATION (2026-08-20, product direction) ────────────────────
+
+    §10 lists nine things before account creation: legal name, email, date of
+    birth, country, state/region, business/sole-proprietor status, three
+    US/18+/sanctions representations, and three policy acceptances. Eight of
+    them no longer gate this function, and the reason for each was given
+    explicitly rather than inferred:
+
+      legal name      Stripe collects it at §13 payout onboarding, and that is
+                      the copy that identifies the seller of record. Asking for
+                      it twice makes two answers to one question.
+      date of birth   The same — Stripe Connect asks for it directly.
+      country         Fixed to `US`. §11 is US-only, so there was never a
+                      second answer for this field to hold.
+      state/region    Comes from the Admin workspace instead.
+      sole proprietor The same.
+      3 representations   Removed outright.
+      3 policy consents   Removed outright.
+
+    **This is a deviation from the Spec, not a defect to "fix" by reinstating
+    the gates in a later session without the same instruction.** It is the same
+    class of decision as the 2026-08-10 Admin-MFA removal and the
+    `campaign_followers` record, and it is written here so it reads as settled
+    rather than as something somebody forgot.
+
+    What did NOT change, and must not:
+
+      - Every column is still there, still nullable, still provenanced, and
+        still swept by §25.8. Nothing was dropped from the schema, so an Admin
+        recording a state/region or a sole-proprietor answer later writes the
+        same field this function stopped demanding. No migration was needed.
+      - The three representation columns are still `NOT NULL DEFAULT false`
+        and are still three separate columns (§28.4). Nothing sets them true.
+        A record that says somebody confirmed something they were never asked
+        would be worse than a record that says they were never asked.
+      - `policy_consents` still refuses to cite an unpublished version (the
+        0003 trigger), and §29.8's reacceptance gate is untouched. What went is
+        the demand at THIS door; the machine behind it is intact.
+      - Email still gates, because it is the account identity. It arrives
+        prefilled from the §7 prospect and is verified by the six-digit code.
+
+    A later phase asked to read the absent representations as if they were
+    answered — or to treat an unsigned Terms as accepted — is asking for
+    something this deviation does not license.
+  */
+  if (!profile.fields.email.value) {
     return {
       ok: false,
       code: 'profile_incomplete',
-      message: 'Some details are still needed before an account can be created.',
-      next: 'Fill them in. Everything else you have entered is saved.',
-      missing,
+      message: 'We do not have an email address for this invitation.',
+      next: 'Go back to the email step and add one. Everything else you have entered is saved.',
+      missing: ['email'],
     };
   }
 
-  const r = profile.representations;
-  if (!r.usPerson || !r.age18Plus || !r.sanctions) {
-    return {
-      ok: false,
-      code: 'representations_missing',
-      message: 'All three confirmations are required before an account can be created.',
-      next: 'Nothing was created and nothing you entered was lost.',
-    };
-  }
+  /*
+    ── The identity, and why a password is now optional ──────────────────────
 
-  /* ── Policy acceptance (§10, §29.8, §31.4) ─────────────────────────────── */
+    Part of the same 2026-08-20 deviation. The password moved to the END of the
+    onboarding flow, after `/setup/live`, so between submitting the answers and
+    reaching that screen a Founder has an account and no credential of their
+    own — which is a state Better Auth already has a shape for, because that is
+    every OAuth-only user.
 
-  const required = await db
-    .select({
-      id: policyVersions.id,
-      slug: policyVersions.slug,
-      version: policyVersions.version,
-      status: policyVersions.status,
-    })
-    .from(policyVersions);
+    `setFounderPassword` is what fills it in, and until it does:
 
-  const byS = new Map(required.map((row) => [row.slug, row]));
-  const unpublished = FOUNDER_CLAIM_POLICY_SLUGS.filter(
-    (slug) => byS.get(slug)?.status !== 'published',
-  );
+      - There is NO `credential` account row, so `sign-in/email` cannot match
+        anything. An account with no password is not an account with a guessable
+        one, and there is no placeholder hash sitting in the table.
+      - The session is minted here, by the same act that creates the user, and
+        it is the only way in. Nothing is left lying around for somebody else.
 
-  if (unpublished.length > 0) {
-    // Not a soft failure and not something to route around. §31.4 forbids
-    // shipping a placeholder or a summary as the document; §1 rule 6 forbids
-    // writing the real text here. So the honest answer is that the account
-    // cannot be created yet, and why.
-    return {
-      ok: false,
-      code: 'policies_unpublished',
-      message:
-        'We cannot create your account yet: the agreements you would be accepting are still with our lawyers, and we will not ask you to sign something that is not final.',
-      next: 'Nothing was created and nothing you entered was lost. We will email you the moment this opens — there is nothing for you to do.',
-      missing: [...unpublished],
-    };
-  }
-
-  const accepted = new Set(input.acceptedPolicySlugs);
-  const notAccepted = FOUNDER_CLAIM_POLICY_SLUGS.filter((slug) => !accepted.has(slug));
-  if (notAccepted.length > 0) {
-    return {
-      ok: false,
-      code: 'consent_missing',
-      message: 'Each agreement has to be accepted before an account can be created.',
-      next: 'Nothing was created and nothing you entered was lost.',
-      missing: [...notAccepted],
-    };
-  }
-
-  /* ── The identity (§5.2: password or Google) ───────────────────────────── */
-
-  if (!input.password && !input.googleUserId) {
-    return {
-      ok: false,
-      code: 'credentials_missing',
-      message: 'Choose a password, or continue with Google.',
-      next: 'Nothing was created and nothing you entered was lost.',
-    };
-  }
+    Google still works exactly as it did: an identity that already exists is
+    bound, and it is taken from a real session rather than from a request body.
+  */
   if (input.password !== undefined && input.password.length < 12) {
     return {
       ok: false,
@@ -640,9 +634,33 @@ export async function completeClaim(
     userId = existing.id;
   } else {
     const ctx = await auth.$context;
+
+    // An address that already has an account is refused rather than bound to.
+    // Binding would let anybody holding a draft link attach that campaign to
+    // somebody else's Founder account by typing their address — the identity
+    // mistake `routes/vetting.ts` records for the Google path, arriving through
+    // the other door.
+    const taken = await ctx.internalAdapter.findUserByEmail(email);
+    if (taken) {
+      return {
+        ok: false,
+        code: 'credentials_missing',
+        message: 'There is already a Proovd account for that email address.',
+        next: 'Nothing was created. Sign in with it, or use a different address on the email step.',
+      };
+    }
+
     const created = await ctx.internalAdapter.createUser({
       email,
-      name: profile.fields.preferredName.value ?? profile.fields.legalName.value!,
+      /*
+        §10's legal name is Stripe's to collect now, so it is usually absent
+        here and this falls through to the address. A `name` is a display
+        label; the seller of record is established at §13 onboarding, and the
+        Admin workspace reads `founder_claim_profiles.legal_name` rather than
+        this column, so an address standing in changes nothing downstream.
+      */
+      name:
+        profile.fields.preferredName.value ?? profile.fields.legalName.value ?? email,
       role: 'founder',
       // §5.2, §33.1.8: collected and explicitly unverified. There is no
       // parameter here that could mark it otherwise, and the database rejects
@@ -651,13 +669,17 @@ export async function completeClaim(
       phoneVerified: false,
       emailVerified: false,
     });
-    const hash = await ctx.password.hash(input.password!);
-    await ctx.internalAdapter.linkAccount({
-      userId: created.id,
-      providerId: 'credential',
-      accountId: created.id,
-      password: hash,
-    });
+
+    // No password yet is no `credential` row at all — see the note above.
+    if (input.password !== undefined) {
+      const hash = await ctx.password.hash(input.password);
+      await ctx.internalAdapter.linkAccount({
+        userId: created.id,
+        providerId: 'credential',
+        accountId: created.id,
+        password: hash,
+      });
+    }
     userId = created.id;
   }
 
@@ -702,7 +724,21 @@ export async function completeClaim(
 
       await tx
         .update(founderClaimProfiles)
-        .set({ claimedAt: now, claimedUserId: userId, updatedBy: `user:${userId}` })
+        .set({
+          claimedAt: now,
+          claimedUserId: userId,
+          updatedBy: `user:${userId}`,
+          /*
+            §11 is US-only, so the country was never a question with a second
+            answer — the screen that asked it offered one value. It is written
+            here rather than left null so §24.3's tax handling and every read
+            that expects a country find one, and its supplier says `proovd`
+            because Proovd is what decided it, not the Founder (§9's rule that
+            provenance follows the actor).
+          */
+          country: 'US',
+          countrySupplier: 'proovd',
+        })
         .where(
           and(
             eq(founderClaimProfiles.draftId, input.draftId),
@@ -726,17 +762,18 @@ export async function completeClaim(
         .set({ status: 'claimed' })
         .where(eq(campaignDrafts.id, input.draftId));
 
-      for (const slug of FOUNDER_CLAIM_POLICY_SLUGS) {
-        const version = byS.get(slug)!;
-        await tx.insert(policyConsents).values({
-          subjectType: 'user',
-          subjectId: userId,
-          policyVersionId: version.id,
-          slug: version.slug,
-          version: version.version,
-          acceptedVia: 'founder_account_claim',
-        });
-      }
+      /*
+        No `policy_consents` rows are written here any more (2026-08-20, and
+        the deviation is stated in full above).
+
+        The absence is the honest record: nobody was shown the agreements and
+        nobody accepted them, so a row saying otherwise would be a consent
+        record that is simply untrue — and consent records are the one kind of
+        row this product may later have to stand behind. §29.8's reacceptance
+        machinery is untouched and still works from `policy_consents`; when a
+        published version is put in front of a Founder and accepted, that is
+        what writes the row.
+      */
 
       await tx.insert(auditEvents).values({
         actor: `user:${userId}`,
@@ -752,10 +789,18 @@ export async function completeClaim(
           founderUserId: userId,
           draftId: input.draftId,
           emailOwnership: profile.emailOwnership,
-          acceptedPolicies: FOUNDER_CLAIM_POLICY_SLUGS.map((slug) => {
-            const v = byS.get(slug)!;
-            return `${v.slug}@${v.version}`;
-          }),
+          /*
+            Both absences are recorded rather than left to be inferred from a
+            missing key. `acceptedPolicies: []` says the claim asked for none —
+            which is a fact about how this account was made, and the one an
+            auditor reading the row a year from now needs. `credentialSet`
+            says whether a password exists yet; `setFounderPassword` writes its
+            own audit row when it does.
+          */
+          acceptedPolicies: [],
+          policyConsentCollected: false,
+          representationsCollected: false,
+          credentialSet: input.password !== undefined || input.googleUserId !== undefined,
         },
       });
     });
@@ -808,4 +853,143 @@ export async function readSignupComplete(
     founderUserId: result?.founderUserId ?? '',
     occurredAt: (row.completedAt ?? row.createdAt).toISOString(),
   };
+}
+
+/* ── The account, created by submission (2026-08-20, product direction) ───── */
+
+/**
+ * Submit the answers, get an account and a session — no password asked for.
+ *
+ * ── Why this exists ─────────────────────────────────────────────────────────
+ * The password moved to the END of the onboarding flow, after `/setup/live`.
+ * Everything between submission and that screen is behind
+ * `requireRole('founder')`, and §13's Stripe account is keyed to a real
+ * `ownerUserId`, so the account cannot wait for the credential: a Founder needs
+ * to BE somebody before they can be paid.
+ *
+ * So the account is created at submission and the credential is chosen at the
+ * end. Those were one act in §10 and are two here, which is the deviation
+ * `completeClaim` records in full.
+ *
+ * ── The temporary password never leaves this function ───────────────────────
+ * Better Auth's session cookie is SIGNED with the app secret, and the only
+ * documented way to mint one is to go through an endpoint that does it —
+ * `setSessionCookie` wants a `GenericEndpointContext`, which an Express route
+ * does not have. Hand-rolling the signature would mean re-deriving a security
+ * primitive from a dependency's internals, and it would break silently on a
+ * minor upgrade.
+ *
+ * So the account is created with 32 random bytes as its password and signed in
+ * through `auth.api.signInEmail` — the real route, its real hashing, its real
+ * cookie. The value is generated here, used once, and goes out of scope; it is
+ * never returned, never stored in plaintext, never logged, and never sent to a
+ * client. `setFounderPassword` replaces it at the end of the flow.
+ *
+ * It is a real credential in the meantime, which is the honest description: an
+ * account whose password nobody knows, reachable only through the session this
+ * mints. That is strictly better than a placeholder hash somebody could
+ * recognise, and better than leaving the account with no credential at all —
+ * which would make `sign-in/email` the wrong error for a Founder who tried it.
+ */
+export async function claimAndSignIn(
+  db: Database,
+  auth: Auth,
+  tokens: TokenService,
+  input: { draftId: string; tokenId: string; actor: string },
+): Promise<
+  | { ok: true; campaignId: string; userId: string; setCookie: string[] }
+  | { ok: false; code: ClaimRefusal; message: string; next: string; missing?: string[] }
+> {
+  const profile = await readClaimProfile(db, input.draftId);
+  const email = profile?.fields.email.value?.toLowerCase();
+  if (!email) {
+    return {
+      ok: false,
+      code: 'profile_incomplete',
+      message: 'We do not have an email address for this invitation.',
+      next: 'Go back to the email step and add one. Everything else you have entered is saved.',
+      missing: ['email'],
+    };
+  }
+
+  const temporary = randomBytes(32).toString('hex');
+
+  const claimed = await completeClaim(db, auth, tokens, {
+    draftId: input.draftId,
+    tokenId: input.tokenId,
+    password: temporary,
+    // Nothing was shown and nothing was accepted, and the empty list says so
+    // rather than a caller quietly passing the slugs anyway.
+    acceptedPolicySlugs: [],
+    actor: input.actor,
+  });
+  if (!claimed.ok) return claimed;
+
+  /*
+    A sign-in failure is NOT a claim failure. The account exists, the campaign
+    moved, and the draft is claimed — all committed. Reporting an error here
+    would tell somebody their account was not created when it was, and there is
+    no second attempt at a claim to make (the idempotency key saw to that).
+    So the cookies come back empty and the caller says what actually happened.
+  */
+  let setCookie: string[] = [];
+  try {
+    const response = await auth.api.signInEmail({
+      body: { email, password: temporary },
+      asResponse: true,
+    });
+    setCookie =
+      typeof response.headers.getSetCookie === 'function'
+        ? response.headers.getSetCookie()
+        : [response.headers.get('set-cookie') ?? ''].filter((value) => value !== '');
+  } catch {
+    setCookie = [];
+  }
+
+  return { ok: true, campaignId: claimed.campaignId, userId: claimed.userId, setCookie };
+}
+
+/**
+ * Choose a password, at the end of the flow.
+ *
+ * `updatePassword` rather than Better Auth's `changePassword`, because there is
+ * no current password to present: the one this account has is the 32 random
+ * bytes `claimAndSignIn` generated and discarded. That is exactly the shape
+ * `updatePassword` exists for, and it is the same call the library's own reset
+ * flow makes.
+ *
+ * The caller is already authenticated — this route is behind
+ * `requireRole('founder')` — so the session IS the proof of identity, which is
+ * a stronger one than a password somebody may have chosen ten seconds ago.
+ */
+export async function setFounderPassword(
+  db: Database,
+  auth: Auth,
+  input: { userId: string; campaignId: string; password: string },
+): Promise<{ ok: true } | { ok: false; message: string; next: string }> {
+  if (input.password.length < 12) {
+    return {
+      ok: false,
+      message: 'That password is too short. Use at least 12 characters.',
+      next: 'Try a longer one. Nothing else about your campaign changed.',
+    };
+  }
+
+  const ctx = await auth.$context;
+  const hash = await ctx.password.hash(input.password);
+  await ctx.internalAdapter.updatePassword(input.userId, hash);
+
+  await db.insert(auditEvents).values({
+    actor: `user:${input.userId}`,
+    targetType: 'campaign',
+    targetId: input.campaignId,
+    action: 'founder.password_set',
+    internalReason:
+      'Founder chose their password at the end of the onboarding flow, replacing the credential minted at submission (2026-08-20 deviation).',
+    customerExplanation: 'You set your Proovd password.',
+    priorValue: { credentialChosenByFounder: false },
+    newValue: { credentialChosenByFounder: true },
+  });
+
+  return { ok: true };
 }

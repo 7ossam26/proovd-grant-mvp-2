@@ -81,7 +81,14 @@ const RELAY = ['head', 'panel', 'cta'] as const;
 const HEADLINE = 'You’re Live!';
 const LEDE =
   'Your content creators are hard at work, kick back and check your dashboard for backers!';
-const CTA_LABEL = 'Take me to my dashboard';
+/*
+  The reference's label is `Take me to my dashboard`, and it was that here too
+  until 2026-08-20. The password moved to the end of the flow, so this control
+  no longer opens the dashboard — it opens the one page between here and it,
+  and §33.11.4 requires a control to name where it goes. Changing the label was
+  the smaller edit than leaving a button that names the wrong destination.
+*/
+const CTA_LABEL = 'Set my password and finish';
 
 export function LiveStep() {
   const { campaignId = '' } = useParams();
@@ -148,7 +155,7 @@ export function LiveStep() {
  * reflows: the stage scales.
  */
 function LivePage({ campaignId }: { campaignId: string }) {
-  const { leave } = useFlowNav();
+  const { leaveToPage } = useFlowNav();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
 
@@ -198,7 +205,7 @@ function LivePage({ campaignId }: { campaignId: string }) {
             type="button"
             className="ff-live__cta"
             data-stage-anim="cta"
-            onClick={() => leave(`/campaigns/${encodeURIComponent(campaignId)}/home`)}
+            onClick={() => leaveToPage('password')}
           >
             {CTA_LABEL}
           </button>
