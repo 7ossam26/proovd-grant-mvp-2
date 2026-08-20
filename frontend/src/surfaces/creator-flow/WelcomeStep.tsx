@@ -1,26 +1,37 @@
 /**
- * Screen 0 — the invitation — Creator Flow v2, Session B, 2026-08-19.
+ * Screen 0 — the invitation — rebuilt 1:1 from
+ * `docs/design-refrence/Proovd_Affiliate_Founder_Rebuild_v11_FIXED_SHAREABLE.html`
+ * (2026-08-20).
  *
  * The address the §8 invitation email points at, and the first thing a Creator
- * ever sees of Proovd. It is a name, a sentence, and one control.
+ * ever sees of Proovd. The reference's `obSplash` screen is the authority for
+ * every value here: the structure (`.claim-intro` → `.claim-wide` →
+ * `.claim-wide-stage` → `.claim-wide-shell`), the copy, the 84px headline with
+ * its 28px mint text stroke, the #DEFAFC band, the 122px CTA, and the four
+ * animation beats. PHASE 49 in `proovd.css` carries the declarations.
  *
- * ── The splash is deviation 1's narrowest part ──────────────────────────────
- * A brand animation before a person may act is, at any length, a thing that
- * holds them. §30 defers general product tours and DNA §6.1 caps every duration
- * at 0.90s, so three mechanisms keep it inside what was authorised: it is
- * capped by `playSplash`, the Skip control is a real button rendered from the
- * first frame rather than something the animation reveals, and it plays once
- * per token in memory (`draft.ts`) so navigating back does not replay it.
- * `reduced()` short-circuits it before it starts — the caller never mounts it,
- * which is the jump-cut rather than a second animated path.
+ * ── The stage is scaled by measurement, not by a media query ────────────────
+ * The reference authors this screen at a fixed 2496×1542 stage and then, in
+ * `_fit()`, scales it to whatever viewport it lands in:
  *
- * ── Two sentences the reference draws that are not here ─────────────────────
- * *"…pay you every time they bite"* is re-authored: §22.1 pays a share of the
- * CAPTURED, validly attributed, pre-tax subtotal after §17's post is verified,
- * not per visit. And the passive *"By continuing you're agreeing to Proovd's
- * Terms"* is refused outright — §28.4 records acceptance as separate unchecked
- * controls at the claim, and no `policy_consents` row exists for anything done
- * on this page. Both are in `CREATOR_FLOW_ABSENCES` with the rule named.
+ *   scale = min(innerWidth / 1440, innerHeight / 1420, 1)
+ *
+ * on mount, on every resize, and once more at 2100ms — the late pass is the
+ * reference's own, and it is what corrects a first measurement taken before
+ * the webfont settles. Reproduced exactly, including the third pass.
+ *
+ * ── The entry sequence ──────────────────────────────────────────────────────
+ * t=0      the splash covers the viewport; the brand square scales in (.4s),
+ *          its dark inner square .15s behind it (.35s)
+ * t=0.68s  the splash slides up and away (.56s)
+ * t=0.92s  the band grows 0 → 285px (.62s)
+ * t=1.27s  the headline's words rise, one every 0.04s
+ * t=1.56s  the sentence fades up
+ * t=1.76s  the CTA scales in
+ *
+ * All of it is CSS, exactly as the reference has it, so the choreography needs
+ * no runtime and cannot desynchronise. `prefers-reduced-motion` drops the
+ * splash and lands every element in its end state — also the reference's rule.
  *
  * ── The name is a record, not a greeting the page invents ───────────────────
  * `readInvitationLanding().recipientName` is what §8's Admin recorded. A
@@ -29,18 +40,22 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
-import {
-  CREATOR_INVITE_NO_OBLIGATION,
-  CREATOR_INVITE_PROMISE,
-} from '@proovd/shared';
-import { Button } from '../../components/index.js';
-import { playSplash } from '../../components/anim.js';
-import { reduced } from '../../components/anim.js';
 import { LinkUnavailable } from '../LinkUnavailable.js';
 import { SurfaceLoading } from '../../features/public/states.js';
-import { CreatorFlowHelp, CreatorFlowPage, useCreatorFlowNav } from './CreatorFlowPage.js';
+import { CreatorFlowPage, useCreatorFlowNav } from './CreatorFlowPage.js';
 import { markSplashSeen, shouldPlaySplash } from './draft.js';
 import { useInvitation } from './useInvitation.js';
+
+/** The reference's own sentence, under the headline. */
+const CLAIM_COPY =
+  'We bring you products people actually want, and pay you every time they bite.';
+
+/** The reference's headline, everything after the recipient's name. */
+const CLAIM_HEAD_TAIL = 'You should never go hunting for the next thing to promote.';
+
+/** `.claim-word` delays: 1.27s, then one every 0.04s. */
+const WORD_DELAY_BASE = 1.27;
+const WORD_DELAY_STEP = 0.04;
 
 export function WelcomeStep() {
   const { token = '' } = useParams();
@@ -60,77 +75,95 @@ export function WelcomeStep() {
 
 function Body({ token, name }: { token: string; name: string }) {
   const { leaveToPage } = useCreatorFlowNav();
-  const sceneRef = useRef<HTMLDivElement>(null);
-  // Decided once, before the first paint, so the overlay is either in the tree
-  // from the start or never in it at all. Deciding it in the effect would flash
-  // a full-screen overlay onto a page that had already rendered.
-  const [splash, setSplash] = useState(() => !reduced() && shouldPlaySplash(token));
-  const stopRef = useRef<(() => void) | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
 
+  /*
+   * The splash is decided once, before the first paint, so the overlay is
+   * either in the tree from the start or never in it at all — deciding it in
+   * an effect would flash a full-screen overlay onto a page that had already
+   * rendered.
+   *
+   * Once per token, in memory (`draft.ts`): the reference is a single-component
+   * prototype whose screen 0 mounts once, and navigating back to this address
+   * must not replay a brand beat. §30 defers general product tours, and a
+   * splash that runs on every arrival is a tour with one slide.
+   */
+  const [splash] = useState(() => shouldPlaySplash(token));
   useEffect(() => {
-    if (!splash) {
-      markSplashSeen(token);
-      return;
-    }
-    const handle = playSplash(sceneRef.current, () => {
-      markSplashSeen(token);
-      setSplash(false);
-    });
-    stopRef.current = handle.stop;
-    if (!handle.ran) {
-      // The runtime is absent, failed, or motion is off. There is one way the
-      // splash ends, so it ends.
-      markSplashSeen(token);
-      setSplash(false);
-    }
-    return () => {
-      stopRef.current = null;
-      handle.stop();
+    markSplashSeen(token);
+  }, [token]);
+
+  /*
+   * `_fit()`, verbatim. Three passes for the reference's three reasons: now,
+   * on resize, and once at 2100ms — the late one corrects a measurement taken
+   * before the webfont and the scrollbar settle.
+   */
+  useEffect(() => {
+    const fit = () => {
+      const el = stageRef.current;
+      if (!el) return;
+      const scale = Math.min(window.innerWidth / 1440, window.innerHeight / 1420, 1);
+      el.style.transform = `translate(-50%,-50%) scale(${scale})`;
     };
-  }, [splash, token]);
+    fit();
+    window.addEventListener('resize', fit);
+    const late = window.setTimeout(fit, 2100);
+    return () => {
+      window.removeEventListener('resize', fit);
+      window.clearTimeout(late);
+    };
+  }, []);
+
+  const headline = `${name ? `${name},` : ''} ${CLAIM_HEAD_TAIL}`.trim();
+  // The reference splits on whitespace and separates the spans with a margin
+  // rather than a space, so `textContent` reads "Mohab,Youshould…". A
+  // multi-word name simply earns a beat per word, which is the same rule.
+  const words = headline.split(/\s+/);
 
   return (
-    <div className="crf-welcome">
+    <div className="claim-intro">
       {splash ? (
-        <div className="crf-splash" ref={sceneRef}>
-          <div className="crf-splash__sticker" data-splash="sticker" aria-hidden="true" />
-          <div className="crf-splash__flash" data-splash="flash" aria-hidden="true" />
-          {/* Present from the first frame, and a real control rather than
-              something the animation reveals (§28.5). */}
-          <Button
-            tier="tertiary"
-            small
-            className="crf-splash__skip"
-            onClick={() => {
-              stopRef.current?.();
-              markSplashSeen(token);
-              setSplash(false);
-            }}
-          >
-            Skip
-          </Button>
+        <div className="claim-motion-splash" aria-hidden="true">
+          <div className="claim-splash-outer">
+            <div className="claim-splash-inner" />
+          </div>
         </div>
       ) : null}
 
-      <div className="crf-welcome__top">
-        <span className="wordmark crf__mark">Proovd</span>
-        <CreatorFlowHelp pageId="welcome" param={token} />
-      </div>
-
-      <div className="crf-welcome__lockup">
-        <h1 className="crf-welcome__head" data-anim="head">
-          {name ? `${name}, you` : 'You'} should never go hunting for the next thing to promote.
-        </h1>
-        <p className="crf-welcome__copy" data-anim="sub">
-          {CREATOR_INVITE_PROMISE}
-        </p>
-        <p className="crf-welcome__note" data-anim="sub">
-          {CREATOR_INVITE_NO_OBLIGATION}
-        </p>
-        <div className="crf-welcome__cta" data-anim="cta">
-          <Button tier="primary" onClick={() => leaveToPage('password', 1)}>
-            Set your password
-          </Button>
+      <div className="claim-wide">
+        <div className="claim-wide-stage" ref={stageRef}>
+          <div className="claim-wide-shell">
+            <div className="claim-meta-space" aria-hidden="true" />
+            <div className="claim-band" aria-hidden="true" />
+            {/* The label is the only thing here the reference does not have,
+                and it changes no pixel and no behaviour: the mint stroke needs
+                the spans, and the spans are separated by a margin rather than
+                a space, so without it a screen reader reads the whole headline
+                as one unbroken word. */}
+            <h1 className="claim-head" aria-label={headline}>
+              {words.map((word, index) => (
+                <span
+                  // The words are fixed for a given name, and a duplicate word
+                  // in a sentence is ordinary — the position is the identity.
+                  key={`${index}-${word}`}
+                  className="claim-word"
+                  style={{
+                    animationDelay: `${(WORD_DELAY_BASE + index * WORD_DELAY_STEP).toFixed(2)}s`,
+                  }}
+                >
+                  {word}
+                </span>
+              ))}
+            </h1>
+            <p className="claim-copy">{CLAIM_COPY}</p>
+            <button
+              type="button"
+              className="claim-cta"
+              onClick={() => leaveToPage('password', 1)}
+            >
+              Get started
+            </button>
+          </div>
         </div>
       </div>
     </div>
