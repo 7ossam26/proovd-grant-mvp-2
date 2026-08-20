@@ -202,7 +202,7 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
  * having, and renders the reason where the control would be (§1.4) instead of
  * offering a jump to the unusable-link page.
  */
-function HelpDrawer({
+export function HelpDrawer({
   pageId,
   param,
   trigger,

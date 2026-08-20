@@ -673,6 +673,10 @@ function splitText(): SplitTextCtor | null {
 /**
  * The invite's entrance, splash included.
  *
+ * `stage` is the screen's own root — everything the timeline touches is inside
+ * it, including the meta row, which on this screen is the column's first child
+ * rather than page chrome.
+ *
  * `splash` is the overlay when one is being played and `null` when it has
  * already run this session — which is the reference's own `splashOn`, and is
  * why the timeline's first position is `'-=0.3'` against the lift or `0`
@@ -721,9 +725,9 @@ export function inviteIntro(
   const pick = (name: string) =>
     stage.querySelector<HTMLElement>('[data-invite="' + name + '"]');
 
-  // The reference's `data-anim="meta"` is the whole top row — the time on the
-  // left and HELP on the right — and here that row is `FlowPage`'s own.
-  const top = stage.querySelector<HTMLElement>('.ff__top');
+  // The reference's `data-anim="meta"` is the whole first row of the column —
+  // the setup time on the left, HELP on the right.
+  const top = pick('meta');
   const band = pick('band');
   const head = pick('head');
   const lede = pick('lede');
@@ -747,7 +751,11 @@ export function inviteIntro(
     // teardown below, is what makes a re-run identical to a first run.
     band.style.height = '';
     band.style.overflow = '';
-    bandHeight = band.getBoundingClientRect().height;
+    // `offsetHeight`, never `getBoundingClientRect()`: the band lives inside a
+    // `scale()`d stage, so the rect is the SCALED height while the value being
+    // tweened back into `style.height` is a local one. Measuring the rect made
+    // the band open to a fraction of its size.
+    bandHeight = band.offsetHeight;
     band.style.overflow = 'hidden';
     band.style.height = '0px';
   }

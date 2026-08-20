@@ -496,28 +496,59 @@ describe('the refusals', () => {
     }
   });
 
-  it('does not claim agreement was given by continuing (§10, §28.4)', async () => {
+  // DELIBERATELY INVERTED (2026-08-20), by explicit product direction. This
+  // test used to refuse the reference's passive legal line on §10/§28.4
+  // grounds; screen 1 now ships it verbatim and the reversal is recorded at
+  // the top of InviteClaim.tsx.
+  //
+  // What the refusal was protecting is asserted here instead, because it is
+  // the half that is about BEHAVIOUR rather than about copy: the claim still
+  // wants three separate acceptances, this page still records none, and the
+  // absence of a consent route from it is unchanged. The two other screens
+  // that refuse the same sentence — the six-digit code and the Creator's
+  // welcome — still assert it is absent, in their own suites.
+  it('renders the reference legal line and still records no consent (§10)', async () => {
     stubLanding();
     renderAt(at('invite'));
     await screen.findByRole('heading', { level: 1 });
-    // §10 records acceptance at the account claim, as three separate controls.
-    // No consent row exists for anything a person does on this page.
-    expect(document.body.textContent).not.toMatch(/by continuing you/i);
-    expect(document.body.textContent).toMatch(/creates no account and asks for no card/i);
+
+    const text = document.body.textContent ?? '';
+    expect(text).toMatch(/By continuing you(’|')re agreeing to Proovd(’|')s/i);
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Privacy Policy.' })).toBeTruthy();
+
+    // The page asks for nothing and can record nothing: no form, no field, no
+    // checkbox, and one control — which navigates.
+    expect(document.querySelectorAll('form')).toHaveLength(0);
+    expect(document.querySelectorAll('input, select, textarea')).toHaveLength(0);
+    expect(
+      screen.getAllByRole('button').filter((b) => !/^help$/i.test(b.textContent ?? '')),
+    ).toHaveLength(1);
   });
 
-  it('renders `~3 mins` only from the record, never as an estimate (§1.4)', async () => {
+  // DELIBERATELY INVERTED (2026-08-20), by explicit product direction. This
+  // used to assert the meta slot rendered the invitation record's own
+  // `expected_setup_time`, and nothing at all when that was blank. The
+  // reference hardcodes `~3 mins` and the instruction was to take its copy
+  // verbatim; the record is a paragraph, and a paragraph in that slot squeezed
+  // HELP out of its own width. The reversal is recorded in InviteClaim.tsx.
+  it('renders the reference time estimate, whatever the record says', async () => {
     stubLanding({ expectedSetupTime: null });
     const view = renderAt(at('invite'));
     await screen.findByRole('heading', { level: 1 });
-    expect(document.body.textContent).not.toMatch(/\bmins?\b/i);
+    expect(screen.getByText('~3 mins')).toBeTruthy();
     view.unmount();
 
+    // The field is still collected and still stored. This screen no longer
+    // renders it, so a long one can never reach the row.
     handlers = [];
-    stubLanding({ expectedSetupTime: 'about 3 minutes' });
+    stubLanding({
+      expectedSetupTime: 'About 20 to 30 minutes to tell us about the product.',
+    });
     renderAt(at('invite'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByText('about 3 minutes')).toBeTruthy();
+    expect(screen.getByText('~3 mins')).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/20 to 30 minutes/i);
   });
 
   it('never renders an internal name (§3.1)', async () => {

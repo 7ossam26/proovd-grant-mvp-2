@@ -7928,248 +7928,244 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
 .ff-nav .btn--primary { margin-left: auto; }
 
 /* ── Screen 1 — the invite ────────────────────────────────────────────────
-   REBUILT 2026-08-20 to the supplied reference's wide claim stage
-   (`[data-claim]`, `claimWide`) and its screenshot. Nothing above this
-   comment moved, and no colour is minted: every value below is a token from
-   Session B's twelve-colour decision.
+   REBUILT 2026-08-20 to the supplied reference's own claim stage
+   (`Proovd Founder Flow v2.dc.html`, `[data-claim]` / `claimWide`).
 
-   ── The stage, converted once ────────────────────────────────────────────
-   The reference authors screen 1 on the 2496x1542 stage inside a 1295px
-   column at scale(0.92). Every measurement on it is therefore a RATIO of that
-   column — the HELP button is 196/1295 of it, the band 285/1295 tall, the
-   headline 90/1295, the control 122/1295 — and those ratios are exactly what
-   the screenshot measures. They are what is reproduced here; the stage is not,
-   because a fixed stage at scale() cannot satisfy 320px reflow.
+   ── This screen is PINNED to the reference, by explicit product direction ──
+   The reference authors it once on a fixed 2496x1542 stage and scales that
+   stage to the viewport (`claimFit`: `min(innerWidth/1440, innerHeight/1420)`,
+   written by InviteClaim.tsx). Inside it sits a 1295px column at `scale(0.92)`.
+   Every value below is the reference's own literal, read from its inline
+   styles rather than derived: 196x60 HELP, a 285px band 100px down, a 90px
+   headline 98px below that with a 28px stroke, 44px copy at 65px, a 122px
+   control at 101px, and a 21px legal line at 40px.
 
-   `--iv-w` IS that column. It caps at 51.5rem, which is the 824px the
-   screenshot measures at its own viewport, and below the cap it is simply the
-   space between the page's gutters. Every rule reads it, so the whole screen
-   scales as ONE thing rather than as a dozen independent clamps that drift
-   apart at intermediate widths — and each rule carries the reference's own
-   inner-px numerator so the arithmetic is checkable.
+   An earlier pass expressed those as RATIOS of a fluid container. That matches
+   at exactly one viewport height and nowhere else, because the reference's
+   scale is driven by `innerHeight / 1420` on any ordinary desktop window.
 
-   Clamp bounds are floors for the phone, where the reference switches to a
-   different layout entirely (`min(12vw,62px)` headlines, a bottom-pinned
-   control). Reproducing that is not this screen's job; not collapsing to
-   illegibility at 320px is.
+   Two conventions this file otherwise holds are deliberately suspended HERE
+   and nowhere else, because the instruction was that the reference outranks
+   the design system on this screen:
 
-   ── The reference has no wordmark here, and the meta row is not chrome ────
-   Its claim stage is ONE vertically centred column: the time and HELP on the
-   first row, then the band, headline, copy, control and legal line. So for
-   this page — and only this page — `.ff__top` joins the centred group instead
-   of pinning to the top, and the wordmark is not drawn. Nothing about
-   `FlowPage` changes; the whole difference is scoped to
-   `[data-flow-page='invite']`.
+     - HEX LITERALS, not tokens. Six of the reference's colours have exact
+       tokens (#41ED98 --brand, #013F17 --dark, #012D10 --darker, #E9FFE1
+       --mint, #DEFAFC --accent-blue, #FAFAFA --white) and three do not
+       (#0FE852 the HELP ink, #B4B4B5 the legal grey, #011E0B the pressed
+       control). Mixing the two would leave half the screen able to drift with
+       a token change and half not, so all nine are literal and this screen
+       reads exactly as the reference does.
 
-   The centring is `margin-top: auto` on the first child and `margin-bottom:
-   auto` on the last, never `justify-content: center`: an auto margin resolves
-   to 0 when free space is negative, so a viewport too short for the content
-   scrolls to all of it. Centred flex content overflows past the top of the
-   scroll box, where it cannot be reached.  */
+     - RADIUS 1px, not `var(--radius)`. The reference's `border-radius:1px` is
+       what its HELP and its control carry. The owner ruling's 2px governs the
+       rest of the product and is untouched.
 
-.ff[data-flow-page='invite'] {
-  --iv-w: min(51.5rem, calc(100vw - 2 * var(--ff-pad)));
+   The project's global type rules DO reach in here — `h1..h6 { margin; line-
+   height: 1.18; font-weight: 900 }`, `p { margin; max-width: 65ch }`, and
+   `button { font: inherit }` — so every one of them is overridden explicitly
+   below rather than left to win.  */
+
+/* `FlowPage`'s chrome is not drawn on this screen: the reference puts the
+   setup time and HELP on the stage's own first row. Hidden rather than
+   emptied, so the wordmark and the second HELP leave the tab order too. */
+.ff[data-flow-page='invite'] .ff__top { display: none; }
+
+/* The reference's `[data-claim]`: `position:fixed;inset:0;overflow:hidden`.
+   Nothing scrolls — the stage scales instead, which is why the composition is
+   identical at every viewport and why this page can never reflow. */
+.ff-invite {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
 }
 
-/* No badge is rendered on this page, so the stage does not reserve room for
-   one — the group is centred in the whole viewport, as the reference is. */
-.ff[data-flow-page='invite'] .ff__stage {
-  gap: 0;
-  padding-bottom: var(--ff-pad);
+/* The stage. `scale(0.37)` is the reference's own placeholder value and is
+   what renders before the layout effect runs; InviteClaim.tsx overwrites the
+   whole transform on mount and on resize. */
+.ff-invite__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.37);
+  transform-origin: center center;
+  background: transparent;
+  color: #011E0B;
+  font-family: 'Satoshi', sans-serif;
+  /* The reference's body sets neither, so its whole stage inherits the UA
+     defaults. This file's `body` sets `--fs-body` (18px) and `line-height:
+     1.6`, which reached in and made the setup time and the legal line taller
+     than the reference's — measured as a 5.1px column-height difference before
+     this was here. Resetting at the stage fixes the class rather than the two
+     elements that happened to show it. */
+  font-size: 16px;
+  line-height: normal;
 }
-.ff[data-flow-page='invite'] .ff__top {
-  width: var(--iv-w);
-  margin-top: auto;
-  margin-inline: auto;
+
+.ff-invite__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1295px;
+  transform: translate(-50%, -50%) scale(0.92);
+}
+
+/* Row 1 — `display:flex;align-items:baseline;justify-content:space-between;gap:24px` */
+.ff-invite__meta {
+  display: flex;
   align-items: baseline;
-  flex: 0 0 auto;
-}
-.ff[data-flow-page='invite'] .ff__mark { display: none; }
-/* With the wordmark gone the right-hand cluster becomes the row: the record's
-   own setup time sits left, HELP right, both on one baseline. */
-.ff[data-flow-page='invite'] .ff__top-right {
-  flex: 1 1 auto;
   justify-content: space-between;
-  align-items: baseline;
+  gap: 24px;
 }
-.ff[data-flow-page='invite'] .ff__body {
-  flex: 0 0 auto;
-  margin-bottom: auto;
-  max-width: none;
-  padding-block: 0;
-}
-
-/* 35/1295 of the column. */
-.ff[data-flow-page='invite'] .ff__meta {
-  font-size: clamp(0.9375rem, calc(var(--iv-w) * 0.02703), 1.392rem);
+.ff-invite__time {
+  font-size: 35px;
+  font-weight: 700;
   letter-spacing: -0.015em;
-  color: var(--darker);
+  /* The yielding half of the row: it may shrink, the control may not. */
+  min-width: 0;
 }
-
-/* 196x60/1295, label 22/1295. The tier, the brand outline and the fill-sweep
-   hover are `.btn--secondary`'s own — only the box and the label are sized. */
-.ff[data-flow-page='invite'] .ff__help.btn {
-  width: clamp(5.5rem, calc(var(--iv-w) * 0.15135), 7.794rem);
-  min-height: clamp(2.25rem, calc(var(--iv-w) * 0.04633), 2.386rem);
-  padding: 0;
-  font-size: clamp(0.75rem, calc(var(--iv-w) * 0.01699), 0.875rem);
+.ff-invite__help {
+  width: 196px;
+  height: 60px;
+  box-sizing: border-box;
+  border: 2px solid #41ED98;
+  border-radius: 1px;
+  background: transparent;
+  color: #0FE852;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  cursor: pointer;
+  /* `.btn`'s outline treatment is not used here — the reference's stroke is a
+     BORDER, inside the 196x60 box, and an outline would sit outside it. */
+  outline: none;
+  line-height: normal;
+  /* Horizontal padding, and a width this row can never take back.
+
+     A flex item shrinks below its own `width` by default, and this one sits in
+     a `space-between` row opposite a slot that used to carry a paragraph — so
+     the button collapsed toward its label and HELP ended up flush against its
+     own border. `flex: none` pins the 196x60 the reference draws; the padding
+     is what keeps the label off the border if the label ever changes. Neither
+     moves anything while the box is 196px and the text is centred. */
+  flex: none;
+  padding: 0 24px;
 }
-/* The reference's HELP is 38px tall, which is below the 44px hard minimum —
-   so the minimum is honoured where it is a minimum. A mouse pointer is not a
-   fingertip, and the screenshot's proportion is the desktop one. */
-@media (pointer: coarse) {
-  .ff[data-flow-page='invite'] .ff__help.btn { min-height: var(--touch); }
+.ff-invite__help:hover { background: #012D10; }
+.ff-invite__help:focus-visible { outline: 3px solid #41ED98; outline-offset: 4px; }
+
+/* Row 2 — the band. `padding:36px 144px` is the reference's own and is inert
+   while the band is empty; it is kept so a visual dropped in later inherits
+   the same inset. */
+.ff-invite__band {
+  margin-top: 100px;
+  height: 285px;
+  background: #DEFAFC;
+  padding: 36px 144px;
+  box-sizing: border-box;
 }
 
-.ff-invite {
-  width: var(--iv-w);
-  margin-inline: auto;
-  display: grid;
-  gap: 0;                       /* every gap here is its own ratio */
-  /* 5/1295 — the control's stroke. Declared here rather than on the row that
-     uses it because the legal line has to add it too: an outline paints
-     OUTSIDE the box and eats into the gap either side, so both neighbouring
-     margins carry it to leave the reference's own visible gap. */
-  --iv-cta-o: clamp(2px, calc(var(--iv-w) * 0.00386), 0.2rem);
+/* Row 3 — the headline. `max-width:20ch` is what decides the line break, so it
+   is not optional: without it the sentence sets across the full 1295px and
+   wraps somewhere else entirely. */
+.ff-invite__head {
+  margin: 98px 0 0;
+  max-width: 20ch;
+  color: #012D10;
+  font-size: 90px;
+  font-weight: 700;
+  line-height: 1.51;
+  letter-spacing: -0.03em;
+  -webkit-text-stroke: 28px #E9FFE1;
+  paint-order: stroke fill;
 }
 
-/* The reference's splash: the page ground, a brand square, a dark square
-   inside it at 52%. Fixed rather than absolute so it covers the viewport
-   whatever the page has scrolled to; `.ff__stage` writes no transform, so
-   nothing above it creates a containing block. */
+/* Row 4 — the copy. `max-width: none` overrides the global 65ch cap; the
+   reference sets none, and the cap would re-wrap it. */
+.ff-invite__lede {
+  margin: 65px 0 0;
+  max-width: none;
+  font-size: 44px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+}
+
+/* Row 5 — the control. A plain button with the reference's own border, not
+   `.btn`: the tier brings an outline, a 44px min-height, `overflow:hidden` and
+   a variant-swap hover, none of which the reference has. Its hover is a
+   background darken and its press another, both stated inline there. */
+.ff-invite__cta {
+  margin-top: 101px;
+  width: 100%;
+  height: 122px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 5px solid #41ED98;
+  border-radius: 1px;
+  background-color: #013F17;
+  color: #E9FFE1;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: normal;
+  cursor: pointer;
+  outline: none;
+}
+.ff-invite__cta:hover { background-color: #012D10; }
+.ff-invite__cta:active { background-color: #011E0B; }
+.ff-invite__cta:focus-visible { outline: 5px solid #E9FFE1; outline-offset: -10px; }
+
+/* Row 6 — the legal line. */
+.ff-invite__legal {
+  margin: 40px 0 0;
+  max-width: none;
+  color: #B4B4B5;
+  font-size: 21px;
+  font-weight: 500;
+  text-align: center;
+}
+.ff-invite__legal a {
+  color: #B4B4B5;
+  font-weight: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* The global `a::after` is the runtime's underline-draw, which rests at
+   `scaleX(0)` and would fight the static underline above. */
+.ff-invite__legal a::after { content: none; }
+
+/* The splash. The reference's own: the page ground, a brand square, and a dark
+   square inside it at 52%. `absolute` because `.ff-invite` is already the
+   fixed full-bleed layer. */
 .ff-invite__splash {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 980;
-  background: var(--white);
+  z-index: 20;
+  background: #FAFAFA;
   display: grid;
   place-items: center;
 }
 .ff-invite__splash-outer {
   width: min(38vmin, 320px);
-  aspect-ratio: 1;
-  background: var(--brand);
+  height: min(38vmin, 320px);
+  background: #41ED98;
   display: grid;
   place-items: center;
 }
 .ff-invite__splash-inner {
   width: 52%;
   height: 52%;
-  background: var(--dark);
+  background: #013F17;
 }
-
-/* 285/1295 tall, 100/1295 below the meta row. Empty in the reference and
-   empty here — it is the space the Founder's own visual will occupy. */
-.ff-invite__band {
-  margin-top: clamp(1.5rem, calc(var(--iv-w) * 0.0772), 3.977rem);
-  height: clamp(5rem, calc(var(--iv-w) * 0.22008), 11.331rem);
-  background: var(--accent-blue);
-  border-radius: var(--radius);
-}
-
-/* 90/1295, 98/1295 below the band, and the reference's 28px mint text-stroke
-   is 28/90 of the size — so it holds at every width rather than being a
-   second number to keep in step. `paint-order` puts the stroke behind the
-   glyph so the letterform survives it. No `text-wrap`: the reference wraps
-   greedily and the screenshot's two lines are that wrap. */
-.ff-invite__head {
-  margin: clamp(1.5rem, calc(var(--iv-w) * 0.07568), 3.898rem) 0 0;
-  font-size: clamp(2rem, calc(var(--iv-w) * 0.0695), 3.579rem);
-  font-weight: 700;
-  line-height: 1.51;
-  letter-spacing: -0.03em;
-  color: var(--darker);
-  -webkit-text-stroke: 0.311em var(--mint);
-  paint-order: stroke fill;
-}
-
-/* 44/1295, 65/1295 below the headline. */
-.ff-invite__lede {
-  margin: clamp(1rem, calc(var(--iv-w) * 0.05019), 2.585rem) 0 0;
-  font-size: clamp(1.0625rem, calc(var(--iv-w) * 0.03398), 1.75rem);
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: -0.012em;
-  color: var(--darker);
-}
-
-/* The control: 1295x122 with a 5px border, 101/1295 below the copy.
-   `.btn`'s stroke is an OUTLINE and sits outside the box (proovd.css:412),
-   where the reference's is a border and sits inside it. So the box is sized
-   to the reference's INNER rectangle — (1295-10) wide by (122-10) tall — and
-   the row pads by the outline width. The visual rectangle is then the
-   reference's own, to the pixel, on both axes. */
-.ff-invite__act {
-  margin-top: calc(
-    clamp(1.5rem, calc(var(--iv-w) * 0.07799), 4.017rem) + var(--iv-cta-o)
-  );
-  display: grid;
-  padding-inline: var(--iv-cta-o);
-}
-.ff-invite__cta.btn {
-  width: 100%;
-  min-height: clamp(var(--touch), calc(var(--iv-w) * 0.08649), 4.454rem);
-  padding-inline: var(--sp-16);
-  outline-width: var(--iv-cta-o);
-  justify-content: center;
-  font-size: clamp(1.125rem, calc(var(--iv-w) * 0.03552), 1.829rem);
-  font-weight: 900;
-  letter-spacing: -0.02em;
-}
-/* A dark-green fill with a brand outline and mint ink — the reference's own
-   claim control, expressed in the tier's own `--r-*`/`--h-*` slots so the
-   runtime's colour hover reads it rather than a second mechanism. Its hover is
-   `--darker`, which is the reference's #012d10 exactly.
-
-   `box-shadow: none` because the OWNER RULING's inset highlight ships on
-   BRAND fills; this is a dark-green one, the reference draws no gloss on it,
-   and a white inset glow is plainly visible on a dark fill. */
-.ff-invite__cta.btn--primary {
-  --r-bg: var(--dark);    --r-text: var(--mint);  --r-border: var(--brand);
-  --h-bg: var(--darker);  --h-text: var(--mint);  --h-border: var(--brand);
-  background: var(--r-bg);
-  color: var(--r-text);
-  outline-color: var(--r-border);
-  box-shadow: none;
-}
-
-/* 21/1295, centred, 40/1295 below the control — the reference's legal slot,
-   and PHASE 34's own mapping of its #B4B4B5 to `--grey`.
-
-   The SENTENCE is not the reference's. It draws "by continuing you're
-   agreeing to Proovd's Terms of Service and Privacy Policy", which is not
-   true: acceptance is recorded at the account claim as three separate
-   controls (Section 10, Section 28.4), and no consent row exists for anything
-   done on this page. The treatment is reproduced; the claim is not. */
-.ff-invite__legal {
-  margin-top: calc(
-    clamp(0.875rem, calc(var(--iv-w) * 0.03089), 1.591rem) + var(--iv-cta-o)
-  );
-  margin-bottom: 0;
-  /* Section 9's global `p { max-width: 65ch }` stands — the reference's own
-     line is short enough never to meet it and this one is not — but the BOX is
-     centred under the control rather than left in the column, which is where
-     `text-align: center` alone leaves it. Found by measuring: the block sat
-     111px left of the control it sits under, and no layout-free test can see
-     that. */
-  margin-inline: auto;
-  font-size: clamp(0.75rem, calc(var(--iv-w) * 0.01622), 0.835rem);
-  font-weight: 500;
-  line-height: 1.5;
-  color: var(--grey);
-  text-align: center;
-}
-.ff-invite__legal a {
-  color: inherit;
-  font-weight: inherit;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-/* A static underline, so the runtime's hover draw has nothing to remove. */
-.ff-invite__legal a::after { content: none; }
 
 /* ── Screens 2-3 — confirming what we understood ──────────────────────────  */
 
@@ -8298,8 +8294,6 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   .ff-type__row { flex-wrap: wrap; gap: var(--sp-12); }
   .ff-type__row-name { margin-left: 0; width: 100%; }
   .ff-confirm__meta { flex-direction: column; gap: var(--sp-8); }
-  /* The stroke reads as a blur at small sizes; the mint fill carries it. */
-  .ff-invite__head { -webkit-text-stroke-width: 0.2em; }
 }
 
 /* The badge is fixed bottom-right at EVERY width, so the stage reserves room
