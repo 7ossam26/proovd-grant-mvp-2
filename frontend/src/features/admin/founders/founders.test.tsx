@@ -2073,6 +2073,83 @@ describe('Session B — Create Founder is a page: five steps, one checklist, two
     expect(fieldPuts).toHaveLength(1);
     expect(JSON.parse(fieldPuts[0]!.body ?? '{}')).toEqual({ value: 'Austin, TX' });
   });
+
+  /**
+   * §1.4, §27.1 — a refused send is said in the page (added 2026-08-20).
+   *
+   * `Create & send` is two acts and the second can be refused on its own: the
+   * §7 preview gate, or the freshness gate on a sign-in older than the window.
+   * This used to fire a `toast` and immediately navigate, which is two ways to
+   * be invisible at once — `useToast` is a no-op with no motion runtime, and a
+   * transient overlay is not where an outcome somebody must act on belongs. On
+   * production that read as a button that did nothing.
+   *
+   * The create controls go with it: the prospect exists, and pressing Create
+   * again would make a second one.
+   */
+  it('states a refused send in the page, and stops offering to create again', async () => {
+    const created = { prospectId: PROSPECT, campaignId: CAMPAIGN, draftId: 'draft-1' };
+    serve([
+      { match: /\/api\/admin\/founders$/, method: 'POST', body: created },
+      {
+        match: /\/api\/admin\/founders\/[^/]+\/fields\/[^/]+$/,
+        method: 'PUT',
+        body: workspaceFixture(),
+      },
+      {
+        match: /\/invitation\/send$/,
+        method: 'POST',
+        status: 403,
+        body: {
+          error: 'reauthentication_required',
+          title: 'Confirm it is you to continue',
+          whatHappened: 'Your sign-in is older than the window Proovd allows.',
+          next: 'Sign in again and we will bring you straight back here.',
+          action: '/signin',
+        },
+      },
+      ...adminRoutes(),
+    ]);
+    const user = userEvent.setup();
+    const view = await renderAdmin('/admin/founders/new');
+
+    await user.type(screen.getByLabelText('Founder name'), 'Noor Vance');
+    await user.type(screen.getByLabelText('Business name'), 'Vance Audio');
+    await user.type(screen.getByLabelText('Email'), 'noor@vance.example');
+    await user.type(screen.getByLabelText('US city and state'), 'Austin, TX');
+    await user.type(screen.getByLabelText('Discovery source'), 'Founder research');
+    await user.type(screen.getByLabelText('Internal owner'), 'Sam Okafor');
+    await user.type(screen.getByLabelText('What we know so far'), 'A modular synth pedal.');
+    await user.type(
+      screen.getByLabelText('Why we think they could be a fit'),
+      'Sells direct already.',
+    );
+    await user.type(screen.getByLabelText('Estimated time to get started'), 'About 20 minutes');
+    await user.click(screen.getByRole('button', { name: 'Create & send invitation' }));
+
+    // The server's own §27.1 answers, in the page rather than announced.
+    const panel = await screen.findByRole('alert', { name: 'Confirm it is you to continue' });
+    expect(panel).toHaveTextContent('Your sign-in is older than the window Proovd allows.');
+    expect(panel).toHaveTextContent('Sign in again');
+    expect(panel).toHaveTextContent(/no invitation was sent/i);
+
+    // It stays put. Navigating away is what made this invisible.
+    expect(view.router.state.location.pathname).toBe('/admin/founders/new');
+
+    // Both ways on: the record that now exists, and the server's own action.
+    expect(
+      within(panel).getByRole('link', { name: 'Open the Founder record' }),
+    ).toHaveAttribute('href', expect.stringContaining(`/admin/founders/${PROSPECT}`));
+    expect(within(panel).getByRole('link', { name: 'Confirm it is you' })).toHaveAttribute(
+      'href',
+      '/signin',
+    );
+
+    // A second press cannot make a second prospect.
+    expect(screen.queryByRole('button', { name: 'Create & send invitation' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create prospect' })).toBeNull();
+    expect(requestsTo(/\/api\/admin\/founders$/).filter((r) => r.method === 'POST')).toHaveLength(1);
+  });
 });
 
 /* ── 19. Session B — the Edit Founder sheet ────────────────────────────────── */

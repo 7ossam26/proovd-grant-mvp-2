@@ -420,6 +420,59 @@ describe('§33.2.1 — an invitation claims only that Affiliate’s association'
 /* ══ §8 — the invitation itself ═══════════════════════════════════════════ */
 
 describe('§8 — the private campaign-specific invitation', () => {
+  /**
+   * The workspace hint and the real gate must not disagree (added 2026-08-20).
+   *
+   * `composeInvitations` computes `unresolved`/`canSend` from association
+   * columns so a surface can explain a control before it is pressed; the gate
+   * is the marker scan over the rendered message. The hint used to test only
+   * the four columns the compose dialog owns, so a campaign whose Founder
+   * record has no product name reported `canSend: true` while every send was
+   * refused on `[PRODUCT NAME]` — a value no control on the Creator workspace
+   * can write. §8 permits recruitment "before, during, or after Founder
+   * onboarding" and the Founder route does not require a product name, so this
+   * is a state a campaign genuinely reaches rather than a hypothetical.
+   */
+  it('does not report a sendable invitation while the gate refuses (§1.1, §1.4)', async () => {
+    // A campaign whose Founder record cannot yet name the product.
+    const founder = await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({
+        legalName: 'Rowan Vale',
+        email: `nameless-product-${randomUUID()}@example.com`,
+        invitationSource: 'introduced by a mutual contact',
+        internalOwner: 'Ada Admin',
+      })
+      .expect(201);
+
+    const { associationId, prospectId } = await recruit({}, founder.body.campaignId as string);
+    // Everything the compose dialog is able to write.
+    await compose(associationId);
+
+    const gate = await request(h.app)
+      .get(`/api/admin/affiliates/${associationId}/preview`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect(gate.body.unresolved).toContain('[PRODUCT NAME]');
+    expect(gate.body.blocked).toBe(true);
+
+    const detail = await request(h.app)
+      .get(`/api/admin/creators/${prospectId}`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    const view = detail.body.profile.invitations.find(
+      (i: { associationId: string }) => i.associationId === associationId,
+    );
+
+    expect(view.canSend).toBe(false);
+    // And it names where the value lives, because it is not on this screen.
+    expect(view.unresolved.join(' ')).toContain('Founder’s record');
+    // With the route to get there — a blocker with no destination is the dead
+    // end this is fixing.
+    expect(view.campaignId).toBe(founder.body.campaignId);
+  });
+
   it('holds Send closed while any field is unwritten', async () => {
     const { associationId } = await recruit();
     await compose(associationId, { whyRecruited: null });

@@ -161,6 +161,8 @@ export interface ProviderBlock {
 
 export interface CreatorInvitationView {
   associationId: string;
+  /** For routing to the campaign record — some blockers live on the Founder. */
+  campaignId: string;
   campaignName: string;
   state: string;
   stateLabel: string;

@@ -1011,8 +1011,13 @@ async function composeInvitations(
   const associations = await db
     .select({
       associationId: campaignAffiliateAssociations.id,
+      campaignId: campaignAffiliateAssociations.campaignId,
       campaignTitle: campaignBuild.title,
       campaignProduct: founderProspects.productName,
+      // §8's invitation names the Founder as well as the product, and both come
+      // from the Founder's record rather than from anything on this screen.
+      founderPreferredName: founderProspects.preferredName,
+      founderLegalName: founderProspects.legalName,
       invitationStatus: campaignAffiliateAssociations.invitationStatus,
       whyRecruited: campaignAffiliateAssociations.whyRecruited,
       reviewedPresence: campaignAffiliateAssociations.reviewedPresence,
@@ -1075,19 +1080,40 @@ async function composeInvitations(
     const latest = mine[0];
 
     /*
-     * What §8's preview gate would refuse right now. The gate itself re-decides
-     * server-side on every send — this is the same list, computed early so the
-     * surface can say why the control is disabled before it is pressed (§1.1:
-     * a disabled button is not authorization).
+     * Why §8's preview gate would refuse right now — a HINT, and it says so.
+     *
+     * The gate is `previewAffiliateInvitation`, which scans the RENDERED
+     * message for markers; this is an input check computed early so the surface
+     * can say why a control is unavailable before it is pressed (§1.1: a
+     * disabled button is not authorization). The comment here used to claim it
+     * was "the same list", and it was not — it tested the four association
+     * columns the compose dialog owns and nothing else, so `canSend` came back
+     * true while the gate refused on `[PRODUCT NAME]`, which is not a value any
+     * control on this screen can write.
+     *
+     * The last two entries are the ones that made it a lie. §8 lets recruitment
+     * start "before, during, or after Founder onboarding", and the Founder
+     * route does not require a product name, so a Creator can be fully composed
+     * against a campaign whose Founder record cannot yet name what it is for.
+     * They name where the value lives, because the answer is not on this
+     * screen — reporting an unfixable blocker without saying that is the dead
+     * end this is fixing.
      */
     const unresolved: string[] = [];
     if (!association.whyRecruited) unresolved.push('Why this Creator was recruited');
     if (!association.reviewedPresence) unresolved.push('What was reviewed');
     if (!association.senderName) unresolved.push('Sender name');
     if (!association.senderEmail) unresolved.push('Sender email');
+    if (!association.campaignProduct) {
+      unresolved.push('The product name, on the Founder’s record');
+    }
+    if (!association.founderPreferredName && !association.founderLegalName) {
+      unresolved.push('The Founder’s name, on the Founder’s record');
+    }
 
     return {
       associationId: association.associationId,
+      campaignId: association.campaignId,
       campaignName: campaignNameOf(association.campaignTitle, association.campaignProduct),
       state: association.invitationStatus,
       stateLabel: invitationStateLabel(association.invitationStatus),

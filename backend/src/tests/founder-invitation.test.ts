@@ -464,6 +464,84 @@ describe('§7 preview shows final variables and no unresolved placeholder', () =
     expect(opened.body.blocked).toBe(false);
   });
 
+  /**
+   * The one variable the message can do without (§7, §5.3, added 2026-08-20).
+   *
+   * Every other helper in this file seeds `productUrl`, which is why nothing
+   * here ever caught this: a blank one resolved to `[PRODUCT URL]`, the marker
+   * gate refused, and Send was unavailable for every Founder without a website
+   * — while `Website` is not on the compose page's checklist, so its primary
+   * button enabled and the refusal only arrived from the server. An Idea
+   * Campaign is for a product that is not built yet, so a great many invitable
+   * Founders have no URL at all.
+   *
+   * The gate itself is not weakened, and the second half of this test is what
+   * says so: with the product NAME blank the send is still refused.
+   */
+  it('sends to a Founder with no website, and still refuses a blank product name', async () => {
+    const email = `no-website-${randomUUID()}@example.com`;
+    const created = await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({
+        legalName: 'Rowan Vale',
+        email,
+        productName: 'Waitlist',
+        // No productUrl. Deliberately absent, not blank-string padded.
+        invitationSource: 'introduced by a mutual contact',
+        internalOwner: 'Ada Admin',
+      })
+      .expect(201);
+    await compose(created.body.draftId);
+
+    const preview = await request(h.app)
+      .get(`/api/admin/founders/${created.body.draftId}/preview`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect(preview.body.unresolved).toEqual([]);
+    expect(preview.body.blocked).toBe(false);
+
+    const before = h.sentEmails.messages.length;
+    await request(h.app)
+      .post(`/api/admin/founders/${created.body.draftId}/send`)
+      .set('cookie', admin.cookie)
+      .send({})
+      .expect(201);
+
+    // The line is absent rather than empty — a Founder reads no stray gap and
+    // no bracketed placeholder where a URL would have been.
+    const message = h.sentEmails.messages[before]!;
+    expect(message.text).not.toMatch(/\[PRODUCT URL\]/);
+    expect(message.html).not.toMatch(/\[PRODUCT URL\]/);
+
+    // The marker gate is intact for the variables the message cannot do
+    // without: the product name is a sentence, and a blank one still refuses.
+    const nameless = await request(h.app)
+      .post('/api/admin/founders')
+      .set('cookie', admin.cookie)
+      .send({
+        legalName: 'Rowan Vale',
+        email: `nameless-${randomUUID()}@example.com`,
+        invitationSource: 'introduced by a mutual contact',
+        internalOwner: 'Ada Admin',
+      })
+      .expect(201);
+    await compose(nameless.body.draftId);
+
+    const blocked = await request(h.app)
+      .get(`/api/admin/founders/${nameless.body.draftId}/preview`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect(blocked.body.unresolved).toContain('[PRODUCT NAME]');
+    expect(blocked.body.blocked).toBe(true);
+
+    const refusedSend = await request(h.app)
+      .post(`/api/admin/founders/${nameless.body.draftId}/send`)
+      .set('cookie', admin.cookie)
+      .send({});
+    expect(refusedSend.status).toBe(422);
+  });
+
   /** §9's autosave rule: a key not in the request writes nothing. */
   it('saving one field does not blank another', async () => {
     const created = await createProspect();

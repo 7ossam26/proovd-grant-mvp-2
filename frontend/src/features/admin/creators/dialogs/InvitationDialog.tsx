@@ -21,6 +21,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router';
 import { Button, Field, Input, Textarea } from '../../../../components/index.js';
 import { DialogShell } from '../../founders/dialogs/index.js';
 import {
@@ -113,6 +114,22 @@ export function InvitationDialog({
               <p className="helper">
                 Before this can be sent: {invitation.unresolved.join(', ')}.
               </p>
+              {/*
+                §8's invitation names the Founder and the product, and neither
+                is written from this screen. Recruitment may run before Founder
+                onboarding, so this is a state a campaign genuinely reaches —
+                naming the blocker without naming its destination is what made
+                it a dead end.
+              */}
+              {invitation.unresolved.some((entry) => entry.includes('Founder’s record')) ? (
+                <p className="helper">
+                  Those last ones are the Founder’s to record, not this screen’s.{' '}
+                  <RouterLink to={`/admin/campaigns/${invitation.campaignId}`}>
+                    Open the campaign
+                  </RouterLink>{' '}
+                  to reach their record. Nothing here is lost meanwhile.
+                </p>
+              ) : null}
               <Field label="Why this Affiliate was recruited">
                 <Textarea
                   value={composing.whyRecruited}
@@ -209,14 +226,23 @@ export function InvitationDialog({
               >
                 Save the invitation
               </Button>
-            ) : (
-              <Button
-                disabled={busy || Boolean(preview?.blocked)}
-                onClick={() => void run(() => sendInvitation(associationId))}
-              >
-                {invitation.state === 'sent' ? 'Send a new invitation' : 'Send the invitation'}
-              </Button>
-            )}
+            ) : null}
+
+            {/*
+              Send is always here, and the PREVIEW decides whether it is
+              available — the preview is the gate's own answer over the
+              rendered message, where `invitation.unresolved` is only an input
+              hint. This used to be the `else` of the branch above, so a
+              blocker the four boxes cannot write — `[PRODUCT NAME]`, which
+              lives on the Founder's record — hid the Send control entirely and
+              left no way to reach it and no statement of why.
+            */}
+            <Button
+              disabled={busy || !preview || preview.blocked}
+              onClick={() => void run(() => sendInvitation(associationId))}
+            >
+              {invitation.state === 'sent' ? 'Send a new invitation' : 'Send the invitation'}
+            </Button>
 
             {invitation.hasLiveToken ? (
               <Button

@@ -12725,3 +12725,29 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
    Admin body size is 18px against the reference's 16px, so the measure needs
    the difference rather than the reference's own number. */
 .fdir-hero .grey { max-width: 42rem; }
+
+/* ════════════════════════ PHASE 48 — the refused invitation, said in the page
+   (Spec §7, §1.4, §27.1; DNA §5.6), added 2026-08-20.
+
+   `Create & send invitation` creates the prospect and then sends, and the send
+   can be refused on its own — the §7 preview gate, or the freshness gate on a
+   sign-in older than the window. Until now that refusal was a `toast` followed
+   immediately by a navigation, which is two ways to be invisible at once:
+   `useToast` is a no-op when the motion runtime is unavailable, and a
+   transient overlay is not where an outcome somebody must act on belongs.
+
+   So the compose page keeps the Admin where they are and states it. The tone
+   is the accent, not `--danger`: the Founder record WAS created and nothing is
+   lost, which is a thing to finish rather than a thing that broke. It reuses
+   `.cf-foot__actions` for its controls so the button row matches the footer
+   it replaces. */
+.cf-refused {
+  margin: var(--sp-24) 0 0;
+  padding: var(--sp-24);
+  border: var(--bw) solid var(--accent-yellow);
+  border-radius: var(--radius);
+  background: var(--grey-lightest);
+}
+.cf-refused .h3 { margin: 0 0 var(--sp-8); }
+.cf-refused p { margin: 0 0 var(--sp-8); }
+.cf-refused .cf-foot__actions { margin-top: var(--sp-16); flex-wrap: wrap; }
