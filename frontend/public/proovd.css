@@ -18084,3 +18084,1175 @@ html.no-motion .ff-story__say { transition: none; }
 @media (max-width: 600px) {
   .ff-brandlogo__back { bottom: 92px; padding: 8px 14px; }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   PHASE 64 — the Founder flow, screen 10: we want to see your product
+   (2026-08-20)
+
+   REBUILT FROM SCRATCH against the supplied reference
+   (`Proovd Founder Flow v2.dc.html`, `[data-visuals]` / `kindWide`) and its
+   screenshot. `VisualsStep.tsx`'s header is the reasoning; this is the
+   composition. Every number is the reference's own, on its own 2496x1542
+   stage — `VisualsStep` owns the scale and writes the whole transform on mount
+   and on resize; the `scale(0.37)` below is the reference's own placeholder and
+   is what renders for the one frame before the layout effect runs. Nothing here
+   reflows: the stage scales, which is why the composition is identical at every
+   viewport (§33.11.1).
+
+   `isClaimPhone()` returns `false` in the reference — "one composition
+   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+   code and this composition is what every viewport gets, exactly as there.
+
+   ── The column has no width of its own ────────────────────────────────────
+   `width: fit-content` over `align-items: flex-start`, and what fits it is this
+   screen's own 112px headline: 1491px at Satoshi's metrics, measured in Chrome
+   against the reference. The SOCIALS screen borrows the same sentence hidden
+   (`.ff-soc__measure`) so the two share one column; here it is the real
+   heading, so nothing is hidden and nothing is hardcoded — the number is a
+   property of the face, not of the layout.
+
+   ── The two suspended conventions, as on screens 1–15 ─────────────────────
+     - HEX LITERALS, not tokens. `#41ED98`, `#013F17`, `#FAFAFA`, `#E9FFE1`,
+       `#8FCBA3`, `#A2AFA8`, `#FBFFD4`, `#DEF6FF`, `#defafc`, `#012D10` and
+       `#3BDC8C` are the reference's own; mixing literal and token would leave
+       half the screen able to drift with a token change and half not.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are.
+
+   ── The dashed rules are gradients, not `border-style: dashed` ────────────
+   Both boxes are the reference's own four-layer repeating gradient over a
+   transparent border — 15px on / 15px off at 5px for the drop zone, 43/43 at
+   10px for the empty list. A `dashed` border would round its own dash length to
+   fit each edge, so the two boxes would disagree with each other and with the
+   reference at every viewport; a gradient dash is exact and scales with the
+   stage. The drop zone's fill is that stack's last layer
+   (`linear-gradient(#E9FFE1,#E9FFE1)`, clipped to `padding-box`), which is why
+   `background-color` is never set on it.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the headline,
+   `p { margin; max-width: var(--measure) }` reaches the two added lines, `ul`
+   carries a list style and padding, `input` inherits the design system's own
+   field treatment, and `body`'s 18px / line-height 1.6 reaches the whole stage
+   — the reference's own body sets neither, so the stage resets both.
+
+   ── The two blocks the reference does not draw ────────────────────────────
+   `.ff-vis__note` (why the link row is drawn and not wired) and
+   `.ff-vis__filemeta` (§12's state and §28.4's approval). The first is
+   ABSOLUTELY positioned inside the 130px gap the composition already leaves
+   above the CTA; the second is INSIDE the reference's own `#DEF6FF` block. Not
+   one reference box moves for either.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen — and the reason is not that
+   the reference has none. It has a wordmark, a HELP and a message bell, and it
+   draws all three INSIDE the `z-index: 25` fixed layer below. Left in place
+   they would sit under that layer and be unreachable, so both are hidden and
+   both leave the tab order with it. */
+.ff[data-flow-page='visuals'] .ff__top,
+.ff[data-flow-page='visuals'] .ff__badge { display: none; }
+
+/* The reference's `[data-visuals]`. Nothing scrolls. */
+.ff-vis {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+}
+
+/* The read failed, so there is no composition to draw. It keeps the layer's
+   ground and centres the panel; nothing here is the reference's, because the
+   reference holds its record in memory and has no failure to render. */
+.ff-vis__failure {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-24);
+}
+
+/* ── The chrome. Its clamps are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-vis__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-vis__back:hover { color: #013F17; }
+/* The reference has no focus treatment at all. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11) and it costs the composition nothing. */
+.ff-vis__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-vis__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-vis__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-vis__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-vis__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-vis__help:hover { background: #E9FFE1; }
+.ff-vis__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* The message bell. Its geometry is the reference's; its number is not, and
+   `VisualsStep`'s header says what the difference is. It does not shake. */
+.ff-vis__mailbtn {
+  position: absolute;
+  right: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13.3333px;
+  line-height: normal;
+  cursor: pointer;
+  outline: none;
+}
+.ff-vis__mailbtn:focus-visible { outline: 2px solid #013F17; outline-offset: 4px; }
+.ff-vis__mail {
+  position: relative;
+  width: clamp(58px, 5.2vw, 78px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  box-sizing: border-box;
+}
+.ff-vis__mail img { width: 68%; height: auto; max-width: none; display: block; }
+.ff-vis__mailcount {
+  position: absolute;
+  left: -10%;
+  top: -16%;
+  min-width: 31%;
+  height: 31%;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  background: #FAFAFA;
+  box-sizing: border-box;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, 0.9vw, 13px);
+  line-height: 1;
+  font-weight: 700;
+  color: #41ED98;
+}
+
+/* ── The stage, and the fit-content column inside it ─────────────────────── */
+
+.ff-vis__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.37);
+  transform-origin: center center;
+  /* See the header: the reference's body sets neither, and this file's does. */
+  font-size: 16px;
+  line-height: normal;
+  color: #013F17;
+}
+
+.ff-vis__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: fit-content;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  /* The reference's own, and the reason the pill needs align-self. */
+  align-items: flex-start;
+}
+
+.ff-vis__pill {
+  align-self: center;
+  padding: 26px 46px;
+  background: #FBFFD4;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+
+.ff-vis__head {
+  margin: 72px 0 0;
+  font-size: 112px;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  color: #013F17;
+  white-space: nowrap;
+}
+
+.ff-vis__panel {
+  margin-top: 120px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 860px 1fr;
+  gap: 80px;
+  align-items: stretch;
+}
+
+.ff-vis__left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ── The drop zone ───────────────────────────────────────────────────────── */
+
+/* Focusable, and off-screen rather than display:none — a hidden input is not in
+   the tab order at all, and this control's whole keyboard path is the real file
+   picker (§28.5). */
+.ff-vis__fileinput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ff-vis__drop {
+  width: 100%;
+  height: 500px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  /* The reference's own — it is a `<button>` there, so this is the UA's
+     padding, measured rather than assumed. The zone's copy is centred and the
+     box is 860px wide, so it governs nothing except the one state whose
+     sentence is long, and `.ff-vis__droptypes` has its own measure for that. */
+  padding: 1px 6px;
+  border-radius: 2px;
+  border: 5px solid transparent;
+  background-image:
+    repeating-linear-gradient(90deg, #8FCBA3 0 15px, transparent 15px 30px),
+    repeating-linear-gradient(90deg, #8FCBA3 0 15px, transparent 15px 30px),
+    repeating-linear-gradient(0deg, #8FCBA3 0 15px, transparent 15px 30px),
+    repeating-linear-gradient(0deg, #8FCBA3 0 15px, transparent 15px 30px),
+    linear-gradient(#E9FFE1, #E9FFE1);
+  background-size: 100% 5px, 100% 5px, 5px 100%, 5px 100%, 100% 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0, 0 0;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  background-clip: border-box, border-box, border-box, border-box, padding-box;
+  cursor: pointer;
+  font-family: 'Satoshi', sans-serif;
+  text-align: center;
+  /* The reference's own hover, on its own curve. */
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ff-vis__drop:hover { transform: scale(1.015); }
+.ff-vis__fileinput:focus-visible + .ff-vis__drop {
+  outline: 3px solid #013F17;
+  outline-offset: 4px;
+}
+/* Unavailable rather than disabled-looking: the box is the reference's and the
+   words inside it are the reason (§1.4). There is nothing to press, so it does
+   not offer a pointer. */
+.ff-vis__drop.is-off { cursor: default; }
+.ff-vis__drop.is-off:hover { transform: none; }
+
+.ff-vis__drop svg { width: 126px; height: 126px; flex: none; display: block; }
+
+/* `line-height: normal` on both, and it is not a shortcut: the reference sets
+   none, so these two lines are 59px and 40px at Satoshi's own metrics. A 1.2
+   here made the label 6px shorter and lifted the arrow above it by 3px on the
+   stage — which is what a measured comparison catches and a screenshot does
+   not. This file's `body` sets 1.6, so `normal` has to be said. */
+.ff-vis__droplabel {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #8FCBA3;
+}
+.ff-vis__droptypes {
+  max-width: 700px;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: normal;
+  color: #A2AFA8;
+}
+
+/* ── The link row ────────────────────────────────────────────────────────── */
+
+.ff-vis__linkrow {
+  display: flex;
+  gap: 26px;
+}
+
+.ff-vis__link {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: 112px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 32px;
+  background: #FAFAFA;
+  border: 4px solid #41ED98;
+  border-radius: 2px;
+  outline: none;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 38px;
+  font-weight: 500;
+  line-height: normal;
+  color: #013F17;
+}
+/* The reference's own rule, and it is a global there:
+   input::placeholder,textarea::placeholder{color:#A2AFA8;opacity:1;} */
+.ff-vis__link::placeholder { color: #A2AFA8; opacity: 1; }
+.ff-vis__link:focus,
+.ff-vis__link:focus-visible {
+  border-color: #41ED98;
+  outline: 2px solid #013F17;
+  outline-offset: 3px;
+}
+
+.ff-vis__add {
+  flex: none;
+  width: 290px;
+  height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: none;
+  border-radius: 2px;
+  background: #013F17;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  /* bind()'s hover pair — M.dur.instant in, M.dur.quick out — and its
+     data-press scale, which is .94 held while the pointer is down and .25s
+     back. GSAP owns everything React state drives on this screen
+     (stageRelayIn, socialNudge, socialAddPop); these two are pure CSS states
+     with no state behind them, which is how every other reference rebuild in
+     this flow carries a hover. */
+  transition: background 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ff-vis__add:hover { background: #012D10; }
+.ff-vis__add:active { transform: scale(0.94); transition-duration: 0.12s; }
+.ff-vis__add:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+
+/* ── The right-hand column: the empty rule, then the list ────────────────── */
+
+.ff-vis__empty {
+  height: 100%;
+  border-radius: 2px;
+  border: 10px solid transparent;
+  box-sizing: border-box;
+  background-image:
+    repeating-linear-gradient(90deg, #defafc 0 43px, transparent 43px 86px),
+    repeating-linear-gradient(90deg, #defafc 0 43px, transparent 43px 86px),
+    repeating-linear-gradient(0deg, #defafc 0 43px, transparent 43px 86px),
+    repeating-linear-gradient(0deg, #defafc 0 43px, transparent 43px 86px);
+  background-size: 100% 10px, 100% 10px, 10px 100%, 10px 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+}
+
+.ff-vis__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+.ff-vis__file {
+  padding: 30px 36px;
+  background: #DEF6FF;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ff-vis__filetop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.ff-vis__filename {
+  min-width: 0;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #013F17;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ff-vis__filex {
+  flex: none;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #013F17;
+  cursor: pointer;
+  outline: none;
+}
+.ff-vis__filex:hover { color: #41ED98; }
+.ff-vis__filex:focus-visible { outline: 3px solid #013F17; outline-offset: 3px; }
+
+/* §12's state and §28.4's approval, inside the reference's own block. */
+.ff-vis__filemeta { display: flex; }
+.ff-vis__filenote {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.3;
+  /* A sentence that states a rule takes the dark ink; #A2AFA8 is a caption tone
+     and this decides whether a file counts. */
+  color: #013F17;
+}
+.ff-vis__filenote.is-ok { color: #0B6B33; }
+.ff-vis__approve {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #013F17;
+  cursor: pointer;
+}
+.ff-vis__approve input {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  accent-color: #013F17;
+  cursor: pointer;
+}
+
+/* ── The CTA, and the two lines the reference does not draw ──────────────── */
+
+.ff-vis__cta {
+  margin-top: 130px;
+  width: 100%;
+  height: 165px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 70px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
+  transition: background 0.2s ease;
+}
+.ff-vis__cta:hover { background: #3BDC8C; }
+.ff-vis__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+
+/* Inside the 130px gap the CTA's own margin already leaves — so the note and
+   any failure sit between the panel and the button without moving either. */
+.ff-vis__note,
+.ff-vis__failline {
+  position: absolute;
+  left: 0;
+  top: calc(100% - 165px - 130px + 10px);
+  margin: 0;
+  width: 1491px;
+  max-width: none;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.28;
+  color: #013F17;
+}
+.ff-vis__failline {
+  top: calc(100% - 165px - 130px + 74px);
+  color: #B3261E;
+}
+
+/* Announced, never drawn: it would otherwise be a second copy of the note. */
+.ff-vis__live { position: absolute; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 65 — the Founder flow, screen 11: more about your brand
+   (2026-08-20)
+
+   BUILT FROM SCRATCH against the supplied reference
+   (`Proovd Founder Flow v2.dc.html`, `[data-brand]` / `kindWide`) and its
+   screenshot, and inserted between the branding screen and the interview.
+   `ColorStep.tsx`'s header is the reasoning; this is the composition.
+
+   Every number below is the reference's own, on its own 2496x1542 stage —
+   `ColorStep` owns the scale and writes the whole transform on mount and on
+   resize; the `scale(0.37)` here is the reference's own placeholder and is what
+   renders for the one frame before the layout effect runs. Nothing reflows: the
+   stage scales, which is why the composition is identical at every viewport
+   (§33.11.1). `isClaimPhone()` returns `false` in the reference — "one
+   composition everywhere: the phone posture stays off" — so its `kindPhone`
+   branch is dead code there and this is what every viewport gets.
+
+   ── The column is the VISUALS headline wide, and that is on purpose ───────
+   `width: fit-content` over a column whose widest child is a hidden 112px span
+   reading `We want to see your product...` — 1491px at Satoshi's metrics. This
+   screen's own 136px headline is narrower, so without that span the panel and
+   the CTA would be a different width here than on the screens either side. The
+   number is a property of the face, so nothing is hardcoded except the two
+   places that have to name it (`__note`, `__status`) and they name the same
+   1491 `.ff-vis` already does.
+
+   Unlike the visuals screen this column is `align-items: center` — the
+   reference's own — so the pill needs no `align-self` and the nowrap headline
+   centres over the panel.
+
+   ── The two suspended conventions, as on screens 1–15 ─────────────────────
+     - HEX LITERALS, not tokens. `#41ED98`, `#013F17`, `#FAFAFA`, `#E9FFE1`,
+       `#8FCBA3`, `#A2AFA8`, `#FBFFD4`, `#7FD9A4`, `#012D10` and `#3BDC8C` are
+       the reference's own; mixing literal and token would leave half the screen
+       able to drift with a token change and half not.
+     - RADIUS 2px, literal, and 0 on everything the reference leaves square —
+       which here is everything except the CTA. It is what `var(--radius)`
+       resolves to under the owner ruling, so the two agree today; the literal
+       is here for the same reason the colours are.
+
+   ── The empty slot's dash is a gradient, not `border-style: dashed` ───────
+   The reference's own four-layer repeating gradient over a transparent border:
+   18px on / 28px off at 4px, one layer per edge. A `dashed` border rounds its
+   dash length to fit each edge, so three slots side by side would disagree with
+   each other and with the reference at every viewport; a gradient dash is exact
+   and scales with the stage. Same decision `.ff-vis` records for its drop zone.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the headline,
+   `p { margin; max-width: var(--measure) }` reaches the two added lines, `ul`
+   carries a list style and padding, `input` inherits the design system's own
+   field treatment, `img` carries `max-width:100%`, and `body`'s 18px /
+   line-height 1.6 reaches the whole stage — the reference's own body sets
+   neither, so the stage resets both.
+
+   ── The two blocks the reference does not draw ────────────────────────────
+   `.ff-col__note` (what the picker is for, and the full-slots sentence) and
+   `.ff-col__status` (§9's autosave vocabulary — this screen writes a record and
+   the reference holds its own in memory). Both are ABSOLUTELY positioned inside
+   the 130px gap the composition already leaves above the CTA, so not one
+   reference box moves for either.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen — and the reason is not that
+   the reference has none. It has a wordmark, a HELP and a message bell, and it
+   draws all three INSIDE the `z-index: 25` fixed layer below. Left in place
+   they would sit under that layer and be unreachable, so both are hidden and
+   both leave the tab order with it. */
+.ff[data-flow-page='color'] .ff__top,
+.ff[data-flow-page='color'] .ff__badge { display: none; }
+
+/* The reference's `[data-brand]`. Nothing scrolls. */
+.ff-col {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+}
+
+/* The read failed, so there is no composition to draw. It keeps the layer's
+   ground and centres the panel; nothing here is the reference's, because the
+   reference holds its record in memory and has no failure to render. */
+.ff-col__failure {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-24);
+}
+
+/* ── The chrome. Its clamps are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-col__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-col__back:hover { color: #013F17; }
+/* The reference has no focus treatment at all. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11) and it costs the composition nothing. */
+.ff-col__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-col__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-col__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-col__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-col__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-col__help:hover { background: #E9FFE1; }
+.ff-col__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* The message bell. Its geometry is the reference's; its number is not, and
+   `ColorStep`'s header says what the difference is. It does not shake. */
+.ff-col__mailbtn {
+  position: absolute;
+  right: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13.3333px;
+  line-height: normal;
+  cursor: pointer;
+  outline: none;
+}
+.ff-col__mailbtn:focus-visible { outline: 2px solid #013F17; outline-offset: 4px; }
+.ff-col__mail {
+  position: relative;
+  width: clamp(58px, 5.2vw, 78px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  box-sizing: border-box;
+}
+.ff-col__mail img { width: 68%; height: auto; max-width: none; display: block; }
+.ff-col__mailcount {
+  position: absolute;
+  left: -10%;
+  top: -16%;
+  min-width: 31%;
+  height: 31%;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  background: #FAFAFA;
+  box-sizing: border-box;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, 0.9vw, 13px);
+  line-height: 1;
+  font-weight: 700;
+  color: #41ED98;
+}
+
+/* ── The stage, and the fit-content column inside it ─────────────────────── */
+
+.ff-col__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.37);
+  transform-origin: center center;
+  /* See the header: the reference's body sets neither, and this file's does. */
+  font-size: 16px;
+  line-height: normal;
+  color: #013F17;
+}
+
+.ff-col__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: fit-content;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  /* The reference's own, and why nothing here needs `align-self`. */
+  align-items: center;
+}
+
+/* The reference's own hidden measure — it is what makes this column 1491px,
+   the same width as the screens either side. `visibility: hidden` rather than
+   `display: none`, because a `display:none` child contributes no width and the
+   whole point of it is the width. */
+.ff-col__measure {
+  height: 0;
+  overflow: hidden;
+  font-size: 112px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.ff-col__pill {
+  padding: 26px 46px;
+  background: #FBFFD4;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+
+.ff-col__head {
+  margin: 72px 0 0;
+  font-size: 136px;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  color: #013F17;
+  white-space: nowrap;
+}
+
+.ff-col__panel {
+  margin-top: 100px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.53fr) minmax(0, 1fr);
+  gap: 100px;
+  /* `start`, not `stretch`: the card is as tall as its own content and the
+     left column ends wherever the swatches end. `margin-top:auto` on the Add
+     button is therefore inert, and it is inert in the reference too. */
+  align-items: start;
+}
+
+.ff-col__left { min-width: 0; }
+
+/* ── The saturation / brightness plane ───────────────────────────────────── */
+
+.ff-col__plane {
+  width: 100%;
+  height: 370px;
+  position: relative;
+  cursor: crosshair;
+  touch-action: none;
+  outline: none;
+}
+/* Added, not reproduced — see `.ff-col__back`. Offset outward so the ring sits
+   clear of the plane's own edge, where the handle can travel. */
+.ff-col__plane:focus-visible { outline: 5px solid #013F17; outline-offset: 6px; }
+.ff-col__planewhite,
+.ff-col__planeblack {
+  position: absolute;
+  inset: 0;
+}
+.ff-col__planewhite { background: linear-gradient(90deg, #fff, rgba(255, 255, 255, 0)); }
+.ff-col__planeblack { background: linear-gradient(0deg, #000, rgba(0, 0, 0, 0)); }
+.ff-col__planehandle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 34px;
+  border: 5px solid #FAFAFA;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* ── The hue bar ─────────────────────────────────────────────────────────── */
+
+.ff-col__hue {
+  width: 100%;
+  height: 34px;
+  margin-top: 52px;
+  position: relative;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+  background: linear-gradient(90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.ff-col__hue:focus-visible { outline: 5px solid #013F17; outline-offset: 10px; }
+.ff-col__huehandle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 52px;
+  height: 58px;
+  border: 4px solid #013F17;
+  background: #FAFAFA;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* ── The three slots ─────────────────────────────────────────────────────── */
+
+.ff-col__slots {
+  margin: 90px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 60px;
+}
+.ff-col__slots > li { min-width: 0; }
+
+.ff-col__slotempty {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 4px solid transparent;
+  box-sizing: border-box;
+  background-image:
+    repeating-linear-gradient(90deg, #8FCBA3 0 18px, transparent 18px 46px),
+    repeating-linear-gradient(90deg, #8FCBA3 0 18px, transparent 18px 46px),
+    repeating-linear-gradient(0deg, #8FCBA3 0 18px, transparent 18px 46px),
+    repeating-linear-gradient(0deg, #8FCBA3 0 18px, transparent 18px 46px);
+  background-size: 100% 4px, 100% 4px, 4px 100%, 4px 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+}
+
+.ff-col__swatch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  /* The prototype harness's own `style-hover`. */
+  transition: filter 0.2s ease;
+}
+.ff-col__swatch:hover { filter: brightness(0.72); }
+.ff-col__swatch:disabled { cursor: default; }
+.ff-col__swatch:focus-visible { outline: 5px solid #013F17; outline-offset: 6px; }
+
+/* `[data-x]{opacity:0;transition:opacity .15s ease}` +
+   `[data-swatch]:hover [data-x]{opacity:1}` — the reference's own, plus its
+   `@media (hover:none)` rule, so a touch device is never left with a remove
+   control it cannot reveal. `:focus-visible` is added for the same reason on a
+   keyboard. */
+.ff-col__x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44%;
+  height: 44%;
+  background: #FAFAFA;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.ff-col__swatch:hover .ff-col__x,
+.ff-col__swatch:focus-visible .ff-col__x { opacity: 1; }
+@media (hover: none) {
+  .ff-col__x { opacity: 1; }
+}
+
+.ff-col__slothex {
+  display: block;
+  margin-top: 30px;
+  text-align: center;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+
+/* ── The selected-colour card ────────────────────────────────────────────── */
+
+.ff-col__card {
+  border: 5px solid #7FD9A4;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.ff-col__cardtop {
+  padding: 112px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-col__preview {
+  width: 66%;
+  aspect-ratio: 1;
+}
+.ff-col__selected {
+  margin-top: 58px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.01em;
+  color: #013F17;
+}
+.ff-col__hexwrap {
+  margin: 26px 0 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-col__hexrow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+/* The design system's own field treatment reaches every `input`; the reference
+   draws a bare centred code with a rule under it, so all of it is undone. */
+.ff-col__hexinput {
+  width: 340px;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  text-align: center;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 58px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+.ff-col__hexinput:focus,
+.ff-col__hexinput:focus-visible {
+  outline: none;
+  border: none;
+  box-shadow: none;
+}
+.ff-col__pencil { flex: none; display: block; }
+.ff-col__hexrule {
+  margin-top: 18px;
+  width: 100%;
+  height: 3px;
+  background-image: repeating-linear-gradient(90deg, #A2AFA8 0 11px, transparent 11px 30px);
+}
+/* The field carries no border of its own, so the rule below it is what a
+   keyboard user has to see change: the reference's own dashed grey turns
+   SOLID, and nothing moves — the height stays 3px, so the card does not grow
+   by a pixel and no reference box shifts.
+
+   It goes to the page's own ink rather than to brand green. `#41ED98` on
+   `#FAFAFA` is 1.46:1 and the browser pass showed the result: a rule you have
+   to look for, as the only indicator on a text field. `#013F17` is 11.7:1, and
+   the change from dashed-grey to solid-dark is unmistakable at a glance. */
+.ff-col__hexwrap:focus-within .ff-col__hexrule {
+  background-image: none;
+  background-color: #013F17;
+}
+
+.ff-col__add {
+  margin-top: auto;
+  width: 100%;
+  height: 112px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
+  background: #013F17;
+  color: #E9FFE1;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.2s ease;
+}
+.ff-col__add:hover { background: #012D10; }
+.ff-col__add:disabled { cursor: default; opacity: 0.55; }
+.ff-col__add:focus-visible { outline: 3px solid #41ED98; outline-offset: -8px; }
+
+/* ── The CTA, and the two lines the reference does not draw ──────────────── */
+
+.ff-col__cta {
+  margin-top: 130px;
+  width: 100%;
+  height: 165px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 70px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
+  transition: background 0.2s ease;
+}
+.ff-col__cta:hover { background: #3BDC8C; }
+.ff-col__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+
+/* ONE block inside the 130px gap the CTA's own margin already leaves, so the
+   note and the save status sit between the panel and the button without moving
+   either. They stack in FLOW inside it rather than at two fixed offsets — the
+   first draft positioned each absolutely and the browser pass caught the
+   consequence: the note wrapped to two lines at this column width and `Saved
+   12:03 AM` printed on top of the second one. A flow block cannot do that
+   however either line grows.
+
+   1491px is the column's own width, named here for the same reason `.ff-vis`
+   names it: an absolutely positioned child has no flow width to inherit. */
+.ff-col__gap {
+  position: absolute;
+  left: 0;
+  top: calc(100% - 165px - 130px + 8px);
+  width: 1491px;
+  /* No height and no `overflow` on purpose. The block is out of flow, so it can
+     never push the CTA; a fixed height with `overflow: hidden` would instead
+     SWALLOW a line that grew, which is the silent version of the defect the
+     browser pass just caught. The budget is 122px — the 130px gap less the 8px
+     above — and at this column width the note is one line (38px) and the status
+     one more (38px + 6px), so there is room to spare. Copy that needed more
+     than the budget would visibly crowd the CTA, which is a signal rather than
+     a disappearance. */
+}
+.ff-col__note,
+.ff-col__status {
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.28;
+  color: #013F17;
+}
+.ff-col__status {
+  margin-top: 6px;
+  font-weight: 700;
+  /* `--moss` is the caption tone and this is not a caption: it is the answer to
+     "did that save", at 12 CSS px. It takes the page's own ink, and the failure
+     states take `.ff-vis__failline`'s red. */
+  color: #013F17;
+}
+.ff-col__status[data-state='failed'],
+.ff-col__status[data-state='retrying'] { color: #B3261E; }
+
+/* Announced, never drawn: it would otherwise be a second copy of the note. */
+.ff-col__live { position: absolute; }
