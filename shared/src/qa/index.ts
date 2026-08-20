@@ -148,6 +148,11 @@ export const PRINCIPAL_FLOWS = [
     routes: [
       '/campaigns/:campaignId/setup/visuals',
       '/campaigns/:campaignId/setup/branding',
+      // The branding answer's second screen (2026-08-20) — the reference's own
+      // `[data-brand]`, one vetting step split on `brandStage` exactly as
+      // `[data-brandlogo]` and it are there. Same read, same record, so it is a
+      // route on this flow rather than a flow of its own.
+      '/campaigns/:campaignId/setup/color',
       '/campaigns/:campaignId/setup/interview',
       '/campaigns/:campaignId/setup/story',
       '/campaigns/:campaignId/setup/socials',

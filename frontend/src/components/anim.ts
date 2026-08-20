@@ -2673,3 +2673,55 @@ export function creatorMomentIn(
     timeline.kill();
   };
 }
+
+/* ── Founder Flow v2, screen 11 — the brand colours ────────────────────────
+ *
+ * The reference binds one generic press to every `[data-press]` element in
+ * `bind()`:
+ *
+ *     const s=el.getAttribute('data-press')==='deep'?.78:.94;
+ *     el.addEventListener('pointerdown',()=>gsap.to(el,{scale:s,
+ *       duration:M.dur.instant,ease:'power2.out'}));
+ *     ['pointerup','pointercancel','pointerleave'].forEach(ev=>
+ *       el.addEventListener(ev,()=>gsap.to(el,{scale:1,duration:.25,
+ *       ease:M.ease.out})));
+ *
+ * A filled swatch carries `data-press="1"`, so it is the shallow 0.94. The
+ * mouseenter/mouseleave half of that same binding is a no-op on a swatch — it
+ * has no `data-hover-*` attribute, so its hover object equals its base — and
+ * the visible hover is the prototype harness's own `style-hover`
+ * (`filter:brightness(.72)`), which is a CSS rule here.
+ *
+ * Two functions rather than one binder, because in React the element is a
+ * child that mounts and unmounts with the record and the handlers are props.
+ * `bind()`'s `if(el.__b)return` guard exists to solve exactly the problem props
+ * do not have.
+ */
+
+/** `pointerdown` — the reference's shallow press. `deep` is its 0.78 variant. */
+export function pressDown(el: HTMLElement | null, deep = false): void {
+  const g = gsap();
+  if (!g || !el || !motionLive()) return;
+  g.to(el, {
+    scale: deep ? 0.78 : 0.94,
+    // The reference does NOT apply its `k()` factor on the way down — only on
+    // the hover pair above it — so this is `M.dur.instant` flat.
+    duration: window.Proovd?.MOTION.dur.instant ?? 0.12,
+    ease: 'power2.out',
+    transformOrigin: '50% 50%',
+    overwrite: 'auto',
+  });
+}
+
+/** `pointerup` / `pointercancel` / `pointerleave` — back to rest. */
+export function pressUp(el: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !el || !motionLive()) return;
+  g.to(el, {
+    scale: 1,
+    duration: refDur(0.25), // between quick 0.20 and base 0.35
+    ease: ease('out'),
+    transformOrigin: '50% 50%',
+    overwrite: 'auto',
+  });
+}

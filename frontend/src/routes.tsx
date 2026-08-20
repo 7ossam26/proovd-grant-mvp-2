@@ -82,6 +82,7 @@ import { ConfirmSolution } from './surfaces/founder-flow/ConfirmSolution.js';
 import { PositioningStep } from './surfaces/founder-flow/PositioningStep.js';
 import { VisualsStep } from './surfaces/founder-flow/VisualsStep.js';
 import { BrandingStep } from './surfaces/founder-flow/BrandingStep.js';
+import { ColorStep } from './surfaces/founder-flow/ColorStep.js';
 import { InterviewStep } from './surfaces/founder-flow/InterviewStep.js';
 import { StoryStep } from './surfaces/founder-flow/StoryStep.js';
 import { SocialsStep } from './surfaces/founder-flow/SocialsStep.js';
@@ -869,6 +870,16 @@ const rootChildren: RouteObject[] = [
   {
     path: 'campaigns/:campaignId/setup/branding',
     element: <BrandingStep />,
+  },
+  {
+    /*
+      The reference's `[data-brand]` — the second half of the branding answer,
+      its own address for the reason every page in this flow has one: `vStep` 4
+      is two screens there (`brandStage`), and a position held in a component's
+      state is a position a reload destroys (DNA §5.12).
+    */
+    path: 'campaigns/:campaignId/setup/color',
+    element: <ColorStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/interview',

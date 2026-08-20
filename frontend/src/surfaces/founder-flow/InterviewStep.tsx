@@ -59,7 +59,10 @@ export function InterviewStep() {
   const { campaignId = '' } = useParams();
 
   return (
-    <AnswerPage pageId="interview" itemKey="interview">
+    /* `back()` from `vStep` 5: `if(p.vStep===4)p.brandStage='colors'` — the
+       reference returns to the COLOURS screen, not the logo one, because that
+       is the page this one was reached from. */
+    <AnswerPage pageId="interview" itemKey="interview" backPageId="color">
       {({ state, refresh }) => {
         const booking = state.interview.booking;
         const described = booking ? BOOKING_STATE[booking.status] : undefined;

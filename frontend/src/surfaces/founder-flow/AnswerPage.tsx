@@ -39,6 +39,7 @@ import {
   founderAnswerNext,
   founderAnswerPrevious,
   founderFlowPage,
+  founderFlowPath,
   type OptionalItemKey,
 } from '@proovd/shared';
 import { Button, StatePanel, Tag, NO_ACTION } from '../../components/index.js';
@@ -123,11 +124,28 @@ export function HelperBlock({
 interface AnswerPageProps {
   pageId: string;
   itemKey: OptionalItemKey;
+  /**
+   * Where Next goes, when it is not the next §12 ANSWER.
+   *
+   * One answer can span more than one page. The reference splits `vStep` 4 on
+   * `brandStage` — `[data-brandlogo]` then `[data-brand]` — and only the second
+   * of the two calls `afterSection`, so the logo screen's Next always goes to
+   * the colours screen and the sequence resumes from there. `founderAnswerNext`
+   * cannot express that: it walks answers, and both screens are the same one.
+   *
+   * Set it and Next goes here unconditionally — including from Last look, which
+   * is the reference's own behaviour (`logoNext` is a bare `step`, never
+   * `afterSection`). `?from=review` is carried forward so the page that DOES
+   * end the answer still returns to Last look.
+   */
+  nextPageId?: string;
+  /** Where Back goes, when it is not the previous §12 answer. Same reason. */
+  backPageId?: string;
   /** The controls. Rendered with the loaded workspace and its autosave. */
   children: (setup: SetupWorkspace & { state: WorkspaceState }) => ReactNode;
 }
 
-export function AnswerPage({ pageId, itemKey, children }: AnswerPageProps) {
+export function AnswerPage({ pageId, itemKey, nextPageId, backPageId, children }: AnswerPageProps) {
   const { campaignId = '' } = useParams();
   const setup = useSetupWorkspace(campaignId);
   const page = founderFlowPage(pageId);
@@ -158,7 +176,13 @@ export function AnswerPage({ pageId, itemKey, children }: AnswerPageProps) {
 
   return (
     <FlowPage pageId={pageId} param={campaignId} badge>
-      <Body pageId={pageId} itemKey={itemKey} setup={{ ...setup, state: setup.state }}>
+      <Body
+        pageId={pageId}
+        itemKey={itemKey}
+        nextPageId={nextPageId}
+        backPageId={backPageId}
+        setup={{ ...setup, state: setup.state }}
+      >
         {children}
       </Body>
     </FlowPage>
@@ -169,15 +193,19 @@ export function AnswerPage({ pageId, itemKey, children }: AnswerPageProps) {
 function Body({
   pageId,
   itemKey,
+  nextPageId,
+  backPageId,
   setup,
   children,
 }: {
   pageId: string;
   itemKey: OptionalItemKey;
+  nextPageId?: string;
+  backPageId?: string;
   setup: SetupWorkspace & { state: WorkspaceState };
   children: AnswerPageProps['children'];
 }) {
-  const { leaveToPage } = useFlowNav();
+  const { leave, leaveToPage, param } = useFlowNav();
   const [params] = useSearchParams();
   const fromReview = params.get('from') === 'review';
 
@@ -187,12 +215,22 @@ function Body({
   const next = founderAnswerNext(pageId);
   const discount = setup.state.fee?.itemDiscountCents;
 
-  /* Where Next goes: back to Last look when the edit was opened from there,
-     otherwise on through the sequence — and Last look is the end of it. */
-  const forwardId = fromReview ? 'last-look' : (next?.pageId ?? 'last-look');
+  /* Where Next goes: a page that continues the SAME answer takes it first and
+     unconditionally (see `nextPageId` — the reference's `logoNext`), then back
+     to Last look when the edit was opened from there, otherwise on through the
+     sequence — and Last look is the end of it. */
+  const forwardId = nextPageId ?? (fromReview ? 'last-look' : (next?.pageId ?? 'last-look'));
   const forwardTitle = founderFlowPage(forwardId)?.title ?? 'the next step';
-  const backId = previous?.pageId ?? 'last-look';
+  const backId = backPageId ?? previous?.pageId ?? 'last-look';
   const backTitle = founderFlowPage(backId)?.title ?? 'the previous step';
+
+  /* Carried forward only on the same-answer hop, so the page that finishes the
+     answer still knows the edit came from Last look. Nothing else appends a
+     query here: `leaveToPage` builds the path from the register. */
+  const forwardTo =
+    nextPageId && fromReview
+      ? `${founderFlowPath(nextPageId, param)}?from=review`
+      : null;
 
   return (
     <div className="ff-answer">
@@ -255,7 +293,7 @@ function Body({
             An edit opened from Last look still returns there, because that
             contract is in the address (`?from=review`) rather than in the
             sequence — so it is unaffected by any of this. */}
-        {fromReview || previous ? (
+        {fromReview || previous || backPageId ? (
           <Button
             tier="tertiary"
             onClick={() => leaveToPage(fromReview ? 'last-look' : backId, -1)}
@@ -274,10 +312,14 @@ function Body({
         <Button
           tier="primary"
           onClick={() => {
-            void setup.autosave.flush().finally(() => leaveToPage(forwardId, 1));
+            void setup.autosave
+              .flush()
+              .finally(() =>
+                forwardTo ? leave(forwardTo, 1) : leaveToPage(forwardId, 1),
+              );
           }}
         >
-          {fromReview ? 'Back to Last look' : `Continue to ${forwardTitle}`}
+          {fromReview && !nextPageId ? 'Back to Last look' : `Continue to ${forwardTitle}`}
         </Button>
       </div>
     </div>

@@ -32,8 +32,15 @@ import {
 import { AnswerPage, HelperBlock } from './AnswerPage.js';
 import { AssetRow, UploadZone } from './SetupUploads.js';
 
-/** Every `#rgb` / `#rrggbb` in the saved colours text, in the order written. */
-function swatchesIn(text: string): string[] {
+/**
+ * Every `#rgb` / `#rrggbb` in the saved colours text, in the order written.
+ *
+ * Exported because the colours SCREEN (`ColorStep`, the reference's own
+ * `[data-brand]`) reads the same one record and must read it the same way. Two
+ * copies of this rule would be two answers to "which colours are saved", and
+ * the screens would disagree the first time somebody typed a shorthand hex.
+ */
+export function swatchesIn(text: string): string[] {
   const found = text.match(/#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b/g) ?? [];
   return [...new Set(found.map((hex) => hex.toLowerCase()))];
 }
@@ -46,7 +53,10 @@ export function BrandingStep() {
   const { campaignId = '' } = useParams();
 
   return (
-    <AnswerPage pageId="branding" itemKey="branding">
+    /* `logoNext:()=>this.step({brandStage:'colors'})` — the reference's own
+       second half of this answer, and a bare `step` there rather than an
+       `afterSection`, so it goes there from Last look too. */
+    <AnswerPage pageId="branding" itemKey="branding" nextPageId="color">
       {({ state, autosave, refresh }) => (
         <BrandingControls
           campaignId={campaignId}

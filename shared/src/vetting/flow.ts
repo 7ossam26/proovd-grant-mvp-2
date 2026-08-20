@@ -223,6 +223,27 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 3,
   },
   {
+    /*
+      The reference's `[data-brand]`, and it is the SECOND half of one answer
+      rather than a ninth one.
+
+      `isBrandLogo` / `isBrandColor` are one vetting step (`vStep` 4) split on
+      `brandStage`, so the reference already treats the logo and the colours as
+      two screens over one record — `logoNext` is `step({brandStage:'colors'})`
+      and only `brandNext` calls `afterSection`. That is why this is a page here
+      and not an entry in `FOUNDER_ANSWER_SEQUENCE`: it collects no §12 answer
+      of its own, it writes the branding answer's own `brandColors`, and adding
+      it to that sequence would make §12 read nine answers where there are
+      eight and put a second US$2 against one item.
+    */
+    id: 'color',
+    path: '/campaigns/:campaignId/setup/color',
+    param: 'campaignId',
+    title: 'Your brand colours',
+    help: 'Pick up to three colours and they land in the brand direction you just wrote. Part of the same answer as your logo — it is not a fourth thing to finish.',
+    stage: 3,
+  },
+  {
     id: 'interview',
     path: '/campaigns/:campaignId/setup/interview',
     param: 'campaignId',
@@ -523,13 +544,18 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
       'tech-stack §12: "The booking record in our database is the source of truth, populated from Cal.com webhooks." A picker of our own is a second scheduler, and the two would disagree about what was booked — the provider would hold a slot this product never recorded, or the reverse. The screen renders the Cal.com embed, and a named absence while that account is unconfigured.',
     specRef: '§12, tech-stack §12',
   },
-  {
-    element:
-      'The branding screen’s draggable HSV square — a saturation/value plane with a handle, over a hue bar',
-    absentBecause:
-      'A drag surface with no keyboard equivalent fails §28.5 on the one screen where the alternative is free, and §12 does not ask for a colour VALUE: it asks for "saved direction containing at least colors and typography/style guidance", which is writing. The hex field, the swatches it builds, and the direction box are all here; only the plane is not.',
-    specRef: '§28.5, §12',
-  },
+  /* The branding screen's draggable HSV square was recorded here as absent,
+     refused for having no keyboard equivalent. It SHIPS as of 2026-08-20, by
+     explicit product direction, as the reference's own `[data-brand]` screen
+     at `/campaigns/:campaignId/setup/color` — plane, hue bar, hex field and
+     three swatch slots, over the same one `brandColors` record the branding
+     screen already writes. What the entry was protecting is not lost: the
+     plane and the bar are ARIA sliders with arrow-key control, and the hex
+     field is the reference's own keyboard path into the same three values
+     (`applyHex` sets H, S and V from a typed code), so §28.5 holds without
+     the composition moving. The entry is removed rather than left standing,
+     because a register saying an element is absent while a page renders it is
+     worse than no register. */
   {
     element: 'The last-look card grid offering an edit affordance on all eight answers',
     absentBecause:
