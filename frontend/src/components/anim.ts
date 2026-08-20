@@ -35,6 +35,13 @@ type GSAP = {
       to: Record<string, unknown>,
       p?: string | number,
     ) => unknown;
+    // `add` and `set` are likewise real timeline members, declared when the
+    // Founder Flow v2 invite choreography needed them (2026-08-20). The
+    // reference composes its claim entrance as ONE timeline with a callback
+    // (`tl.add(openBand, '-=0.3')`) rather than as chained tweens, and losing
+    // that would lose the overlap the whole sequence is built on.
+    add: (t: unknown, p?: string | number) => unknown;
+    set: (t: unknown, v: Record<string, unknown>, p?: string | number) => unknown;
     kill: () => unknown;
   };
   killTweensOf: (t: unknown) => unknown;
@@ -636,5 +643,275 @@ export function playSplash(
       tl.kill();
       finish();
     },
+  };
+}
+
+/* ── Founder Flow v2 — screen 1, the invite ────────────────────────────────
+   Rebuilt 2026-08-20 to the supplied reference's own claim choreography.
+
+   Screen 1 does NOT use `relayIn`. The reference gives the front door a
+   bespoke entrance — the splash lifts, the pale band unrolls, and the copy
+   arrives behind it word by word — and a page that fades in sideways with
+   everything else would lose the one beat the flow's first screen has. So the
+   invite renders `data-invite="…"` markers instead of `data-anim`, which is
+   what makes `relayIn` a no-op on it rather than something to switch off.
+
+   Every duration is a §6.1 token, with the reference's own number recorded
+   beside it. Its longest here is 0.62s and §6.1's ceiling is `grand: 0.90`,
+   so nothing had to be cut to fit. */
+
+/** GSAP SplitText, vendored at `public/vendor/gsap/SplitText.min.js`. */
+type SplitTextCtor = new (
+  target: Element,
+  vars: Record<string, unknown>,
+) => { words: Element[]; revert: () => void };
+
+function splitText(): SplitTextCtor | null {
+  return (window as unknown as { SplitText?: SplitTextCtor }).SplitText ?? null;
+}
+
+/**
+ * The invite's entrance, splash included.
+ *
+ * `splash` is the overlay when one is being played and `null` when it has
+ * already run this session — which is the reference's own `splashOn`, and is
+ * why the timeline's first position is `'-=0.3'` against the lift or `0`
+ * without it. The band opens under whichever it is.
+ *
+ * ── The band unrolls with a height tween, not with Flip ────────────────────
+ * The reference captures a Flip state over the band AND everything below it,
+ * restores the height, and flips — so the copy is carried down as the band
+ * grows. Flip does that by writing inline transforms onto those same elements,
+ * which are at that moment staged at `autoAlpha: 0` and about to be tweened on
+ * `y` and `yPercent`. Two owners of one transform is how a headline lands 16px
+ * out of place and nothing looks broken. A height tween on the band alone
+ * reflows its siblings for free and has one owner, which is the reference's own
+ * documented fallback (`else g.from(band,{height:0,…})`).
+ *
+ * ── The split waits for fonts ──────────────────────────────────────────────
+ * DNA §6.4: split after fonts settle, or SplitText measures the fallback face
+ * and the words land at the wrong widths. The staging is synchronous so there
+ * is nothing to flash in the meantime; only the play is deferred, raced against
+ * the reference's own 1.2s timeout so a font that never resolves cannot strand
+ * the page.
+ *
+ * Returns a teardown. `onSplashDone` is what un-mounts the overlay, and it runs
+ * exactly once — from the lift, from the safety timer, or immediately when
+ * motion is off (DNA §6.6: the jump-cut is the same end state, not a second
+ * path through the code).
+ */
+export function inviteIntro(
+  stage: HTMLElement | null,
+  splash: HTMLElement | null,
+  onSplashDone: () => void,
+): () => void {
+  const g = gsap();
+  let splashDone = false;
+  const finishSplash = () => {
+    if (splashDone) return;
+    splashDone = true;
+    onSplashDone();
+  };
+
+  if (!g || !stage || !motionLive()) {
+    finishSplash();
+    return () => {};
+  }
+
+  const pick = (name: string) =>
+    stage.querySelector<HTMLElement>('[data-invite="' + name + '"]');
+
+  // The reference's `data-anim="meta"` is the whole top row — the time on the
+  // left and HELP on the right — and here that row is `FlowPage`'s own.
+  const top = stage.querySelector<HTMLElement>('.ff__top');
+  const band = pick('band');
+  const head = pick('head');
+  const lede = pick('lede');
+  const legal = pick('legal');
+  const cta = pick('cta');
+
+  const rest = [top, lede, legal].filter((el): el is HTMLElement => !!el);
+  const tail = [lede, legal].filter((el): el is HTMLElement => !!el);
+
+  // ── Stage everything now, synchronously, before the font race ────────────
+  if (rest.length) g.set(rest, { autoAlpha: 0, y: 16 });
+  if (cta) g.set(cta, { autoAlpha: 0, scale: 0.94, transformOrigin: '50% 50%' });
+
+  let bandHeight = 0;
+  if (band) {
+    // Measured from the stylesheet, never from whatever is on the element.
+    // React re-invokes an effect immediately after tearing it down under
+    // StrictMode, so this runs twice on every development mount — and a second
+    // pass that measured the `0px` the first pass wrote would tween 0 to 0 and
+    // leave the band collapsed for good. Clearing first, and restoring in the
+    // teardown below, is what makes a re-run identical to a first run.
+    band.style.height = '';
+    band.style.overflow = '';
+    bandHeight = band.getBoundingClientRect().height;
+    band.style.overflow = 'hidden';
+    band.style.height = '0px';
+  }
+
+  let split: { words: Element[]; revert: () => void } | null = null;
+  const S = splitText();
+  if (head) {
+    if (S) {
+      try {
+        split = new S(head, { type: 'words' });
+        g.set(split.words, { autoAlpha: 0, yPercent: 60 });
+      } catch {
+        split = null;
+        g.set(head, { autoAlpha: 0, y: 16 });
+      }
+    } else {
+      g.set(head, { autoAlpha: 0, y: 16 });
+    }
+  }
+
+  const revert = () => {
+    try {
+      split?.revert();
+    } catch {
+      /* a reverted split is not worth a broken page */
+    }
+    split = null;
+  };
+
+  const openBand = () => {
+    if (!band) return;
+    band.style.overflow = '';
+    g.fromTo(
+      band,
+      { height: 0 },
+      {
+        height: bandHeight,
+        duration: dur('slow'), // 0.60, the reference's own
+        ease: ease('out'), // power3.out
+        clearProps: 'height',
+        overwrite: 'auto',
+      },
+    );
+  };
+
+  let killed = false;
+  let timeline: ReturnType<GSAP['timeline']> | null = null;
+
+  const run = () => {
+    if (killed) return;
+    const tl = g.timeline();
+    timeline = tl;
+
+    if (splash) {
+      const outer = splash.querySelector('[data-invite-splash="outer"]');
+      const inner = splash.querySelector('[data-invite-splash="inner"]');
+      if (outer) {
+        // 0.35 stands in for the reference's 0.4; `snap` is back.out(1.4) for
+        // its back.out(1.7) — the system names one back ease and this is it.
+        tl.from(outer, { scale: 0, duration: dur('base'), ease: ease('snap') });
+      }
+      if (inner) {
+        tl.from(inner, { scale: 0, duration: dur('base'), ease: ease('snap') }, '-=0.25');
+      }
+      tl.to({}, { duration: 0.2 }); // the reference's own held beat
+      tl.to(splash, {
+        yPercent: -100,
+        duration: dur('slow'), // 0.60 for the reference's 0.55
+        ease: ease('move'), // power2.inOut
+        onComplete: finishSplash,
+      });
+    }
+
+    tl.add(openBand, splash ? '-=0.3' : 0);
+    if (top) tl.to(top, { autoAlpha: 1, y: 0, duration: dur('base') }, '-=0.3');
+
+    if (split) {
+      tl.to(
+        split.words,
+        {
+          autoAlpha: 1,
+          yPercent: 0,
+          duration: dur('slow'), // 0.60 for the reference's 0.55
+          ease: ease('hero'), // power4.out
+          stagger: window.Proovd?.MOTION.stagger.tight ?? 0.04,
+          onComplete: revert,
+        },
+        '-=0.24',
+      );
+    } else if (head) {
+      tl.to(
+        head,
+        { autoAlpha: 1, y: 0, duration: dur('slow'), ease: ease('hero') },
+        '-=0.24',
+      );
+    }
+
+    if (tail.length) {
+      tl.to(tail, { autoAlpha: 1, y: 0, duration: dur('base'), stagger: 0.07 }, '-=0.5');
+    }
+    if (cta) {
+      tl.to(
+        cta,
+        {
+          autoAlpha: 1,
+          scale: 1,
+          duration: dur('slow'), // 0.60 for the reference's 0.5
+          ease: ease('snap'), // back.out(1.4) for its back.out(1.2)
+          clearProps: 'transform',
+        },
+        '-=0.2',
+      );
+    }
+  };
+
+  // The reference races `document.fonts.ready` against 1.2s and runs either
+  // way. Both branches call `run`, so a rejected font promise is a played
+  // animation rather than a page that never arrives.
+  const fonts = document.fonts?.ready;
+  if (fonts) {
+    void Promise.race([
+      fonts,
+      new Promise((resolve) => window.setTimeout(resolve, 1200)),
+    ]).then(run, run);
+  } else {
+    run();
+  }
+
+  // Two backstops, and they guard different failures. The first lifts a splash
+  // whose tween never progressed — a full-screen overlay that does not leave is
+  // a locked page rather than a missing animation. The second is `relayIn`'s
+  // own stuck sweep: `holdHidden` registers `[data-reveal]` and these elements
+  // are staged by an inline `set`, so the runtime's 3s force-reveal cannot see
+  // them. A dropped tween would otherwise leave a blank page with a working
+  // keyboard path, which is the worst failure this flow has.
+  const lift = window.setTimeout(finishSplash, 2600);
+  const sweep = window.setTimeout(() => {
+    revert();
+    const all = [top, band, head, lede, legal, cta].filter(
+      (el): el is HTMLElement => !!el,
+    );
+    for (const el of all) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility,height' });
+      }
+    }
+  }, 4200);
+
+  // The teardown stops tweens and restores what was staged. It deliberately
+  // does NOT call `finishSplash`: that is a React state write, and StrictMode
+  // tears an effect down and immediately re-runs it, so calling it here
+  // un-mounts the overlay before the timeline that plays it has ever started —
+  // a splash that never appears in development and does in production is the
+  // worst way to find this out. A real unmount removes the overlay with the
+  // component, and a state write against an unmounted component is a no-op.
+  return () => {
+    killed = true;
+    window.clearTimeout(lift);
+    window.clearTimeout(sweep);
+    timeline?.kill();
+    revert();
+    if (band) {
+      band.style.height = '';
+      band.style.overflow = '';
+    }
   };
 }

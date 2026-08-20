@@ -211,7 +211,11 @@ describe('the flow is a sequence of pages', () => {
     stubVetting(ANSWERED);
     renderAt(at('invite'));
 
-    await user.click(await screen.findByRole('button', { name: /claim invite/i }));
+    // DELIBERATELY UPDATED (2026-08-20): screen 1 was rebuilt to the supplied
+    // reference and its control is the reference's own `Check info`. What this
+    // walk asserts — that the front door leads to the problem page and the
+    // sequence walks both ways — is unchanged.
+    await user.click(await screen.findByRole('button', { name: /check info/i }));
     await screen.findByRole('heading', { name: /how we understood your problem/i });
 
     await user.click(await screen.findByRole('button', { name: /continue to your solution/i }));
