@@ -143,7 +143,7 @@ export function buildFlowStepsFor(model: 'idea' | 'product'): readonly BuildFlow
  * celebration on it.
  */
 export const BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD =
-  'These are the parts of your page it helps to write in one sitting. Your campaign has more to fill in before it can go for review, and the next screen lists exactly what is left.';
+  'These are the parts of your page it helps to write in one sitting. Your campaign has more to fill in before it can go for review, and the control below opens the page that lists exactly what is left.';
 
 /**
  * §14.4's threshold is a COUNT of pre-orders, not an amount.

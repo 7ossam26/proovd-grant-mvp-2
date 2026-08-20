@@ -378,13 +378,61 @@ describe('confirming what Proovd understood', () => {
     expect(screen.getByRole('status').textContent).not.toMatch(/retrying/i);
   });
 
-  it('will not continue from an empty answer', async () => {
+  /*
+    REWRITTEN 2026-08-20. It asserted a DISABLED forward control, and the screen
+    was rebuilt to the reference's own `Next`, which is never disabled — the
+    file's header records why: `.ff-prob__cta:disabled` renders identically to
+    the live control, so a Founder pressed a button that looked exactly as
+    pressable as it ever does and nothing happened.
+
+    What it was protecting is what it still asserts, and more of it: an empty
+    answer does not go past this screen. That is now load-bearing rather than
+    tidy — letting one through deferred the refusal to Positioning six pages
+    later, which answered it by navigating BACKWARD to here, and that closed the
+    ring this test's neighbour below now covers.
+  */
+  it('will not continue from an empty answer, and says why at the control', async () => {
+    const user = userEvent.setup();
     stubVetting({ selectedType: 'pre_launch' });
     renderAt(at('problem'));
     await screen.findByRole('heading', { level: 1 });
-    expect(
-      screen.getByRole('button', { name: /continue to your solution/i }).hasAttribute('disabled'),
-    ).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Still here, and told why — never an inert button and never a silent one.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/cannot be skipped/i);
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute(
+      'data-flow-page',
+      'problem',
+    );
+    // And the box is open, because it is read-only until Edit: a refusal about
+    // an empty field with the field still closed names a control nobody sees.
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('readonly');
+  });
+
+  it('returns to Positioning when Positioning is what sent you here', async () => {
+    // Without the return contract, filling the answer Positioning is waiting on
+    // costs seven screens to get back — solution, reach, the campaign path, the
+    // address, a NEW six-digit code, and both confirms. That is the ring again,
+    // walked by hand. `AnswerPage`'s `?from=review`, for the other place in the
+    // flow that sends somebody back for an answer.
+    const user = userEvent.setup();
+    stubVetting({ selectedType: 'pre_launch' });
+    renderAt(`${at('problem')}?from=positioning`);
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getByRole('button', { name: 'edit' }));
+    await user.type(screen.getByRole('textbox'), 'Benches are lit from the ceiling.');
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Straight back, not on to Your solution.
+    await waitFor(() =>
+      expect(document.querySelector('[data-flow-page]')).toHaveAttribute(
+        'data-flow-page',
+        'positioning',
+      ),
+    );
   });
 });
 
@@ -1003,6 +1051,58 @@ describe('positioning', () => {
     await screen.findByText(FLOW_COMPLETION_IS_DECIDED);
   });
 
+  it('never answers Next with silence, and never with a step backwards', async () => {
+    /*
+      Two bugs, and this test is the second half of the correction.
+
+      The first, reported 2026-08-20: `Next` was `disabled` while an earlier §9
+      answer was empty, and `.ff-compet__next:disabled` renders identically to
+      the live control — same brand fill, same opacity. The button looked
+      exactly as pressable as it ever does and did nothing at all. That half
+      stands: the control is enabled and it answers.
+
+      The second, reported the same day and REWRITTEN here: the answer it gave
+      was to navigate to the page owning the empty answer. Walking forward from
+      there arrives back here — problem → solution → reach → campaign type →
+      email → code → the two confirms → positioning — so Next went round for
+      ever and `visuals` was never reached. The guard is still right; §9 submits
+      all three together and `submitVetting` refuses a short set by name. What
+      it owes is the reason, said here, beside the links that were always on
+      this page. An empty answer no longer gets past the screen that owns it
+      either, which is what stops anybody arriving here in this state at all.
+    */
+    const user = userEvent.setup();
+    stubVetting({
+      ...ANSWERED,
+      problem: null,
+      completeness: { problem: false, solution: true, competition: false },
+    });
+    renderAt(at('positioning'));
+
+    const next = await screen.findByRole('button', { name: /next/i });
+    expect(next).toBeEnabled();
+
+    await user.type(screen.getByRole('textbox'), 'Spreadsheets, mostly.');
+    await user.click(next);
+
+    // Still here, and the one message says what it blocks rather than only
+    // what is missing — a second paragraph repeating it is what the first
+    // correction shipped and a Founder reported.
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute(
+      'data-flow-page',
+      'positioning',
+    );
+    const missing = screen.getByText(/one earlier answer is still empty/i);
+    expect(missing).toHaveTextContent(/Next cannot go until it is filled in/i);
+    expect(screen.queryAllByText(/is still empty/i)).toHaveLength(1);
+
+    // And Next answers by putting the caret on the way out — a link that comes
+    // back here rather than seven screens away, one of which mints a new code.
+    const link = within(missing).getByRole('link', { name: /your problem/i });
+    expect(link).toHaveAttribute('href', `${at('problem')}?from=positioning`);
+    expect(link).toHaveFocus();
+  });
+
   it('renders the dictation absence rather than a microphone that refuses', async () => {
     stubVetting({
       ...ANSWERED,
@@ -1183,6 +1283,26 @@ describe('the five §12 answers (10–14)', () => {
       await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1));
       view.unmount();
     }
+  });
+
+  it('offers no Back on the first one, so Back can never walk forward', async () => {
+    // §10's claim invalidated the draft token, so nothing behind `visuals` has
+    // an address left. Its Back used to go to Last look — five pages FORWARD —
+    // and that closed a ring: Back from Last look walked socials → story →
+    // interview → branding → visuals and arrived at Last look again, round for
+    // as long as somebody kept pressing it.
+    stubStage3();
+    const view = renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: /^back to/i })).toBeNull();
+    view.unmount();
+
+    // And every later answer still steps back exactly one page.
+    handlers = [];
+    stubStage3();
+    renderAt(at('branding'));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('button', { name: 'Back to Your visuals' })).toBeInTheDocument();
   });
 
   it('names the saving from the SETTING, never from a hardcoded $2', async () => {
@@ -2098,6 +2218,21 @@ describe('the build steps (21–24)', () => {
       screen.getByRole('button', { name: /see what is left on your campaign/i }),
     ).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/your campaign is (built|ready|complete)/i);
+  });
+
+  it('continues into the flow rather than ending at the campaign build', async () => {
+    // The last step's only forward control used to leave the flow for
+    // `/campaigns/:id/build`, and nothing in the product navigated into
+    // `in-review` — so `in-review`, `live` and `password` were an unreachable
+    // island and no Founder ever arrived at the screen that sets a password.
+    // The reference's own chain is build → `campreview` → `live`.
+    const user = userEvent.setup();
+    stubStage5();
+    renderAt(at('rewards'));
+    await screen.findByRole('heading', { name: /backer rewards/i });
+
+    await user.click(screen.getByRole('button', { name: /see where your campaign stands/i }));
+    await screen.findByRole('heading', { name: /where your campaign stands/i });
   });
 });
 

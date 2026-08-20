@@ -99,6 +99,15 @@
  * The reference's `competNext` advances a step. Ours submits the whole vetting
  * record, and §9's type lock happens there and is permanent.
  *
+ * **It is never a silent no-op** (fixed 2026-08-20, from a real report that the
+ * control "does nothing"). It was `disabled` while the box was empty or while
+ * an earlier §9 answer was, and this screen's `:disabled` renders identically
+ * to the live button — so the whole failure was invisible. Both guards survive
+ * and both now speak: an empty box says so and takes the caret, and an empty
+ * earlier answer sends somebody to the screen that owns it, because §9 submits
+ * all three at once and that is the only direction that still moves. See
+ * `submit()`.
+ *
  * `CAMPAIGN_TYPE_LOCK_WARNING` was rendered here and is NOT any more, removed
  * on explicit product direction (2026-08-20) — the reference draws no such line
  * and the screen was asked to match it. Recorded rather than quietly dropped,
@@ -309,6 +318,8 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
+  /** The first empty earlier answer's link — where `Next` puts focus. */
+  const missingLink = useRef<HTMLAnchorElement>(null);
 
   // Read once, during the first render: `FlowPage` resets the module value in
   // its own layout effect, and a later re-render would read the reset.
@@ -442,6 +453,15 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
 
   const status = describeSaveState(autosave.state);
   const missing = EARLIER.filter((entry) => !loaded.completeness[entry.key]);
+  /**
+   * The first earlier answer that is still empty, if any.
+   *
+   * §9 submits all three together and `submitVetting` refuses a short set by
+   * name, so while one of these is empty there is nothing this screen can
+   * submit — and the one direction that still carries the flow forward is the
+   * screen that owns the empty one. `Next` goes there.
+   */
+  const nextMissing = missing[0] ?? null;
   const dictation = loaded.transcription;
   /** The port, as the vetting read reports it. Absent means an older payload,
    *  which is treated as configured — the request is the thing that decides. */
@@ -451,7 +471,6 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
    *  transcription is unconfigured, which is this one. */
   const canDictate = speechReady || portReady;
   const recording = phase === 'live' || phase === 'paused';
-  const blocked = busy || !answer.trim() || missing.length > 0;
 
   function change(next: string) {
     setAnswer(next);
@@ -792,8 +811,64 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
     window.requestAnimationFrame(() => beginHandoff());
   }
 
+  /**
+   * `Next`, and it always answers.
+   *
+   * It used to be `disabled` whenever the box was empty or an earlier answer
+   * was, and `.ff-compet__next:disabled` renders identically to the live
+   * control — full brand fill, full opacity, only the cursor differs. So a
+   * Founder pressed a button that looked exactly as pressable as it ever does
+   * and NOTHING happened: §27.1's "what can I do now", answered by a control
+   * that does not respond, with the reason 11 stage-scaled pixels below it.
+   *
+   * The guards are right and the silence was not, so each refusal is said out
+   * loud where the control is instead of being expressed as an inert button:
+   *
+   *   nothing typed here    say so, and put the caret in the box
+   *   an earlier answer     §9 submits all three together, so the way forward
+   *     still empty         is the screen that owns the empty one. Next goes
+   *                         there rather than nowhere.
+   *
+   * `busy` stays a real `disabled`, because it is the one state where a second
+   * press would do something wrong rather than nothing — and it lasts as long
+   * as one request.
+   *
+   * The server re-decides both regardless (§1.1): `submitVetting` refuses a
+   * short answer set by name, and that refusal is what a Founder reads if this
+   * screen's own copy of the question is ever wrong.
+   */
   async function submit() {
-    if (blocked) return;
+    if (busy) return;
+
+    if (!answer.trim()) {
+      setAlert(
+        'Write your positioning first — who else solves this, and why somebody would choose you. Next submits all your answers once it is here.',
+      );
+      field.current?.focus();
+      return;
+    }
+
+    if (nextMissing) {
+      /*
+        Answered by moving focus to the link that resolves it — not by
+        navigating, and not by a second paragraph.
+
+        It used to `leave` for the page owning the empty answer, and that closed
+        a ring: problem → solution → reach → campaign type → email → code → the
+        two confirms → positioning → back to problem, round for as long as
+        somebody kept pressing Next, and `visuals` was never reached.
+
+        The first correction stated the refusal in an alert of its own, and a
+        Founder reported the result: two messages saying the same thing, because
+        the list below the column already names every empty answer and is
+        rendered before Next is ever pressed. So that list is the one message —
+        it says what it blocks — and Next puts the caret on the way out of it.
+        Announced to a screen reader, visible to everybody else.
+      */
+      missingLink.current?.focus();
+      return;
+    }
+
     setBusy(true);
     setAlert(null);
     try {
@@ -1006,7 +1081,7 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
                 type="button"
                 className="ff-compet__next"
                 data-say-next="1"
-                disabled={blocked}
+                disabled={busy}
                 onClick={() => void submit()}
               >
                 Next
@@ -1047,6 +1122,11 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
             ) : null}
 
             {missing.length > 0 ? (
+              /* The one message about this, and it says what it BLOCKS rather
+                 than only what is missing — Next has nothing else to add.
+                 `?from=positioning` is the return contract: filling the answer
+                 comes straight back here instead of walking the seven screens
+                 between them, one of which mints a new six-digit code. */
               <p className="ff-compet__alert" role="alert">
                 One earlier answer is still empty:{' '}
                 {missing.map((entry, index) => {
@@ -1054,13 +1134,18 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
                   return (
                     <span key={entry.key}>
                       {index > 0 ? ', ' : null}
-                      <a href={founderFlowPath(entry.pageId, token)}>
+                      <a
+                        ref={index === 0 ? missingLink : undefined}
+                        href={`${founderFlowPath(entry.pageId, token)}?from=positioning`}
+                      >
                         {page?.title ?? entry.pageId}
                       </a>
                     </span>
                   );
                 })}
-                . Everything you have written here is saved.
+                . Your three answers are submitted together, so Next cannot go
+                until it is filled in — it brings you straight back here, and
+                everything you have written is saved.
               </p>
             ) : null}
 

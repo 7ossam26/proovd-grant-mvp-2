@@ -238,21 +238,31 @@ function Body({
       </p>
 
       <div className="ff-nav" data-anim="cta">
-        <Button
-          tier="tertiary"
-          onClick={() => {
-            if (fromReview) {
-              leaveToPage('last-look', -1);
-              return;
-            }
-            // Everything before this page is behind the draft token, so the
-            // first optional answer's Back goes to Last look rather than out
-            // of the stage. `founderAnswerPrevious` returns null there.
-            leaveToPage(previous ? backId : 'last-look', -1);
-          }}
-        >
-          {fromReview || !previous ? 'Back to Last look' : `Back to ${backTitle}`}
-        </Button>
+        {/* The first optional answer renders no Back control, and that is the
+            fix for a real cycle rather than a missing affordance.
+
+            Everything before this page is behind the draft token, which §10's
+            claim invalidated, so there is no earlier address to return to —
+            the reference's `back()` sends `vetting` vStep 3 to vStep 2
+            (Positioning) and we cannot. It used to send `visuals` to Last look
+            instead, which is five pages FORWARD, and that closed a ring:
+            Back from Last look walked socials → story → interview → branding →
+            visuals and then jumped forward to Last look again, so pressing
+            Back never left the sequence. The first page of a stage offers no
+            Back, exactly as `problem`, `solution` and `reach` do at the start
+            of stage 1.
+
+            An edit opened from Last look still returns there, because that
+            contract is in the address (`?from=review`) rather than in the
+            sequence — so it is unaffected by any of this. */}
+        {fromReview || previous ? (
+          <Button
+            tier="tertiary"
+            onClick={() => leaveToPage(fromReview ? 'last-look' : backId, -1)}
+          >
+            {fromReview ? 'Back to Last look' : `Back to ${backTitle}`}
+          </Button>
+        ) : null}
         <span
           className="ff-confirm__status"
           role="status"
