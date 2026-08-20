@@ -8793,7 +8793,7 @@ html.no-motion .ff-prob__rail { transition: none; }
 .ff-helper__head { margin: 0; font-size: 1.125rem; color: var(--dark); }
 
 /* ── Screen 15 — Last look ────────────────────────────────────────────────
-   Rebuilt 1:1 from the reference on 2026-08-20; the block is `PHASE 62` at the
+   Rebuilt 1:1 from the reference on 2026-08-20; the block is `PHASE 63` at the
    bottom of this file, under the `.ff-ll` prefix. The token-scale card list
    that stood here is gone with its component — dead CSS ships in every
    browser, and §33.11.3 reads what ships.                                   */
@@ -8999,7 +8999,7 @@ html.no-motion .ff-prob__rail { transition: none; }
 
 /* §12's high-effort note lived here from Session E until 2026-08-20, when Last
    look was rebuilt to the reference. It has no room in that composition, so it
-   rides the chrome band instead — `.ff-ll__foot`, in PHASE 62. */
+   rides the chrome band instead — `.ff-ll__foot`, in PHASE 63. */
 
 @media (max-width: 599.98px) {
   .ff-money__fields { grid-template-columns: 1fr; }
@@ -16805,7 +16805,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   .crf-agree__back:hover,
   .crf-agree__back:active { scale: 1; }
 }
-<<<<<<< HEAD
 /* ^ That closing brace was MISSING, and had been since PHASE 46 shipped. An
    unclosed `@media` swallows the rest of the file, so PHASE 61's `.ff-password`
    and everything after it were parsed INSIDE `prefers-reduced-motion: reduce`
@@ -16814,16 +16813,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
    this block. `a11y.test.tsx`'s two stylesheet scans check comment balance and
    `var()` definitions and not brace balance, which is why it survived — a
    silently-invalid stylesheet has now shipped three times. */
-=======
-/* ^ That closing brace was MISSING until 2026-08-20, and it is why this is
-   worth a note rather than a silent fix. PHASE 60 opened this media query and
-   never closed it, so every rule after it — the whole of PHASE 61, the Founder
-   flow's password page — was nested inside `(prefers-reduced-motion: reduce)`
-   and applied to nobody who had not turned motion off. The stylesheet is still
-   VALID CSS, which is why nothing caught it: `a11y.test.tsx`'s two scans check
-   comment balance and `var()` definitions, and neither counts braces. Found by
-   rendering PHASE 62 and getting browser defaults. */
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
 
 /* ══════════════════════════════════════════════════════════════════════════
    PHASE 61 — the Founder flow's last page: your password (2026-08-20)
@@ -16896,7 +16885,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   .ff-password__nav > .btn { width: 100%; }
 }
 
-<<<<<<< HEAD
 /* ═══════════════════════════ PHASE 62 — YOUR STORY, rebuilt 2026-08-20 from
    the supplied reference (`Proovd Founder Flow v2.dc.html`, `[data-story]` /
    `kindWide`) and its screenshot.
@@ -16954,81 +16942,12 @@ html.no-motion .ff-reach__cta { opacity: 1; }
    Nothing scrolls — the stage scales instead, which is why the composition is
    identical at every viewport and why this page can never reflow (§33.11.1). */
 .ff-story {
-=======
-/* ══════════════════════ PHASE 62 — screen 15, Last look, rebuilt 1:1 from
-   the reference (Founder Flow v2, `[data-lastlook]` / `kindWide`), 2026-08-20.
-
-   Drawn to the supplied reference (`Proovd Founder Flow v2.dc.html`) and
-   measured against it in a real browser at 1320x900, on the terms every other
-   1:1 screen of this flow ships under: the reference outranks the design
-   system HERE, and nowhere else.
-
-   ── This is not `.ff-look` ────────────────────────────────────────────────
-   `.ff-look` was the Session D surface — a token-scale card list at the
-   product's own sizes. It is gone with its component. `.ff-ll` is a different
-   composition over the same record, so it is a different prefix, the way
-   `.ff-pc` is not `.ff-prob`.
-
-   ── The layout model is the reference's, literally ────────────────────────
-   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
-   scaled to the viewport by `fitStages()`:
-
-       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
-       if (!hero && c === 'vetting' && vReviewing) s *= .9;
-
-   The `.9` is this screen's own branch, with the reference's own reason:
-   "Last look carries the whole answer grid, so it sits a notch under the other
-   pages." The component owns the scale and writes the whole transform on mount
-   and on resize; the `scale(0.3713)` below is what renders for the one frame
-   before the layout effect runs, and is the value measured at 1320x900.
-   Nothing here reflows — the stage scales instead, which is why the
-   composition is identical at every viewport (§33.11.1).
-
-   `isClaimPhone()` returns `false` in the reference — "one composition
-   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
-   code and this composition is what every viewport gets, exactly as there.
-
-   ── The column measures itself ────────────────────────────────────────────
-   `width: fit-content`, and its first child is a hidden `nowrap` span at
-   112px/700. That span IS the width: measured in the reference, the column and
-   the span both read 1521.34px and the grid inside is 100% of it. The
-   mechanism is reproduced rather than the number, because a literal 1521.34
-   would be right for one font cut and quietly wrong for the next.
-
-   ── The two suspended conventions, as on screens 1–8 ──────────────────────
-     - HEX LITERALS, not tokens. Six of the reference's colours here have exact
-       or near tokens; mixing literal and token would leave half the screen able
-       to drift with a token change and half not.
-     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
-       owner ruling, so the two agree today; the literal is here for the same
-       reason the colours are.
-
-   ── What the project's globals do to this screen, overridden explicitly ───
-   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the headline,
-   `p { margin; max-width: var(--measure) }` reaches the foot line, `button`'s
-   own reset reaches the cards and the CTA, and `body`'s 18px / line-height 1.6
-   reaches the whole stage — the reference's own body sets neither, so the stage
-   resets both.
-   ═════════════════════════════════════════════════════════════════════════ */
-
-/* `FlowPage`'s chrome is not drawn on this screen, and the reason is not that
-   the reference has none. It has a wordmark and a HELP, and it draws them
-   INSIDE the `z-index: 25` fixed layer below. Left in place they would sit
-   under that layer and be unreachable. There is no message badge on this
-   screen at all: the reference draws none. */
-.ff[data-flow-page='last-look'] .ff__top,
-.ff[data-flow-page='last-look'] .ff__badge { display: none; }
-
-/* The reference's `[data-lastlook]`. Nothing scrolls. */
-.ff-ll {
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: #FAFAFA;
   z-index: 25;
   font-family: 'Satoshi', sans-serif;
-<<<<<<< HEAD
 }
 
 /* The read failed, so there is no composition to draw. It keeps the layer's
@@ -17047,16 +16966,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
    composition, so it does not scale with the stage. ─────────────────────── */
 
 .ff-story__back {
-=======
-  color: #013F17;
-}
-
-/* ── The chrome. Its `clamp()`s are the reference's own, and they are
-   viewport-relative there too: this is furniture rather than part of the
-   composition, so it does not scale with the stage. ─────────────────────── */
-
-.ff-ll__back {
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   position: absolute;
   left: clamp(20px, 3vw, 46px);
   bottom: clamp(20px, 3vw, 40px);
@@ -17079,7 +16988,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   cursor: pointer;
   outline: none;
 }
-<<<<<<< HEAD
 .ff-story__back:hover { color: #013F17; }
 /* The reference has no focus treatment at all. A visible one is added rather
    than reproduced, because a control a keyboard user cannot locate is not the
@@ -17088,16 +16996,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
 .ff-story__back svg { width: 11px; height: 11px; flex: none; }
 
 .ff-story__top {
-=======
-.ff-ll__back:hover { color: #013F17; }
-/* The reference has no focus treatment at all. A visible one is added rather
-   than reproduced, because a control a keyboard user cannot locate is not the
-   same control (§28.5, §33.11) and it costs the composition nothing. */
-.ff-ll__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
-.ff-ll__back svg { width: 11px; height: 11px; flex: none; }
-
-.ff-ll__top {
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   position: absolute;
   left: 0;
   right: 0;
@@ -17108,21 +17006,13 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   justify-content: space-between;
   padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
 }
-<<<<<<< HEAD
 .ff-story__logo {
-=======
-.ff-ll__logo {
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   height: clamp(26px, 2.4vw, 36px);
   width: auto;
   max-width: none;
   display: block;
 }
-<<<<<<< HEAD
 .ff-story__help {
-=======
-.ff-ll__help {
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   padding: 10px 22px;
   min-height: 40px;
   border: 2px solid #41ED98;
@@ -17138,7 +17028,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   cursor: pointer;
   outline: none;
 }
-<<<<<<< HEAD
 .ff-story__help:hover { background: #E9FFE1; }
 .ff-story__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
 
@@ -17192,20 +17081,11 @@ html.no-motion .ff-reach__cta { opacity: 1; }
 /* ── The stage, and the 1800px column inside it ──────────────────────────── */
 
 .ff-story__stage {
-=======
-.ff-ll__help:hover { background: #E9FFE1; }
-.ff-ll__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
-
-/* ── The stage, and the column inside it ─────────────────────────────────── */
-
-.ff-ll__stage {
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   width: 2496px;
   height: 1542px;
   position: absolute;
   left: 50%;
   top: 50%;
-<<<<<<< HEAD
   transform: translate(-50%, -50%) scale(0.37);
   transform-origin: center center;
   /* The reference's body sets neither of these and ours sets both, so the
@@ -17220,29 +17100,11 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   top: 50%;
   width: 1800px;
   transform: translate(-50%, -50%);
-=======
-  transform: translate(-50%, -50%) scale(0.3713);
-  transform-origin: center center;
-  color: #013F17;
-  font-size: 16px;
-  line-height: normal;
-}
-
-/* `translate(-50%, calc(-50% + 70px))` — its own offset, and the column is
-   CENTRED on the stage rather than pinned to it. */
-.ff-ll__col {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: fit-content;
-  transform: translate(-50%, calc(-50% + 70px));
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-<<<<<<< HEAD
 .ff-story__head {
   margin: 0;
   width: 100%;
@@ -17402,134 +17264,6 @@ html.no-motion .ff-story__say { transition: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-=======
-/* The measurement. Zero-height, clipped, and hidden — it renders nothing and
-   is `aria-hidden` in the markup, so it is a width and never content. */
-.ff-ll__measure {
-  height: 0;
-  overflow: hidden;
-  font-size: 112px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  white-space: nowrap;
-  visibility: hidden;
-}
-
-.ff-ll__head {
-  margin: 0;
-  font-size: 112px;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
-  color: #013F17;
-}
-
-.ff-ll__label {
-  margin-top: 70px;
-  font-size: 26px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #7FD9A4;
-}
-
-.ff-ll__fee {
-  margin-top: 22px;
-  font-size: 240px;
-  font-weight: 900;
-  line-height: 0.92;
-  letter-spacing: -0.04em;
-  color: #013F17;
-}
-
-.ff-ll__sub {
-  margin-top: 34px;
-  font-size: 44px;
-  font-weight: 500;
-  letter-spacing: -0.012em;
-  color: #013F17;
-}
-
-.ff-ll__hint {
-  margin-top: 96px;
-  font-size: 44px;
-  font-weight: 500;
-  letter-spacing: -0.012em;
-  color: #A2AFA8;
-}
-
-/* Eight cards, four to a row. `1fr` columns over a column whose width the
-   measuring span fixes, so every card is the same size whatever its label. */
-.ff-ll__grid {
-  margin-top: 88px;
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 36px;
-}
-
-.ff-ll__card {
-  height: 184px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 0;
-  border: 3px solid #A2AFA8;
-  border-radius: 2px;
-  background: transparent;
-  cursor: pointer;
-  font-family: 'Satoshi', sans-serif;
-  text-align: center;
-  /* The reference's own curve, and its own 0.25s. */
-  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-  outline: none;
-}
-.ff-ll__card:hover { transform: scale(1.06); }
-.ff-ll__card:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
-/* `filled` — the reference's three paired values, together so they cannot be
-   set apart. */
-.ff-ll__card.is-added {
-  border-color: #41ED98;
-  background: rgba(65, 237, 152, 0.06);
-}
-.ff-ll__card.is-added .ff-ll__card-tag { color: #41ED98; }
-/* The three §9 answers. Not a button, so no hover and no pointer: the box is
-   the reference's, and the absence of the affordance is what says the card
-   does not open. */
-.ff-ll__card.is-locked {
-  border-color: #41ED98;
-  background: rgba(65, 237, 152, 0.06);
-  cursor: default;
-}
-.ff-ll__card.is-locked .ff-ll__card-tag { color: #41ED98; }
-
-.ff-ll__card-title {
-  font-size: 44px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-  color: #013F17;
-}
-.ff-ll__card-tag {
-  font-size: 26px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  line-height: normal;
-  text-transform: uppercase;
-  color: #7FA98D;
-}
-
-.ff-ll__cta {
-  margin-top: 150px;
-  width: 100%;
-  height: 165px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
   border: none;
   border-radius: 2px;
   background: #41ED98;
@@ -17540,7 +17274,6 @@ html.no-motion .ff-story__say { transition: none; }
   line-height: normal;
   letter-spacing: -0.02em;
   cursor: pointer;
-<<<<<<< HEAD
   outline: none;
   box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
 }
@@ -17672,7 +17405,317 @@ html.no-motion .ff-story__say { transition: none; }
    stage, and the stage scales rather than reflowing. */
 @media (max-width: 600px) {
   .ff-story__back { bottom: 92px; padding: 8px 14px; }
-=======
+}
+
+/* ══════════════════════ PHASE 63 — screen 15, Last look, rebuilt 1:1 from
+   the reference (Founder Flow v2, `[data-lastlook]` / `kindWide`), 2026-08-20.
+
+   Drawn to the supplied reference (`Proovd Founder Flow v2.dc.html`) and
+   measured against it in a real browser at 1320x900, on the terms every other
+   1:1 screen of this flow ships under: the reference outranks the design
+   system HERE, and nowhere else.
+
+   ── This is not `.ff-look` ────────────────────────────────────────────────
+   `.ff-look` was the Session D surface — a token-scale card list at the
+   product's own sizes. It is gone with its component. `.ff-ll` is a different
+   composition over the same record, so it is a different prefix, the way
+   `.ff-pc` is not `.ff-prob`.
+
+   ── The layout model is the reference's, literally ────────────────────────
+   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
+   scaled to the viewport by `fitStages()`:
+
+       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
+       if (!hero && c === 'vetting' && vReviewing) s *= .9;
+
+   The `.9` is this screen's own branch, with the reference's own reason:
+   "Last look carries the whole answer grid, so it sits a notch under the other
+   pages." The component owns the scale and writes the whole transform on mount
+   and on resize; the `scale(0.3713)` below is what renders for the one frame
+   before the layout effect runs, and is the value measured at 1320x900.
+   Nothing here reflows — the stage scales instead, which is why the
+   composition is identical at every viewport (§33.11.1).
+
+   `isClaimPhone()` returns `false` in the reference — "one composition
+   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+   code and this composition is what every viewport gets, exactly as there.
+
+   ── The column measures itself ────────────────────────────────────────────
+   `width: fit-content`, and its first child is a hidden `nowrap` span at
+   112px/700. That span IS the width: measured in the reference, the column and
+   the span both read 1521.34px and the grid inside is 100% of it. The
+   mechanism is reproduced rather than the number, because a literal 1521.34
+   would be right for one font cut and quietly wrong for the next.
+
+   ── The two suspended conventions, as on screens 1–8 ──────────────────────
+     - HEX LITERALS, not tokens. Six of the reference's colours here have exact
+       or near tokens; mixing literal and token would leave half the screen able
+       to drift with a token change and half not.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the headline,
+   `p { margin; max-width: var(--measure) }` reaches the foot line, `button`'s
+   own reset reaches the cards and the CTA, and `body`'s 18px / line-height 1.6
+   reaches the whole stage — the reference's own body sets neither, so the stage
+   resets both.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen, and the reason is not that
+   the reference has none. It has a wordmark and a HELP, and it draws them
+   INSIDE the `z-index: 25` fixed layer below. Left in place they would sit
+   under that layer and be unreachable. There is no message badge on this
+   screen at all: the reference draws none. */
+.ff[data-flow-page='last-look'] .ff__top,
+.ff[data-flow-page='last-look'] .ff__badge { display: none; }
+
+/* The reference's `[data-lastlook]`. Nothing scrolls. */
+.ff-ll {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+  color: #013F17;
+}
+
+/* ── The chrome. Its `clamp()`s are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-ll__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-ll__back:hover { color: #013F17; }
+/* The reference has no focus treatment at all. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11) and it costs the composition nothing. */
+.ff-ll__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-ll__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-ll__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-ll__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-ll__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-ll__help:hover { background: #E9FFE1; }
+.ff-ll__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* ── The stage, and the column inside it ─────────────────────────────────── */
+
+.ff-ll__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.3713);
+  transform-origin: center center;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* `translate(-50%, calc(-50% + 70px))` — its own offset, and the column is
+   CENTRED on the stage rather than pinned to it. */
+.ff-ll__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: fit-content;
+  transform: translate(-50%, calc(-50% + 70px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The measurement. Zero-height, clipped, and hidden — it renders nothing and
+   is `aria-hidden` in the markup, so it is a width and never content. */
+.ff-ll__measure {
+  height: 0;
+  overflow: hidden;
+  font-size: 112px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.ff-ll__head {
+  margin: 0;
+  font-size: 112px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: #013F17;
+}
+
+.ff-ll__label {
+  margin-top: 70px;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7FD9A4;
+}
+
+.ff-ll__fee {
+  margin-top: 22px;
+  font-size: 240px;
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  color: #013F17;
+}
+
+.ff-ll__sub {
+  margin-top: 34px;
+  font-size: 44px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: #013F17;
+}
+
+.ff-ll__hint {
+  margin-top: 96px;
+  font-size: 44px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: #A2AFA8;
+}
+
+/* Eight cards, four to a row. `1fr` columns over a column whose width the
+   measuring span fixes, so every card is the same size whatever its label. */
+.ff-ll__grid {
+  margin-top: 88px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 36px;
+}
+
+.ff-ll__card {
+  height: 184px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0;
+  border: 3px solid #A2AFA8;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Satoshi', sans-serif;
+  text-align: center;
+  /* The reference's own curve, and its own 0.25s. */
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  outline: none;
+}
+.ff-ll__card:hover { transform: scale(1.06); }
+.ff-ll__card:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+/* `filled` — the reference's three paired values, together so they cannot be
+   set apart. */
+.ff-ll__card.is-added {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.06);
+}
+.ff-ll__card.is-added .ff-ll__card-tag { color: #41ED98; }
+/* The three §9 answers. Not a button, so no hover and no pointer: the box is
+   the reference's, and the absence of the affordance is what says the card
+   does not open. */
+.ff-ll__card.is-locked {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.06);
+  cursor: default;
+}
+.ff-ll__card.is-locked .ff-ll__card-tag { color: #41ED98; }
+
+.ff-ll__card-title {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: #013F17;
+}
+.ff-ll__card-tag {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: normal;
+  text-transform: uppercase;
+  color: #7FA98D;
+}
+
+.ff-ll__cta {
+  margin-top: 150px;
+  width: 100%;
+  height: 165px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 70px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
   /* The owner ruling's inset highlight, at the reference's own values. */
   box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
   outline: none;
@@ -17729,7 +17772,7 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-ll__state .section { padding-block: 0; }
 .ff-ll__state .measure { max-width: none; }
 
-/* ══════════════════════════════════════════ PHASE 62 — RESPONSIVE ══
+/* ══════════════════════════════════════════ PHASE 63 — RESPONSIVE ══
    One media query, and it is not a reflow: the stage is one composition at
    every width (`isClaimPhone()` is `false` in the reference). What changes is
    the furniture, which was never on the stage — at phone width the foot line
@@ -17739,5 +17782,4 @@ html.no-motion .ff-story__say { transition: none; }
     width: calc(100vw - 40px);
     bottom: calc(clamp(20px, 3vw, 40px) + 34px);
   }
->>>>>>> 1518a18 (feat: replace Session D review screen with a 1:1 implementation of the Last Look reference, including updated styling and animations.)
 }

@@ -4097,10 +4097,10 @@ reference's `[data-lastlook]` (`Proovd Founder Flow v2.dc.html`, `kindWide`), by
 product direction, on the terms every other 1:1 screen of this flow ships under: the
 reference outranks the design system HERE, and nowhere else. The Session D surface it
 replaces was a token-scale card list; `.ff-look` and `.ff-card` are deleted with their
-component, and `.ff-ll` / `PHASE 62` is the reference's own stylesheet.
+component, and `.ff-ll` / `PHASE 63` is the reference's own stylesheet.
 
 `lastLookIntro` in `components/anim.ts` is the entrance; `LastLook.tsx` the screen;
-`PHASE 62` the styles. **No route, no register, no service and no migration** — the data
+`PHASE 63` the styles. **No route, no register, no service and no migration** — the data
 is the same `useSetupWorkspace` read Session D used.
 
 - **The stage model is the reference's, including the branch that names this screen.**
@@ -4149,12 +4149,26 @@ is the same `useSetupWorkspace` read Session D used.
   1's own legal-line treatment — and it is now a COUNT of three named criteria rather
   than a verdict with a disclaimer under it, which is §12's "neutrally, not as a quality
   judgment" in one sentence instead of four.
-- **A pre-existing stylesheet defect was found by this rebuild and fixed.** PHASE 60
-  opened `@media (prefers-reduced-motion: reduce)` and never closed it, so **every rule
-  after it — the whole of PHASE 61, the Founder flow's password page — applied only to
-  people who had turned motion off.** The file is still valid CSS, which is why nothing
-  caught it: `a11y.test.tsx`'s two scans check comment balance and `var()` definitions,
-  and neither counts braces. Found by rendering PHASE 62 and getting browser defaults.
+- **A pre-existing stylesheet defect was found by this rebuild and fixed — and found
+  independently by the Story session on the same day.** An `@media (prefers-reduced-motion:
+  reduce)` opened in PHASE 46 and was never closed, so **every rule after it — the whole of
+  PHASE 61, the Founder flow's password page — applied only to people who had turned motion
+  off.** The file is still valid CSS, which is why nothing caught it: `a11y.test.tsx`'s two
+  scans check comment balance and `var()` definitions, and neither counts braces. Found here
+  by rendering the new block and getting browser defaults; found there by reading
+  `document.styleSheets` and seeing the CSSOM stop at 2698 rules. Both sessions wrote the
+  same `}`; the Story session's comment is the one that survives the merge, because it names
+  the phase that opened it.
+- **The merge of the two sessions was committed WITH conflict markers, and that is what a
+  Founder saw.** `e9e71bf` carried ten unresolved `<<<<<<< / ======= / >>>>>>>` regions in
+  `proovd.css` — nowhere else in the repo — which cut `.ff-story {` off mid-rule and left six
+  unclosed braces. Everything after line 16956 was swallowed, so **neither** rebuilt screen
+  had any of its own CSS: the reference's `<img>` wordmark rendered at intrinsic size, the
+  in-layer HELP fell into the flow beside `FlowPage`'s, and the stage never scaled. Recovered
+  by splitting the file into its two sides, checking each is brace-balanced on its own, and
+  concatenating them — Story first, since it was pushed first, and Last look renumbered to
+  **PHASE 63** because both sessions had independently taken 62. A brace-balance scan belongs
+  in `a11y.test.tsx` beside the other two; it would have caught this and both `@media` bugs.
 - **Measured clean at 1440, 1320, 1280 and a true 320:** zero document overflow, nothing
   past the viewport, exactly one `h1`. The keyboard path is complete and every control
   names itself — Back names its destination, five cards are named by title and tag, `All
