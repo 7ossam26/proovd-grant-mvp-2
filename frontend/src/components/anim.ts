@@ -2926,3 +2926,157 @@ export function mailBellLoop(el: HTMLElement | null): () => void {
   tl.to(el, { rotation: 0, duration: refDur(0.12), ease: 'power2.inOut' });
   return () => tl.kill();
 }
+
+/* ── The brand-voice sheets (Founder Flow v2, `[data-voice]`, 2026-08-21) ──── */
+
+/**
+ * `modalIntro` — "the sheet grows out of the chip that opened it, then its own
+ * rows come up". The reference's own comment, and its own three tweens:
+ *
+ *     const r = box.getBoundingClientRect(), o = this._org;
+ *     if (o) {
+ *       const sx = Math.max(.12, o.width/r.width), sy = Math.max(.12, o.height/r.height);
+ *       g.fromTo(box,
+ *         {x:(o.left+o.width/2)-(r.left+r.width/2), y:(o.top+o.height/2)-(r.top+r.height/2),
+ *          scaleX:sx, scaleY:sy, opacity:0, transformOrigin:'50% 50%'},
+ *         {x:0,y:0,scaleX:1,scaleY:1,opacity:1,duration:.46,ease:'power3.out',
+ *          clearProps:'transform,opacity'});
+ *     } else {
+ *       g.fromTo(box,{scale:.9,opacity:0},{scale:1,opacity:1,duration:.36,…});
+ *     }
+ *     const rows = [...box.querySelector(':scope > div').children];
+ *     g.fromTo(rows,{y:16,opacity:0},{y:0,opacity:1,duration:.34,ease:'power3.out',
+ *       delay:.16,stagger:.06,clearProps:'transform,opacity'});
+ *     g.fromTo(scrim,{backgroundColor:'rgba(1,63,23,0)'},
+ *       {backgroundColor:'rgba(1,63,23,.35)',duration:.4,ease:'power2.out'});
+ *
+ * ── `origin` is the RECT of the control that opened it, captured on click ───
+ * `markOrigin(e)` reads `e.currentTarget.getBoundingClientRect()` at the moment
+ * of the click, before the sheet exists. Recomputing it afterwards would be
+ * reading a chip that a re-render may already have moved, and the whole point of
+ * the tween is that the sheet leaves the thing that was pressed. The `.12` floor
+ * is its own: a sheet that starts at a hundredth of its size reads as a flash
+ * rather than as a growth.
+ *
+ * ── The scrim tween is on the PARENT, and its ease has no §6.1 token ────────
+ * `power2.out` is not one of the six in `MOTION.ease`, and the nearest — `out`,
+ * power3.out — is a different curve on the one element whose whole job is to
+ * darken evenly. It is written literally, on the same licence every other 1:1
+ * screen of this flow ships under.
+ *
+ * ── There is no exit, and that is the reference's behaviour ─────────────────
+ * `voiceReplaceDone` and `voiceAddDone` set state and the sheet is gone on the
+ * next frame. Adding a fade out would be inventing a beat.
+ */
+export function voiceSheetIn(
+  box: HTMLElement | null,
+  origin: DOMRect | null,
+): () => void {
+  const g = gsap();
+  if (!g || !box || !motionLive()) return () => {};
+
+  const rows = Array.from(
+    (box.firstElementChild?.children ?? []) as HTMLCollectionOf<HTMLElement>,
+  );
+  const scrim = box.parentElement;
+
+  g.killTweensOf(box);
+  if (origin && origin.width > 0 && origin.height > 0) {
+    // Measure the box as LAID OUT, never as currently transformed.
+    //
+    // React re-invokes a layout effect immediately after tearing it down on
+    // mount under StrictMode, so this runs twice. `killTweensOf` stops the
+    // first tween and leaves its inline transform behind — so without this the
+    // second run measures a box already scaled to 22.7% x 12% and computes
+    // `origin.width / r.width` ≈ 1, `origin.height / r.height` ≈ 0.74 and no
+    // offset at all. The sheet then squashes vertically in place instead of
+    // growing out of the chip, which is a different animation that still
+    // ends in the right place — the kind a screenshot cannot see.
+    g.set(box, { clearProps: 'transform' });
+    const r = box.getBoundingClientRect();
+    g.fromTo(
+      box,
+      {
+        x: origin.left + origin.width / 2 - (r.left + r.width / 2),
+        y: origin.top + origin.height / 2 - (r.top + r.height / 2),
+        scaleX: Math.max(0.12, origin.width / r.width),
+        scaleY: Math.max(0.12, origin.height / r.height),
+        opacity: 0,
+        transformOrigin: '50% 50%',
+      },
+      {
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+        opacity: 1,
+        duration: refDur(0.46), // between base 0.35 and slow 0.60
+        ease: ease('out'), // power3.out
+        clearProps: 'transform,opacity',
+        overwrite: 'auto',
+      },
+    );
+  } else {
+    g.fromTo(
+      box,
+      { scale: 0.9, opacity: 0 },
+      {
+        scale: 1,
+        opacity: 1,
+        duration: refDur(0.36), // base 0.35
+        ease: ease('out'), // power3.out
+        clearProps: 'transform,opacity',
+        overwrite: 'auto',
+      },
+    );
+  }
+
+  if (rows.length) {
+    g.killTweensOf(rows);
+    g.fromTo(
+      rows,
+      { y: 16, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        duration: refDur(0.34), // base 0.35
+        ease: ease('out'), // power3.out
+        delay: refDur(0.16),
+        stagger: refDur(0.06),
+        clearProps: 'transform,opacity',
+        overwrite: 'auto',
+      },
+    );
+  }
+
+  if (scrim) {
+    g.killTweensOf(scrim);
+    g.fromTo(
+      scrim,
+      { backgroundColor: 'rgba(1,63,23,0)' },
+      {
+        backgroundColor: 'rgba(1,63,23,.35)',
+        duration: refDur(0.4), // between base 0.35 and slow 0.60
+        ease: 'power2.out', // its own; §6.1 has no power2.out
+        overwrite: 'auto',
+      },
+    );
+  }
+
+  // `relayIn`'s stuck sweep, on a sheet that is staged by an inline `fromTo`:
+  // the runtime's 3s force-reveal only registers `[data-reveal]`, and a dropped
+  // tween here would leave an invisible dialog with a working keyboard path.
+  const sweep = window.setTimeout(() => {
+    for (const el of [box, ...rows]) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity' });
+      }
+    }
+  }, 2400);
+
+  return () => {
+    window.clearTimeout(sweep);
+    g.killTweensOf([box, ...rows]);
+    if (scrim) g.killTweensOf(scrim);
+  };
+}

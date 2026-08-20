@@ -184,3 +184,166 @@ export const ROSTER_CHIPS_ARE_RECORDED =
 /** §17: a campaign is live because a launch record exists, and for no other reason. */
 export const LIVE_MEANS_A_LAUNCH_RECORD =
   'Your campaign page is public and your Creators’ links are live.';
+
+/* ── Screen 21 — the brand voice, rebuilt 1:1 from the reference, 2026-08-21 ──
+ *
+ * The reference's `[data-voice]`: a sentence a Founder edits by tapping the
+ * adjectives inside it — `Teeb is [Luxurious ▾] and [Youthful ▾]` — with a
+ * replacement sheet behind each chip and an "add more" sheet behind `+ add
+ * more`. What it collects is a description of how the campaign should sound,
+ * and §14.4 has exactly one field for that: `campaign_build.brand_voice`.
+ *
+ * ── The chips are a way into ONE field, not a second record ─────────────────
+ * A repeater beside `brand_voice` would make §14.4's field and the Founder's
+ * chips two answers to one question, and the one nobody updated is the one that
+ * ships. So the words compose the text, the text is what is stored, and
+ * `parseBrandVoice` reads them back out of it — which is what lets the same
+ * record be edited from `/campaigns/:campaignId/build`, whose textarea is the
+ * other surface over this column.
+ *
+ * ── No cap, and that is a refusal the register already carries ──────────────
+ * The reference stops at six adjectives (`.slice(0, 6)`). §14.4 caps nothing,
+ * and a Founder with a seventh word would be refused by a number nobody agreed
+ * to (§1 rule 6). `FOUNDER_FLOW_ABSENCES` records it by name.
+ */
+
+/**
+ * The reference's `VOICE_SHORT` — the six offered when REPLACING a word.
+ *
+ * Its own list, kept in its own order. The replacement sheet is a narrower
+ * question than "what else is true of you", which is why the reference gives it
+ * six rather than twelve, and reproducing that is reproducing the question.
+ */
+export const BRAND_VOICE_WORDS_SHORT = [
+  'Fun',
+  'Regal',
+  'Professional',
+  'Affordable',
+  'Confident',
+  'Friendly',
+] as const;
+
+/**
+ * The reference's `VOICE_ALL` — the twelve offered when ADDING words.
+ *
+ * `Trustworthy` stays. §3.2's ban is on `trust` as in *held in trust*, the
+ * scanner is word-bounded, and a brand adjective is not a custody claim. It is
+ * recorded here so a later session does not "fix" it.
+ */
+export const BRAND_VOICE_WORDS_ALL = [
+  'Fun',
+  'Regal',
+  'Professional',
+  'Affordable',
+  'Trustworthy',
+  'Quirky',
+  'Visionary',
+  'Provocative',
+  'Human',
+  'Caring',
+  'Confident',
+  'Friendly',
+] as const;
+
+/** The two chip fills, alternating by position. The reference's own pair. */
+export const BRAND_VOICE_CHIP_FILLS = ['#F4FFA0', '#DFFAFC'] as const;
+
+export interface BrandVoiceValue {
+  /** The adjectives, in the order they are read. */
+  words: readonly string[];
+  /** The reference's "Tell us more" paragraph, or ''. */
+  more: string;
+}
+
+/**
+ * How many words a comma-part may carry before it stops being an adjective.
+ *
+ * The chips are one record with `/campaigns/:campaignId/build`, whose control
+ * is a textarea — so a Founder may legitimately write prose into this column
+ * and come back here. Splitting `A brand for people who commute, mostly` into
+ * two chips would present their sentence as two adjectives. So a first
+ * paragraph only becomes chips when every part reads like one; anything else is
+ * carried whole as `more`, and the sentence survives verbatim.
+ */
+const ADJECTIVE_MAX_WORDS = 2;
+const ADJECTIVE_MAX_CHARS = 24;
+
+function readsLikeAnAdjective(part: string): boolean {
+  const t = part.trim();
+  if (!t || t.length > ADJECTIVE_MAX_CHARS) return false;
+  return t.split(/\s+/).length <= ADJECTIVE_MAX_WORDS;
+}
+
+/**
+ * `brand_voice` → the chips and the paragraph. The inverse of `composeBrandVoice`.
+ *
+ * Round-trippable by construction: compose writes the words as one comma-joined
+ * first paragraph and the paragraph after a blank line, and this reads exactly
+ * that back. Anything it cannot read as chips it returns as `more` rather than
+ * discarding — losing a Founder's own sentence to a parser is worse than
+ * rendering no chips.
+ */
+export function parseBrandVoice(stored: string | null | undefined): BrandVoiceValue {
+  const text = (stored ?? '').trim();
+  if (!text) return { words: [], more: '' };
+
+  const split = text.split(/\n\s*\n/);
+  const head = (split[0] ?? '').trim();
+  const tail = split.slice(1).join('\n\n').trim();
+
+  const parts = head
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length && parts.every(readsLikeAnAdjective)) {
+    return { words: parts, more: tail };
+  }
+  return { words: [], more: text };
+}
+
+/** The chips and the paragraph → `brand_voice`. */
+export function composeBrandVoice(value: BrandVoiceValue): string {
+  const words = value.words.map((w) => w.trim()).filter(Boolean);
+  const more = value.more.trim();
+  const head = words.join(', ');
+  if (head && more) return `${head}\n\n${more}`;
+  return head || more;
+}
+
+/**
+ * The sentence the reference draws, as its three parts.
+ *
+ * `voiceChips`: the last of several words is preceded by `and`, and every word
+ * before the last two is followed by a comma. One word takes neither. Returned
+ * rather than rendered so the surface stays a renderer.
+ */
+export function brandVoiceChipAffixes(
+  index: number,
+  count: number,
+): { pre: string; post: string } {
+  return {
+    pre: index === count - 1 && count > 1 ? 'and' : '',
+    post: index < count - 2 ? ',' : '',
+  };
+}
+
+/**
+ * What the sentence reads when no word has been chosen yet.
+ *
+ * The reference always ships two, so it never draws this. §16a's rule decides
+ * it here: an empty record is not a zero, and a bare `Teeb is` with nothing
+ * after it reads as a sentence somebody failed to finish.
+ */
+export const BRAND_VOICE_NO_WORDS_YET =
+  'No words yet — add the first one below.';
+
+/**
+ * §14.4's field is one field, and it is read by people rather than by a model.
+ *
+ * §30 defers AI rewriting by name, §12 makes the helper resources static, and
+ * there is no model client in this tree. The words are a way of writing the
+ * field, and nothing writes anything in a tone.
+ */
+export const BRAND_VOICE_IS_READ_BY_PEOPLE =
+  'A reviewer and a Creator both read this. Nothing is generated from it.';
