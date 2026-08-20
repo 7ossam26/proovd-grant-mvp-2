@@ -165,25 +165,50 @@ function rejectionText(code: string): string {
 /**
  * Which stored profile belongs to which row.
  *
- * Host first, so a profile lands where a Founder would look for it; then the
- * leftovers fill the free rows in order, so nothing a Founder has saved is
- * invisible. Anything past four rows is returned separately rather than
- * dropped — the surface this replaced could write more than four, and a record
- * that exists and is not shown is the worst of the three outcomes.
+ * Three passes, in this order, and the order is the point:
+ *
+ *  1. The row it was WRITTEN from, when this page is the one that wrote it.
+ *     The record carries no row — the server derives a hostname and nothing
+ *     else — so without this a profile whose host matches no row lands in the
+ *     first free one, which is not the row the Founder typed it into. Adding a
+ *     website to row 4 and watching its answer appear against row 2 is a
+ *     surface disagreeing with the person using it.
+ *  2. Host, so a profile from an earlier visit lands where somebody would look
+ *     for it.
+ *  3. The free rows in order, so nothing saved is invisible.
+ *
+ * Anything past four rows is returned separately rather than dropped — the
+ * surface this replaced could write more than four, and a record that exists
+ * and is not shown is the worst of the three outcomes.
  */
-function bindProfiles(profiles: readonly SocialState[]): {
+function bindProfiles(
+  profiles: readonly SocialState[],
+  writtenFrom: Readonly<Record<string, number>>,
+): {
   bound: (SocialState | null)[];
   extra: SocialState[];
 } {
   const bound: (SocialState | null)[] = ROWS.map(() => null);
   const left = [...profiles];
 
-  ROWS.forEach((row, index) => {
-    if (!row.hosts.length) return;
-    const at = left.findIndex((p) =>
-      (row.hosts as readonly string[]).includes((p.platform ?? '').toLowerCase()),
-    );
+  const take = (index: number, at: number) => {
     if (at >= 0) bound[index] = left.splice(at, 1)[0]!;
+  };
+
+  ROWS.forEach((_, index) =>
+    take(
+      index,
+      left.findIndex((p) => writtenFrom[p.id] === index),
+    ),
+  );
+  ROWS.forEach((row, index) => {
+    if (bound[index] || !row.hosts.length) return;
+    take(
+      index,
+      left.findIndex((p) =>
+        (row.hosts as readonly string[]).includes((p.platform ?? '').toLowerCase()),
+      ),
+    );
   });
   ROWS.forEach((_, index) => {
     if (bound[index] || !left.length) return;
@@ -251,7 +276,14 @@ function SocialsScreen({
   const direction = useRef<1 | -1 | null>(null);
   if (direction.current === null) direction.current = flowDirection();
 
-  const { bound, extra } = useMemo(() => bindProfiles(state.socials), [state.socials]);
+  /* Which row wrote which profile — see `bindProfiles`. It exists only for as
+     long as the page is open; on the next visit the host decides, which is the
+     best the record can support. */
+  const [writtenFrom, setWrittenFrom] = useState<Record<string, number>>({});
+  const { bound, extra } = useMemo(
+    () => bindProfiles(state.socials, writtenFrom),
+    [state.socials, writtenFrom],
+  );
 
   // The reference's `st.ans.socials.urls`. Seeded from the record and the only
   // copy from then on — a save that raced a keystroke would otherwise reinstate
@@ -322,7 +354,13 @@ function SocialsScreen({
           if (existing) await refresh(removeSocial(campaignId, existing.id));
           // The control claim is never a default: a row nobody has confirmed is
           // written `false`, which is what it is (§28.4).
-          await refresh(addSocial(campaignId, { url: value, controlsConfirmed: false }));
+          const before = new Set(state.socials.map((s) => s.id));
+          const result = await addSocial(campaignId, { url: value, controlsConfirmed: false });
+          await refresh(Promise.resolve(result));
+          // Remember which row wrote it, so the answer appears against the row
+          // it was typed into rather than wherever its hostname sorts.
+          const created = result.workspace.socials.find((s) => !before.has(s.id));
+          if (created) setWrittenFrom((current) => ({ ...current, [created.id]: index }));
         }
         socialAddPop(row?.querySelector('button') ?? null);
         setAdded((current) => ({ ...current, [index]: true }));
@@ -342,7 +380,7 @@ function SocialsScreen({
         setBusy(null);
       }
     },
-    [locked, busy, urls, bound, campaignId, refresh],
+    [locked, busy, urls, bound, state.socials, campaignId, refresh],
   );
 
   /** `socialsNext:()=>this.step({vReviewing:true,fromReview:false})` — Last look. */
@@ -435,6 +473,8 @@ function SocialsScreen({
               return (
                 <div
                   className="ff-soc__row"
+                  /* The reference's own attribute on this element. */
+                  data-soc-row="1"
                   key={row.id}
                   ref={(el) => {
                     rowEls.current[index] = el;
@@ -533,11 +573,14 @@ function SocialsScreen({
                           Remove
                         </button>
                       </>
-                    ) : (
+                    ) : index === 0 && !state.socials.length ? (
+                      /* Once, on the first empty row. §12's rule is worth
+                         stating and stating it four times is noise the
+                         reference's empty gap does not have. */
                       <span className="ff-soc__note">
                         Paste a link and press Add. We check it opens; you tell us you control it.
                       </span>
-                    )}
+                    ) : null}
                   </span>
                 </div>
               );

@@ -566,13 +566,18 @@ The dependency runs one way: §22.8's fourth criterion reads 21a's Day-14 failur
 
 ## How a session works
 
-One phase per session (`docs/master-plan.md` §1.3): read `docs/phases/phase-NN.md`, then read only the Spec sections it names — not from memory — build, run **that phase's named §33 acceptance tests**, and commit only when every one passes. Serial: never start a phase whose predecessors aren't green. If the phase is too large for one session, stop and say so; a truncated session produces code that looks finished and isn't. Phase sequencing and the 00–24 table live in `docs/master-plan.md` §6.
+**Verification is scaled to the change, and most changes are small.** Almost everything below this line in this file is a record of *phase* work — whole surfaces, money paths, acceptance suites, 1280/320 browser passes. Do not read that narrative as the bar for an ordinary edit. There are two kinds of work and they get different amounts of checking:
+
+- **A small change** — a copy fix, a style tweak, one component, one bug, a rename, a small refactor. Make the change, run `npm run typecheck`, and run **only** the one test file that directly covers what you touched (`npx vitest run <path>`). That is the whole verification. Do **not** run `npm test`, do not run a whole workspace project, do not run the §33.11 sweep or the bundle scan, do not do a browser or screenshot pass, and do not write a new test file — unless it is a bug fix whose bug a test would have caught, in which case one focused case is enough. If no test file covers what you touched, typecheck is the whole verification.
+- **Phase work** — a `docs/phases/phase-NN.md` brief, or a multi-session rebuild brief. One phase per session (`docs/master-plan.md` §1.3): read the phase file, then read only the Spec sections it names — not from memory — build, run **that phase's named §33 acceptance tests**, and commit only when every one passes. Serial: never start a phase whose predecessors aren't green. If the phase is too large for one session, stop and say so; a truncated session produces code that looks finished and isn't. Phase sequencing and the 00–24 table live in `docs/master-plan.md` §6.
+
+When in doubt about which kind of work you were handed, it is the small kind. If a small change looks like it puts something wider at risk, **say so in one sentence and let the user decide** — do not run the wider thing on your own initiative, and do not report a change as unverified because you chose not to run a suite nobody asked for.
 
 ## Toolchain (established Phase 1, per `docs/tech-stack-v2.md` §2, §11, §13)
 
 - **Repo:** npm workspaces — `frontend/` (React 19 + Vite), `backend/` (Express 5), `shared/` (Zod schemas, money waterfall, state machines, calendar). One root `package.json`, one multi-stage `Dockerfile`.
 - **DB:** Postgres 16 + Drizzle; `drizzle-kit` generates and applies migrations. Money is integer cents in `bigint`.
-- **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one test with Vitest's filter: `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`.
+- **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one file with `npx vitest run <path>`, one test with Vitest's filter `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`. **`npm test` is for phase work and for when the user asks for it** — an ordinary edit gets a typecheck and the one relevant file (see "How a session works").
 - **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11.
 - **Integration tests need a real Postgres.** `backend/src/tests/app-harness.ts` uses `TEST_DATABASE_URL` when set and otherwise starts a Testcontainers `postgres:16-alpine`, which needs Docker. The migrator runs `CREATE ROLE proovd_app`, so the connecting role needs `CREATEROLE` or superuser. With neither Docker nor a spare server, a throwaway cluster works: `initdb -D <tmp> -U postgres --auth=trust`, `pg_ctl -o "-p 55432"` start, `createdb`, point `TEST_DATABASE_URL` at it, and stop it afterwards.
 - **A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`**, one failing statement per transaction — the first error aborts the block, so a second assertion in the same one only observes the abort. `policy-versions.test.ts` is the pattern. A test that must commit restores what it changed in a `finally`.
@@ -2060,6 +2065,8 @@ A surface is complete only with all of §1.1: content and actions; loading, empt
 Every waiting, review, payment, recovery, or exception state answers the six questions (§27.1): what happened, what next, who owns it, when's the next update, what can I do now, how do I get help without losing context.
 
 **A phase is not done until its named §33 tests pass.** §33's own framing: these are requirements, not examples. Do not commit a phase with a failing named test.
+
+**This section describes a surface built in a phase, and nothing above applies to an ordinary edit.** A small change is done when it does what was asked, typechecks, and the one test file covering it passes — see "How a session works". Re-verifying an untouched guarantee, re-running a suite nobody asked for, or opening a browser pass for a copy fix is not thoroughness; it is a change the user has to wait for and did not want.
 
 ---
 
