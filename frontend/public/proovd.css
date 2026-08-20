@@ -18075,7 +18075,6 @@ html.no-motion .ff-story__say { transition: none; }
   .ff-brandlogo__back { bottom: 92px; padding: 8px 14px; }
 }
 
-<<<<<<< HEAD
 /* ═════════════════════════════════════════════════════════════════════════
    PHASE 64 — the Founder flow, screen 10: we want to see your product
    (2026-08-20)
@@ -18089,41 +18088,11 @@ html.no-motion .ff-story__say { transition: none; }
    is what renders for the one frame before the layout effect runs. Nothing here
    reflows: the stage scales, which is why the composition is identical at every
    viewport (§33.11.1).
-=======
-/* ══════════════════════ PHASE 64 — screen 21, the brand voice, rebuilt 1:1
-   from the reference (Founder Flow v2, `[data-voice]` / `kindWide`), 2026-08-21.
-
-   Drawn to the supplied reference (`Proovd Founder Flow v2.dc.html`) and
-   measured against it in a real browser at 1320x900, on the terms every other
-   1:1 screen of this flow ships under: the reference outranks the design
-   system HERE, and nowhere else.
-
-   ── This is not `.ff-voice` ───────────────────────────────────────────────
-   `.ff-voice` was the Session F surface — a token-scale chip list with a
-   textarea under it, at the product's own sizes. It is gone with its
-   component. `.ff-vc` is a different composition over the same record, so it
-   is a different prefix, the way `.ff-ll` is not `.ff-look` and `.ff-pc` is
-   not `.ff-prob`.
-
-   ── The layout model is the reference's, literally ────────────────────────
-   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
-   scaled to the viewport by `fitStages()`:
-
-       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
-
-   No branch of that function names `build`, so this screen takes `pageScale`
-   alone. The component owns the scale and writes the whole transform on mount
-   and on resize; the `scale(0.4125)` below is what renders for the one frame
-   before the layout effect runs, and is the value measured at 1320x900.
-   Nothing here reflows — the stage scales instead, which is why the
-   composition is identical at every viewport (§33.11.1).
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
 
    `isClaimPhone()` returns `false` in the reference — "one composition
    everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
    code and this composition is what every viewport gets, exactly as there.
 
-<<<<<<< HEAD
    ── The column has no width of its own ────────────────────────────────────
    `width: fit-content` over `align-items: flex-start`, and what fits it is this
    screen's own 112px headline: 1491px at Satoshi's metrics, measured in Chrome
@@ -18137,24 +18106,10 @@ html.no-motion .ff-story__say { transition: none; }
        `#8FCBA3`, `#A2AFA8`, `#FBFFD4`, `#DEF6FF`, `#defafc`, `#012D10` and
        `#3BDC8C` are the reference's own; mixing literal and token would leave
        half the screen able to drift with a token change and half not.
-=======
-   ── The two sheets are NOT on the stage ───────────────────────────────────
-   They are `position:fixed` with their own `clamp()`s, and those are
-   viewport-relative in the reference too. So the stage scales and the sheets
-   do not, which is the reference's own arrangement: a dialog is furniture, and
-   furniture is sized to the screen rather than to the composition.
-
-   ── The two suspended conventions, as on screens 1–8 and 15 ───────────────
-     - HEX LITERALS, not tokens. Nine of the reference's colours here have
-       exact or near tokens; mixing literal and token would leave half the
-       screen able to drift with a token change and half not, so all of them
-       are literal and this screen reads exactly as the reference does.
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
      - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
        owner ruling, so the two agree today; the literal is here for the same
        reason the colours are.
 
-<<<<<<< HEAD
    ── The dashed rules are gradients, not `border-style: dashed` ────────────
    Both boxes are the reference's own four-layer repeating gradient over a
    transparent border — 15px on / 15px off at 5px for the drop zone, 43/43 at
@@ -18190,40 +18145,12 @@ html.no-motion .ff-story__say { transition: none; }
 
 /* The reference's `[data-visuals]`. Nothing scrolls. */
 .ff-vis {
-=======
-   ── What the project's globals do to this screen, overridden explicitly ───
-   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the note,
-   `p { margin; max-width: var(--measure) }` reaches the save line and the two
-   sheet lines, `button,input,textarea,select { font: inherit }` reaches every
-   control, and `body`'s 18px / line-height 1.6 reaches the whole stage — the
-   reference's own body sets neither a size nor a line-height, so the stage
-   resets both and the sheets reset them again.
-
-   The CTA and the chips deliberately keep the UA's own `padding: 1px 6px`,
-   which is what the reference computes: both are fixed-size flex boxes with
-   their content centred, so it changes nothing, and writing a `padding: 0`
-   the reference does not have would be a difference rather than a fix.
-   ═════════════════════════════════════════════════════════════════════════ */
-
-/* `FlowPage`'s chrome is not drawn on this screen, and the reason is not that
-   the reference has none. It has a wordmark and a HELP, and it draws them
-   INSIDE the `z-index: 25` fixed layer below. Left in place they would sit
-   under that layer and be unreachable, so both are hidden and both leave the
-   tab order with it. There is no message badge on this screen at all: the
-   reference draws none, and `FlowPage` is no longer asked for one. */
-.ff[data-flow-page='voice'] .ff__top,
-.ff[data-flow-page='voice'] .ff__badge { display: none; }
-
-/* The reference's `[data-voice]`. Nothing scrolls. */
-.ff-vc {
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   position: fixed;
   inset: 0;
   overflow: hidden;
   background: #FAFAFA;
   z-index: 25;
   font-family: 'Satoshi', sans-serif;
-<<<<<<< HEAD
 }
 
 /* The read failed, so there is no composition to draw. It keeps the layer's
@@ -18242,21 +18169,6 @@ html.no-motion .ff-story__say { transition: none; }
    composition, so it does not scale with the stage. ─────────────────────── */
 
 .ff-vis__back {
-=======
-  color: #013F17;
-  /* The reference's own body sets a family and nothing else, so its whole
-     layer inherits 16px / normal. The project's sets 18px / 1.6, which reaches
-     the chrome and both sheets. */
-  font-size: 16px;
-  line-height: normal;
-}
-
-/* ── The chrome. Its `clamp()`s are the reference's own, and they are
-   viewport-relative there too: this is furniture rather than part of the
-   composition, so it does not scale with the stage. ─────────────────────── */
-
-.ff-vc__back {
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   position: absolute;
   left: clamp(20px, 3vw, 46px);
   bottom: clamp(20px, 3vw, 40px);
@@ -18279,7 +18191,6 @@ html.no-motion .ff-story__say { transition: none; }
   cursor: pointer;
   outline: none;
 }
-<<<<<<< HEAD
 .ff-vis__back:hover { color: #013F17; }
 /* The reference has no focus treatment at all. A visible one is added rather
    than reproduced, because a control a keyboard user cannot locate is not the
@@ -18288,16 +18199,6 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-vis__back svg { width: 11px; height: 11px; flex: none; }
 
 .ff-vis__top {
-=======
-.ff-vc__back:hover { color: #013F17; }
-/* The reference has no focus treatment at all. A visible one is added rather
-   than reproduced, because a control a keyboard user cannot locate is not the
-   same control (§28.5, §33.11) and it costs the composition nothing. */
-.ff-vc__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
-.ff-vc__back svg { width: 11px; height: 11px; flex: none; }
-
-.ff-vc__top {
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   position: absolute;
   left: 0;
   right: 0;
@@ -18308,21 +18209,13 @@ html.no-motion .ff-story__say { transition: none; }
   justify-content: space-between;
   padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
 }
-<<<<<<< HEAD
 .ff-vis__logo {
-=======
-.ff-vc__logo {
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   height: clamp(26px, 2.4vw, 36px);
   width: auto;
   max-width: none;
   display: block;
 }
-<<<<<<< HEAD
 .ff-vis__help {
-=======
-.ff-vc__help {
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   padding: 10px 22px;
   min-height: 40px;
   border: 2px solid #41ED98;
@@ -18338,7 +18231,6 @@ html.no-motion .ff-story__say { transition: none; }
   cursor: pointer;
   outline: none;
 }
-<<<<<<< HEAD
 .ff-vis__help:hover { background: #E9FFE1; }
 .ff-vis__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
 
@@ -18392,20 +18284,11 @@ html.no-motion .ff-story__say { transition: none; }
 /* ── The stage, and the fit-content column inside it ─────────────────────── */
 
 .ff-vis__stage {
-=======
-.ff-vc__help:hover { background: #E9FFE1; }
-.ff-vc__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
-
-/* ── The stage, and the 2000px column inside it ──────────────────────────── */
-
-.ff-vc__stage {
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   width: 2496px;
   height: 1542px;
   position: absolute;
   left: 50%;
   top: 50%;
-<<<<<<< HEAD
   transform: translate(-50%, -50%) scale(0.37);
   transform-origin: center center;
   /* See the header: the reference's body sets neither, and this file's does. */
@@ -19232,40 +19115,12 @@ html.no-motion .ff-story__say { transition: none; }
   box-shadow: none;
   text-align: center;
   font-family: 'Satoshi', sans-serif;
-=======
-  transform: translate(-50%, -50%) scale(0.4125);
-  transform-origin: center center;
-  color: #013F17;
-  font-size: 16px;
-  line-height: normal;
-}
-
-/* Centred on the stage rather than pinned to it, with no offset of its own —
-   unlike `.ff-pc__col` and `.ff-ll__col`, which each carry a `+ 70px`. */
-.ff-vc__col {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 2000px;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* `data-anim="note"`. A `span` in the reference; an `h1` here, because
-   §33.11.2 wants exactly one on the page and this is the only thing that names
-   it. Every value is the reference's. */
-.ff-vc__note {
-  margin: 0;
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   font-size: 58px;
   font-weight: 700;
   line-height: normal;
   letter-spacing: -0.02em;
   color: #013F17;
 }
-<<<<<<< HEAD
 .ff-col__hexinput:focus,
 .ff-col__hexinput:focus-visible {
   outline: none;
@@ -19324,7 +19179,269 @@ html.no-motion .ff-story__say { transition: none; }
   margin-top: 130px;
   width: 100%;
   height: 165px;
-=======
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 70px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
+  transition: background 0.2s ease;
+}
+.ff-col__cta:hover { background: #3BDC8C; }
+.ff-col__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+
+/* ONE block inside the 130px gap the CTA's own margin already leaves, so the
+   note and the save status sit between the panel and the button without moving
+   either. They stack in FLOW inside it rather than at two fixed offsets — the
+   first draft positioned each absolutely and the browser pass caught the
+   consequence: the note wrapped to two lines at this column width and `Saved
+   12:03 AM` printed on top of the second one. A flow block cannot do that
+   however either line grows.
+
+   1491px is the column's own width, named here for the same reason `.ff-vis`
+   names it: an absolutely positioned child has no flow width to inherit. */
+.ff-col__gap {
+  position: absolute;
+  left: 0;
+  top: calc(100% - 165px - 130px + 8px);
+  width: 1491px;
+  /* No height and no `overflow` on purpose. The block is out of flow, so it can
+     never push the CTA; a fixed height with `overflow: hidden` would instead
+     SWALLOW a line that grew, which is the silent version of the defect the
+     browser pass just caught. The budget is 122px — the 130px gap less the 8px
+     above — and at this column width the note is one line (38px) and the status
+     one more (38px + 6px), so there is room to spare. Copy that needed more
+     than the budget would visibly crowd the CTA, which is a signal rather than
+     a disappearance. */
+}
+.ff-col__note,
+.ff-col__status {
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.28;
+  color: #013F17;
+}
+.ff-col__status {
+  margin-top: 6px;
+  font-weight: 700;
+  /* `--moss` is the caption tone and this is not a caption: it is the answer to
+     "did that save", at 12 CSS px. It takes the page's own ink, and the failure
+     states take `.ff-vis__failline`'s red. */
+  color: #013F17;
+}
+.ff-col__status[data-state='failed'],
+.ff-col__status[data-state='retrying'] { color: #B3261E; }
+
+/* Announced, never drawn: it would otherwise be a second copy of the note. */
+.ff-col__live { position: absolute; }
+
+/* ══════════════════════ PHASE 64 — screen 21, the brand voice, rebuilt 1:1
+   from the reference (Founder Flow v2, `[data-voice]` / `kindWide`), 2026-08-21.
+
+   Drawn to the supplied reference (`Proovd Founder Flow v2.dc.html`) and
+   measured against it in a real browser at 1320x900, on the terms every other
+   1:1 screen of this flow ships under: the reference outranks the design
+   system HERE, and nowhere else.
+
+   ── This is not `.ff-voice` ───────────────────────────────────────────────
+   `.ff-voice` was the Session F surface — a token-scale chip list with a
+   textarea under it, at the product's own sizes. It is gone with its
+   component. `.ff-vc` is a different composition over the same record, so it
+   is a different prefix, the way `.ff-ll` is not `.ff-look` and `.ff-pc` is
+   not `.ff-prob`.
+
+   ── The layout model is the reference's, literally ────────────────────────
+   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
+   scaled to the viewport by `fitStages()`:
+
+       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
+
+   No branch of that function names `build`, so this screen takes `pageScale`
+   alone. The component owns the scale and writes the whole transform on mount
+   and on resize; the `scale(0.4125)` below is what renders for the one frame
+   before the layout effect runs, and is the value measured at 1320x900.
+   Nothing here reflows — the stage scales instead, which is why the
+   composition is identical at every viewport (§33.11.1).
+
+   `isClaimPhone()` returns `false` in the reference — "one composition
+   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+   code and this composition is what every viewport gets, exactly as there.
+
+   ── The two sheets are NOT on the stage ───────────────────────────────────
+   They are `position:fixed` with their own `clamp()`s, and those are
+   viewport-relative in the reference too. So the stage scales and the sheets
+   do not, which is the reference's own arrangement: a dialog is furniture, and
+   furniture is sized to the screen rather than to the composition.
+
+   ── The two suspended conventions, as on screens 1–8 and 15 ───────────────
+     - HEX LITERALS, not tokens. Nine of the reference's colours here have
+       exact or near tokens; mixing literal and token would leave half the
+       screen able to drift with a token change and half not, so all of them
+       are literal and this screen reads exactly as the reference does.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the note,
+   `p { margin; max-width: var(--measure) }` reaches the save line and the two
+   sheet lines, `button,input,textarea,select { font: inherit }` reaches every
+   control, and `body`'s 18px / line-height 1.6 reaches the whole stage — the
+   reference's own body sets neither a size nor a line-height, so the stage
+   resets both and the sheets reset them again.
+
+   The CTA and the chips deliberately keep the UA's own `padding: 1px 6px`,
+   which is what the reference computes: both are fixed-size flex boxes with
+   their content centred, so it changes nothing, and writing a `padding: 0`
+   the reference does not have would be a difference rather than a fix.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen, and the reason is not that
+   the reference has none. It has a wordmark and a HELP, and it draws them
+   INSIDE the `z-index: 25` fixed layer below. Left in place they would sit
+   under that layer and be unreachable, so both are hidden and both leave the
+   tab order with it. There is no message badge on this screen at all: the
+   reference draws none, and `FlowPage` is no longer asked for one. */
+.ff[data-flow-page='voice'] .ff__top,
+.ff[data-flow-page='voice'] .ff__badge { display: none; }
+
+/* The reference's `[data-voice]`. Nothing scrolls. */
+.ff-vc {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+  color: #013F17;
+  /* The reference's own body sets a family and nothing else, so its whole
+     layer inherits 16px / normal. The project's sets 18px / 1.6, which reaches
+     the chrome and both sheets. */
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* ── The chrome. Its `clamp()`s are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-vc__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-vc__back:hover { color: #013F17; }
+/* The reference has no focus treatment at all. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11) and it costs the composition nothing. */
+.ff-vc__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-vc__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-vc__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-vc__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-vc__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-vc__help:hover { background: #E9FFE1; }
+.ff-vc__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* ── The stage, and the 2000px column inside it ──────────────────────────── */
+
+.ff-vc__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.4125);
+  transform-origin: center center;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* Centred on the stage rather than pinned to it, with no offset of its own —
+   unlike `.ff-pc__col` and `.ff-ll__col`, which each carry a `+ 70px`. */
+.ff-vc__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2000px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* `data-anim="note"`. A `span` in the reference; an `h1` here, because
+   §33.11.2 wants exactly one on the page and this is the only thing that names
+   it. Every value is the reference's. */
+.ff-vc__note {
+  margin: 0;
+  font-size: 58px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
 
 /* `data-anim="panel"` — the sentence. It WRAPS: a Founder with five adjectives
    runs past 2000px and the reference's own `flex-wrap` is what carries them
@@ -19420,7 +19537,6 @@ html.no-motion .ff-story__say { transition: none; }
   width: 2000px;
   height: 160px;
   flex: none;
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   display: flex;
   align-items: center;
   justify-content: center;
@@ -19429,9 +19545,6 @@ html.no-motion .ff-story__say { transition: none; }
   background: #41ED98;
   color: #FAFAFA;
   font-family: 'Satoshi', sans-serif;
-<<<<<<< HEAD
-  font-size: 70px;
-=======
   font-size: 66px;
   font-weight: 900;
   line-height: normal;
@@ -19647,67 +19760,11 @@ html.no-motion .ff-story__say { transition: none; }
   color: #FAFAFA;
   font-family: 'Satoshi', sans-serif;
   font-size: clamp(18px, 1.9vw, 26px);
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
   font-weight: 900;
   line-height: normal;
   letter-spacing: -0.02em;
   cursor: pointer;
   outline: none;
-<<<<<<< HEAD
-  box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
-  transition: background 0.2s ease;
-}
-.ff-col__cta:hover { background: #3BDC8C; }
-.ff-col__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
-
-/* ONE block inside the 130px gap the CTA's own margin already leaves, so the
-   note and the save status sit between the panel and the button without moving
-   either. They stack in FLOW inside it rather than at two fixed offsets — the
-   first draft positioned each absolutely and the browser pass caught the
-   consequence: the note wrapped to two lines at this column width and `Saved
-   12:03 AM` printed on top of the second one. A flow block cannot do that
-   however either line grows.
-
-   1491px is the column's own width, named here for the same reason `.ff-vis`
-   names it: an absolutely positioned child has no flow width to inherit. */
-.ff-col__gap {
-  position: absolute;
-  left: 0;
-  top: calc(100% - 165px - 130px + 8px);
-  width: 1491px;
-  /* No height and no `overflow` on purpose. The block is out of flow, so it can
-     never push the CTA; a fixed height with `overflow: hidden` would instead
-     SWALLOW a line that grew, which is the silent version of the defect the
-     browser pass just caught. The budget is 122px — the 130px gap less the 8px
-     above — and at this column width the note is one line (38px) and the status
-     one more (38px + 6px), so there is room to spare. Copy that needed more
-     than the budget would visibly crowd the CTA, which is a signal rather than
-     a disappearance. */
-}
-.ff-col__note,
-.ff-col__status {
-  margin: 0;
-  width: 100%;
-  max-width: none;
-  font-size: 30px;
-  font-weight: 500;
-  line-height: 1.28;
-  color: #013F17;
-}
-.ff-col__status {
-  margin-top: 6px;
-  font-weight: 700;
-  /* `--moss` is the caption tone and this is not a caption: it is the answer to
-     "did that save", at 12 CSS px. It takes the page's own ink, and the failure
-     states take `.ff-vis__failline`'s red. */
-  color: #013F17;
-}
-.ff-col__status[data-state='failed'],
-.ff-col__status[data-state='retrying'] { color: #B3261E; }
-
-/* Announced, never drawn: it would otherwise be a second copy of the note. */
-.ff-col__live { position: absolute; }
-=======
 }
 .ff-vc__done.is-off { background: #A2AFA8; }
 .ff-vc__done:focus-visible { outline: 3px solid #013F17; outline-offset: 3px; }
@@ -19789,4 +19846,3 @@ html.no-motion .ff-story__say { transition: none; }
    removed: it is a composition the reference does not have, and it made the
    sheet 68px TALLER — 1017 against its 949 — so it cut off more of the control
    it was meant to make reachable. The scrolling scrim above fixed that instead. */
->>>>>>> 1f51fdd (feat: implement core vetting flow logic, animation utilities, and initial VoiceStep surface for the founder onboarding process.)
