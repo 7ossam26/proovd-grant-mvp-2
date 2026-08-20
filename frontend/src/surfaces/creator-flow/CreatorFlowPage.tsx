@@ -167,11 +167,13 @@ export function CreatorFlowPage({
 }
 
 /**
- * The help control, for the one page that renders no top bar.
+ * The help control, for a page that renders no top bar.
  *
- * Exported so the invitation screen can place it inside its own lockup rather
- * than reproduce the drawer. §27.1's sixth question is answered on every screen
- * or on none.
+ * Screen 0 was its one caller until 2026-08-20, when that screen was rebuilt
+ * 1:1 from the v11 reference — whose invitation screen is a name, a sentence
+ * and one control, with an empty 60px band where a meta row would sit. It is
+ * kept exported because the drawer belongs beside the bar rather than inside
+ * it, and the next bare page needs the same thing.
  */
 export function CreatorFlowHelp({ pageId, param }: { pageId: string; param: string }) {
   return (

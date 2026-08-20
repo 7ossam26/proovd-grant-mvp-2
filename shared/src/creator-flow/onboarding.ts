@@ -44,21 +44,31 @@ export const CREATOR_INVITE_NO_OBLIGATION =
 /* ── Screen 1, the password ───────────────────────────────────────────────── */
 
 /**
- * The requirement list, and the reason it has exactly one entry.
+ * The requirement list — the v11 reference's four checks (2026-08-20).
  *
- * The reference draws four live checks — eight characters, an upper, a lower, a
- * special — and `completeAffiliateSignup` enforces exactly one thing: **twelve
- * characters**. Shipping the reference's list would tick all four for an
- * eight-character password and then be refused by the server, which is §1.1's
- * failure with a green tick on it.
+ * The screen was rebuilt 1:1 from
+ * `docs/design-refrence/Proovd_Affiliate_Founder_Rebuild_v11_FIXED_SHAREABLE.html`,
+ * whose `pwReqs()` is four live checks in this order: length, an uppercase, a
+ * lowercase, a special. The order is load-bearing — the list renders as a 2×2
+ * grid filled row-major, so reordering moves the boxes.
  *
- * So the list is what the server enforces, and the server was not changed to
- * match the list. Three reasons, in order: the Founder and the Admin have no
- * composition rule either, and a per-role password policy is a difference
- * nobody asked for; Session F's password change goes through Better Auth's own
- * route, which would start refusing passwords that already exist; and length
- * beats composition on the evidence. A checklist where three of four ticks
- * decide nothing teaches people that ticks are decorative.
+ * ── One number differs from the reference, and it is the one the server owns ─
+ * The reference's first check is `v.length>=8`. `completeAffiliateSignup`
+ * refuses anything under **twelve** characters, so shipping the reference's own
+ * number would tick all four for an eight-character password and then be
+ * refused at the claim, six screens later — §1.1's failure with a green tick on
+ * it. The label reads the constant rather than a literal, so the screen and the
+ * server can never disagree about it.
+ *
+ * The server was not moved down to 8 to close the gap the other way: the
+ * Founder and the Admin have no composition rule either and a per-role password
+ * policy is a difference nobody asked for; Session F's password change goes
+ * through Better Auth's own route, which would start refusing passwords that
+ * already exist; and lowering a minimum is a security change nobody requested.
+ *
+ * The other three checks decide nothing the server enforces, which is exactly
+ * what the reference does — they are guidance the person can act on, and all
+ * four must pass before the confirm field appears (`pwStrong()`).
  */
 export const CREATOR_PASSWORD_MIN_LENGTH = 12;
 
@@ -74,6 +84,9 @@ export const CREATOR_PASSWORD_REQUIREMENTS: readonly CreatorPasswordRequirement[
     label: `At least ${CREATOR_PASSWORD_MIN_LENGTH} characters`,
     met: (value) => value.length >= CREATOR_PASSWORD_MIN_LENGTH,
   },
+  { id: 'upper', label: 'An uppercase letter', met: (value) => /[A-Z]/.test(value) },
+  { id: 'lower', label: 'A lowercase letter', met: (value) => /[a-z]/.test(value) },
+  { id: 'special', label: 'A special character', met: (value) => /[^A-Za-z0-9]/.test(value) },
 ];
 
 export function creatorPasswordMeetsRequirements(value: string): boolean {
@@ -83,6 +96,21 @@ export function creatorPasswordMeetsRequirements(value: string): boolean {
 /** The reference's own line, and it is true — Better Auth hashes at the claim. */
 export const CREATOR_PASSWORD_NEVER_PLAIN =
   'We never store it in plain text.';
+
+/* ── The v11 reference's own strings, character for character (2026-08-20) ───
+ *
+ * Every one of these is read out of the reference's `moment-password` markup
+ * rather than retyped. The apostrophe in the mismatch line is the straight
+ * `'` the reference file actually contains (verified at the byte level), not
+ * the typographic `’` a copy pass would reach for.
+ */
+export const CREATOR_PASSWORD_HEAD = 'Set a password.';
+export const CREATOR_PASSWORD_LEDE = `Keep your account yours. ${CREATOR_PASSWORD_NEVER_PLAIN}`;
+export const CREATOR_PASSWORD_PLACEHOLDER = 'Your password';
+export const CREATOR_PASSWORD_CONFIRM_PLACEHOLDER = 'Confirm it';
+export const CREATOR_PASSWORD_MISMATCH = "Those don't match yet.";
+/** `obLabels[1]` — the reference's label for this step's forward control. */
+export const CREATOR_PASSWORD_CTA = 'Continue';
 
 /**
  * Why the password is gone after a reload, said on the screen that asks again.

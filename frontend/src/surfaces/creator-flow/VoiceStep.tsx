@@ -236,7 +236,8 @@ function Body({ token, loaded }: { token: string; loaded: CreatorInvitationState
             `space-between` and the reference put a toggle knob here; without a
             second child the row read as a bordered box with a hole in it, and
             the on/off state was conveyed by colour only (DNA §1) — the same
-            reasoning `.crf-pw__tick` already carries. */}
+            reasoning the password screen's requirement ticks carry, where the
+            met/not-met state is in an `.sr-only` span beside the fill. */}
         <span className="crf-voice__flex-state">{flexible ? 'Yes' : 'No'}</span>
       </button>
 
