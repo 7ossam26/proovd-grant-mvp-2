@@ -304,7 +304,9 @@ function FoundersTable({ rows }: { rows: FounderListRow[] }) {
   return (
     <div className="tablewrap">
       <table className="table fdir-table">
-        <caption className="admin-table__caption">
+        {/* The reference draws no caption. Ours stays for the accessible name and
+            stops taking a line of its own above the header row. */}
+        <caption className="admin-table__caption sr-only">
           Type and lifecycle, the Admin and Founder action columns, and the internal owner.
         </caption>
         <thead>
@@ -359,7 +361,14 @@ function FoundersTable({ rows }: { rows: FounderListRow[] }) {
                   {row.founderAction.label}
                 </span>
               </td>
-              <td className="grey">{row.owner ?? 'Not recorded'}</td>
+              <td>
+                <span className="fdir-owner">
+                  <span className="grey">{row.owner ?? 'Not recorded'}</span>
+                  {/* Decorative: the row is already a link through `.fdr-name`
+                      and the whole row opens on click. */}
+                  <b aria-hidden="true">&rarr;</b>
+                </span>
+              </td>
             </tr>
           ))}
         </tbody>

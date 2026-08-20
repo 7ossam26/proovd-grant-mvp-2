@@ -6041,7 +6041,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   gap: var(--sp-32);
   margin-bottom: var(--sp-48);
 }
-.fdir-hero .grey { max-width: 34rem; }
+.fdir-hero .grey { max-width: 34rem; }  /* PHASE 47 widens this — see below. */
 
 /* The six filter cards: one bordered strip, counts leading (DNA §5.4 — a
    finite set with the number first). The active card earns the brand tint. */
@@ -12572,3 +12572,156 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
     grid-template-columns: 1fr;
   }
 }
+
+/* ════════════════════════ PHASE 47 — the Founders directory, measured against
+   its reference (Spec §26, §26.1, §33.11.2; DNA §5.2, §5.14), added 2026-08-20.
+
+   The Founders workspace was built from `docs/design-refrence/
+   Proovd-Founder-Admin.html` in Sessions A–C, and PHASE 31 took its palette,
+   its spacing, and its type from that file's own readable CSS. What it did not
+   take was the reference's CONTAINER and its table geometry. A browser pass at
+   1440 measured the two rather than comparing screenshots:
+
+     reference   content 1310px at x=48  ·  columns 305/185/261/261/163
+                 row 88px, 1px brand hairline ·  type as a filled chip
+     shipped     content 1109px at x=156 ·  columns auto (a real <table>)
+                 row 93px, no hairline        ·  type as bold text
+
+   The 201px is ONE token. `--gutter` is `clamp(1.5rem, 6vw, 6rem)` — a
+   marketing-page gutter — and 6vw at this width is 85px against the
+   reference's flat 48px; `--wrap` then caps at 90vw on top of it. §26 licenses
+   dashboard density in the Admin panel and nowhere else, so the Admin chrome
+   reads its own gutter here and the public site's is untouched (`.topbar`,
+   `.views`, and `.view` are AdminLayout's alone — nothing else renders them).
+   Everything downstream follows from that one change rather than from six
+   separate corrections: six filter cards that stopped wrapping their
+   subtitles, a search field that regained 200px, and five columns that stopped
+   squeezing their action text.
+
+   The table stays a real <table> rather than becoming the reference's grid of
+   <button>s. `table-layout: fixed` reproduces its
+   `1.4fr .85fr 1.2fr 1.2fr .75fr` exactly, and `<th scope="col">` is what a
+   screen reader needs (§33.11.2) — the reference's own markup associates no
+   header with any cell, which is the one place its structure is worse than
+   ours and is not a difference worth copying.
+
+   PHASE 25's three conventions bind: tokens only, scoped overrides, and every
+   responsive rule names the overflow it answers.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────── THE ADMIN CONTAINER */
+
+/* The cap stays: above 1600px the reference stretches a five-column table
+   across the whole monitor, which is its prototype's shape rather than a
+   decision. At or below it the two are the same box. */
+.topbar,
+.views { width: min(100%, 1600px); }
+.topbar { padding-inline: var(--sp-48); }
+.view { padding: var(--sp-48) var(--sp-48) var(--sp-120); }
+
+/* ───────────────────────────────────────────── THE DIRECTORY TABLE */
+
+.fdir-table {
+  table-layout: fixed;
+  border-top: 2px solid var(--brand);
+}
+
+/* 1.4 : 0.85 : 1.2 : 1.2 : 0.75 of the table, the reference's own fractions. */
+.fdir-table th:nth-child(1) { width: 25.93%; }
+.fdir-table th:nth-child(2) { width: 15.74%; }
+.fdir-table th:nth-child(3) { width: 22.22%; }
+.fdir-table th:nth-child(4) { width: 22.22%; }
+.fdir-table th:nth-child(5) { width: 13.89%; }
+
+.fdir-table th {
+  color: var(--moss);
+  letter-spacing: 0.1em;
+  padding: var(--sp-16) var(--sp-16) 0.85rem 0;
+  border-bottom: 1px solid var(--brand);
+}
+
+/* The hairline is the row separator, and `height` on a cell is a minimum —
+   5.5rem is the reference's own row, so a one-line row and a wrapping one
+   still read as the same rhythm. */
+.fdir-table td {
+  height: 5.5rem;
+  padding: 1.1rem var(--sp-16) 1.1rem 0;
+  border-bottom: 1px solid var(--brand);
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.fdir-table tbody tr:hover,
+.fdir-table tbody tr:focus-within { background: var(--brand-5); }
+
+/* The campaign type is a filled chip, not bold text: it is a closed
+   two-value vocabulary plus §9's derived `Proposed`, and a chip is what says
+   so at a glance. Dark fill, so the owner ruling's #FAFAFA does not apply —
+   this is `--mint` on `--dark`, which is what the reference measures at. */
+.fdir-table .fdir-type {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  margin-bottom: 0.4rem;
+  padding: 0.36rem 0.5rem;
+  background: var(--dark);
+  color: var(--mint);
+  border-radius: var(--radius);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fdir-table .fdir-avatar {
+  width: 2.6rem;
+  height: 2.6rem;
+  font-size: 0.8rem;
+}
+
+/* Owner and the row's own affordance share the last cell. The arrow is
+   decorative — the row is already a link through `.fdr-name`, and the whole
+   row is clickable — so it is aria-hidden in the markup rather than a second
+   thing a screen reader announces (§33.11.4: a control names its action, and
+   this is not a control). */
+.fdir-owner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-12);
+}
+.fdir-owner b {
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--darker);
+  line-height: 1;
+}
+
+/* ═════════════════════════════════════════════ PHASE 47 — RESPONSIVE ══ */
+
+/* A 48px gutter is 30% of a 320px viewport. The Admin chrome steps down with
+   the same two breakpoints PHASE 31's cards already use, so the topbar, the
+   filter strip, and the table keep one left edge at every width. */
+@media (max-width: 900px) {
+  .topbar { padding-inline: var(--sp-24); }
+  .view { padding: var(--sp-32) var(--sp-24) var(--sp-96); }
+}
+@media (max-width: 600px) {
+  .topbar { padding-inline: var(--sp-16); }
+  .view { padding: var(--sp-24) var(--sp-16) var(--sp-80); }
+}
+
+/* Five fixed columns cannot hold five readable cells much under a laptop.
+   `.tablewrap` already scrolls; below 900px the table is given its natural
+   width inside that scroller rather than compressing every column at once —
+   the PHASE 38 rule that a hidden column is a missing column, applied to a
+   table that genuinely cannot wrap. */
+@media (max-width: 900px) {
+  .fdir-table { min-width: 52rem; }
+}
+
+/* The subtitle is one line in the reference and wrapped to two here, which
+   pushed `Create Founder` a line down and broke the hero's baseline. The
+   Admin body size is 18px against the reference's 16px, so the measure needs
+   the difference rather than the reference's own number. */
+.fdir-hero .grey { max-width: 42rem; }
