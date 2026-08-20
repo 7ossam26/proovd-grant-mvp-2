@@ -54,6 +54,37 @@ export interface ProgressionStep {
 }
 
 /**
+ * The step a pre-order is actually at, from its stored status and whether the
+ * campaign has recorded a delivery.
+ *
+ * Pure, and exported, because Session F's Backers page needs the same answer
+ * for a whole campaign at once and a per-row `backerProgression` call would be
+ * an N+1. Two implementations of "where is this pre-order" is two answers, and
+ * the one nobody updated is the one a Founder acts on — so there is one rule
+ * with two callers rather than a batched copy of it.
+ */
+export function backerProgressionStep(
+  status: string,
+  delivered: boolean,
+): BackerProgressionKey {
+  if (status === 'reserved_active') return 'reserved';
+  if (status === 'pending_capture') return 'charge_due';
+  if (
+    status === 'threshold_not_met_no_charge' ||
+    status === 'killed_no_charge' ||
+    status === 'reserved_canceled'
+  ) {
+    return 'no_charge';
+  }
+  if (status === 'capture_failed_retrying' || status === 'capture_failed_dropped') return 'failed';
+  if (status === 'refunded' || status === 'reversed' || status === 'disputed') return 'refunded';
+  // Captured. Whether that reads as captured, delivery due, or delivered is
+  // a fact about the campaign's fulfillment record, not about the money.
+  if (delivered) return 'delivered';
+  return 'delivery_due';
+}
+
+/**
  * §31.8's progression for one reservation.
  *
  * Outcome steps — `no_charge`, `failed`, `refunded` — are returned ONLY when
@@ -78,29 +109,7 @@ export async function backerProgression(
     .limit(1);
   if (!row) return [];
 
-  const status = row.status as string;
-  const delivered = row.deliveredAt != null;
-
-  /** The step this reservation is actually at, from its stored status. */
-  function currentKey(): BackerProgressionKey {
-    if (status === 'reserved_active') return 'reserved';
-    if (status === 'pending_capture') return 'charge_due';
-    if (
-      status === 'threshold_not_met_no_charge' ||
-      status === 'killed_no_charge' ||
-      status === 'reserved_canceled'
-    ) {
-      return 'no_charge';
-    }
-    if (status === 'capture_failed_retrying' || status === 'capture_failed_dropped') return 'failed';
-    if (status === 'refunded' || status === 'reversed' || status === 'disputed') return 'refunded';
-    // Captured. Whether that reads as captured, delivery due, or delivered is
-    // a fact about the campaign's fulfillment record, not about the money.
-    if (delivered) return 'delivered';
-    return 'delivery_due';
-  }
-
-  const current = currentKey();
+  const current = backerProgressionStep(row.status as string, row.deliveredAt != null);
   const order = BACKER_PROGRESSION.map((s) => s.key);
   const currentIndex = order.indexOf(current);
 

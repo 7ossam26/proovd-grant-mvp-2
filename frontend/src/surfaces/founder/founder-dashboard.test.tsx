@@ -30,6 +30,7 @@ import {
   EDITABLE_FIELDS,
   EDIT_TIER_GROUPS,
   FOUNDER_CHAPTERS,
+  FOUNDER_CHAPTER_BUILD,
   LIVE_ABSENCES,
   MEETING_REQUEST_IS_NOT_A_SCHEDULER,
   MEETING_REQUEST_ONE_MESSAGE,
@@ -40,6 +41,13 @@ import {
   RETRY_WINDOW_IS_STORED,
   RETRY_WINDOW_OUTCOME,
   W9_IS_NOT_UPLOADED_HERE,
+  BACKER_DATA_REQUEST_GRANTS_NO_ACCESS,
+  DO_NOT_FULFILL_LABEL,
+  EXPORT_CANNOT_CARRY_A_CONSENT_CONDITION,
+  FOUNDER_EXPORT_WITHHELD,
+  REFUSED_BACKER_DATA_PURPOSES,
+  RESOLUTION_IS_NOT_FULFILLMENT,
+  WRAP_ABSENCES,
   liveAbsence,
 } from '@proovd/shared';
 import { SERVICE_SLA_BLOCK } from '../../features/public/site.js';
@@ -261,21 +269,25 @@ describe('B1 — the shell wraps what already exists', () => {
     );
   });
 
-  it('an unbuilt chapter names the surface that owns its work today', async () => {
+  it('no chapter is interim any more, and the shell has no branch left for one', async () => {
     /*
-      DELIBERATELY MOVED (Session E, 2026-08-19). This asserted the shape on
-      the Get paid chapter, which is now built — so `after` (Wrap) is the one
-      interim chapter left, and it is what carries the arrangement Session B
-      established. Session F retires this test with the last `ownedForNowBy`.
-    */
-    installShell({ status: 'closed_resolved' });
-    renderAt(`/campaigns/${CAMPAIGN}/home?chapter=after`);
-    await waitFor(() => expect(rail()).toBeTruthy());
+      DELIBERATELY RETIRED (Session F, 2026-08-20). This asserted the interim
+      panel's shape — a real route to the surface that owned the work, and the
+      session that would replace it. Session E moved it from Get paid onto
+      Wrap; Session F built Wrap, so the assertion would now be asserting that
+      Session F did not happen.
 
-    // Not an apology and not an empty frame: a real route to the surface that
-    // does this work now.
-    const link = screen.getByRole('link', { name: /Your campaigns/i });
-    expect(link.getAttribute('href')).toBe('/campaigns');
+      What replaces it is the fact that made it dead: every chapter's
+      `ownedForNowBy` is null, and `ChapterBody` is an exhaustive switch over a
+      closed union — so there is no interim branch for a fifth state to fall
+      into, and adding a chapter without a component fails the BUILD.
+    */
+    for (const chapter of FOUNDER_CHAPTERS) {
+      expect(
+        FOUNDER_CHAPTER_BUILD[chapter.id].ownedForNowBy,
+        `${chapter.id} still names a surface that owns its work`,
+      ).toBeNull();
+    }
   });
 });
 
@@ -834,6 +846,213 @@ describe('the retired money addresses', () => {
       .getAllByRole('button')
       .find((button) => button.getAttribute('aria-current') === 'page');
     expect(current?.textContent?.trim()).toBe('Get paid');
+  });
+});
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SESSION F — Chapter 4, Wrap, and the Backers page
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+  A campaign in a Wrap state, which is the only condition under which Chapter 4
+  is unlocked at all. `closed_resolved` is what the QA fixture uses too, for the
+  reason the last describe in this file records.
+*/
+const wrap = () => `/campaigns/${CAMPAIGN}/home?chapter=after`;
+const backersPath = () => `/campaigns/${CAMPAIGN}/backers`;
+
+function installWrapped() {
+  installShell({ status: 'closed_resolved' });
+}
+
+describe('F1 — the Creator recap has no ranking anywhere in it', () => {
+  it('renders the roster with no position, no podium, and no order of merit', async () => {
+    installWrapped();
+    renderAt(wrap());
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your creators' })).toBeTruthy());
+
+    /*
+      The reference ranks four ways at once — a numbered badge, a first-place
+      tile, a "who you'd work with again" heading, and a sort by backer count.
+      §30 defers public leaderboards, and removing the crown while keeping the
+      sort is still a ranking because the order IS the claim.
+    */
+    const body = document.body.textContent ?? '';
+    expect(body).not.toMatch(/is leading/i);
+    expect(body).not.toMatch(/#1|#2|#3/);
+    expect(body).toMatch(/listed by handle/i);
+
+    /*
+      The word-hunt is not the assertion — `leaderboard` appears on this page,
+      inside the register sentence that refuses one, and a scan that could not
+      tell an explanation from a usage would force the explanation out (the
+      rule `notifications/` records).
+
+      The assertion is the ORDER, because the order IS the claim: the server
+      sorts by handle and the surface renders what it is given. A surface that
+      re-sorted by anything would show these two the other way round.
+    */
+    const handles = [...document.querySelectorAll('.fd-wrap__handle')].map(
+      (node) => node.textContent?.trim(),
+    );
+    expect(handles).toEqual(['@benchnotes', '@solderandsawdust']);
+  });
+
+  it('offers §22.9 on a recorded completion and withholds it otherwise', async () => {
+    installWrapped();
+    renderAt(wrap());
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your creators' })).toBeTruthy());
+
+    // The fixture has one completed Creator and one Proovd has not decided on.
+    // The ask follows §22.8's recorded status, which contains no sales term at
+    // all (§33.10.6) — never a revenue figure.
+    expect(screen.getAllByRole('button', { name: /ask them to work again/i })).toHaveLength(1);
+    expect(document.body.textContent).toContain(
+      'Proovd has not made a completion decision on this partnership yet',
+    );
+  });
+});
+
+describe('F1 — §22.11 and §22.10', () => {
+  it('says whether the money is closed out without naming a reconciliation item', async () => {
+    installWrapped();
+    renderAt(wrap());
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Closing the campaign out' })).toBeTruthy(),
+    );
+    // §22.11's own sentence: money reconciled is not a reward shipped.
+    expect(screen.getByText(RESOLUTION_IS_NOT_FULFILLMENT)).toBeTruthy();
+    // §21's item keys are Admin vocabulary and a Founder cannot act on one.
+    const body = document.body.textContent ?? '';
+    for (const key of ['batch_completeness', 'provisional_vs_earned', 'founder_share_w9']) {
+      expect(body).not.toContain(key);
+    }
+  });
+
+  it('renders Phase 21b two gates as two panels, with no combined tick above them', async () => {
+    installWrapped();
+    renderAt(wrap());
+
+    // `NextCampaign.tsx` was built in Phase 21b and routed nowhere until now.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Your next campaign' })).toBeTruthy(),
+    );
+    expect(screen.getByText('The three-month wait')).toBeTruthy();
+    expect(screen.getByText("Proovd's readiness decision")).toBeTruthy();
+    // §33.10.9's trap is summarising both into one green tick.
+    expect(screen.getByText(/both parts above have to be done/i)).toBeTruthy();
+  });
+
+  it('states the threshold as a count of pre-orders, never a dollar amount', async () => {
+    installWrapped();
+    renderAt(wrap());
+
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeTruthy());
+    const body = document.body.textContent ?? '';
+    // §4.1. The reference reads "$12,840 raised against a $10,000 threshold".
+    expect(body).toMatch(/pre-orders this campaign needed/i);
+    expect(body).not.toMatch(/against a \$[\d,]+ threshold/i);
+  });
+});
+
+describe('F2 — the §19 operational share reaches a Founder for the first time', () => {
+  it('renders a withdrawn share as what it is, never as deliverable', async () => {
+    installWrapped();
+    renderAt(backersPath());
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: /people, with what they chose/i })).toBeTruthy(),
+    );
+    // The pinned sentence, not the enum value — this is a fact about
+    // somebody's money and `do_not_fulfill` is an internal name (§3.1).
+    expect(screen.getByText(DO_NOT_FULFILL_LABEL)).toBeTruthy();
+    expect(document.body.textContent).not.toContain('do_not_fulfill');
+  });
+});
+
+describe('F3 — the export names what it withholds before the button', () => {
+  it('lists every withheld column and links to the server-composed file', async () => {
+    installWrapped();
+    renderAt(backersPath());
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Download the list' })).toBeTruthy(),
+    );
+    for (const withheld of FOUNDER_EXPORT_WITHHELD) {
+      expect(document.body.textContent).toContain(withheld.reason);
+    }
+    expect(screen.getByText(EXPORT_CANNOT_CARRY_A_CONSENT_CONDITION)).toBeTruthy();
+
+    // A plain link the browser follows. Nothing in the surface assembles a row
+    // or chooses a column — §25.7's limit applies to what leaves the server.
+    const download = screen.getByRole('link', { name: /download the pre-order list/i });
+    expect(download.getAttribute('href')).toContain('/backers/export');
+  });
+});
+
+describe('F4 — §25.7 two purposes, and two refusals with their reasons', () => {
+  it('offers only fulfillment and support, and says why the other two are absent', async () => {
+    installWrapped();
+    renderAt(backersPath());
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Ask for more than this' })).toBeTruthy(),
+    );
+    expect(screen.getByRole('radio', { name: /delivering what somebody pre-ordered/i })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /answering a support question/i })).toBeTruthy();
+
+    // The reference's other two are named with their reason, where the option
+    // would have been — not quietly dropped.
+    for (const refused of REFUSED_BACKER_DATA_PURPOSES) {
+      expect(document.body.textContent).toContain(refused.refusedBecause);
+      expect(screen.queryByRole('radio', { name: refused.label })).toBeNull();
+    }
+    expect(screen.getByText(BACKER_DATA_REQUEST_GRANTS_NO_ACCESS)).toBeTruthy();
+  });
+
+  it('records the ask through the route', async () => {
+    installWrapped();
+    const user = userEvent.setup();
+    renderAt(backersPath());
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Ask for more than this' })).toBeTruthy(),
+    );
+    await user.click(screen.getByRole('radio', { name: /answering a support question/i }));
+    await user.type(
+      screen.getByLabelText(/what do you need, exactly/i),
+      'A backer says their reward never arrived.',
+    );
+    await user.click(screen.getByRole('button', { name: /send this to proovd/i }));
+
+    await waitFor(() => expect(seen.some((url) => url.includes('/backer-data-request'))).toBe(true));
+  });
+});
+
+describe('the Wrap chapter absences', () => {
+  it('renders every register entry across the chapter and the Backers page', async () => {
+    installWrapped();
+    const { unmount } = renderAt(wrap());
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your creators' })).toBeTruthy());
+    const chapterBody = document.body.textContent ?? '';
+    unmount();
+
+    installWrapped();
+    renderAt(backersPath());
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Download the list' })).toBeTruthy(),
+    );
+    const combined = chapterBody + (document.body.textContent ?? '');
+
+    for (const absence of WRAP_ABSENCES) {
+      expect(combined, `${absence.id} is refused but its reason renders nowhere`).toContain(
+        absence.absentBecause,
+      );
+    }
   });
 });
 

@@ -36,6 +36,7 @@ import { MoneyRecord } from './features/admin/money/MoneyRecord.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
+import { BackersPage } from './surfaces/founder/BackersPage.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
 import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
 import {
@@ -834,10 +835,9 @@ const rootChildren: RouteObject[] = [
       chapter is `?chapter=` beneath it (DNA §5.12), so a position survives a
       reload without minting a second address for one campaign.
 
-      Chapters 1–3 are built (Sessions C, D and E); `/roster`,
+      All four chapters are built (Sessions C, D, E and F); `/roster`,
       `/creator-readiness`, `/updates`, `/results` and `/fulfillment` all
-      redirect into them. Wrap names the surfaces that own its work today until
-      Session F moves it here.
+      redirect into them.
     */
     path: 'campaigns/:campaignId/home',
     element: <FounderDashboard />,
@@ -863,6 +863,21 @@ const rootChildren: RouteObject[] = [
     */
     path: 'campaigns/:campaignId/fulfillment',
     element: <PaidChapterRedirect />,
+  },
+  {
+    /*
+      §19's operational share, §20's Explore section 10, and §25.7's ask
+      (Founder Dashboard Session F, 2026-08-19).
+
+      A PAGE rather than a chapter, which is the supplied reference's own
+      architecture: a chapter's home is a hub, and the list of people behind the
+      numbers is its own page reached by a link and left by a back control. It
+      is linked from Chapter 2 (a live campaign has people to support) and from
+      Chapter 4 (a finished one has rewards to deliver), so it belongs to
+      neither and sits at its own address.
+    */
+    path: 'campaigns/:campaignId/backers',
+    element: <BackersPage />,
   },
   {
     // Phase 22c (§27.7). The first ACCOUNT-level address either role has had —

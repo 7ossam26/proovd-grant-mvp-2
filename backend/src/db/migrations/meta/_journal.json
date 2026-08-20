@@ -407,6 +407,13 @@
       "when": 1787500800000,
       "tag": "0057_founder_post_acknowledgement",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1787587200000,
+      "tag": "0058_founder_backer_data_request",
+      "breakpoints": true
     }
   ]
 }

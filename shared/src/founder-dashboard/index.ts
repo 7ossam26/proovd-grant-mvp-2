@@ -266,11 +266,12 @@ export const FOUNDER_CHAPTER_BUILD = {
     ownedForNowBy: null,
   },
   after: {
+    // §22.8's recorded completion, §22.9's ask, §22.10's two gates, §22.11's
+    // resolution, and the §19 operational share on its own page — built
+    // Session F, which also routed Phase 21b's `NextCampaign` for the first
+    // time and filled §20's Explore section 10.
     session: 'Session F',
-    ownedForNowBy: [
-      { label: 'Get paid', path: '/campaigns/:campaignId/home?chapter=payouts' },
-      { label: 'Your campaigns', path: '/campaigns' },
-    ],
+    ownedForNowBy: null,
   },
 } as const satisfies Record<FounderChapterId, FounderChapterBuildState>;
 

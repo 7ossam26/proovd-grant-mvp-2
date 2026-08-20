@@ -588,7 +588,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // fields on screen and out of every file, and the absence of the route is
   // what enforces it. `requireAdmin` refuses a Founder and a Creator by role
   // before any query runs.
-  app.use(createAdminBackersRouter({ db, auth }));
+  app.use(createAdminBackersRouter({ db, auth, audit }));
   // The Admin Tasks panel, built 2026-08-16. §26 names no task list and this
   // adds none of §1 rule 6's seven inventions: a private note an operator
   // writes to themselves, pointed at the record it belongs to. No assignee

@@ -181,3 +181,10 @@ export * from './meetings.js';
 // Dashboard Session D — a recorded §1 rule 6 deviation; see the file header for
 // the four absences, the strongest being that it carries no free text at all).
 export * from './posts.js';
+
+// The Founder's Backer data request (migration 0058, Founder Dashboard Session
+// F). NOT a deviation — §25.7 already permits Backer email and purchase details
+// for fulfillment and support, and refuses marketing and community. Both
+// refusals are in the CHECK; an approved request grants no access, because
+// `exportBackerRows` takes no argument one could arrive as.
+export * from './backer-data.js';

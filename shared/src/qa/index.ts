@@ -237,6 +237,27 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: true,
   },
   {
+    /*
+      Chapter 4 and the Backers page (Founder Dashboard Session F).
+
+      Two addresses in one flow because they are one piece of work: the chapter
+      is what a Founder reads when the campaign is over, and the Backers page is
+      the list of people it is about — linked from the chapter, and from
+      Chapter 2 while a campaign is still live.
+
+      `keyboardPathRequired` because the page carries §19's operational share:
+      an email address per person, the export that hands them over, and §25.7's
+      request form. §28.5 names data and privacy surfaces among the five, and a
+      list a keyboard user cannot walk is a list they cannot fulfil from.
+    */
+    key: 'founder_wrap',
+    label: 'After the campaign: your creators, your backers, the export, and the next campaign',
+    specRef: '§19, §20, §22.8–§22.11, §25.7',
+    audience: 'founder',
+    routes: ['/campaigns/:campaignId/home?chapter=after', '/campaigns/:campaignId/backers'],
+    keyboardPathRequired: true,
+  },
+  {
     key: 'creator_signup',
     label: 'The Creator invitation, signup, and payout setup',
     specRef: '§11, §13',

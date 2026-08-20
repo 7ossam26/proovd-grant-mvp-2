@@ -10486,3 +10486,228 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
       token's own ratio is a product-wide decision with its own pass. */
 .fd-paid__payments .stat__value { font-size: clamp(1.5rem, 7vw, 4.5rem); }
 .fd-paid__payments .stat__sub { color: var(--dark); }
+
+/* ═══════════════════════ PHASE 41 — Chapter 4, Wrap, and the Backers page
+   Founder Dashboard Session F, 2026-08-20.
+
+   PHASE 41 and not the 40 a reader might assume: 39 was the shell and Chapters
+   2 and 3, 40 was taken elsewhere the same week, and the number has now moved
+   four times in three days. Derive it (`grep -oE "PHASE [0-9]+" | sort -u -V |
+   tail -1`), do not carry it forward from a brief.
+
+   Prefixes: `.fd-wrap__` and `.fd-backers__`, both free. `.fd-` is the Founder
+   dashboard's own family (PHASE 39); `.cr-` is the Affiliate ADMIN workspace,
+   `.mny-` the Money console, `.cmp-` the Campaigns hub.
+
+   Conventions carried from PHASE 39, and each one is a defect a browser pass
+   found on an earlier chapter:
+
+     * every grid is `minmax(0, 1fr)`. An implicit `auto` track is sized to the
+       widest item's MIN-content, and a text input carries an intrinsic one that
+       ignores `width: 100%` — which is how a single-column grid comes to be
+       wider than its own container at 320.
+     * an email, a reward SKU and a pre-order reference are each ONE unbreakable
+       token, so every cell that can hold one takes `overflow-wrap: anywhere`.
+     * a sentence that states a RULE takes `--dark`; a caption stays `--moss`.
+       `--moss` on white is 3.37:1 and these lines are what say why a control
+       does not exist (Founder Flow Session E's finding, Session C's scoping).
+     * a `.btn` is `inline-flex`, so a direct button child of a column flex is
+       stretched to the measure with its label centred unless it is told not to.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Chapter 4 ───────────────────────────────────────────────────────────── */
+
+.fd-wrap__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--sp-12);
+  margin-block: var(--sp-24);
+}
+
+/* §4.1: the threshold is a COUNT. Stated plainly, next to the numbers it is
+   about, rather than as a caption under them. */
+.fd-wrap__threshold {
+  margin-block: var(--sp-12);
+  color: var(--dark);
+}
+
+.fd-wrap__granted {
+  margin-block: var(--sp-12);
+  padding: var(--sp-12);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+  background: var(--mint);
+}
+
+.fd-wrap__creators {
+  list-style: none;
+  margin: var(--sp-24) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: var(--sp-12);
+}
+
+.fd-wrap__creators > li { min-width: 0; }
+
+/* A handle is one unbreakable token and can be long. */
+.fd-wrap__handle {
+  font-weight: 600;
+  color: var(--dark);
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+.fd-wrap__niche {
+  color: var(--moss);
+  margin-block: var(--sp-4) var(--sp-8);
+}
+
+.fd-wrap__decided {
+  color: var(--moss);
+}
+
+/* The ask's controls sit in a row that WRAPS rather than squeezing: a `.btn` is
+   `overflow: hidden` because it hosts the fill sweep, so a squeezed row clips a
+   label instead of shortening it (PHASE 38's Create Founder finding). No media
+   query — `flex-wrap` does nothing at a width where the row fits, so there is
+   no breakpoint to get wrong. */
+.fd-wrap__creators .btn {
+  align-self: start;
+  margin-top: var(--sp-8);
+  margin-right: var(--sp-8);
+}
+
+/* ── The Backers page ────────────────────────────────────────────────────── */
+
+.fd-backers__back {
+  margin-block: 0 var(--sp-12);
+}
+
+.fd-backers__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--sp-12);
+  margin-block: var(--sp-24);
+}
+
+/* §25.7's two refusals, where the reference put two more options. They read as
+   part of the choice, so they sit directly beneath it rather than in a note
+   further down the page. */
+.fd-backers__refused {
+  list-style: none;
+  margin: var(--sp-12) 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-12);
+}
+
+.fd-backers__refused-label {
+  display: block;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.fd-backers__rows {
+  list-style: none;
+  margin: var(--sp-12) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border-top: var(--bw) solid var(--grey-light);
+}
+
+.fd-backers__rows > li {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--sp-8) var(--sp-12);
+  align-items: baseline;
+  padding-block: var(--sp-12);
+  border-bottom: var(--bw) solid var(--grey-light);
+  min-width: 0;
+}
+
+/* Every one of these can hold a single unbreakable token: an address with no
+   spaces, a SKU, and a uuid. */
+.fd-backers__email,
+.fd-backers__reward,
+.fd-backers__ref {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.fd-backers__email {
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.fd-backers__reward { color: var(--moss); }
+
+/* The reference and the state both claim a row; on a narrow screen the id is
+   the least useful of the four, so it takes its own line last. */
+.fd-backers__ref {
+  grid-column: 1 / -1;
+  color: var(--moss);
+  font-size: var(--fs-body);
+}
+
+.fd-backers__step { justify-self: start; }
+
+@media (max-width: 600px) {
+  .fd-backers__rows > li { grid-template-columns: minmax(0, 1fr); }
+  .fd-backers__step { justify-self: start; }
+}
+
+/* -- The money hero, for the fourth time -----------------------------------
+
+   `--fs-num` has a 2.5rem floor because `.stat__value` is the done-moment
+   number slot, sized for a COUNT — Chapter 2's Glance puts `44` in it, and at
+   40px that is fine. `US$5,715.60` is eleven glyphs of one unbreakable token
+   and ran 108px past its card at 1280 here, pushing the figures row, the
+   measure and the section with it: one defect reported as four.
+
+   Session E lowered the floor on `.fd-paid__payments` and scoped it there so
+   every counting Stat in the product stayed untouched. Lowering it alone was
+   not enough here: this row was two auto-fit columns, so the amount had half
+   the measure and was still 11px over at 1280 — and a wider figure would put
+   it back however far the clamp came down. So the row is ONE column at every
+   width. The count and the amount are two facts about the same campaign and
+   read perfectly well stacked; sizing an unbreakable token to fit half a
+   measure is how this defect keeps coming back. Not `overflow-wrap` either:
+   breaking an amount across two lines is worse than shrinking it.
+
+   `.stat__sub` is `--grey` (2.27:1 on white) and here it carries the label of
+   the largest money figure a Founder reads — Founder Flow Session E's rule,
+   that a line saying what a number MEANS is not a caption. Scoped, because the
+   token's own ratio is a product-wide decision with its own pass. */
+.fd-wrap__figures { grid-template-columns: minmax(0, 1fr); }
+.fd-wrap__figures .stat--white .stat__value { font-size: clamp(1.5rem, 6vw, 3.5rem); }
+.fd-wrap__figures .stat__sub { color: var(--dark); }
+
+/* -- What is a caption and what is a rule, on these two surfaces -----------
+
+   Founder Flow Session E's finding and Session C's scoping, applied line by
+   line: `--moss` is 3.37:1 and `--grey` is ~2.2:1 on white, both under AA, and
+   both are product-wide decisions with their own pass. So a caption keeps the
+   quiet token and anything that CHANGES WHAT SOMEBODY DOES takes `--dark`.
+
+     * the do-not-fulfill note is a rule about money — the whole reason a row
+       stays on the list is to say nothing is owed;
+     * the `To deliver` sub says what the number a Founder packs against counts;
+     * the reward title is what they ship, and the pre-order reference is what
+       they read out to support — both are content, not decoration;
+     * §25.7's basis under each permitted purpose is why that purpose is the
+       one they may pick;
+     * a §22.8 disqualification reason is Proovd's recorded decision about
+       somebody's work.
+
+   `.fd-wrap__niche` stays `--moss`: a Creator's niche genuinely is a caption
+   beside their handle, and re-toning every quiet line would leave the surface
+   with no quiet lines at all. */
+.fd-backers__figures .stat__sub,
+.fd-backers__rows .fd-backers__reward,
+.fd-backers__rows .fd-backers__ref,
+.fd-backers__ask .choice__sub,
+.fd-wrap__decided { color: var(--dark); }

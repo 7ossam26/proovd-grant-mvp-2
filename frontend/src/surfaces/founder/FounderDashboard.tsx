@@ -47,7 +47,6 @@ import { Link as RouterLink, useParams, useSearchParams } from 'react-router';
 import {
   FOUNDER_CHAPTERS,
   FOUNDER_CHAPTERS_INTRO,
-  FOUNDER_CHAPTER_BUILD,
   campaignStatusLabel,
   founderChapterForStatus,
   founderChapterOrDefault,
@@ -60,6 +59,7 @@ import { SurfaceLoading, supportMailto } from '../../features/public/states.js';
 import { ChooseChapter } from './chapters/ChooseChapter.js';
 import { LiveChapter } from './chapters/LiveChapter.js';
 import { PaidChapter } from './chapters/PaidChapter.js';
+import { WrapChapter } from './chapters/WrapChapter.js';
 import {
   fetchFounderDashboard,
   FounderRequestError,
@@ -71,7 +71,16 @@ type State =
   | { status: 'error'; title: string; detail: string }
   | { status: 'ready'; dashboard: FounderDashboardView };
 
-/** The chapter's own content, or an honest account of where that work lives. */
+/**
+ * The chapter's own content.
+ *
+ * Every one of the four is built as of Session F, so there is no interim
+ * branch here and no `FOUNDER_CHAPTER_BUILD` lookup: an unbuilt chapter had a
+ * panel naming the surface that owned its work, and that panel now describes
+ * nothing. Leaving it would be a state the product cannot reach, rendered by
+ * code the type checker can no longer prove is dead — the chapter id is a
+ * closed union and the four cases exhaust it.
+ */
 function ChapterBody({
   chapter,
   campaignId,
@@ -81,83 +90,29 @@ function ChapterBody({
   campaignId: string;
   campaignType: string | null;
 }) {
-  // Session D: §20's Glance, the one ranked Act, Explore's eleven sections, the
-  // three live-editing tiers' first UI, §18's updates, and deviation 2's post
-  // acknowledgement. Phase 17a's `CampaignHome` is what it grew out of and is
-  // retired with `/updates` — one surface over one live campaign.
-  if (chapter === 'live') return <LiveChapter campaignId={campaignId} />;
-  // Session C: §14.5's roster, §14.2's three responses, §14.3's bonus, and
-  // deviation 1's meeting request.
-  if (chapter === 'choose') {
-    return <ChooseChapter campaignId={campaignId} campaignType={campaignType} />;
+  switch (chapter) {
+    // Session C: §14.5's roster, §14.2's three responses, §14.3's bonus, and
+    // deviation 1's meeting request.
+    case 'choose':
+      return <ChooseChapter campaignId={campaignId} campaignType={campaignType} />;
+    // Session D: §20's Glance, the one ranked Act, Explore's eleven sections,
+    // the three live-editing tiers' first UI, §18's updates, and deviation 2's
+    // post acknowledgement. Phase 17a's `CampaignHome` is what it grew out of
+    // and is retired with `/updates` — one surface over one live campaign.
+    case 'live':
+      return <LiveChapter campaignId={campaignId} />;
+    // Session E: §21's retry window, §22.3's W-9 and schedule through the ONE
+    // resolver, §22.4's Day 14 checklist, and §22.5's four obligations. Phase
+    // 18b's `CampaignResults` and Phase 21a's `Fulfillment` are what it grew
+    // out of; both addresses redirect here.
+    case 'payouts':
+      return <PaidChapter campaignId={campaignId} />;
+    // Session F: §22.8's recorded completion, §22.9's ask, §22.11's resolution,
+    // §22.10's two gates, and the link to §19's people on their own page.
+    // Phase 21b's `NextCampaign` had been built and routed nowhere.
+    case 'after':
+      return <WrapChapter campaignId={campaignId} />;
   }
-  // Session E: §21's retry window, §22.3's W-9 and schedule through the ONE
-  // resolver, §22.4's Day 14 checklist, and §22.5's four obligations. Phase
-  // 18b's `CampaignResults` and Phase 21a's `Fulfillment` are what it grew out
-  // of; both addresses redirect here.
-  if (chapter === 'payouts') return <PaidChapter campaignId={campaignId} />;
-
-  const build = FOUNDER_CHAPTER_BUILD[chapter];
-  const meta = FOUNDER_CHAPTERS.find((c) => c.id === chapter)!;
-  const owners = build.ownedForNowBy ?? [];
-
-  /*
-    The interim chapter, in the shape the Admin rebuilds established: it names
-    the surface that owns this work TODAY with a real route to it, and says
-    which session replaces it. It does not apologise and it does not render an
-    empty frame — a chapter that offered nothing would be worse than the
-    addresses that already work.
-  */
-  return (
-    <Section aria-labelledby={`fd-chapter-${chapter}`}>
-      <Measure>
-        <p className="kicker">{meta.label}</p>
-        <h1 className="h2" id={`fd-chapter-${chapter}`}>
-          {meta.title}
-        </h1>
-        <p className="lede">{meta.note}</p>
-        <StatePanel
-          state="This chapter is not built yet"
-          whatHappened={`Everything it will hold already exists and is reachable — it has not moved here yet. ${build.session} builds this chapter.`}
-          next="Open the surface that owns this work today. Nothing about your campaign is waiting on this page."
-          owner="Proovd"
-          nextUpdate={`When ${build.session} ships`}
-          /*
-            ONE control (DNA §5.6). The first owner is this chapter's primary
-            surface; any others sit below the panel rather than inside this
-            slot. A block list here renders beside `getHelp` in the panel's own
-            action row, which is what the browser pass caught — jsdom has no
-            layout, so nothing else could have.
-          */
-          action={
-            owners[0] ? (
-              <RouterLink to={owners[0].path.replace(':campaignId', campaignId)}>
-                {owners[0].label}
-              </RouterLink>
-            ) : (
-              NO_ACTION
-            )
-          }
-          reference={campaignId}
-          getHelp={{ href: supportMailto(`Campaign ${campaignId} — ${meta.label}`) }}
-        />
-        {owners.length > 1 ? (
-          <>
-            <p className="kicker">Also on this campaign</p>
-            <ul className="doc-list">
-              {owners.slice(1).map((owner) => (
-                <li key={owner.path}>
-                  <RouterLink to={owner.path.replace(':campaignId', campaignId)}>
-                    {owner.label}
-                  </RouterLink>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-      </Measure>
-    </Section>
-  );
 }
 
 /** The drawer — every chapter, what it is, and why a locked one is locked. */

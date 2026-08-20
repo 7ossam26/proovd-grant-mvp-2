@@ -37,6 +37,12 @@ import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { findFounderCampaign } from '../workspace/service.js';
 import { readFounderDashboard } from '../founder-dashboard/service.js';
+import {
+  exportBackerRows,
+  readFounderBackers,
+  readFounderWrap,
+  requestBackerData,
+} from '../founder-dashboard/wrap.js';
 import { readCampaignHome } from '../live/home.js';
 import { readFounderResults } from '../close/results.js';
 import { readFounderPaymentStatus, requestEarlyRemaining } from '../close/founder-payments.js';
@@ -504,6 +510,88 @@ export function createFounderHomeRouter(deps: FounderHomeRouterDeps): Router {
         actor: actorId(req),
       });
       res.json({ movedToHistory: moved });
+    },
+  );
+
+  /* ── Chapter 4 and the Backers page (Session F) ─────────────────────────── */
+
+  /**
+   * F1. §22.8's recorded completion per Creator, §22.9's asks, §22.10's two
+   * gates and §22.11's resolution, in one read. Every one of those services has
+   * existed since Phase 21b and had no Founder route.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/wrap`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+    const wrap = await readFounderWrap(db, campaignId);
+    if (!wrap) {
+      notFound(res);
+      return;
+    }
+    res.json({ wrap });
+  });
+
+  /**
+   * F2. §19's operational share, which the Spec calls MANDATORY and which no
+   * Founder route has ever read. `do_not_fulfill` rows are returned rather than
+   * filtered: a Founder needs to see that a pre-order was shared and then
+   * withdrawn, and what they must NOT do about it.
+   */
+  router.get(`${FOUNDER_HOME_PATH}/campaigns/:campaignId/backers`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+    res.json({ backers: await readFounderBackers(db, campaignId) });
+  });
+
+  /**
+   * F3. §20's Explore section 10. The response is a CSV body, and the column
+   * list comes from the register — `exportBackerRows` takes no argument that
+   * could widen it, so there is no query parameter to police here either.
+   */
+  router.get(
+    `${FOUNDER_HOME_PATH}/campaigns/:campaignId/backers/export`,
+    founder,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+      const file = await exportBackerRows(db, campaignId);
+      res.setHeader('content-type', 'text/csv; charset=utf-8');
+      res.setHeader('content-disposition', `attachment; filename="${file.filename}"`);
+      res.send(file.csv);
+    },
+  );
+
+  /**
+   * F4. §25.7's ask. Ungated: it records what a Founder needs and grants
+   * nothing — there is no column an exporter reads and no parameter an approval
+   * could arrive as. Registered in `UNGATED_ADMIN_WRITES`' Founder-side
+   * equivalent by being a Founder route, which takes `requireRole` only.
+   */
+  router.post(
+    `${FOUNDER_HOME_PATH}/campaigns/:campaignId/backer-data-request`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await requestBackerData(
+        { db, audit },
+        {
+          campaignId,
+          founderUserId: req.authUser?.id ?? '',
+          purpose: String(body['purpose'] ?? ''),
+          detail: String(body['detail'] ?? ''),
+        },
+      );
+      if (!result.ok) {
+        res.status(result.code === 'already_open' ? 409 : 400).json({
+          error: result.code,
+          whatHappened: result.message,
+        });
+        return;
+      }
+      res.json({ requestId: result.requestId });
     },
   );
 

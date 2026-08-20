@@ -1504,3 +1504,134 @@ export const respondToDay14Clarification = (
     method: 'POST',
     body: JSON.stringify({ requestId, responseNote }),
   });
+
+/* ── Chapter 4, Wrap, and the Backers page (Session F) ─────────────────────── */
+
+export interface WrapCreatorRow {
+  associationId: string;
+  publicHandle: string | null;
+  subtype: string | null;
+  audienceNiche: string | null;
+  adminBio: string | null;
+  status: string;
+  rosterMembership: string;
+  completion: {
+    status: 'successfully_completed' | 'completion_disqualified';
+    decidedAt: string;
+    reason: string | null;
+  } | null;
+  workAgain: {
+    eligible: boolean;
+    request: {
+      id: string;
+      status: string;
+      requestedAt: string;
+      responseNote: string | null;
+    } | null;
+  };
+}
+
+export interface FounderWrapView {
+  campaignId: string;
+  campaignStatus: string;
+  closedAt: string | null;
+  resolution: {
+    resolved: boolean;
+    resolvedAt: string | null;
+    fulfillmentNote: string;
+    fulfillmentActive: boolean;
+    fulfilledAt: string | null;
+  };
+  creators: WrapCreatorRow[];
+  nextCampaign: {
+    cooldown: {
+      months: number | null;
+      closedAt: string | null;
+      earliestAt: string | null;
+      elapsed: boolean;
+      blocker: string | null;
+    };
+    adminReadiness: {
+      decision: 'ready' | 'not_ready' | null;
+      decidedAt: string | null;
+      explanation: string | null;
+    };
+    readyForNextCampaign: boolean;
+    prepareNote: string;
+  };
+}
+
+export const fetchFounderWrap = (campaignId: string): Promise<{ wrap: FounderWrapView }> =>
+  call(`${base(campaignId)}/wrap`);
+
+/** §22.9's ask, on the Creator recap. `WORK_AGAIN_ACCEPTANCE_GRANTS_NOTHING` rides the answer. */
+export const requestWorkAgain = (
+  campaignId: string,
+  associationId: string,
+  message: string,
+): Promise<{ requestId: string; grantsNothing: readonly string[] }> =>
+  call(`/api/founder/campaigns/${encodeURIComponent(campaignId)}/work-again`, {
+    method: 'POST',
+    body: JSON.stringify({ associationId, message }),
+  });
+
+export interface FounderBackerRow {
+  preorderReference: string;
+  backerEmail: string;
+  rewardSku: string;
+  rewardTitle: string;
+  fulfillmentState: 'active' | 'do_not_fulfill';
+  doNotFulfillLabel: string | null;
+  doNotFulfillAt: string | null;
+  sharedAt: string;
+  progressionStep: string;
+  progressionLabel: string;
+}
+
+export interface BackerDataRequestRow {
+  id: string;
+  purpose: string;
+  detail: string;
+  status: string;
+  requestedAt: string;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+export interface FounderBackersView {
+  campaignId: string;
+  sharedCount: number;
+  activeCount: number;
+  doNotFulfillCount: number;
+  rows: FounderBackerRow[];
+  exportColumns: { key: string; header: string; definition: string }[];
+  exportWithheld: { header: string; reason: string }[];
+  dataRequests: BackerDataRequestRow[];
+}
+
+export const fetchFounderBackers = (
+  campaignId: string,
+): Promise<{ backers: FounderBackersView }> => call(`${base(campaignId)}/backers`);
+
+/**
+ * §25.7's ask. The purpose is one of §25.7's two; marketing and community are
+ * refused before the request is composed, and refused again by a 0058 CHECK.
+ */
+export const requestBackerData = (
+  campaignId: string,
+  purpose: string,
+  detail: string,
+): Promise<{ requestId: string }> =>
+  call(`${base(campaignId)}/backer-data-request`, {
+    method: 'POST',
+    body: JSON.stringify({ purpose, detail }),
+  });
+
+/**
+ * §20's Explore section 10. The address is a plain GET the browser follows —
+ * the CSV is composed on the SERVER from `FOUNDER_EXPORT_COLUMNS`, so there is
+ * nothing here that could choose a column, and no client-side assembly that
+ * could quietly include one the register withholds.
+ */
+export const founderBackerExportPath = (campaignId: string): string =>
+  `${base(campaignId)}/backers/export`;
