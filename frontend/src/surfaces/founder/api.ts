@@ -1635,3 +1635,91 @@ export const requestBackerData = (
  */
 export const founderBackerExportPath = (campaignId: string): string =>
   `${base(campaignId)}/backers/export`;
+
+/* ── Session G: §5.2's account-level settings ─────────────────────────────── */
+
+export interface FounderSettingsFieldValue {
+  id: string;
+  value: string | null;
+  guarded: boolean;
+}
+
+export interface FounderSettingsView {
+  campaignId: string;
+  campaignTitle: string | null;
+  signInEmail: string | null;
+  accountCreatedAt: string | null;
+  fields: FounderSettingsFieldValue[];
+  representations: { id: string; label: string; confirmed: boolean }[];
+  dateOfBirthOnFile: boolean;
+  country: string | null;
+  stateRegion: string | null;
+  soleProprietor: boolean | null;
+  w9: {
+    state: string;
+    line: string;
+    action: string;
+    requestedAt: string | null;
+    submittedAt: string | null;
+    verifiedAt: string | null;
+    returnReason: string | null;
+    blocksPayments: boolean;
+  } | null;
+  w9NotApplicableBecause: string | null;
+  deletionRequestedAt: string | null;
+}
+
+/**
+ * Account-level, so no campaign id anywhere in the path.
+ *
+ * A Founder with two campaigns has two `founder_claim_profiles` rows; the
+ * server picks the most recent, which is the same row the Admin workspace
+ * edits. A campaign parameter here would let the two disagree about which
+ * record a phone number lives on.
+ */
+export const fetchFounderSettings = (): Promise<{ settings: FounderSettingsView }> =>
+  call('/api/founder/settings');
+
+/**
+ * One registered field, with the reason §25.6 requires on a claimed account.
+ *
+ * The field id is in the path and the server validates it against the register
+ * — there is no way to name a column from here, which is 16a's rule applied to
+ * a customer-facing correction.
+ */
+export const correctFounderField = (
+  fieldId: string,
+  value: string | null,
+  reason: string,
+): Promise<{ settings: FounderSettingsView }> =>
+  call(`/api/founder/settings/fields/${encodeURIComponent(fieldId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value, reason }),
+  });
+
+/**
+ * §5.2's password, through the wrapper that forces `revokeOtherSessions` and
+ * writes the §25.6 row. The browser never calls `/api/auth/change-password`
+ * directly, and it never calls `update-user` at all.
+ */
+export const changeFounderPassword = (
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: true }> =>
+  call('/api/founder/settings/password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+
+/**
+ * §5.2's delete-account request. It records an ask onto 0040's insert-only
+ * record and erases nothing — there is no approval state to poll and no purge
+ * date to render, because neither exists.
+ */
+export const requestFounderDeletion = (
+  requestDetail: string,
+): Promise<{ settings: FounderSettingsView }> =>
+  call('/api/founder/settings/deletion-request', {
+    method: 'POST',
+    body: JSON.stringify({ requestDetail }),
+  });

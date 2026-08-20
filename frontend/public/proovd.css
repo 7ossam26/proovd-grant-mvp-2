@@ -10711,3 +10711,163 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
 .fd-backers__rows .fd-backers__ref,
 .fd-backers__ask .choice__sub,
 .fd-wrap__decided { color: var(--dark); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PHASE 42 — The Founder's account settings (§5.2), Session G, 2026-08-20
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Eleven items at one account-level address, and the page Phase 22c's
+   `/settings/notifications` was always going to join. Nothing here mints a
+   colour: every rule reads a slot, and the two tone decisions below are the
+   same one PHASE 39 and PHASE 41 recorded — a sentence that states a rule
+   takes `--dark`, a caption keeps `--moss`.
+
+   `.fd-set-` and not `.fd-` bare: `.fd` is the dashboard SHELL, and this page
+   is deliberately outside it (a chapter belongs to a campaign; these belong to
+   the person). Scoping the shell's `.wrap` fix to `.fd` is what makes that
+   distinction matter, and this page uses `Section`/`Measure` at the top level
+   exactly as the notification page it absorbs always did.
+
+   Prefixes checked and free: `.pc-` (33), `.ff-` (34), `.cr-` (26/32), `.cf-`
+   (31), `.mny-` (36), `.tdy-` (37), `.fd-` (39/41). */
+
+.fd-set__kicker {
+  color: var(--moss);
+  margin: 0 0 var(--sp-24);
+}
+
+/* One block per §5.2 item, with a rule of its own so the sections read as a
+   list of eleven rather than as one long column of prose. */
+.fd-set__block {
+  display: grid;
+  gap: var(--sp-12);
+  padding-block: var(--sp-24);
+  border-top: var(--bw) solid var(--grey-light);
+}
+
+.fd-set__fields,
+.fd-set__confirmations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sp-16);
+}
+
+.fd-set__field {
+  display: grid;
+  gap: var(--sp-8);
+}
+
+/* The value and its control on one line where there is room, stacked where
+   there is not. `flex-wrap` rather than a breakpoint: PHASE 34's finding —
+   wrapping does nothing at a width where the row fits and everything at a
+   width where it does not, so there is no number to get wrong. The Button is
+   `flex: 0 0 auto` for the reason PHASE 39 recorded on `.copylink`: a `.btn`
+   is `overflow: hidden` because it hosts the fill sweep, so a squeezed row
+   clips the label rather than wrapping it. */
+.fd-set__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-12);
+}
+
+.fd-set__row > div {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.fd-set__row > .btn {
+  flex: 0 0 auto;
+}
+
+/* `.kicker`'s own treatment rather than a font-size token: there is no
+   `--fs-caption` in this file (the var scan in `a11y.test.tsx` said so, which
+   is what that scan is for), and the six that do exist are body, button, h2,
+   hero, number and step. Uppercase at the body size with tracking is what
+   every other label-above-a-value in the product does. */
+.fd-set__label {
+  color: var(--moss);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* An address, a phone number, and a legal name are each one unbreakable token
+   and each is wider than its column at 320. PHASE 36 made this call twice on
+   the Money console and PHASE 41 once on the Backers page; it is the same
+   defect and the same answer. */
+.fd-set__value {
+  color: var(--dark);
+  overflow-wrap: anywhere;
+}
+
+.fd-set__help {
+  color: var(--moss);
+  margin: 0;
+}
+
+.fd-set__edit {
+  display: grid;
+  gap: var(--sp-12);
+  padding: var(--sp-16);
+  border: var(--bw) solid var(--grey-light);
+  border-radius: var(--radius);
+}
+
+.fd-set__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-12);
+}
+
+/* A `.btn` is inline-flex, and an inline-flex flex ITEM in a grid or column is
+   stretched to the container width by the default `align-items: stretch` —
+   Founder Flow Session D found it on a `.tag`, Session E on a `.btn`, and the
+   Money console a third time. A direct child of the block, so nothing inside
+   `.fd-set__acts` (already a row) is touched. */
+.fd-set__block > .btn {
+  justify-self: start;
+}
+
+.fd-set__confirmations li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  justify-content: space-between;
+}
+
+/* -- What is a caption and what is a rule, on this surface -----------------
+
+   PHASE 41's rule, third time. `--moss` is 3.37:1 on white and under AA, and
+   re-toning the token is a product-wide decision with its own pass — so a
+   caption keeps it and anything that CHANGES WHAT SOMEBODY DOES takes
+   `--dark`. Here that is:
+
+     * `.fd-set__rule` — the four pinned sentences. Every one of them states a
+       consequence somebody needs before they act: that changing a password
+       signs them out everywhere, that Proovd never sees their identity
+       documents, that a W-9 belongs to a campaign, and that closing an account
+       does not erase the records. Reading any of those as decoration is
+       exactly the §1.4 failure they exist to prevent.
+     * `.fd-set__consequence` — what changing a legal name or a contact address
+       actually moves, stated BEFORE the change rather than discovered after
+       it.
+
+   `.fd-set__label` and `.fd-set__help` stay `--moss`: a field's name beside
+   its value, and a hint under it, genuinely are captions. */
+.fd-set__rule,
+.fd-set__consequence {
+  color: var(--dark);
+  margin: 0;
+}
+
+.fd-set__consequence {
+  padding-left: var(--sp-12);
+  border-left: var(--bw) solid var(--accent-yellow);
+}

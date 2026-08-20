@@ -258,6 +258,26 @@ export const PRINCIPAL_FLOWS = [
     keyboardPathRequired: true,
   },
   {
+    /*
+      §5.2's eleven settings at one account-level address (Session G).
+
+      The only Founder flow with no campaign in its route, because
+      `founder_claim_profiles` is unique per campaign and these belong to the
+      person. `/settings/notifications` — Phase 22c's own address, and the one
+      account-level route the product had before this — redirects here.
+
+      `keyboardPathRequired` because §28.5 names account and privacy surfaces
+      among its five: this page changes a password, corrects the address every
+      transactional message goes to, and files an account-closure request.
+    */
+    key: 'founder_settings',
+    label: 'Your account: your details, your password, payouts, W-9, and closing the account',
+    specRef: '§5.2, §13, §22.3, §25.8, §27.7',
+    audience: 'founder',
+    routes: ['/settings'],
+    keyboardPathRequired: true,
+  },
+  {
     key: 'creator_signup',
     label: 'The Creator invitation, signup, and payout setup',
     specRef: '§11, §13',

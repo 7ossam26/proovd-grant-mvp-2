@@ -37,3 +37,4 @@ export * from './founder-dashboard/choose.js';
 export * from './founder-dashboard/live.js';
 export * from './founder-dashboard/paid.js';
 export * from './founder-dashboard/wrap.js';
+export * from './founder-dashboard/settings.js';

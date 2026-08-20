@@ -37,11 +37,11 @@ import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
 import { BackersPage } from './surfaces/founder/BackersPage.js';
+import { SettingsPage } from './surfaces/founder/SettingsPage.js';
 import { FounderCampaigns } from './surfaces/founder/FounderCampaigns.js';
 import { SignIn, ResetPassword } from './surfaces/auth/SignIn.js';
 import {
   CreatorNotificationSettings,
-  FounderNotificationSettings,
 } from './surfaces/notifications/NotificationSettings.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { CreatorSignup } from './surfaces/creator/CreatorSignup.js';
@@ -880,16 +880,34 @@ const rootChildren: RouteObject[] = [
     element: <BackersPage />,
   },
   {
-    // Phase 22c (§27.7). The first ACCOUNT-level address either role has had —
-    // every other authenticated route in the product is scoped to a campaign
-    // or an association, because until now everything a Founder or Creator did
-    // belonged to one campaign. The digest preference belongs to the person.
+    // Session G (§5.2). The eleven settings §5.2 names, at one address.
     //
-    // Deliberately NOT on the campaign home: §27.7 says notification history
-    // must not turn the Founder home into a widget dashboard or override the
-    // one ranked Act item, and its own address is what makes that structural.
+    // The ACCOUNT-level address Phase 22c opened, widened to what §5.2
+    // actually lists. Its reasoning is unchanged and still applies: it is
+    // deliberately not on the campaign home, because §27.7 says notification
+    // history must not turn the Founder home into a widget dashboard or
+    // override the one ranked Act item, and its own address is what makes
+    // that structural.
+    //
+    // Account-level rather than campaign-scoped, for the reason Phase 22c's
+    // page recorded when it was the only one: `founder_claim_profiles` is
+    // unique per campaign, so a Founder with two campaigns would otherwise
+    // have two settings pages and correcting a phone number on one would
+    // leave the other saying something else.
+    path: 'settings',
+    element: <SettingsPage />,
+  },
+  {
+    // Phase 22c's own address, retired to a redirect.
+    //
+    // The digest control and the notification history are now a section of
+    // `/settings` — two Founder surfaces over one preference would be two
+    // places to answer one question, the reasoning that retired `/roster`,
+    // `/updates`, `/results` and `/fulfillment` into the four chapters. The
+    // address survives its page because it is the one account-level route the
+    // product has had, and something may still point at it.
     path: 'settings/notifications',
-    element: <FounderNotificationSettings />,
+    element: <Navigate to="/settings" replace />,
   },
     ],
   },

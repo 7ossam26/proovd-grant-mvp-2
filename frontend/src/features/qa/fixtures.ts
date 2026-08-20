@@ -35,6 +35,7 @@ import type {
   FounderPaymentStatusView,
   FounderReadiness,
   FounderBackersView,
+  FounderSettingsView,
   FounderResultsView,
   FounderUpdatesView,
   FounderWrapView,
@@ -1110,6 +1111,51 @@ const founderBackers: FounderBackersView = {
   exportColumns: [...FOUNDER_EXPORT_COLUMNS],
   exportWithheld: [...FOUNDER_EXPORT_WITHHELD],
   dataRequests: [],
+};
+
+/*
+  §5.2's eleven settings, Session G.
+
+  The account is CLAIMED and the campaign has closed with a charge, so the W-9
+  block renders the resolver's own line rather than the not-yet sentence — the
+  branch worth sweeping, since the other one has no state to get wrong. No
+  deletion request is on file, so the ask renders as a control rather than as a
+  receipt; the receipt branch is the surface suite's.
+*/
+const founderSettings: FounderSettingsView = {
+  campaignId: QA.campaignId,
+  campaignTitle: QA.title,
+  signInEmail: 'nadia@example.com',
+  accountCreatedAt: '2026-06-02T10:00:00.000Z',
+  fields: [
+    { id: 'preferred_name', value: 'Nadia', guarded: false },
+    { id: 'phone', value: '+1 503 555 0134', guarded: false },
+    { id: 'business_name', value: 'Solder & Sawdust LLC', guarded: false },
+    { id: 'business_entity_type', value: 'LLC', guarded: false },
+    { id: 'legal_name', value: 'Nadia Okonkwo', guarded: true },
+    { id: 'email', value: 'nadia@example.com', guarded: true },
+  ],
+  representations: [
+    { id: 'age_18_plus', label: 'I am 18 or older', confirmed: true },
+    { id: 'us_person', label: 'I am a US person', confirmed: true },
+    { id: 'sanctions', label: 'I am not on a sanctions list', confirmed: true },
+  ],
+  dateOfBirthOnFile: true,
+  country: 'US',
+  stateRegion: 'OR',
+  soleProprietor: false,
+  w9: {
+    state: 'verified',
+    line: 'Your W-9 is on file and verified.',
+    action: 'No action needed',
+    requestedAt: '2026-09-13T17:00:00.000Z',
+    submittedAt: '2026-09-14T09:12:00.000Z',
+    verifiedAt: '2026-09-15T11:40:00.000Z',
+    returnReason: null,
+    blocksPayments: false,
+  },
+  w9NotApplicableBecause: null,
+  deletionRequestedAt: null,
 };
 
 /* ── §11/§14/§18/§21 the Creator's surfaces ────────────────────────────────── */
@@ -2478,6 +2524,9 @@ export const QA_ROUTES: StubRoute[] = [
   { match: /\/api\/founder\/campaigns\/[^/]+\/backers\/export$/, body: '' },
   { match: /\/api\/founder\/campaigns\/[^/]+\/backers$/, body: { backers: founderBackers } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/wrap$/, body: { wrap: founderWrap } },
+  /* Session G. Account-level: no campaign id in the path, and no overlap with
+     the campaign-scoped matchers above it. */
+  { match: /\/api\/founder\/settings$/, body: { settings: founderSettings } },
   { match: /\/api\/founder\/notifications\/preferences$/, body: { preference: digestPreference } },
   { match: /\/api\/founder\/notifications\/history/, body: { history: notificationHistory } },
   { match: /\/api\/founder\/campaigns$/, body: { campaigns: [{ campaignId: QA.campaignId, status: 'live', type: 'pre_launch', listingPaid: true, highEffort: false }] } },
