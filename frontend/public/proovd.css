@@ -11222,35 +11222,37 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
   color: var(--moss);
 }
 
-/* ────────────────────────────────────────────────────── screen 1, the password
+/* ─────────────────────────────────────── screens 1, 2 and 7, rebuilt 1:1
 
-   Screen 1's own declarations left this section on 2026-08-20, when it was
-   rebuilt 1:1 from the v11 reference — they live in PHASE 58 now. `.crf-pw__*`
-   is deliberately absent from the two shared rules below: PHASE 58 sets its own
-   head and lede, and a stale `font-size: var(--fs-step)` reaching the rebuilt
-   `.crf-pw__head` from up here leaked a 40px size and a -1.4px letter-spacing
-   into it — invisible at 1440, where both children set their own, and NOT
-   invisible below 901px, where the lede inherits letter-spacing. Two sections
-   styling one class is exactly how that happens. */
+   Screen 1's own declarations left this section on 2026-08-20, screen 2's
+   followed the same day, and screen 7's went with them — all three were rebuilt
+   1:1 from the v11 reference, and they live in PHASE 58, PHASE 59 and PHASE 60
+   now. `.crf-pw__*`, `.crf-you__*` and `.crf-agree__*` are deliberately absent
+   from the rules below: each phase sets its own head and lede, and a stale
+   `font-size: var(--fs-step)` reaching a rebuilt `__head` from up here leaked a
+   40px size and a -1.4px letter-spacing into it — invisible at 1440, where both
+   children set their own, and NOT invisible below 901px, where the lede
+   inherits letter-spacing. Two sections styling one class is exactly how that
+   happens.
 
-.crf-you__head,
+   `.crf-you__head` and `.crf-agree__head` still exist as class names in PHASE
+   59 and PHASE 60, on the same elements, which is why removing them from here
+   mattered rather than being tidying. */
+
 .crf-channel__head,
 .crf-voice__head,
 .crf-presence__head,
-.crf-verify__head,
-.crf-agree__head {
+.crf-verify__head {
   font-size: var(--fs-step);
   line-height: 1.04;
   letter-spacing: -0.035em;
   margin: 0 0 var(--sp-12);
 }
 
-.crf-you__lede,
 .crf-channel__lede,
 .crf-voice__lede,
 .crf-presence__lede,
-.crf-verify__lede,
-.crf-agree__lede {
+.crf-verify__lede {
   font-size: 1rem;
   line-height: 1.5;
   color: var(--moss);
@@ -11258,9 +11260,6 @@ a.mny-row:hover { border-color: var(--brand); background: var(--brand-5); }
   max-width: 42ch;
 }
 
-/* ─────────────────────────────────────────────────────────── screen 2, you */
-
-.crf-you__fields,
 .crf-channel__fields,
 .crf-presence__fields,
 .crf-verify__fields {
@@ -11619,8 +11618,7 @@ button.crf-help__card:hover { border-color: var(--brand); }
 .crf-voice__flex.is-on .crf-voice__flex-state { color: var(--dark); }
 
 .crf-voice__problems,
-.crf-verify__problems,
-.crf-agree__problems {
+.crf-verify__problems {
   margin: var(--sp-16) 0 0;
   padding: var(--sp-12) var(--sp-16);
   border-left: 0.1875rem solid var(--accent-yellow);
@@ -11665,77 +11663,10 @@ ul.crf-voice__problems { padding-left: var(--sp-32); }
 
 .crf-verify__basis { margin: var(--sp-16) 0 0; }
 
-/* ───────────────────────────────────────────────── screen 7, the agreement */
+/* ───────────────────────────────────────────────── screen 7, the agreement
 
-.crf-agree__promises {
-  display: grid;
-  gap: var(--sp-12);
-  margin-bottom: var(--sp-32);
-}
-
-.crf-agree__promise {
-  padding: var(--sp-16) var(--sp-24);
-  border: var(--bw) solid var(--grey-light);
-  background: var(--surface);
-}
-
-.crf-agree__promise h2 {
-  font-size: 1.0625rem;
-  font-weight: 800;
-  margin: 0 0 var(--sp-4);
-}
-
-.crf-agree__promise p {
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  color: var(--moss);
-  margin: 0;
-}
-
-.crf-agree__block { margin-bottom: var(--sp-32); display: grid; gap: var(--sp-16); }
-
-.crf-agree__block-head {
-  font-size: 0.9375rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--darker);
-  margin: 0;
-}
-
-.crf-agree__block-help,
-.crf-agree__ip,
-.crf-agree__policy-link {
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--moss);
-  margin: 0;
-}
-
-.crf-agree__policy { display: grid; gap: var(--sp-4); }
-
-/* `--brand` on white is about 1.46:1, so a brand-coloured link in body copy is
-   unreadable — the underline is what carries the affordance. Found by the
-   browser pass. */
-.crf-agree__policy-link a,
-.crf-agree__unpublished a,
-.crf-agree__problems a {
-  color: var(--dark);
-  text-decoration: underline;
-  text-underline-offset: 0.125rem;
-}
-
-/* Where the primary action would be while the agreements are draft. It is a
-   stated reason and not a disabled control — §31.4's refusal, rendered. */
-.crf-agree__unpublished {
-  padding: var(--sp-16) var(--sp-24);
-  border-left: 0.1875rem solid var(--brand);
-  background: var(--surface);
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  color: var(--dark);
-  margin: 0;
-}
+   Rebuilt 1:1 from the v11 reference on 2026-08-20 — every declaration it had
+   here is in PHASE 60 now. Nothing is left in this section for it. */
 
 /* ── Narrow widths ─────────────────────────────────────────────────────────
    One correction, and it names what it answers: the tone grid's 15rem minimum
@@ -15943,8 +15874,1006 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   .crf-pw__cta:active:not(:disabled) { transform: none; }
 }
 
+/* ══════════════════════ PHASE 59 — screen 2, you, rebuilt 1:1 from
+   `docs/design-refrence/Proovd_Affiliate_Founder_Rebuild_v11_FIXED_SHAREABLE.html`
+   (2026-08-20) ═══════════════════════════════════════════════════════════════
+
+   PHASE 58's arrangement, applied to the next screen of the same reference: the
+   prefix is `.crf-you-`, the screen renders `bare` so it owns its own header
+   the way the reference does, and every value below was MEASURED out of the
+   reference in Chrome rather than read off the cascade.
+
+   ── The two things measuring settled here ──────────────────────────────────
+   PHASE 58 records why the reference's stylesheet cannot be read straight: the
+   first skin is inside `@media not all` and never runs, and every `>` rule
+   under `.proovd-app` misses because the DC runtime leaves `<sc-if>` wrappers
+   in the DOM. Both bite again. `.proovd-skin .obapp>.proovd-moment` misses, so
+   the stage padding is the base `clamp(2.25rem,5vh,4.5rem)`; the header stays
+   static rather than absolute; and the Back control is the inline `#013F17` at
+   700/14px rather than the `#41ED98` the skin appears to promise.
+
+   What DOES land is every descendant rule, and those are the composition:
+   `.moment-profile .obrow` becomes a three-area grid at 901px, `.obbody`
+   becomes two equal columns, and the three fields are placed by name — so the
+   DOM order (name, email, phone) and the reading order (name, phone, email)
+   differ on purpose. `--ob-w` is 68rem for this moment and the action is capped
+   at 38rem, which is why the CTA is narrower than the fields above it.
+
+   Measured at 1440x900: h1 57.6px/700, lede 16px/500 #669370 at 42ch, labels
+   12px/700 uppercase #A2AFA8, inputs 16.8px/700 on a 2px #A2AFA8 underline with
+   a 60px min-height, the locked row the same silhouette in #D8E2DB with a
+   16.8px/600 #669370 value and a 13.6px/700 #5BAA78 chip, row 1088px, body
+   532+532 at 20px/24px, action 608px, CTA 608x64 at 900 weight on #41ED98.
+
+   ── Colours are literals on purpose ────────────────────────────────────────
+   PHASE 58's reason, unchanged: this is a 1:1 transplant of a foreign design,
+   and #3BDC8C, #A2AFA8, #D8E2DB, #5BAA78 and #F1F3F2 have no slot here.
+   Half-mapping a palette is how a transplant starts disagreeing with the thing
+   it was copied from. */
+
+.crf-you {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #FAFAFA;
+  color: #013F17;
+  /* The reference's own inherited chain, restored at the root of the moment.
+     Its `html` is 16px and its `body` sets no size, so everything inside
+     inherits 1rem/`normal`; this product's `body` sets 18px and 1.6, which
+     reached both inputs and the locked row. Every child below states its own
+     size, so this changes nothing visible today — it stops the next child
+     added here from silently arriving 2px larger than the reference's. */
+  font-size: 1rem;
+  line-height: normal;
+}
+
+/* The reference's `<header>`: static, full width, Back alone on the left.
+   `showBrand` is `!showBack`, so the wordmark is deliberately absent here. */
+.crf-you__bar {
+  flex: none;
+  min-height: 3.625rem;
+  padding: 1.125rem 1.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.crf-you__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #013F17;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: opacity 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The reference's own `style-hover="opacity:.6"`. */
+.crf-you__back:hover { opacity: 0.6; }
+.crf-you__back svg { flex: none; }
+
+/* `.scroll.px.proovd-moment.moment-profile` — the stage. `safe center` is the
+   reference's own value (`.obapp .scroll`, a descendant rule, so it lands): it
+   centres while the row fits and stops clipping the top when it does not. */
+.crf-you__screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
+  overflow-y: auto;
+  background: #FAFAFA;
+  padding:
+    clamp(2.25rem, 5vh, 4.5rem)
+    clamp(1.35rem, 4.4vw, 4rem)
+    clamp(3.5rem, 7vh, 6rem);
+}
+
+/* `.obrow` — `--ob-w:68rem` for this moment only. */
+.crf-you__row {
+  width: min(100%, 68rem);
+  max-width: 68rem;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1.75rem, 3vh, 2.75rem);
+  text-align: center;
+}
+
+/* `.obhead` */
+.crf-you__head {
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.crf-you__title {
+  margin: 0 0 0.625rem;
+  font-size: clamp(3.35rem, 4vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: #013F17;
+  text-wrap: balance;
+}
+
+.crf-you__lede {
+  margin: 0 auto;
+  max-width: 40ch;
+  font-size: clamp(1rem, 1.05vw, 1.25rem);
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+  color: #669370;
+}
+
+/* `.obbody` — the skin strips the panel treatment back to bare content, and
+   the profile step is the one that makes it a grid. */
+.crf-you__body {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #013F17;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* The two margins are INLINE on the reference's own field divs, so they apply
+   at every width — under the grid at 901px they add to its 20px row-gap, and
+   under the flex column below it they add to its 16px gap. Declaring them only
+   inside the grid rule loses 32px of the phone layout. */
+.crf-you__field--name,
+.crf-you__field--email { margin-bottom: 1rem; }
+
+.crf-you__label {
+  display: block;
+  margin-bottom: 0.4375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #A2AFA8;
+}
+
+/* Both editable fields. `border:0` plus one underline is the skin's own
+   silhouette for this step (`.moment-profile .obbody input`). */
+.crf-you__input {
+  width: 100%;
+  min-height: clamp(2.75rem, 3.6vw, 3.3rem);
+  border: 0;
+  border-bottom: 2px solid #A2AFA8;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.75rem 0.125rem;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: clamp(0.95rem, 1.15vw, 1.0625rem);
+  color: #013F17;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.crf-you__input:focus {
+  border-bottom-color: #41ED98;
+  outline: none;
+}
+
+/* The email row: the same silhouette as an input, in a quieter rule, with no
+   focusable control inside it. */
+.crf-you__locked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+  min-height: 3.75rem;
+  padding: 0.75rem 0.125rem;
+  border: 0;
+  border-bottom: 2px solid #D8E2DB;
+  background: transparent;
+}
+
+.crf-you__locked-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #669370;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crf-you__locked-tag {
+  flex: none;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #5BAA78;
+  white-space: nowrap;
+}
+
+/* Not the reference's — it has no save state to report. It takes the position
+   and the treatment the reference gives trouble on screen 1, and it spans the
+   grid so the fields beside it do not move when it appears. */
+.crf-you__trouble {
+  grid-column: 1 / -1;
+  margin: 0.875rem 0 0;
+  font-size: 0.8438rem;
+  font-weight: 600;
+  color: #C0392B;
+}
+
+/* `.ob-inline-action` / `.ob-inline-button`. The action is a sibling of the
+   body rather than a child, and it is capped at 38rem while the body runs the
+   full 68rem — so the CTA really is narrower than the fields above it. */
+.crf-you__action {
+  width: 100%;
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.crf-you__cta {
+  width: 100%;
+  min-height: clamp(4rem, 5.2vh, 4.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border: 0;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: inherit;
+  font-size: clamp(1.25rem, 1.35vw, 1.65rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: none;
+  /* The reference tweens these in GSAP (hover .12s power2.out, release .25s
+     power3.out). Expressed as transitions because the values and the feel are
+     identical and a transition cannot desynchronise from a re-render.
+     `scale`, NOT `transform` — measured, and it is the whole reason this rule
+     is written this way. The entry relay writes `transform: translateX()` on
+     this same button, and a `transition: transform` turns GSAP's instant
+     from-state into a 0.25s ease TOWARDS 52px: the CTA visibly drifts right
+     before it comes back. `scale` is an independent transform property, so the
+     press and the relay compose instead of fighting. */
+  transition:
+    background-color 0.12s cubic-bezier(0.22, 0.61, 0.36, 1),
+    scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.crf-you__cta:hover:not(:disabled) {
+  background-color: #3BDC8C;
+  scale: 1.02;
+}
+
+.crf-you__cta:active:not(:disabled) {
+  scale: 0.96;
+  transition-duration: 0.12s, 0.12s;
+}
+
+.crf-you__cta:disabled {
+  background: #F1F3F2;
+  color: #A2AFA8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.crf-you__cta svg { flex: none; }
+
+/* ── @media (max-width:899px) — the reference's shell caps itself ────────── */
+/* `.frame{max-width:45rem}` — below 900 the reference stops being full-bleed
+   and becomes a 720px column centred on the page, header included. Measured:
+   at 768 the row starts at 57.8px, which is 24px of centring plus 33.8px of
+   `--px`, not `--px` alone. The boundary really is 899 and not 900 — at exactly
+   900 the reference is uncapped AND already stacking. */
+@media (max-width: 899px) {
+  .crf-you {
+    width: 100%;
+    max-width: 45rem;
+    margin-inline: auto;
+  }
+}
+
+/* ── @media (max-width:900px) — the row narrows and the fields stack ─────── */
+@media (max-width: 900px) {
+  .crf-you__row {
+    width: min(100%, 42rem);
+    max-width: 42rem;
+  }
+}
+
+/* ── @media (min-width:901px) — the three-area grid and the larger controls ─ */
+@media (min-width: 901px) {
+  .crf-you__row {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: "head" "body" "action";
+    row-gap: clamp(2rem, 3.2vh, 2.8rem);
+    column-gap: clamp(1.6rem, 2.6vh, 2.4rem);
+    justify-content: center;
+    min-height: 0;
+    text-align: center;
+  }
+
+  .crf-you__head {
+    grid-area: head;
+    max-width: 52rem;
+  }
+
+  .crf-you__title { margin-bottom: clamp(0.9rem, 1.4vh, 1.25rem); }
+
+  .crf-you__lede {
+    max-width: 42ch;
+    line-height: 1.55;
+  }
+
+  /* Two equal columns, and the three fields placed by name. */
+  .crf-you__body {
+    grid-area: body;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem 1.5rem;
+  }
+
+  .crf-you__field--name  { grid-column: 1;      grid-row: 1; }
+  .crf-you__field--phone { grid-column: 2;      grid-row: 1; }
+  .crf-you__field--email { grid-column: 1 / -1; grid-row: 2; }
+
+  .crf-you__label {
+    margin-bottom: 0.6rem;
+    line-height: 1.35;
+  }
+
+  .crf-you__input {
+    min-height: clamp(3.75rem, 4.8vh, 4.25rem);
+    font-size: clamp(1.05rem, 1vw, 1.2rem);
+    font-weight: 700;
+  }
+
+  .crf-you__locked-value { font-size: clamp(1.05rem, 1vw, 1.2rem); }
+  .crf-you__locked-tag { font-size: 0.85rem; }
+
+  .crf-you__action {
+    grid-area: action;
+    width: min(100%, 38rem);
+    justify-self: center;
+  }
+}
+
+/* ── Short landscape: the reference tightens rather than scrolls ─────────── */
+/* The row gap deliberately does NOT tighten here, and that is measured rather
+   than an omission. The reference's short-landscape rule is `.proovd-app .obrow
+   {gap:…}` at three classes; the profile's own `.moment-profile .obrow
+   {row-gap:…}` is four, so the more specific one still wins and the rows stay
+   32px apart. Only the column gap tightens, and this grid has one column. */
+@media (min-width: 901px) and (max-height: 720px) {
+  .crf-you__row { column-gap: clamp(1.15rem, 2vh, 1.65rem); }
+  .crf-you__title { font-size: clamp(2.75rem, 3.2vw, 3.75rem); }
+  .crf-you__input { min-height: 3.55rem; }
+  .crf-you__cta { min-height: 4rem; }
+}
+
+/* ── @media (min-width:1500px) — only the stage gutter moves ─────────────── */
+@media (min-width: 1500px) {
+  .crf-you__screen { padding-inline: clamp(4rem, 5vw, 7rem); }
+}
+
+/* ── @media (max-width:600px) — hairline rules and a smaller headline ────── */
+@media (max-width: 600px) {
+  .crf-you__screen {
+    padding-top: 1.5rem;
+    padding-bottom: 5rem;
+  }
+  .crf-you__title { font-size: clamp(2.25rem, 9vw, 3rem); }
+  .crf-you__row { gap: clamp(1.4rem, 4vh, 2rem); }
+  .crf-you__body { width: 100%; }
+  /* The inputs go hairline and the locked row deliberately does not: the
+     reference narrows `input` and `.obbody input`, and the email row is a
+     `div` that neither selector reaches. Measured, not assumed. */
+  .crf-you__input { border-bottom-width: 1px; }
+}
+
+/* The relay is `creatorMomentIn`; with motion off the end state is the only
+   state, and the CTA keeps its colour change without the scale. */
+@media (prefers-reduced-motion: reduce) {
+  .crf-you__cta:hover:not(:disabled),
+  .crf-you__cta:active:not(:disabled) { scale: 1; }
+}
+
+/* ══════════════════ PHASE 60 — screen 7, the agreement, rebuilt 1:1 from
+   `docs/design-refrence/Proovd_Affiliate_Founder_Rebuild_v11_FIXED_SHAREABLE.html`
+   (2026-08-20) ═══════════════════════════════════════════════════════════════
+
+   PHASE 58/59's arrangement, applied to the last screen of the same reference:
+   the prefix is `.crf-agree-`, the screen renders `bare` so it owns its own
+   header the way the reference does, and every value below was MEASURED out of
+   the reference in Chrome rather than read off the cascade.
+
+   ── What measuring settled here ────────────────────────────────────────────
+   PHASE 58 records why the reference's stylesheet cannot be read straight: the
+   first skin is inside `@media not all` and never runs, and every `>` rule
+   under `.proovd-app` misses because the DC runtime leaves `sc-if` wrappers in
+   the DOM. Both bite again — the stage padding is the base
+   `clamp(2.25rem,5vh,4.5rem)`, the header stays static, and the Back control is
+   the inline `#013F17` at 700/14px.
+
+   Three more things only the measurement gives:
+
+   · The panel is a TWO-COLUMN grid with the hairline between the promises drawn
+     as a `border-left` on the second one and 2rem of padding beside it — not a
+     border-bottom on the first, and not a separate rule. Below 901px it becomes
+     one column and the same hairline moves to `border-top`, which is where the
+     base skin puts it.
+
+   · Both legal paragraphs span the grid, and only the first carries the
+     horizontal rule (`margin-top:.4rem; padding-top:1.25rem; border-top`).
+
+   · The lede's `max-width` is 42ch and NOT the 40ch its own inline style asks
+     for: `.obhead p{max-width:42ch}` in the 901px block is `!important` and
+     wins. It is what makes the second line break after "No".
+
+   Measured at 1440x714: h1 44.8px/700 with a 48.38px line box, lede 16px/500
+   #669370 at 42ch/1.55, row 1088px with a 28px row-gap, panel 1088x256 on
+   #013F17 with 36px padding and 492+492 columns at 20/32px, tick 26px on
+   #41ED98 with a 13px stroke-3.4 check, promise title 17.6px/800 #FAFAFA over
+   14px/400 #E9FFE1, legal 13px and 12px #A2AFA8, action 672px, CTA 672x64 at
+   900 weight/20px on #41ED98 with a 2px radius and a 24px arrow.
+
+   ── The Back control's hover is the reference's, and it is two things ───────
+   `style-hover="opacity:.6"` from the DC runtime AND the skin's own JS, which
+   finds a transparent button and tweens it to `#E9FFE1` with `#013F17` ink at
+   scale 1.02. Verified by dispatching the event in Chrome and reading the
+   tween's own vars rather than by reading the source — the first read of it was
+   wrong. Both are reproduced.
+
+   ── Colours are literals on purpose ────────────────────────────────────────
+   PHASE 58's reason, unchanged: this is a 1:1 transplant of a foreign design,
+   and #3BDC8C, #A2AFA8, #E9FFE1, #F1F3F2 and the rgba hairline have no slot
+   here. Half-mapping a palette is how a transplant starts disagreeing with the
+   thing it was copied from. */
+
+.crf-agree {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #FAFAFA;
+  color: #013F17;
+  /* The reference inherits `normal` through the whole moment; this product's
+     `body` sets 1.6, which reached both promise bodies and both legal lines. */
+  line-height: normal;
+}
+
+/* The reference's header: static, full width, Back alone on the left.
+   `showBrand` is `!showBack`, so the wordmark is deliberately absent here. */
+.crf-agree__bar {
+  flex: none;
+  min-height: 3.625rem;
+  padding: 1.125rem 1.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.crf-agree__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: none;
+  color: #013F17;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition:
+    opacity 0.12s cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 0.12s cubic-bezier(0.22, 0.61, 0.36, 1),
+    scale 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Both halves of the reference's hover, measured rather than read. */
+.crf-agree__back:hover {
+  opacity: 0.6;
+  background-color: #E9FFE1;
+  color: #013F17;
+  scale: 1.02;
+}
+
+/* `pointerdown` on a control under 3600px squared tweens to .94, not .96. */
+.crf-agree__back:active {
+  scale: 0.94;
+  transition-duration: 0.12s;
+}
+
+.crf-agree__back svg { flex: none; }
+
+/* `.scroll.px.proovd-moment.moment-agree` — the stage. `safe center` is the
+   reference's own value (`.obapp .scroll`, a descendant rule, so it lands): it
+   centres while the row fits and stops clipping the top when it does not. */
+.crf-agree__screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
+  overflow-y: auto;
+  padding:
+    clamp(2.25rem, 5vh, 4.5rem)
+    clamp(1.35rem, 4.4vw, 4rem)
+    clamp(3.5rem, 7vh, 6rem);
+}
+
+/* `.obrow` — `--ob-w:68rem` for this moment only. */
+.crf-agree__row {
+  width: min(100%, 68rem);
+  max-width: 68rem;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1.75rem, 3vh, 2.75rem);
+  text-align: center;
+}
+
+/* `.obhead` */
+.crf-agree__head {
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.crf-agree__title {
+  margin: 0 0 0.625rem;
+  font-size: clamp(3.35rem, 4vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: #013F17;
+  text-wrap: balance;
+}
+
+.crf-agree__lede {
+  margin: 0 auto;
+  max-width: 40ch;
+  font-size: clamp(1rem, 1.05vw, 1.25rem);
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+  color: #669370;
+}
+
+/* `.obbody.agreement-panel` — the one dark guarantee surface. */
+.crf-agree__panel {
+  width: 100%;
+  margin: 0 auto;
+  padding: clamp(1.4rem, 2.2vw, 2rem);
+  border: 0;
+  border-radius: 0;
+  background: #013F17;
+  color: #FAFAFA;
+  text-align: left;
+}
+
+.crf-agree__promise {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0.5rem 0;
+  border: 0;
+  background: transparent;
+}
+
+/* One column below 901px, so the divider is horizontal — the base skin's own
+   `.moment-agree .obbody>div+div{border-top}`. */
+.crf-agree__promise + .crf-agree__promise {
+  border-top: 1px solid rgba(233, 255, 225, 0.2);
+}
+
+.crf-agree__tick {
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: none;
+  margin-top: 0.0625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #41ED98;
+}
+
+.crf-agree__promise-text { min-width: 0; }
+
+/* This product caps every `<p>` at `--measure` (proovd.css:306, §9's measure
+   rule) and the reference caps none of these — its own `p{max-width:68ch}` is
+   in the `@media not all` skin that never runs. The cap reached all four
+   paragraphs in the panel and wrapped the primary legal line to three lines
+   where the reference sets two, which is 38.74px of extra panel height. Found
+   by measuring the two renders side by side, not by looking at them. */
+.crf-agree__promise-title,
+.crf-agree__promise-body,
+.crf-agree__legal,
+.crf-agree__more-body,
+.crf-agree__hint { max-width: none; }
+
+.crf-agree__promise-title {
+  margin: 0 0 0.1875rem;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+  color: #FAFAFA;
+}
+
+.crf-agree__promise-body {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+  color: #E9FFE1;
+}
+
+.crf-agree__legal {
+  margin: 0;
+  letter-spacing: -0.012em;
+  color: #A2AFA8;
+}
+
+.crf-agree__legal--primary {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.crf-agree__legal--terms {
+  margin-top: 0.625rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* The reference's three document names: bold, underlined, the same ink as the
+   sentence around them. Two of them are real links here and the third is the
+   bold text the reference draws — see `AgreeStep.tsx` for why. */
+.crf-agree__legal--terms b,
+.crf-agree__doc {
+  font-weight: 700;
+  color: #A2AFA8;
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+}
+
+.crf-agree__doc:hover { color: #E9FFE1; }
+
+/* One grid area for the action and the state that can open above it.
+   `grid-template-areas` names three rows, so an item with no area of its own
+   auto-places into an implicit FOURTH — which put the completion panel BELOW
+   the button. A wrapper keeps them in one row and in reading order, and when
+   the panel is absent it holds exactly one child and changes no geometry. */
+.crf-agree__tail {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(1.75rem, 3vh, 2.6rem);
+}
+
+/* `.ob-inline-action` / `.ob-inline-button`. */
+.crf-agree__action {
+  width: 100%;
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.crf-agree__cta {
+  width: 100%;
+  min-height: clamp(4rem, 5.2vh, 4.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border: 0;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: inherit;
+  font-size: clamp(1.25rem, 1.35vw, 1.65rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: none;
+  /* The reference tweens these in GSAP (hover .12s power2.out, release .25s
+     power3.out). Expressed as transitions because the values and the feel are
+     identical and a transition cannot desynchronise from a re-render. */
+  transition:
+    background-color 0.12s cubic-bezier(0.22, 0.61, 0.36, 1),
+    scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.crf-agree__cta:hover:not(:disabled) {
+  background-color: #3BDC8C;
+  scale: 1.02;
+}
+
+/* `pointerdown` on a control over 3600px squared tweens to .96. */
+.crf-agree__cta:active:not(:disabled) {
+  scale: 0.96;
+  transition-duration: 0.12s, 0.12s;
+}
+
+.crf-agree__cta:disabled {
+  background: #F1F3F2;
+  color: #A2AFA8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.crf-agree__cta svg { flex: none; }
+
+/* ── The completion state, which the reference has no drawing for ──────────
+   It belongs to the panel above it, so it takes the panel's silhouette in the
+   pale surface rather than inventing a third treatment. It is only ever on
+   screen when the record is genuinely short. */
+.crf-agree__more {
+  width: 100%;
+  padding: clamp(1.4rem, 2.2vw, 2rem);
+  background: #E9FFE1;
+  color: #013F17;
+  text-align: left;
+}
+
+.crf-agree__more-title {
+  margin: 0 0 0.375rem;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+
+.crf-agree__more-body {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #013F17;
+}
+
+.crf-agree__fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem 1.5rem;
+}
+
+/* Everything under the three fields: its own stack, so the age statement and
+   the password block cannot run into each other. The first browser pass had
+   the 18+ hint touching the password label with nothing between them. */
+.crf-agree__block { margin-top: 1.5rem; }
+
+.crf-agree__label {
+  display: block;
+  margin-bottom: 0.4375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5B7562;
+}
+
+.crf-agree__input {
+  width: 100%;
+  min-height: 3.25rem;
+  border: 0;
+  border-bottom: 2px solid #A2AFA8;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.75rem 0.125rem;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #013F17;
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.crf-agree__input:focus {
+  border-bottom-color: #41ED98;
+  outline: none;
+}
+
+.crf-agree__hint {
+  margin: 0.4375rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #013F17;
+}
+
+/* §28.4: one control, one column, and it is not ticked for anybody. */
+.crf-agree__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6875rem;
+  margin-top: 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #013F17;
+  cursor: pointer;
+}
+
+.crf-agree__check input {
+  width: 1.375rem;
+  height: 1.375rem;
+  flex: none;
+  margin: 0;
+  accent-color: #013F17;
+  cursor: pointer;
+}
+
+.crf-agree__trouble {
+  margin: 1.25rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #C0392B;
+}
+
+.crf-agree__trouble--loose { margin-top: 0; }
+
+.crf-agree__trouble a {
+  color: #013F17;
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+}
+
+/* Where the primary action would be while the agreements are draft. A stated
+   reason and not a disabled control — §31.4's refusal, rendered. */
+.crf-agree__unpublished {
+  width: 100%;
+  margin: 0;
+  padding: 1rem 1.5rem;
+  border-left: 0.1875rem solid #41ED98;
+  background: #F1F3F2;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #013F17;
+  text-align: left;
+}
+
+.crf-agree__unpublished a {
+  color: #013F17;
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+}
+
+/* ── @media (max-width:900px) — the row narrows ──────────────────────────── */
+@media (max-width: 900px) {
+  .crf-agree__row {
+    width: min(100%, 42rem);
+    max-width: 42rem;
+  }
+}
+
+/* ── @media (min-width:901px) — the three-area grid and the two-up panel ─── */
+@media (min-width: 901px) {
+  .crf-agree__row {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-areas: "head" "body" "action";
+    row-gap: clamp(1.75rem, 3vh, 2.6rem);
+    column-gap: clamp(1.6rem, 2.6vh, 2.4rem);
+    justify-content: center;
+    min-height: 0;
+    text-align: center;
+  }
+
+  .crf-agree__head {
+    grid-area: head;
+    max-width: 60rem;
+  }
+
+  .crf-agree__title {
+    margin-bottom: clamp(0.9rem, 1.4vh, 1.25rem);
+    font-size: clamp(2.8rem, 3.1vw, 3.7rem);
+  }
+
+  .crf-agree__lede {
+    max-width: 42ch;
+    line-height: 1.55;
+  }
+
+  .crf-agree__panel {
+    grid-area: body;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem 2rem;
+    padding: clamp(1.75rem, 2.5vw, 2.5rem);
+    text-align: left;
+  }
+
+  /* The hairline is a `border-left` on the second promise, with 2rem beside
+     it — not a rule between rows. */
+  .crf-agree__promise + .crf-agree__promise {
+    border-top: 0;
+    border-left: 1px solid rgba(233, 255, 225, 0.2);
+    padding-left: 2rem;
+  }
+
+  .crf-agree__promise-title {
+    font-size: 1.1rem;
+    line-height: 1.55;
+  }
+
+  .crf-agree__promise-body { line-height: 1.55; }
+
+  .crf-agree__legal {
+    grid-column: 1 / -1;
+    line-height: 1.55;
+  }
+
+  .crf-agree__legal--primary {
+    margin-top: 0.4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(233, 255, 225, 0.2);
+  }
+
+  .crf-agree__tail { grid-area: action; }
+
+  .crf-agree__action { width: min(100%, 42rem); }
+
+  /* Three fields, one row. Two columns left a hole under the first, which
+     reads as a missing field rather than as a layout. */
+  .crf-agree__fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ── Short landscape: the reference tightens rather than scrolls ─────────── */
+@media (min-width: 901px) and (max-height: 720px) {
+  .crf-agree__row { column-gap: clamp(1.15rem, 2vh, 1.65rem); }
+  .crf-agree__cta { min-height: 4rem; }
+}
+
+/* ── @media (min-width:1500px) — only the stage gutter moves ─────────────── */
+@media (min-width: 1500px) {
+  .crf-agree__screen { padding-inline: clamp(4rem, 5vw, 7rem); }
+}
+
+/* ── @media (max-width:600px) — a smaller headline and tighter stage ─────── */
+@media (max-width: 600px) {
+  .crf-agree__screen {
+    padding-top: 1.5rem;
+    padding-bottom: 5rem;
+  }
+  .crf-agree__title { font-size: clamp(2.25rem, 9vw, 3rem); }
+  .crf-agree__row { gap: clamp(1.4rem, 4vh, 2rem); }
+  .crf-agree__input { border-bottom-width: 1px; }
+}
+
+/* The relay is `creatorMomentIn`; with motion off the end state is the only
+   state, and both controls keep their colour change without the scale. */
+@media (prefers-reduced-motion: reduce) {
+  .crf-agree__cta:hover:not(:disabled),
+  .crf-agree__cta:active:not(:disabled),
+  .crf-agree__back:hover,
+  .crf-agree__back:active { scale: 1; }
+
 /* ══════════════════════════════════════════════════════════════════════════
-   PHASE 59 — the Founder flow's last page: your password (2026-08-20)
+   PHASE 61 — the Founder flow's last page: your password (2026-08-20)
    ══════════════════════════════════════════════════════════════════════════
 
    §10 took the password at a screen near the beginning of the flow. By product

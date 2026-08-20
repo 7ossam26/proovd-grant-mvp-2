@@ -2582,7 +2582,14 @@ export function socialAddPop(button: HTMLElement | null): void {
     },
   );
 }
-/* ── Creator flow screen 1, the password — the v11 reference's own relay ─────
+/* ── Creator flow onboarding — the v11 reference's own relay ─────────────────
+ *
+ * Shared by screen 1 (the password), screen 2 (you) and screen 7 (the
+ * agreement). All three are the same composition — `.obhead` with a lede inside
+ * it, `.obbody`, `.ob-inline-action` — and the reference runs one
+ * `proovdAnimateMoment` over every step, so one function here is the
+ * reference's own arrangement rather than a convenience. The caller passes the
+ * data-attribute namespace so the screens keep their own markup.
  *
  * `relayIn` above is this codebase's generalisation of the same reference, and
  * it rounds: 56px of travel where the reference tweens 52, `dur('slow')` (0.60)
@@ -2610,13 +2617,20 @@ export function socialAddPop(button: HTMLElement | null): void {
  * a computed background colour to find its own CTA; the caller passes the nodes
  * explicitly, so a restyle cannot silently drop the button out of the relay.
  *
- * `primary` is null while the CTA is disabled, which is the state every fresh
- * arrival is in — so on a normal entry the form and the button are simply
- * present and only the heading travels.
+ * `primary` is null while the CTA is disabled, which is the state a fresh
+ * arrival at the password screen is in — so there the form and the button are
+ * simply present and only the heading travels. Screen 2 arrives prefilled, so
+ * its CTA is enabled and all three nodes ride the stagger.
+ *
+ * Screen 7's CTA is never disabled — the reference's `obEnabled` is `step>=6`
+ * on that step, unconditionally — so all three nodes ride it there too, and the
+ * lede rides the same compound transform because the agreement's lede also
+ * carries an inline `max-width` and is also reached before the `.obbody`.
  */
-export function creatorPasswordIn(
+export function creatorMomentIn(
   stage: HTMLElement | null,
   direction: 1 | -1,
+  attr: 'pw' | 'you' | 'agree',
 ): () => void {
   const g = gsap();
   if (!g || !stage || !motionLive()) return () => {};
@@ -2625,11 +2639,13 @@ export function creatorPasswordIn(
   // `motionLive()` is already false under `prefers-reduced-motion`, so reaching
   // this line means motion is live; the jump-cut is proovd.css's.
   const pick = (name: string) =>
-    stage.querySelector<HTMLElement>('[data-pw="' + name + '"]');
+    stage.querySelector<HTMLElement>('[data-' + attr + '="' + name + '"]');
 
   const head = pick('head');
   const lede = pick('lede');
-  const cta = stage.querySelector<HTMLElement>('[data-pw="cta"]:not([disabled])');
+  const cta = stage.querySelector<HTMLElement>(
+    '[data-' + attr + '="cta"]:not([disabled])',
+  );
 
   const els = [head, lede, cta].filter((el): el is HTMLElement => !!el);
   if (!els.length) return () => {};

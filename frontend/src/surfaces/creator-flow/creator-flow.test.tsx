@@ -300,21 +300,28 @@ describe('the four pages are one list, read three ways', () => {
   });
 
   it('lists what is behind and nothing ahead', async () => {
+    // MOVED from `profile` to `channel` (2026-08-20). Screens 1 and 2 were
+    // rebuilt 1:1 from the v11 reference and both render `bare` — the
+    // reference's header past the invitation is `← Back` alone, with
+    // `showBrand` explicitly `!showBack`, so neither draws the shell's bar or
+    // its Help control. Screen 3 is the deepest page that still does, and what
+    // this test protects is the drawer's rule rather than the page it opens on.
     stubInvitation();
     const user = userEvent.setup();
-    await renderAt('profile');
+    await renderAt('channel');
     await screen.findByRole('heading', { level: 1 });
 
     await user.click(screen.getByRole('button', { name: /^help$/i }));
     const drawer = await screen.findByRole('dialog');
 
-    // Screen 2 is `profile`, so its own card and the two before it — and the
+    // Screen 3 is `channel`, so its own card and the three before it — and the
     // one AFTER it must not be offered, because a drawer listing what is to
     // come is a progress bar with reading attached.
+    expect(within(drawer).getByText('Your channel')).toBeTruthy();
     expect(within(drawer).getByText('You')).toBeTruthy();
     expect(within(drawer).getByText('Your password')).toBeTruthy();
     expect(within(drawer).getByText('Your invitation')).toBeTruthy();
-    expect(within(drawer).queryByText('Your channel')).toBeNull();
+    expect(within(drawer).queryByText('Your voice')).toBeNull();
   });
 });
 
@@ -442,41 +449,54 @@ describe('screen 1 — the password', () => {
 /* ══ Screen 2 — you ═══════════════════════════════════════════════════════ */
 
 describe('screen 2 — you', () => {
-  it('lets the email be corrected, and never renders it locked', async () => {
+  // DELIBERATELY INVERTED (2026-08-20). This screen was rebuilt 1:1 from the
+  // v11 reference, whose email row is a value and a `Locked` chip rather than
+  // an input. §11's correction right is not withdrawn by that — Session F's
+  // `/creator/settings` carries `email` with a reason, a prior value read under
+  // lock and an audit row — so what this test now protects is that the right
+  // moved rather than vanished: the field is not editable HERE, and it is not
+  // in the tab path either, so the reading order and the tab order agree.
+  it('renders the email locked, and puts nothing focusable in that row', async () => {
+    stubInvitation();
+    await renderAt('profile');
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.queryByLabelText(/^email$/i)).toBeNull();
+    expect(screen.getByText('sam@example.com')).toBeTruthy();
+    expect(screen.getByText('Locked')).toBeTruthy();
+
+    const row = screen.getByRole('group', { name: /^email$/i });
+    expect(row.querySelector('input,button,select,textarea,a[href]')).toBeNull();
+  });
+
+  it('gates the CTA on the name alone, which is what the reference gates on', async () => {
     stubInvitation();
     const user = userEvent.setup();
     await renderAt('profile');
     await screen.findByRole('heading', { level: 1 });
 
-    const email = screen.getByLabelText(/^email$/i) as HTMLInputElement;
-    expect(email.hasAttribute('readonly')).toBe(false);
-    expect(email.hasAttribute('disabled')).toBe(false);
-    expect(document.body.textContent ?? '').not.toMatch(/\blocked\b/i);
+    const cta = screen.getByRole('button', { name: /^continue to your channel$/i });
+    expect((cta as HTMLButtonElement).disabled).toBe(false);
 
-    await user.clear(email);
-    await user.type(email, 'sam@newaddress.example');
-    await waitFor(() => {
-      expect(patches().some((p) => p['email'] === 'sam@newaddress.example')).toBe(true);
-    });
+    await user.clear(screen.getByLabelText(/^legal name$/i));
+    expect((cta as HTMLButtonElement).disabled).toBe(true);
+    // The reference's own difference between its two button branches.
+    expect(cta.querySelector('svg')).toBeNull();
   });
 
-  it('says the phone is never verified, and offers no way to verify it', async () => {
+  it('collects a phone and offers no way to verify it', async () => {
     // MOVED here from `creator-signup.test.tsx` with the field itself
     // (Creator Flow v2 Session B, 2026-08-19). §33.1.8's own guarantee.
+    //
+    // The sentence that said so left with the rebuild — the reference's
+    // composition is a label and a field — so what is asserted is the
+    // guarantee itself: there is no control that could verify one.
     stubInvitation();
     await renderAt('profile');
     await screen.findByRole('heading', { level: 1 });
 
     expect(screen.getByLabelText(/^phone$/i)).toBeTruthy();
-    expect(screen.getByText(/we do not text you and we do not verify this number/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /verify/i })).toBeNull();
-  });
-
-  it('labels a prefilled field with its source (§11)', async () => {
-    stubInvitation();
-    await renderAt('profile');
-    await screen.findByRole('heading', { level: 1 });
-    expect(screen.getAllByText(/from your invitation\. change it if it is wrong\./i).length).toBeGreaterThan(0);
   });
 
   it('sends only the key that changed', async () => {
@@ -825,42 +845,77 @@ describe('screen 6 — the numbers', () => {
   });
 });
 
+/* ══ Screen 7 — the agreement, rebuilt 1:1 from the v11 reference ══════════
+ *
+ * DELIBERATELY INVERTED (2026-08-20). Five assertions here read the other way
+ * until this screen was rebuilt from the reference by explicit product
+ * direction. What each one was protecting is recorded on the assertion that
+ * replaced it, and the two arguments they came from are kept whole in
+ * `CREATOR_FLOW_ABSENCES` rather than deleted.
+ */
 describe('screen 7 — the agreement', () => {
-  it('does not promise there are no clawbacks (§22.1, §29.5, §24.8)', async () => {
+  it("renders the reference's own guarantee copy (inverted 2026-08-20)", async () => {
     stubInvitation();
     await renderAt('agree');
     await screen.findByRole('heading', { level: 1 });
 
+    // Session C refused this copy because §22.1, §29.5 and §24.8 make it
+    // narrower than it claims, and that reasoning is still on the register
+    // entry. The instruction changed, not the Spec.
     const text = document.body.textContent ?? '';
-    expect(text).not.toMatch(/no clawbacks/i);
-    expect(text).not.toMatch(/your (money|pay) is guaranteed/i);
-    // §29.5 protects VALID FINALIZED commission, and only absent
-    // Creator-caused invalidity. Saying which is stronger copy than saying
-    // neither.
-    expect(text).toMatch(/can be reversed/i);
+    expect(text).toContain('You stay in control. Your pay is guaranteed.');
+    expect(text).toContain('No clawbacks.');
+    expect(text).toContain('Your money is guaranteed');
   });
 
-  it('takes exactly two policy acceptances, and says where the third belongs', async () => {
+  it('takes exactly two policy acceptances, and names the third without one', async () => {
     stubInvitation();
     await renderAt('agree');
     await screen.findByRole('heading', { level: 1 });
 
     // §31.5's IP agreement is PER CAMPAIGN and due before WORK — collected at
-    // §14.2 acceptance, on the campaign it belongs to.
-    expect(screen.queryByRole('checkbox', { name: /IP|NDA|confidentiality/i })).toBeNull();
-    expect(screen.getByText(/per campaign/i)).toBeTruthy();
+    // §14.2 acceptance, on the campaign it belongs to. The reference names it
+    // in the sentence and gives it no link; so does this.
+    const docs = Array.from(document.querySelectorAll('.crf-agree__doc'));
+    expect(docs.map((d) => d.textContent)).toEqual(['Terms', 'Acceptable Use Policy']);
+    expect(screen.queryByRole('link', { name: /IP & NDA/i })).toBeNull();
   });
 
-  it('collects the three §11 fields the reference never draws', async () => {
+  it('is the reference composition and nothing else until it is pressed', async () => {
     stubInvitation();
     await renderAt('agree');
     await screen.findByRole('heading', { level: 1 });
 
-    // Gates on `completeAffiliateSignup`, and on no screen of the prototype.
-    // They sit beside the two confirmations they are the factual half of.
+    // The three §11 facts the reference draws on no screen, and the fifth
+    // representation its sentence does not make, are a STATE — not on screen
+    // until the record is short and somebody has asked to continue.
+    expect(document.querySelector('.crf-agree__more')).toBeNull();
+    expect(screen.queryByLabelText(/date of birth/i)).toBeNull();
+
+    // One control, and it is the reference's.
+    const buttons = Array.from(document.querySelectorAll('.crf-agree__cta'));
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]?.textContent).toContain('Agree and enter');
+  });
+
+  it('asks for the missing §11 facts rather than refusing (§1.1)', async () => {
+    stubInvitation();
+    const user = userEvent.setup();
+    await renderAt('agree');
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getByRole('button', { name: /agree and enter/i }));
+
+    // Checked in the browser first, so nobody meets a server refusal for
+    // something visible from here. The server re-decides regardless (§1.1).
     expect(screen.getByLabelText(/date of birth/i)).toBeTruthy();
     expect(screen.getByLabelText(/country/i)).toBeTruthy();
     expect(screen.getByLabelText(/^state$/i)).toBeTruthy();
+
+    // §28.4: the fifth representation is its own unchecked control, because the
+    // reference's legal line states the other four and does not state this one.
+    const age = screen.getByRole('checkbox', { name: /at least 18 years old/i });
+    expect((age as HTMLInputElement).checked).toBe(false);
   });
 
   it('derives no age from the date of birth (§11)', async () => {
@@ -868,26 +923,25 @@ describe('screen 7 — the agreement', () => {
     const user = userEvent.setup();
     await renderAt('agree');
     await screen.findByRole('heading', { level: 1 });
+    await user.click(screen.getByRole('button', { name: /agree and enter/i }));
 
-    await user.type(screen.getByLabelText(/date of birth/i), '1994-03-11');
     // §11 records what somebody states, and the 18+ confirmation is the
-    // statement. Nothing here computes, ticks, or refuses on an age — the scan
+    // statement. Nothing computes, ticks, or refuses on an age — the scan
     // excludes the confirmation itself, whose own words are "at least 18 years
     // old" and which is the statement rather than a derivation of one.
     const derived = Array.from(document.querySelectorAll('p, span, div'))
       .map((n) => n.textContent ?? '')
       .filter((t) => !/at least 18 years old/i.test(t));
     expect(derived.some((t) => /you are \d+|\d+ years old today|\bage:/i.test(t))).toBe(false);
-    expect(
-      screen.getByRole('checkbox', { name: /at least 18 years old/i }).getAttribute('aria-checked'),
-    ).toBe('false');
   });
 
   it('asks for the password again only when a reload lost it', async () => {
     stubInvitation();
     clearDraft();
+    const user = userEvent.setup();
     await renderAt('agree');
     await screen.findByRole('heading', { level: 1 });
+    await user.click(screen.getByRole('button', { name: /agree and enter/i }));
     // It is module state by design: a credential in `sessionStorage` outlives
     // the tab and is readable by anything in the page.
     expect(screen.getByText(/a refresh loses it/i)).toBeTruthy();

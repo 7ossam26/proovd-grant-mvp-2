@@ -306,17 +306,17 @@ export const CREATOR_FLOW_ABSENCES: readonly CreatorFlowAbsence[] = [
   },
   {
     element:
-      '"Your money is guaranteed" / "Follow the agreement and your pay is locked" / "No clawbacks." above the agreement on the consent screen',
+      'RESTORED 2026-08-20 — "Your money is guaranteed" / "Follow the agreement and your pay is locked" / "No clawbacks." above the agreement on the consent screen',
     absentBecause:
-      'Untrue, on the screen where somebody is consenting. §22.1 provides for cancelling unpaid invalid amounts and creating a contractual recovery record on fraud, fake traffic, self-dealing, false claims, invalid proof, or material breach; §29.5 protects only VALID FINALIZED commission and only absent Creator-caused invalidity; and 20a\'s `applyCauseBasedAffiliateAdjustment` exists precisely because clawbacks happen. Re-authored to what is true, which is close to the Spec\'s own and is stronger copy.',
+      'DELIBERATELY INVERTED (2026-08-20). Session C refused this copy and the reason it gave is still true: §22.1 provides for cancelling unpaid invalid amounts and creating a contractual recovery record on fraud, fake traffic, self-dealing, false claims, invalid proof, or material breach; §29.5 protects only VALID FINALIZED commission and only absent Creator-caused invalidity; and 20a\'s `applyCauseBasedAffiliateAdjustment` exists precisely because clawbacks happen. The screen was then rebuilt 1:1 from the reference by explicit product direction, which names copy as something to reproduce rather than re-author, so the reference\'s own words now ship. The entry is kept rather than deleted so a later session meets the argument instead of rediscovering it: if this is ever re-authored again, `CREATOR_AGREE_MONEY_TITLE` and `_BODY` are the two constants to change and nothing else moves.',
     specRef: '§22.1, §29.5, §24.8',
     session: 'C',
   },
   {
     element:
-      'One `Agree and enter` button covering Terms + AUP + IP & NDA and four representations in one sentence',
+      'RESTORED 2026-08-20 — one `Agree and enter` button covering Terms + AUP + IP & NDA and four representations in one sentence',
     absentBecause:
-      'Three separate problems. §28.4 forbids bundling and requires the 18+ confirmation unchecked; §11 requires exactly two policy acceptances, Terms and the Creator AUP, which is what `AFFILIATE_CLAIM_POLICY_SLUGS` already holds; and §31.5\'s IP agreement is PER CAMPAIGN and due before work, already collected at §14.2 acceptance — putting it here would collect it for a campaign the Creator has not accepted.',
+      'DELIBERATELY INVERTED (2026-08-20), and only partly. The button is the reference\'s again and its legal line states four of §11\'s five representations, which is what the press records. What did NOT come back: §11 still takes exactly two policy acceptances, Terms and the Creator AUP, because `AFFILIATE_CLAIM_POLICY_SLUGS` is what `completeAffiliateSignup` checks and §31.5\'s IP agreement is PER CAMPAIGN and due before work — so the third name in that sentence is rendered as text with no route and no consent row behind it, exactly as the reference draws it. The fifth representation (18+) is not in the sentence, so it is not recorded by the press; it is asked for beside the date of birth in the completion state, unchecked (§28.4).',
     specRef: '§28.4, §11, §31.5',
     session: 'C',
   },
