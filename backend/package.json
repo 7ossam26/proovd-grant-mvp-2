@@ -43,6 +43,7 @@
     "dev": "tsx watch --env-file=../.env src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "seed:prod": "node dist/scripts/seed-prod-admin.js",
     "migrate:dev": "drizzle-kit migrate --config=drizzle.config.ts",
     "migrate:generate": "drizzle-kit generate --config=drizzle.config.ts"
   }
