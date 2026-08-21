@@ -113,12 +113,16 @@ export function buildStepNav(build: BuildFlowState, stepId: string): ReactNode {
 }
 
 function BuildStepNav({ build, stepId }: { build: BuildFlowState; stepId: string }) {
-  const { leave, leaveToPage, param } = useFlowNav();
+  const { leave, leaveToPage, swapToPage, param } = useFlowNav();
   const model = build.state?.model ?? 'product';
   const walk = buildFlowStepsFor(model).map((step) => step.id);
   const index = walk.indexOf(stepId as (typeof walk)[number]);
 
-  const previous = index > 0 ? walk[index - 1] : 'creator-payment';
+  const previous = stepId === 'faqs'
+    ? 'creator-pay-explainer'
+    : index > 0
+      ? walk[index - 1]
+      : 'creator-payment';
   const next = index >= 0 && index < walk.length - 1 ? walk[index + 1] : null;
   const last = next === null;
 
@@ -128,7 +132,12 @@ function BuildStepNav({ build, stepId }: { build: BuildFlowState; stepId: string
         <p className="ff-build__not-done">{BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD}</p>
       ) : null}
       <div className="ff-nav" data-anim="cta">
-        <Button tier="tertiary" onClick={() => leaveToPage(previous!, -1)}>
+        <Button
+          tier="tertiary"
+          onClick={() => previous === 'creator-pay-explainer'
+            ? swapToPage(previous, -1)
+            : leaveToPage(previous!, -1)}
+        >
           {BACK_LABEL[previous!] ?? 'Back'}
         </Button>
         {last ? (
@@ -175,6 +184,7 @@ const FORWARD_LABEL: Record<string, string> = {
 /** The label a back control carries, so it names where it goes too. */
 export const BACK_LABEL: Record<string, string> = {
   'creator-payment': 'Back to how Creators are paid',
+  'creator-pay-explainer': 'Back to how Creator preorders work',
   voice: 'Back to your brand voice',
   threshold: 'Back to your order threshold',
   faqs: 'Back to your FAQs',

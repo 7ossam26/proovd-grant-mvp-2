@@ -345,6 +345,14 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 5,
   },
   {
+    id: 'creator-pay-explainer',
+    path: '/campaigns/:campaignId/setup/creator-pay-explainer',
+    param: 'campaignId',
+    title: 'How Creator preorders work',
+    help: 'Creators take a share of the preorders, so there is nothing to pay upfront.',
+    stage: 5,
+  },
+  {
     /*
       Idea campaigns only — §14.4 gives a Product campaign no public
       threshold. `buildFlowStepsFor` is what decides the walk; the page is

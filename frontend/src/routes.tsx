@@ -92,6 +92,7 @@ import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
 import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
 import { VoiceStep } from './surfaces/founder-flow/VoiceStep.js';
+import { CreatorPayExplainerStep } from './surfaces/founder-flow/CreatorPayExplainerStep.js';
 import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
@@ -940,6 +941,10 @@ const rootChildren: RouteObject[] = [
   {
     path: 'campaigns/:campaignId/setup/voice',
     element: <VoiceStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/creator-pay-explainer',
+    element: <CreatorPayExplainerStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/threshold',

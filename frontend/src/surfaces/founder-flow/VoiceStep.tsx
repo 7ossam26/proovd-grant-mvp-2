@@ -176,7 +176,7 @@ function VoiceScreen({
   campaignId: string;
   build: BuildFlowState;
 }) {
-  const { leave, leaveToPage } = useFlowNav();
+  const { leave, swapToPage } = useFlowNav();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
 
@@ -236,10 +236,9 @@ function VoiceScreen({
     } finally {
       setBusy(false);
     }
-    // `next()`'s build branch is `this.step({buildStep: st.buildStep + 1})`.
-    // Ours is `buildFlowStepsFor`'s walk, which is Idea/Product aware — §14.4
-    // gives a Product campaign no public threshold, so it has no screen 22.
-    leaveToPage(build.state?.model === 'idea' ? 'threshold' : 'faqs', 1);
+    // The supplied Creator Pay explainer is the next routed beat. It records
+    // nothing, so the build record and the autosave context remain intact.
+    swapToPage('creator-pay-explainer', 1);
   }
 
   const status = describeSaveState(build.autosave.state);

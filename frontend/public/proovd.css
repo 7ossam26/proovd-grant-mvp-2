@@ -21200,3 +21200,271 @@ html.no-motion .ff-story__say { transition: none; }
     bottom: calc(clamp(20px, 3vw, 40px) + 34px);
   }
 }
+
+/* ═════════════════════ CREATOR PAY EXPLAINER — reference `scPay` ══ */
+
+/* This page owns the same reference chrome as Brand Voice. */
+.ff[data-flow-page='creator-pay-explainer'] .ff__top,
+.ff[data-flow-page='creator-pay-explainer'] .ff__badge { display: none; }
+
+.ff-payx {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+.ff-payx__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-payx__back:hover { color: #013F17; }
+.ff-payx__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-payx__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-payx__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-payx__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-payx__help:hover { background: #E9FFE1; }
+
+.ff-payx__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.37);
+  transform-origin: center center;
+}
+.ff-payx__column {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1900px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-payx__art {
+  width: 640px;
+  height: auto;
+  max-width: none;
+  display: block;
+  mix-blend-mode: multiply;
+}
+.ff-payx__title {
+  margin: 110px 0 0;
+  max-width: none;
+  font-size: 78px;
+  font-weight: 500;
+  line-height: 1.34;
+  letter-spacing: -0.02em;
+  color: #013F17;
+  text-align: center;
+}
+.ff-payx__cta {
+  margin-top: 150px;
+  width: 1180px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 62px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-payx__cta:hover { background: #3BDC8C; }
+
+.ff-payx__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  border: none;
+  padding: 0;
+  background: rgba(1, 45, 16, 0.4);
+  animation: ff-payx-scrim-in 0.25s ease both;
+  cursor: default;
+}
+.ff-payx__scrim.is-closing {
+  animation: ff-payx-scrim-out 0.28s cubic-bezier(0.55, 0.085, 0.68, 0.53) both;
+}
+.ff-payx__drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(27rem, 88vw);
+  height: 100%;
+  z-index: 60;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: clamp(20px, 2.4vw, 32px) clamp(1.35rem, 4.4vw, 4rem);
+  background: #012D10;
+  font-family: 'Satoshi', sans-serif;
+  animation: ff-payx-drawer-in 0.4s cubic-bezier(0.215, 0.61, 0.355, 1) both;
+}
+.ff-payx__drawer.is-closing {
+  animation: ff-payx-drawer-out 0.28s cubic-bezier(0.55, 0.085, 0.68, 0.53) both;
+}
+.ff-payx__drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(0.8rem, 1.3vw, 1.1rem);
+  margin-bottom: clamp(18px, 2.2vw, 28px);
+  color: #E9FFE1;
+  font-weight: 900;
+  font-size: clamp(18px, 1.6vw, 21px);
+  letter-spacing: -0.03em;
+}
+.ff-payx__drawer-close {
+  width: clamp(2.75rem, 3.6vw, 3.3rem);
+  height: clamp(2.75rem, 3.6vw, 3.3rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  background: none;
+  color: #E9FFE1;
+  cursor: pointer;
+}
+.ff-payx__drawer-intro {
+  margin-bottom: clamp(12px, 1.6vw, 18px);
+  color: #A2AFA8;
+  font-size: clamp(0.8rem, 0.6vw, 0.92rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ff-payx__docs {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vw, 16px);
+}
+.ff-payx__doc {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(14px, 1.6vw, 20px);
+  border: 2px solid #1B4A2C;
+  border-radius: 2px;
+  background: transparent;
+  text-align: left;
+  font-family: 'Satoshi', sans-serif;
+  cursor: pointer;
+}
+.ff-payx__doc:hover { border-color: #41ED98; }
+.ff-payx__doc.is-current {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.08);
+}
+.ff-payx__doc-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ff-payx__doc-tag {
+  color: #A2AFA8;
+  font-size: clamp(0.7rem, 0.55vw, 0.84rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ff-payx__doc.is-current .ff-payx__doc-tag { color: #41ED98; }
+.ff-payx__doc-title {
+  color: #E9FFE1;
+  font-size: clamp(14px, 1.3vw, 18px);
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+.ff-payx__doc-body {
+  color: #A2AFA8;
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+@keyframes ff-payx-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ff-payx-scrim-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes ff-payx-drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes ff-payx-drawer-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
+
+@media (max-width: 600px) {
+  .ff-payx__back {
+    bottom: 92px;
+    padding: 8px 14px;
+  }
+  .ff-payx__drawer {
+    inset: auto 0 0;
+    width: 100%;
+    height: 86vh;
+    animation-name: ff-payx-drawer-up;
+  }
+  .ff-payx__drawer.is-closing { animation-name: ff-payx-drawer-down; }
+}
+
+@keyframes ff-payx-drawer-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes ff-payx-drawer-down { from { transform: translateY(0); } to { transform: translateY(100%); } }

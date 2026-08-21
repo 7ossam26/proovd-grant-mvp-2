@@ -86,6 +86,8 @@ interface FlowNav {
   leave: (to: string, direction?: 1 | -1) => void;
   /** The same, addressed by flow page id. */
   leaveToPage: (pageId: string, direction?: 1 | -1) => void;
+  /** Swap routes without an exit tween; the arriving page still relays in. */
+  swapToPage: (pageId: string, direction?: 1 | -1) => void;
   /** This page's own route parameter: a draft token, or a campaign id. */
   param: string;
 }
@@ -152,8 +154,16 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
     [leave, param],
   );
 
+  const swapToPage = useCallback(
+    (nextId: string, direction: 1 | -1 = 1) => {
+      pendingDirection = direction;
+      void navigate(founderFlowPath(nextId, param));
+    },
+    [navigate, param],
+  );
+
   return (
-    <FlowNavContext.Provider value={{ leave, leaveToPage, param }}>
+    <FlowNavContext.Provider value={{ leave, leaveToPage, swapToPage, param }}>
       <main className="ff" data-flow-page={pageId}>
         <div className="ff__stage" ref={stageRef}>
           <div className="ff__top">
