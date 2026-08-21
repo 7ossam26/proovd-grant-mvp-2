@@ -16,23 +16,9 @@ import { CampaignPage } from './features/public/campaign/CampaignPage.js';
 import { LiveCampaignPage } from './features/public/campaign/LiveCampaignPage.js';
 import { AdminLayout } from './features/admin/AdminLayout.js';
 import { AdminSignIn } from './features/admin/AdminSignIn.js';
+import { SectionPlaceholder, AdminAddressRetired } from './features/admin/SectionPlaceholder.js';
 import { RequireRole, RedirectIfAuthenticated } from './lib/routeGuards.js';
 import { roleHome } from './lib/session.js';
-import { FoundersList } from './features/admin/founders/FoundersList.js';
-import { CreateFounder } from './features/admin/founders/CreateFounder.js';
-import { FounderWorkspace } from './features/admin/founders/FounderWorkspace.js';
-import { CreatorsDirectory } from './features/admin/creators/CreatorsDirectory.js';
-import { CreatorRecord } from './features/admin/creators/CreatorRecord.js';
-import { PostReview } from './features/admin/creators/PostReview.js';
-import { SupportQueue } from './features/admin/support/SupportQueue.js';
-import { SupportCase } from './features/admin/support/SupportCase.js';
-import { CampaignsDirectory } from './features/admin/campaigns/CampaignsDirectory.js';
-import { CampaignRecord } from './features/admin/campaigns/CampaignRecord.js';
-import { BackersWorkspace } from './features/admin/backers/BackersWorkspace.js';
-import { LiveModePage } from './features/admin/live-mode/LiveModePage.js';
-import { TodayPage } from './features/admin/today/TodayPage.js';
-import { MoneyQueue } from './features/admin/money/MoneyQueue.js';
-import { MoneyRecord } from './features/admin/money/MoneyRecord.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
 import { CampaignPreview } from './surfaces/founder/CampaignPreview.js';
 import { FounderDashboard } from './surfaces/founder/FounderDashboard.js';
@@ -187,37 +173,6 @@ function LiveChapterRedirect() {
 function PaidChapterRedirect() {
   const { campaignId = '' } = useParams();
   return <Navigate to={founderDashboardPath(campaignId, 'payouts')} replace />;
-}
-
-/*
- * The Affiliate record's retired sibling addresses (Session C, 2026-08-17).
- * Each redirects into the tab that absorbed it, so a bookmark, a Support
- * context link, or a Tasks reference minted before the rebuild still lands on
- * the record it meant rather than a 404.
- */
-function RelationshipRedirect() {
-  const { prospectId = '', associationId = '' } = useParams();
-  return (
-    <Navigate
-      to={`/admin/creators/${encodeURIComponent(prospectId)}?tab=campaigns&rel=${encodeURIComponent(associationId)}`}
-      replace
-    />
-  );
-}
-
-function HistoryRedirect() {
-  const { prospectId = '' } = useParams();
-  return <Navigate to={`/admin/creators/${encodeURIComponent(prospectId)}?tab=history`} replace />;
-}
-
-function ControlsRedirect() {
-  const { prospectId = '' } = useParams();
-  return (
-    <Navigate
-      to={`/admin/creators/${encodeURIComponent(prospectId)}?tab=support&section=enforcement`}
-      replace
-    />
-  );
 }
 
 /**
@@ -377,126 +332,57 @@ const rootChildren: RouteObject[] = [
       </RequireRole>
     ),
     children: [
-      { index: true, element: <Navigate to="/admin/today" replace /> },
+      { index: true, element: <Navigate to="/admin/founders" replace /> },
       /*
-        §26, §1.4 — Today, built 2026-08-19. The last parked section.
+        The five sections, every one a placeholder (2026-08-21).
 
-        It was parked for a real reason: §26 names eight sub-sections and none
-        of them is an overview, so there was nothing to build FROM until the
-        workspaces existed. All six now do, so this is the Glance layer over
-        their queues — six counts, each read from a record with a deadline
-        somebody agreed to, each opening the workspace that owns it.
+        The panel is being rebuilt one section at a time, so its screens were
+        removed and its nav was not. Each address below still resolves and
+        still renders a heading and a state — §33.11 sweeps all five, and a
+        route that resolved to nothing would fail that sweep on a missing
+        heading rather than on anything real (§1.4).
 
-        It decides nothing, stores nothing, and records no visit. §30's
-        prohibition on manufactured engagement is strongest as an absence:
-        there is no write route at all.
+        Today, Money & Fulfillment and Live mode left the nav by product
+        direction. Their BACKENDS are untouched and still mounted, and their
+        addresses now render `AdminAddressRetired` through the catch-all below
+        rather than a blank shell.
+
+        `Affiliates` keeps the `/admin/creators` PATH: five backend files
+        compose links to it and their tests assert those strings, so the label
+        is what changed and the address is what the product already points at.
+
+        Each path is a splat (`section/*`) so a deep link still lands on its
+        section rather than a blank page. The Tasks panel mints references
+        like `/admin/creators/<id>?tab=...`, and §27's internal notices link to
+        the same shapes; those addresses outlived their screens, and answering
+        them with the section being rebuilt is truthful where nothing is not.
+
+        The server is untouched. Every `/api/admin/*` router is still mounted
+        and still tested, so a rebuilt section has its data on day one.
       */
-      { path: 'today', element: <TodayPage /> },
-      // §26.1. Two addresses: everybody, and one person. The workspace is keyed
-      // on the PROSPECT rather than on a draft or a campaign, because a Founder
-      // whose campaign was archived-and-restarted (§9's wrong-type path) has
-      // more than one of each and is still one person.
-      //
-      // The Admin panel's one remaining section — Today — is parked in the
-      // shell rather than routed here. A route with no surface is a claim that
-      // a surface exists (§1.4); the shell's parked control says what the
-      // destination is instead.
-      { path: 'founders', element: <FoundersList /> },
-      // Static before dynamic — the router ranks it, but the order documents it.
-      { path: 'founders/new', element: <CreateFounder /> },
-      { path: 'founders/:prospectId', element: <FounderWorkspace /> },
-      // §26.1, §8. The Creator (Affiliate) workspace, keyed on the PERSON for
-      // the same reason the Founder one is: a Creator recruited to two
-      // campaigns is one person with two `campaign_affiliate_associations`
-      // rows, and the deleted campaign-scoped screen could not say so.
-      //
-      // One record address with the view in the URL (DNA §5.12): `?tab=` for
-      // the eight tabs, `?section=` for the tab's sections, `?rel=` for the
-      // selected relationship. Session C absorbed the old `/history`,
-      // `/controls`, and `/relationships/:associationId` sibling addresses
-      // into the tabs; the relationship address redirects so a bookmark, the
-      // Support workspace's context link, or a Tasks reference from before
-      // the rebuild still lands on the record it meant.
-      { path: 'creators', element: <CreatorsDirectory /> },
-      { path: 'creators/:prospectId', element: <CreatorRecord /> },
       {
-        path: 'creators/:prospectId/relationships/:associationId',
-        element: <RelationshipRedirect />,
+        path: 'founders/*',
+        element: <SectionPlaceholder name="Founders" did="hold every Founder's record — their invitation, campaign, money and history" />,
       },
-      { path: 'creators/:prospectId/history', element: <HistoryRedirect /> },
-      { path: 'creators/:prospectId/controls', element: <ControlsRedirect /> },
-      // §17's decision is its own address, because it is its own act — an
-      // Admin part-way through seven checks who reloads gets the checks back.
       {
-        path: 'creators/:prospectId/relationships/:associationId/review',
-        element: <PostReview />,
+        path: 'creators/*',
+        element: <SectionPlaceholder name="Affiliates" did="hold every Affiliate's record — their verification, campaigns, earnings and standing" />,
       },
-      // §26.7, §26.8, §27.8. The Support workspace over the case domain Phase
-      // 16b shipped. Two addresses: the queue, and one case.
-      //
-      // The four tabs are a `?tab=` search param rather than path segments,
-      // for the reason the Creator relationship panes are: they are four views
-      // of ONE record, and a bookmark to the evidence should still be that
-      // case. The queue's filter is a search param for the same reason — a
-      // filtered queue is a position, and a position that vanishes on reload
-      // is one an Admin cannot send to a colleague (DNA §5.12).
-      { path: 'support', element: <SupportQueue /> },
-      { path: 'support/:caseId', element: <SupportCase /> },
-      // §26.1, §23.1. The Campaigns hub, built 2026-08-15. Two addresses: every
-      // campaign, and one campaign.
-      //
-      // It is a READ. There is no create, edit, approve, launch, pause, or
-      // close route here and the API behind it is two GETs — every campaign
-      // decision already has a router another workspace owns, and a duplicate
-      // control would be a second door into rules those encode.
-      //
-      // The four tabs are a `?tab=` search param rather than path segments, for
-      // the reason the Support case and the Creator relationship panes are:
-      // they are four views of ONE record, and a bookmark to the Close tab
-      // should still be that campaign (DNA §5.12). The directory's filter is a
-      // search param for the same reason.
-      { path: 'campaigns', element: <CampaignsDirectory /> },
-      { path: 'campaigns/:campaignId', element: <CampaignRecord /> },
-      /* §26.1, §26.5, §25.7 — Backers. One address, because §5.4 gives a Backer
-         no account and the reference's own promise is "One row per Backer. No
-         extra record page." Everything a row holds is on the row; the position
-         (view, filters, page) lives in the query string so a drilled-through
-         list is a link an Admin can send. */
-      { path: 'backers', element: <BackersWorkspace /> },
-      /*
-        §34, §2.1, Appendix C — the live-mode gate, built 2026-08-19 over the
-        API Phase 24 shipped and tested. That phase recorded its own gap: "the
-        API exists and is tested; there is no React page for it yet… §1.1 does
-        [name one], so this is a real gap rather than a decision."
-
-        There is no override on it and nowhere to add one — the
-        `/admin/prerequisites` posture since Phase 06a. The enable form is
-        ABSENT while the gate is shut rather than disabled, because §34 is
-        released by satisfying it and a disabled control is one somebody looks
-        for a way around.
-      */
-      /*
-        §21, §22.1–§22.7, §24.8, §24.11, §26.6 — the Money & Fulfillment
-        console, built 2026-08-19. The Campaigns hub has named this destination
-        since it was built and carried "Money console not built yet — the
-        amounts here come from its records"; this is that console, and that
-        sentence is the promise it keeps.
-
-        Two addresses. The queue is ordered by §33.7.12's own rule — interrupted
-        batches first, because "an incomplete batch is visibly recoverable" is
-        the acceptance test — and the record carries its six views in `?tab=`,
-        for the reason the Support case and the Campaigns record do: they are
-        six views of ONE campaign's money, and a bookmark to the Founder payment
-        should still be that campaign (DNA §5.12).
-
-        Every money decision in the product is made here and nowhere else. A
-        second control elsewhere would be a second path into rules — §22.1's one
-        Transfer per Creator, §24.8's cause matrix, §22.3's W-9 block — whose
-        whole safety is that there is one.
-      */
-      { path: 'money', element: <MoneyQueue /> },
-      { path: 'money/:campaignId', element: <MoneyRecord /> },
-      { path: 'live-mode', element: <LiveModePage /> },
+      {
+        path: 'backers/*',
+        element: <SectionPlaceholder name="Backers" did="list every pre-order beside the person who placed it" />,
+      },
+      {
+        path: 'campaigns/*',
+        element: <SectionPlaceholder name="Campaigns" did="summarise every campaign and link into the workspace that owned each decision" />,
+      },
+      {
+        path: 'support/*',
+        element: <SectionPlaceholder name="Support" did="run the support queue with its response promise, evidence and handoff notes" />,
+      },
+      /* Any other Admin address — including the three retired sections — keeps
+         the shell and says so, rather than rendering an empty `Outlet`. */
+      { path: '*', element: <AdminAddressRetired /> },
     ],
   },
   {

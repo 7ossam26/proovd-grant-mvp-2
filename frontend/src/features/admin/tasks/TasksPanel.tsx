@@ -42,7 +42,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Button, StatePanel } from '../../../components/index.js';
 import { supportMailto } from '../../public/states.js';
-import { ConfirmDialog } from '../founders/dialogs/ConfirmDialog.js';
+import { ConfirmDialog } from '../ConfirmDialog.js';
 import {
   AdminRequestError,
   archiveTaskList,
