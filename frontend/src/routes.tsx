@@ -83,7 +83,7 @@ import { CreatorPayExplainerStep } from './surfaces/founder-flow/CreatorPayExpla
 import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
-import { InReviewStep } from './surfaces/founder-flow/InReviewStep.js';
+import { InReviewReferenceStep } from './surfaces/founder-flow/InReviewReferenceStep.js';
 import { LiveStep } from './surfaces/founder-flow/LiveStep.js';
 import { PasswordStep as FounderPasswordStep } from './surfaces/founder-flow/PasswordStep.js';
 import {
@@ -854,7 +854,7 @@ const rootChildren: RouteObject[] = [
       somebody may have bookmarked.
     */
     path: 'campaigns/:campaignId/setup/in-review',
-    element: <InReviewStep />,
+    element: <InReviewReferenceStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/live',
