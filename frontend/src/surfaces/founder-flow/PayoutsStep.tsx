@@ -31,18 +31,47 @@
  * happier ending, so they are treated the same way.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router';
 import {
-  PAYOUTS_BEFORE_FEE,
-  PAYOUT_PREPARE_COLLECTS_NOTHING,
-  STRIPE_PREPARE_ITEMS,
-} from '@proovd/shared';
-import { Button, StatePanel, NO_ACTION } from '../../components/index.js';
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { useParams } from 'react-router';
+import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { PayoutOnboarding, type PayoutState } from '../payouts/PayoutOnboarding.js';
 import { fetchPayouts, requestOnboardingLink, PayoutRequestError } from '../payouts/api.js';
-import { FlowPage, useFlowNav } from './FlowPage.js';
+import { flowDirection, FlowPage, HelpDrawer, useFlowNav } from './FlowPage.js';
+
+const PAYOUT_ASSETS = {
+  logo: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg',
+    import.meta.url,
+  ).href,
+  stripe: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/stripe.svg',
+    import.meta.url,
+  ).href,
+  id: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-id.svg',
+    import.meta.url,
+  ).href,
+  bank: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-bank.svg',
+    import.meta.url,
+  ).href,
+  ssn: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-ssn.svg',
+    import.meta.url,
+  ).href,
+  piggy: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/piggy.png',
+    import.meta.url,
+  ).href,
+};
 
 export function PayoutsStep() {
   const { campaignId = '' } = useParams();
@@ -91,7 +120,7 @@ export function PayoutsStep() {
   if (!payouts) return <SurfaceLoading subject="your payout setup" reference="Payout setup" />;
 
   return (
-    <FlowPage pageId="payouts" param={campaignId} badge>
+    <FlowPage pageId="payouts" param={campaignId}>
       <Body payouts={payouts} />
     </FlowPage>
   );
@@ -108,121 +137,248 @@ function Body({ payouts }: { payouts: PayoutState }) {
     try {
       const link = await requestOnboardingLink('founder');
       window.location.assign(link.url);
-    } catch (e: unknown) {
+    } catch (cause: unknown) {
       setBusy(false);
       setError(
-        e instanceof PayoutRequestError
-          ? (e.detail.whatHappened ?? e.detail.title)
+        cause instanceof PayoutRequestError
+          ? (cause.detail.whatHappened ?? cause.detail.title)
           : 'We could not open Stripe. Nothing has changed.',
       );
     }
   }, []);
 
-  const back = (
-    <Button tier="tertiary" onClick={() => leaveToPage('last-look', -1)}>
-      Back to Last look
-    </Button>
-  );
-
-  /* ── §13: complete. The reference's "You're all set to get paid!" ───────── */
+  const back = () => leaveToPage('last-look', -1);
 
   if (payouts.state === 'complete') {
     return (
-      <div className="ff-money ff-money--done">
-        <h1 className="ff-money__title" data-anim="head">
-          You’re all set to get paid!
-        </h1>
-        <p className="ff-money__lede" data-anim="sub">
-          Stripe has everything it needs from you. Your campaign can take pre-orders when it goes
-          live, and the money lands in your own account.
-        </p>
-        <div className="ff-nav" data-anim="cta">
-          {back}
-          {/* §33.11.4: a control names its destination. The reference's own
-              label here is `Continue`, and the next thing is money. */}
-          <Button tier="primary" onClick={() => leaveToPage('fee')}>
-            Continue to your listing fee
-          </Button>
-        </div>
-      </div>
+      <ReferenceShell onBack={back}>
+        <ReferenceStage state="complete">
+          <div className="ff-payout-ref__paid-lockup">
+            <h1 data-payout-anim="head" className="ff-payout-ref__paid-head">
+              You’re all set to get paid!
+            </h1>
+            <img
+              data-payout-grow="1"
+              className="ff-payout-ref__piggy"
+              src={PAYOUT_ASSETS.piggy}
+              alt=""
+            />
+            <button
+              type="button"
+              data-payout-anim="cta"
+              className="ff-payout-ref__paid-cta"
+              onClick={() => leaveToPage('fee')}
+            >
+              Continue
+            </button>
+          </div>
+        </ReferenceStage>
+      </ReferenceShell>
     );
   }
 
-  /* ── §13's other three states, and the unconfigured case ────────────────── */
-
+  // These server states do not exist in the prototype. Keep the product's
+  // exact missing-requirement, review, and restriction behavior for them.
   if (payouts.state !== 'not_started' || !payouts.onboardingAvailable) {
     return (
-      <div className="ff-money">
-        <h1 className="ff-money__title" data-anim="head">
-          How you get paid
-        </h1>
-        <div className="ff-money__panel" data-anim="panel">
-          <PayoutOnboarding payouts={payouts} role="founder" onStart={start} />
+      <ReferenceShell onBack={back}>
+        <div className="ff-payout-ref__fallback">
+          <h1 className="ff-money__title">How you get paid</h1>
+          <div className="ff-money__panel">
+            <PayoutOnboarding payouts={payouts} role="founder" onStart={start} />
+          </div>
         </div>
-        {/* No forward control on any of these three. `listingFeeEligible` is
-            true only for a COMPLETE seller account, so the fee page refuses
-            for all of them — and offering to open a page whose server-side
-            answer we already know is a refusal is §1.4's failure with an
-            arrow on it. §13 is strongest about the restricted one ("no
-            misleading ability to pay the listing fee") and the other two are
-            the same fact with a happier ending. The resume action, where
-            there is one, is inside the panel above. */}
-        <div className="ff-nav" data-anim="cta">{back}</div>
-      </div>
+      </ReferenceShell>
     );
   }
 
-  /* ── Not started. The reference's "Setup how you get paid" ──────────────── */
+  return (
+    <ReferenceShell onBack={back}>
+      <ReferenceStage state="setup">
+        <div className="ff-payout-ref__setup-lockup">
+          <h1 data-payout-anim="head" className="ff-payout-ref__setup-head">
+            Setup how you get paid
+          </h1>
+          <div data-payout-anim="panel" className="ff-payout-ref__prepare">
+            <div className="ff-payout-ref__prepare-head">
+              <span>Prepare:</span>
+              <img src={PAYOUT_ASSETS.stripe} alt="stripe" />
+            </div>
+            <div className="ff-payout-ref__items">
+              <PayoutPrepareItem icon={PAYOUT_ASSETS.id}>A government ID</PayoutPrepareItem>
+              <PayoutPrepareItem icon={PAYOUT_ASSETS.bank}>
+                Your US bank account details
+              </PayoutPrepareItem>
+              <PayoutPrepareItem icon={PAYOUT_ASSETS.ssn}>
+                Your SSN or EIN if you have a business
+              </PayoutPrepareItem>
+            </div>
+          </div>
+          <button
+            type="button"
+            data-payout-anim="cta"
+            className="ff-payout-ref__setup-cta"
+            onClick={() => void start()}
+            disabled={busy}
+          >
+            {busy ? 'Opening Stripe…' : 'Take me to stripe'}
+          </button>
+          {error ? (
+            <p className="ff-payout-ref__error" role="alert">
+              {error} Nothing about your account has changed.
+            </p>
+          ) : null}
+        </div>
+      </ReferenceStage>
+    </ReferenceShell>
+  );
+}
+
+function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () => void }) {
+  const { param } = useFlowNav();
 
   return (
-    <div className="ff-money">
-      <h1 className="ff-money__title ff-money__title--small" data-anim="head">
-        Set up how you get paid
-      </h1>
-      <p className="ff-money__lede" data-anim="sub">
-        {PAYOUTS_BEFORE_FEE}
-      </p>
+    <section className="ff-payout-ref">
+      <button type="button" className="ff-payout-ref__back" onClick={onBack}>
+        <svg
+          viewBox="0 0 24 24"
+          width="11"
+          height="11"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M15 5 8 12l7 7" />
+        </svg>
+        Back
+      </button>
+      <header className="ff-payout-ref__top">
+        <img src={PAYOUT_ASSETS.logo} alt="proovd" className="ff-payout-ref__logo" />
+        <HelpDrawer
+          pageId="payouts"
+          param={param}
+          trigger={
+            <button type="button" className="ff-payout-ref__help">
+              Help
+            </button>
+          }
+        />
+      </header>
+      {children}
+    </section>
+  );
+}
 
-      <div className="ff-prepare" data-anim="panel">
-        <div className="ff-prepare__head">
-          <h2 className="ff-prepare__title">Prepare:</h2>
-          {/* The provider's own name, as text. An image here would be a claim
-              rendered as a logo, and the sentence below is what carries it. */}
-          <span className="ff-prepare__mark">Stripe</span>
-        </div>
-        <ul className="ff-prepare__list">
-          {STRIPE_PREPARE_ITEMS.map((item) => (
-            <li className="ff-prepare__item" key={item.key}>
-              <span className="ff-prepare__label">{item.label}</span>
-              <span className="ff-prepare__why">{item.why}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="ff-prepare__note">{PAYOUT_PREPARE_COLLECTS_NOTHING}</p>
-      </div>
+function ReferenceStage({ children, state }: { children: ReactNode; state: 'setup' | 'complete' }) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  const directionRef = useRef(flowDirection());
 
-      {error ? (
-        <div className="notice notice--warn" role="alert">
-          <p>{error}</p>
-          <p className="fine">Nothing about your account has changed.</p>
-        </div>
-      ) : null}
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
 
-      <div className="ff-nav" data-anim="cta">
-        {back}
-        <Button tier="primary" onClick={() => void start()} disabled={busy}>
-          {busy ? 'Opening Stripe…' : 'Take me to Stripe'}
-        </Button>
-      </div>
-      {/* §1.4: Stripe does not return anybody HERE. §32.2 gives Connect one
-          configured return address per deployment, and it is `/stripe/return`,
-          which re-reads the account and renders whichever of §13's states is
-          actually true. Saying "this page" would name the wrong destination on
-          the screen somebody reads before leaving. */}
-      <p className="ff-money__foot">
-        Stripe opens in this tab. When you finish there we show you what Stripe said, and your
-        campaigns are one step away.
-      </p>
+    const fit = () => {
+      const scale = Math.min(window.innerWidth / 2496, window.innerHeight / 1542) * 0.78;
+      stage.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(4)})`;
+    };
+    const settle = () => window.setTimeout(fit, 320);
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', settle);
+
+    const gsap = (
+      window as unknown as {
+        gsap?: {
+          set: (target: unknown, vars: Record<string, unknown>) => void;
+          fromTo: (
+            target: unknown,
+            from: Record<string, unknown>,
+            to: Record<string, unknown>,
+          ) => void;
+          killTweensOf: (target: unknown) => void;
+        };
+      }
+    ).gsap;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animated = Array.from(stage.querySelectorAll('[data-payout-anim]'));
+    const grow = stage.querySelector('[data-payout-grow]');
+
+    if (gsap && !reduced) {
+      if (state === 'setup') {
+        gsap.fromTo(
+          animated,
+          { x: 150 * directionRef.current, opacity: 0 },
+          {
+            x: 0,
+            opacity: 1,
+            duration: 0.62,
+            ease: 'power3.out',
+            stagger: { each: 0.085, from: directionRef.current === -1 ? 'end' : 'start' },
+            force3D: true,
+            clearProps: 'transform,opacity',
+          },
+        );
+      } else if (grow) {
+        gsap.set(animated, { opacity: 0 });
+        gsap.fromTo(
+          grow,
+          { scale: 0.12, opacity: 0, x: 0, y: 0 },
+          {
+            scale: 1,
+            opacity: 1,
+            x: 0,
+            y: 0,
+            duration: 1,
+            ease: 'back.out(2.2)',
+            transformOrigin: '50% 50%',
+            force3D: true,
+            clearProps: 'transform,opacity',
+            onComplete: () =>
+              gsap.fromTo(
+                animated,
+                { y: 34, opacity: 0 },
+                {
+                  y: 0,
+                  opacity: 1,
+                  duration: 0.5,
+                  ease: 'power3.out',
+                  stagger: 0.12,
+                  force3D: true,
+                  clearProps: 'transform,opacity',
+                },
+              ),
+          },
+        );
+      }
+    }
+
+    const sweep = window.setTimeout(() => {
+      if (gsap) gsap.set([...animated, ...(grow ? [grow] : [])], { clearProps: 'transform,opacity' });
+    }, 3400);
+
+    return () => {
+      window.removeEventListener('resize', fit);
+      window.removeEventListener('orientationchange', settle);
+      window.clearTimeout(sweep);
+      if (gsap) gsap.killTweensOf([...animated, ...(grow ? [grow] : [])]);
+    };
+  }, [state]);
+
+  return (
+    <div className="ff-payout-ref__stage" ref={stageRef}>
+      {children}
+    </div>
+  );
+}
+
+function PayoutPrepareItem({ icon, children }: { icon: string; children: ReactNode }) {
+  return (
+    <div className="ff-payout-ref__item">
+      <img src={icon} alt="" />
+      <span>{children}</span>
     </div>
   );
 }

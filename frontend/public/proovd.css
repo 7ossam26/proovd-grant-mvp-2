@@ -8997,6 +8997,242 @@ html.no-motion .ff-prob__rail { transition: none; }
   font-size: 0.9375rem;
 }
 
+/* ── Founder Flow v2 — screen 25, reference-authored payout stage ────────
+   This route deliberately does not use the fluid `.ff-money` composition.
+   The supplied source authors a 2496×1542 stage and scales it by
+   min(viewport/2496×1542) × .78. PayoutsStep owns that scale on resize. */
+.ff[data-flow-page='payouts'] .ff__top,
+.ff[data-flow-page='payouts'] .ff__badge { display: none; }
+.ff[data-flow-page='payouts'] .ff__stage { padding: 0; gap: 0; }
+.ff[data-flow-page='payouts'] .ff__body {
+  display: block;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ff-payout-ref {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 25;
+  background: #FAFAFA;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 16px;
+  line-height: normal;
+}
+.ff-payout-ref__top {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-payout-ref__logo {
+  display: block;
+  width: auto;
+  height: clamp(26px, 2.4vw, 36px);
+}
+.ff-payout-ref__help {
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 10px 22px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(12px, 1vw, 15px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-payout-ref__help:hover { background: #E9FFE1; }
+.ff-payout-ref__help:focus-visible {
+  outline: 3px solid #013F17;
+  outline-offset: 3px;
+}
+.ff-payout-ref__back {
+  position: absolute;
+  z-index: 6;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, .8vw, 12px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-payout-ref__back:hover { color: #013F17; }
+.ff-payout-ref__back:focus-visible {
+  outline: 3px solid #41ED98;
+  outline-offset: 2px;
+}
+.ff-payout-ref__stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2496px;
+  height: 1542px;
+  transform: translate(-50%, -50%) scale(.37);
+  transform-origin: center center;
+}
+
+.ff-payout-ref__setup-lockup {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1860px;
+  transform: translate(-50%, calc(-50% + 30px));
+  display: flex;
+  flex-direction: column;
+}
+.ff-payout-ref__setup-head {
+  align-self: center;
+  margin: 0 0 150px;
+  color: #013F17;
+  font-size: 104px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+.ff-payout-ref__prepare { display: flex; flex-direction: column; }
+.ff-payout-ref__prepare-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  color: #013F17;
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-payout-ref__prepare-head img {
+  display: block;
+  width: auto;
+  height: 62px;
+}
+.ff-payout-ref__items {
+  margin-top: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 86px;
+}
+.ff-payout-ref__item {
+  display: flex;
+  align-items: center;
+  gap: 74px;
+  color: #013F17;
+  font-size: 52px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-payout-ref__item img {
+  display: block;
+  flex: none;
+  width: 104px;
+  height: 104px;
+}
+.ff-payout-ref__setup-cta,
+.ff-payout-ref__paid-cta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, .42) inset;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -.02em;
+  cursor: pointer;
+}
+.ff-payout-ref__setup-cta {
+  margin-top: 150px;
+  height: 150px;
+  font-size: 60px;
+}
+.ff-payout-ref__setup-cta:hover,
+.ff-payout-ref__paid-cta:hover { background: #3BDC8C; }
+.ff-payout-ref__setup-cta:focus-visible,
+.ff-payout-ref__paid-cta:focus-visible {
+  outline: 6px solid #013F17;
+  outline-offset: 6px;
+}
+.ff-payout-ref__setup-cta:disabled { cursor: wait; opacity: .72; }
+.ff-payout-ref__error {
+  margin: 24px 0 0;
+  max-width: none;
+  color: #013F17;
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ff-payout-ref__paid-lockup {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1720px;
+  transform: translate(-50%, calc(-50% + 30px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-payout-ref__paid-head {
+  margin: 0;
+  color: #013F17;
+  font-size: 126px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -.035em;
+  text-align: center;
+}
+.ff-payout-ref__piggy {
+  display: block;
+  width: 900px;
+  height: auto;
+  margin-top: 120px;
+}
+.ff-payout-ref__paid-cta {
+  height: 184px;
+  margin-top: 180px;
+  font-size: 72px;
+}
+
+.ff-payout-ref__fallback {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(44rem, calc(100vw - 40px));
+  transform: translate(-50%, -50%);
+}
+
+@media (max-width: 600px) {
+  .ff-payout-ref__back { bottom: 92px; padding: 8px 14px; }
+}
+
 /* §12's high-effort note lived here from Session E until 2026-08-20, when Last
    look was rebuilt to the reference. It has no room in that composition, so it
    rides the chrome band instead — `.ff-ll__foot`, in PHASE 63. */
