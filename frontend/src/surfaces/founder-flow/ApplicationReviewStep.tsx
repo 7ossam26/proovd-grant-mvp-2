@@ -151,7 +151,10 @@ function ApplicationReviewScreen({ campaignType }: { campaignType: CampaignType 
     return () => window.clearTimeout(hold);
   }, [swapToPage]);
 
-  const campaignWord = campaignType === 'pre_launch' ? 'Product' : 'Idea';
+  // The approval interstitial is a fixed reference beat. The campaign type is
+  // still loaded above because a direct entry needs the same readiness gate,
+  // but it must not leak into this screen's copy.
+  const campaignWord = 'campaign';
 
   return (
     <section className="ff-application-review" data-reviewwait="1">
@@ -181,13 +184,13 @@ function ApplicationReviewScreen({ campaignType }: { campaignType: CampaignType 
             className="ff-application-review__art"
           />
           <h1 data-review-anim="copy" className="ff-application-review__head">
-            Application in review
+            Campaign in review
           </h1>
           <p data-review-anim="copy" className="ff-application-review__sub">
             We’re reviewing your {campaignWord} this won’t take long
           </p>
           <p data-review-anim="copy" className="ff-application-review__note">
-            Our Team will reach out to you as soon as we approve you for the next steps
+            Our Team will reach out to you as soon as we get all your affiliates in place
           </p>
         </div>
       </div>

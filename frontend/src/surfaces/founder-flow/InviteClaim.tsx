@@ -246,7 +246,7 @@ function InviteScreen({ token, draft }: { token: string; draft: DraftLandingData
         </div>
       ) : null}
 
-      <div className="ff-invite__stage" ref={stage}>
+      <div className="ff-invite__stage" data-claim-stage="1" ref={stage}>
         <div className="ff-invite__col">
           <div className="ff-invite__meta" data-invite="meta">
             {/* The reference's own string. See the note at the top of this

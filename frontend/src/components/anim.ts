@@ -66,6 +66,7 @@ type GSAP = {
   ticker: {
     add: (fn: (time: number, deltaTime: number) => void) => unknown;
     remove: (fn: (time: number, deltaTime: number) => void) => unknown;
+    wake?: () => unknown;
   };
 };
 
@@ -472,7 +473,7 @@ export function relayIn(stage: HTMLElement | null, direction: 1 | -1): () => voi
 }
 
 /**
- * The page exit, with the README's 520ms fallback.
+ * The page exit, matching the reference's 200ms fade and 400ms fallback.
  *
  * The outgoing page fades before the route changes, so `done` is what actually
  * navigates. The fallback exists because a tween in a backgrounded tab does not
@@ -491,11 +492,15 @@ export function pageExit(stage: HTMLElement | null, done: () => void): void {
     return;
   }
   let ran = false;
+  // `pageGo` wakes the same ticker before its fade. This matters after the tab
+  // has been backgrounded: a sleeping ticker otherwise makes the exit appear
+  // to be skipped and the fallback performs the route change instead.
+  g.ticker?.wake?.();
   const fallback = window.setTimeout(() => {
     if (ran) return;
     ran = true;
     done();
-  }, 520);
+  }, 400);
   g.to(stage, {
     autoAlpha: 0,
     duration: dur('quick'), // 0.20 stands in for the reference's 0.28

@@ -24,7 +24,7 @@
  *
  * ── The exit runs before the route changes ──────────────────────────────────
  * `leave` fades the outgoing page and navigates in the tween's callback, with
- * the README's 520ms fallback inside `pageExit` so a backgrounded tab cannot
+ * the reference's 400ms fallback inside `pageExit` so a backgrounded tab cannot
  * strand somebody on a page that faded and never left. With motion off it
  * navigates immediately, which is the jump-cut rather than a second path.
  */
@@ -151,7 +151,14 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
   const leave = useCallback(
     (to: string, direction: 1 | -1 = 1, state?: unknown) => {
       pendingDirection = direction;
-      pageExit(stageRef.current, () => {
+      // The reference fades the page-owned stage, not its chrome wrapper. The
+      // invite and paper screens use these markers so their fixed composition
+      // is the exact element that participates in the route handoff.
+      const exitStage =
+        stageRef.current?.querySelector<HTMLElement>(
+          '[data-claim-stage],[data-page-stage]',
+        ) ?? stageRef.current;
+      pageExit(exitStage, () => {
         void navigate(to, { state });
       });
     },
