@@ -573,13 +573,6 @@ function SocialsScreen({
                           Remove
                         </button>
                       </>
-                    ) : index === 0 && !state.socials.length ? (
-                      /* Once, on the first empty row. §12's rule is worth
-                         stating and stating it four times is noise the
-                         reference's empty gap does not have. */
-                      <span className="ff-soc__note">
-                        Paste a link and press Add. We check it opens; you tell us you control it.
-                      </span>
                     ) : null}
                   </span>
                 </div>

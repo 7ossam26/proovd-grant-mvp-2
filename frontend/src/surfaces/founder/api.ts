@@ -62,9 +62,15 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       body = null;
     }
-    throw new AdminRequestError(
-      body?.title ? { ...(body as AdminError), status: response.status } : opaque(response.status),
-    );
+    if (body && (body.title || body.whatHappened || body.next || body.error)) {
+      throw new AdminRequestError({
+        ...opaque(response.status),
+        ...body,
+        title: body.title ?? 'That campaign change was not saved',
+        status: response.status,
+      });
+    }
+    throw new AdminRequestError(opaque(response.status));
   }
 
   if (response.status === 204) return undefined as T;

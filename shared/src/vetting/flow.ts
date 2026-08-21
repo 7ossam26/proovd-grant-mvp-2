@@ -712,9 +712,6 @@ export const FLOW_COMPLETION_IS_DECIDED =
  * carried in the address rather than in a component's state, so a reload in the
  * middle of an edit still comes back here.
  */
-export const FLOW_LAST_LOOK_RETURNS =
-  'Opening one from here brings you straight back to this page when you are done.';
-
 /**
  * Rendered under the date of birth.
  *

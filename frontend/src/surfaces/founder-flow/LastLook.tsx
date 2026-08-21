@@ -97,7 +97,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import { useParams } from 'react-router';
 import {
-  FLOW_LAST_LOOK_RETURNS,
   FOUNDER_ANSWER_SEQUENCE,
   OPTIONAL_ITEMS,
   formatUsd,
@@ -369,29 +368,8 @@ function Screen({
  * decides §14.3's ceiling.
  */
 function Foot({ state }: { state: WorkspaceState }) {
-  const high = state.highEffort;
-  const prepared = high
-    ? [
-        high.visualsCompleted,
-        high.brandingCompleted,
-        high.interviewScheduledOrConfirmed,
-      ].filter(Boolean).length
-    : 0;
-
-  return (
-    <p className="ff-ll__foot">
-      {FLOW_LAST_LOOK_RETURNS}
-      {high ? (
-        <>
-          {' '}
-          Creators are told whether visuals, branding and an interview are in place —{' '}
-          {prepared === 3
-            ? 'you have all three, so they are offered the standard rate.'
-            : `you have ${prepared} of the three, so one may propose a rate above the standard one.`}
-        </>
-      ) : null}
-    </p>
-  );
+  void state;
+  return null;
 }
 
 /**

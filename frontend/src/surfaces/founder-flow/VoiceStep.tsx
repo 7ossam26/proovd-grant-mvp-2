@@ -71,7 +71,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import {
   BRAND_VOICE_CHIP_FILLS,
   BRAND_VOICE_IS_READ_BY_PEOPLE,
@@ -131,6 +131,9 @@ const CLOSE = 'Close';
 /** `voiceBrand`'s stand-in while the Founder has not titled the campaign. */
 const FALLBACK_BRAND = 'Your brand';
 
+/** The same two campaign states accepted by the build write routes. */
+const EDITABLE_STATUSES: readonly string[] = ['affiliate_response_and_build', 'changes_required'];
+
 export function VoiceStep() {
   const { campaignId = '' } = useParams();
   const build = useBuildFlow(campaignId);
@@ -157,6 +160,13 @@ export function VoiceStep() {
 
   if (!build.state) {
     return <SurfaceLoading subject="your campaign page" reference="Your campaign" />;
+  }
+
+  // The reference's `scVoice` is true only while `pageStatus === 'draft'`.
+  // Do not render a read-only imitation of that screen for a campaign already
+  // in review; send it to the lifecycle screen instead.
+  if (!EDITABLE_STATUSES.includes(build.state.campaignStatus)) {
+    return <Navigate to={founderFlowPath('in-review', campaignId)} replace />;
   }
 
   return (
@@ -197,7 +207,6 @@ function VoiceScreen({
   const [busy, setBusy] = useState(false);
 
   const brand = (build.state?.build?.title ?? '').trim() || FALLBACK_BRAND;
-
   const write = useCallback(
     (next: { words?: readonly string[]; more?: string }) => {
       const value = { words: next.words ?? words, more: next.more ?? more };
@@ -375,7 +384,6 @@ function VoiceScreen({
       <p className="ff-vc__save" role="status" aria-live="polite" data-loud={loud}>
         {status}
       </p>
-
       {sheet.kind === 'replace' ? (
         <ReplaceSheet
           brand={brand}

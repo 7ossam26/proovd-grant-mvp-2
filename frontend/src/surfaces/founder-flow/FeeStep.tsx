@@ -150,16 +150,6 @@ const FIT_H = 1542;
 /** The prototype's `pageScale` prop default. */
 const PAGE_SCALE = 0.78;
 
-/**
- * Pitch builds need the complete Founder Flow without pretending that a real
- * payment provider exists. Vite development therefore follows the reference
- * prototype's own behaviour: `Pay & Start` advances to the campaign builder
- * and never opens Checkout. Set `VITE_PITCH_DEMO=false` only when deliberately
- * exercising Stripe's test-mode integration locally. Production can never
- * enter this branch.
- */
-const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
-
 function stageScale(): string {
   const s = Math.min(window.innerWidth / FIT_W, window.innerHeight / FIT_H) * PAGE_SCALE;
   // `s.toFixed(4)` is the reference's own — it writes the transform as a string
@@ -470,7 +460,7 @@ function FeeScreen({
 
   // §13: the incomplete and restricted states offer no way to pay, so they do
   // not get a screen whose whole composition is an amount and a Pay control.
-  if (!PITCH_DEMO && !paid && !listing.checkoutAvailable) {
+  if (!paid && !listing.checkoutAvailable) {
     const restricted = listing.onboardingState === 'restricted';
     const taxOff = listing.taxAvailable === false;
     return (
@@ -552,7 +542,7 @@ function FeeScreen({
   const freeUntil = paid ? new Date(payment!.freeCancellationDeadlineAt) : null;
   const withinFreeWindow = freeUntil !== null && freeUntil.getTime() > Date.now();
 
-  const sheetOpen = !PITCH_DEMO && sheet !== 'none';
+  const sheetOpen = sheet !== 'none';
 
   return (
     <Shell rootRef={root} inert={sheetOpen}>
@@ -608,13 +598,9 @@ function FeeScreen({
             aria-label={
               paid
                 ? 'Start your campaign page — your brand voice'
-                : PITCH_DEMO
-                  ? 'Pay & Start — continue the pitch demo without payment'
-                  : 'Pay & Start — your billing address and total'
+                : 'Pay & Start — your billing address and total'
             }
-            onClick={() =>
-              paid || PITCH_DEMO ? leaveToPage('voice') : startPaying()
-            }
+            onClick={() => (paid ? leaveToPage('voice') : startPaying())}
           >
             {paid ? 'Start your campaign page' : 'Pay & Start'}
           </button>

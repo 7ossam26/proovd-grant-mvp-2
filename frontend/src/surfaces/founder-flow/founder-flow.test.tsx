@@ -7,8 +7,8 @@
  * and back work between them, that the help drawer lists what is behind and
  * never what is ahead, that the confirm screens render §9's prefill provenance
  * and never clear a valid field, that the campaign path is a real radio group
- * which explains both options before either is chosen, and that this screen
- * locks nothing.
+ * which explains both options before either is chosen, and a campaign in
+ * review cannot issue build writes.
  *
  * The server-side halves — that the type lock is permanent, that a failed save
  * leaves the record alone, that `founder_signup_complete` emits once — are
@@ -27,7 +27,6 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import {
   FLOW_COMPLETION_IS_DECIDED,
-  FLOW_LAST_LOOK_RETURNS,
   FOUNDER_ANSWER_SEQUENCE,
   FOUNDER_FLOW_EARLIER_STAGE_CLOSED,
   FOUNDER_FLOW_ABSENCES,
@@ -1458,7 +1457,6 @@ describe('Last look (15)', () => {
     renderAt(at('last-look'));
     await screen.findByRole('heading', { name: /last look/i });
 
-    expect(screen.getByText(FLOW_LAST_LOOK_RETURNS, { exact: false })).toBeInTheDocument();
 
     const brandLabel = founderAnswerLabel(
       FOUNDER_ANSWER_SEQUENCE.find((entry) => entry.key === 'branding')!,
@@ -2231,17 +2229,44 @@ describe('the build steps (21–24)', () => {
   it('composes the voice chips into the one §14.4 field, with no cap', async () => {
     stubStage5();
     renderAt(at('voice'));
-    await screen.findByRole('heading', { name: /how should your campaign sound/i });
+    await screen.findByRole('heading', { name: /brand voice and tone/i });
 
+    await userEvent.click(screen.getByRole('button', { name: /add more/i }));
     await userEvent.click(screen.getByRole('button', { name: 'Fun' }));
     await userEvent.click(screen.getByRole('button', { name: 'Regal' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm' }));
 
-    const box = screen.getByLabelText(/your brand voice/i) as HTMLTextAreaElement;
-    expect(box.value).toBe('Fun, Regal');
+    expect(screen.getByRole('button', { name: 'Replace Fun' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace Regal' })).toBeInTheDocument();
 
     // §14.4 caps nothing — the reference stops at six. Every suggestion is
     // still offered after two are in.
+    await userEvent.click(screen.getByRole('button', { name: /add more/i }));
     expect(screen.getAllByRole('button', { pressed: false }).length).toBeGreaterThan(6);
+  });
+
+  it('opens the add-more sheet while the campaign is editable', async () => {
+    stubStage5();
+    renderAt(at('voice'));
+    await screen.findByRole('heading', { name: /brand voice and tone/i });
+
+    await userEvent.click(screen.getByRole('button', { name: /add more/i }));
+
+    expect(await screen.findByRole('dialog', { name: /is also/i })).toBeInTheDocument();
+  });
+
+  it('does not issue build writes after the campaign is locked for review', async () => {
+    stubStage5({
+      campaignStatus: 'pending_review',
+      build: { ...BUILD_FIELDS, brandVoice: 'Fun' },
+    });
+    renderAt(at('voice'));
+    await screen.findByRole('heading', { name: /campaign in review/i });
+
+    expect(document.querySelector('[data-flow-page="voice"]')).toBeNull();
+    expect(
+      requests.some((request) => request.method === 'PATCH' && /\/build$/.test(request.url)),
+    ).toBe(false);
   });
 
   it('takes the threshold as a count, never an amount (§4.1)', async () => {
