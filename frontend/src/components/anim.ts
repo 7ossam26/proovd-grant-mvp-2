@@ -1852,6 +1852,81 @@ export function stageRelayIn(
 }
 
 /**
+ * The flourish — `verifyIntro`'s last branch, for a page whose focal panel is a
+ * preview or a card.
+ *
+ * The reference's own comment says what it is for: "pages whose focal panel is
+ * a preview or a card: it lands with a scale so the screen has a beat of its
+ * own instead of the flat relay". It runs BESIDE the relay rather than inside
+ * it — the element is not in `verifyIntro`'s thirteen-name list at all — so a
+ * page can have both, and the FAQ screen does: `panel`, `art` and `cta` relay
+ * while the preview card scales up underneath the `art` column's own travel.
+ *
+ * Its literal tween, from `verifyIntro`:
+ *
+ *     const flo = [...root.querySelectorAll('[data-flourish]')];
+ *     if (flo.length) {
+ *       g.killTweensOf(flo);
+ *       g.fromTo(flo, { scale: .9, opacity: 0, transformOrigin: '50% 50%' },
+ *         { scale: 1, opacity: 1, duration: .8, ease: 'back.out(1.3)',
+ *           delay: .24, stagger: .12, force3D: true,
+ *           clearProps: 'transform,opacity' });
+ *     }
+ *
+ * `back.out(1.3)` overshoots — sampled against the reference at 1600x793 the
+ * card peaks at `scale(1.0061)` around 760ms and settles by 1050ms — so the
+ * ease is `snap` rather than `out`. §6.1's `snap` is `back.out(1.4)`, which is
+ * the nearest token and the one `stageGrowIn`'s sibling already uses; 1.3 and
+ * 1.4 differ by about a thousandth of the box at the peak, and a fourth
+ * hand-written cubic beside three tokens is the drift this file exists to
+ * avoid.
+ *
+ * The marker is `data-stage-flourish`, not `data-flourish`, for the reason
+ * `stageRelayIn` records about its own: `FlowPage`'s `relayIn` must stay a
+ * no-op on these pages rather than being something to switch off.
+ */
+export function stageFlourishIn(root: HTMLElement | null): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const cards = [...root.querySelectorAll<HTMLElement>('[data-stage-flourish]')];
+  if (!cards.length) return () => {};
+
+  g.killTweensOf(cards);
+  g.fromTo(
+    cards,
+    { scale: 0.9, autoAlpha: 0, transformOrigin: '50% 50%' },
+    {
+      scale: 1,
+      autoAlpha: 1,
+      duration: refDur(0.8), // between slow 0.60 and grand 0.90
+      ease: ease('snap'), // back.out(1.4); the reference writes back.out(1.3)
+      delay: refDur(0.24), // its own number; quick 0.20 is the nearest token
+      stagger: refDur(0.12),
+      force3D: true,
+      clearProps: 'transform,opacity,visibility',
+      overwrite: 'auto',
+    },
+  );
+
+  // `stageRelayIn`'s stuck sweep, for the same reason: the runtime's own 3s
+  // force-reveal only registers `[data-reveal]`, and these are staged by an
+  // inline `fromTo`.
+  const sweep = window.setTimeout(() => {
+    for (const el of cards) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility' });
+      }
+    }
+  }, 3400);
+
+  return () => {
+    window.clearTimeout(sweep);
+    g.killTweensOf(cards);
+  };
+}
+
+/**
  * Screen 15 — Last look's entrance, which is the flow's one headline-first page.
  *
  * REBUILT 2026-08-20 to the supplied reference's `[data-lastlook]`
