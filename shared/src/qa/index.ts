@@ -453,28 +453,26 @@ export const PRINCIPAL_FLOWS = [
     label: 'The Admin panel',
     specRef: '§26',
     audience: 'admin',
-    // §26.1's two addresses: every Founder, and one Founder's workspace — plus
-    // §34's gate, added 2026-08-19, which is the one Admin surface where the
-    // §33.11 sweep has something specific to prove: that while the gate is shut
-    // there is no control on the page that could open it.
+    // The panel's screens were removed on 2026-08-21 so it can be rebuilt one
+    // section at a time, and it was reduced to FIVE sections by product
+    // direction: Founders, Affiliates, Backers, Campaigns, Support. Today,
+    // Money & Fulfillment and Live mode left the nav; their backends are
+    // untouched and their addresses render the retired-address state.
     //
-    // The §21/§22/§24 money console joined on 2026-08-19. Both of its addresses
-    // are swept, because it is the surface where every money decision in the
-    // product is made and §27.1's six questions matter most on the screen that
-    // says what somebody is owed.
+    // What these five keep under test is the SHELL — the skip link, the nav's
+    // keyboard path, the landmark structure, and one `h1` per address. A
+    // placeholder proves nothing about a workspace that does not exist yet;
+    // this is not a coverage claim about the sections themselves.
     //
-    // Nothing in this shell is parked any more: Today was the last section
-    // without a route and it was built on 2026-08-19, so every address the nav
-    // offers is swept.
+    // `Affiliates` is swept at `/admin/creators`, which is its real path — the
+    // rename was to the label, because five backend files compose links to the
+    // address and their tests assert those strings.
     routes: [
-      // Today, built 2026-08-19 — the shell's index and the first Admin screen
-      // anybody sees, so it is swept first.
-      '/admin/today',
       '/admin/founders',
-      '/admin/founders/:prospectId',
-      '/admin/money',
-      '/admin/money/:campaignId',
-      '/admin/live-mode',
+      '/admin/creators',
+      '/admin/backers',
+      '/admin/campaigns',
+      '/admin/support',
     ],
     keyboardPathRequired: true,
   },

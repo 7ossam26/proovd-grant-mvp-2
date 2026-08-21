@@ -60,10 +60,10 @@ import {
   Textarea,
   useButtonProgress,
   useToast,
-} from '../../../../components/index.js';
-import { animateModalClose, animateModalOpen } from '../../../../components/anim.js';
-import { useProovdMotion } from '../../../../motion/MotionProvider.js';
-import { AdminRequestError } from '../../api.js';
+} from '../../components/index.js';
+import { animateModalClose, animateModalOpen } from '../../components/anim.js';
+import { useProovdMotion } from '../../motion/MotionProvider.js';
+import { AdminRequestError } from './api.js';
 
 /* ── The panel ──────────────────────────────────────────────────────────────*/
 
