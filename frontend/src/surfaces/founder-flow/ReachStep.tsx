@@ -31,11 +31,9 @@
  *      than forgotten: the screen now renders the reference's copy and nothing
  *      else, so the whole of what keeps the figure from reading as a
  *      measurement is the absence of any record behind it.
- *   2. **§10's relevance signal is not this screen.** The match screen that
- *      rendered the recorded Creator count was removed from the flow on
- *      2026-08-20 (with the claim screen); the Admin recording behind it
- *      (`possible_creator_results`) is untouched. This screen does not stand
- *      in for it: it names no Creator, no category, and no participation.
+ *   2. **§10's relevance signal is not this screen.** The Match beat now has
+ *      its own campaign route after Details. This screen does not stand in for
+ *      it: it names no Creator, no category, and no participation.
  *
  * A later phase asked to make this number dynamic — to read it from a record,
  * to vary it per campaign, or to derive it from §10's count — is asking for

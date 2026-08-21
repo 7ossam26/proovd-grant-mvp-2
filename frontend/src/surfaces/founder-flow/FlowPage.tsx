@@ -81,6 +81,16 @@ export function flowDirection(): 1 | -1 {
   return pendingDirection;
 }
 
+/**
+ * A full-viewport screen that does not render `FlowPage` still has to consume
+ * a backwards arrival before its next forward navigation. `FlowPage` normally
+ * performs this reset in its own layout effect; Match owns the viewport and
+ * calls this equivalent after capturing `flowDirection()`.
+ */
+export function resetFlowDirection(): void {
+  pendingDirection = 1;
+}
+
 interface FlowNav {
   /** Fade this page out, then go. `direction` drives the next page's relay. */
   leave: (to: string, direction?: 1 | -1) => void;

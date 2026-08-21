@@ -74,6 +74,7 @@ import { StoryStep } from './surfaces/founder-flow/StoryStep.js';
 import { SocialsStep } from './surfaces/founder-flow/SocialsStep.js';
 import { LastLook } from './surfaces/founder-flow/LastLook.js';
 import { DetailsStep } from './surfaces/founder-flow/DetailsStep.js';
+import { MatchStep } from './surfaces/founder-flow/MatchStep.js';
 import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
 import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
@@ -115,9 +116,10 @@ function CreatorFinishRedirect() {
 }
 
 /**
- * The old possible-creators result address. It pointed at the claim until
- * 2026-08-20, when the match and claim screens were removed from the flow;
- * a bookmarked address now lands on Positioning, the last page of the token.
+ * The old token-addressed possible-creators result. It pointed at the claim
+ * until 2026-08-20, when that result pair was removed from the token flow; a
+ * bookmarked address now lands on Positioning, the last page of the token.
+ * The later campaign-addressed Match screen is a separate route.
  */
 function DraftResultRedirect() {
   const { token = '' } = useParams();
@@ -794,6 +796,15 @@ const rootChildren: RouteObject[] = [
     */
     path: 'campaigns/:campaignId/setup/details',
     element: <DetailsStep />,
+  },
+  {
+    /*
+      The reference's `[data-match]`, inserted immediately after its
+      `[data-hello]` / Details screen. It needs no API call of its own and
+      carries the campaign id forward to the existing payout setup.
+    */
+    path: 'campaigns/:campaignId/setup/match',
+    element: <MatchStep />,
   },
   {
     /*

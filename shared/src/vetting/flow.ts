@@ -10,12 +10,12 @@
  * somewhere that does not exist.
  *
  * ── It holds only the pages that EXIST ──────────────────────────────────────
- * Twenty-six were planned and twenty-four are here. On 2026-08-20, by
+ * Twenty-six were planned and twenty-five are here. On 2026-08-20, by
  * explicit product direction, the reach orbit and the problem confirm were
- * added from the reference, and two pages were removed outright — the §10
- * relevance signal (`match`) and the account-claim screen (`claim`) —
- * screens and register entries both. So this is every page the flow has,
- * and the help drawer's "everything before it" is a fact rather than an
+ * added from the reference, and the account-claim screen (`claim`) was removed
+ * outright. The reference's `match` relevance signal returned on 2026-08-21,
+ * between Details and the existing money flow. So this is every page the flow
+ * has, and the help drawer's "everything before it" is a fact rather than an
  * aspiration.
  *
  * ── The order is the reconciliation's, not the reference's ──────────────────
@@ -297,6 +297,19 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   },
   {
     /*
+      The reference's `[data-match]`, immediately after `[data-hello]` (the
+      Details page above). It writes nothing, changes no auth regime, and hands
+      the same campaign to the payout setup Details previously opened directly.
+    */
+    id: 'match',
+    path: '/campaigns/:campaignId/setup/match',
+    param: 'campaignId',
+    title: 'Creator match',
+    help: 'The creators we lined up for your campaign, based on your category and audience.',
+    stage: 3,
+  },
+  {
+    /*
       Stage 4 — the money. Session E (2026-08-19).
 
       Stripe FIRST, and not as a preference: `beginListingCheckout` refuses
@@ -566,14 +579,14 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
      refusal about an element of a screen that no longer exists refuses
      nothing, so the entries went with the screens.
 
-     Two of those four are live again as of 2026-08-21, and neither returns as
-     an absence. Screen 16 was built from the reference's `[data-hello]` page
-     by explicit product direction, so the `Username:` label and the details
-     screen SHIP — the label reads back a name this screen never asks for, and
-     the third field is the date of birth. What the details entry was
-     protecting is now structural rather than a refusal: there is no name input
-     and no route that could accept one, and §5.2 keeps `legal_name` on the
-     guarded settings path with its own reason and its own audit row. */
+     All four are live again as of 2026-08-21, and none returns as an absence.
+     Screen 16 ships the reference's `[data-hello]`; the next route now ships
+     `[data-match]` with its sub-line and category breakdown. The details label
+     reads back a name this screen never asks for, and its third field is the
+     date of birth. What the details entry was protecting is now structural
+     rather than a refusal: there is no name input and no route that could
+     accept one, and §5.2 keeps `legal_name` on the guarded settings path with
+     its own reason and its own audit row. */
   /* The interview screen’s own platform tiles and time-slot chips were
      recorded here, refused because a picker of our own would be a second
      scheduler. They now SHIP, by explicit product direction (2026-08-20) — see

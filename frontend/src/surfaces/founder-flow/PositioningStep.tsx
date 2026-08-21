@@ -875,8 +875,9 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
       await autosave.flush();
       const result = await submitVetting(token);
       if (result.submittedAt) {
-        // The match and claim screens left the flow on 2026-08-20, so the
-        // submission goes straight on to the first campaign-addressed page.
+        // The old token-addressed match/claim result pair left this part of
+        // the flow on 2026-08-20, so submission goes straight on to the first
+        // campaign-addressed page. The new Match route comes later, after Details.
         // The submit response carries the campaign id for exactly this hop.
         leave(founderFlowPath('visuals', result.campaignId), 1);
         return;

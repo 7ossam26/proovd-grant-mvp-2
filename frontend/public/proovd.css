@@ -17014,3 +17014,168 @@ html.no-motion .ff-story__say { transition: none; }
   /* §9's line would sit under the Back control at phone width. */
   .ff-faq__save { bottom: calc(92px + 34px); }
 }
+
+/* ═════════════════════════════ FOUNDER FLOW — CREATOR MATCH ══════════════
+   The reference's `[data-match]`, copied in its own 2496 × 1542 coordinate
+   space. It deliberately has no FlowPage chrome: the whole viewport is the
+   click target, and the three illustrations are the only furniture. */
+
+.ff-match {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  margin: 0;
+  background: #FAFAFA;
+  z-index: 25;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 16px;
+  line-height: normal;
+  cursor: pointer;
+}
+
+.ff-match__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.37);
+  transform-origin: center center;
+}
+
+.ff-match__lockup {
+  position: absolute;
+  left: 1248px;
+  top: 628px;
+  width: 1900px;
+  transform: translate(-50%, calc(-50% - 60px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ff-match__mark {
+  width: 452px;
+  height: 327px;
+  max-width: none;
+  display: block;
+}
+
+.ff-match__panel {
+  margin-top: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 80px;
+}
+
+.ff-match__count {
+  margin: 0;
+  max-width: none;
+  color: #013F17;
+  font-size: 198px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.ff-match__types {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: #013F17;
+  font-size: 56px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.012em;
+}
+
+.ff-match__sub {
+  margin-top: 96px;
+  color: #013F17;
+  font-size: 74px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.02em;
+}
+
+.ff-match__cta {
+  margin-top: 120px;
+  width: 640px;
+  height: 134px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 5px solid #41ED98;
+  box-sizing: border-box;
+  border-radius: 2px;
+  background: #013F17;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 54px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ff-match__cta:hover { transform: scale(1.02); }
+
+.ff-match__cupid {
+  position: absolute;
+  bottom: -1vw;
+  height: auto;
+  max-width: none;
+  display: block;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+.ff-match__cupid--left { left: -1vw; width: 20vw; }
+.ff-match__cupid--right { right: -1vw; width: 21vw; }
+
+/* The reference's only responsive branch is a small coarse-pointer portrait
+   guard. Dismissing it leaves the same fixed landscape composition underneath. */
+.ff-match-rotate {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px;
+  background: #FAFAFA;
+  color: #013F17;
+  text-align: center;
+  font-family: 'Satoshi', sans-serif;
+  line-height: normal;
+  cursor: pointer;
+}
+.ff-match-rotate img {
+  width: auto;
+  height: 34px;
+  max-width: none;
+  display: block;
+}
+.ff-match-rotate__title {
+  color: #013F17;
+  font-size: clamp(20px, 4vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ff-match-rotate__body {
+  max-width: 34ch;
+  color: #669370;
+  font-size: clamp(14px, 3vw, 17px);
+  font-weight: 500;
+}
+.ff-match-rotate__action {
+  margin-top: 6px;
+  color: #41ED98;
+  font-size: clamp(12px, 2.6vw, 14px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

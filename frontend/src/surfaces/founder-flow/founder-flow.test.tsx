@@ -1026,9 +1026,9 @@ describe('positioning', () => {
   });
 
   it('submits, then goes straight to the first campaign-addressed page', async () => {
-    // The match and claim screens left the flow on 2026-08-20, so the
-    // submission continues to Your visuals with the campaign id the submit
-    // response carries.
+    // The old token-addressed match/claim result pair left this part of the
+    // flow on 2026-08-20, so submission continues to Your visuals with the
+    // campaign id the submit response carries. Match now comes after Details.
     const user = userEvent.setup();
     // Registered BEFORE `stubVetting`, whose matcher is `url.includes('/vetting')`
     // and would otherwise answer the submit with the unsubmitted state.

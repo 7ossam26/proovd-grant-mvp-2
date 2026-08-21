@@ -106,9 +106,9 @@ export const PRINCIPAL_FLOWS = [
     // `/draft/:token/vetting` left this list with Session C: Positioning is
     // its own page now and the address is a redirect, not a surface.
     //
-    // `/draft/:token/match` and `/draft/:token/claim` left it on 2026-08-20,
-    // when both screens were removed from the flow outright — routes,
-    // components and register entries together.
+    // `/draft/:token/claim` left it on 2026-08-20 when that screen was removed
+    // outright. The returned Match page is campaign-addressed later in the
+    // flow, so it belongs to the Founder workspace register below.
     routes: [
       '/draft/:token',
       '/draft/:token/problem',
@@ -161,6 +161,10 @@ export const PRINCIPAL_FLOWS = [
       // own: it is the same auth regime and the same sweep stub — a Founder
       // session over one campaign, no connected account and no listing state.
       '/campaigns/:campaignId/setup/details',
+      // The reference's Creator match beat, inserted after Details and before
+      // the stage-4 payout route. It remains in stage 3 because it reads and
+      // writes no connected-account or listing state.
+      '/campaigns/:campaignId/setup/match',
     ],
     keyboardPathRequired: true,
   },

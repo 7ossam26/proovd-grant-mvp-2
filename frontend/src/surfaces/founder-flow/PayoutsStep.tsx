@@ -127,7 +127,7 @@ export function PayoutsStep() {
 }
 
 function Body({ payouts }: { payouts: PayoutState }) {
-  const { leaveToPage } = useFlowNav();
+  const { leaveToPage, swapToPage } = useFlowNav();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,7 +147,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
     }
   }, []);
 
-  const back = () => leaveToPage('details', -1);
+  const back = () => swapToPage('match', -1);
 
   if (payouts.state === 'complete') {
     return (

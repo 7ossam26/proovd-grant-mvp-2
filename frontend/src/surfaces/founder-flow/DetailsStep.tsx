@@ -56,9 +56,10 @@
  *
  * so a stray Enter with the form half-filled does nothing while the button
  * beside it would have worked. That asymmetry is deliberate there and is kept:
- * a keystroke is not a decision, and this is the last screen before payout
- * setup. It also bails inside a textarea, with the help drawer open, or with
- * the calendar open — the reference's own three exemptions.
+ * a keystroke is not a decision, and this is the last data-entry screen before
+ * the Match beat and payout setup. It also bails inside a textarea, with the
+ * help drawer open, or with the calendar open — the reference's own three
+ * exemptions.
  *
  * The 18+ arithmetic is `dobAge()`'s, and it decides ONLY that keystroke. §10
  * collects the date and lists the 18+ representation separately, as something
@@ -289,7 +290,7 @@ function Screen({
   failure: string | null;
   onDetails: (next: FounderDetails) => void;
 }) {
-  const { leave, leaveToPage } = useFlowNav();
+  const { leave, leaveToPage, swapToPage } = useFlowNav();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
 
@@ -352,8 +353,10 @@ function Screen({
   /** `helloNext`, plus the one flush the reference has no server to need. */
   const advance = useCallback(() => {
     if ((phone ?? '') !== (details?.phone ?? '')) void save({ phone });
-    leaveToPage('payouts');
-  }, [phone, details, save, leaveToPage]);
+    // The reference swaps `intake` to `match` immediately. The arriving Match
+    // screen owns the full transition, so there is no outgoing page fade here.
+    swapToPage('match');
+  }, [phone, details, save, swapToPage]);
 
   /*
     `enterAdvance`, with its three exemptions and its `ctaState()` gate.
