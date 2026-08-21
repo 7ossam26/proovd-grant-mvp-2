@@ -188,23 +188,45 @@ export function startSpeech(handlers: {
    */
   let ended = false;
   let guard = 0;
+  let restart = 0;
+  let restartAttempts = 0;
+  let starting = false;
+  let running = false;
   const finish = () => {
     if (ended) return;
     ended = true;
     window.clearTimeout(guard);
+    window.clearTimeout(restart);
     handlers.onEnded();
   };
+  const refuse = (reason: SpeechRefusal) => {
+    if (finished || refused) return;
+    refused = true;
+    handlers.onRefused(reason);
+  };
 
-  const begin = () => {
+  /**
+   * `start()` is allowed to throw synchronously. In particular, Chromium can
+   * reject a restart while the previous recognition is still unwinding. The
+   * old implementation swallowed both the initial failure and that restart
+   * failure, leaving the UI in a recording state with no engine behind it.
+   */
+  const begin = (): boolean => {
+    if (finished || refused || paused || starting || running) return true;
+    starting = true;
     try {
       recognition.start();
+      running = true;
+      return true;
     } catch {
-      // Already running. Calling `start` twice throws rather than no-opping,
-      // and the browser's own run is the one that matters.
+      return false;
+    } finally {
+      starting = false;
     }
   };
 
   recognition.onaudiostart = () => {
+    running = true;
     if (!finished && !refused) handlers.onListening();
   };
 
@@ -225,38 +247,63 @@ export function startSpeech(handlers: {
     // module ended the run itself. Neither is a refusal and neither stops the
     // session — `onend` restarts it.
     if (event.error === 'no-speech' || event.error === 'aborted') return;
-    refused = true;
     if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-      handlers.onRefused('denied');
+      refuse('denied');
     } else if (event.error === 'audio-capture') {
-      handlers.onRefused('no_microphone');
+      refuse('no_microphone');
     } else {
-      handlers.onRefused('unavailable');
+      refuse('unavailable');
     }
   };
 
   recognition.onend = () => {
+    running = false;
     if (finished || refused) {
       finish();
       return;
     }
     if (paused) return;
     // `continuous` ends on its own after silence. Keep going.
-    begin();
+    // A short task boundary avoids Chromium's InvalidStateError while the
+    // previous recognition is still being torn down.
+    restartAttempts = 0;
+    const retry = () => {
+      if (finished || refused || paused) return;
+      if (begin()) {
+        restartAttempts = 0;
+        return;
+      }
+      if (restartAttempts < 3) {
+        restartAttempts += 1;
+        restart = window.setTimeout(retry, 100);
+      } else {
+        refuse('unavailable');
+      }
+    };
+    restart = window.setTimeout(retry, 0);
   };
 
-  begin();
+  // Do not return a session when the first start was rejected. The caller can
+  // then select its configured recording/transcription fallback instead of
+  // showing a microphone that cannot produce text.
+  if (!begin()) return null;
 
   return {
     pause() {
       if (finished) return;
       paused = true;
-      recognition.stop();
+      window.clearTimeout(restart);
+      try {
+        recognition.stop();
+      } catch {
+        // The recognition may already have ended; `resume` can start a fresh
+        // run, and pause itself must not finish the session.
+      }
     },
     resume() {
       if (finished) return;
       paused = false;
-      begin();
+      if (!begin()) refuse('unavailable');
     },
     stop() {
       finished = true;
@@ -267,7 +314,8 @@ export function startSpeech(handlers: {
       }
       // Long enough for a real `onend` to win the race, short enough that
       // nobody is left looking at controls that no longer do anything.
-      guard = window.setTimeout(finish, 250);
+      if (!running && !starting) finish();
+      else guard = window.setTimeout(finish, 250);
     },
     abandon() {
       finished = true;
@@ -279,7 +327,8 @@ export function startSpeech(handlers: {
       } catch {
         // As above.
       }
-      guard = window.setTimeout(finish, 250);
+      if (!running && !starting) finish();
+      else guard = window.setTimeout(finish, 250);
     },
   };
 }
