@@ -172,14 +172,44 @@ export const transcribeAudio = (token: string, audio: Blob): Promise<{ text: str
     headers: { 'content-type': audio.type || 'audio/webm' },
     body: audio,
   });
-export const fetchVetting = (token: string): Promise<VettingState> =>
-  call(`${base(token)}/vetting`);
+/*
+ * Founder-flow pages are separate routes, but they all read the same vetting
+ * record. Keeping the successful read for this browser session prevents the
+ * next route from rendering its generic "Opening..." StatePanel for one
+ * frame while it repeats an identical request. Writes below refresh the same
+ * entry, so this is a read-through cache rather than a stale snapshot.
+ */
+const vettingCache = new Map<string, VettingState>();
 
-export const saveVetting = (token: string, patch: VettingPatch): Promise<VettingState> =>
-  call(`${base(token)}/vetting`, { method: 'PATCH', body: JSON.stringify(patch) });
+export const fetchVetting = async (token: string): Promise<VettingState> => {
+  const cached = vettingCache.get(token);
+  if (cached) return cached;
 
-export const submitVetting = (token: string): Promise<VettingState> =>
-  call(`${base(token)}/vetting/submit`, { method: 'POST', body: JSON.stringify({}) });
+  const state = await call<VettingState>(`${base(token)}/vetting`);
+  vettingCache.set(token, state);
+  return state;
+};
+
+export const saveVetting = async (
+  token: string,
+  patch: VettingPatch,
+): Promise<VettingState> => {
+  const state = await call<VettingState>(`${base(token)}/vetting`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+  vettingCache.set(token, state);
+  return state;
+};
+
+export const submitVetting = async (token: string): Promise<VettingState> => {
+  const state = await call<VettingState>(`${base(token)}/vetting/submit`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  vettingCache.set(token, state);
+  return state;
+};
 
 /* ── §10 the account claim ────────────────────────────────────────────────── */
 

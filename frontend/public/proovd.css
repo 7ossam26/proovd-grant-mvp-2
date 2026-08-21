@@ -43,6 +43,22 @@
 /* If you self-host static weights instead of the variable file, replace the
    two blocks above with one @font-face per weight (400/500/700/900). */
 
+/* Shared accessibility utility. Content marked `sr-only` must remain in the
+   accessibility tree without becoming a visible flex/grid item. The Founder
+   Flow code screen relies on this for each box's spoken label and its group
+   description; without it those words leak into the visual composition. */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 
 /* ────────────────────────────────────────────────────────── §1 RAW PALETTE
    Raw values live here and ONLY here. Components must read slots or these
