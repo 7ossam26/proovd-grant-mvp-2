@@ -124,6 +124,35 @@ function Body({ payouts }: { payouts: PayoutState }) {
     </Button>
   );
 
+  /*
+    Past this step without finishing it.
+
+    Deliberately NOT in `.ff-nav`: the row's tiers descend to one primary
+    (DNA §7.1), and a second tertiary beside `back` — or a secondary competing
+    with `Take me to Stripe` — would present leaving as an equal choice. It
+    is a quiet line under the row instead.
+
+    It does not offer a payment it knows will refuse. `listingFeeEligible` is
+    false without a complete `founder_seller`, and screen 20 already renders
+    that as its own named state — what happened, who owns it, and the way back
+    here — rather than a dead control (§1.4, §27.1). So the destination is
+    honest whichever of §13's states somebody leaves from. Visible label short,
+    accessible name naming where it goes and containing the visible words
+    (§33.11.4, WCAG 2.5.3).
+  */
+  const skip = (
+    <div data-anim="cta">
+      <Button
+        tier="tertiary"
+        small
+        aria-label="Skip for now to your listing fee"
+        onClick={() => leaveToPage('fee')}
+      >
+        Skip for now
+      </Button>
+    </div>
+  );
+
   /* ── §13: complete. The reference's "You're all set to get paid!" ───────── */
 
   if (payouts.state === 'complete') {
@@ -159,15 +188,16 @@ function Body({ payouts }: { payouts: PayoutState }) {
         <div className="ff-money__panel" data-anim="panel">
           <PayoutOnboarding payouts={payouts} role="founder" onStart={start} />
         </div>
-        {/* No forward control on any of these three. `listingFeeEligible` is
-            true only for a COMPLETE seller account, so the fee page refuses
-            for all of them — and offering to open a page whose server-side
-            answer we already know is a refusal is §1.4's failure with an
-            arrow on it. §13 is strongest about the restricted one ("no
-            misleading ability to pay the listing fee") and the other two are
-            the same fact with a happier ending. The resume action, where
-            there is one, is inside the panel above. */}
+        {/* No PRIMARY on any of these three. `listingFeeEligible` is true only
+            for a COMPLETE seller account, so a control offering to pay from
+            here is §1.4's failure with an arrow on it — §13 is strongest about
+            the restricted one ("no misleading ability to pay the listing fee")
+            and the other two are the same fact with a happier ending. The
+            resume action, where there is one, is inside the panel above; the
+            skip below leads to the fee screen's own named refusal rather than
+            to a payment. */}
         <div className="ff-nav" data-anim="cta">{back}</div>
+        {skip}
       </div>
     );
   }
@@ -223,6 +253,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
         Stripe opens in this tab. When you finish there we show you what Stripe said, and your
         campaigns are one step away.
       </p>
+      {skip}
     </div>
   );
 }
