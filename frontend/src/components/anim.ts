@@ -1851,6 +1851,52 @@ export function stageRelayIn(
   };
 }
 
+/** Screen 22's below-floor input beat, copied from `goalNext`. */
+export function thresholdFloorPop(input: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !input || !motionLive()) return;
+  g.killTweensOf(input);
+  g.fromTo(
+    input,
+    { scale: 0.97 },
+    {
+      scale: 1,
+      duration: refDur(0.45),
+      ease: 'back.out(2)',
+      clearProps: 'transform',
+    },
+  );
+}
+
+/** The reference Help drawer's literal desktop entrance. */
+export function referenceDrawerOpen(
+  drawer: HTMLElement | null,
+  scrim: HTMLElement | null,
+): void {
+  const g = gsap();
+  if (!g || !drawer || !motionLive()) return;
+  if (scrim) g.from(scrim, { opacity: 0, duration: refDur(0.25) });
+  g.from(drawer, { xPercent: 100, duration: refDur(0.4), ease: 'power3.out' });
+}
+
+/** The reference Help drawer exits before React removes it. */
+export function referenceDrawerClose(
+  drawer: HTMLElement | null,
+  done: () => void,
+): void {
+  const g = gsap();
+  if (!g || !drawer || !motionLive()) {
+    done();
+    return;
+  }
+  g.to(drawer, {
+    xPercent: 100,
+    duration: refDur(0.28),
+    ease: 'power2.in',
+    onComplete: done,
+  });
+}
+
 /**
  * The flourish — `verifyIntro`'s last branch, for a page whose focal panel is a
  * preview or a card.
