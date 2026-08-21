@@ -21468,3 +21468,494 @@ html.no-motion .ff-story__say { transition: none; }
 
 @keyframes ff-payx-drawer-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes ff-payx-drawer-down { from { transform: translateY(0); } to { transform: translateY(100%); } }
+
+/* ══════════════════════ PHASE 67 — screen 23, add your FAQ’s, rebuilt 1:1
+   from the reference (Founder Flow v2, `[data-faq]` / `kindWide`), 2026-08-21.
+
+   Drawn to the supplied reference (`Proovd Founder Flow v2.dc.html`) and
+   measured against it in a real browser at 1600x793, on the terms every other
+   1:1 screen of this flow ships under: the reference outranks the design system
+   HERE, and nowhere else.
+
+   ── This is not the old `.ff-faq` ─────────────────────────────────────────
+   Session F's `.ff-faq` was a two-column form-and-card-list at the product's
+   own token sizes, inside `BuildStepPage`. It is gone with its markup. The
+   prefix is kept because the screen is the same answer and the old rules are
+   replaced wholesale rather than sitting beside these — unlike `.ff-vc`, which
+   had to differ from `.ff-voice` because both existed at once for a while.
+
+   ── The layout model is the reference's, literally ────────────────────────
+   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
+   scaled to the viewport by `fitStages()`:
+
+       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
+
+   No branch of that function names `build`, so this screen takes `pageScale`
+   alone. The component owns the scale and writes the whole transform on mount
+   and on resize; the `scale(0.4011)` below is what renders for the one frame
+   before the layout effect runs, and is the value measured at 1600x793.
+
+   Inside it, a 2260px grid centred on the stage:
+
+       grid-template-columns: minmax(0,1.12fr) minmax(0,1.08fr);
+       gap: 130px; align-items: center;
+
+   which resolves to 1084.36px / 1045.64px — the numbers Chrome reports for the
+   reference. `align-items:center` is load-bearing rather than incidental: the
+   right column is a fixed 1333px rhythm and the left one changes height with
+   the preview text (measured 1151 → 1143 → 1174 as a card fills and a delete
+   control appears), so the two share a centre line and never a top edge.
+   Nothing here reflows — the stage scales instead, which is why the composition
+   is identical at every viewport (§33.11.1).
+
+   `isClaimPhone()` returns `false` in the reference — "one composition
+   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+   code and this composition is what every viewport gets, exactly as there.
+
+   ── The two suspended conventions, as on screens 1–15 and 21 ──────────────
+     - HEX LITERALS, not tokens. `#FAFAFA`, `#013F17`, `#41ED98`, `#E9FFE1`,
+       `#E7F7EA`, `#4E8C67`, `#A2AFA8`, `#7FA98D`, `#012D10` and `#3BDC8C` are
+       the reference's own; mixing literal and token would leave half the screen
+       able to drift with a token change and half not.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `body`'s 18px / line-height 1.6 reaches the whole fixed layer — the
+   reference's own body sets a family and nothing else — so the layer and the
+   stage both reset it. `h1..h6 { margin; line-height:1.18; font-weight:900 }`
+   reaches the headline, `p { margin; max-width: var(--measure) }` reaches the
+   lede and the preview body, `label` carries the design system's own field
+   treatment, and `input`/`textarea` carry its field chrome. Every one is
+   overridden here rather than worked around.
+
+   ── The four blocks the reference does not draw ───────────────────────────
+   `.ff-faq__note` (the §12 lock), `.ff-faq__save` (§9's three phrases),
+   `.ff-faq__live` (what just happened, announced) and `.ff-faq__state` (the
+   failure §1.1 requires). The first three are ABSOLUTELY positioned in the
+   chrome, so not one reference box moves for them however long they get.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen, and the reason is not that
+   the reference has none. It has a wordmark and a HELP and it draws them INSIDE
+   the `z-index: 25` fixed layer below. Left in place they would sit under that
+   layer and be unreachable, so both are hidden and both leave the tab order
+   with it. There is no message badge here: the reference draws none, and
+   `FlowPage` is no longer asked for one. */
+.ff[data-flow-page='faqs'] .ff__top,
+.ff[data-flow-page='faqs'] .ff__badge { display: none; }
+
+/* The reference's `[data-faq]`. Nothing scrolls. */
+.ff-faq {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* ── The chrome. Its `clamp()`s are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-faq__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-faq__back:hover { color: #013F17; }
+/* The reference has no focus treatment anywhere. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11), and it costs the composition nothing. */
+.ff-faq__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-faq__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-faq__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-faq__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-faq__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-faq__help:hover { background: #E9FFE1; }
+.ff-faq__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* ── The stage, and the 2260px grid inside it ────────────────────────────── */
+
+.ff-faq__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.4011);
+  transform-origin: center center;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+.ff-faq__grid {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2260px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1.08fr);
+  gap: 130px;
+  align-items: center;
+}
+
+/* ── The left column: `data-anim="art"` ──────────────────────────────────── */
+
+.ff-faq__art {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* `data-flourish="1"` — the preview card. `min-height` rather than `height`,
+   because the reference's own box grows with the answer: measured, 828px with
+   the placeholder sentences in it and 820px (its floor) with a one-line real
+   answer. */
+.ff-faq__card {
+  background: #E7F7EA;
+  padding: 150px 130px;
+  box-sizing: border-box;
+  min-height: 820px;
+}
+/* No `display` — the reference's span is INLINE, and that is not incidental:
+   measured, an inline box's rect is the font's own content area (110 stage px
+   at 88px Satoshi) while a block's is the 96.8px line box, so the two report
+   different heights for identical glyphs. The baseline lands in the same place
+   either way and the wrap width is the same 824px, but `1:1` means the
+   declaration the reference has rather than one that renders the same today. */
+.ff-faq__cardq {
+  font-size: 88px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: #013F17;
+}
+.ff-faq__carda {
+  margin: 96px 0 0;
+  max-width: none;
+  font-size: 56px;
+  font-weight: 500;
+  line-height: 1.42;
+  letter-spacing: -0.012em;
+  color: #013F17;
+  text-wrap: pretty;
+}
+
+/* The two arrows. `border-right:none` on the first is the reference's own, so
+   the pair shares one 2px rule down the middle rather than drawing two. */
+.ff-faq__nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.ff-faq__arrow {
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #4E8C67;
+  border-right: none;
+  border-radius: 0;
+  background: transparent;
+  color: #A2AFA8;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 56px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: normal;
+  cursor: pointer;
+  outline: none;
+}
+.ff-faq__arrow--next { border-right: 2px solid #4E8C67; }
+/* `faqPrevFg` / `faqNextFg`: `#013F17` when the move is available and `#A2AFA8`
+   when it is not. The reference leaves both clickable and decides in the
+   handler, which is reproduced — see the component for why they are not
+   `disabled`. */
+.ff-faq__arrow[data-on='true'] { color: #013F17; }
+.ff-faq__arrow[data-on='true']:hover { background: #E9FFE1; }
+.ff-faq__arrow[data-on='false'] { cursor: default; }
+.ff-faq__arrow:focus-visible { outline: 4px solid #013F17; outline-offset: -6px; }
+
+.ff-faq__row {
+  margin-top: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+}
+.ff-faq__guide {
+  padding: 0 0 16px;
+  border: none;
+  border-bottom: 5px solid #41ED98;
+  border-radius: 0;
+  background: none;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 44px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+}
+.ff-faq__guide:hover { border-bottom-color: #013F17; }
+.ff-faq__guide:focus-visible { outline: 4px solid #013F17; outline-offset: 6px; }
+
+.ff-faq__delete {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 26px 44px;
+  border: 2px solid #013F17;
+  border-radius: 2px;
+  background: transparent;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+}
+.ff-faq__delete:hover { background: #E9FFE1; }
+.ff-faq__delete:focus-visible { outline: 4px solid #013F17; outline-offset: 4px; }
+.ff-faq__delete:disabled { opacity: 0.45; cursor: default; }
+
+/* ── The right column: `data-anim="panel"` ───────────────────────────────── */
+
+.ff-faq__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* A `span` in the reference; an `h1` here, because §33.11.2 wants exactly one on
+   the page and this is the only thing that names it. Every value below is the
+   reference's, including the `line-height: normal` the project's own `h1` rule
+   would otherwise replace with 1.18. */
+.ff-faq__head {
+  margin: 0;
+  font-size: 76px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.03em;
+  color: #013F17;
+}
+.ff-faq__lede {
+  margin: 44px 0 0;
+  max-width: none;
+  font-size: 44px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.012em;
+  color: #013F17;
+  text-wrap: pretty;
+}
+
+/* `faqTitleLabel` / `faqBodyLabel`. A `span` in the reference; a `label` here,
+   so the two fields have real accessible names instead of a sentence that
+   happens to sit above them (§28.5). The 70px and 56px margins are the
+   reference's two different values, which is why this cannot be one rule. */
+.ff-faq__label {
+  display: block;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 50px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+  text-transform: none;
+}
+.ff-faq__panel > .ff-faq__label:nth-of-type(1) { margin-top: 70px; }
+.ff-faq__panel > .ff-faq__label:nth-of-type(2) { margin-top: 56px; }
+
+.ff-faq__input,
+.ff-faq__area {
+  margin-top: 26px;
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 2px solid #013F17;
+  border-radius: 2px;
+  outline: none;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 48px;
+  font-weight: 500;
+  color: #013F17;
+  min-height: 0;
+}
+.ff-faq__input { height: 150px; padding: 0 44px; line-height: normal; }
+.ff-faq__area { height: 390px; padding: 40px 44px; line-height: 1.4; resize: none; }
+.ff-faq__input::placeholder,
+.ff-faq__area::placeholder { color: #A2AFA8; opacity: 1; }
+.ff-faq__input:focus-visible,
+.ff-faq__area:focus-visible { outline: 4px solid #013F17; outline-offset: 6px; }
+.ff-faq__input:disabled,
+.ff-faq__area:disabled { opacity: 0.6; cursor: default; }
+
+.ff-faq__buttons {
+  margin-top: 50px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.ff-faq__add,
+.ff-faq__cta {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 2px;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 56px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #FAFAFA;
+  cursor: pointer;
+  outline: none;
+}
+.ff-faq__add { border: 5px solid #41ED98; background: #013F17; }
+.ff-faq__add:hover { background: #012D10; }
+.ff-faq__add:disabled { opacity: 0.45; cursor: default; }
+.ff-faq__cta {
+  border: none;
+  background: #41ED98;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-faq__cta:hover { background: #3BDC8C; }
+.ff-faq__add:focus-visible,
+.ff-faq__cta:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+
+/* ── §9's three phrases, the §12 lock, and the failure ──────────────────────
+   None of it is on the reference's screen: it holds its record in memory and
+   never waits for one. All of it is absolutely positioned so a save that fails
+   or a lock notice can never move the stage — the composition is a fixed
+   rhythm, and one extra line inside it would push the CTA off the bottom at a
+   narrow height. */
+
+.ff-faq__save {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(20px, 3vw, 40px);
+  transform: translateX(-50%);
+  z-index: 6;
+  margin: 0;
+  max-width: min(90vw, 40rem);
+  text-align: center;
+  font-size: clamp(11px, 0.9vw, 13px);
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7FA98D;
+}
+/* A retry and a refusal are the two a Founder has to act on, so they are the
+   two that are legible rather than quiet (§1.4). */
+.ff-faq__save[data-loud='true'] { color: #013F17; }
+
+.ff-faq__note {
+  position: absolute;
+  left: 50%;
+  top: clamp(76px, 7vw, 104px);
+  transform: translateX(-50%);
+  z-index: 6;
+  margin: 0;
+  width: min(90vw, 46rem);
+  max-width: none;
+  text-align: center;
+  font-size: clamp(12px, 1vw, 15px);
+  font-weight: 500;
+  line-height: 1.45;
+  color: #013F17;
+}
+
+.ff-faq__state {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 34rem);
+  margin: 0;
+  max-width: none;
+  color: #013F17;
+}
+.ff-faq__state .wrap { width: 100%; }
+.ff-faq__state .section { padding-block: 0; }
+.ff-faq__state .measure { max-width: none; }
+
+/* ══════════════════════════════════════════ PHASE 67 — RESPONSIVE ══
+   The reference's own one media query for this screen, and it is not a reflow:
+   the stage is one composition at every width and scales to it.
+
+       @media (max-width:600px){[data-back]{bottom:92px !important;padding:8px 14px !important;}}
+
+   What moves is the furniture, which was never on the stage. Caught by the
+   1280/320 screenshot pass rather than by reading — the rule lives in the
+   reference's own `<style>` block rather than beside the control it moves, and
+   measured at 320 the app's BACK sat 72px below the reference's. */
+@media (max-width: 600px) {
+  .ff-faq__back { bottom: 92px; padding: 8px 14px; }
+  /* §9's line would sit under the Back control at phone width. */
+  .ff-faq__save { bottom: calc(92px + 34px); }
+}

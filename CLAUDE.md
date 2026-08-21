@@ -4306,3 +4306,139 @@ with **no CSS of their own** ever since. The Visuals section of this file went w
 - **The Color screen has never had a section in this file.** It was built in `9397d2a` alongside the
   visuals and documented nowhere, and inventing a record of a browser pass nobody ran would be worse
   than the gap. `ColorStep.tsx`'s own header carries the reasoning.
+
+### The FAQs were rebuilt 1:1 from the reference — and the merge had eaten the stylesheet (§14.4, §12, §9, §33.11, 2026-08-21)
+
+Screen 23 — `/campaigns/:campaignId/setup/faqs` — rebuilt from scratch against the
+supplied reference's `[data-faq]` (`Proovd Founder Flow v2.dc.html`, `kindWide`) and
+its screenshot, by explicit product direction, on the terms every other 1:1 screen of
+this flow ships under: the reference outranks the design system HERE, and nowhere
+else. Session F's surface — a token-scale form beside a stacked card list inside
+`BuildStepPage` — is gone with its 22 rules; `PHASE 67` is the reference's own
+composition.
+
+`stageFlourishIn` in `components/anim.ts` is the new helper, `FaqsStep.tsx` the
+screen, `PHASE 67` the styles. **No route, register entry, table or migration** — the
+data is the same `useBuildFlow` read, and every write drives `saveFaq`/`removeFaq`,
+which shipped with campaign-page-v2 on 2026-08-18.
+
+- **The stylesheet was committed with twelve unresolved conflict regions, and that
+  had to be repaired before anything could be added to it.** `bbeefbf` carried
+  `<<<<<<< HEAD` / `=======` / `>>>>>>>` at top level in `proovd.css` — both sides
+  had independently taken **PHASE 64** (HEAD for screen 10's visuals, the incoming
+  side for screen 21's brand voice), and git matched their shared declaration bodies
+  as context and interleaved them into twelve hunks. Repaired exactly the way
+  `e9e71bf`'s identical failure was: split into the two sides, check each is
+  brace-balanced alone, concatenate, renumber the collision (the voice tail is
+  **PHASE 66** now). **This is the second time two sessions have derived the same
+  phase number.** Run
+  `grep -oE "PHASE [0-9]+" frontend/public/proovd.css | sort -u -V | tail -1`.
+- **`a11y.test.tsx`'s scans could not see it, and the reason is worth knowing.** The
+  file was brace-balanced, comment-balanced and defined every token it used — the
+  markers sit at top level where a parser drops them along with whatever rule they
+  cut in half, and all three existing scans passed on a stylesheet with two whole
+  screens' rules interleaved. **A deletion is invisible to a validator**; what found
+  it was asking the file whether `.ff-vc` and `.ff-vis` both existed.
+- **The reference renders in ARIAL on any machine, and the screenshot does not.** Its
+  `@font-face` points at `./fonts/Satoshi-400.woff2` and the bundle ships **no
+  `fonts/` directory at all**, so all four faces report `status: error` and it falls
+  back to `sans-serif`. That is not cosmetic: in Arial its preview headline wraps to
+  two lines and its guide control measures 438px; in Satoshi both are one line and
+  391px. The screenshot shows ONE line, so the screenshot is the ground truth and the
+  app is right. The comparison was made like-for-like by copying the product's own
+  variable Satoshi into a scratchpad copy of the reference — never into the bundle,
+  which is untouched.
+- **Measured 1:1 at 1600x793, box by box.** Every one of the 21 boxes ON THE STAGE is
+  identical — x, y, w, h, offsetW/H, font, size, weight, line-height, letter-spacing,
+  colour, background, radius, border, padding, margin, display, alignment, gap,
+  grid-template-columns, shadow. The four chrome boxes differ only in absolute `x`,
+  because the DC harness reserves a 15px scrollbar (`documentElement.scrollWidth` is
+  1585 against clientWidth 1600); `back` and `logo` are at x=46 in BOTH and `help`
+  sits 46px from the right edge in BOTH.
+- **`align-items: center` on the grid is load-bearing rather than incidental.** The
+  right column is a fixed 1333px rhythm; the left one changes height with the preview
+  (measured 1151 → 1143 → 1174 as a card fills and the delete control appears), so
+  the two share a centre line and never a top edge.
+- **The preview title carries no `display`, and that was a real correction.** A block
+  span reports the 96.8px line box and an inline one the font's own 110px content
+  area — same glyphs, same baseline, same 824px wrap width, different measurement.
+  `1:1` means the declaration the reference has rather than one that renders the same
+  today.
+- **Five states driven through real DOM events, 62 field comparisons, zero
+  differences.** Initial, typed, after-add, after-prev, after-delete — labels,
+  preview text, values, both arrow colours, all three heights, the delete button's
+  box and text, and the button set. `faqAdd` appends a blank and moves the cursor;
+  `faqDelete` drops the current one and steps back; the renumbering matches.
+- **The entrance is `verifyIntro`'s `runRelay` PLUS its flourish branch, and this is
+  the flow's first screen with both.** Relay order is `panel, art, cta` — out of that
+  function's fixed thirteen-name list, and the opposite of document order, which is
+  exactly why `stageRelayIn` takes the order rather than reading the DOM. Sampled
+  frame by frame against the reference: at opacity 0.75 the stagger is ref
+  +85.9/+171.3/+253.6ms against app +86.5/+171.0/+249.5ms. The tween reads
+  `dur 0.79` (0.62 + 2 x 0.085), `power3.out`, `x: 150 → 0`; the flourish
+  `dur 0.8, delay 0.24, back.out(1.4)`, peaking at 1.0066 against the reference's
+  1.0062 (`back.out(1.3)` — §6.1's `snap` is the nearest token, and a fourth
+  hand-written cubic beside three tokens is the drift this file exists to avoid).
+- **Two tweens per element appear in dev and it is not this screen's.** React 19
+  StrictMode double-invokes effects; `VoiceStep` reports the same 2. Production has
+  no StrictMode.
+- **The reference's record is an array with a cursor; ours is rows, and the
+  difference is a server rule rather than a design decision.** `upsertFaq` refuses a
+  blank — "An FAQ needs both a question and an answer" — so a blank card cannot be
+  persisted and must not be, or a Founder's public page grows a heading with nothing
+  under it. The cursor list is local and seeded from the rows; a card writes once
+  BOTH halves are non-blank; `Add FAQ` is purely local until the new card has
+  something in it; every cursor move flushes first, because `useAutosave` coalesces
+  by replacing and a debounce still in flight would send the new card's text under
+  the old card's id.
+- **It gets its own `useAutosave`, not `build.autosave`.** That one is `saveBuild`
+  over `Partial<BuildFields>`, which has no field for an FAQ; routing one through it
+  would mean a fake key or a lie in the type. Same hook, so §9's three phrases, the
+  retry rule and the `beforeunload` warning are the ones every other Founder surface
+  uses — and a 422 reads `Not saved — …` rather than `retrying`, because a refusal is
+  a decision (`isRetryable` draws that line once, for everybody).
+- **Two things the reference draws are refused.** `Our guide on FAQ's` is a `<button>`
+  there with no `onClick` at all — a control that does nothing — so it opens the HELP
+  drawer the §12 guidance lives in (the `VoiceStep` arrangement; there is no PDF,
+  because §12's object storage is Track A4). And the document-level Enter handler:
+  `enterAdvance`'s early return catches only a `TEXTAREA`, so pressing Enter in the
+  FAQ TITLE leaves the page and somebody who typed a question and expected to add it
+  is on the rewards screen instead. Enter moves to the answer, which is the field's
+  own next step — `EmailStep`, `BrandingStep` and `VisualsStep` each bind Enter the
+  same way.
+- **The screenshot pass found a defect nothing else could — the fourteenth rebuild in
+  a row.** The reference carries `@media (max-width:600px){[data-back]{bottom:92px
+  !important;padding:8px 14px !important;}}` in its own `<style>` block rather than
+  beside the control it moves, and at 320 the app's BACK sat **72px** below the
+  reference's and measured 4px narrower. Eight other screens in this flow already
+  carry that rule; this one did not. Fixed, and re-measured identical (x20 y518
+  w77.5 h30 in both).
+- **Final measurement: 0 document overflow at 1600x793 and at a TRUE 320** (through
+  `Emulation.setDeviceMetricsOverride` — `--window-size` lies on Windows, which
+  PHASE 38 records), exactly one `h1`, both fields labelled, and a complete
+  ten-stop keyboard path where every control is named, every one has a visible focus
+  ring, Shift+Tab reverses, the arrow glyphs are `aria-hidden` behind real names, and
+  the delete's `X` is hidden.
+- **Three axe colour-contrast findings and every one is inherited.** `#41ED98` on
+  `#FAFAFA` at 1.45 for BACK and HELP is byte-identical to `.ff-vc__back`/`.ff-pc__back`,
+  which PHASE 54 and 66 already ship; `#FAFAFA` on `#41ED98` at 1.45 for the CTA is
+  the brand-fill pair the owner ruling re-recorded as tech-stack §3.6's documented,
+  scoped exception. Nothing was re-toned: doing it here would make one screen
+  disagree with both the reference and the rest of the flow.
+- **The four states the reference has none of all answer.** The read failing renders
+  a `StatePanel` with §27.1's questions and a support route; a campaign past
+  `affiliate_response_and_build`/`changes_required` renders the screen with the lock
+  sentence and all three write controls disabled; a refused save carries the server's
+  own `whatHappened` and turns legible; `prefers-reduced-motion` renders the page
+  whole with nothing staged. All four are absolutely positioned in the chrome, so
+  none can move a reference box.
+- **One assertion in `founder-flow.test.tsx` was consciously updated**, with a dated
+  comment: it named the retired surface's heading, field and `.ff-faq__preview`. What
+  it was protecting — the preview renders what is typed — is what it still asserts,
+  plus the reference's placeholder before anything is typed. **The suite was not
+  run**, per this session's instruction; `npm run typecheck` is clean across all
+  three workspaces.
+- **What is NOT done:** re-writing `sortOrder` on the surviving rows after a delete
+  (persisted rows keep the value they were written with; the public page orders by it
+  and ties break on insertion, and a burst of writes for a cosmetic ordering is worse
+  than the drift), and any test run.

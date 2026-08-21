@@ -2226,13 +2226,21 @@ describe('the build steps (21–24)', () => {
     expect(screen.getByRole('button', { name: /on to your faqs/i })).toBeInTheDocument();
   });
 
-  it('previews an FAQ as it is typed', async () => {
+  // DELIBERATELY UPDATED (2026-08-21): screen 23 was rebuilt 1:1 from the
+  // reference, so the surface this named is gone — its heading was `What will
+  // people ask?`, its field `The question`, and its `.ff-faq__preview` a
+  // stacked card list. What the test was protecting is unchanged and is what it
+  // still asserts: the preview renders what is typed, from the same values.
+  // The reference's own placeholder is what stands there before anything is.
+  it('previews an FAQ as it is typed, over the reference placeholder', async () => {
     stubStage5();
     renderAt(at('faqs'));
-    await screen.findByRole('heading', { name: /what will people ask/i });
+    await screen.findByRole('heading', { name: /add your faq/i });
 
-    await userEvent.type(screen.getByLabelText(/the question/i), 'When will I get it?');
-    const preview = document.querySelector('.ff-faq__preview') as HTMLElement;
+    const preview = document.querySelector('.ff-faq__card') as HTMLElement;
+    expect(within(preview).getByText('You’ll see FAQ 1 here')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/FAQ 1 Title/i), 'When will I get it?');
     expect(within(preview).getByText('When will I get it?')).toBeInTheDocument();
   });
 
