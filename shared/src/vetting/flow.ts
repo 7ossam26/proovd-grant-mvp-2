@@ -223,6 +223,27 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 3,
   },
   {
+    /*
+      The reference's `[data-brand]`, and it is the SECOND half of one answer
+      rather than a ninth one.
+
+      `isBrandLogo` / `isBrandColor` are one vetting step (`vStep` 4) split on
+      `brandStage`, so the reference already treats the logo and the colours as
+      two screens over one record — `logoNext` is `step({brandStage:'colors'})`
+      and only `brandNext` calls `afterSection`. That is why this is a page here
+      and not an entry in `FOUNDER_ANSWER_SEQUENCE`: it collects no §12 answer
+      of its own, it writes the branding answer's own `brandColors`, and adding
+      it to that sequence would make §12 read nine answers where there are
+      eight and put a second US$2 against one item.
+    */
+    id: 'color',
+    path: '/campaigns/:campaignId/setup/color',
+    param: 'campaignId',
+    title: 'Your brand colours',
+    help: 'Pick up to three colours and they land in the brand direction you just wrote. Part of the same answer as your logo — it is not a fourth thing to finish.',
+    stage: 3,
+  },
+  {
     id: 'interview',
     path: '/campaigns/:campaignId/setup/interview',
     param: 'campaignId',
@@ -252,6 +273,26 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     param: 'campaignId',
     title: 'Last look',
     help: 'All eight answers in one place, with what your listing fee comes to. Open any of the five optional ones to change it and you come straight back here.',
+    stage: 3,
+  },
+  {
+    /*
+      Screen 16 — Your details. Added 2026-08-21 from the reference's
+      `[data-hello]` page, in the position the reference gives it: its
+      `allGood` goes to `intake`, and `intake` is this.
+
+      Stage 3, and it could be nothing else. It writes
+      `founder_claim_profiles`, which is the Founder's own account record, so
+      it sits behind `requireRole('founder')` like every page from the five §12
+      answers on. It is deliberately not stage 4: it touches no money and needs
+      no `founder_seller` account, and putting it there would place a phone
+      number behind a Stripe onboarding that has not happened.
+    */
+    id: 'details',
+    path: '/campaigns/:campaignId/setup/details',
+    param: 'campaignId',
+    title: 'Your details',
+    help: 'The phone number and date of birth on your account. We show your name back rather than asking for it again — change it in your settings if it is wrong.',
     stage: 3,
   },
   {
@@ -515,21 +556,41 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
      were removed from the flow outright: the match sub-line and its category
      breakdown, the `Username:` label, and the three-field details screen. A
      refusal about an element of a screen that no longer exists refuses
-     nothing, so the entries went with the screens. */
-  {
-    element:
-      'The interview screen’s own platform tiles (Meet / Zoom / Teams) and time-slot chips',
-    absentBecause:
-      'tech-stack §12: "The booking record in our database is the source of truth, populated from Cal.com webhooks." A picker of our own is a second scheduler, and the two would disagree about what was booked — the provider would hold a slot this product never recorded, or the reverse. The screen renders the Cal.com embed, and a named absence while that account is unconfigured.',
-    specRef: '§12, tech-stack §12',
-  },
-  {
-    element:
-      'The branding screen’s draggable HSV square — a saturation/value plane with a handle, over a hue bar',
-    absentBecause:
-      'A drag surface with no keyboard equivalent fails §28.5 on the one screen where the alternative is free, and §12 does not ask for a colour VALUE: it asks for "saved direction containing at least colors and typography/style guidance", which is writing. The hex field, the swatches it builds, and the direction box are all here; only the plane is not.',
-    specRef: '§28.5, §12',
-  },
+     nothing, so the entries went with the screens.
+
+     Two of those four are live again as of 2026-08-21, and neither returns as
+     an absence. Screen 16 was built from the reference's `[data-hello]` page
+     by explicit product direction, so the `Username:` label and the details
+     screen SHIP — the label reads back a name this screen never asks for, and
+     the third field is the date of birth. What the details entry was
+     protecting is now structural rather than a refusal: there is no name input
+     and no route that could accept one, and §5.2 keeps `legal_name` on the
+     guarded settings path with its own reason and its own audit row. */
+  /* The interview screen’s own platform tiles and time-slot chips were
+     recorded here, refused because a picker of our own would be a second
+     scheduler. They now SHIP, by explicit product direction (2026-08-20) — see
+     the rebuild recorded at the top of `InterviewStep.tsx`. The entry is
+     removed rather than left standing, because a register saying an element is
+     absent while the page renders it is worse than no register.
+
+     What that entry was protecting is unchanged, and is now structural rather
+     than a refusal: `POST .../interview` writes `selected` and only
+     `selected`, so nothing the picker can reach completes §12’s item. The
+     provider’s own confirmation is still the only path to `confirmed`
+     (tech-stack §12). */
+
+  /* The branding screen's draggable HSV square was recorded here as absent,
+     refused for having no keyboard equivalent. It SHIPS as of 2026-08-20, by
+     explicit product direction, as the reference's own `[data-brand]` screen
+     at `/campaigns/:campaignId/setup/color` — plane, hue bar, hex field and
+     three swatch slots, over the same one `brandColors` record the branding
+     screen already writes. What the entry was protecting is not lost: the
+     plane and the bar are ARIA sliders with arrow-key control, and the hex
+     field is the reference's own keyboard path into the same three values
+     (`applyHex` sets H, S and V from a typed code), so §28.5 holds without
+     the composition moving. The entry is removed rather than left standing,
+     because a register saying an element is absent while a page renders it is
+     worse than no register. */
   {
     element: 'The last-look card grid offering an edit affordance on all eight answers',
     absentBecause:

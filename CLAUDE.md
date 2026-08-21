@@ -4264,3 +4264,111 @@ is the same `useSetupWorkspace` read Session D used.
   rendered page at 1320 and a true 320, zero document overflow at four widths, one `h1`,
   the complete keyboard path with every control named, the failure state answering
   §27.1's six questions, and `prefers-reduced-motion` rendering the page whole.
+
+### Screen 10, the visuals, was rebuilt to the reference (§12, §28.4, §28.5, §33.11, 2026-08-20)
+
+`/campaigns/:campaignId/setup/visuals` was rebuilt from scratch against the supplied reference
+(`Proovd Founder Flow v2.dc.html`, `[data-visuals]` / `kindWide`) and its screenshot. What stood
+there was Session D's `AnswerPage` layout — a trail line, the optional tag, the §12 question as the
+heading, a stacked file list, a dashed `UploadZone`, the helper accordion and a nav row. None of it
+is left. `VisualsStep.tsx` is the surface, `PHASE 64` the styles. **No route, table, register entry
+or migration changed**; every control drives the Phase 09a upload path unchanged.
+
+- **The composition is measured, not approximated.** Driven in headless Chrome against the reference
+  at 1860×922 and 1280×800, box by box — x, y, w, h, offsetW/H, font, weight, line-height,
+  letter-spacing, colour, background, radius, border, padding, margin, gap, display, alignment and
+  shadow. Every one matches: stage scale 0.4664 and 0.4, column 1491px, panel `860px 551.062px`,
+  drop zone 500px, input 544×112 beside a 290×112 `Add`, CTA 1491×165. The remaining reported
+  differences are the reference's zone being a `<button>` (its UA font-size, `buttontext` and
+  `buttonface` under a gradient stack that paints over all three) and the DC harness reserving a
+  15px scrollbar, which shifts its right-anchored chrome by exactly that.
+- **The relay is the reference's, frame for frame.** `verifyIntro`'s `runRelay` over
+  `pill, head, panel, cta` — 620ms `power3.out` from `x:150`, 85ms stagger. Sampled every animation
+  frame on both sides: ref starts 0/74/158/241ms and settles 524/607/691/774; app starts
+  2/78/162/245 and settles 529/612/695/778. Hover, the `data-press` 0.94 and the focus rings were
+  driven with real pointer events.
+- **Three fixes came out of the measurement and none was visible in a screenshot.** The zone's two
+  lines had `line-height` 1.2 and 1.34 where the reference sets none, which made the label 6px short
+  and lifted the arrow 3px on the stage; the zone carried a 60px inline padding where the reference
+  has the UA button's `1px 6px`; and the stage transform is written through `toFixed(4)` now, which
+  is the reference's own rounding rather than a number that agrees to five decimal places.
+- **The link row is drawn and it is not wired, and the row says so before anybody types.** The
+  reference's `addLink` appends the URL to the same `files` list an upload lands in.
+  `campaign_assets.storage_key` is NOT NULL, so a visual is an object we fetched and read, and §12's
+  evidence rule for this item is exactly that. A URL would have to be fetched from wherever a
+  Founder pointed, on a schedule nobody defined, and could change after approval into something they
+  never approved — a §12 evidence decision and a migration, not a surface rebuild.
+  `VISUALS_LINK_ABSENT` sits in the 130px gap the composition already leaves above the CTA, so not
+  one reference box moves for it, and the field keeps what was typed.
+- **Two §12 facts live inside the reference's own file row.** Its row is a label and an `x`; §12
+  needs the object's state (and the reason when it did not count) and §28.4 forbids folding the
+  Founder's approval into the upload. Both are a second line INSIDE the `#DEF6FF` block, so the list
+  keeps its width, its 34px gap and its position, and the CTA does not move.
+- **Enter presses Add rather than leaving the page.** The reference binds Enter GLOBALLY
+  (`enterAdvance`) and excludes only a `TEXTAREA`, so pressing it in the link field navigates to the
+  next screen — somebody who typed an address and expected to add it ends up on Branding. Every
+  other rebuilt screen in this flow binds Enter to its own field's control (`EmailStep` sends,
+  `BrandingStep` adds a swatch) and nothing binds it to navigation.
+- **The zone is a `label` over a real file input**, so the keyboard path is the browser's own picker
+  (§28.5) and the box is identical. Both unavailable states — Track A4 uploads and §12's post-payment
+  lock — render their reason INSIDE the reference's 500px box rather than as a disabled control.
+- **`Next` is the reference's word and it is in §33.11.4's `OBJECTLESS_CTA_LABELS`** — the same
+  knowing exception `Socials`, `ConfirmProblem` and `ConfirmAnswer` already carry, where the
+  reference's copy is the specification. What costs the composition nothing is the accessible name,
+  which adds the destination and contains the visible word (WCAG 2.5.3).
+- **There is still no Back on a plain arrival**, and `AnswerPage`'s header records why: everything
+  behind this page is on the draft token §10's claim invalidated, and sending Back to Last look —
+  five pages forward — closed a ring. An edit opened from Last look still returns there, and there
+  the control is drawn exactly as the reference draws it.
+- **The pill's number is the §6 setting.** The reference hardcodes `FEE_PER=2`; this renders
+  `fee.itemDiscountCents` in the reference's own `$2 discount` shape, and `optional: discount` when
+  there is no calculation to read. No fee arithmetic exists in the file.
+
+**A pre-existing defect was found and fixed, and it was not this screen's.** PHASE 46's last
+`@media (prefers-reduced-motion: reduce)` block was never closed. An unterminated at-rule does not
+fail — the parser swallows everything after it into the block — so **PHASE 61 in full was in the
+served stylesheet and in no stylesheet the browser had, and the password page had been rendering
+unstyled since it shipped**. `a11y.test.tsx`'s two stylesheet scans cannot see it: the comments were
+balanced and every token was defined. A third scan is added there for brace balance, on the
+comments-stripped copy.
+
+**Three assertions in `founder-flow.test.tsx` were consciously changed**, each with a dated comment:
+the Track A4 absence now reads the reference's box copy, `offers copy, never generate` moved to
+`branding` (whose helper block still exists — this page's does not), and the sequence walk clicks
+`Next` by its accessible name. **They were not run**: this session's instruction was no test suites.
+`npm run typecheck` is clean across all three workspaces.
+
+### The merge dropped the Visuals and Color styles, and this is the recovery (2026-08-21)
+
+`2f44efa` — `Merge branch 'main'` — resolved a conflict in `proovd.css` and in this file by taking
+one side whole. Both sides had independently taken **PHASE 62 and PHASE 63**: the kept side used
+them for **Your story** and **Last look**, the dropped side for **the visuals** (screen 10) and
+**more about your brand** (screen 11). So `9397d2a`'s two sections — 67 `.ff-vis` rules and 74
+`.ff-col` rules, 1,171 lines — left the stylesheet entirely, and both screens have been rendering
+with **no CSS of their own** ever since. The Visuals section of this file went with them.
+
+- **Nothing was broken; two things were simply absent, which is why every scan passed.** The file
+  was brace-balanced, comment-balanced, and defined every token it used — `a11y.test.tsx`'s four
+  scans all passed on a stylesheet missing two whole screens. That is the difference between this
+  and the two `@media` bugs the same file has already shipped: a scan can see a rule that is
+  swallowed, and cannot see a rule that was never there. **A deletion is invisible to a validator.**
+  What found it was asking the file whether `.ff-vis` existed at all, which returned zero.
+- **Recovered byte-for-byte from `9397d2a`, not rewritten.** The sections were verified balanced in
+  isolation before being appended, and the only edit is the two header lines: **the visuals is now
+  `PHASE 64` and the brand colours `PHASE 65`**, the next free numbers. That is the same renumber
+  `e9e71bf` recorded when Story and Last look collided on 62 — and it is the second time this
+  collision has happened, because a phase number is derived from the file at the moment somebody
+  writes it and two sessions in parallel derive the same one. **Run
+  `grep -oE "PHASE [0-9]+" frontend/public/proovd.css | sort -u -V | tail -1` and take the next.**
+- **`.ff-look` and `.ff-card` are correctly gone and were not restored.** They are Session D's old
+  Last look card list, deleted with their component when `.ff-ll` replaced it. A selector-family
+  diff of the two files reported five families missing and two of them were supposed to be —
+  restoring all five would have put a deleted surface's stylesheet back.
+- **Verified after the repair:** the four `proovd.css` scans pass; all 73 classes the two components
+  render resolve to a rule; the 131 recovered rules sit at top level except the one inside
+  `@media (hover: none)`, which is `ColorStep.tsx`'s own touch-device swatch rule; and both screens
+  suppress `FlowPage`'s `.ff__top`/`.ff__badge` as the other four full-bleed screens do, so neither
+  draws a second header.
+- **The Color screen has never had a section in this file.** It was built in `9397d2a` alongside the
+  visuals and documented nowhere, and inventing a record of a browser pass nobody ran would be worse
+  than the gap. `ColorStep.tsx`'s own header carries the reasoning.

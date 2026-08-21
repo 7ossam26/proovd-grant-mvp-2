@@ -148,10 +148,19 @@ export const PRINCIPAL_FLOWS = [
     routes: [
       '/campaigns/:campaignId/setup/visuals',
       '/campaigns/:campaignId/setup/branding',
+      // The branding answer's second screen (2026-08-20) — the reference's own
+      // `[data-brand]`, one vetting step split on `brandStage` exactly as
+      // `[data-brandlogo]` and it are there. Same read, same record, so it is a
+      // route on this flow rather than a flow of its own.
+      '/campaigns/:campaignId/setup/color',
       '/campaigns/:campaignId/setup/interview',
       '/campaigns/:campaignId/setup/story',
       '/campaigns/:campaignId/setup/socials',
       '/campaigns/:campaignId/setup/review',
+      // Screen 16, added 2026-08-21. On this flow rather than an entry of its
+      // own: it is the same auth regime and the same sweep stub — a Founder
+      // session over one campaign, no connected account and no listing state.
+      '/campaigns/:campaignId/setup/details',
     ],
     keyboardPathRequired: true,
   },

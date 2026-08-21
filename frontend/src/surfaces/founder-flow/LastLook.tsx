@@ -76,12 +76,12 @@
  * That is the same substitution screen 20 made for the same `${{ feeNow }}`.
  * There is no arithmetic on a fee anywhere under `frontend/src/surfaces/`.
  *
- * ── Where the money screens are ────────────────────────────────────────────
- * `All good` opens Stripe payout setup, which Session E built as screen 25 —
- * and not the listing fee, which is screen 20 behind it, because
- * `beginListingCheckout` refuses without a complete `founder_seller` account.
- * The reference's own `allGood` goes to its `intake` page, which this product
- * does not have.
+ * ── Where `All good` goes ──────────────────────────────────────────────────
+ * To screen 16, Your details — which is what the reference's own `allGood`
+ * does: `{si: this.I('intake')}`, and `intake` is that page. It was built on
+ * 2026-08-21 and took the forward target; before it existed this went straight
+ * to Stripe payout setup (screen 25), which is now one page further on. Nothing
+ * else about this screen changed.
  *
  * ── And why the high-effort note is here at all ────────────────────────────
  * Session E retired the campaign workspace, which was the only surface that
@@ -338,7 +338,7 @@ function Screen({
               type="button"
               className="ff-ll__cta"
               data-stage-anim="cta"
-              onClick={() => leaveToPage('payouts')}
+              onClick={() => leaveToPage('details')}
             >
               {CTA_LABEL}
             </button>

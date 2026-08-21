@@ -210,4 +210,40 @@ describe('proovd.css parses as its author intended', () => {
     const missing = [...used].filter((token) => !defined.has(token));
     expect(missing, `undefined custom properties: ${missing.join(', ')}`).toEqual([]);
   });
+
+  /**
+   * The third way, and it has now happened too (2026-08-20).
+   *
+   * PHASE 46's last `@media (prefers-reduced-motion: reduce)` block was never
+   * closed. An unterminated at-rule does not fail — the parser swallows
+   * everything after it INTO the block — so PHASE 61 in full, and PHASE 62
+   * after it, were in the served stylesheet and in no stylesheet the browser
+   * had. The password page had been rendering unstyled since it shipped.
+   *
+   * Neither scan above can see it: the comments were balanced and every token
+   * was defined. This one reads the file with comments stripped — a brace
+   * inside a comment is prose, and this file is full of it — and asserts the
+   * braces balance and never close below zero.
+   */
+  it('closes every block exactly once', () => {
+    let depth = 0;
+    let line = 1;
+    let deepestUnclosed = 0;
+    for (let i = 0; i < code.length; i += 1) {
+      const c = code[i];
+      if (c === '\n') line += 1;
+      if (c === '{') {
+        depth += 1;
+        if (depth === 1) deepestUnclosed = line;
+      }
+      if (c === '}') {
+        depth -= 1;
+        expect(depth, `a block closed that was never opened, line ${line}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+    expect(
+      depth,
+      `an unterminated block swallows every rule after it — the one that opens near line ${deepestUnclosed} is never closed`,
+    ).toBe(0);
+  });
 });
