@@ -77,7 +77,6 @@ import { DetailsStep } from './surfaces/founder-flow/DetailsStep.js';
 import { MatchStep } from './surfaces/founder-flow/MatchStep.js';
 import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
-import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
 import { ApplicationReviewStep } from './surfaces/founder-flow/ApplicationReviewStep.js';
 import { VoiceStep } from './surfaces/founder-flow/VoiceStep.js';
 import { CreatorPayExplainerStep } from './surfaces/founder-flow/CreatorPayExplainerStep.js';
@@ -818,7 +817,7 @@ const rootChildren: RouteObject[] = [
       a Product Founder is never routed there.
     */
     path: 'campaigns/:campaignId/setup/creator-payment',
-    element: <CreatorPaymentStep />,
+    element: <CreatorPayExplainerStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/application-review',
@@ -831,10 +830,6 @@ const rootChildren: RouteObject[] = [
   {
     path: 'campaigns/:campaignId/setup/voice',
     element: <VoiceStep />,
-  },
-  {
-    path: 'campaigns/:campaignId/setup/creator-pay-explainer',
-    element: <CreatorPayExplainerStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/threshold',

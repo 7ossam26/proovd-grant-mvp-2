@@ -179,7 +179,6 @@ const FORWARD_LABEL: Record<string, string> = {
 export const BACK_LABEL: Record<string, string> = {
   fee: 'Back to your listing fee',
   'creator-payment': 'Back to how Creators are paid',
-  'creator-pay-explainer': 'Back to how Creator preorders work',
   voice: 'Back to your brand voice',
   threshold: 'Back to your order threshold',
   faqs: 'Back to your FAQs',

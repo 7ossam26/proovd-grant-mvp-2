@@ -1,8 +1,7 @@
 /**
- * The reference's `CREATOR PAY` (`scPay`) beat, inserted between brand voice
- * and FAQs. This is deliberately separate from `CreatorPaymentStep`: that
- * earlier page records the product's fixed-payment openness decision, while
- * this page is the supplied explanatory screen and records nothing.
+ * The reference's `CREATOR PAY` (`scPay`) beat, immediately after Match and
+ * before the passive Application review screen. It records nothing: the CTA
+ * simply advances through the reference flow.
  */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
@@ -24,7 +23,7 @@ export function CreatorPayExplainerStep() {
   const { campaignId = '' } = useParams();
 
   return (
-    <FlowPage pageId="creator-pay-explainer" param={campaignId}>
+    <FlowPage pageId="creator-payment" param={campaignId}>
       <CreatorPayExplainerScreen />
     </FlowPage>
   );
@@ -61,8 +60,8 @@ function CreatorPayExplainerScreen() {
       <button
         type="button"
         className="ff-payx__back"
-        aria-label="Back to your brand voice"
-        onClick={() => swapToPage('voice', -1)}
+        aria-label="Back to Creator match"
+        onClick={() => swapToPage('match', -1)}
       >
         <svg
           viewBox="0 0 24 24"
@@ -100,7 +99,7 @@ function CreatorPayExplainerScreen() {
             type="button"
             className="ff-payx__cta"
             data-stage-anim="cta"
-            onClick={() => swapToPage('faqs', 1)}
+            onClick={() => swapToPage('application-review', 1)}
           >
             I understand
           </button>
