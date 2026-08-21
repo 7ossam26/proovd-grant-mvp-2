@@ -59,6 +59,15 @@
   border: 0 !important;
 }
 
+/* During an internal Founder Flow handoff, a destination can briefly wait for
+   its record before mounting its actual stage. The previous page has already
+   left, so exposing that generic fallback would create a fake extra screen in
+   the choreography. FlowPage removes this guard before the destination paints.
+   Direct visits are unaffected and still show their honest loading state. */
+html.ff-transitioning .state-panel {
+  visibility: hidden;
+}
+
 
 /* ────────────────────────────────────────────────────────── §1 RAW PALETTE
    Raw values live here and ONLY here. Components must read slots or these

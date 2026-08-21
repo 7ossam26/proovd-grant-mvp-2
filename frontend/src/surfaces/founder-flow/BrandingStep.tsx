@@ -8,7 +8,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { founderFlowPath } from '@proovd/shared';
 import { NO_ACTION, StatePanel } from '../../components/index.js';
-import { fileRowIn, mailBellLoop, stageRelayIn } from '../../components/anim.js';
+import { fileRowIn, stageRelayIn } from '../../components/anim.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import {
   fileChecksum,
@@ -102,7 +102,6 @@ function BrandLogoScreen({
   const fromReview = params.get('from') === 'review';
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
-  const bell = useRef<HTMLSpanElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const direction = useRef<1 | -1 | null>(null);
   if (direction.current === null) direction.current = flowDirection();
@@ -128,7 +127,6 @@ function BrandLogoScreen({
     () => stageRelayIn(root.current, direction.current ?? 1, RELAY),
     [],
   );
-  useLayoutEffect(() => mailBellLoop(bell.current), []);
 
   const upload = useCallback(
     async (file: File) => {
@@ -217,7 +215,7 @@ function BrandLogoScreen({
         extra={<HelperResources subject="branding" />}
         trigger={
           <button type="button" className="ff-brandlogo__mailbtn" aria-label="Help and reading — 3 messages">
-            <span className="ff-brandlogo__mail" ref={bell} aria-hidden="true">
+            <span className="ff-brandlogo__mail" aria-hidden="true">
               <img src="/assets/mail.webp" alt="" />
               <span className="ff-brandlogo__mailcount">3</span>
             </span>

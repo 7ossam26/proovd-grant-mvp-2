@@ -80,13 +80,9 @@ export function UploadZone({
   const [failure, setFailure] = useState<string | null>(null);
 
   if (!available) {
-    return (
-      <p className="ff-upload__absent">
-        Uploading is not switched on for this deployment yet, so there is nowhere to put a file.
-        Everything else on this page works and nothing you have written has been lost — you can
-        add files here once we turn it on, and we will tell you when.
-      </p>
-    );
+    // The reference does not render a deployment/configuration explanation
+    // when this optional control is unavailable.
+    return null;
   }
 
   async function choose(file: File) {

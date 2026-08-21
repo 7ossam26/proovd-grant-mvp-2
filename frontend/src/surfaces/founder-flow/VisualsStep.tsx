@@ -434,15 +434,7 @@ function VisualsScreen({
                     </span>
                     <span className="ff-vis__droptypes">PNG, JPG, MP4</span>
                   </>
-                ) : (
-                  <>
-                    <span className="ff-vis__droplabel">Adding files is not switched on yet</span>
-                    <span className="ff-vis__droptypes">
-                      There is nowhere to put a file on this deployment. Nothing you have written is
-                      lost, and we will tell you when it is on.
-                    </span>
-                  </>
-                )}
+                ) : null}
               </label>
 
               <div className="ff-vis__linkrow">

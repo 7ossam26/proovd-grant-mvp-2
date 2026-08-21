@@ -56,11 +56,10 @@ export function Dictation({
   }, []);
 
   if (availability && !availability.available) {
-    return (
-      <p className="ff-answer__dictation-absent" data-anim="note">
-        {availability.absentBecause}
-      </p>
-    );
+    // The reference has no unavailable-service explanation on the answer
+    // screen. Keep the server state for behavior, but do not invent a visible
+    // deployment message that is absent from the composition.
+    return null;
   }
 
   async function start() {

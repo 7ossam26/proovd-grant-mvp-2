@@ -215,8 +215,19 @@ export const listCampaigns = (): Promise<{
   }>;
 }> => call('/api/founder/campaigns');
 
-export const fetchWorkspace = (campaignId: string): Promise<{ workspace: WorkspaceState }> =>
-  call(`${base(campaignId)}/workspace`);
+const workspaceCache = new Map<string, { workspace: WorkspaceState }>();
+
+export const fetchWorkspace = async (
+  campaignId: string,
+): Promise<{ workspace: WorkspaceState }> => {
+  const cached = workspaceCache.get(campaignId);
+  if (cached) return cached;
+  const result = await call<{ workspace: WorkspaceState }>(
+    `${base(campaignId)}/workspace`,
+  );
+  workspaceCache.set(campaignId, result);
+  return result;
+};
 
 /**
  * Dictation on the Story step (deviation 2, Session D).
@@ -232,11 +243,17 @@ export const transcribeStory = (campaignId: string, audio: Blob): Promise<{ text
     body: audio,
   });
 
-export const saveWorkspace = (
+export const saveWorkspace = async (
   campaignId: string,
   patch: WorkspacePatch,
-): Promise<{ workspace: WorkspaceState }> =>
-  call(`${base(campaignId)}/workspace`, { method: 'PATCH', body: JSON.stringify(patch) });
+): Promise<{ workspace: WorkspaceState }> => {
+  const result = await call<{ workspace: WorkspaceState }>(
+    `${base(campaignId)}/workspace`,
+    { method: 'PATCH', body: JSON.stringify(patch) },
+  );
+  workspaceCache.set(campaignId, result);
+  return result;
+};
 
 /* ── Your details (screen 16) ─────────────────────────────────────────────── */
 

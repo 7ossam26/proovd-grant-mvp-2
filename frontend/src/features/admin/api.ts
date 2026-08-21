@@ -175,5 +175,15 @@ export interface DraftLanding {
   noGuarantee: string;
 }
 
-export const fetchDraftLanding = (token: string): Promise<DraftLanding> =>
-  call(`/api/draft/${encodeURIComponent(token)}`);
+/* The invite, reach and solution screens share this immutable-in-flow read.
+   Reusing it prevents a route transition from exposing a loading panel while
+   the next screen repeats the same request. A full reload starts fresh. */
+const draftLandingCache = new Map<string, DraftLanding>();
+
+export const fetchDraftLanding = async (token: string): Promise<DraftLanding> => {
+  const cached = draftLandingCache.get(token);
+  if (cached) return cached;
+  const draft = await call<DraftLanding>(`/api/draft/${encodeURIComponent(token)}`);
+  draftLandingCache.set(token, draft);
+  return draft;
+};

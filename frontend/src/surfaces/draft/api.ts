@@ -282,7 +282,25 @@ export interface ClaimPatch {
   representationSanctions?: boolean;
 }
 
-export const fetchClaim = (token: string): Promise<ClaimView> => call(`${base(token)}/claim`);
+const claimCache = new Map<string, ClaimView>();
 
-export const saveClaim = (token: string, patch: ClaimPatch): Promise<ClaimProfileState> =>
-  call(`${base(token)}/claim`, { method: 'PATCH', body: JSON.stringify(patch) });
+export const fetchClaim = async (token: string): Promise<ClaimView> => {
+  const cached = claimCache.get(token);
+  if (cached) return cached;
+  const claim = await call<ClaimView>(`${base(token)}/claim`);
+  claimCache.set(token, claim);
+  return claim;
+};
+
+export const saveClaim = async (
+  token: string,
+  patch: ClaimPatch,
+): Promise<ClaimProfileState> => {
+  const profile = await call<ClaimProfileState>(`${base(token)}/claim`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  });
+  const cached = claimCache.get(token);
+  if (cached) claimCache.set(token, { ...cached, profile });
+  return profile;
+};

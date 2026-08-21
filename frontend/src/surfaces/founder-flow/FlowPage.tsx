@@ -63,6 +63,7 @@ import { useProovdMotion } from '../../motion/MotionProvider.js';
  * paint always runs forward".
  */
 let pendingDirection: 1 | -1 = 1;
+let transitionGuardTimer: number | null = null;
 
 /**
  * Which way THIS page's relay runs, for a page that owns its own entrance.
@@ -143,6 +144,14 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
   useProovdMotion(stageRef, [pageId]);
 
   useLayoutEffect(() => {
+    // A destination may need a read before it can mount its real FlowPage.
+    // Clear the transition guard before that page paints, so a fallback
+    // StatePanel can never become a visible intermediate Founder screen.
+    document.documentElement.classList.remove('ff-transitioning');
+    if (transitionGuardTimer !== null) {
+      window.clearTimeout(transitionGuardTimer);
+      transitionGuardTimer = null;
+    }
     const direction = pendingDirection;
     pendingDirection = 1;
     return relayIn(stageRef.current, direction);
@@ -151,6 +160,16 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
   const leave = useCallback(
     (to: string, direction: 1 | -1 = 1, state?: unknown) => {
       pendingDirection = direction;
+      document.documentElement.classList.add('ff-transitioning');
+      if (transitionGuardTimer !== null) window.clearTimeout(transitionGuardTimer);
+      // If the destination fails before it can mount FlowPage, do not leave
+      // its error/loading state hidden forever. This is only a safety escape;
+      // normal successful transitions clear it in the destination layout
+      // effect before the first visible frame.
+      transitionGuardTimer = window.setTimeout(() => {
+        document.documentElement.classList.remove('ff-transitioning');
+        transitionGuardTimer = null;
+      }, 3000);
       // The reference fades the page-owned stage, not its chrome wrapper. The
       // invite and paper screens use these markers so their fixed composition
       // is the exact element that participates in the route handoff.

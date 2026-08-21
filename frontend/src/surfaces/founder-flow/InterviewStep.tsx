@@ -366,11 +366,7 @@ function InterviewScreen({
     ? 'Your listing fee is paid, so this is locked as it was checked.'
     : live
       ? 'There is already an interview on this campaign. Cancel it below to pick another time.'
-      : !interview.bookable
-        ? interview.missingSettings.length > 0
-          ? `Proovd has not published interview times for this deployment yet (${interview.missingSettings.join(', ')}).`
-          : 'Proovd has not published interview times for this deployment yet.'
-        : null;
+      : null;
 
   const pick = useCallback(
     (run: () => void) => {

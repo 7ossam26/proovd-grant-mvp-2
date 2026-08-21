@@ -1807,36 +1807,44 @@ export function stageRelayIn(
       root.querySelector<HTMLElement>('[data-stage-anim="' + name + '"]'),
     )
     .filter((el): el is HTMLElement => !!el);
-  if (!relay.length) return () => {};
+  // The reference's mail badge is a separate looping beat (`data-mailbell`)
+  // from the page relay. Founder Flow keeps the badge's screen-specific class
+  // but the `__mail` suffix is shared by every one of those badges.
+  const bells = Array.from(root.querySelectorAll<HTMLElement>('[class$="__mail"]'));
+  if (!relay.length && !bells.length) return () => {};
 
-  g.killTweensOf(relay);
-  g.fromTo(
-    relay,
-    { x: 150 * direction, autoAlpha: 0 },
-    {
-      x: 0,
-      autoAlpha: 1,
-      // The reference's literal numbers, through `refDur`, on the same
-      // `problemIntro` licence recorded above: this file's convention is to
-      // round to the nearest §6.1 token, and the brief for these pages is a
-      // 1:1 behavioural reproduction. `slow` 0.60 and `stagger.base` 0.08 were
-      // what stood here, and against a frame-by-frame capture of the reference
-      // the three elements land 20ms and 15ms early — small, but the whole
-      // point of a relay is when each piece arrives. 0.62 is inside §6.1's
-      // `grand: 0.90` ceiling, and §6.1's phone factor still applies.
-      duration: refDur(0.62), // between slow 0.60 and grand 0.90
-      ease: ease('out'), // power3.out
-      force3D: true,
-      stagger: {
-        each: refDur(0.085), // its own number; stagger.base 0.08 is the token
-        // Back navigation relays from the LAST child, so the element the
-        // person is returning toward is the one that arrives first.
-        from: direction === -1 ? 'end' : 'start',
+  const stopBells = bells.map((bell) => mailBellLoop(bell));
+
+  if (relay.length) {
+    g.killTweensOf(relay);
+    g.fromTo(
+      relay,
+      { x: 150 * direction, autoAlpha: 0 },
+      {
+        x: 0,
+        autoAlpha: 1,
+        // The reference's literal numbers, through `refDur`, on the same
+        // `problemIntro` licence recorded above: this file's convention is to
+        // round to the nearest §6.1 token, and the brief for these pages is a
+        // 1:1 behavioural reproduction. `slow` 0.60 and `stagger.base` 0.08 were
+        // what stood here, and against a frame-by-frame capture of the reference
+        // the three elements land 20ms and 15ms early — small, but the whole
+        // point of a relay is when each piece arrives. 0.62 is inside §6.1's
+        // `grand: 0.90` ceiling, and §6.1's phone factor still applies.
+        duration: refDur(0.62), // between slow 0.60 and grand 0.90
+        ease: ease('out'), // power3.out
+        force3D: true,
+        stagger: {
+          each: refDur(0.085), // its own number; stagger.base 0.08 is the token
+          // Back navigation relays from the LAST child, so the element the
+          // person is returning toward is the one that arrives first.
+          from: direction === -1 ? 'end' : 'start',
+        },
+        clearProps: 'transform,opacity,visibility',
+        overwrite: 'auto',
       },
-      clearProps: 'transform,opacity,visibility',
-      overwrite: 'auto',
-    },
-  );
+    );
+  }
 
   // The reference's own `this.later(... clearProps ...)` backstop, and
   // `relayIn`'s stuck sweep: the runtime's 3s force-reveal only registers
@@ -1853,6 +1861,7 @@ export function stageRelayIn(
   return () => {
     window.clearTimeout(sweep);
     g.killTweensOf(relay);
+    stopBells.forEach((stop) => stop());
   };
 }
 
