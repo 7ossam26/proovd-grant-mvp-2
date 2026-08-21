@@ -113,16 +113,12 @@ export function buildStepNav(build: BuildFlowState, stepId: string): ReactNode {
 }
 
 function BuildStepNav({ build, stepId }: { build: BuildFlowState; stepId: string }) {
-  const { leave, leaveToPage, swapToPage, param } = useFlowNav();
+  const { leave, leaveToPage, param } = useFlowNav();
   const model = build.state?.model ?? 'product';
   const walk = buildFlowStepsFor(model).map((step) => step.id);
   const index = walk.indexOf(stepId as (typeof walk)[number]);
 
-  const previous = stepId === 'faqs'
-    ? 'creator-pay-explainer'
-    : index > 0
-      ? walk[index - 1]
-      : 'creator-payment';
+  const previous = index > 0 ? walk[index - 1] : 'fee';
   const next = index >= 0 && index < walk.length - 1 ? walk[index + 1] : null;
   const last = next === null;
 
@@ -134,9 +130,7 @@ function BuildStepNav({ build, stepId }: { build: BuildFlowState; stepId: string
       <div className="ff-nav" data-anim="cta">
         <Button
           tier="tertiary"
-          onClick={() => previous === 'creator-pay-explainer'
-            ? swapToPage(previous, -1)
-            : leaveToPage(previous!, -1)}
+          onClick={() => leaveToPage(previous!, -1)}
         >
           {BACK_LABEL[previous!] ?? 'Back'}
         </Button>
@@ -159,8 +153,8 @@ function BuildStepNav({ build, stepId }: { build: BuildFlowState; stepId: string
                 password. `in-review` reads §23.1 rather than deciding it, so a
                 campaign that is still `affiliate_response_and_build` is told
                 exactly that and offered the build page again. */}
-            <Button tier="primary" onClick={() => leaveToPage('in-review')}>
-              See where your campaign stands
+            <Button tier="primary" onClick={() => leaveToPage('payouts')}>
+              Set up how you get paid
             </Button>
           </>
         ) : (
@@ -183,6 +177,7 @@ const FORWARD_LABEL: Record<string, string> = {
 
 /** The label a back control carries, so it names where it goes too. */
 export const BACK_LABEL: Record<string, string> = {
+  fee: 'Back to your listing fee',
   'creator-payment': 'Back to how Creators are paid',
   'creator-pay-explainer': 'Back to how Creator preorders work',
   voice: 'Back to your brand voice',

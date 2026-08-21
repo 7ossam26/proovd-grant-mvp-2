@@ -93,11 +93,11 @@ export function resetFlowDirection(): void {
 
 interface FlowNav {
   /** Fade this page out, then go. `direction` drives the next page's relay. */
-  leave: (to: string, direction?: 1 | -1) => void;
+  leave: (to: string, direction?: 1 | -1, state?: unknown) => void;
   /** The same, addressed by flow page id. */
-  leaveToPage: (pageId: string, direction?: 1 | -1) => void;
+  leaveToPage: (pageId: string, direction?: 1 | -1, state?: unknown) => void;
   /** Swap routes without an exit tween; the arriving page still relays in. */
-  swapToPage: (pageId: string, direction?: 1 | -1) => void;
+  swapToPage: (pageId: string, direction?: 1 | -1, state?: unknown) => void;
   /** This page's own route parameter: a draft token, or a campaign id. */
   param: string;
 }
@@ -149,25 +149,25 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
   }, [pageId]);
 
   const leave = useCallback(
-    (to: string, direction: 1 | -1 = 1) => {
+    (to: string, direction: 1 | -1 = 1, state?: unknown) => {
       pendingDirection = direction;
       pageExit(stageRef.current, () => {
-        void navigate(to);
+        void navigate(to, { state });
       });
     },
     [navigate],
   );
 
   const leaveToPage = useCallback(
-    (nextId: string, direction: 1 | -1 = 1) =>
-      leave(founderFlowPath(nextId, param), direction),
+    (nextId: string, direction: 1 | -1 = 1, state?: unknown) =>
+      leave(founderFlowPath(nextId, param), direction, state),
     [leave, param],
   );
 
   const swapToPage = useCallback(
-    (nextId: string, direction: 1 | -1 = 1) => {
+    (nextId: string, direction: 1 | -1 = 1, state?: unknown) => {
       pendingDirection = direction;
-      void navigate(founderFlowPath(nextId, param));
+      void navigate(founderFlowPath(nextId, param), { state });
     },
     [navigate, param],
   );

@@ -236,9 +236,9 @@ function VoiceScreen({
     } finally {
       setBusy(false);
     }
-    // The supplied Creator Pay explainer is the next routed beat. It records
-    // nothing, so the build record and the autosave context remain intact.
-    swapToPage('creator-pay-explainer', 1);
+    // The reference goes straight into the model-specific build walk here:
+    // Idea campaigns have a threshold; Product campaigns do not.
+    swapToPage(build.state?.model === 'idea' ? 'threshold' : 'faqs', 1);
   }
 
   const status = describeSaveState(build.autosave.state);
@@ -248,16 +248,15 @@ function VoiceScreen({
   return (
     <div className="ff-vc" ref={root}>
       {/* The reference's own control, bottom-left. `back()`'s build branch goes
-          to its `fee` screen; ours goes to the step before this one in the
-          product's own walk, which is `creator-payment`. Its label names the
+          to its `fee` screen. Its label names the
           destination only to a screen reader: the visible word is the
           reference's own `Back`, and §33.11.4's objectless-CTA rule is answered
           by the accessible name rather than by overriding its copy. */}
       <button
         type="button"
         className="ff-vc__back"
-        aria-label="Back to how Creators are paid"
-        onClick={() => leave(founderFlowPath('creator-payment', campaignId), -1)}
+        aria-label="Back to your listing fee"
+        onClick={() => leave(founderFlowPath('fee', campaignId), -1)}
       >
         <svg
           viewBox="0 0 24 24"

@@ -127,7 +127,7 @@ export function PayoutsStep() {
 }
 
 function Body({ payouts }: { payouts: PayoutState }) {
-  const { leaveToPage, swapToPage } = useFlowNav();
+  const { leaveToPage } = useFlowNav();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,7 +147,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
     }
   }, []);
 
-  const back = () => swapToPage('match', -1);
+  const back = () => leaveToPage('rewards', -1);
 
   if (payouts.state === 'complete') {
     return (
@@ -167,7 +167,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
               type="button"
               data-payout-anim="cta"
               className="ff-payout-ref__paid-cta"
-              onClick={() => leaveToPage('fee')}
+              onClick={() => leaveToPage('in-review')}
             >
               Continue
             </button>
@@ -235,7 +235,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
 }
 
 function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () => void }) {
-  const { param } = useFlowNav();
+  const { leaveToPage, param } = useFlowNav();
 
   return (
     <section className="ff-payout-ref">
@@ -254,6 +254,14 @@ function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () 
           <path d="M15 5 8 12l7 7" />
         </svg>
         Back
+      </button>
+      <button
+        type="button"
+        className="ff-payout-ref__skip"
+        aria-label="Skip for now to campaign review"
+        onClick={() => leaveToPage('in-review')}
+      >
+        Skip for now
       </button>
       <header className="ff-payout-ref__top">
         <img src={PAYOUT_ASSETS.logo} alt="proovd" className="ff-payout-ref__logo" />

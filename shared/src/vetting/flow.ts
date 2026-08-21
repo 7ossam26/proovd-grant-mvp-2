@@ -299,7 +299,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     /*
       The reference's `[data-match]`, immediately after `[data-hello]` (the
       Details page above). It writes nothing, changes no auth regime, and hands
-      the same campaign to the payout setup Details previously opened directly.
+      the same campaign to Creator pay, exactly as the reference does.
     */
     id: 'match',
     path: '/campaigns/:campaignId/setup/match',
@@ -310,20 +310,31 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
   },
   {
     /*
-      Stage 4 — the money. Session E (2026-08-19).
-
-      Stripe FIRST, and not as a preference: `beginListingCheckout` refuses
-      without a complete `founder_seller` account, and §23.1 orders the two
-      states the same way — `stripe_onboarding_pending` precedes
-      `listing_fee_pending`. The reference draws the fee at 20 and payouts at
-      25; drawn that way, screen 20 offers a payment the server declines.
+      The reference's post-Match sequence: Creator pay, the passive Application
+      review beat, then the Listing fee. Payout setup belongs after the build.
     */
-    id: 'payouts',
-    path: '/campaigns/:campaignId/setup/payouts',
+    id: 'creator-payment',
+    path: '/campaigns/:campaignId/setup/creator-payment',
     param: 'campaignId',
-    title: 'How you get paid',
-    help: 'Your campaign takes payments through a Stripe account in your name. Stripe asks for your ID, bank and tax details directly — Proovd never sees them.',
-    stage: 4,
+    title: 'How Creators are paid',
+    help: 'Creators take a share of what your campaign collects. On a Product Campaign one may also ask for a fixed payment — this is where you say whether you would consider it, and it commits you to nothing.',
+    stage: 5,
+  },
+  {
+    id: 'creator-pay-explainer',
+    path: '/campaigns/:campaignId/setup/creator-pay-explainer',
+    param: 'campaignId',
+    title: 'How Creator preorders work',
+    help: 'Creators take a share of the preorders, so there is nothing to pay upfront.',
+    stage: 5,
+  },
+  {
+    id: 'application-review',
+    path: '/campaigns/:campaignId/setup/application-review',
+    param: 'campaignId',
+    title: 'Review',
+    help: 'We read every campaign by hand. This is usually minutes, not days.',
+    stage: 5,
   },
   {
     id: 'fee',
@@ -334,35 +345,11 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 4,
   },
   {
-    /*
-      Stage 5 — openness, the build, and what stands between a submitted
-      campaign and a live one. Session F (2026-08-19).
-
-      After the fee because Phase 11's effect 4 is what opens the formal
-      Creator opportunity: before it there is no Creator to be open to, and
-      §15's review has nothing to review.
-    */
-    id: 'creator-payment',
-    path: '/campaigns/:campaignId/setup/creator-payment',
-    param: 'campaignId',
-    title: 'How Creators are paid',
-    help: 'Creators take a share of what your campaign collects. On a Product Campaign one may also ask for a fixed payment — this is where you say whether you would consider it, and it commits you to nothing.',
-    stage: 5,
-  },
-  {
     id: 'voice',
     path: '/campaigns/:campaignId/setup/voice',
     param: 'campaignId',
     title: 'Your brand voice',
     help: 'A few words for how your campaign should sound, and anything else worth knowing. A reviewer and a Creator both read it.',
-    stage: 5,
-  },
-  {
-    id: 'creator-pay-explainer',
-    path: '/campaigns/:campaignId/setup/creator-pay-explainer',
-    param: 'campaignId',
-    title: 'How Creator preorders work',
-    help: 'Creators take a share of the preorders, so there is nothing to pay upfront.',
     stage: 5,
   },
   {
@@ -394,6 +381,14 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     title: 'Your Backer rewards',
     help: 'What somebody receives for pre-ordering, what it costs, and when it arrives. Your campaign needs at least one.',
     stage: 5,
+  },
+  {
+    id: 'payouts',
+    path: '/campaigns/:campaignId/setup/payouts',
+    param: 'campaignId',
+    title: 'How you get paid',
+    help: 'Your campaign takes payments through a Stripe account in your name. Stripe asks for your ID, bank and tax details directly — Proovd never sees them.',
+    stage: 4,
   },
   {
     /*

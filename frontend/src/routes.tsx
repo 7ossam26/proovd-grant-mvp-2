@@ -78,6 +78,7 @@ import { MatchStep } from './surfaces/founder-flow/MatchStep.js';
 import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
 import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
+import { ApplicationReviewStep } from './surfaces/founder-flow/ApplicationReviewStep.js';
 import { VoiceStep } from './surfaces/founder-flow/VoiceStep.js';
 import { CreatorPayExplainerStep } from './surfaces/founder-flow/CreatorPayExplainerStep.js';
 import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
@@ -801,26 +802,10 @@ const rootChildren: RouteObject[] = [
     /*
       The reference's `[data-match]`, inserted immediately after its
       `[data-hello]` / Details screen. It needs no API call of its own and
-      carries the campaign id forward to the existing payout setup.
+      carries the campaign id forward to Creator pay.
     */
     path: 'campaigns/:campaignId/setup/match',
     element: <MatchStep />,
-  },
-  {
-    /*
-      Founder Flow v2 Session E (2026-08-19) — stage 4, the money.
-
-      Stripe BEFORE the fee, because `beginListingCheckout` refuses without a
-      complete `founder_seller` account and §23.1 orders the two campaign states
-      the same way. The reference draws them the other way round, which would
-      put a payment control on a page the server declines.
-    */
-    path: 'campaigns/:campaignId/setup/payouts',
-    element: <PayoutsStep />,
-  },
-  {
-    path: 'campaigns/:campaignId/setup/fee',
-    element: <FeeStep />,
   },
   {
     /*
@@ -834,6 +819,14 @@ const rootChildren: RouteObject[] = [
     */
     path: 'campaigns/:campaignId/setup/creator-payment',
     element: <CreatorPaymentStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/application-review',
+    element: <ApplicationReviewStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/fee',
+    element: <FeeStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/voice',
@@ -854,6 +847,10 @@ const rootChildren: RouteObject[] = [
   {
     path: 'campaigns/:campaignId/setup/rewards',
     element: <RewardsStep />,
+  },
+  {
+    path: 'campaigns/:campaignId/setup/payouts',
+    element: <PayoutsStep />,
   },
   {
     /*

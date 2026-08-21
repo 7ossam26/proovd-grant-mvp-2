@@ -351,8 +351,8 @@ function Unpaid({
       </div>
 
       <div className="ff-nav" data-anim="cta">
-        <Button tier="tertiary" onClick={() => leaveToPage('payouts', -1)}>
-          Back to how you get paid
+        <Button tier="tertiary" onClick={() => leaveToPage('creator-payment', -1)}>
+          Back to how Creators are paid
         </Button>
         <Button
           tier="primary"
@@ -632,8 +632,8 @@ function Paid({
             handing over to the build surface. Phase 11's effect 4 is what
             opened the formal Creator opportunity, which is why the question
             about Creator pay comes immediately after the fee and not before. */}
-        <Button tier="primary" onClick={() => leaveToPage('creator-payment')}>
-          Next — how Creators are paid
+        <Button tier="primary" onClick={() => leaveToPage('voice')}>
+          Start your campaign page
         </Button>
       </div>
     </div>

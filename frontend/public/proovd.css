@@ -4848,6 +4848,115 @@ html.no-motion .ff-prob__rail { transition: none; }
    This route deliberately does not use the fluid `.ff-money` composition.
    The supplied source authors a 2496×1542 stage and scales it by
    min(viewport/2496×1542) × .78. PayoutsStep owns that scale on resize. */
+.ff[data-flow-page='application-review'] .ff__top,
+.ff[data-flow-page='application-review'] .ff__badge { display: none; }
+.ff[data-flow-page='application-review'] .ff__stage { padding: 0; gap: 0; }
+.ff[data-flow-page='application-review'] .ff__body {
+  display: block;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ff-application-review {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 25;
+  background: #FAFAFA;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 16px;
+  line-height: normal;
+}
+.ff-application-review__top {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-application-review__logo {
+  display: block;
+  width: auto;
+  height: clamp(26px, 2.4vw, 36px);
+}
+.ff-application-review__help {
+  min-height: 40px;
+  padding: 10px 22px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(12px, 1vw, 15px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-application-review__help:hover { background: #E9FFE1; }
+.ff-application-review__help:focus-visible {
+  outline: 3px solid #41ED98;
+  outline-offset: 2px;
+}
+.ff-application-review__stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2496px;
+  height: 1542px;
+  transform: translate(-50%, -50%) scale(.37);
+  transform-origin: center center;
+}
+.ff-application-review__lockup {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2000px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-application-review__art {
+  display: block;
+  width: 1620px;
+  height: auto;
+}
+.ff-application-review__head {
+  margin: 150px 0 0;
+  color: #013F17;
+  font-size: 118px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.035em;
+  text-align: center;
+}
+.ff-application-review__sub {
+  margin: 48px 0 0;
+  color: #17A35E;
+  font-size: 56px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -.02em;
+  text-align: center;
+}
+.ff-application-review__note {
+  margin: 56px 0 0;
+  color: #A2AFA8;
+  font-size: 40px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -.012em;
+  text-align: center;
+}
+
 .ff[data-flow-page='payouts'] .ff__top,
 .ff[data-flow-page='payouts'] .ff__badge { display: none; }
 .ff[data-flow-page='payouts'] .ff__stage { padding: 0; gap: 0; }
@@ -4930,6 +5039,30 @@ html.no-motion .ff-prob__rail { transition: none; }
 }
 .ff-payout-ref__back:hover { color: #013F17; }
 .ff-payout-ref__back:focus-visible {
+  outline: 3px solid #41ED98;
+  outline-offset: 2px;
+}
+.ff-payout-ref__skip {
+  position: absolute;
+  z-index: 6;
+  right: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, .8vw, 12px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-payout-ref__skip:hover { color: #013F17; }
+.ff-payout-ref__skip:focus-visible {
   outline: 3px solid #41ED98;
   outline-offset: 2px;
 }
@@ -5077,7 +5210,8 @@ html.no-motion .ff-prob__rail { transition: none; }
 }
 
 @media (max-width: 600px) {
-  .ff-payout-ref__back { bottom: 92px; padding: 8px 14px; }
+  .ff-payout-ref__back,
+  .ff-payout-ref__skip { bottom: 92px; padding: 8px 14px; }
 }
 
 /* §12's high-effort note lived here from Session E until 2026-08-20, when Last

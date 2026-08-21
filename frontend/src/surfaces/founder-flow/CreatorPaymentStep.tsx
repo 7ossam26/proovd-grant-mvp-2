@@ -109,7 +109,7 @@ function Body({
   campaignId: string;
   onRecorded: (next: OpennessState) => void;
 }) {
-  const { leaveToPage } = useFlowNav();
+  const { leaveToPage, swapToPage } = useFlowNav();
   const [chosen, setChosen] = useState<string>(openness.stance ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +121,11 @@ function Body({
     try {
       const result = await recordOpenness(campaignId, chosen as FixedPaymentStance);
       onRecorded(result.openness);
-      leaveToPage('voice');
+      // The reference changes state immediately here; the review screen owns
+      // the grow-first entrance that makes the transition visible.
+      swapToPage('application-review', 1, {
+        campaignType: result.openness.campaignType,
+      });
     } catch (e: unknown) {
       setBusy(false);
       setError(
@@ -130,7 +134,7 @@ function Body({
           : 'We could not record that. Nothing has changed.',
       );
     }
-  }, [campaignId, chosen, leaveToPage, onRecorded]);
+  }, [campaignId, chosen, onRecorded, swapToPage]);
 
   /* ── §14.3: an Idea Campaign has nothing to be open to ─────────────────── */
 
@@ -151,7 +155,12 @@ function Body({
           {FIXED_PAYMENT_IDEA_EXPLAINER}
         </p>
         <div className="ff-nav" data-anim="cta">
-          <Button tier="primary" onClick={() => leaveToPage('voice')}>
+          <Button
+            tier="primary"
+            onClick={() =>
+              swapToPage('application-review', 1, { campaignType: openness.campaignType })
+            }
+          >
             Start your campaign page
           </Button>
         </div>
@@ -211,8 +220,8 @@ function Body({
       ) : null}
 
       <div className="ff-nav" data-anim="cta">
-        <Button tier="tertiary" onClick={() => leaveToPage('fee', -1)}>
-          Back to your listing fee
+        <Button tier="tertiary" onClick={() => leaveToPage('match', -1)}>
+          Back to Creator match
         </Button>
         <Button tier="primary" onClick={() => void save()} disabled={busy || !chosen}>
           {busy ? 'Recording…' : 'Save and start your campaign page'}

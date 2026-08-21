@@ -61,7 +61,7 @@ export function MatchStep() {
   const advance = useCallback(() => {
     if (leaving.current) return;
     leaving.current = true;
-    void navigate(founderFlowPath('payouts', campaignId));
+    void navigate(founderFlowPath('creator-payment', campaignId));
   }, [campaignId, navigate]);
 
   // `fitStages()` from the reference, including its delayed orientation settle.
