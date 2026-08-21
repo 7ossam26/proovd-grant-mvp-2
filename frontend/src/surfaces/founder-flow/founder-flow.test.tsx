@@ -45,7 +45,8 @@ import {
   ROSTER_CHIPS_ARE_RECORDED,
   LISTING_FEE_LOCKED_AFTER_PAYMENT,
   LISTING_FEE_NEWSLETTER_LABEL,
-  LISTING_FEE_STILL_LOWERABLE,
+  payoutDiscountLine,
+  payoutSavedLine,
   PAYOUT_PREPARE_COLLECTS_NOTHING,
   SEPARATE_FIVE_PERCENT_NOTE,
   STRIPE_PREPARE_ITEMS,
@@ -1201,6 +1202,10 @@ function workspaceState(overrides: Record<string, unknown> = {}): Record<string,
       discountLines: [{ item: 'visuals', discountCents: '200' }],
       discountCents: '200',
       subtotalCents: '3300',
+      // What the four remaining optional answers would still take off. Derived
+      // on the server (§12 applies a cap AND a floor) and rendered by screen
+      // 20's discount control.
+      remainingDiscountCents: '800',
       calculatedAt: '2026-08-18T10:00:00.000Z',
       locked: false,
       separateStreamNote: 'The 5% is separate.',
@@ -1648,6 +1653,20 @@ function paidListing(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * Screen 20's pay sheet — the step §13's billing address, tax total and
+ * Appendix A.5 live on since the 1:1 rebuild (2026-08-21).
+ *
+ * The reference's `payAndStart` advances a step; here it opens a charge, and
+ * none of what §13 requires before one fits the composition. So the assertions
+ * that used to read the page directly open the sheet first.
+ */
+async function openPaySheet() {
+  await screen.findByRole('heading', { name: /please pay/i });
+  await userEvent.click(screen.getByRole('button', { name: /^pay & start/i }));
+  await screen.findByRole('dialog');
+}
+
 function stubMoney(payouts: Record<string, unknown> = {}, listing: Record<string, unknown> = {}) {
   handlers.push((url) =>
     url.startsWith('/api/account/me')
@@ -1788,14 +1807,26 @@ describe('the listing fee (20)', () => {
         : undefined,
     );
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await screen.findByRole('heading', { name: /please pay/i });
 
-    const hero = document.querySelector('.ff-money__amount') as HTMLElement;
-    expect(hero.textContent).toBe('US$29.00');
-    expect(screen.queryByText('US$25.00')).not.toBeInTheDocument();
+    // UPDATED 2026-08-21 for the 1:1 rebuild: the hero is the reference's own
+    // `${{ feeNow }}` — a literal `$` and the server's amount — so what is
+    // asserted is the same fact in the shape the screen now renders it.
+    const hero = document.querySelector('.ff-fee__amount') as HTMLElement;
+    expect(hero.textContent).toBe('$29.00');
+    expect(document.body.textContent).not.toContain('25.00');
   });
 
-  it('never reports a saving of zero, and says what each answer is worth', async () => {
+  /*
+    DELIBERATELY INVERTED 2026-08-21. This asserted that `You saved $0` never
+    renders — Session E's judgement, recorded on `payoutSavedLine`, and reversed
+    by product direction with the 1:1 rebuild: the supplied screenshot shows
+    that line at zero and the reference's copy is the specification on these
+    pages. What the test protected is the half that matters and it is what is
+    asserted now: every amount on the screen is the SERVER's, in the reference's
+    own sentence, and nothing here computes one.
+  */
+  it('renders the reference’s saved line, with the server’s amount', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
     handlers.unshift((url) =>
       url.includes('/workspace')
@@ -1816,19 +1847,22 @@ describe('the listing fee (20)', () => {
         : undefined,
     );
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await screen.findByRole('heading', { name: /please pay/i });
 
-    // The reference renders `You saved $0 by doing bonus tasks` here.
-    expect(document.body.textContent).not.toMatch(/saved\s+US\$0/i);
-    expect(document.body.textContent).not.toMatch(/saved\s+\$0/i);
-    expect(screen.getByText(/Each optional answer takes US\$2\.00 off/)).toBeInTheDocument();
-    expect(screen.getByText(LISTING_FEE_STILL_LOWERABLE)).toBeInTheDocument();
+    expect(screen.getByText(payoutSavedLine('$0.00'))).toBeInTheDocument();
+    // `payCanLower` is the server's `remainingDiscountCents`, not
+    // `subtotal − floor`: the reference's subtraction is its own cap and floor
+    // coinciding rather than the rule.
+    expect(screen.getByText(payoutDiscountLine('$8.00'))).toBeInTheDocument();
   });
 
   it('shows the base line and each earned saving on its own labeled line (§13)', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    // UPDATED 2026-08-21: §13's itemisation has no room in the reference's
+    // composition, so it is on the pay sheet — the step before anybody agrees
+    // to anything, which is where §13 wants it.
+    await openPaySheet();
 
     expect(screen.getByText('Listing a campaign')).toBeInTheDocument();
     expect(screen.getByText('US$35.00')).toBeInTheDocument();
@@ -1842,7 +1876,7 @@ describe('the listing fee (20)', () => {
   it('explains the separate 5% without conflating the two streams (§24.6)', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await openPaySheet();
 
     const note = screen.getByText(SEPARATE_FIVE_PERCENT_NOTE);
     const text = note.textContent?.toLowerCase() ?? '';
@@ -1877,7 +1911,7 @@ describe('the listing fee (20)', () => {
   it('renders Appendix A.5 verbatim once the total is known, with A.5’s own action', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await openPaySheet();
 
     await userEvent.type(screen.getByLabelText(/billing zip/i), '97201');
     await userEvent.click(screen.getByRole('button', { name: /work out my total/i }));
@@ -1892,8 +1926,11 @@ describe('the listing fee (20)', () => {
     // reference's own `Pay & Start` would leave the consent's opening clause —
     // "By clicking Agree and Pay" — describing a control that is not there.
     expect(screen.getByRole('link', { name: expected.action })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /pay & start/i })).not.toBeInTheDocument();
-    const rows = document.querySelectorAll('.ff-lines__row--total dd');
+    // `Pay & Start` is the control that OPENED this sheet, and the background
+    // is `inert` while it is open — so it is not something a person can press
+    // from here (§30).
+    expect(document.querySelector('.ff-fee__page')?.hasAttribute('inert')).toBe(true);
+    const rows = document.querySelectorAll('.ff-fee__line--total dd');
     expect(rows).toHaveLength(1);
     expect(rows[0]?.textContent).toBe('US$35.72');
   });
@@ -1901,7 +1938,7 @@ describe('the listing fee (20)', () => {
   it('keeps the newsletter its own unchecked control (§28.4)', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await openPaySheet();
     await userEvent.type(screen.getByLabelText(/billing zip/i), '97201');
     await userEvent.click(screen.getByRole('button', { name: /work out my total/i }));
     await screen.findByTestId('listing-consent');
@@ -1913,7 +1950,7 @@ describe('the listing fee (20)', () => {
   it('does not advance on Enter (disagreement 10)', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await openPaySheet();
 
     // The reference binds Enter to the current page's primary action
     // throughout. §30 forbids competing actions in a payment state, and a
@@ -1927,11 +1964,18 @@ describe('the listing fee (20)', () => {
   it('renders §24.6’s record and §31.6’s decision once the fee is paid', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true }, paidListing());
     renderAt(at('fee'));
-    await screen.findByRole('heading', { name: /your listing fee is paid/i });
+    // UPDATED 2026-08-21: the paid state keeps the reference's composition —
+    // a headline, the amount, a line, one quiet control and one loud one — so
+    // §24.6's record and §31.6's decision are behind `See what you paid`, and
+    // the deadline itself is on the screen in the chrome.
+    await screen.findByRole('heading', { name: /paid\. now build it/i });
 
-    const total = document.querySelector('.ff-money__amount') as HTMLElement;
-    expect(total.textContent).toBe('US$35.72');
-    expect(screen.getByText(/PROOVD LISTING/)).toBeInTheDocument();
+    const total = document.querySelector('.ff-fee__amount') as HTMLElement;
+    expect(total.textContent).toBe('$35.72');
+    expect(document.body.textContent).toMatch(/whole amount back/i);
+
+    await userEvent.click(screen.getByRole('button', { name: /see what you paid/i }));
+    expect(await screen.findByText(/PROOVD LISTING/)).toBeInTheDocument();
     expect(screen.getByText(LISTING_FEE_LOCKED_AFTER_PAYMENT)).toBeInTheDocument();
     // §31.6, inside the window: the whole amount back, including its tax.
     expect(
@@ -1944,7 +1988,7 @@ describe('the listing fee (20)', () => {
   it('says nothing was charged when Stripe sends somebody back (§30)', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(`${at('fee')}?listing=canceled`);
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await screen.findByRole('heading', { name: /please pay/i });
 
     expect(screen.getByText(LISTING_FEE_CHECKOUT_CANCELED)).toBeInTheDocument();
   });
@@ -1959,8 +2003,8 @@ describe('what Session E moved', () => {
     renderAt(`/campaigns/${CAMPAIGN}/workspace`);
     // The fee page rendered, which is the whole claim — the memory router the
     // suite drives never touches `window.location`.
-    await screen.findByRole('heading', { name: /your listing fee/i });
-    expect(screen.getByText(LISTING_FEE_STILL_LOWERABLE)).toBeInTheDocument();
+    await screen.findByRole('heading', { name: /please pay/i });
+    expect(screen.getByText(payoutSavedLine('$2.00'))).toBeInTheDocument();
   });
 
   it('sends Last look’s All good to Stripe rather than to the fee', async () => {

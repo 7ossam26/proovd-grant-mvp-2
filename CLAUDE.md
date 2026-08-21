@@ -4508,3 +4508,134 @@ which shipped with campaign-page-v2 on 2026-08-18.
   (persisted rows keep the value they were written with; the public page orders by it
   and ties break on insertion, and a burst of writes for a cosmetic ordering is worse
   than the drift), and any test run.
+
+### The listing fee was rebuilt 1:1 from the reference (§13, §24.6, §31.6, §30, Appendix A.5, 2026-08-21)
+
+Screen 20 — `/campaigns/:campaignId/setup/fee` — rebuilt from scratch against the supplied
+reference's `[data-paynow]` (`Proovd Founder Flow v2.dc.html`, `kindWide`) and its screenshot, by
+explicit product direction, on the terms every other 1:1 screen of this flow ships under: the
+reference outranks the design system HERE, and nowhere else. Session E's `.ff-money` surface — a
+token-scale title, a `clamp()` hero, a `dl` of fee lines, a billing panel, a two-button nav row and
+a second screen for the quote — is gone with its markup and its five FeeStep-only CSS rules.
+
+`stageBigHeadIn` and `paySheetIn` in `components/anim.ts` are the two entrances; `FeeStep.tsx` the
+screen; `PHASE 68` the styles; `shared/src/vetting/money.ts` the reference's own copy; and
+`workspace/listing-fee.ts` + `projection.ts` the one derived field. **No migration** — the fee is
+computed from four §6 settings that already exist.
+
+- **The composition is measured, not approximated.** Driven in headless Chrome against the
+  reference at 1320x900, box by box — x, y, w, h, offsetW/H, font, size, weight, line-height,
+  letter-spacing, colour, background, radius, border, padding, margin, display, alignment, shadow,
+  transform. Stage `scale(0.4125)` (= `min(1320/2496, 900/1542) × 0.78`, `pageScale` alone — no
+  branch of `fitStages` names `fee`), a 2220px column, h1 118/900/lh-1/-.035em at y 214.67, the
+  amount 290/900/lh-.9 at y 325.22, the saving 56/900 at y 478.26, a 1130×130 outlined control at
+  554.98, a 1130×150 CTA at 623.46. **Every declared box and every style field is identical**; the
+  only differences anywhere are the two amounts' own digits and the DC runtime's `.sc-interp`
+  wrapper spans, which are its artifact rather than its design. The chrome matches too — BACK is
+  identical on every field, and the top bar differs by exactly the 15px `scrollbar-gutter` the
+  reference reserves (HELP sits 39.59px from the right edge in both).
+- **At 320 the reference does the same thing, and that was checked rather than assumed.** Both
+  report `scale(0.1)` and a 249.6×154.2 stage at the same y. `isClaimPhone()` returns `false` there
+  — "one composition everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+  code and this is what every viewport gets.
+- **The entrance is this flow's one title-FIRST page**, and `verifyIntro` names it by selector:
+  `const bigFirst = !back && !growFirst && root.matches('[data-paynow]')`. The headline opens at
+  `scale(2.2567)` in the middle of the VIEWPORT and travels into place over 1.15s `power2.inOut`,
+  then the four things under it relay in behind it. Sampled frame by frame against the reference:
+  aligned on the tween's own start, every (scale, y) pair matches to four decimals — 2.2132/493.9,
+  2.1656/474.5, 2.0919/444.5, 1.4514/183.8 — the head lands at the same frame, the relay starts
+  +66ms after it in both, and the internal stagger reads fee 0.914 / sub 0.787 / hint 0.556 / cta
+  0.174 there against 0.913 / 0.785 / 0.553 / 0.169 here. On BACK it is the ordinary relay with the
+  head IN the order and the stagger from the END, which is what `!back` makes it there; driven
+  through the voice page's own Back control and sampled.
+- **1.15s exceeds §6.1's `grand` ceiling and is kept**, on the licence `problemIntro` records and
+  `reachIntro`'s `refDur(1)` already takes: it is the one-shot landing of a page title, once per
+  arrival, and rounding it to 0.90 finishes the travel before the eye has followed it.
+- **Every amount is the server's, in the reference's own shape.** The prototype hardcodes
+  `FEE_BASE=35`, `FEE_FLOOR=25`, `FEE_PER=2` and builds three of its five strings from them; all
+  four are §6 settings. The reference's markup is a literal `$` plus `{{ feeNow }}`, so the `$` is
+  copy and the value is `formatUsd`'s — which always renders cents, because a second money format
+  in the product is worse than a hero that reads `$35.00` where the mock reads `$35`.
+- **`Discount $N by completing tasks` is the one line that could not be computed here, and it is
+  the reason for the only backend change.** The reference writes `fee() − FEE_FLOOR`, which equals
+  the remaining discount only while `base − cap` and the floor coincide — they do on the seeded §6
+  numbers and need not after an Admin edits one of the four. `lowestReachableSubtotal` and
+  `remainingDiscount` sit beside §12's own arithmetic in `workspace/listing-fee.ts`, and
+  `remainingDiscountCents` rides the fee payload; `payCanLower` is that number above zero. At the
+  floor the control is ABSENT rather than disabled, which is what `<sc-if>` does there.
+- **`You saved $0 by doing bonus tasks` is DELIBERATELY REINSTATED.** Session E refused that line at
+  zero and rendered `LISTING_FEE_STILL_LOWERABLE` in its place; the 1:1 rebuild reverses it by
+  product direction, because the supplied screenshot shows it and the reference's copy is the
+  specification on these pages. It is true at every value. The retired constant is deleted (an
+  exported string nothing renders ships in every browser), the reversal is recorded on
+  `payoutSavedLine`, and **the two matching `FOUNDER_FLOW_ABSENCES` entries were removed** — that
+  register's own rule: an entry saying an element is absent while a page renders it is worse than no
+  register.
+- **What §13 requires and the composition has no room for is a SHEET, in the reference's own card
+  vocabulary.** `payAndStart` advances a step there; here it opens a charge, and §13 wants a billing
+  address, a real Stripe Tax total, the itemisation, the descriptor and Appendix A.5 verbatim first.
+  Rather than invent a treatment, the sheet is `[data-pay-modal]` from the adjacent `[data-paypick]`
+  screen — 720px, a 3px brand border, a 2px radius, over `rgba(1,63,23,.35)` — entering with its own
+  `payModalIn` tween (`y:18, opacity:0, scale:.97, .34s power3.out`), sampled and confirmed. Nothing
+  this page proved before has moved or been dropped; most of it is one click further in.
+- **Enter still does not advance, and that refusal is unchanged.** `enterAdvance` → `next()` is
+  global there and `ctaState` for `fee` is `{show:true,label:'Pay $35'}` — fine where the one
+  control is a one-line input, and dangerous on a screen with a ZIP field (§30). There is no key
+  handler and no `<form>`, so the browser's own submit-on-Enter has nothing to submit either; driven
+  with a real keystroke and asserted against both the route and the checkout call.
+- **Four defects only measurement could find — and two of them are the same React 19 trap.**
+  StrictMode double-invokes an effect in development, and both entrances read the DOM: the head's
+  second invocation measured it MID-FLIGHT (1082px instead of 479px), so `s` clamped to its 1.3
+  floor and `dx`/`dy` came out zero — a landing that did not travel; and `g.from` takes the current
+  state as its DESTINATION, so the sheet's second call animated y18→y18 and then snapped. Both fixed
+  by clearing the transform before measuring, which makes the numbers the same however many times
+  the effect runs. Third: `paySheetIn` used `autoAlpha`, which sets `visibility: hidden` for the
+  first frame, and **an element that is `visibility: hidden` cannot take focus** — the sheet opened
+  with focus still on `<body>`, outside a dialog claiming `aria-modal`. The reference writes
+  `opacity`, which is both 1:1 and correct. Fourth: the consent ran the card past its own fold and
+  put `Agree and Pay` off-screen, so the sheet became three regions with only the middle scrolling.
+- **A fifth the keyboard walk found: the scrim blocked a POINTER and nothing else.** Tab ran
+  straight through `Pay & Start` behind an `aria-modal` sheet — two competing actions in a payment
+  state, and a claim to a screen reader that was not true. The background is `inert` while the sheet
+  is open, which needs no focus trap and makes the two agree.
+- **The states the reference does not draw.** A failure, §13's two refusals and an uncalculated fee
+  replace the stage with a `StatePanel` — a payment screen showing a hero over a control that will
+  refuse is worse than no hero — and each gained an `h1`, because `StatePanel`'s head is a `<p>` by
+  design and §33.11.2 wants exactly one per surface. It was first drawn at 34px UNDER a 40px panel
+  head, which is the caption-over-the-state inversion Founder Flow Sessions E and F each recorded;
+  it is above it now. `ring` moved to the one of the three a Founder can act on: a restricted
+  account and an unconfigured tax service are Proovd's and both say `No action needed`. The paid
+  state keeps the reference's five slots — headline, amount, line, one quiet control, one loud one —
+  with §24.6's record and §31.6's decision behind `See what you paid` and the §31.6 deadline itself
+  in the chrome, absolutely positioned so it can never move a reference box.
+- **Final measurement: 0 document overflow at 1440, 1320, 1280 and a true 320 on every state,
+  exactly one `h1` on each, and a complete keyboard path where every control is named and every one
+  has a visible focus ring.** Escape closes the sheet and returns focus to the control that opened
+  it. All four hover states are byte-identical to the reference, driven with real pointer events:
+  `scale(1.02)` on the discount control, `#3BDC8C` on the CTA, `#013F17` on BACK, `#E9FFE1` on HELP.
+  With `prefers-reduced-motion` the page renders whole and nothing is staged.
+- **Four contrast findings on the page and all four are the reference's own pairs** — `#41ED98` on
+  `#FAFAFA` at 1.46 for BACK, HELP and the saved line (what `.ff-vc__back`/`.ff-pc__back` already
+  ship on the two screens before this one), and `#FAFAFA` on `#41ED98` at 1.46 for the CTA, which is
+  tech-stack §3.6's documented, scoped brand-fill exception the owner ruling re-recorded. The
+  discount control's `#4E8C67` measures 3.82 at 52px and passes. **What did NOT pass was mine**: the
+  sheet's 14.5px saving lines and 13px controls at 3.82 under a 4.5 requirement, in a block the
+  reference does not draw. Darkened to `#3F7856` (5.07, measured) and scoped to those lines; the
+  reference's own `#4E8C67` stays on the control it belongs to. The sheet's `#7FD9A4` eyebrow at
+  1.63 is that card's own pairing and duplicates a subject the `h2` under it states in ink.
+
+**What this deliberately did not do:** a second refund, checkout or cancellation path; any change to
+`beginListingCheckout`, `applyListingPayment`, the §12 lock or the §31.6 window; a card field of any
+kind (§34 gates live mode on samples mounting none, and Stripe Checkout is where a card is entered);
+an Enter binding; a `US$` prefix on the hero, or a rule that drops the cents when they are zero.
+`.ff-money`, `__title`, `__lede`, `__sub`, `__foot` and `__panel` are still `CreatorPaymentStep`'s
+and `BuildStepPage`'s and are untouched.
+
+**Testing was deliberately partial, at the user's instruction (no test suites).**
+`npm run typecheck` is clean across all three workspaces, and `proovd.css` passes the four scans
+this file has learned to run — 941 balanced comments, 2617/2617 braces, no undefined `var()`, no
+conflict markers. **Not run:** `npm test`, the §33.11 sweep, and axe. The assertions in
+`listing-payment.test.tsx` (13) and `founder-flow.test.tsx`'s fee block were updated to the rebuilt
+surface with dated comments — every fact they prove is preserved, including Appendix A.5 compared
+byte-for-byte against the Spec — but **they have not been executed**, and that is an open item
+rather than a skipped one.

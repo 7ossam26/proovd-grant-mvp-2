@@ -4716,36 +4716,13 @@ html.no-motion .ff-prob__rail { transition: none; }
   font-size: 0.9375rem;
 }
 
-/* Screen 20's hero. The reference sets 290px on a 2496px stage; this is the
-   same proportion of a real viewport, floored so it stays a hero on a phone. */
-.ff-money__amount {
-  margin: 0;
-  font-size: clamp(3.5rem, 14vw, 8rem);
-  line-height: 0.9;
-  letter-spacing: -0.045em;
-  font-weight: 900;
-  color: var(--dark);
-}
-/* After payment the number is a record rather than an ask, so it stops
-   shouting — the amount has already left the Founder's account. */
-.ff-money__amount--paid { font-size: clamp(2.5rem, 8vw, 4.5rem); }
-
-/* The saving, in the brand fill. Never rendered at zero. */
-.ff-money__saving {
-  margin: 0;
-  max-width: var(--measure);
-  color: var(--moss);
-  font-weight: 700;
-}
-
-/* Stripe sending somebody back without paying is ordinary, and §30 wants the
-   money fact first. The accent band is the one the toasts already use. */
-.ff-money__canceled {
-  margin: 0;
-  padding: var(--sp-12) var(--sp-16);
-  background: var(--accent-yellow);
-  color: var(--dark);
-}
+/* `.ff-money__amount`, `--paid`, `__saving`, `__canceled`, `__fields` and the
+   whole `.ff-lines` family lived here and went with screen 20's markup when it
+   was rebuilt 1:1 from the reference (PHASE 68, 2026-08-21). They were this
+   page's alone — `.ff-money`, `__title`, `__lede`, `__sub`, `__foot` and
+   `__panel` are still `CreatorPaymentStep`'s and `BuildStepPage`'s and stay.
+   Dead CSS ships in every browser, which is why it is deleted rather than
+   left. */
 
 .ff-money__panel {
   padding-top: var(--sp-24);
@@ -4759,39 +4736,6 @@ html.no-motion .ff-prob__rail { transition: none; }
    rendered full width with its label centred, which reads as a stray line of
    text rather than as a control. Session D's `.tag` lesson, on a button. */
 .ff-money__panel > .btn { align-self: flex-start; }
-.ff-money__fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--sp-16);
-}
-
-/* ── §13's itemisation ────────────────────────────────────────────────────
-   Each earned saving on its own labeled line — not one "discounts" row. The
-   Founder is meant to see which of their own answers earned which. */
-.ff-lines {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-8);
-  padding: var(--sp-16) 0;
-  border-top: 1px solid var(--grey-light);
-  border-bottom: 1px solid var(--grey-light);
-}
-.ff-lines__row,
-.ff-lines__note {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-16);
-}
-.ff-lines dt { margin: 0; color: var(--moss); }
-.ff-lines dd { margin: 0; color: var(--dark); font-variant-numeric: tabular-nums; }
-.ff-lines__row--saving dd { color: var(--moss); }
-.ff-lines__row--total { padding-top: var(--sp-8); border-top: 1px solid var(--grey-light); }
-.ff-lines__row--total dt,
-.ff-lines__row--total dd { color: var(--dark); font-weight: 700; }
-/* Tax before an address exists is a sentence, not a US$0.00 line (§1.4). */
-.ff-lines__note dd { color: var(--moss); font-size: 0.9375rem; text-align: right; }
 
 /* ── Screen 25's Prepare list ─────────────────────────────────────────────
    What STRIPE will ask for. There is no input in this block and no route
@@ -5221,9 +5165,7 @@ html.no-motion .ff-prob__rail { transition: none; }
 @media (max-width: 599.98px) {
   .ff-money__fields { grid-template-columns: 1fr; }
   .ff-prepare { padding: var(--sp-16); }
-  .ff-lines__row,
-  .ff-lines__note { flex-direction: column; gap: var(--sp-4); align-items: flex-start; }
-  .ff-lines__note dd { text-align: left; }
+
 }
 
 /* ── PHASE 34 — Session F: openness, the build, and live ───────────────────
@@ -18021,4 +17963,688 @@ html.no-motion .ff-story__say { transition: none; }
 }
 @media (max-width: 600px) {
   .ff-goal-help { inset: auto 0 0 0; width: 100%; height: 86vh; }
+}
+
+
+/* ══════════════════════ PHASE 68 — screen 20, you’re in / please pay, rebuilt
+   1:1 from the reference (Founder Flow v2, `[data-paynow]` / `kindWide`),
+   2026-08-21.
+
+   Drawn to the supplied reference (`Proovd Founder Flow v2.dc.html`) and
+   measured against it in a real browser at 1320x900, on the terms every other
+   1:1 screen of this flow ships under: the reference outranks the design system
+   HERE, and nowhere else.
+
+   ── This replaces `.ff-money`'s use on the fee page, not `.ff-money` ───────
+   Session E's fee screen shared `.ff-money` with `CreatorPaymentStep` and
+   `BuildStepPage`, which still use it. What went with the old markup is only
+   the four rules nothing else read — `__amount`, `__amount--paid`, `__saving`
+   and `__canceled` — plus the `.ff-lines` family, which was this page's alone.
+   The prefix here is `.ff-fee`: `.ff-pay` is already taken by `.ff-payx` (the
+   Creator-pay explainer) and `.ff-payouts`.
+
+   ── The layout model is the reference's, literally ────────────────────────
+   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
+   scaled to the viewport by `fitStages()`:
+
+       let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
+
+   No branch of that function names `fee`, so this screen takes `pageScale`
+   alone. The component owns the scale and writes the whole transform on mount
+   and on resize; the `scale(0.4125)` below is what renders for the one frame
+   before the layout effect runs, and is the value measured at 1320x900.
+
+   Inside it, a 2220px column centred on the stage, `flex-direction: column;
+   align-items: center`. Every child carries the reference's own pixel value on
+   that stage: an 118px/900/lh-1 headline, 150px to a 290px/900/lh-.9 number,
+   110px to a 56px/900 line, 110px to a 1130x130 outlined control, 36px to a
+   1130x150 CTA. Nothing reflows — the stage scales, which is why the
+   composition is identical at every viewport (§33.11.1).
+
+   `isClaimPhone()` returns `false` in the reference — "one composition
+   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+   code and this composition is what every viewport gets, exactly as there.
+
+   ── The two suspended conventions, as on every 1:1 screen of this flow ────
+     - HEX LITERALS, not tokens. `#FAFAFA`, `#013F17`, `#41ED98`, `#3BDC8C`,
+       `#E9FFE1`, `#4E8C67`, `#7FD9A4`, `#A2AFA8` and `rgba(1,63,23,.35)` are
+       the reference's own; mixing literal and token would leave half the screen
+       able to drift with a token change and half not.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are.
+
+   ── The UA button padding is reproduced, not normalised ───────────────────
+   The reference's two stage buttons set no padding, so Chrome's own `1px 6px`
+   applies and `box-sizing: border-box` (its global `*` rule) takes it out of
+   the declared 1130x130 and 1130x150. Both are stated here rather than reset,
+   because a reset changes where the label sits inside the box.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `body`'s 18px / line-height 1.6 reaches the whole fixed layer — the
+   reference's own body sets a family and a colour and nothing else — so the
+   layer and the stage both reset it. `h1..h6 { margin; line-height:1.18;
+   font-weight:900 }` reaches the headline, `p { margin; max-width: var(
+   --measure) }` reaches every sentence in the sheet, and `label`/`input` carry
+   the design system's field treatment. Every one is overridden here.
+
+   ── The sheet is the reference's OTHER card, borrowed ─────────────────────
+   §13's billing address, Stripe Tax total and Appendix A.5 have no room in this
+   composition. Rather than invent a treatment for them, the sheet is
+   `[data-pay-modal]` from the adjacent `[data-paypick]` screen — 720px, 3px
+   `#41ED98`, radius 2px, over `rgba(1,63,23,.35)`, centred — with `payModalIn`
+   as its entrance. It scrolls internally, so however long the consent runs the
+   card never grows past the viewport.
+
+   ── The blocks the reference does not draw ────────────────────────────────
+   `.ff-fee__note` (the §31.6 deadline, and Stripe's cancelled return) and
+   `.ff-fee__state` (the failure, §13's two refusals, and a fee that has not
+   been calculated). The first is ABSOLUTELY positioned in the chrome, so not
+   one reference box moves for it however long it gets; the second replaces the
+   stage outright, because a payment screen showing a hero over a control that
+   will refuse is worse than no hero.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen, and the reason is not that
+   the reference has none. It has a wordmark and a HELP and it draws them INSIDE
+   the `z-index: 25` fixed layer below. Left in place they would sit under that
+   layer and be unreachable, so both are hidden and both leave the tab order
+   with it. There is no message badge here: the reference draws none, and §30
+   forbids a second control competing for the press in a payment state. */
+.ff[data-flow-page='fee'] .ff__top,
+.ff[data-flow-page='fee'] .ff__badge { display: none; }
+
+/* The reference's `[data-paynow]`. Nothing scrolls. */
+.ff-fee {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* ── The chrome. Its clamps are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-fee__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-fee__back:hover { color: #013F17; }
+/* The reference has no focus treatment anywhere. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11), and it costs the composition nothing. */
+.ff-fee__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-fee__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-fee__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-fee__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-fee__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-fee__help:hover { background: #E9FFE1; }
+.ff-fee__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* ── The stage, and the 2220px column inside it ──────────────────────────── */
+
+.ff-fee__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.4125);
+  transform-origin: center center;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+.ff-fee__column {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2220px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* h1 data-anim="head": margin 0; 118px/900; line-height 1; -.035em; #013F17;
+   text-align center. */
+.ff-fee__head {
+  margin: 0;
+  max-width: none;
+  font-size: 118px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  color: #013F17;
+  text-align: center;
+}
+
+/* span data-anim="fee": margin-top 150px; 290px/900; line-height .9; -.045em.
+
+   A flex item, so the span blockifies and its box is the line box — 261px tall
+   at line-height .9, which is what the reference reports. */
+.ff-fee__amount {
+  margin-top: 150px;
+  font-size: 290px;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  color: #013F17;
+  /* No `white-space: nowrap`, deliberately. It was here as a guard and the
+     field-by-field comparison caught it: the reference reports `text-wrap:
+     wrap` on this span and an amount has no break opportunity in it anyway, so
+     the guard bought nothing and cost a difference. */
+}
+
+/* span data-anim="sub": margin-top 110px; 56px/900; -.02em; #41ED98. */
+.ff-fee__saved {
+  margin-top: 110px;
+  font-size: 56px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #41ED98;
+  /* No `text-align`. The reference sets one on its phone branch and not on
+     this one, and the span is a shrink-to-fit flex item, so `start` is what it
+     computes there. */
+}
+
+/* button data-anim="hint": margin-top 110px; 1130x130; 3px solid #4E8C67;
+   radius 2px; transparent; #4E8C67; 52px/500; -.02em;
+   transition transform .25s cubic-bezier(.22,1,.36,1); hover scale(1.02). */
+.ff-fee__hint {
+  margin-top: 110px;
+  width: 1130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  /* Chrome's own button padding, which the reference inherits. */
+  padding: 1px 6px;
+  border: 3px solid #4E8C67;
+  border-radius: 2px;
+  background: transparent;
+  color: #4E8C67;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 52px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ff-fee__hint:hover { transform: scale(1.02); }
+.ff-fee__hint:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+
+/* button data-anim="cta": margin-top 36px; 1130x150; no border; radius 2px;
+   #41ED98; #FAFAFA; 62px/900; -.02em; inset shadow; hover #3BDC8C. */
+.ff-fee__cta {
+  margin-top: 36px;
+  width: 1130px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 1px 6px;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 62px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-fee__cta:hover { background: #3BDC8C; }
+.ff-fee__cta:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+
+/* ── The pay sheet: [data-pay-modal], borrowed from [data-paypick] ───────── */
+
+.ff-fee__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vw, 40px);
+  background: rgba(1, 63, 23, 0.35);
+}
+
+.ff-fee__sheet {
+  width: min(720px, 86vw);
+  max-height: 100%;
+  box-sizing: border-box;
+  padding: clamp(28px, 3.4vw, 52px) clamp(28px, 3.4vw, 48px);
+  background: #FAFAFA;
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+  font-size: 16px;
+  line-height: normal;
+  /* Nothing scrolls at this level: the card is a three-region column and the
+     middle region is the only thing that moves, so the title stays put and the
+     ONE action never leaves the screen. `overflow: hidden` here is what stops a
+     long consent pushing the pay control below the card's own fold — which is
+     what happened before the boxes were measured. */
+  overflow: hidden;
+}
+
+/* The three regions. */
+.ff-fee__sheet-head { flex: none; }
+.ff-fee__sheet-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-fee__sheet-scroll {
+  /* `min-height: 0` is what lets a flex item shrink below its content, which
+     is what makes `overflow-y` mean anything inside a column flex container. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: clamp(12px, 1.4vw, 18px);
+  scrollbar-width: thin;
+  scrollbar-color: #41ED98 transparent;
+  /* The scroll-shadow: two solid caps that travel WITH the content
+     (`background-attachment: local`) sitting over two fixed shadows, so an edge
+     darkens only while there is something past it. A payment sheet whose
+     consent runs on with no sign that it does is a consent somebody stops
+     reading, and a scrollbar alone is 6px of grey in the corner. */
+  background:
+    linear-gradient(#FAFAFA 40%, rgba(250, 250, 250, 0)) top / 100% 22px no-repeat,
+    linear-gradient(rgba(250, 250, 250, 0), #FAFAFA 60%) bottom / 100% 22px no-repeat,
+    radial-gradient(farthest-side at 50% 0, rgba(1, 63, 23, 0.14), rgba(1, 63, 23, 0)) top / 100% 11px no-repeat,
+    radial-gradient(farthest-side at 50% 100%, rgba(1, 63, 23, 0.14), rgba(1, 63, 23, 0)) bottom / 100% 11px no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Its eyebrow: clamp(11px,1vw,14px)/900; .16em; uppercase; #7FD9A4. */
+.ff-fee__eyebrow {
+  font-size: clamp(11px, 1vw, 14px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7FD9A4;
+}
+
+/* Its paragraph treatment, on the heading this sheet needs and it does not. */
+.ff-fee__sheet-title {
+  margin: clamp(20px, 2.2vw, 30px) 0 0;
+  max-width: none;
+  font-size: clamp(18px, 1.8vw, 26px);
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+
+.ff-fee__sheet-body {
+  margin: clamp(12px, 1.4vw, 18px) 0 0;
+  max-width: none;
+  font-size: clamp(14px, 1.2vw, 17px);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: #013F17;
+}
+
+.ff-fee__sheet-fine--centred { text-align: center; }
+.ff-fee__sheet-fine {
+  margin: clamp(12px, 1.4vw, 18px) 0 0;
+  max-width: none;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 500;
+  line-height: 1.55;
+  /* A sentence that states a rule about money is not a caption: #A2AFA8 is the
+     reference's own quiet grey and it is under AA on #FAFAFA, so what a Founder
+     has to ACT on takes the ink instead (the rule PHASE 45 and 46 each
+     recorded). */
+  color: #013F17;
+  text-align: left;
+  align-self: stretch;
+}
+
+/* ── The itemisation ─────────────────────────────────────────────────────── */
+
+.ff-fee__lines {
+  margin: clamp(20px, 2.2vw, 30px) 0 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.ff-fee__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: clamp(13px, 1.1vw, 16px);
+  line-height: 1.45;
+}
+.ff-fee__line dt {
+  margin: 0;
+  font-weight: 500;
+  color: #013F17;
+}
+.ff-fee__line dd {
+  margin: 0;
+  font-weight: 700;
+  color: #013F17;
+  font-variant-numeric: tabular-nums;
+  /* An amount is one unbreakable token. */
+  white-space: nowrap;
+}
+/* `#3F7856`, not the reference's `#4E8C67`, and only here.
+
+   `#4E8C67` is the reference's own and it stays on `.ff-fee__hint`, where it is
+   52px and measures 3.82:1 — over AA's 3.0 for large text. These are 14.5px
+   lines in a block the reference does not draw at all, so 3.82 is under the
+   4.5 they need, and one of them is the amount a saving took off. Darkened to
+   5.07:1, measured. The eyebrow above keeps the reference's own `#7FD9A4`
+   (1.63:1): it is that card's own pairing and it duplicates a subject the
+   `h2` under it states in ink. */
+.ff-fee__line--saving dt,
+.ff-fee__line--saving dd { color: #3F7856; }
+.ff-fee__line--total {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 2px solid #E9FFE1;
+}
+.ff-fee__line--total dt,
+.ff-fee__line--total dd { font-weight: 900; }
+/* Not an amount: a sentence in the amount's column, so it does not read as
+   one and does not need the tabular figures. */
+.ff-fee__pending { font-weight: 500 !important; white-space: normal !important; }
+
+/* ── The two billing fields ──────────────────────────────────────────────── */
+
+.ff-fee__fields {
+  margin-top: clamp(20px, 2.2vw, 30px);
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.ff-fee__label {
+  display: block;
+  margin: 0;
+  padding: 0;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(11px, 0.95vw, 13px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  /* A field label at 12px. Same reason again. */
+  color: #3F7856;
+}
+.ff-fee__label + .ff-fee__input { margin-bottom: 10px; }
+.ff-fee__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border: 2px solid #4E8C67;
+  border-radius: 2px;
+  background: #FAFAFA;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(15px, 1.3vw, 18px);
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+.ff-fee__input::placeholder { color: #A2AFA8; opacity: 1; }
+.ff-fee__input:focus-visible { outline: 3px solid #013F17; outline-offset: 3px; }
+
+/* §28.4's own unchecked control keeps the design system's Option treatment —
+   the reference has no equivalent to reproduce, and a hand-drawn checkbox is
+   the one place in this file where reproducing nothing would cost real ARIA. */
+.ff-fee__option {
+  margin-top: clamp(18px, 2vw, 26px);
+  align-self: stretch;
+  text-align: left;
+}
+
+/* ── Appendix A.5, verbatim ──────────────────────────────────────────────── */
+
+.ff-fee__consent {
+  margin-top: clamp(20px, 2.2vw, 30px);
+  align-self: stretch;
+  padding: clamp(16px, 1.8vw, 24px);
+  border: 2px solid #E9FFE1;
+  border-radius: 2px;
+  background: #FFFFFF;
+  text-align: left;
+  /* A.5's nine paragraphs sit in the sheet's own scrolling region rather than
+     in a second scroller inside it. Two nested scroll boxes is one too many on
+     a payment screen: a person can be scrolling the wrong one and think the
+     consent has ended. */
+  flex: none;
+}
+.ff-fee__consent-body {
+  margin: 0;
+  max-width: none;
+  /* The Appendix's own paragraph breaks, preserved. */
+  white-space: pre-line;
+  font-size: clamp(12px, 1.05vw, 15px);
+  font-weight: 500;
+  line-height: 1.55;
+  color: #013F17;
+}
+
+/* ── The sheet's controls ────────────────────────────────────────────────── */
+
+.ff-fee__sheet-cta {
+  margin-top: clamp(24px, 2.6vw, 34px);
+  width: 100%;
+  min-height: clamp(52px, 5vw, 68px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(16px, 1.5vw, 22px);
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-fee__sheet-cta:hover { background: #3BDC8C; color: #FAFAFA; }
+.ff-fee__sheet-cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+.ff-fee__sheet-cta:disabled { opacity: 0.45; cursor: default; }
+
+.ff-fee__sheet-back,
+.ff-fee__sheet-close {
+  margin-top: clamp(12px, 1.4vw, 18px);
+  padding: 8px 14px;
+  min-height: 40px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  /* Same reason as the saving lines: 13px controls need 4.5:1 and the
+     reference's own green gives 3.82 at this size. */
+  color: #3F7856;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(12px, 1vw, 14px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-fee__sheet-back:hover,
+.ff-fee__sheet-close:hover { color: #013F17; }
+.ff-fee__sheet-back:focus-visible,
+.ff-fee__sheet-close:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-fee__sheet-back:disabled { opacity: 0.45; cursor: default; }
+
+.ff-fee__error {
+  margin-top: clamp(16px, 1.8vw, 22px);
+  align-self: stretch;
+  padding: clamp(12px, 1.4vw, 18px);
+  border: 2px solid #013F17;
+  border-radius: 2px;
+  background: #F7FF9E;
+  text-align: left;
+}
+.ff-fee__error p {
+  margin: 0;
+  max-width: none;
+  font-size: clamp(12px, 1.05vw, 15px);
+  font-weight: 500;
+  line-height: 1.5;
+  color: #013F17;
+}
+.ff-fee__error p + p { margin-top: 6px; }
+
+/* ── The two blocks the reference does not draw ──────────────────────────── */
+
+/* Absolutely positioned, so however long it gets it cannot move one box of the
+   composition — the stage is a fixed rhythm and a line inside it would push the
+   CTA down at every viewport. */
+.ff-fee__note {
+  position: absolute;
+  left: 50%;
+  top: clamp(76px, 7vw, 104px);
+  transform: translateX(-50%);
+  z-index: 6;
+  margin: 0;
+  width: min(90vw, 48rem);
+  max-width: none;
+  text-align: center;
+  font-size: clamp(12px, 1vw, 15px);
+  font-weight: 500;
+  line-height: 1.45;
+  color: #013F17;
+}
+
+.ff-fee__state {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 34rem);
+  margin: 0;
+  max-width: none;
+  color: #013F17;
+}
+/* §33.11.2 wants exactly one `h1` per surface and `StatePanel`'s own head is a
+   `<p>` — it is a panel, not a page. Sized between the reference's furniture
+   and its stage so a state reads as this page in a different condition rather
+   than as a different product. */
+.ff-fee__state-title {
+  margin: 0 0 clamp(16px, 1.8vw, 24px);
+  max-width: none;
+  /* Above `state-panel__head`'s 40px, deliberately. Measured at 1320 the
+     first draft rendered the `h1` at 34px UNDER a 40px panel head, so the
+     title read as a caption over the state — the inversion Founder Flow
+     Sessions E and F each recorded on a different screen. */
+  font-size: clamp(34px, 3.6vw, 52px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #013F17;
+  text-align: center;
+}
+.ff-fee__state .wrap { width: 100%; }
+.ff-fee__state .section { padding-block: 0; }
+.ff-fee__state .measure { max-width: none; }
+
+/* ══════════════════════════════════════════ PHASE 68 — RESPONSIVE ══
+   The reference's own one media query for this screen, and it is not a reflow:
+   the stage is one composition at every width and scales to it.
+
+       @media (max-width:600px){[data-back]{bottom:92px !important;padding:8px 14px !important;}}
+
+   What moves is the furniture, which was never on the stage. */
+@media (max-width: 600px) {
+  .ff-fee__back { bottom: 92px; padding: 8px 14px; }
 }

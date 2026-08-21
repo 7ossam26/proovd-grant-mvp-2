@@ -605,20 +605,18 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
       'Three of the eight are §9 answers, and §9 locks them at submission — the route that wrote them is behind the draft token the claim just invalidated. So the first three cards render what was submitted and offer nothing, and the five optional ones open. An edit control that cannot work is worse than none.',
     specRef: '§9, §10, §1.4',
   },
-  {
-    element:
-      'The listing-fee screen’s `You saved $0 by doing bonus tasks`, rendered when nothing was completed',
-    absentBecause:
-      'The walk found the prototype renders that line at zero. Telling somebody who did none of the optional answers that they saved nothing is worse than silence — it reads as a report that the work is not worth doing, on the screen where they can still do it. The savings line renders only when there is a saving; otherwise `LISTING_FEE_STILL_LOWERABLE` says the same beat forward.',
-    specRef: '§1.4, DNA §5.4',
-  },
-  {
-    element:
-      'The listing-fee screen’s `Discount $10 by completing tasks` — the remaining discount, derived in the browser as `fee() − FEE_FLOOR`',
-    absentBecause:
-      'A second implementation of the fee, in a React component, is Phase 09’s named trap: it is how the preview and the charge diverge. The screen says how many optional answers are still open and what each one is worth — a count and a per-item amount the server sent — and never a total this browser worked out. It is also more accurate: the reference’s subtraction only equals the remaining discount because its three constants happen to line up, and §6 lets an operator change any of them.',
-    specRef: '§6, §12, §24.6',
-  },
+  /* Two entries stood here — the listing fee’s `You saved $0 by doing bonus
+     tasks` and its `Discount $10 by completing tasks` — and both are REMOVED
+     (2026-08-21), because screen 20 was rebuilt 1:1 from the reference and both
+     lines now render. The register’s own rule, recorded above: an entry saying
+     an element is absent while a page renders it is worse than no register.
+
+     What the second entry was protecting is intact and is the reason it could
+     go: the discount is still not derived in the browser. `fee() − FEE_FLOOR`
+     is the reference’s cap and floor coinciding rather than the rule, so the
+     amount comes from the server as `remainingDiscountCents`
+     (`workspace/listing-fee.ts`, `lowestReachableSubtotal`). The reversal of
+     the first is recorded on `payoutSavedLine`. */
   {
     element:
       'The `Saved $2` pulse toast on the listing-fee screen, firing when a bonus answer lands',

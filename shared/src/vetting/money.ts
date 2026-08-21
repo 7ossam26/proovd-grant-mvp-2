@@ -84,17 +84,54 @@ export const PAYOUTS_BEFORE_FEE =
 
 /* ── Screen 20: the listing fee ───────────────────────────────────────────── */
 
+/* ── Screen 20's own copy, rebuilt 1:1 from the reference (2026-08-21) ─────
+   The prototype builds three of the five stage strings from `FEE_BASE`,
+   `FEE_FLOOR` and `FEE_PER`:
+
+     paySavedText   : 'You saved $'+(FEE_BASE-fee())+' by doing bonus tasks'
+     payDiscountText: 'Discount $'+(fee()-FEE_FLOOR)+' by completing tasks'
+     the hero       : '$'+fee()
+
+   The sentences are the reference's copy and ship verbatim; the amounts are
+   the server's, because all four of its constants are §6 settings (Phase 06:
+   "a hardcoded duration is a bug even when the number is right"). Each takes
+   an ALREADY-FORMATTED amount — no function here does arithmetic, and none
+   takes cents, so there is nothing in this file for a later session to
+   subtract. */
+
 /**
- * Rendered where the reference renders `You saved $0 by doing bonus tasks`.
+ * `paySavedText`. The reference's own sentence, at whatever the saving is.
  *
- * The walk found the prototype renders that line at zero, which tells somebody
- * who did none of the optional answers that doing them saved nothing. This is
- * the same beat said forward: what is still available, as a COUNT of answers
- * and the per-answer amount the server sends — never a total this browser
- * worked out (`founder-flow-v2.md` E2, Phase 09's rule).
+ * DELIBERATELY INVERTED (2026-08-21). Session E refused this line at zero —
+ * "telling somebody who completed none of the optional answers that they saved
+ * nothing is the report they least need on the screen where they can still
+ * change it" — and rendered {@link LISTING_FEE_STILL_LOWERABLE} in its place.
+ * That was a judgement rather than a Spec rule, and the 1:1 rebuild reverses
+ * it by product direction: the supplied screenshot shows `You saved $0 by
+ * doing bonus tasks` and the reference's copy is the specification on these
+ * pages. The sentence is true at every value, and what a Founder can still do
+ * about it is the line immediately below it.
  */
-export const LISTING_FEE_STILL_LOWERABLE =
-  'You can still bring this down. Each optional answer you complete takes the listing fee lower, right up until you pay.';
+export const payoutSavedLine = (savedAmount: string): string =>
+  `You saved ${savedAmount} by doing bonus tasks`;
+
+/**
+ * `payDiscountText`, on the control that goes back to Last look.
+ *
+ * The amount is the server's `remainingDiscountCents`, not `subtotal − floor`:
+ * §12 applies a cap AND a floor, and the reference's subtraction is those two
+ * coinciding on its own three constants rather than the rule
+ * (`workspace/listing-fee.ts`, `lowestReachableSubtotal`).
+ */
+export const payoutDiscountLine = (remainingAmount: string): string =>
+  `Discount ${remainingAmount} by completing tasks`;
+
+/* `LISTING_FEE_STILL_LOWERABLE` stood here and is DELETED (2026-08-21). It was
+   Session E's replacement for the reference's `You saved $0 by doing bonus
+   tasks`; the 1:1 rebuild reinstates that line by product direction, so this
+   had no renderer left, and an exported string nothing renders is dead code
+   that ships in every browser. The reversal is recorded on `payoutSavedLine`.
+   {@link LISTING_FEE_AT_THE_FLOOR} stays — it is rendered on the pay sheet. */
 
 /**
  * Rendered once the five are in.
@@ -135,3 +172,42 @@ export const LISTING_FEE_LOCKED_AFTER_PAYMENT =
  */
 export const LISTING_FEE_CHECKOUT_CANCELED =
   'You came back without paying, and nothing was charged. Your campaign and every answer are exactly as you left them.';
+
+/* ── The pay sheet: what the reference has no room for ────────────────────
+   The reference's `payAndStart` advances a step. Ours opens a charge, and §13
+   requires a billing address, a real Stripe Tax total, the itemisation, the
+   descriptor and Appendix A.5 verbatim before anybody agrees to anything.
+
+   None of that fits the fee screen's composition, and putting it there would
+   change the one thing this rebuild exists to reproduce. So it is a sheet over
+   the stage, drawn in the reference's OWN card vocabulary — `[data-pay-modal]`
+   on the adjacent `[data-paypick]` screen: a 720px card, a 3px brand border, a
+   2px radius, over a `rgba(1,63,23,.35)` scrim, entering with its `payModalIn`
+   tween. Borrowed rather than invented, which is what keeps a screen the
+   reference does not draw inside its design language. */
+
+/** The sheet's eyebrow, in the reference's `Upfront fee` slot. */
+export const PAY_SHEET_EYEBROW = 'Listing fee';
+
+/**
+ * Above the two billing fields.
+ *
+ * A.5 names an exact `US$[TOTAL]`, and an exact total needs an address to tax
+ * against. Asking for one without saying why, on a payment screen, reads as
+ * data collection for its own sake — {@link LISTING_FEE_ADDRESS_FIRST} says it
+ * on the sheet the address is asked on.
+ */
+export const PAY_SHEET_ADDRESS_HEAD = 'Where are you billed?';
+
+/**
+ * On the first step of the sheet, under the one control.
+ *
+ * §30: a payment state says what the control does to the money. This one does
+ * nothing to it, and somebody who has just pressed `Pay & Start` is owed that
+ * before they type a postcode.
+ */
+export const PAY_SHEET_NOTHING_CHARGED_YET =
+  'Nothing is charged by this. It works out your sales tax so we can show you the exact total to agree to.';
+
+/** The sheet's second step, above the itemisation. */
+export const PAY_SHEET_TOTAL_HEAD = 'Your total';

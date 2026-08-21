@@ -36,6 +36,7 @@ import {
 import { loadWorkspaceRows, type WorkspaceRows } from './service.js';
 import { readInterviewConfiguration, readBookingHistory } from './interview.js';
 import { OPTIONAL_ITEM_KEYS, type OptionalItemKey } from './registry.js';
+import { remainingDiscount } from './listing-fee.js';
 
 /* ── Shared shapes ────────────────────────────────────────────────────────── */
 
@@ -63,6 +64,18 @@ export interface FeeView {
   discountLines: Array<{ item: OptionalItemKey; discountCents: string }>;
   discountCents: string;
   subtotalCents: string;
+  /**
+   * What completing the remaining optional answers would still take off.
+   *
+   * The fee screen renders the reference's own `Discount $N by completing
+   * tasks` from this, and shows the control at all only while it is above zero.
+   * It is derived here rather than in the browser because §12 applies BOTH a
+   * cap and a floor: `subtotal − floor` equals it only while `base − cap` and
+   * the floor coincide, which they do on the seeded §6 numbers and need not
+   * after an Admin edits one of the four (`listing-fee.ts`,
+   * `lowestReachableSubtotal`).
+   */
+  remainingDiscountCents: string;
   calculatedAt: string | null;
   /** True once Phase 11 has charged this calculation. */
   locked: boolean;
@@ -131,6 +144,10 @@ async function feeView(db: Database, campaignId: string): Promise<FeeView | null
     discountLines: (latest.discountLines as Array<{ item: OptionalItemKey; discountCents: string }>) ?? [],
     discountCents: latest.discountCents.toString(),
     subtotalCents: latest.subtotalCents.toString(),
+    // From the four §6 values STORED on the calculation, not the ones in force
+    // now: a settings change after the fee was computed must not move the
+    // number a Founder is looking at (§29.6's rule, on a smaller clock).
+    remainingDiscountCents: remainingDiscount(latest, latest.subtotalCents).toString(),
     calculatedAt: latest.calculatedAt.toISOString(),
     locked: latest.lockedAt !== null,
     separateStreamNote: SEPARATE_STREAM_NOTE,

@@ -1973,6 +1973,197 @@ export function stageFlourishIn(root: HTMLElement | null): () => void {
 }
 
 /**
+ * Screen 20 — the listing fee's entrance, which is the flow's one title-FIRST
+ * page. Rebuilt 1:1 from the reference's `[data-paynow]`, 2026-08-21.
+ *
+ * `verifyIntro` picks this branch for exactly one screen, by name:
+ *
+ *     const bigFirst = !back && !growFirst && root.matches('[data-paynow]');
+ *     const bigHead  = bigFirst ? root.querySelector('[data-anim="head"]') : null;
+ *     if (bigHead) {
+ *       const rest = els.filter(e => e !== bigHead);
+ *       const go = () => { if(ran)return; ran=true; g.fromTo(rest,{x:150*d,opacity:0},
+ *         {x:0,opacity:1,duration:.62,ease:'power3.out',force3D:true,
+ *          stagger:{each:.085,from:'start'},clearProps:'transform,opacity'}); };
+ *       g.set(rest,{opacity:0});
+ *       const r  = bigHead.getBoundingClientRect();
+ *       const ps = bigHead.offsetWidth ? r.width/bigHead.offsetWidth : 1;
+ *       const dx = (window.innerWidth /2 - (r.left + r.width /2))/ps;
+ *       const dy = (window.innerHeight/2 - (r.top  + r.height/2))/ps;
+ *       const s  = Math.min(2.4, Math.max(1.3, (window.innerWidth*.82)/Math.max(1,r.width)));
+ *       g.fromTo(bigHead,{x:dx,y:dy,scale:s,opacity:0},
+ *         {x:0,y:0,scale:1,opacity:1,duration:1.15,ease:'power2.inOut',force3D:true,
+ *          transformOrigin:'50% 50%',clearProps:'transform',onComplete:go});
+ *       this.later(go,1400);
+ *     }
+ *
+ * So the headline opens large in the middle of the VIEWPORT, travels and
+ * shrinks into its real place over 1.15s, and only then do the number, the
+ * saving, the discount control and the CTA relay in behind it. Its own comment:
+ * "the headline opens big in the middle of the screen, shrinks into its real
+ * place, then everything else relays in behind it."
+ *
+ * ── The three numbers that are read rather than written ────────────────────
+ * `ps` is the STAGE's scale, recovered from the ratio of the laid-out width to
+ * the offset width — the element sits inside a `scale(0.41)` stage, so a
+ * viewport-space delta has to be divided by it before GSAP applies it in the
+ * element's own space. `dx`/`dy` centre it on the viewport, not on the stage.
+ * `s` is capped at 2.4 and floored at 1.3 so the title is legible at a narrow
+ * width and does not run off the edge at a wide one. All three are computed at
+ * mount from the real box, which is why nothing here is a magic number.
+ *
+ * ── 1.15s exceeds §6.1's `grand` and is kept ──────────────────────────────
+ * The one-shot landing of a page title, once per arrival, on the same licence
+ * `problemIntro` records and `reachIntro`'s `refDur(1)` count already takes.
+ * Rounding it to 0.90 makes the travel and the scale finish before the eye has
+ * followed them, which is the beat the whole entrance is. §6.1's phone factor
+ * still applies, through the same `t()` every other helper uses.
+ *
+ * ── On BACK it is an ordinary relay, head included ─────────────────────────
+ * `bigFirst` is `!back && …`, so on a back navigation the caller uses
+ * {@link stageRelayIn} with the head IN the order and `from: 'end'`. Replaying
+ * the landing on the way back would re-introduce a page somebody is leaving.
+ *
+ * `order` is the reference's own `els` sequence out of `verifyIntro`'s fixed
+ * list, passed rather than read from the DOM because the 0.085s stagger follows
+ * THAT order. The head is filtered out of it here, exactly as `rest` is there.
+ */
+export function stageBigHeadIn(
+  root: HTMLElement | null,
+  order: readonly string[],
+): () => void {
+  const g = gsap();
+  if (!g || !root || !motionLive()) return () => {};
+
+  const head = root.querySelector<HTMLElement>('[data-stage-anim="head"]');
+  const rest = order
+    .map((name) => root.querySelector<HTMLElement>('[data-stage-anim="' + name + '"]'))
+    .filter((el): el is HTMLElement => !!el && el !== head);
+  if (!head || !rest.length) return () => {};
+
+  let ran = false;
+  const go = () => {
+    if (ran) return;
+    ran = true;
+    g.fromTo(
+      rest,
+      { x: 150, autoAlpha: 0 },
+      {
+        x: 0,
+        autoAlpha: 1,
+        duration: refDur(0.62), // between slow 0.60 and grand 0.90
+        ease: ease('out'), // power3.out
+        force3D: true,
+        stagger: { each: refDur(0.085), from: 'start' },
+        clearProps: 'transform,opacity,visibility',
+        overwrite: 'auto',
+      },
+    );
+  };
+
+  g.killTweensOf(rest);
+  g.killTweensOf(head);
+  // Measure from the UNTWEENED box. React 19's StrictMode double-invokes an
+  // effect in development, and without this the second invocation measures the
+  // head mid-flight — 1082px wide instead of 479px — so `s` clamps to its 1.3
+  // floor and `dx`/`dy` come out as zero, which is a landing that does not
+  // travel. The reference's own function runs once and never meets it; this is
+  // the same numbers computed from the same box however many times it runs.
+  g.set(head, { clearProps: 'transform' });
+  g.set(rest, { autoAlpha: 0 });
+
+  const box = head.getBoundingClientRect();
+  const scale = head.offsetWidth ? box.width / head.offsetWidth : 1;
+  const dx = (window.innerWidth / 2 - (box.left + box.width / 2)) / (scale || 1);
+  const dy = (window.innerHeight / 2 - (box.top + box.height / 2)) / (scale || 1);
+  const from = Math.min(2.4, Math.max(1.3, (window.innerWidth * 0.82) / Math.max(1, box.width)));
+
+  g.fromTo(
+    head,
+    { x: dx, y: dy, scale: from, autoAlpha: 0 },
+    {
+      x: 0,
+      y: 0,
+      scale: 1,
+      autoAlpha: 1,
+      duration: refDur(1.15), // the reference's own; see the note above
+      ease: ease('move'), // power2.inOut
+      force3D: true,
+      transformOrigin: '50% 50%',
+      clearProps: 'transform',
+      overwrite: 'auto',
+      onComplete: go,
+    },
+  );
+
+  // The reference's own `this.later(go, 1400)`: a dropped `onComplete` would
+  // otherwise leave four elements at opacity 0 with a working keyboard path,
+  // which is the worst failure this page has because nothing looks broken.
+  const late = window.setTimeout(go, 1400);
+  // And its `this.later(clearProps, 3400)` — `stageRelayIn`'s stuck sweep, for
+  // the same reason: the runtime's 3s force-reveal only registers
+  // `[data-reveal]`, and these are staged by an inline `fromTo`.
+  const sweep = window.setTimeout(() => {
+    for (const el of [head, ...rest]) {
+      if (Number(getComputedStyle(el).opacity) < 0.9) {
+        g.set(el, { clearProps: 'transform,opacity,visibility' });
+      }
+    }
+  }, 3400);
+
+  return () => {
+    window.clearTimeout(late);
+    window.clearTimeout(sweep);
+    g.killTweensOf([head, ...rest]);
+    // A killed tween leaves its last frame on the element; the next run has to
+    // measure a real box, and anything that unmounted mid-flight must not be
+    // left half-scaled and invisible.
+    g.set([head, ...rest], { clearProps: 'transform,opacity,visibility' });
+  };
+}
+
+/**
+ * The pay sheet's entrance — the reference's own `payModalIn`, verbatim:
+ *
+ *     g.from(el, {y:18, opacity:0, scale:.97, duration:.34,
+ *                 ease:'power3.out', clearProps:'transform,opacity'});
+ *
+ * It belongs to `[data-paypick]`'s card rather than to the fee screen, and it
+ * is reused here because the sheet is that card: §13's billing address, tax
+ * total and Appendix A.5 have no room in the fee screen's composition, so they
+ * open in the reference's own modal vocabulary rather than in one invented for
+ * them. `Modal`'s shared `animateModalOpen` is deliberately not used — this is
+ * a 1:1 screen and its card has its own tween.
+ */
+export function paySheetIn(el: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !el || !motionLive()) return;
+  g.killTweensOf(el);
+  // Reset before measuring, for `stageBigHeadIn`'s reason and with a worse
+  // symptom: `g.from` takes the element's CURRENT state as its DESTINATION, so
+  // under React 19's StrictMode double-invoke the second call found the first
+  // call's from-state and animated y18→y18 — a card that sat still for 340ms
+  // and then snapped into place. Sampled frame by frame, not noticed by eye.
+  g.set(el, { clearProps: 'transform,opacity' });
+  g.from(el, {
+    y: 18,
+    // `opacity`, not `autoAlpha` — the reference's own property, and the
+    // difference is load-bearing here rather than stylistic. `autoAlpha` sets
+    // `visibility: hidden` for the first frame, and an element that is
+    // `visibility: hidden` cannot take focus: the sheet opened with focus
+    // still on `<body>`, so a keyboard user was left outside a dialog that
+    // claimed `aria-modal`. Found by tracing `document.activeElement`.
+    opacity: 0,
+    scale: 0.97,
+    duration: refDur(0.34), // between quick 0.20 and base 0.35
+    ease: ease('out'), // power3.out
+    transformOrigin: '50% 50%',
+    clearProps: 'transform,opacity',
+    overwrite: 'auto',
+  });
+}
+
+/**
  * Screen 15 — Last look's entrance, which is the flow's one headline-first page.
  *
  * REBUILT 2026-08-20 to the supplied reference's `[data-lastlook]`

@@ -16,6 +16,15 @@
  * and Appendix A.5, and neither of those changed address. It now drives the
  * real route through `appRoutes`, which is also what proves the page is
  * reachable at all.
+ *
+ * ── And where the assertions look, since 2026-08-21 ───────────────────────
+ * Screen 20 was rebuilt 1:1 from the reference (`[data-paynow]`), whose whole
+ * composition is a headline, one amount, one line and two controls. §13's
+ * billing address, the Stripe Tax total, the itemisation and Appendix A.5 have
+ * no room in it, so they open in a sheet behind `Pay & Start` — the reference's
+ * own `[data-pay-modal]` card, borrowed from the adjacent screen. Not one fact
+ * this suite proves has moved or been dropped; what changed is that most of
+ * them are two clicks in rather than one. `openPaySheet()` is that step.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -90,6 +99,10 @@ const WORKSPACE_FEE = {
   ],
   discountCents: '400',
   subtotalCents: '3100',
+  // What the three remaining optional answers would still take off. Derived by
+  // the server (§12 applies a cap AND a floor, so it is not `subtotal − floor`)
+  // and rendered by screen 20's discount control.
+  remainingDiscountCents: '600',
   calculatedAt: '2026-08-19T10:00:00.000Z',
   locked: false,
   separateStreamNote:
@@ -149,6 +162,20 @@ function mount(listing: Record<string, unknown>, quote: unknown = QUOTE) {
   return render(<RouterProvider router={router} />);
 }
 
+/**
+ * `Pay & Start` → the sheet §13's requirements live on (2026-08-21).
+ *
+ * The reference's own control advances a step; here it opens a charge, so
+ * everything a person must read before agreeing is on the card it opens.
+ */
+async function openPaySheet(user: ReturnType<typeof userEvent.setup>) {
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: /please pay/i })).toBeInTheDocument(),
+  );
+  await user.click(screen.getByRole('button', { name: /^pay & start/i }));
+  await screen.findByRole('dialog');
+}
+
 /** The A.5 block, straight from the Spec — the same source the shared test uses. */
 function specConsentBody(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -177,7 +204,7 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
     mount(eligible);
     const user = userEvent.setup();
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
+    await openPaySheet(user);
 
     // Tax needs an address, so the total is quoted only after one is given.
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
@@ -205,7 +232,7 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
     mount(eligible);
     const user = userEvent.setup();
 
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
+    await openPaySheet(user);
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
     await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
@@ -231,7 +258,7 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
   it('states the refund promise, the separate 5%, and that a pending proposal is not acceptance', async () => {
     mount(eligible);
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
+    await openPaySheet(user);
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
     await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
@@ -251,19 +278,21 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
   it('offers one payment action, carrying A.5’s exact words and the session URL', async () => {
     mount(eligible);
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
+    await openPaySheet(user);
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
     await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
     const pay = await screen.findByRole('link', { name: 'Agree and Pay US$33.48' });
     expect(pay).toHaveAttribute('href', QUOTE.url);
 
-    // §30: no competing action in a payment state. The flow's Back control
-    // sits beside it and is deliberately `tertiary` — the rule is about a
-    // second thing competing for the press, not about having a way out.
-    const primaries = document.querySelectorAll('.btn--primary');
-    expect(primaries).toHaveLength(1);
-    expect(primaries[0]?.textContent).toContain('Agree and Pay');
+    // §30: no competing action in a payment state. UPDATED 2026-08-21 — the
+    // rebuilt screen uses the reference's own controls rather than `.btn`, so
+    // the fact is asserted where it lives: exactly one filled action inside the
+    // sheet, and the page's own `Pay & Start` unreachable behind it (`inert`).
+    const filled = document.querySelectorAll('.ff-fee__sheet-cta');
+    expect(filled).toHaveLength(1);
+    expect(filled[0]?.textContent).toContain('Agree and Pay');
+    expect(document.querySelector('.ff-fee__page')?.hasAttribute('inert')).toBe(true);
     // Help is not lost by keeping it to one: HELP is in the flow's top bar on
     // every page, which is where §27.1's sixth question is answered.
     expect(screen.getByRole('button', { name: /^help$/i })).toBeInTheDocument();
@@ -272,7 +301,7 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
   it('keeps the newsletter consent unchecked and separate (§28.4)', async () => {
     mount(eligible);
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
+    await openPaySheet(user);
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
     await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
@@ -289,7 +318,7 @@ describe('the pre-payment surface (§13, §33.3.5)', () => {
     // that divergence is the bug the no-arithmetic rule exists to expose.
     mount(eligible, { ...QUOTE, totalCents: '9999' });
     const user = userEvent.setup();
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Your listing fee' })).toBeInTheDocument());
+    await openPaySheet(user);
     await user.type(screen.getByLabelText('Billing ZIP code'), '94105');
     await user.click(screen.getByRole('button', { name: 'Work out my total' }));
 
@@ -314,6 +343,10 @@ describe('states with no path to payment (§13)', () => {
     await waitFor(() =>
       expect(screen.getByText('Payment is not available')).toBeInTheDocument(),
     );
+    // UPDATED 2026-08-21: on the rebuilt screen a §13 refusal replaces the
+    // stage outright rather than sitting under a hero and a Pay control, so
+    // `Pay & Start` is absent too — which is the stronger form of the same rule.
+    expect(screen.queryByRole('button', { name: /Pay & Start/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Work out my total/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Agree and Pay/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Contact support/)).toBeInTheDocument();
@@ -375,15 +408,23 @@ describe('after payment (§24.6, §31.6)', () => {
   it('shows the itemised record and offers the free cancellation while it is open', async () => {
     mount(paid());
 
+    // UPDATED 2026-08-21: the paid state keeps the reference's composition, so
+    // §24.6's itemisation and §31.6's control are behind `See what you paid`.
+    // The hero and the deadline are on the screen itself.
+    const user = userEvent.setup();
     await waitFor(() =>
-      expect(screen.getByText('Your listing fee is paid')).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /paid\. now build it/i })).toBeInTheDocument(),
     );
-    expect(screen.getByText('US$35.00')).toBeInTheDocument();
+    // The hero is the reference's `$` plus the server's amount, and it is the
+    // total charged rather than the base — the one number a Founder came back
+    // for.
+    expect(document.querySelector('.ff-fee__amount')?.textContent).toBe('$35.64');
+
+    await user.click(screen.getByRole('button', { name: /see what you paid/i }));
+    expect(await screen.findByText('US$35.00')).toBeInTheDocument();
     expect(screen.getByText('Story completed')).toBeInTheDocument();
     expect(screen.getByText('US$2.64')).toBeInTheDocument();
-    // Twice by design: the page's own hero keeps the amount after payment, and
-    // §24.6's itemisation states it as the total charged. One field, one value.
-    expect(screen.getAllByText('US$35.64')).toHaveLength(2);
+    expect(screen.getByText('US$35.64')).toBeInTheDocument();
     expect(screen.getAllByText(/PROOVD LISTING/).length).toBeGreaterThanOrEqual(1);
 
     expect(
@@ -401,12 +442,18 @@ describe('after payment (§24.6, §31.6)', () => {
       }),
     );
 
+    const user = userEvent.setup();
     await waitFor(() =>
-      expect(screen.getByText('Your listing fee is paid')).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: /paid\. now build it/i })).toBeInTheDocument(),
     );
+    // Said on the screen as well as on the sheet: after the window §31.6 stops
+    // being an automatic refund, and that is not a fact to keep behind a
+    // control (§27.1).
     expect(screen.getByText(/free cancellation window has closed/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /see what you paid/i }));
     expect(
-      screen.getByRole('button', { name: 'Ask to cancel this campaign' }),
+      await screen.findByRole('button', { name: 'Ask to cancel this campaign' }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Cancel and refund/ }),

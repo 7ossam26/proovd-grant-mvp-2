@@ -219,6 +219,10 @@ const workspace: WorkspaceState = {
     ],
     discountCents: '400',
     subtotalCents: '3100',
+    // Three of the five optional answers are still open, and the server derives
+    // what they would still take off (§12 applies a cap AND a floor, so it is
+    // not `subtotal − floor`). Screen 20's discount control renders it.
+    remainingDiscountCents: '600',
     calculatedAt: '2026-08-03T10:05:00.000Z',
     locked: false,
     separateStreamNote:

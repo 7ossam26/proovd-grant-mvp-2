@@ -94,6 +94,14 @@ export interface FeeState {
   discountLines: Array<{ item: OptionalItemKey; discountCents: string }>;
   discountCents: string;
   subtotalCents: string;
+  /**
+   * What completing the remaining optional answers would still take off.
+   *
+   * Derived on the server (`workspace/listing-fee.ts`), because §12 applies a
+   * cap AND a floor and `subtotal − floor` is the two coinciding rather than
+   * the rule. The fee screen renders it and computes nothing.
+   */
+  remainingDiscountCents: string;
   calculatedAt: string | null;
   locked: boolean;
   /** §24.6. The server owns this sentence — it is a commercial statement. */

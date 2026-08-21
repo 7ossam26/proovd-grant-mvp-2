@@ -66,6 +66,35 @@ export interface ListingFeeResult extends ListingFeeSettings {
 }
 
 /**
+ * The lowest subtotal these settings can ever reach — every optional item done.
+ *
+ * §12 applies a cap and a floor and they are not the same constraint, so the
+ * lowest reachable fee is `max(floor, base − cap)` rather than either one. That
+ * distinction is exactly why this is here and not in the browser: with the
+ * seeded numbers the two coincide (35 − 10 = 25 = the floor), and a surface
+ * that wrote `subtotal − floor` would be right today and silently wrong the
+ * first time an Admin moved one of the four (§6 makes all four editable).
+ */
+export function lowestReachableSubtotal(settings: ListingFeeSettings): bigint {
+  const reduced = settings.baseCents - settings.maxDiscountCents;
+  return reduced < settings.minSubtotalCents ? settings.minSubtotalCents : reduced;
+}
+
+/**
+ * What completing the remaining optional answers would still take off.
+ *
+ * The number the fee screen renders as "Discount $N by completing tasks", and
+ * the reason there is no arithmetic behind that sentence in the browser. Never
+ * negative: a subtotal below the lowest reachable one cannot exist, and if a
+ * settings change ever made it look that way, promising a discount that is not
+ * available is the worse of the two failures.
+ */
+export function remainingDiscount(settings: ListingFeeSettings, subtotalCents: bigint): bigint {
+  const remaining = subtotalCents - lowestReachableSubtotal(settings);
+  return remaining > 0n ? remaining : 0n;
+}
+
+/**
  * Reads the four §6 values in force.
  *
  * `readSettingValue` throws on an unset or unregistered setting rather than
