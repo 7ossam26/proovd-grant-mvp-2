@@ -147,7 +147,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
     }
   }, []);
 
-  const back = () => leaveToPage('last-look', -1);
+  const back = () => leaveToPage('details', -1);
 
   if (payouts.state === 'complete') {
     return (
@@ -379,6 +379,7 @@ function PayoutPrepareItem({ icon, children }: { icon: string; children: ReactNo
     <div className="ff-payout-ref__item">
       <img src={icon} alt="" />
       <span>{children}</span>
+
     </div>
   );
 }

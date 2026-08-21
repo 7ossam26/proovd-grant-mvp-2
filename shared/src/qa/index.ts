@@ -157,6 +157,10 @@ export const PRINCIPAL_FLOWS = [
       '/campaigns/:campaignId/setup/story',
       '/campaigns/:campaignId/setup/socials',
       '/campaigns/:campaignId/setup/review',
+      // Screen 16, added 2026-08-21. On this flow rather than an entry of its
+      // own: it is the same auth regime and the same sweep stub — a Founder
+      // session over one campaign, no connected account and no listing state.
+      '/campaigns/:campaignId/setup/details',
     ],
     keyboardPathRequired: true,
   },

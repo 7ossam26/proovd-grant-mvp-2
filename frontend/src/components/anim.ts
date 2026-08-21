@@ -3080,3 +3080,230 @@ export function voiceSheetIn(
     if (scrim) g.killTweensOf(scrim);
   };
 }
+
+/* ── Screen 16, the DOB calendar (Founder Flow v2, `[data-hello]`, 2026-08-21) ─
+   `dobToggle`, `dobClose`, `dobPick` and `dobPage`, reproduced tween for
+   tween. The one thing that is NOT reproduced is `dobStep`'s day fade: it
+   targets `[data-day]`, which appears nowhere in the reference's markup, so
+   that tween has never run and stepping a month there is an instant swap. A
+   fade added here would be a movement the reference does not make. */
+
+/**
+ * The panel grows out of the field.
+ *
+ *     gsap.set(p,{clearProps:'height,opacity,maxHeight,top'});
+ *     p.style.top='0px';
+ *     const nat=p.offsetHeight; const to=nat; p.style.maxHeight=to+'px';
+ *     gsap.set(rows,{opacity:0});
+ *     gsap.fromTo(p,{height:h0,opacity:1},{height:end,duration:.45,
+ *       ease:'power3.out', onComplete:()=>gsap.set(p,{clearProps:'height'})});
+ *     gsap.to(rows,{opacity:1,duration:.24,stagger:.045,delay:.16});
+ *
+ * `h0` is the FIELD's `offsetHeight` — an unscaled layout pixel, and the panel
+ * lives inside a `scale(2.6)` box, so the two are in different unit spaces.
+ * That is the reference's own arithmetic and it is kept: the number decides
+ * where the growth starts, and changing it would change the movement.
+ *
+ * The lift is the second half of the same beat: a panel whose grown height
+ * would reach past the fold travels up inside the one movement rather than
+ * being repositioned after it.
+ */
+export function dobPanelOpen(
+  panel: HTMLElement | null,
+  field: HTMLElement | null,
+): () => void {
+  const g = gsap();
+  if (!g || !panel) return () => {};
+  const h0 = field?.offsetHeight ?? 56;
+  const rows = Array.from(panel.children);
+
+  if (!motionLive()) {
+    g?.set(rows, { clearProps: 'opacity' });
+    return () => {};
+  }
+
+  g.set(panel, { clearProps: 'height,opacity,maxHeight,top,y' });
+  panel.style.top = '0px';
+  const natural = panel.offsetHeight;
+  panel.style.maxHeight = natural + 'px';
+
+  g.set(rows, { opacity: 0 });
+  g.fromTo(
+    panel,
+    { height: h0, opacity: 1 },
+    {
+      height: natural,
+      duration: refDur(0.45), // between base 0.35 and slow 0.60
+      ease: ease('out'), // power3.out
+      onComplete: () => g.set(panel, { clearProps: 'height' }),
+    },
+  );
+  g.to(rows, {
+    opacity: 1,
+    duration: refDur(0.24), // between quick 0.20 and base 0.35
+    stagger: 0.045,
+    delay: refDur(0.16),
+  });
+
+  // The reference's own `later(...)` backstop: a dropped tween must never
+  // leave the panel clipped to the field's height with its rows invisible.
+  const sweep = window.setTimeout(() => {
+    g.set(panel, { clearProps: 'height' });
+    g.set(rows, { opacity: 1 });
+  }, 900);
+
+  const top = field?.getBoundingClientRect().top ?? 0;
+  const over = top + natural - (window.innerHeight - 12);
+  let lift = 0;
+  if (over > 4) {
+    lift = window.setTimeout(() => g.set(panel, { y: -over }), 900);
+    g.fromTo(panel, { y: 0 }, { y: -over, duration: refDur(0.45), ease: ease('out') });
+  }
+
+  return () => {
+    window.clearTimeout(sweep);
+    if (lift) window.clearTimeout(lift);
+    g.killTweensOf(panel);
+    g.killTweensOf(rows);
+  };
+}
+
+/**
+ * The panel shuts back into the field, and `done` is what unmounts it.
+ *
+ *     gsap.to(p,{height:h0,opacity:0,duration:.24,ease:'power2.in',
+ *       onComplete:shut});
+ *     this.later(()=>{ if(this.state.dobOpen)shut(); },520);
+ *
+ * The 520ms fallback is the reference's, and it exists for the same reason
+ * `pageExit`'s does: a tween in a backgrounded tab does not progress, and
+ * without it the panel would stay open forever. It drives an UNMOUNT and never
+ * a status, so an early fire costs a cut-short fade and nothing else.
+ */
+export function dobPanelClose(
+  panel: HTMLElement | null,
+  field: HTMLElement | null,
+  done: () => void,
+): void {
+  const g = gsap();
+  if (!g || !panel || !motionLive()) {
+    done();
+    return;
+  }
+  let ran = false;
+  const finish = () => {
+    if (ran) return;
+    ran = true;
+    done();
+  };
+  const fallback = window.setTimeout(finish, 520);
+  g.killTweensOf(panel);
+  g.to(panel, {
+    height: field?.offsetHeight ?? 56,
+    opacity: 0,
+    duration: refDur(0.24), // between quick 0.20 and base 0.35
+    ease: ease('exit'), // power2.in
+    onComplete: () => {
+      window.clearTimeout(fallback);
+      finish();
+    },
+  });
+}
+
+/**
+ * The chosen day pops.
+ *
+ *     gsap.fromTo(cell,{scale:.72},{scale:1,duration:.34,ease:'back.out(2)'});
+ *
+ * `back.out(2)` is its own overshoot rather than §6.1's `snap` (`back.out(1.4)`)
+ * — a stronger one, and on a 25px cell the difference is the whole gesture.
+ */
+export function dobCellPop(panel: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !panel || !motionLive()) return;
+  const cell = panel.querySelector<HTMLElement>('[data-cell][data-sel="1"]');
+  if (!cell) return;
+  g.fromTo(
+    cell,
+    { scale: 0.72 },
+    {
+      scale: 1,
+      duration: refDur(0.34), // base 0.35 is the token
+      ease: 'back.out(2)',
+      clearProps: 'transform',
+    },
+  );
+}
+
+/**
+ * A decade page slides its years in.
+ *
+ *     gsap.from(document.querySelectorAll('[data-year]'),
+ *       {x:dir>0?12:-12,opacity:0,duration:.22,stagger:.012,ease:'power2.out'});
+ */
+export function dobYearsPage(panel: HTMLElement | null, direction: 1 | -1): void {
+  const g = gsap();
+  if (!g || !panel || !motionLive()) return;
+  const years = Array.from(panel.querySelectorAll<HTMLElement>('[data-year]'));
+  if (!years.length) return;
+  g.from(years, {
+    x: direction > 0 ? 12 : -12,
+    opacity: 0,
+    duration: refDur(0.22), // between quick 0.20 and base 0.35
+    stagger: 0.012,
+    ease: 'power2.out',
+    clearProps: 'transform,opacity',
+  });
+}
+
+/** `if(box&&window.gsap)gsap.from(box,{opacity:0,duration:.2});` */
+export function dobMonthsFade(box: HTMLElement | null): void {
+  const g = gsap();
+  if (!g || !box || !motionLive()) return;
+  g.from(box, { opacity: 0, duration: refDur(0.2), clearProps: 'opacity' }); // quick 0.20
+}
+
+/**
+ * `dobPlace()` — the month/year swap re-measures the panel in place.
+ *
+ *     gsap.set(p,{clearProps:'height,maxHeight'});
+ *     const nat=p.offsetHeight;
+ *     p.style.maxHeight=Math.min(nat,Math.max(320,window.innerHeight-24))+'px';
+ *     const over=(fTop+Math.min(...))-(window.innerHeight-12);
+ *     gsap.to(p,{y:over>4?-over:0,duration:.28,ease:'power2.out'});
+ *
+ * Year mode is TALLER than day mode, so without this the cap `dobPanelOpen`
+ * set for the day grid survives the swap and clips the year grid — which the
+ * browser pass caught as a missing `Clear` control at the foot of the panel.
+ *
+ * The cap mixes unit spaces exactly as the reference does: `offsetHeight` is
+ * the panel's own layout pixel and `window.innerHeight` is a viewport pixel,
+ * and the panel is inside a `scale(2.6)` box inside the stage. That is its own
+ * arithmetic and it is kept, because it is what decides whether the panel is
+ * capped at all — at every ordinary viewport the natural height wins and the
+ * panel is simply its content, which is what the reference draws.
+ */
+export function dobPanelPlace(
+  panel: HTMLElement | null,
+  field: HTMLElement | null,
+): void {
+  const g = gsap();
+  if (!g || !panel) return;
+  g.set(panel, { clearProps: 'height,maxHeight' });
+  const natural = panel.offsetHeight;
+  const cap = Math.min(natural, Math.max(320, window.innerHeight - 24));
+  panel.style.maxHeight = cap + 'px';
+  if (!motionLive()) return;
+
+  const top = field?.getBoundingClientRect().top ?? 0;
+  const over = top + cap - (window.innerHeight - 12);
+  const lift = over > 4 ? -over : 0;
+  g.to(panel, {
+    y: lift,
+    duration: refDur(0.28), // between quick 0.20 and base 0.35
+    ease: 'power2.out',
+  });
+  // The reference's own settle: a dropped tween must not leave the panel
+  // half-lifted over the control that opened it.
+  window.setTimeout(() => g.set(panel, { y: lift }), 340);
+}

@@ -230,6 +230,31 @@ export const saveWorkspace = (
 ): Promise<{ workspace: WorkspaceState }> =>
   call(`${base(campaignId)}/workspace`, { method: 'PATCH', body: JSON.stringify(patch) });
 
+/* ── Your details (screen 16) ─────────────────────────────────────────────── */
+
+export interface FounderDetails {
+  /** Shown back, never written from that screen. */
+  name: string | null;
+  phone: string | null;
+  /** `YYYY-MM-DD`, or null. A date, never an age. */
+  dateOfBirth: string | null;
+}
+
+export interface FounderDetailsPatch {
+  phone?: string | null;
+  dateOfBirth?: string | null;
+}
+
+export const fetchFounderDetails = (
+  campaignId: string,
+): Promise<{ details: FounderDetails }> => call(`${base(campaignId)}/details`);
+
+export const saveFounderDetails = (
+  campaignId: string,
+  patch: FounderDetailsPatch,
+): Promise<{ details: FounderDetails }> =>
+  call(`${base(campaignId)}/details`, { method: 'PATCH', body: JSON.stringify(patch) });
+
 /* ── Uploads ──────────────────────────────────────────────────────────────── */
 
 export interface PresignedUpload {
@@ -422,6 +447,30 @@ export const cancelListing = (
   });
 
 /* ── The interview ────────────────────────────────────────────────────────── */
+
+/**
+ * Records a chosen slot — `POST .../interview`, Phase 09a.
+ *
+ * The route has existed since Phase 09a, is driven by the backend suite, and
+ * until this screen was rebuilt to the reference it had NO frontend caller at
+ * all: `recordBooking` was reachable only from Admin. It is the SELECTION half
+ * of the two-step model §12 describes — it always writes `selected`, never
+ * `confirmed`, because §12 is explicit that a slot somebody picked and nobody
+ * confirmed does not complete the item. Confirmation still arrives from the
+ * Cal.com webhook or from an Admin reconciling a missed delivery (tech-stack
+ * §12), and nothing on this path can produce it.
+ *
+ * `timezone` is the browser's own IANA zone, because the record stores the
+ * Founder's zone beside the instant and `scheduledAt` alone cannot carry it.
+ */
+export const bookInterview = (
+  campaignId: string,
+  input: { meetingProvider: string; scheduledAt: string; timezone: string },
+): Promise<{ workspace: WorkspaceState }> =>
+  call(`${base(campaignId)}/interview`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 
 export const cancelInterview = (
   campaignId: string,

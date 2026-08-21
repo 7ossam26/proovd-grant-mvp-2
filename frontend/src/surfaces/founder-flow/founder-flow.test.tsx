@@ -1712,7 +1712,7 @@ describe('how you get paid (25)', () => {
     await screen.findByRole('heading', { name: /your listing fee/i });
   });
 
-  it('offers a restricted account a support path and no way to pay', async () => {
+  it('offers a restricted account a support path and no way to PAY', async () => {
     stubMoney({ state: 'restricted', canResume: false, disabledReason: 'rejected.fraud' });
     renderAt(at('payouts'));
     await screen.findByText(/Stripe cannot continue with this account/i);
@@ -1720,8 +1720,17 @@ describe('how you get paid (25)', () => {
     // §13: "no misleading ability to pay the listing fee", and no retry either —
     // looping somebody through onboarding that will fail again is §1.4's
     // failure with a spinner on it.
+    //
+    // DELIBERATELY NARROWED (2026-08-21): this walked every button and refused
+    // the whole vocabulary, which also refused a control that merely LEAVES.
+    // The skip added this day is small, tertiary, sits under the row, and names
+    // no payment — the §13 property is that nothing here offers to pay or to
+    // retry onboarding, not that the page is a dead end. `Skip for now` is
+    // exempted by name so a `Pay now` or a `Resume with Stripe` added later
+    // still fails.
     for (const control of screen.getAllByRole('button')) {
-      const label = (control.textContent ?? '').toLowerCase();
+      const label = (control.textContent ?? '').trim().toLowerCase();
+      if (label === 'skip for now') continue;
       expect(label).not.toMatch(/pay|listing fee|stripe|finish|resume|try again/);
     }
     expect(screen.queryByRole('link', { name: /listing fee/i })).not.toBeInTheDocument();
@@ -1729,10 +1738,16 @@ describe('how you get paid (25)', () => {
     expect(document.body.textContent).not.toContain('rejected.fraud');
   });
 
-  it('offers no way forward while Stripe is still reviewing', async () => {
+  it('offers no PAYMENT while Stripe is still reviewing, and a way past', async () => {
     // `listingFeeEligible` is true only for a COMPLETE account, so the fee page
-    // refuses for this one too — and a control opening a page whose answer we
-    // already know is a refusal is the same §1.4 failure with a happier tone.
+    // refuses for this one too — what §1.4 forbids is a control that IMPLIES
+    // the payment will go through, and screen 20's refusal is a named state
+    // with the way back on it rather than a dead end.
+    //
+    // DELIBERATELY INVERTED (2026-08-21): the second half asserted no forward
+    // control existed at all. What it protected survives as the stronger half —
+    // no visible label anywhere on the page names the listing fee, so nothing
+    // here reads as an offer to pay.
     stubMoney({ state: 'under_review', pendingVerification: ['individual.verification.document'] });
     renderAt(at('payouts'));
     await screen.findByText(/Stripe is checking your details/i);
@@ -1740,6 +1755,13 @@ describe('how you get paid (25)', () => {
     for (const control of screen.getAllByRole('button')) {
       expect((control.textContent ?? '').toLowerCase()).not.toContain('listing fee');
     }
+
+    // The skip names where it goes on its accessible name (§33.11.4) while
+    // keeping the visible label short (WCAG 2.5.3: the name contains it).
+    const skip = screen.getByRole('button', { name: /skip for now to your listing fee/i });
+    expect(skip.textContent?.trim()).toBe('Skip for now');
+    await userEvent.click(skip);
+    await screen.findByRole('heading', { name: /your listing fee/i });
   });
 });
 
