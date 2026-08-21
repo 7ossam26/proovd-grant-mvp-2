@@ -87,6 +87,7 @@ import { InterviewStep } from './surfaces/founder-flow/InterviewStep.js';
 import { StoryStep } from './surfaces/founder-flow/StoryStep.js';
 import { SocialsStep } from './surfaces/founder-flow/SocialsStep.js';
 import { LastLook } from './surfaces/founder-flow/LastLook.js';
+import { DetailsStep } from './surfaces/founder-flow/DetailsStep.js';
 import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
 import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
@@ -896,6 +897,16 @@ const rootChildren: RouteObject[] = [
   {
     path: 'campaigns/:campaignId/setup/review',
     element: <LastLook />,
+  },
+  {
+    /*
+      Screen 16 — Your details. Added 2026-08-21, in the reference's own
+      position: Last look's `allGood` is `{si: I('intake')}`, and `intake` is
+      this page. Stage 3 — it writes the Founder's own account record and needs
+      no `founder_seller` account, so it sits before the money below it.
+    */
+    path: 'campaigns/:campaignId/setup/details',
+    element: <DetailsStep />,
   },
   {
     /*

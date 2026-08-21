@@ -2728,6 +2728,13 @@ export const QA_ROUTES: StubRoute[] = [
 
   /* Founder (§12–§22) */
   { match: /\/api\/founder\/campaigns\/[^/]+\/workspace/, body: { workspace } },
+  // Screen 16 (2026-08-21). A phone already on file and no date of birth, so
+  // the sweep renders the field in both of its two colours — the prompt and a
+  // value — rather than only the empty one.
+  {
+    match: /\/api\/founder\/campaigns\/[^/]+\/details$/,
+    body: { details: { name: 'Ada Okafor', phone: '+1 (415) 555-0134', dateOfBirth: null } },
+  },
   { match: /\/api\/founder\/campaigns\/[^/]+\/listing$/, body: { listing } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/roster$/, body: { roster } },
   { match: /\/api\/founder\/campaigns\/[^/]+\/build$/, body: build },

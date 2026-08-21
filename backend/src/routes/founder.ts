@@ -44,6 +44,11 @@ import type { Auth } from '../auth/auth.js';
 import type { AuditWriter } from '../auth/audit.js';
 import { requireRole } from '../auth/guards.js';
 import { readOpenness, recordOpenness } from '../campaign/openness.js';
+import {
+  readFounderDetails,
+  saveFounderDetails,
+  type FounderDetailsPatch,
+} from '../vetting/details.js';
 import type { ObjectStorage } from '../storage/object-storage.js';
 import type { Scheduler } from '../interviews/calcom.js';
 import { interviewReference } from '../interviews/reference.js';
@@ -372,6 +377,67 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
       })),
     });
   });
+
+  /* ── Your details (screen 16) ───────────────────────────────────────────── */
+
+  /**
+   * The three facts the reference's `[data-hello]` page shows and collects.
+   *
+   * A read of its own rather than three more fields on the workspace: the
+   * workspace read is §12's campaign record and this is the Founder's own
+   * account record, and folding a person's phone number and date of birth into
+   * the payload five other pages already fetch would put them on the wire on
+   * every autosave (§25.5).
+   */
+  router.get(`${FOUNDER_PATH}/campaigns/:campaignId/details`, founder, async (req, res) => {
+    const campaignId = await resolve(req, res);
+    if (!campaignId) return;
+    const details = await readFounderDetails(db, { campaignId });
+    if (!details) {
+      notFound(res);
+      return;
+    }
+    res.json({ details });
+  });
+
+  /**
+   * Autosave, on §9's rule: a key absent from the body writes nothing, so
+   * saving a phone number cannot blank a date of birth given on another visit.
+   */
+  router.patch(
+    `${FOUNDER_PATH}/campaigns/:campaignId/details`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const body = req.body as Record<string, unknown>;
+      const patch: { phone?: string | null; dateOfBirth?: string | null } = {};
+      const text = (key: string) =>
+        typeof body[key] === 'string' || body[key] === null
+          ? (body[key] as string | null)
+          : undefined;
+
+      const phone = text('phone');
+      if (phone !== undefined) patch.phone = phone;
+      const dob = text('dateOfBirth');
+      if (dob !== undefined) patch.dateOfBirth = dob;
+
+      const result = await saveFounderDetails(db, {
+        campaignId,
+        actor: actorId(req),
+        patch: patch as FounderDetailsPatch,
+      });
+      if (!result.ok) {
+        res
+          .status(result.code === 'not_found' ? 404 : 400)
+          .json({ title: 'We could not save that', whatHappened: result.message });
+        return;
+      }
+      res.json({ details: result.details });
+    },
+  );
 
   /* ── The workspace ──────────────────────────────────────────────────────── */
 

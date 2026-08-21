@@ -19846,3 +19846,1121 @@ html.no-motion .ff-story__say { transition: none; }
    removed: it is a composition the reference does not have, and it made the
    sheet 68px TALLER — 1017 against its 949 — so it cut off more of the control
    it was meant to make reachable. The scrolling scrim above fixed that instead. */
+
+/* ═════════════════════════════════════ PHASE 64 — THE FOUNDER INTERVIEW ══
+   2026-08-20. The reference's `[data-sched]` screen, rebuilt 1:1
+   (`Proovd Founder Flow v2.dc.html`, `kindWide`). `InterviewStep.tsx` owns the
+   markup and the header there says what is the reference's and what is not.
+
+   ── The layout model is the reference's, literally ────────────────────────
+   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
+   scaled to the viewport by `fitStages()`:
+
+       let s = Math.min(innerWidth / 2496, innerHeight / 1542) * (pageScale || .78);
+
+   No branch of that function names this screen, so it takes `pageScale` alone.
+   `InterviewStep` owns the scale and writes the whole transform on mount and on
+   resize; the `scale(0.37)` below is the reference's own placeholder and is
+   what renders for the one frame before the layout effect runs. Nothing here
+   reflows — the stage scales instead, which is why the composition is identical
+   at every viewport (§33.11.1).
+
+   `isClaimPhone()` returns `false` in the reference — "one composition
+   everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
+   code and this composition is what every viewport gets, exactly as there.
+
+   ── The two suspended conventions, as on screens 1–16 ─────────────────────
+     - HEX LITERALS, not tokens. `#41ED98`, `#013F17`, `#FAFAFA`, `#FBFFD4`,
+       `#F2F2F2`, `#E9FFE1` and `#3BDC8C` are the reference's own; mixing
+       literal and token would leave half the screen able to drift with a token
+       change and half not.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are. The pill has NO radius in the reference and has
+       none here.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the headline,
+   `p { margin; max-width: var(--measure) }` reaches every line under the CTA,
+   `img,svg,video { max-width:100%; height:auto }` reaches the logo, the bell
+   and the three brand marks, and `body`'s 18px / line-height 1.6 reaches the
+   whole stage — the reference's own body sets neither, so the stage resets
+   both.
+
+   ── The one block the reference does not draw ─────────────────────────────
+   `.ff-int__state` is §12's booking record, the two named absences, the
+   refusal, and the Cal.com embed. It is ABSOLUTELY positioned under the
+   column, in the room the composition already leaves between the CTA and the
+   bottom of the stage, so not one reference box moves for it. See
+   `InterviewStep`'s header for why each part has to exist at all.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen — and the reason is not that
+   the reference has none. It has a wordmark, a HELP and a message bell, and it
+   draws all three INSIDE the `z-index: 25` fixed layer below. Left in place
+   they would sit under that layer and be unreachable, so both are hidden and
+   both leave the tab order with it. */
+.ff[data-flow-page='interview'] .ff__top,
+.ff[data-flow-page='interview'] .ff__badge { display: none; }
+
+/* The reference's `[data-sched]`. Nothing scrolls. */
+.ff-int {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+  /* The reference's page inherits the UA's own root metrics; ours inherits
+     `body`'s 18px/1.6. Restated here so the chrome outside the stage measures
+     against what it was authored against. */
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* The read failed, so there is no composition to draw. It keeps the layer's
+   ground and centres the panel; nothing here is the reference's, because the
+   reference holds its answer in memory and has no failure to render. */
+.ff-int__failure {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-24);
+}
+
+/* ── The chrome. Its `clamp()`s are the reference's own, and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-int__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-int__back:hover { color: #013F17; }
+/* The reference has no focus treatment at all. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11) and it costs the composition nothing. */
+.ff-int__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-int__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-int__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-int__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-int__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-int__help:hover { background: #E9FFE1; }
+.ff-int__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* The message bell. Its geometry is the reference's; its number is not, and
+   `InterviewStep`'s header says what the difference is. It does not shake. */
+.ff-int__mailbtn {
+  position: absolute;
+  right: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13.3333px;
+  line-height: normal;
+  cursor: pointer;
+  outline: none;
+}
+.ff-int__mailbtn:focus-visible { outline: 2px solid #013F17; outline-offset: 4px; }
+.ff-int__mail {
+  position: relative;
+  width: clamp(58px, 5.2vw, 78px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  box-sizing: border-box;
+}
+.ff-int__mail img { width: 68%; height: auto; max-width: none; display: block; }
+.ff-int__mailcount {
+  position: absolute;
+  left: -10%;
+  top: -16%;
+  /* `width: 31%; aspect-ratio: 1` there, over a one-digit number. Ours is a
+     count of reading cards and is legitimately two digits, so the box grows
+     rather than clipping — and the aspect keeps a one-digit badge identical to
+     the reference's own square. */
+  min-width: 31%;
+  min-height: 31%;
+  aspect-ratio: 1;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  background: #FAFAFA;
+  box-sizing: border-box;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, 0.9vw, 13px);
+  line-height: 1;
+  font-weight: 700;
+  color: #41ED98;
+}
+
+/* ── The stage, and the fit-content column inside it ─────────────────────── */
+
+.ff-int__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.37);
+  transform-origin: center center;
+  /* See the header: the reference's body sets neither, and this file's does. */
+  font-size: 16px;
+  line-height: normal;
+  color: #013F17;
+}
+
+.ff-int__col {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: fit-content;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The visuals headline, measured and discarded. Its only job is the width. */
+.ff-int__measure {
+  height: 0;
+  overflow: hidden;
+  font-size: 112px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.ff-int__pill {
+  padding: 26px 46px;
+  background: #FBFFD4;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+
+.ff-int__head {
+  margin: 72px 0 0;
+  font-size: 121px;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  color: #013F17;
+  white-space: nowrap;
+}
+
+.ff-int__panel {
+  margin-top: 110px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ff-int__label {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+.ff-int__label--time { margin-top: 62px; }
+
+/* ── Choose how to meet ──────────────────────────────────────────────────── */
+
+.ff-int__tiles {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 30px;
+}
+
+.ff-int__tile {
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 38px;
+  box-sizing: border-box;
+  border-radius: 2px;
+  border: 3px solid #F2F2F2;
+  background: #F2F2F2;
+  cursor: pointer;
+  font-family: 'Satoshi', sans-serif;
+  text-align: left;
+  outline: none;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ff-int__tile:hover { transform: scale(1.015); }
+.ff-int__tile:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+/* `bg: sel ? 'rgba(65,237,152,.05)' : '#F2F2F2'`, `bd: sel ? '#41ED98' : '#F2F2F2'`.
+   The LABEL does not change colour on a tile — only on a time chip. That is the
+   reference's own asymmetry and it is reproduced rather than tidied. */
+.ff-int__tile.is-on {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.05);
+}
+/* Not `disabled`: a keyboard user has to be able to reach the control that
+   explains itself (§28.5). The tile keeps its own look and stops responding to
+   a hover it will not honour. */
+.ff-int__tile[aria-disabled='true'],
+.ff-int__slot[aria-disabled='true'] { cursor: default; }
+.ff-int__tile[aria-disabled='true']:hover,
+.ff-int__slot[aria-disabled='true']:hover { transform: none; }
+
+.ff-int__icon {
+  width: 92px;
+  height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The three marks are authored at their reference sizes; the global
+   `img,svg,video { max-width:100% }` would shrink the 92px Meet mark inside its
+   own box the moment anything else claimed room in it. */
+.ff-int__icon svg { max-width: none; height: auto; display: block; flex: none; }
+
+.ff-int__tilelabel {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #013F17;
+}
+
+/* ── Pick a time ─────────────────────────────────────────────────────────── */
+
+.ff-int__slots {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 26px;
+}
+
+.ff-int__slot {
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  border: 3px solid #F2F2F2;
+  background: #F2F2F2;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ff-int__slot:hover { transform: scale(1.02); }
+.ff-int__slot:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+.ff-int__slot.is-on {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.05);
+  color: #41ED98;
+}
+
+/* ── Next ────────────────────────────────────────────────────────────────── */
+
+.ff-int__cta {
+  margin-top: 130px;
+  width: 100%;
+  height: 165px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 70px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, 0.42) inset;
+}
+.ff-int__cta:hover { background: #3BDC8C; }
+.ff-int__cta:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
+.ff-int__cta:disabled { cursor: default; opacity: 0.72; }
+
+/* ── The block the reference has no equivalent of ────────────────────────── */
+
+.ff-int__state {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  /* The reference has nothing here to copy a size from. Its own smallest
+     stage text is the 42px section label, so this sits one step under it —
+     secondary to the composition and still a sentence rather than a caption,
+     because what it carries is a rule about somebody’s listing fee. */
+  font-size: 36px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  /* A rule about somebody's money, and about what is and is not booked, takes
+     the ink the rest of the screen uses. `--moss` at 3.37:1 is this flow's
+     caption tone and this is not a caption. */
+  color: #013F17;
+}
+.ff-int__state p { margin: 0; max-width: none; }
+
+.ff-int__record {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.ff-int__recordline { flex: 1 1 20ch; min-width: 0; }
+.ff-int__tag {
+  flex: none;
+  padding: 8px 20px;
+  border: 3px solid #013F17;
+  border-radius: 2px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.ff-int__tag--on { border-color: #41ED98; color: #013F17; background: rgba(65, 237, 152, 0.14); }
+
+.ff-int__failline { color: #013F17; font-weight: 700; }
+
+.ff-int__note { max-width: none; }
+
+.ff-int__mini {
+  flex: none;
+  padding: 10px 24px;
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  outline: none;
+}
+.ff-int__mini:hover { background: #E9FFE1; }
+.ff-int__mini:focus-visible { outline: 4px solid #013F17; outline-offset: 4px; }
+
+/* §12's own mechanism, behind one gesture (DNA §5.12) so the composition above
+   it is untouched until somebody asks for it. */
+.ff-int__embed > summary {
+  cursor: pointer;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+.ff-int__embed > summary:focus-visible { outline: 4px solid #013F17; outline-offset: 4px; }
+.ff-int__embed .interview-embed { margin-top: 20px; }
+
+/* Announced, never drawn. The composition has no room for a status line and
+   every state it would carry is already a visible sentence above. */
+.ff-int__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+
+/* ═════════════════════════════ PHASE 65 — SCREEN 16, YOUR DETAILS ══
+   2026-08-21. The reference's `[data-hello]` page, built from scratch and 1:1
+   (`Proovd Founder Flow v2.dc.html`, `kindWide`). `DetailsStep.tsx` owns the
+   markup and its header says what is the reference's and what is not.
+
+   ── The layout model is the reference's, literally ────────────────────────
+   `position:fixed;inset:0;overflow:hidden` around a fixed 2496x1542 stage,
+   scaled to the viewport by `fitStages()`:
+
+       let s = min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
+       if (!hero && c === 'intake') s *= .92;   // "the details card runs tall"
+
+   `DetailsStep` writes the whole transform on mount and on resize; the
+   `scale(0.368)` below is the reference's own value at 1280x800 and is what
+   renders for the one frame before the layout effect runs. Nothing here
+   reflows — the stage scales instead — which is why the composition is
+   identical at every viewport (§33.11.1).
+
+   ── The two suspended conventions, as on every 1:1 screen in this flow ────
+     - HEX LITERALS, not tokens. Several of the reference's colours here have
+       exact or near tokens; mixing literal and token would leave half the
+       screen able to drift with a token change and half not. `#17A35E` and
+       `#7FE7B0` have no token at all.
+     - RADIUS 2px, literal. It is what `var(--radius)` resolves to under the
+       owner ruling, so the two agree today; the literal is here for the same
+       reason the colours are.
+
+   ── What the project's globals do to this screen, overridden explicitly ───
+   `img, svg, video { max-width:100%; height:auto }` reaches the avatar, which
+   is a fixed 1050px square on a 2496px stage and must not be capped by the
+   VIEWPORT. `h1..h6 { margin; line-height:1.18; font-weight:900 }` reaches the
+   greeting, which is 700 at `line-height: normal` there. `body`'s 18px / 1.6
+   reaches the whole stage — the reference's own body sets 16px / normal, so
+   the stage resets both, and every `em` inside the calendar resolves from it.
+
+   ── The calendar is authored at REAL pixel scale, on purpose ──────────────
+   Its variables are `vw` clamps evaluated against the window, not the stage —
+   `:root` in the reference, `.ff-hl__calwrap` here, with the same three
+   breakpoints. The panel then sits inside a `scale(2.6)` box inside the
+   `~0.368` stage, so it renders at ~0.957 of its natural size. That is how the
+   prototype keeps a calendar legible on a page whose type is authored at 54px,
+   and it is reproduced as the mechanism rather than as the resulting numbers,
+   which move with the viewport. ═════════════════════════════════════════════ */
+
+/* `FlowPage`'s chrome is not drawn on this screen, and not because the
+   reference has none: it has a wordmark and a HELP and draws them INSIDE the
+   `z-index: 25` fixed layer below, where anything left outside would sit under
+   that layer and be unreachable. There is no message badge here at all — the
+   reference draws none. */
+.ff[data-flow-page='details'] .ff__top,
+.ff[data-flow-page='details'] .ff__badge { display: none; }
+
+/* The reference's `[data-hello]`. Nothing scrolls. */
+.ff-hl {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  z-index: 25;
+  font-family: 'Satoshi', sans-serif;
+  color: #013F17;
+}
+
+/* ── The chrome. Its `clamp()`s are the reference's own and they are
+   viewport-relative there too: this is furniture rather than part of the
+   composition, so it does not scale with the stage. ─────────────────────── */
+
+.ff-hl__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  min-height: 30px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(10px, 0.8vw, 12px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-hl__back:hover { color: #013F17; }
+/* The reference has no focus treatment at all. A visible one is added rather
+   than reproduced, because a control a keyboard user cannot locate is not the
+   same control (§28.5, §33.11) and it costs the composition nothing. */
+.ff-hl__back:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+.ff-hl__back svg { width: 11px; height: 11px; flex: none; }
+
+.ff-hl__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-hl__logo {
+  height: clamp(26px, 2.4vw, 36px);
+  width: auto;
+  max-width: none;
+  display: block;
+}
+.ff-hl__help {
+  padding: 10px 22px;
+  min-height: 40px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 900;
+  font-size: clamp(12px, 1vw, 15px);
+  line-height: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  outline: none;
+}
+.ff-hl__help:hover { background: #E9FFE1; }
+.ff-hl__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* ── The stage, and the two columns on it ────────────────────────────────── */
+
+.ff-hl__stage {
+  width: 2496px;
+  height: 1542px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.368);
+  transform-origin: center center;
+  color: #013F17;
+  font-size: 16px;
+  line-height: normal;
+}
+
+/* `grid-template-columns: 1050px 1fr` over a fixed 2300px, so the panel
+   resolves to exactly 1080px. Centred on the stage rather than pinned to it. */
+.ff-hl__grid {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2300px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: 1050px 1fr;
+  gap: 170px;
+  align-items: start;
+}
+
+.ff-hl__art {
+  width: 1050px;
+  height: 1050px;
+  max-width: none;
+  display: block;
+  object-fit: cover;
+}
+
+.ff-hl__panel {
+  margin-top: 150px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A `<span>` in the reference — see `DetailsStep`'s header for why it is an
+   `h1` here, and why that changes nothing about the box it occupies. */
+.ff-hl__greet {
+  margin: 0;
+  font-size: 50px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #17A35E;
+}
+
+.ff-hl__row { display: flex; gap: 26px; }
+/* A label and a value: they share a baseline. */
+.ff-hl__row--name { margin-top: 96px; align-items: baseline; }
+/* A label and a control: they share a centre line. */
+.ff-hl__row--phone,
+.ff-hl__row--dob { margin-top: 74px; align-items: center; }
+
+.ff-hl__label {
+  font-size: 54px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #111111;
+}
+/* Only the two rows with a control shrink-lock their label, exactly as there:
+   the name row has nothing to shrink against. */
+.ff-hl__row--phone .ff-hl__label,
+.ff-hl__row--dob .ff-hl__label { flex: none; }
+
+.ff-hl__value {
+  font-size: 54px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #111111;
+}
+
+.ff-hl__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 78px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid #A2AFA8;
+  border-radius: 0;
+  outline: none;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 54px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #111111;
+}
+.ff-hl__input::placeholder { color: #A2AFA8; opacity: 1; }
+.ff-hl__input:focus { border-bottom-color: #41ED98; }
+
+.ff-hl__dob {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 106px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 30px;
+  background: transparent;
+  border: 3px solid #7FE7B0;
+  border-radius: 2px;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 46px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #A2AFA8;
+  cursor: pointer;
+  text-align: left;
+  outline: none;
+}
+/* `dobFieldFg` — `#012D10` once a date is on file, `#A2AFA8` while it is a
+   prompt. Two colours because they are two different things. */
+.ff-hl__dob.is-set { color: #012D10; }
+.ff-hl__dob:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+.ff-hl__dob svg { width: 46px; height: 46px; flex: none; max-width: none; }
+
+.ff-hl__cta {
+  margin-top: 130px;
+  width: 100%;
+  height: 150px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 64px;
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  box-shadow: 0px 3px 12px rgba(255, 255, 255, 0.42) inset;
+  outline: none;
+}
+.ff-hl__cta:hover { background: #3BDC8C; }
+.ff-hl__cta:focus-visible { outline: 4px solid #013F17; outline-offset: 4px; }
+
+/* ── The calendar ────────────────────────────────────────────────────────── */
+
+/* `position:relative;height:0` — the panel costs the column nothing and the
+   calendar overlays the button below it. */
+.ff-hl__calholder { position: relative; height: 0; }
+
+.ff-hl__calscale {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  width: 640px;
+  transform: scale(2.6);
+  transform-origin: top left;
+}
+
+/* `max-width: 22rem` is what actually decides the panel's width — 352px, not
+   the 640px above it. */
+.ff-hl__calwrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 22rem;
+
+  /* The reference's `:root`, verbatim and in scope. `vw` is the window in both
+     places, so these resolve identically. */
+  --bw: 2px;
+  --br: 1px;
+  --h3: clamp(1.4rem, 1.9vw, 1.65rem);
+  --small: clamp(0.875rem, 0.98vw, 0.95rem);
+  --micro: clamp(0.7rem, 0.82vw, 0.8rem);
+  --tag: clamp(0.62rem, 0.72vw, 0.72rem);
+  --tap: clamp(2.75rem, 3.6vw, 3.3rem);
+  --cell: clamp(1.65rem, 1.95vw, 1.8rem);
+}
+@media (min-width: 1500px) {
+  .ff-hl__calwrap {
+    --h3: clamp(1.5rem, 1.35vw, 1.9rem);
+    --small: clamp(0.96rem, 0.74vw, 1.1rem);
+    --micro: clamp(0.8rem, 0.6vw, 0.92rem);
+    --tag: clamp(0.7rem, 0.55vw, 0.84rem);
+    --tap: clamp(3.1rem, 2.6vw, 3.7rem);
+    --cell: clamp(1.8rem, 1.6vw, 2.2rem);
+  }
+}
+@media (max-width: 600px) {
+  .ff-hl__calwrap { --bw: 1px; --br: 0.5px; --cell: 2.75rem; }
+}
+
+.ff-hl__cal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: auto;
+  z-index: 12;
+  width: 100%;
+  min-width: min(17.5rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: var(--bw) solid #41ED98;
+  border-radius: var(--br);
+  overflow: hidden;
+  padding: clamp(0.45rem, 0.6vw, 0.55rem);
+  transform-origin: top center;
+}
+
+.ff-hl__cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1em;
+  margin-bottom: 0.4em;
+  flex: none;
+}
+
+/* 13.3333px is the UA button default the reference inherits: it resets
+   `box-sizing` and nothing else, while this project sets `button { font:
+   inherit }`. The arrow glyphs are sized in `em` off it, so reproducing the
+   inherited size is what reproduces the glyphs. */
+.ff-hl__cal-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0;
+  font-size: 13.3333px;
+  color: #A2AFA8;
+  cursor: pointer;
+  outline: none;
+}
+.ff-hl__cal-arrow:hover { color: #41ED98; }
+.ff-hl__cal-arrow:focus-visible { outline: 2px solid #013F17; outline-offset: -2px; }
+.ff-hl__cal-arrow svg { width: 0.85em; height: 0.85em; max-width: none; }
+.ff-hl__cal-arrow:active { transform: scale(0.94); }
+
+.ff-hl__cal-month {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  background: none;
+  border: none;
+  min-height: var(--tap);
+  padding: 0.2em 0.45em;
+  font-family: inherit;
+  font-weight: 900;
+  font-size: var(--small);
+  line-height: normal;
+  letter-spacing: -0.02em;
+  color: #012D10;
+  cursor: pointer;
+  outline: none;
+}
+.ff-hl__cal-month:hover { color: #41ED98; }
+.ff-hl__cal-month:focus-visible { outline: 2px solid #013F17; outline-offset: -2px; }
+.ff-hl__cal-month:active { transform: scale(0.94); }
+.ff-hl__cal-month svg { width: 0.8em; height: 0.8em; max-width: none; }
+
+.ff-hl__cal-decade {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.3em;
+  margin-bottom: 0.3em;
+}
+.ff-hl__cal-decade .ff-hl__cal-arrow { flex: none; }
+.ff-hl__cal-decade .ff-hl__cal-arrow svg { stroke-width: 3; }
+.ff-hl__cal-decade-label {
+  font-weight: 700;
+  font-size: var(--micro);
+  color: #669370;
+  letter-spacing: 0.02em;
+}
+
+.ff-hl__cal-years {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25em;
+}
+.ff-hl__cal-year {
+  min-height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--br);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--small);
+  line-height: normal;
+  letter-spacing: -0.01em;
+  background: #F7F7F7;
+  color: #012D10;
+  border: var(--bw) solid #F7F7F7;
+  outline: none;
+}
+.ff-hl__cal-year.is-off { color: #A2AFA8; cursor: default; }
+.ff-hl__cal-year.is-on { background: #41ED98; color: #E9FFE1; border-color: #41ED98; }
+.ff-hl__cal-year:focus-visible { outline: 2px solid #013F17; outline-offset: -2px; }
+.ff-hl__cal-year:active { transform: scale(0.94); }
+
+.ff-hl__cal-monthwrap { position: relative; margin-top: 0.55em; }
+.ff-hl__cal-months {
+  height: calc(var(--cell) * 3);
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+.ff-hl__cal-months::-webkit-scrollbar { display: none; }
+.ff-hl__cal-months-pad { padding: var(--cell) 0; }
+.ff-hl__cal-mo {
+  width: 100%;
+  height: var(--cell);
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: normal;
+  letter-spacing: -0.02em;
+  /* `d >= 2` — the distance from the month in view decides all three. */
+  font-weight: 700;
+  font-size: var(--micro);
+  color: #A2AFA8;
+  outline: none;
+}
+.ff-hl__cal-mo.is-near { font-size: var(--small); color: #669370; }
+.ff-hl__cal-mo.is-on { font-size: var(--h3); font-weight: 900; color: #012D10; }
+.ff-hl__cal-mo:focus-visible { outline: 2px solid #013F17; outline-offset: -2px; }
+/* The two rules the scroller snaps between. */
+.ff-hl__cal-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #41ED98;
+  pointer-events: none;
+}
+.ff-hl__cal-rule--a { top: var(--cell); }
+.ff-hl__cal-rule--b { top: calc(var(--cell) * 2); }
+
+.ff-hl__cal-dows {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.18em;
+  margin-bottom: 0.25em;
+}
+.ff-hl__cal-dows span {
+  text-align: center;
+  font-size: var(--tag);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #A2AFA8;
+}
+
+.ff-hl__cal-cells {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.18em;
+  flex: none;
+  align-content: start;
+}
+.ff-hl__cal-cell {
+  min-height: var(--cell);
+  height: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--br);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--small);
+  line-height: normal;
+  background: #FFFFFF;
+  color: #012D10;
+  border: var(--bw) solid transparent;
+  outline: none;
+}
+/* A future day is drawn and inert — never removed, so the month keeps its
+   shape and nothing shifts as the weeks pass. */
+.ff-hl__cal-cell.is-future { color: #A2AFA8; cursor: default; }
+.ff-hl__cal-cell.is-sel { background: #41ED98; color: #E9FFE1; border-color: #41ED98; }
+.ff-hl__cal-cell:focus-visible { outline: 2px solid #013F17; outline-offset: -2px; }
+
+.ff-hl__cal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.4em;
+  flex: none;
+}
+.ff-hl__cal-clear {
+  background: none;
+  border: none;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0.5em 1.2em;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--micro);
+  line-height: normal;
+  color: #012D10;
+  cursor: pointer;
+  outline: none;
+}
+.ff-hl__cal-clear:hover { color: #41ED98; }
+.ff-hl__cal-clear:focus-visible { outline: 2px solid #013F17; outline-offset: -2px; }
+.ff-hl__cal-clear:active { transform: scale(0.94); }
+
+/* ── The two states the reference never has ──────────────────────────────── */
+
+/* A save that failed, on the chrome layer. The reference's column is a fixed
+   vertical rhythm and one more line moves everything, so this costs the stage
+   nothing — the arrangement Last look uses for its own foot line. */
+.ff-hl__foot {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 5;
+  transform: translateX(-50%);
+  margin: 0;
+  width: min(62vw, 900px);
+  max-width: none;
+  text-align: center;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: clamp(10px, 0.78vw, 12px);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  text-wrap: pretty;
+}
+.ff-hl__foot-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #013F17;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* `.wrap` is a VIEWPORT width (`min(90vw, 1600px)`), so `SurfaceLoading`'s own
+   `Section` would compute wider than this box and spill — PHASE 38's finding,
+   in its general form. The section's vertical rhythm goes with it: this box is
+   already centred, so padding above and below only moves it off centre. */
+.ff-hl__state {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 34rem);
+  margin: 0;
+  max-width: none;
+  color: #013F17;
+}
+.ff-hl__state .wrap { width: 100%; }
+.ff-hl__state .section { padding-block: 0; }
+.ff-hl__state .measure { max-width: none; }
+
+/* ══════════════════════════════════════════ PHASE 65 — RESPONSIVE ══
+   One media query, and it is not a reflow: the stage is one composition at
+   every width (`isClaimPhone()` is `false` in the reference). What changes is
+   the furniture, which was never on the stage — at phone width the foot line
+   would sit under the Back control, so it clears it. */
+@media (max-width: 600px) {
+  .ff-hl__foot {
+    width: calc(100vw - 40px);
+    bottom: calc(clamp(20px, 3vw, 40px) + 34px);
+  }
+}

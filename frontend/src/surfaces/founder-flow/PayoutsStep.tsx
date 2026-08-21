@@ -119,8 +119,10 @@ function Body({ payouts }: { payouts: PayoutState }) {
   }, []);
 
   const back = (
-    <Button tier="tertiary" onClick={() => leaveToPage('last-look', -1)}>
-      Back to Last look
+    // Screen 16 took the page before this one on 2026-08-21, so Back follows
+    // it rather than skipping over the details somebody just gave.
+    <Button tier="tertiary" onClick={() => leaveToPage('details', -1)}>
+      Back to Your details
     </Button>
   );
 
