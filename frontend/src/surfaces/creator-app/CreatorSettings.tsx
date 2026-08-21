@@ -209,9 +209,22 @@ export function CreatorSettings() {
           Your bank details, your tax form, and your payout schedule live with Stripe. Proovd holds a
           status and an account number and nothing else.
         </p>
-        <Button tier="secondary" href="/creator/payouts">
-          Open your payout setup
-        </Button>
+        {/*
+          There is deliberately no control here, and that is a recorded gap
+          rather than a decision. Until 2026-08-21 this rendered a button to
+          `/creator/payouts`, which has never been a route — so it did not open
+          payout setup, it rendered the 404 surface. The backend half exists and
+          is tested (`CREATOR_PAYOUTS_PATH`, `routes/payouts.ts`); what is
+          missing is a signed-in Creator surface to render `PayoutOnboarding`
+          against it, the way the Founder's own settings page already does.
+
+          Removing the control rather than pointing it somewhere plausible is
+          §1.4: the status above is true and useful on its own, and a button
+          that goes to the wrong place is worse than no button. The one place a
+          Creator can currently reach onboarding is the invitation flow's last
+          screen, which renders `PayoutOnboarding` against the token-addressed
+          endpoint.
+        */}
       </Card>
 
       <Card>
@@ -239,7 +252,9 @@ export function CreatorSettings() {
           Changing a password goes through the same route as forgetting one — we email you a link, so
           somebody with your open laptop cannot change it.
         </p>
-        <Button tier="secondary" href="/forgot-password">
+        {/* `/reset-password` is the route (`routes.tsx`); `/forgot-password`
+            was never one and rendered the 404 surface. */}
+        <Button tier="secondary" href="/reset-password">
           Send me a password link
         </Button>
       </Card>

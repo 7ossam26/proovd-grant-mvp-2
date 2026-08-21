@@ -149,6 +149,36 @@ const schema = z.object({
     .positive('DRAFT_VERIFY_LIMIT must be a positive number of attempts')
     .optional(),
 
+  /**
+   * Lets a CLAIMED invitation link keep opening, for local work only.
+   *
+   * §10 has the Founder claim invalidate the draft token, and §11 does the same
+   * for the Creator invitation, so both links are single-use by design. That is
+   * correct in production and makes the flow unwalkable locally: the claim
+   * happens at the Positioning screen, several pages before the end, and from
+   * that moment browser-Back onto any earlier page meets a dead link. Testing
+   * the flow means minting a fresh invitation for every attempt.
+   *
+   * What this relaxes is narrow, and deliberately so. It changes what the
+   * READER tolerates, never what the claim records: `claimDraft` still writes
+   * `claimed_at` and `revoked_at`, so the append-only trigger, the
+   * one-live-token-per-lineage index and claim idempotency are all untouched.
+   * `verify()` skips exactly two guards, only for the two invitation scopes,
+   * and only when the revocation reason is the one a claim writes. A token that
+   * was superseded by an Admin resend, revoked by an Admin, anonymised by the
+   * retention sweep, genuinely expired, attempt-locked, or presented at the
+   * wrong scope still fails.
+   *
+   * **Refused outright when `NODE_ENV` is `production`** (see the refinement
+   * below), on the same reasoning as `DRAFT_VERIFY_LIMIT`: single-use is a
+   * security property, and one a deployment can switch off from its own
+   * environment is not a property.
+   */
+  INVITATION_LINKS_REUSABLE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+
   // ── Transactional email (§27.2) ──────────────────────────────────────────
   // Optional to boot, because the app has to start before an Admin can look at
   // the §6 prerequisites panel and see that it is missing. Absent, the panel's
@@ -564,6 +594,23 @@ function checkDraftVerifyLimit(data: Env): void {
 }
 
 /**
+ * Single-use invitation links may be relaxed for local work and NEVER in
+ * production. Refuses to boot rather than ignoring the value, for the reason
+ * above: an operator who set it meant to change something, and the one
+ * environment where a spent link must stay spent is the one with real people
+ * behind it (§10, §11, §28.1).
+ */
+function checkInvitationLinksReusable(data: Env): void {
+  if (data.NODE_ENV === 'production' && data.INVITATION_LINKS_REUSABLE) {
+    throw new Error(
+      'INVITATION_LINKS_REUSABLE=true but NODE_ENV=production. §10 and §11 ' +
+        'make an invitation link single-use once claimed, and that is not ' +
+        'configurable in production. Remove the variable.',
+    );
+  }
+}
+
+/**
  * Validates raw environment variables and returns the typed result.
  * Throws on schema failure or Stripe mode mismatch.
  * Tests import this directly; `loadEnv` is what triggers process.exit.
@@ -582,6 +629,7 @@ export function validateEnv(raw: Record<string, string | undefined> = process.en
   checkScheduler(result.data);
   checkTranscription(result.data);
   checkDraftVerifyLimit(result.data);
+  checkInvitationLinksReusable(result.data);
   return result.data;
 }
 

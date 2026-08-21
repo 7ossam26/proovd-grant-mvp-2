@@ -20,11 +20,20 @@ export interface LinkUnavailableProps {
    * Where "Get help" goes. Defaults to the support route the API names in its
    * rejection body, so the page and the server agree without the page having to
    * read anything per-request — nothing here varies by failure mode.
+   *
+   * It is `/support` and not `/support/link`, which was the default until
+   * 2026-08-21 and had never been a route: the only public `support` path is
+   * the exact one at `routes.tsx`, and the other is inside the `admin` group.
+   * Both controls below read this one value, so the dead default meant every
+   * dead-link panel offered two buttons and both landed on the 404 surface —
+   * "We don't have a page at this address" — which is the opposite of §27.1's
+   * sixth question. `routes.tsx` records the same bug being fixed once before
+   * for `/support` itself; this was the variant that fix did not reach.
    */
   supportHref?: string;
 }
 
-export function LinkUnavailable({ supportHref = '/support/link' }: LinkUnavailableProps) {
+export function LinkUnavailable({ supportHref = '/support' }: LinkUnavailableProps) {
   return (
     <Mode kind="light">
       <Section breathe>

@@ -180,6 +180,9 @@ async function main() {
     ...(env.DRAFT_VERIFY_LIMIT !== undefined
       ? { draftVerifyLimit: env.DRAFT_VERIFY_LIMIT, emailCodeLimit: env.DRAFT_VERIFY_LIMIT }
       : {}),
+    // Same posture, same boot refusal: a claimed invitation link keeps opening
+    // for local work only, so the flow can be re-walked without a fresh invite.
+    invitationLinksReusable: env.INVITATION_LINKS_REUSABLE,
     liveModeEnvironment: prerequisiteFacts(env),
     prerequisiteEnvironment: prerequisiteFacts(env),
     emailTransport,

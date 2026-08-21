@@ -204,6 +204,14 @@ export interface AppConfig {
    */
   emailCodeLimit?: number;
   /**
+   * LOCAL DEVELOPMENT ONLY — `INVITATION_LINKS_REUSABLE`, refused at boot in
+   * production. Lets a CLAIMED Founder-draft or Creator-invitation link keep
+   * opening, so the flow can be walked and re-walked without minting a fresh
+   * invitation for every attempt. See `TokenServiceDeps` for exactly what it
+   * relaxes, which is two guards and nothing else.
+   */
+  invitationLinksReusable?: boolean;
+  /**
    * The blanket per-address request limit. Defaults to the production value.
    *
    * Configurable only because the integration suite drives an entire Founder
@@ -304,7 +312,12 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       }),
     ...(config.google ? { google: config.google } : {}),
   });
-  const tokens = createTokenService({ db, audit, secret: config.authSecret });
+  const tokens = createTokenService({
+    db,
+    audit,
+    secret: config.authSecret,
+    allowClaimedInvitationReuse: config.invitationLinksReusable ?? false,
+  });
 
   // ── Security headers ───────────────────────────────────────────────────────
   app.use(helmet());

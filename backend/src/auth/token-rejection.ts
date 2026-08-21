@@ -47,7 +47,11 @@ export const TOKEN_REJECTION_BODY = Object.freeze({
     "can't tell which from here — so nothing is wrong with your account, and " +
     'nothing has been charged.',
   next: 'Ask the person who sent it for a new one, or contact support and we can help.',
-  support: '/support/link',
+  // `/support`, not `/support/link`, which was the value until 2026-08-21 and
+  // had never been a route — so the one field whose whole job is "a way to
+  // reach a human" pointed at the 404 surface. The frontend panel read the
+  // same dead address for both of its controls.
+  support: '/support',
 });
 
 /**

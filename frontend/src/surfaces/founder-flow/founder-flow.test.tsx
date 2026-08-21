@@ -824,7 +824,7 @@ function stubCode(accept = '418306') {
               title: 'We cannot open this link',
               detail: '',
               next: '',
-              support: '/support/link',
+              support: '/support',
             },
           };
     }

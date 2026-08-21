@@ -131,7 +131,12 @@ export function CreatorEarnings() {
         <p>{EARNINGS_ARE_NOT_WITHDRAWN}</p>
         <p className="cra-help">{CREATOR_EARNINGS_PAYOUT_IS_STRIPES}</p>
         <p className="cra-help">{TAX_DOCUMENTS_ARE_STRIPES}</p>
-        <Button tier="secondary" href="/creator/payouts">
+        {/* `/creator/payouts` has never been a route — until 2026-08-21 this
+            rendered the 404 surface. Settings is where the payout status
+            actually lives, so that is where this goes; see the recorded gap in
+            `CreatorSettings.tsx` for why there is no onboarding control there
+            either. */}
+        <Button tier="secondary" href="/creator/settings">
           Your payout account
         </Button>
       </Card>

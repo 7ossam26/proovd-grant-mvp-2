@@ -260,6 +260,16 @@ export interface TokenServiceDeps {
    */
   secret: string;
   now?: () => Date;
+  /**
+   * LOCAL DEVELOPMENT ONLY — `INVITATION_LINKS_REUSABLE`, refused at boot when
+   * `NODE_ENV=production` (see `env.ts`). Defaults false, so a caller that does
+   * not know this exists gets §10/§11 single-use behaviour.
+   *
+   * When true, `verify()` admits an invitation token whose ONLY defect is that
+   * it was claimed. Nothing else is relaxed and nothing about the claim itself
+   * changes — see the guard in `verify` for the exact conditions.
+   */
+  allowClaimedInvitationReuse?: boolean;
 }
 
 export function createTokenService({
@@ -267,6 +277,7 @@ export function createTokenService({
   audit,
   secret,
   now = () => new Date(),
+  allowClaimedInvitationReuse = false,
 }: TokenServiceDeps) {
   /**
    * Issues a brand-new token and its lineage.
@@ -643,8 +654,32 @@ export function createTokenService({
       // a token grants no access outside its scope.
       return reject(`scope mismatch: ${row.scope} presented as ${expectedScope}`, row.id);
     }
-    if (row.revokedAt) return reject(`revoked: ${row.revokedReason}`, row.id);
-    if (row.claimedAt) return reject('already claimed', row.id);
+    /*
+      The one local-development relaxation, and it is deliberately the
+      narrowest shape that makes the flow walkable (`INVITATION_LINKS_REUSABLE`,
+      refused at boot in production).
+
+      A claim writes `claimed_at` AND `revoked_at` with reason `claimed` —
+      `claimDraft` and `claimAffiliateInvitation` both do, identically — so a
+      spent invitation trips the next two guards. This skips exactly those two,
+      for exactly the two invitation scopes, and only when the reason is the one
+      a claim writes.
+
+      Everything else still rejects, which is the point: `superseded_by_rotation`
+      (an Admin resend really does kill the old link), `admin_revoked`,
+      `draft_anonymised`, a genuine expiry, the attempt lock, a scope mismatch,
+      and every hash failure above. Off — the default and the only production
+      value — this is dead weight and the guards read as they always have.
+    */
+    const claimedInvitationReuse =
+      allowClaimedInvitationReuse &&
+      (expectedScope === 'founder_draft' || expectedScope === 'affiliate_invitation') &&
+      row.revokedReason === 'claimed';
+
+    if (row.revokedAt && !claimedInvitationReuse) {
+      return reject(`revoked: ${row.revokedReason}`, row.id);
+    }
+    if (row.claimedAt && !claimedInvitationReuse) return reject('already claimed', row.id);
     if (row.expiresAt && row.expiresAt <= now()) return reject('expired', row.id);
     if (row.failedAttempts >= MAX_FAILED_ATTEMPTS) {
       return reject('attempt limit exceeded', row.id);
