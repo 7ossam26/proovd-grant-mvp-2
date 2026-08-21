@@ -46,7 +46,7 @@ import {
 } from './logic.js';
 import type { AuditWriter } from '../auth/audit.js';
 
-type Executor = Pick<Database, 'select' | 'insert' | 'update' | 'execute'>;
+type Executor = Pick<Database, 'select' | 'insert' | 'update' | 'delete' | 'execute'>;
 
 /** The lifecycle states in which the Founder may still edit the build freely. */
 const BUILD_EDITABLE_STATUSES = ['affiliate_response_and_build', 'changes_required'] as const;
@@ -446,6 +446,41 @@ export async function upsertRewardPackage(
   // A reward package changes build completeness; re-derive.
   await recomputeBuildStatus(db, input.campaignId);
   return { ok: true, package: row };
+}
+
+export async function deleteRewardPackage(
+  db: Database,
+  deps: { audit: AuditWriter },
+  input: { campaignId: string; campaignStatus: string; packageId: string; actor: string },
+): Promise<{ ok: true } | ContentRefusal> {
+  if (!(BUILD_EDITABLE_STATUSES as readonly string[]).includes(input.campaignStatus)) {
+    return notEditable('Reward packages');
+  }
+  const [removed] = await db
+    .delete(campaignRewardPackages)
+    .where(
+      and(
+        eq(campaignRewardPackages.id, input.packageId),
+        eq(campaignRewardPackages.campaignId, input.campaignId),
+      ),
+    )
+    .returning();
+  if (!removed) return invalidValue('That reward package was not found.');
+  await deps.audit({
+    action: 'build.reward_package_removed',
+    targetType: 'campaign',
+    targetId: input.campaignId,
+    internalReason: `campaign reward removed: ${removed.title.slice(0, 120)}`,
+    priorValue: {
+      sku: removed.sku,
+      title: removed.title,
+      priceCents: removed.priceCents.toString(),
+      delivery: removed.delivery,
+    },
+    actorId: input.actor,
+  });
+  await recomputeBuildStatus(db, input.campaignId);
+  return { ok: true };
 }
 
 /* ── FAQs (§14.4) ──────────────────────────────────────────────────────────── */

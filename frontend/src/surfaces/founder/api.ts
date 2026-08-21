@@ -738,9 +738,18 @@ export const saveRewardPackage = (
     delivery: string;
     limitedQuantity?: number | null;
     badge?: string | null;
+    sortOrder?: number;
   },
 ): Promise<{ package: RewardPackageView }> =>
   call(`${base(campaignId)}/build/rewards`, { method: 'PUT', body: JSON.stringify(reward) });
+
+export const removeRewardPackage = (
+  campaignId: string,
+  packageId: string,
+): Promise<{ removed: true }> =>
+  call(`${base(campaignId)}/build/rewards/${encodeURIComponent(packageId)}`, {
+    method: 'DELETE',
+  });
 
 /* ── FAQs, the demo stage, and the benefit cards ─────────────────────────────
  *

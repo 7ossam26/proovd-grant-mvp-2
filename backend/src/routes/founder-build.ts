@@ -27,6 +27,7 @@ import {
   readBuild,
   saveBuild,
   upsertRewardPackage,
+  deleteRewardPackage,
   upsertFaq,
   deleteFaq,
   upsertDemoMoment,
@@ -186,6 +187,23 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
     }
     res.json({ package: serializeReward(result.package) });
   });
+
+  router.delete(
+    '/api/founder/campaigns/:campaignId/build/rewards/:packageId',
+    founder,
+    async (req, res) => {
+      const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+      if (!campaign) return notFound(res);
+      const result = await deleteRewardPackage(db, { audit }, {
+        campaignId: campaign.campaignId,
+        campaignStatus: campaign.status,
+        packageId: req.params['packageId'] as string,
+        actor: actor(req),
+      });
+      if (!result.ok) return contentRefusal(res, result);
+      res.json({ removed: true });
+    },
+  );
 
   /* ── FAQs (§14.4) ───────────────────────────────────────────────────────── */
   //

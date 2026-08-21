@@ -17313,3 +17313,258 @@ html.no-motion .ff-story__say { transition: none; }
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+
+/* Rewards setup — reference page geometry is a fixed 2496×1542 stage. */
+.ff[data-flow-page='rewards'] .ff__top,
+.ff[data-flow-page='rewards'] .ff__badge { display: none; }
+.ff[data-flow-page='rewards'] .ff__stage { gap: 0; padding: 0; }
+.ff[data-flow-page='rewards'] .ff__body { display: block; max-width: none; margin: 0; padding: 0; }
+
+.ff-reward-ref {
+  position: fixed;
+  z-index: 25;
+  inset: 0;
+  overflow: hidden;
+  background: #FAFAFA;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 16px;
+  line-height: normal;
+}
+.ff-reward-ref *, .ff-reward-ref *::before, .ff-reward-ref *::after { box-sizing: border-box; }
+.ff-reward-ref__top {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-reward-ref__logo { display: block; width: auto; height: clamp(26px, 2.4vw, 36px); }
+.ff-reward-ref__help {
+  min-height: 40px;
+  padding: 10px 22px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font: 900 clamp(12px, 1vw, 15px)/1 'Satoshi', sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.ff-reward-ref__help:hover { background: #E9FFE1; }
+.ff-reward-ref__back {
+  position: absolute;
+  z-index: 6;
+  bottom: clamp(20px, 3vw, 40px);
+  left: clamp(20px, 3vw, 46px);
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: #41ED98;
+  font: 900 clamp(10px, .8vw, 12px)/1 'Satoshi', sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease;
+  gap: 8px;
+}
+.ff-reward-ref__back:hover { color: #013F17; }
+.ff-reward-ref__stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2496px;
+  height: 1542px;
+  transform-origin: center center;
+}
+.ff-reward-ref__lockup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 1980px;
+  transform: translate(-50%, calc(-50% + 40px));
+  grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 80px;
+}
+.ff-reward-ref__intro { display: flex; flex-direction: column; }
+.ff-reward-ref__intro h1 {
+  width: 100%;
+  margin: 0;
+  color: #013F17;
+  font: 900 70px/1.12 'Satoshi', sans-serif;
+  letter-spacing: -.035em;
+}
+.ff-reward-ref__intro p {
+  width: 100%;
+  max-width: none;
+  margin: 48px 0 0;
+  color: #013F17;
+  font: 500 36px/1.44 'Satoshi', sans-serif;
+  letter-spacing: -.012em;
+  text-wrap: pretty;
+}
+.ff-reward-ref__guide {
+  align-self: flex-start;
+  margin-top: 56px;
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 3px solid #41ED98;
+  background: transparent;
+  color: #013F17;
+  font: 900 34px/1 'Satoshi', sans-serif;
+  letter-spacing: -.02em;
+  cursor: pointer;
+}
+.ff-reward-ref__card-wrap { display: flex; flex-direction: column; }
+.ff-reward-ref__card { display: flex; flex-direction: column; padding: 40px; background: #F5F5F5; }
+.ff-reward-ref__gift { display: block; width: 100%; aspect-ratio: 2 / 1; object-fit: cover; }
+.ff-reward-ref__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-top: 46px;
+  gap: 40px;
+}
+.ff-reward-ref__line { display: flex; flex-direction: column; }
+.ff-reward-ref__line::after {
+  display: block;
+  height: 5px;
+  background-image: repeating-linear-gradient(90deg, #4E785C 0 14px, transparent 14px 27px);
+  content: '';
+}
+.ff-reward-ref__input-row { display: flex; align-items: center; gap: 12px; }
+.ff-reward-ref input, .ff-reward-ref textarea {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #013F17;
+  caret-color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+}
+.ff-reward-ref input::placeholder, .ff-reward-ref textarea::placeholder { color: #A2AFA8; opacity: 1; }
+.ff-reward-ref__pencil { display: block; width: 38px; height: 38px; flex: none; margin-top: 4px; }
+.ff-reward-ref__title-field { width: 240px; flex: none; }
+.ff-reward-ref__title-field::after { margin-top: 20px; }
+.ff-reward-ref__title-field input {
+  width: 100%;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-reward-ref__date-field { width: 186px; flex: none; align-items: center; }
+.ff-reward-ref__delivered { color: #A2AFA8; font-size: 24px; font-weight: 500; }
+.ff-reward-ref__date-field.has-value .ff-reward-ref__delivered { color: #013F17; }
+.ff-reward-ref__date-row { display: flex; width: 100%; align-items: center; margin-top: 8px; gap: 18px; }
+.ff-reward-ref__date-row input {
+  width: auto;
+  flex: 0 1 auto;
+  text-align: center;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-reward-ref__date-row .ff-reward-ref__pencil { width: 36px; height: 36px; margin-top: 2px; }
+.ff-reward-ref__date-field::after { width: 100%; margin-top: 18px; }
+.ff-reward-ref__body-field { margin-top: 92px; }
+.ff-reward-ref__body-row { display: flex; align-items: flex-end; gap: 30px; }
+.ff-reward-ref__body-row .ff-reward-ref__pencil { margin-top: 0; }
+.ff-reward-ref__body-row textarea {
+  height: 108px;
+  flex: 1;
+  overflow: hidden;
+  resize: none;
+  font-size: 36px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -.012em;
+}
+.ff-reward-ref__body-field::after { margin-top: 24px; }
+.ff-reward-ref__price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 98px;
+  gap: 40px;
+}
+.ff-reward-ref__price-field { width: 230px; flex: none; }
+.ff-reward-ref__price-field .ff-reward-ref__input-row { gap: 10px; }
+.ff-reward-ref__price-field input {
+  width: 100%;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+.ff-reward-ref__price-field .ff-reward-ref__pencil { width: 54px; height: 54px; margin-top: 6px; }
+.ff-reward-ref__price-field::after { margin-top: 18px; }
+.ff-reward-ref__pager { display: flex; gap: 24px; }
+.ff-reward-ref__pager button {
+  display: flex;
+  width: 82px;
+  height: 82px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  cursor: pointer;
+}
+.ff-reward-ref__pager button:disabled { border-color: #D6D6D6; color: #D6D6D6; cursor: default; }
+.ff-reward-ref__pager svg { display: block; width: 46px; height: 46px; }
+.ff-reward-ref__cta {
+  display: flex;
+  width: 100%;
+  height: 104px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 80px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: #41ED98;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, .42) inset;
+  color: #FAFAFA;
+  font: 900 48px/1 'Satoshi', sans-serif;
+  letter-spacing: -.02em;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.ff-reward-ref__cta:hover { background: #3BDC8C; }
+.ff-reward-ref__delete {
+  align-self: center;
+  margin-top: 56px;
+  padding: 0 0 12px;
+  border: 0;
+  border-bottom: 4px solid #A2AFA8;
+  background: transparent;
+  color: #A2AFA8;
+  font: 700 40px/1 'Satoshi', sans-serif;
+  letter-spacing: -.02em;
+  cursor: pointer;
+}
+.ff-reward-ref__delete:hover { border-color: #013F17; color: #013F17; }
+.ff-reward-ref__error {
+  max-width: none;
+  margin: 24px 0 0;
+  color: #013F17;
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+}
+@media (max-width: 600px) {
+  .ff-reward-ref__back { bottom: 92px; padding: 8px 14px; }
+}
