@@ -90,10 +90,20 @@ export function StatePanel({
 }: StatePanelProps) {
   const headId = useId();
   const isNoAction = action === NO_ACTION;
+  const isFounderFlowLoading =
+    typeof state === 'string' && /^(opening|loading)\b/i.test(state);
 
   return (
     <section
-      className={ring ? 'state-panel state-panel--ring' : 'state-panel'}
+      className={
+        [
+          'state-panel',
+          ring ? 'state-panel--ring' : '',
+          isFounderFlowLoading ? 'state-panel--transient' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      }
       aria-labelledby={headId}
     >
       <p className="state-panel__head" id={headId}>

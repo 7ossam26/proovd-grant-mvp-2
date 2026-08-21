@@ -1002,6 +1002,10 @@ a::after, .u::after {
 /* ---- StatePanel — Spec §27.1 six questions. Sits on the page by default; the
    brand ring is opt-in for a "needs you" emphasis state. */
 .state-panel { display: grid; gap: var(--sp-16); max-width: var(--measure); }
+/* Founder Flow should reveal the destination screen directly. These panels
+   are only the data-fetch fallback and are never part of the reference
+   choreography, so they must not become a visible refresh/transition frame. */
+.ff .state-panel--transient { display: none; }
 .state-panel--ring {
   outline: var(--bw) solid var(--brand);
   outline-offset: 0;
