@@ -28,12 +28,17 @@
  * `/admin/signin` — its own address, its own minimal shell. The absence of the
  * branch is what keeps the leak from coming back: there is nowhere to put it.
  *
- * ── Nothing is parked any more (2026-08-19) ─────────────────────────────────
- * Today was the last section without a workspace, and it now has one. Every
- * entry in this nav is a real link to a real address, and `useParkedControl`
- * survives here for the Explore control alone — the §26.5 ledger, §26.6 money
- * controls, and §31.7 risk panels are supplied separately, and their APIs and
- * §33 suites are live behind them.
+ * ── The sections were removed to be rebuilt (2026-08-21) ────────────────
+ * Every screen below this shell was deleted so the panel can be rebuilt one
+ * section at a time. The nav survived deliberately: it is the map of what the
+ * panel IS, and dismantling it too would leave nothing to rebuild against.
+ * Each tab is still a real link to a real address; what it renders is
+ * `SectionPlaceholder` until its own section is built.
+ *
+ * The Explore control went with them — it was the last `useParkedControl`
+ * caller, and a control that exists only to explain why it does nothing is
+ * exactly the dead code this removal was asked to avoid. The server is
+ * untouched: every `/api/admin/*` router is still mounted and still tested.
  *
  * ── The environment chip never claims a mode it did not check ───────────────
  * `TEST MODE` is the single most consequential sentence this page could say,
@@ -57,7 +62,6 @@ import {
   type AdminEnvironment,
   type AdminIdentity,
 } from './api.js';
-import { useParkedControl } from './founders/parked.js';
 import { TasksPanel } from './tasks/TasksPanel.js';
 
 type IdentityState =
@@ -217,8 +221,6 @@ interface AdminFrameProps {
 }
 
 function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
-  const parked = useParkedControl();
-
   return (
     <>
       <a className="skip-link" href="#admin-main">
@@ -232,126 +234,63 @@ function AdminFrame({ children, identity, onSignOut }: AdminFrameProps) {
 
         <nav className="topnav" aria-label="Admin sections">
           {/*
-            §26, §1.4 — Today, built 2026-08-19. It was the last parked section,
-            and it is a REAL link now: the Glance layer over the six workspaces'
-            own queues, composed from records that already carry deadlines.
+            The five sections the panel is being rebuilt as (2026-08-21).
+
+            Today, Money & Fulfillment and Live mode were removed from the nav
+            by product direction. Their BACKENDS are untouched and still
+            mounted — `/api/admin/today`, the close/refund/dispute routers and
+            `/api/admin/live-mode` all still answer and are still driven by
+            their §33 suites and by pg-boss jobs. What went is the tab.
+
+            `Affiliates` is a deliberate rename of what this tab said until
+            today (`Creators`), and it does not breach §3.1. That rule governs
+            what reaches a FOUNDER or a BACKER; the Admin panel is internal,
+            and the workspace behind this tab has used the Affiliate record
+            vocabulary since 2026-08-11 for exactly that reason. The tab and
+            the record now agree.
+
+            Its ADDRESS stays `/admin/creators`. Five backend files compose
+            links to it — the §27 mid-campaign notices, the campaign hub’s
+            roster link, the §26.8 support context, and the Tasks reference
+            register — and their tests assert those strings. Renaming the path
+            would mean editing backend files this removal deliberately does
+            not touch. The label is what a person reads; the path is what the
+            product already points at.
           */}
-          <NavLink
-            to="/admin/today"
-            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
-          >
-            Today
-          </NavLink>
-          {/* The two sections that exist, and therefore the two real links. */}
           <NavLink
             to="/admin/founders"
             className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
           >
             Founders
           </NavLink>
-          {/*
-            §26.1, §23.1 — the Campaigns hub, built 2026-08-15.
-
-            It is a read-only section: it summarises the five domains a campaign
-            spans and links into the workspaces that own them. Every campaign
-            decision stays where its rules live, which is why this tab adds no
-            control and its API is two GETs.
-          */}
           <NavLink
-            to="/admin/campaigns"
+            to="/admin/creators"
             className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
           >
-            Campaigns
+            Affiliates
           </NavLink>
-          {/*
-            §26.1, §26.5, §25.7, §28.4 — the Backers workspace, built
-            2026-08-15. Placed beside Campaigns because that is the section
-            which links into it: a campaign row routes to this list already
-            filtered to that campaign.
-
-            Read-only like Campaigns, and for a second reason: it is the only
-            surface in the product that shows a Backer's survey answer beside
-            their email, so it carries no write AND no export. The consent that
-            rides each row is §28.4's optional Founder marketing/survey consent
-            — never the reference's "share my name and email", which describes a
-            choice §19 does not offer, since the Founder receives the email
-            mandatorily at pre-order and cannot retract it.
-          */}
           <NavLink
             to="/admin/backers"
             className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
           >
             Backers
           </NavLink>
-          {/*
-            §26.1, §8 — the Creator workspace, built 2026-08-11.
-
-            The tab keeps the §3.1 substitution ("Creators") while the workspace
-            behind it uses the reference's internal record vocabulary
-            ("Affiliate"). That is the reference's own split and not an
-            inconsistency: a Founder-facing distribution partner is a Creator,
-            and internal records may say Affiliate. Nothing in that workspace
-            reaches a customer — the Founder-visible projection selects seven
-            columns and none of its vocabulary.
-          */}
           <NavLink
-            to="/admin/creators"
+            to="/admin/campaigns"
             className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
           >
-            Creators
+            Campaigns
           </NavLink>
-          {/*
-            §26.7, §26.8, §27.8 — the Support workspace, built 2026-08-13 over
-            the case domain Phase 16b already shipped. It is the operations
-            console for `support_cases`: the §27.8 promise, the §26.8 handoff
-            and timeline, and the §33.9.11 split between what an internal note
-            may carry and what a reply may not.
-          */}
           <NavLink
             to="/admin/support"
             className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
           >
             Support
           </NavLink>
-          {/*
-            §21, §22, §24 — the Money & Fulfillment console, built 2026-08-19.
-
-            Beside Campaigns and Backers because it is the third read of the
-            same campaign, and before Creators and Support because close work
-            has deadlines nobody can extend. It is the ONE place a money
-            decision is made: §22.1's Transfer, §22.3's release, §24.8's refund,
-            §24.11's dispute, and §22.4's Day 14 all have exactly one door.
-          */}
-          <NavLink
-            to="/admin/money"
-            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
-          >
-            Money
-          </NavLink>
-          {/*
-            §34, §2.1, Appendix C — the live-mode gate, built 2026-08-19 over
-            the API Phase 24 shipped and tested.
-
-            Last in the order because it is the rarest thing an Admin does and
-            the most consequential: §34's eleven conditions, the one named pilot
-            campaign, and the rollback. It carries no override and there is
-            nowhere to add one.
-          */}
-          <NavLink
-            to="/admin/live-mode"
-            className={({ isActive }) => (isActive ? 'navlink is-active' : 'navlink')}
-          >
-            Live mode
-          </NavLink>
         </nav>
 
         <div className="topbar__right">
           <EnvironmentChip environment={identity.environment} />
-          {/* Parked: the §26.5 ledger, money controls, and risk panels are
-              their own workspaces and are supplied separately. */}
-          <Button tier="secondary" small {...parked('explorePanels')}>
-            Explore
-          </Button>
           <span className="envmeta">{identity.name || identity.email}</span>
           <Button tier="tertiary" small onClick={onSignOut}>
             Sign out
