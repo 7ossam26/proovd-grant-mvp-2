@@ -1875,8 +1875,25 @@ export function referenceDrawerOpen(
 ): void {
   const g = gsap();
   if (!g || !drawer || !motionLive()) return;
-  if (scrim) g.from(scrim, { opacity: 0, duration: refDur(0.25) });
-  g.from(drawer, { xPercent: 100, duration: refDur(0.4), ease: 'power3.out' });
+  g.killTweensOf(drawer);
+  g.set(drawer, { clearProps: 'transform' });
+  if (scrim) {
+    g.killTweensOf(scrim);
+    g.fromTo(
+      scrim,
+      { opacity: 0 },
+      { opacity: 1, duration: refDur(0.25), clearProps: 'opacity', overwrite: 'auto' },
+    );
+  }
+  const from = phone() ? { yPercent: 100 } : { xPercent: 100 };
+  g.fromTo(drawer, from, {
+    xPercent: 0,
+    yPercent: 0,
+    duration: refDur(0.4),
+    ease: 'power3.out',
+    clearProps: 'transform',
+    overwrite: 'auto',
+  });
 }
 
 /** The reference Help drawer exits before React removes it. */
@@ -1889,8 +1906,9 @@ export function referenceDrawerClose(
     done();
     return;
   }
+  g.killTweensOf(drawer);
   g.to(drawer, {
-    xPercent: 100,
+    ...(phone() ? { yPercent: 100 } : { xPercent: 100 }),
     duration: refDur(0.28),
     ease: 'power2.in',
     onComplete: done,

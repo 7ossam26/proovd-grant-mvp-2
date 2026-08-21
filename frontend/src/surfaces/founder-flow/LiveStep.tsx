@@ -77,6 +77,19 @@ function stageScale(): number {
  */
 const RELAY = ['head', 'panel', 'cta'] as const;
 
+/**
+ * Pitch builds need the complete Founder Flow without a §17 coordinated launch
+ * having run. Vite development therefore follows the reference prototype, which
+ * arrives at the celebration from the review screen with no server at all. Set
+ * `VITE_PITCH_DEMO=false` to restore the launch-record guard locally.
+ * Production can never enter this branch.
+ *
+ * The guard above it is NOT deleted, and that matters: `NotLiveYet` is what a
+ * real Founder sees, and §1.4's rule — never a celebration for something that
+ * has not happened — still holds everywhere the flag is false.
+ */
+const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
+
 /** The reference's own copy, with its own curly apostrophe. Verbatim. */
 const HEADLINE = 'You’re Live!';
 const LEDE =
@@ -138,7 +151,7 @@ export function LiveStep() {
 
   return (
     <FlowPage pageId="live" param={campaignId}>
-      {build.campaignStatus === 'live' ? (
+      {PITCH_DEMO || build.campaignStatus === 'live' ? (
         <LivePage campaignId={campaignId} />
       ) : (
         <NotLiveYet campaignId={campaignId} />

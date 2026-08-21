@@ -44,7 +44,21 @@ import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { PayoutOnboarding, type PayoutState } from '../payouts/PayoutOnboarding.js';
 import { fetchPayouts, requestOnboardingLink, PayoutRequestError } from '../payouts/api.js';
-import { flowDirection, FlowPage, HelpDrawer, useFlowNav } from './FlowPage.js';
+import { flowDirection, FlowPage, useFlowNav } from './FlowPage.js';
+
+/**
+ * Pitch builds need the complete Founder Flow without pretending that a real
+ * payment provider exists. Vite development therefore follows the reference
+ * prototype's own behaviour: `Take me to stripe` advances to the "You're all
+ * set to get paid!" screen and never opens a hosted onboarding link. Set
+ * `VITE_PITCH_DEMO=false` only when deliberately exercising Stripe's test-mode
+ * integration locally. Production can never enter this branch.
+ *
+ * `FeeStep` carries the same constant for the same reason; the two are
+ * deliberately separate rather than shared, because either screen may need to
+ * leave the demo independently of the other.
+ */
+const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
 
 const PAYOUT_ASSETS = {
   logo: new URL(
@@ -71,7 +85,68 @@ const PAYOUT_ASSETS = {
     '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/piggy.png',
     import.meta.url,
   ).href,
+  font400: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-400.woff2',
+    import.meta.url,
+  ).href,
+  font500: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-500.woff2',
+    import.meta.url,
+  ).href,
+  font700: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-700.woff2',
+    import.meta.url,
+  ).href,
+  font900: new URL(
+    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-900.woff2',
+    import.meta.url,
+  ).href,
 };
+
+const PAYOUT_HELP_DOCS = [
+  {
+    tag: 'PDF · 0.6 MB',
+    title: 'Stripe onboarding checklist.pdf',
+    body: 'Every document Stripe asks for, in the order it asks.',
+    current: true,
+  },
+  {
+    tag: 'PDF · 0.4 MB',
+    title: 'SSN or EIN for payouts.pdf',
+    body: 'Which one applies to you, and what changes if you incorporate.',
+    current: false,
+  },
+  {
+    tag: 'GUIDE · 4.2 MB',
+    title: 'Proovd founder handbook.pdf',
+    body: 'Every step of the flow in one document. Worth a skim.',
+    current: false,
+  },
+] as const;
+
+interface PayoutGsap {
+  from: (target: unknown, vars: Record<string, unknown>) => void;
+  fromTo: (
+    target: unknown,
+    from: Record<string, unknown>,
+    to: Record<string, unknown>,
+  ) => void;
+  killTweensOf: (target: unknown) => void;
+  set: (target: unknown, vars: Record<string, unknown>) => void;
+  to: (target: unknown, vars: Record<string, unknown>) => void;
+}
+
+function payoutGsap(): PayoutGsap | undefined {
+  return (window as unknown as { gsap?: PayoutGsap }).gsap;
+}
+
+function pressCloseButton(event: React.PointerEvent<HTMLButtonElement>) {
+  payoutGsap()?.to(event.currentTarget, { scale: 0.78, duration: 0.12, ease: 'power2.out' });
+}
+
+function releaseCloseButton(event: React.PointerEvent<HTMLButtonElement>) {
+  payoutGsap()?.to(event.currentTarget, { scale: 1, duration: 0.25, ease: 'power3.out' });
+}
 
 export function PayoutsStep() {
   const { campaignId = '' } = useParams();
@@ -127,11 +202,19 @@ export function PayoutsStep() {
 }
 
 function Body({ payouts }: { payouts: PayoutState }) {
-  const { leaveToPage } = useFlowNav();
+  const { leaveToPage, swapToPage } = useFlowNav();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The demo advance, held here rather than pushed at the server: nothing about
+  // the account has changed, and a reload correctly returns to the setup state.
+  const [demoComplete, setDemoComplete] = useState(false);
 
   const start = useCallback(async () => {
+    if (PITCH_DEMO) {
+      setDemoComplete(true);
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -147,12 +230,14 @@ function Body({ payouts }: { payouts: PayoutState }) {
     }
   }, []);
 
-  const back = () => leaveToPage('rewards', -1);
+  // The reference swaps the state immediately and lets the arriving screen
+  // relay in from the left. There is no outgoing fade on this Back action.
+  const back = () => swapToPage('rewards', -1);
 
-  if (payouts.state === 'complete') {
+  if (demoComplete || payouts.state === 'complete') {
     return (
       <ReferenceShell onBack={back}>
-        <ReferenceStage state="complete">
+        <ReferenceStage key="complete" state="complete">
           <div className="ff-payout-ref__paid-lockup">
             <h1 data-payout-anim="head" className="ff-payout-ref__paid-head">
               You’re all set to get paid!
@@ -179,7 +264,12 @@ function Body({ payouts }: { payouts: PayoutState }) {
 
   // These server states do not exist in the prototype. Keep the product's
   // exact missing-requirement, review, and restriction behavior for them.
-  if (payouts.state !== 'not_started' || !payouts.onboardingAvailable) {
+  //
+  // Only the `onboardingAvailable` half is relaxed for a pitch build. A
+  // deployment with no Stripe Connect URLs is exactly the one a pitch runs on,
+  // so refusing there would hide the screen the demo exists to show — while a
+  // genuinely restricted or under-review account still renders its own state.
+  if (payouts.state !== 'not_started' || (!payouts.onboardingAvailable && !PITCH_DEMO)) {
     return (
       <ReferenceShell onBack={back}>
         <div className="ff-payout-ref__fallback">
@@ -194,7 +284,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
 
   return (
     <ReferenceShell onBack={back}>
-      <ReferenceStage state="setup">
+      <ReferenceStage key="setup" state="setup">
         <div className="ff-payout-ref__setup-lockup">
           <h1 data-payout-anim="head" className="ff-payout-ref__setup-head">
             Setup how you get paid
@@ -235,10 +325,52 @@ function Body({ payouts }: { payouts: PayoutState }) {
 }
 
 function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () => void }) {
-  const { leaveToPage, param } = useFlowNav();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerClosing, setDrawerClosing] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const scrimRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!drawerOpen) return;
+    const gsap = payoutGsap();
+    const drawer = drawerRef.current;
+    const scrim = scrimRef.current;
+    if (!gsap) return;
+
+    if (scrim) gsap.from(scrim, { opacity: 0, duration: 0.25 });
+    if (drawer) gsap.from(drawer, { xPercent: 100, duration: 0.4, ease: 'power3.out' });
+
+    return () => {
+      if (scrim) gsap.killTweensOf(scrim);
+      if (drawer) gsap.killTweensOf(drawer);
+    };
+  }, [drawerOpen]);
+
+  const closeDrawer = useCallback(() => {
+    if (drawerClosing) return;
+    const gsap = payoutGsap();
+    const drawer = drawerRef.current;
+    const done = () => {
+      setDrawerOpen(false);
+      setDrawerClosing(false);
+    };
+
+    setDrawerClosing(true);
+    if (gsap && drawer) {
+      gsap.to(drawer, { xPercent: 100, duration: 0.28, ease: 'power2.in', onComplete: done });
+    } else {
+      done();
+    }
+  }, [drawerClosing]);
 
   return (
     <section className="ff-payout-ref">
+      <style>{`
+        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font400}') format('woff2');font-weight:400;font-display:swap;font-style:normal;}
+        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font500}') format('woff2');font-weight:500;font-display:swap;font-style:normal;}
+        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font700}') format('woff2');font-weight:600 700;font-display:swap;font-style:normal;}
+        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font900}') format('woff2');font-weight:800 900;font-display:swap;font-style:normal;}
+      `}</style>
       <button type="button" className="ff-payout-ref__back" onClick={onBack}>
         <svg
           viewBox="0 0 24 24"
@@ -255,27 +387,60 @@ function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () 
         </svg>
         Back
       </button>
-      <button
-        type="button"
-        className="ff-payout-ref__skip"
-        aria-label="Skip for now to campaign review"
-        onClick={() => leaveToPage('in-review')}
-      >
-        Skip for now
-      </button>
       <header className="ff-payout-ref__top">
         <img src={PAYOUT_ASSETS.logo} alt="proovd" className="ff-payout-ref__logo" />
-        <HelpDrawer
-          pageId="payouts"
-          param={param}
-          trigger={
-            <button type="button" className="ff-payout-ref__help">
-              Help
-            </button>
-          }
-        />
+        <button type="button" className="ff-payout-ref__help" onClick={() => setDrawerOpen(true)}>
+          Help
+        </button>
       </header>
       {children}
+      {drawerOpen ? (
+        <>
+          <div ref={scrimRef} className="ff-payout-ref__scrim" onClick={closeDrawer} />
+          <aside ref={drawerRef} className="ff-payout-ref__drawer">
+            <div className="ff-payout-ref__drawer-head">
+              <span>Help</span>
+              <button
+                type="button"
+                onClick={closeDrawer}
+                onPointerDown={pressCloseButton}
+                onPointerUp={releaseCloseButton}
+                onPointerCancel={releaseCloseButton}
+                onPointerLeave={releaseCloseButton}
+                aria-label="Close help"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="20"
+                  height="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="ff-payout-ref__drawer-intro">Reading for this page</div>
+            <div className="ff-payout-ref__docs">
+              {PAYOUT_HELP_DOCS.map((doc) => (
+                <button
+                  type="button"
+                  className={doc.current ? 'ff-payout-ref__doc is-current' : 'ff-payout-ref__doc'}
+                  key={doc.title}
+                >
+                  <span className="ff-payout-ref__doc-tag">{doc.tag}</span>
+                  <span className="ff-payout-ref__doc-title">{doc.title}</span>
+                  <span className="ff-payout-ref__doc-body">{doc.body}</span>
+                </button>
+              ))}
+            </div>
+          </aside>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -297,19 +462,7 @@ function ReferenceStage({ children, state }: { children: ReactNode; state: 'setu
     window.addEventListener('resize', fit);
     window.addEventListener('orientationchange', settle);
 
-    const gsap = (
-      window as unknown as {
-        gsap?: {
-          set: (target: unknown, vars: Record<string, unknown>) => void;
-          fromTo: (
-            target: unknown,
-            from: Record<string, unknown>,
-            to: Record<string, unknown>,
-          ) => void;
-          killTweensOf: (target: unknown) => void;
-        };
-      }
-    ).gsap;
+    const gsap = payoutGsap();
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const animated = Array.from(stage.querySelectorAll('[data-payout-anim]'));
     const grow = stage.querySelector('[data-payout-grow]');
@@ -365,7 +518,7 @@ function ReferenceStage({ children, state }: { children: ReactNode; state: 'setu
 
     const sweep = window.setTimeout(() => {
       if (gsap) gsap.set([...animated, ...(grow ? [grow] : [])], { clearProps: 'transform,opacity' });
-    }, 3400);
+    }, 2200);
 
     return () => {
       window.removeEventListener('resize', fit);

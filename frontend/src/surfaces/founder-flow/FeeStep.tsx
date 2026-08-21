@@ -120,7 +120,13 @@ import {
   type OptionalItemKey,
 } from '@proovd/shared';
 import { Button, Option, StatePanel, NO_ACTION } from '../../components/index.js';
-import { paySheetIn, stageBigHeadIn, stageRelayIn } from '../../components/anim.js';
+import {
+  paySheetIn,
+  referenceDrawerClose,
+  referenceDrawerOpen,
+  stageBigHeadIn,
+  stageRelayIn,
+} from '../../components/anim.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import {
   fetchListing,
@@ -132,7 +138,7 @@ import {
   type FounderError,
   type ListingState,
 } from '../founder/api.js';
-import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
+import { FlowPage, flowDirection, useFlowNav } from './FlowPage.js';
 import { useSetupWorkspace } from './useSetup.js';
 
 /* ── The stage ─────────────────────────────────────────────────────────────
@@ -143,6 +149,16 @@ const FIT_W = 2496;
 const FIT_H = 1542;
 /** The prototype's `pageScale` prop default. */
 const PAGE_SCALE = 0.78;
+
+/**
+ * Pitch builds need the complete Founder Flow without pretending that a real
+ * payment provider exists. Vite development therefore follows the reference
+ * prototype's own behaviour: `Pay & Start` advances to the campaign builder
+ * and never opens Checkout. Set `VITE_PITCH_DEMO=false` only when deliberately
+ * exercising Stripe's test-mode integration locally. Production can never
+ * enter this branch.
+ */
+const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
 
 function stageScale(): string {
   const s = Math.min(window.innerWidth / FIT_W, window.innerHeight / FIT_H) * PAGE_SCALE;
@@ -179,8 +195,17 @@ const usd = (cents: string): string => formatUsd(BigInt(cents));
  */
 const plain = (cents: string): string => usd(cents).replace('US$', '');
 
+/**
+ * The prototype interpolates whole-dollar numbers after a literal `$` and does
+ * not print accounting decimals (`$33`, `$2`, `$8`). Keep the two decimals in
+ * the checkout/consent sheet, but remove them from the reference-owned stage
+ * when the server amount is an exact dollar. Non-whole configured amounts stay
+ * exact rather than being rounded.
+ */
+const referencePlain = (cents: string): string => plain(cents).replace(/\.00$/, '');
+
 /** The hero's shape: the reference's `$`, the server's amount. */
-const heroAmount = (cents: string): string => `$${plain(cents)}`;
+const heroAmount = (cents: string): string => `$${referencePlain(cents)}`;
 
 /**
  * A deadline, local with UTC beside it — §27.1's rule.
@@ -235,7 +260,7 @@ export function FeeStep() {
   if (problem) {
     return (
       <FlowPage pageId="fee" param={campaignId}>
-        <Shell campaignId={campaignId}>
+        <Shell>
           <div className="ff-fee__state">
             <h1 className="ff-fee__state-title">Your listing fee</h1>
             <StatePanel
@@ -385,7 +410,7 @@ function FeeScreen({
   if (refunded) {
     const refund = listing.refund!;
     return (
-      <Shell campaignId={campaignId}>
+      <Shell>
         <div className="ff-fee__state">
             <h1 className="ff-fee__state-title">Your listing fee</h1>
           <StatePanel
@@ -405,7 +430,7 @@ function FeeScreen({
 
   if (cancellation?.status === 'canceled') {
     return (
-      <Shell campaignId={campaignId}>
+      <Shell>
         <div className="ff-fee__state">
             <h1 className="ff-fee__state-title">Your listing fee</h1>
           <StatePanel
@@ -425,7 +450,7 @@ function FeeScreen({
 
   if (cancellation?.status === 'pending') {
     return (
-      <Shell campaignId={campaignId}>
+      <Shell>
         <div className="ff-fee__state">
             <h1 className="ff-fee__state-title">Your listing fee</h1>
           <StatePanel
@@ -445,11 +470,11 @@ function FeeScreen({
 
   // §13: the incomplete and restricted states offer no way to pay, so they do
   // not get a screen whose whole composition is an amount and a Pay control.
-  if (!paid && !listing.checkoutAvailable) {
+  if (!PITCH_DEMO && !paid && !listing.checkoutAvailable) {
     const restricted = listing.onboardingState === 'restricted';
     const taxOff = listing.taxAvailable === false;
     return (
-      <Shell campaignId={campaignId}>
+      <Shell>
         <div className="ff-fee__state">
             <h1 className="ff-fee__state-title">Your listing fee</h1>
           <StatePanel
@@ -494,7 +519,7 @@ function FeeScreen({
 
   if (!paid && !fee) {
     return (
-      <Shell campaignId={campaignId}>
+      <Shell>
         <div className="ff-fee__state">
             <h1 className="ff-fee__state-title">Your listing fee</h1>
           <StatePanel
@@ -527,10 +552,10 @@ function FeeScreen({
   const freeUntil = paid ? new Date(payment!.freeCancellationDeadlineAt) : null;
   const withinFreeWindow = freeUntil !== null && freeUntil.getTime() > Date.now();
 
-  const sheetOpen = sheet !== 'none';
+  const sheetOpen = !PITCH_DEMO && sheet !== 'none';
 
   return (
-    <Shell campaignId={campaignId} rootRef={root} inert={sheetOpen}>
+    <Shell rootRef={root} inert={sheetOpen}>
       <div className="ff-fee__page" inert={sheetOpen}>
       <div className="ff-fee__stage" data-page-stage="1" ref={stage}>
         <div className="ff-fee__column">
@@ -583,9 +608,13 @@ function FeeScreen({
             aria-label={
               paid
                 ? 'Start your campaign page — your brand voice'
-                : 'Pay & Start — your billing address and total'
+                : PITCH_DEMO
+                  ? 'Pay & Start — continue the pitch demo without payment'
+                  : 'Pay & Start — your billing address and total'
             }
-            onClick={() => (paid ? leaveToPage('voice') : startPaying())}
+            onClick={() =>
+              paid || PITCH_DEMO ? leaveToPage('voice') : startPaying()
+            }
           >
             {paid ? 'Start your campaign page' : 'Pay & Start'}
           </button>
@@ -657,12 +686,10 @@ function FeeScreen({
    have the same way out and the same way to get help. */
 
 function Shell({
-  campaignId,
   rootRef,
   inert,
   children,
 }: {
-  campaignId: string;
   rootRef?: React.RefObject<HTMLDivElement | null>;
   /**
    * True while the pay sheet is open.
@@ -677,6 +704,7 @@ function Shell({
   children: ReactNode;
 }) {
   const { leaveToPage } = useFlowNav();
+  const [helpOpen, setHelpOpen] = useState(false);
   return (
     <div className="ff-fee" ref={rootRef}>
       {/* `back()`: `if(c==='fee'){ this.step({si:this.I('model')},'back'); }` —
@@ -710,19 +738,81 @@ function Shell({
         {/* Not a link. A half-paid campaign is not a site, and the way out of a
             payment screen should not be the brand. */}
         <img className="ff-fee__logo" src="/assets/proovd-logo.svg" alt="Proovd" />
-        <HelpDrawer
-          pageId="fee"
-          param={campaignId}
-          trigger={
-            <button type="button" className="ff-fee__help">
-              Help
-            </button>
-          }
-        />
+        <button
+          type="button"
+          className="ff-fee__help"
+          aria-expanded={helpOpen}
+          onClick={() => setHelpOpen(true)}
+        >
+          Help
+        </button>
       </div>
 
       {children}
+      {helpOpen ? <FeeHelpDrawer onClose={() => setHelpOpen(false)} /> : null}
     </div>
+  );
+}
+
+/** The reference's page-specific HELP drawer for `[data-paynow]`. */
+function FeeHelpDrawer({ onClose }: { onClose: () => void }) {
+  const aside = useRef<HTMLElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => referenceDrawerOpen(aside.current, scrim.current), []);
+
+  const close = useCallback(
+    () => referenceDrawerClose(aside.current, onClose),
+    [onClose],
+  );
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      close();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [close]);
+
+  return (
+    <>
+      <div className="ff-fee-help__scrim" ref={scrim} onClick={close} />
+      <aside className="ff-fee-help" ref={aside} role="dialog" aria-modal="true" aria-label="Help">
+        <div className="ff-fee-help__head">
+          <span>Help</span>
+          <button type="button" onClick={close} aria-label="Close help">
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="ff-fee-help__intro">Reading for this page</div>
+        <div className="ff-fee-help__docs">
+          <button type="button" className="is-current">
+            <span className="ff-fee-help__tag">PDF · 0.3 MB</span>
+            <strong>Listing fee breakdown.pdf</strong>
+            <span>What the fee covers and how the discounts stack.</span>
+          </button>
+          <button type="button">
+            <span className="ff-fee-help__tag">GUIDE · 4.2 MB</span>
+            <strong>Proovd founder handbook.pdf</strong>
+            <span>Every step of the flow in one document. Worth a skim.</span>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
 

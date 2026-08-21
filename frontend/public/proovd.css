@@ -4918,9 +4918,17 @@ html.no-motion .ff-prob__rail { transition: none; }
   z-index: 25;
   background: #FAFAFA;
   color: #013F17;
-  font-family: 'Satoshi', sans-serif;
+  --payout-micro: clamp(.7rem, .82vw, .8rem);
+  --payout-tag: clamp(.62rem, .72vw, .72rem);
+  --payout-tap: clamp(2.75rem, 3.6vw, 3.3rem);
+  --payout-px: clamp(1.35rem, 4.4vw, 4rem);
+  font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
   font-size: 16px;
   line-height: normal;
+}
+.ff-payout-ref :focus-visible {
+  outline: auto;
+  outline-offset: 0;
 }
 .ff-payout-ref__top {
   position: absolute;
@@ -4955,10 +4963,6 @@ html.no-motion .ff-prob__rail { transition: none; }
   cursor: pointer;
 }
 .ff-payout-ref__help:hover { background: #E9FFE1; }
-.ff-payout-ref__help:focus-visible {
-  outline: 3px solid #013F17;
-  outline-offset: 3px;
-}
 .ff-payout-ref__back {
   position: absolute;
   z-index: 6;
@@ -4982,34 +4986,6 @@ html.no-motion .ff-prob__rail { transition: none; }
   cursor: pointer;
 }
 .ff-payout-ref__back:hover { color: #013F17; }
-.ff-payout-ref__back:focus-visible {
-  outline: 3px solid #41ED98;
-  outline-offset: 2px;
-}
-.ff-payout-ref__skip {
-  position: absolute;
-  z-index: 6;
-  right: clamp(20px, 3vw, 46px);
-  bottom: clamp(20px, 3vw, 40px);
-  min-height: 30px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: #41ED98;
-  font-family: 'Satoshi', sans-serif;
-  font-size: clamp(10px, .8vw, 12px);
-  font-weight: 900;
-  line-height: normal;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-.ff-payout-ref__skip:hover { color: #013F17; }
-.ff-payout-ref__skip:focus-visible {
-  outline: 3px solid #41ED98;
-  outline-offset: 2px;
-}
 .ff-payout-ref__stage {
   position: absolute;
   left: 50%;
@@ -5086,7 +5062,7 @@ html.no-motion .ff-prob__rail { transition: none; }
   background: #41ED98;
   color: #FAFAFA;
   box-shadow: 0 3px 12px rgba(255, 255, 255, .42) inset;
-  font-family: 'Satoshi', sans-serif;
+  font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
   font-weight: 900;
   line-height: normal;
   letter-spacing: -.02em;
@@ -5099,11 +5075,6 @@ html.no-motion .ff-prob__rail { transition: none; }
 }
 .ff-payout-ref__setup-cta:hover,
 .ff-payout-ref__paid-cta:hover { background: #3BDC8C; }
-.ff-payout-ref__setup-cta:focus-visible,
-.ff-payout-ref__paid-cta:focus-visible {
-  outline: 6px solid #013F17;
-  outline-offset: 6px;
-}
 .ff-payout-ref__setup-cta:disabled { cursor: wait; opacity: .72; }
 .ff-payout-ref__error {
   margin: 24px 0 0;
@@ -5153,9 +5124,119 @@ html.no-motion .ff-prob__rail { transition: none; }
   transform: translate(-50%, -50%);
 }
 
+.ff-payout-ref__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(1, 45, 16, .4);
+}
+.ff-payout-ref__drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 60;
+  width: min(27rem, 88vw);
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: clamp(20px, 2.4vw, 32px) var(--payout-px);
+  background: #012D10;
+  color: #E9FFE1;
+  font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
+}
+.ff-payout-ref__drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(.8rem, 1.3vw, 1.1rem);
+  margin-bottom: clamp(18px, 2.2vw, 28px);
+  color: #E9FFE1;
+  font-size: clamp(18px, 1.6vw, 21px);
+  font-weight: 900;
+  letter-spacing: -.03em;
+}
+.ff-payout-ref__drawer-head button {
+  width: var(--payout-tap);
+  height: var(--payout-tap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #E9FFE1;
+  cursor: pointer;
+}
+.ff-payout-ref__drawer-intro {
+  margin-bottom: clamp(12px, 1.6vw, 18px);
+  color: #A2AFA8;
+  font-size: var(--payout-micro);
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.ff-payout-ref__docs {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vw, 16px);
+}
+.ff-payout-ref__doc {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(14px, 1.6vw, 20px);
+  border: 2px solid #1B4A2C;
+  border-radius: 2px;
+  background: transparent;
+  text-align: left;
+  font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
+  cursor: pointer;
+}
+.ff-payout-ref__doc:hover { border-color: #41ED98; }
+.ff-payout-ref__doc.is-current {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, .08);
+}
+.ff-payout-ref__doc-tag {
+  color: #A2AFA8;
+  font-size: var(--payout-tag);
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.ff-payout-ref__doc.is-current .ff-payout-ref__doc-tag { color: #41ED98; }
+.ff-payout-ref__doc-title {
+  color: #E9FFE1;
+  font-size: clamp(14px, 1.3vw, 18px);
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -.02em;
+  text-wrap: pretty;
+}
+.ff-payout-ref__doc-body {
+  color: #A2AFA8;
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+@media (min-width: 1500px) {
+  .ff-payout-ref {
+    --payout-micro: clamp(.8rem, .6vw, .92rem);
+    --payout-tag: clamp(.7rem, .55vw, .84rem);
+    --payout-tap: clamp(3.1rem, 2.6vw, 3.7rem);
+    --payout-px: clamp(4rem, 5vw, 7rem);
+  }
+}
+
 @media (max-width: 600px) {
-  .ff-payout-ref__back,
-  .ff-payout-ref__skip { bottom: 92px; padding: 8px 14px; }
+  .ff-payout-ref__back { bottom: 92px; padding: 8px 14px; }
+  .ff-payout-ref__drawer {
+    inset: auto 0 0;
+    width: 100%;
+    height: 86vh;
+  }
 }
 
 /* §12's high-effort note lived here from Session E until 2026-08-20, when Last
@@ -18136,6 +18217,123 @@ html.no-motion .ff-story__say { transition: none; }
 }
 .ff-fee__help:hover { background: #E9FFE1; }
 .ff-fee__help:focus-visible { outline: 2px solid #013F17; outline-offset: 3px; }
+
+/* The reference's page-specific HELP drawer. It contains only the reading for
+   this page plus the founder handbook; it is not the app's flow navigator. */
+.ff-fee-help__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(1, 45, 16, 0.4);
+}
+.ff-fee-help {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 60;
+  width: min(27rem, 88vw);
+  height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: clamp(20px, 2.4vw, 32px) clamp(1.35rem, 4.4vw, 4rem);
+  background: #012D10;
+  color: #E9FFE1;
+  font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
+}
+.ff-fee-help__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(0.8rem, 1.3vw, 1.1rem);
+  margin-bottom: clamp(18px, 2.2vw, 28px);
+  font-size: clamp(18px, 1.6vw, 21px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.03em;
+}
+.ff-fee-help__head button {
+  width: clamp(2.75rem, 3.6vw, 3.3rem);
+  height: clamp(2.75rem, 3.6vw, 3.3rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #E9FFE1;
+  cursor: pointer;
+}
+.ff-fee-help__intro {
+  margin-bottom: clamp(12px, 1.6vw, 18px);
+  color: #A2AFA8;
+  font-size: clamp(0.7rem, 0.82vw, 0.8rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ff-fee-help__docs {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vw, 16px);
+}
+.ff-fee-help__docs button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(14px, 1.6vw, 20px);
+  border: 2px solid #1B4A2C;
+  border-radius: 2px;
+  background: transparent;
+  color: #A2AFA8;
+  font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.ff-fee-help__docs button.is-current {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.08);
+}
+.ff-fee-help__docs button:hover { border-color: #41ED98; }
+.ff-fee-help__tag {
+  color: #A2AFA8;
+  font-size: clamp(0.62rem, 0.72vw, 0.72rem);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ff-fee-help__docs .is-current .ff-fee-help__tag { color: #41ED98; }
+.ff-fee-help__docs strong {
+  margin-top: 2px;
+  color: #E9FFE1;
+  font-size: clamp(14px, 1.3vw, 18px);
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+.ff-fee-help__docs button > span:last-child {
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+@media (min-width: 1500px) {
+  .ff-fee-help {
+    padding-inline: clamp(4rem, 5vw, 7rem);
+  }
+  .ff-fee-help__head button {
+    width: clamp(3.1rem, 2.6vw, 3.7rem);
+    height: clamp(3.1rem, 2.6vw, 3.7rem);
+  }
+  .ff-fee-help__intro { font-size: clamp(0.8rem, 0.6vw, 0.92rem); }
+  .ff-fee-help__tag { font-size: clamp(0.7rem, 0.55vw, 0.84rem); }
+}
+
+@media (max-width: 600px) {
+  .ff-fee-help { inset: auto 0 0 0; width: 100%; height: 86vh; }
+}
 
 /* ── The stage, and the 2220px column inside it ──────────────────────────── */
 
