@@ -3726,7 +3726,7 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   align-self: flex-start;
   display: block;
   width: auto;
-  height: 1.75rem;
+  height: 1.25rem;
 }
 .ff-device-gate__body {
   flex: 1;
