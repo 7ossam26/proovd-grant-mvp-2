@@ -1522,13 +1522,13 @@ describe('Last look (15)', () => {
     for (const entry of FOUNDER_ANSWER_SEQUENCE) {
       expect(screen.getByText(founderAnswerLabel(entry)), entry.key).toBeInTheDocument();
     }
-    expect(screen.getByText('US$33.00')).toBeInTheDocument();
+    expect(screen.getByText('$33')).toBeInTheDocument();
     // Nothing computed here: the reference's FEE_BASE / FEE_PER / FEE_FLOOR are
     // three §6 settings and every amount arrives already worked out. The
     // sentence is the reference's own `lastLookNote`, with the per-item amount
     // read from the server rather than from its hardcoded `$2`.
     expect(
-      screen.getByText(/bonus answers left, each one drops the fee US\$2\.00\./i),
+      screen.getByText(/bonus answers left, each one drops the fee \$2\./i),
     ).toBeInTheDocument();
   });
 

@@ -71,8 +71,8 @@
  * The reference hardcodes `FEE_BASE=35`, `FEE_PER=2`, `FEE_FLOOR=25` and
  * renders `${{ feeNow }}`. All three are §6 settings, and Phase 06's rule is
  * that a hardcoded number is a bug even when it is right. So the template's
- * variable is replaced with the server's amount and its `$` goes with it —
- * `formatUsd` already carries a currency mark, and `$US$33.00` is not a price.
+ * variable is replaced with the server's amount. The review keeps the
+ * reference's compact `$35` shape and only shows cents when cents really exist.
  * That is the same substitution screen 20 made for the same `${{ feeNow }}`.
  * There is no arithmetic on a fee anywhere under `frontend/src/surfaces/`.
  *
@@ -166,12 +166,17 @@ const TAG_SKIPPED = 'Skipped';
  */
 const TAG_SUBMITTED = 'Submitted';
 
+/** The reference's `$35` display, while preserving real non-zero cents. */
+function formatReviewUsd(cents: bigint): string {
+  return formatUsd(cents).replace(/^US\$/, '$').replace(/\.00$/, '');
+}
+
 /** `lastLookNote`, with the per-item amount read from the server's fee. */
 function feeNote(fee: WorkspaceState['fee']): string {
   if (!fee) return '';
   const left = OPTIONAL_ITEMS.length - fee.completedItems;
   return left
-    ? `${left} bonus ${left === 1 ? 'answer' : 'answers'} left, each one drops the fee ${formatUsd(BigInt(fee.itemDiscountCents))}.`
+    ? `${left} bonus ${left === 1 ? 'answer' : 'answers'} left, each one drops the fee ${formatReviewUsd(BigInt(fee.itemDiscountCents))}.`
     : 'Every bonus answer is in, this is the lowest fee.';
 }
 
@@ -309,7 +314,7 @@ function Screen({
             </span>
 
             <span className="ff-ll__fee" data-stage-anim="fee">
-              {state.fee ? formatUsd(BigInt(state.fee.subtotalCents)) : '—'}
+              {state.fee ? formatReviewUsd(BigInt(state.fee.subtotalCents)) : '—'}
             </span>
 
             <span className="ff-ll__sub" data-stage-anim="sub">
