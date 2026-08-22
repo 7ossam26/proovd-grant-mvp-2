@@ -1,5 +1,5 @@
 /**
- * Screen 23 — add your FAQ's, rebuilt 1:1 from the reference.
+ * Step 25 — add your FAQ's, rebuilt 1:1 from the reference.
  *
  * REBUILT FROM SCRATCH 2026-08-21 against the supplied reference
  * (`Proovd Founder Flow v2.dc.html`, `[data-faq]` / `kindWide`) and its
@@ -85,6 +85,7 @@ import { useAutosave } from '../../lib/useAutosave.js';
 import { removeFaq, saveFaq, type FaqView } from '../founder/api.js';
 import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
 import { useBuildFlow, type BuildFlowState } from './useBuild.js';
+import { isReferenceWalkthrough } from './referenceWalkthrough.js';
 
 /* ── The stage ─────────────────────────────────────────────────────────────
    `fitStages()` for a page it treats as ordinary: the stage's own size as the
@@ -214,7 +215,9 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
   const [said, setSaid] = useState('');
 
   const model = build.state?.model ?? 'product';
-  const locked = !EDITABLE_STATUSES.includes(build.state?.campaignStatus ?? '');
+  const walkthrough = isReferenceWalkthrough(campaignId);
+  const locked =
+    !walkthrough && !EDITABLE_STATUSES.includes(build.state?.campaignStatus ?? '');
 
   const current = cards[index] ?? { t: '', b: '' };
   const canDelete = cards.length > 1;
@@ -258,6 +261,14 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
    */
   const persist = useCallback(
     async (patch: FaqPatch) => {
+      if (isReferenceWalkthrough(campaignId)) {
+        setCards((list) =>
+          list.map((card, i) =>
+            i === patch.at ? { ...card, id: card.id ?? `walkthrough-faq-${String(i)}` } : card,
+          ),
+        );
+        return;
+      }
       const { faq } = await saveFaq(campaignId, patch.faq);
       setCards((list) => list.map((card, i) => (i === patch.at ? { ...card, id: faq.id } : card)));
     },
@@ -345,7 +356,7 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
     const label = `FAQ ${String(index + 1)}`;
     setCards((list) => list.filter((_, i) => i !== index));
     setIndex((i) => Math.max(0, i - 1));
-    if (going?.id) {
+    if (going?.id && !walkthrough) {
       try {
         await removeFaq(campaignId, going.id);
       } catch {

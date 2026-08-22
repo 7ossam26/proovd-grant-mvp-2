@@ -15020,11 +15020,8 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-vc__cta:focus-visible { outline: 6px solid #013F17; outline-offset: 6px; }
 .ff-vc__cta:disabled { cursor: default; }
 
-/* ── §9's three autosave phrases, and the failure state ─────────────────────
-   Neither is on the reference's screen: it holds its record in memory and
-   never waits for one. Both are absolutely positioned so a save that fails can
-   never move the stage — the composition is a fixed rhythm and one extra line
-   in it would push the CTA off the bottom at a narrow height. */
+/* Save failures are outside the reference composition and absolutely
+   positioned so they cannot move it. Routine Saving/Saved states are hidden. */
 
 .ff-vc__save {
   position: absolute;
@@ -15042,9 +15039,7 @@ html.no-motion .ff-story__say { transition: none; }
   text-transform: uppercase;
   color: #7FA98D;
 }
-/* A retry and a refusal are the two a Founder has to act on, so they are the
-   two that are legible rather than quiet (§1.4). */
-.ff-vc__save[data-loud='true'] { color: #013F17; }
+.ff-vc__save { color: #013F17; }
 
 .ff-vc__state {
   position: absolute;

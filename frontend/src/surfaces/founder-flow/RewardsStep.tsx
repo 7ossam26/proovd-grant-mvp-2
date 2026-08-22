@@ -1,5 +1,5 @@
 /**
- * Screen 24 — your Backer rewards — Founder Flow v2, Session F.
+ * Step 26 — your Backer rewards — Founder Flow v2, Session F.
  *
  * `campaign_reward_packages`, through `saveRewardPackage` — the same route
  * `/campaigns/:campaignId/build` calls. §14.4 requires at least one, which is
@@ -35,6 +35,7 @@ import {
   type RewardPackageView,
 } from '../founder/api.js';
 import { flowDirection, FlowPage, HelpDrawer, useFlowNav } from './FlowPage.js';
+import { isReferenceWalkthrough } from './referenceWalkthrough.js';
 
 /** Dollars as typed → integer cents, once. `12.5` and `12.50` are the same. */
 function toCents(typed: string): string | null {
@@ -167,6 +168,7 @@ function RewardsBody({
     async (reward: RewardDraft, rewardIndex: number) => {
       const cents = toCents(reward.price);
       if (!reward.title.trim() || !reward.body.trim() || !reward.date.trim() || cents === null) return;
+      if (isReferenceWalkthrough(campaignId)) return;
       setError(null);
       try {
         const result = await saveRewardPackage(campaignId, {

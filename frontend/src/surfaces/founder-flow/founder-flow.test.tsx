@@ -63,6 +63,7 @@ function respond(status: number, body: unknown): Response {
 
 beforeEach(() => {
   invalidateSession();
+  sessionStorage.clear();
   handlers = [];
   requests = [];
   vi.stubGlobal('fetch', async (input: string, init?: RequestInit) => {
@@ -2295,7 +2296,7 @@ describe('how Creators are paid (18)', () => {
   });
 });
 
-describe('the build steps (21–24)', () => {
+describe('the build steps (23–26)', () => {
   it('composes the voice chips into the one §14.4 field, with no cap', async () => {
     stubStage5();
     renderAt(at('voice'));
@@ -2334,6 +2335,23 @@ describe('the build steps (21–24)', () => {
     await screen.findByRole('heading', { name: /campaign in review/i });
 
     expect(document.querySelector('[data-flow-page="voice"]')).toBeNull();
+    expect(
+      requests.some((request) => request.method === 'PATCH' && /\/build$/.test(request.url)),
+    ).toBe(false);
+  });
+
+  it('keeps the local reference walkthrough on every build page after the fee bypass', async () => {
+    sessionStorage.setItem('proovd:founder-reference-walkthrough:camp-d1', '1');
+    stubStage5({
+      campaignStatus: 'vetting',
+      build: { ...BUILD_FIELDS, brandVoice: 'Fun' },
+    });
+    renderAt(at('voice'));
+    await screen.findByRole('heading', { name: /brand voice and tone/i });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByRole('heading', { name: /add your faq/i });
+
     expect(
       requests.some((request) => request.method === 'PATCH' && /\/build$/.test(request.url)),
     ).toBe(false);

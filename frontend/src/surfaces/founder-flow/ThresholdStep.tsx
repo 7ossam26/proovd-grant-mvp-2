@@ -1,5 +1,5 @@
 /**
- * Screen 22 — Set your order goal, rebuilt from the reference's `scGoal`.
+ * Step 24 — Set your order threshold, rebuilt from the reference's `scGoal`.
  * The fixed stage, copy, states, relay, $500 beat, and Help drawer below are
  * the reference implementation. The existing API still persists the value.
  */

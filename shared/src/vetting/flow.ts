@@ -318,7 +318,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     param: 'campaignId',
     title: 'How Creators are paid',
     help: 'Creators take a share of the preorders, so there is nothing to pay upfront.',
-    stage: 5,
+    stage: 4,
   },
   {
     id: 'application-review',
@@ -326,7 +326,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     param: 'campaignId',
     title: 'Review',
     help: 'We read every campaign by hand. This is usually minutes, not days.',
-    stage: 5,
+    stage: 4,
   },
   {
     id: 'fee',
@@ -380,7 +380,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     param: 'campaignId',
     title: 'How you get paid',
     help: 'Your campaign takes payments through a Stripe account in your name. Stripe asks for your ID, bank and tax details directly — Proovd never sees them.',
-    stage: 4,
+    stage: 5,
   },
   {
     /*

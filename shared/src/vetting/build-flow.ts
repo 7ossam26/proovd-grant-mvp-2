@@ -103,7 +103,7 @@ export const FIXED_PAYMENT_PERCENT_SETTINGS = {
   withFixed: 'affiliate_base_percent_with_fixed',
 } as const;
 
-/* ── Screens 21–24 — the build steps ──────────────────────────────────────── */
+/* ── Steps 23–26 — the authored launch-preparation steps ─────────────────── */
 
 export interface BuildFlowStep {
   /** The flow page id, and the register key. */
@@ -155,7 +155,7 @@ export const BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD =
 export const ORDER_THRESHOLD_IS_A_COUNT =
   'This is a number of pre-orders, not an amount of money. If your campaign reaches it, the cards are charged; if it does not, nobody is charged at all.';
 
-/* ── Screens 19 and 26 — the two waiting states ───────────────────────────── */
+/* ── Launch-preparation lifecycle states ──────────────────────────────────── */
 
 /**
  * Pinned, and asserted by a source scan rather than trusted.

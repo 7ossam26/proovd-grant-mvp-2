@@ -216,6 +216,21 @@ describe('the fixed-payment openness (§16, §14.3)', () => {
 /* ── The build steps ──────────────────────────────────────────────────────── */
 
 describe('the four build steps (§14.4)', () => {
+  it('keeps Stage 5 in the launch-preparation order', () => {
+    expect(
+      FOUNDER_FLOW_PAGES.filter((page) => page.stage === 5).map((page) => page.id),
+    ).toEqual([
+      'voice',
+      'threshold',
+      'faqs',
+      'rewards',
+      'payouts',
+      'in-review',
+      'live',
+      'password',
+    ]);
+  });
+
   it('walks the threshold on an Idea campaign and never on a Product one', () => {
     // §14.4 gives a Product campaign no public threshold. A hand-written walk
     // would send every Product Founder to a page with nothing on it.

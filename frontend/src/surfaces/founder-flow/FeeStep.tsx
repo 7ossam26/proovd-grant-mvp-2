@@ -142,6 +142,7 @@ import {
 } from '../founder/api.js';
 import { FlowPage, flowDirection, useFlowNav } from './FlowPage.js';
 import { useSetupWorkspace } from './useSetup.js';
+import { PITCH_DEMO, startReferenceWalkthrough } from './referenceWalkthrough.js';
 
 /* ── The stage ─────────────────────────────────────────────────────────────
    `fitStages()` for a page it treats as ordinary: the stage's own size as the
@@ -163,8 +164,6 @@ const MAX_REFERENCE_SCALE = 0.37;
  * `VITE_PITCH_DEMO=false` to restore the real payout/Stripe gate locally.
  * Production can never enter this branch.
  */
-const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
-
 function stageScale(): string {
   const fitted = Math.min(window.innerWidth / FIT_W, window.innerHeight / FIT_H) * PAGE_SCALE;
   const s = Math.min(fitted, MAX_REFERENCE_SCALE);
@@ -618,9 +617,16 @@ function FeeScreen({
                   ? 'Pay & Start — continue the pitch demo without payment'
                   : 'Pay & Start — your billing address and total'
             }
-            onClick={() =>
-              paid || PITCH_DEMO ? leaveToPage('voice') : startPaying()
-            }
+            onClick={() => {
+              if (paid) {
+                leaveToPage('voice');
+              } else if (PITCH_DEMO) {
+                startReferenceWalkthrough(campaignId);
+                leaveToPage('voice');
+              } else {
+                startPaying();
+              }
+            }}
           >
             {paid ? 'Start your campaign page' : 'Pay & Start'}
           </button>

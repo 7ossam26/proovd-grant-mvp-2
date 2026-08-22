@@ -26,6 +26,7 @@ import {
   type BuildState,
 } from '../founder/api.js';
 import { useAutosave, type AutosaveController } from '../../lib/useAutosave.js';
+import { isReferenceWalkthrough } from './referenceWalkthrough.js';
 
 export interface BuildFlowState {
   state: BuildState | null;
@@ -62,6 +63,10 @@ export function useBuildFlow(campaignId: string): BuildFlowState {
   const autosave = useAutosave<Partial<BuildFields>>(
     useCallback(
       async (patch: Partial<BuildFields>) => {
+        // The local reference walkthrough must remain non-financial and
+        // non-lifecycle-mutating. Keep its edits local while still letting the
+        // complete reference sequence be exercised.
+        if (isReferenceWalkthrough(campaignId)) return;
         const result = await saveBuild(campaignId, patch);
         // Only what the server DERIVES. `build` is deliberately not written
         // back over the caller's own text state (§9).

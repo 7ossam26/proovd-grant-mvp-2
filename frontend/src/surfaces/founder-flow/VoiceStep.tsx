@@ -1,5 +1,5 @@
 /**
- * Screen 21 — your brand voice, rebuilt 1:1 from the reference.
+ * Step 23 — your brand voice, rebuilt 1:1 from the reference.
  *
  * REBUILT 2026-08-21 from the supplied reference (`Proovd Founder Flow v2.dc.html`,
  * `[data-voice]` / `kindWide`), from scratch. The Session F surface it replaces
@@ -88,6 +88,7 @@ import { stageRelayIn, voiceSheetIn } from '../../components/anim.js';
 import { describeSaveState } from '../../lib/autosave.js';
 import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
 import { useBuildFlow, type BuildFlowState } from './useBuild.js';
+import { isReferenceWalkthrough } from './referenceWalkthrough.js';
 
 /* ── The stage ─────────────────────────────────────────────────────────────
    `fitStages()` for a page it treats as ordinary: the stage's own size as the
@@ -164,7 +165,10 @@ export function VoiceStep() {
   // The reference's `scVoice` is true only while `pageStatus === 'draft'`.
   // Do not render a read-only imitation of that screen for a campaign already
   // in review; send it to the lifecycle screen instead.
-  if (!EDITABLE_STATUSES.includes(build.state.campaignStatus)) {
+  if (
+    !EDITABLE_STATUSES.includes(build.state.campaignStatus) &&
+    !isReferenceWalkthrough(campaignId)
+  ) {
     return <Navigate to={founderFlowPath('in-review', campaignId)} replace />;
   }
 
@@ -376,12 +380,14 @@ function VoiceScreen({
         </div>
       </div>
 
-      {/* Below the composition and absolutely positioned, so a save that fails
-          can never move the stage. The reference holds its record in memory and
-          never waits for one, so this line and the two states above are ours. */}
-      <p className="ff-vc__save" role="status" aria-live="polite" data-loud={loud}>
-        {status}
-      </p>
+      {/* The reference has no success/status line. Keep only a failure visible:
+          it requires action and cannot honestly disappear, while routine
+          “Saving…” / “Saved” states remain out of the composition. */}
+      {loud ? (
+        <p className="ff-vc__save" role="alert">
+          {status}
+        </p>
+      ) : null}
       {sheet.kind === 'replace' ? (
         <ReplaceSheet
           brand={brand}
