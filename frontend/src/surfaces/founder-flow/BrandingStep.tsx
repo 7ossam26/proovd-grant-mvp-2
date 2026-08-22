@@ -20,7 +20,6 @@ import {
   type AssetState,
   type WorkspaceState,
 } from '../founder/api.js';
-import { HelperResources } from '../founder/HelperResources.js';
 import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
 import { useSetupWorkspace } from './useSetup.js';
 
@@ -204,7 +203,6 @@ function BrandLogoScreen({
         <HelpDrawer
           pageId="branding"
           param={campaignId}
-          extra={<HelperResources subject="branding" />}
           trigger={<button type="button" className="ff-brandlogo__help">Help</button>}
         />
       </div>
@@ -212,7 +210,6 @@ function BrandLogoScreen({
       <HelpDrawer
         pageId="branding"
         param={campaignId}
-        extra={<HelperResources subject="branding" />}
         trigger={
           <button type="button" className="ff-brandlogo__mailbtn" aria-label="Help and reading — 3 messages">
             <span className="ff-brandlogo__mail" aria-hidden="true">

@@ -28,7 +28,6 @@ import { axe } from 'jest-axe';
 import {
   FLOW_COMPLETION_IS_DECIDED,
   FOUNDER_ANSWER_SEQUENCE,
-  FOUNDER_FLOW_EARLIER_STAGE_CLOSED,
   FOUNDER_FLOW_ABSENCES,
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
@@ -232,11 +231,11 @@ describe('the flow is a sequence of pages', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   The help drawer — §27.1's sixth question, once for the whole flow
+   The reference Help drawer — reading for this page, then the handbook
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('the help drawer', () => {
-  it('leads with this page and marks it, and marks the earlier ones done', async () => {
+  it('leads with this page’s reference reading and ends with the handbook', async () => {
     const user = userEvent.setup();
     stubVetting(ANSWERED);
     renderAt(at('solution'));
@@ -244,16 +243,15 @@ describe('the help drawer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Help' }));
     const dialog = await screen.findByRole('dialog');
-    const cards = within(dialog).getAllByRole('button');
+    const cards = dialog.querySelectorAll('.ff-help-ref__docs article');
 
-    expect(cards[0]!.textContent).toContain('Your solution');
-    expect(cards[0]!.textContent).toContain('This page');
-    expect(cards[0]!.getAttribute('aria-current')).toBe('page');
-    expect(cards[1]!.textContent).toContain('Your problem');
-    expect(cards[1]!.textContent).toContain('Done');
+    expect(cards[0]).toHaveTextContent('One-sentence solution statements.pdf');
+    expect(cards[0]).toHaveTextContent('PDF · 0.6 MB');
+    expect(cards[0]).toHaveClass('is-current');
+    expect(cards[cards.length - 1]).toHaveTextContent('Proovd founder handbook.pdf');
   });
 
-  it('never lists a page ahead of the one you are on', async () => {
+  it('is page reading rather than a progress or navigation list', async () => {
     const user = userEvent.setup();
     stubVetting(ANSWERED);
     renderAt(at('problem'));
@@ -261,24 +259,22 @@ describe('the help drawer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Help' }));
     const dialog = await screen.findByRole('dialog');
-    // A drawer that listed what is coming would offer to jump to addresses
-    // that refuse, and would be a progress bar with reading attached.
-    expect(dialog.textContent).not.toContain('Campaign type');
-    expect(dialog.textContent).toContain('Your problem');
-    expect(dialog.textContent).toContain('Your invite');
+    expect(dialog).toHaveTextContent('Writing a problem backers recognise.pdf');
+    expect(dialog).toHaveTextContent('Problem statement worksheet.pdf');
+    expect(dialog).not.toHaveTextContent('Your solution');
+    expect(dialog).not.toHaveTextContent('Your invite');
   });
 
-  it('jumps to an earlier page without losing the position', async () => {
+  it('closes from its X without changing the page', async () => {
     const user = userEvent.setup();
-    stubLanding();
     stubVetting(ANSWERED);
     renderAt(at('solution'));
     await screen.findByRole('heading', { level: 1 });
 
     await user.click(screen.getByRole('button', { name: 'Help' }));
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: /your problem/i }));
-    await screen.findByRole('heading', { name: /how we understood your problem/i });
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /close help/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute('data-flow-page', 'solution');
   });
 });
 
@@ -1340,16 +1336,11 @@ describe('the five §12 answers (10–14)', () => {
     }
   });
 
-  it('offers no Back on the first one, so Back can never walk forward', async () => {
-    // §10's claim invalidated the draft token, so nothing behind `visuals` has
-    // an address left. Its Back used to go to Last look — five pages FORWARD —
-    // and that closed a ring: Back from Last look walked socials → story →
-    // interview → branding → visuals and arrived at Last look again, round for
-    // as long as somebody kept pressing it.
+  it('renders the reference Back on Visuals without inventing a spent-token route', async () => {
     stubStage3();
     const view = renderAt(at('visuals'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.queryByRole('button', { name: /^back to/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Back to the previous step' })).toBeInTheDocument();
     view.unmount();
 
     // And every later answer still steps back exactly one page.
@@ -1357,7 +1348,7 @@ describe('the five §12 answers (10–14)', () => {
     stubStage3();
     renderAt(at('branding'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByRole('button', { name: 'Back to Your visuals' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
   it('names the saving from the SETTING, never from a hardcoded $2', async () => {
@@ -1386,16 +1377,13 @@ describe('the five §12 answers (10–14)', () => {
     expect(screen.getByText('A logo or wordmark has not been uploaded.')).toBeInTheDocument();
   });
 
-  it('renders the Track A4 upload absence rather than a control that fails', async () => {
-    // DELIBERATELY REWORDED (2026-08-20): `visuals` was rebuilt to the supplied
-    // reference and its zone carries the absence inside the reference's own
-    // 500px box. The rule is unchanged and is what this asserts — the reason
-    // renders where the control would be, and no control offers to add a file.
+  it('keeps the reference upload copy visible when storage is unavailable', async () => {
     stubStage3();
     renderAt(at('visuals'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.queryByText(/tap to add a file/i)).toBeNull();
-    expect(screen.getByText(/adding files is not switched on/i)).toBeInTheDocument();
+    expect(screen.getByText('Tap to add a file')).toBeInTheDocument();
+    expect(screen.getByText('PNG, JPG, MP4')).toBeInTheDocument();
+    expect(document.querySelector('#ff-vis-file')).toBeDisabled();
   });
 
   it('names the missing §6 settings instead of offering a slot', async () => {
@@ -1531,8 +1519,8 @@ describe('Last look (15)', () => {
   });
 });
 
-describe('the help drawer across the stage boundary', () => {
-  it('offers reading but no jump once the invitation link is spent', async () => {
+describe('the help drawer on campaign-addressed pages', () => {
+  it('shows only that page’s resources and the handbook', async () => {
     const user = userEvent.setup();
     stubStage3();
     renderAt(at('visuals'));
@@ -1541,15 +1529,10 @@ describe('the help drawer across the stage boundary', () => {
     await user.click(screen.getAllByRole('button', { name: 'Help' })[0]!);
     const drawer = await screen.findByRole('dialog');
 
-    // The card for an earlier page is still there, with its explanation.
-    expect(within(drawer).getByText('Your positioning')).toBeInTheDocument();
-    // …and it is not a control, because the address it needs no longer exists.
-    expect(
-      within(drawer).queryByRole('button', { name: /your positioning/i }),
-    ).toBeNull();
-    expect(within(drawer).getAllByText(FOUNDER_FLOW_EARLIER_STAGE_CLOSED).length).toBeGreaterThan(0);
-    // A page in the same stage still jumps.
-    expect(within(drawer).getByRole('button', { name: /your visuals/i })).toBeInTheDocument();
+    expect(drawer).toHaveTextContent('Shooting product photos on a phone.pdf');
+    expect(drawer).toHaveTextContent('Clip lengths that convert.pdf');
+    expect(drawer).toHaveTextContent('Proovd founder handbook.pdf');
+    expect(drawer).not.toHaveTextContent('Your positioning');
   });
 });
 

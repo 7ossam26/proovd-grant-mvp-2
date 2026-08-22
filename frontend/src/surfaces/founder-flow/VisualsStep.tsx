@@ -93,7 +93,7 @@
  */
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { EVIDENCE_REJECTIONS, founderFlowIndex, founderFlowPath } from '@proovd/shared';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { StatePanel, NO_ACTION } from '../../components/index.js';
@@ -207,6 +207,7 @@ function VisualsScreen({
   refresh: (promise: Promise<{ workspace: WorkspaceState }>) => Promise<void>;
 }) {
   const { leave, leaveToPage } = useFlowNav();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const fromReview = params.get('from') === 'review';
 
@@ -316,31 +317,35 @@ function VisualsScreen({
 
   return (
     <div className="ff-vis" ref={root}>
-      {/* The reference's own control, bottom-left. See the header for why it is
-          drawn only for an edit opened from Last look. */}
-      {fromReview ? (
-        <button
-          type="button"
-          className="ff-vis__back"
-          aria-label="Back to Last look"
-          onClick={() => leaveToPage('last-look', -1)}
+      {/* The reference draws this control in both the forward flow and a review
+          edit. Review has a durable named destination; the forward boundary
+          crosses from the spent invitation token to the campaign session, so
+          it returns to the actual history entry instead of fabricating a route
+          whose token can no longer be used. */}
+      <button
+        type="button"
+        className="ff-vis__back"
+        aria-label={fromReview ? 'Back to Last look' : 'Back to the previous step'}
+        onClick={() => {
+          if (fromReview) leaveToPage('last-look', -1);
+          else void navigate(-1);
+        }}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="11"
+          height="11"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="11"
-            height="11"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M15 5 8 12l7 7" />
-          </svg>
-          Back
-        </button>
-      ) : null}
+          <path d="M15 5 8 12l7 7" />
+        </svg>
+        Back
+      </button>
 
       <div className="ff-vis__top">
         {/* Not a link. A campaign's own half-finished form is not a site, and

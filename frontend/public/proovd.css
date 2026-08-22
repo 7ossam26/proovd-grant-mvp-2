@@ -3744,40 +3744,147 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   z-index: 60;
 }
 
-/* ── The help drawer ──────────────────────────────────────────────────────
-   Inside .drawer.mode-drawer, so the panel, the scrim and the slide are the
-   ones every other sheet in the product uses. */
+/* ── The reference Help drawer ────────────────────────────────────────────
+   Page-specific reading, then the founder handbook. It is not navigation and
+   it is not a progress list. Geometry and colours are literal from the
+   reference's `[data-drawer]`; Radix supplies focus trapping, Escape and
+   scrim dismissal while `referenceDrawerOpen/Close` supply its timings. */
 
-.ff-help__sub { margin: 0 0 var(--sp-24); color: var(--mode-body); }
-.ff-help__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-12); }
-.ff-help__card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--sp-4) var(--sp-12);
-  width: 100%;
-  text-align: left;
-  padding: var(--sp-16);
+.ff-help-ref__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 940;
+  background: rgba(1, 45, 16, 0.4);
+}
+
+.ff-help-ref {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 960;
+  width: min(27rem, 88vw);
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: clamp(20px, 2.4vw, 32px) clamp(1.35rem, 4.4vw, 4rem);
+  background: #012D10;
+  color: #E9FFE1;
+  font-family: 'Satoshi', sans-serif;
+  line-height: normal;
+  outline: none;
+}
+
+.ff-help-ref__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(0.8rem, 1.3vw, 1.1rem);
+  margin-bottom: clamp(18px, 2.2vw, 28px);
+}
+
+.ff-help-ref__head h2 {
+  margin: 0;
+  color: #E9FFE1;
+  font-size: clamp(18px, 1.6vw, 21px);
+  font-weight: 900;
+  line-height: normal;
+  letter-spacing: -0.03em;
+}
+
+.ff-help-ref__head button {
+  width: clamp(2.75rem, 3.6vw, 3.3rem);
+  height: clamp(2.75rem, 3.6vw, 3.3rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0;
+  border: 0;
   background: none;
-  border: var(--bw) solid var(--moss);
-  border-radius: var(--radius);
-  color: var(--mode-body);
+  color: #E9FFE1;
   cursor: pointer;
-  min-height: var(--touch);
 }
-.ff-help__card.is-current {
-  border-color: var(--brand);
-  background: var(--brand-5);
+
+.ff-help-ref__head button:focus-visible {
+  outline: 2px solid #41ED98;
+  outline-offset: 2px;
 }
-.ff-help__title { font-weight: 900; color: var(--mode-title); }
-.ff-help__state {
-  font-size: 0.75rem;
+
+.ff-help-ref__intro {
+  margin-bottom: clamp(12px, 1.6vw, 18px);
+  color: #A2AFA8;
+  font-size: clamp(0.7rem, 0.82vw, 0.8rem);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ff-help-ref__docs {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.2vw, 16px);
+}
+
+.ff-help-ref__docs article {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: clamp(14px, 1.6vw, 20px);
+  border: 2px solid #1B4A2C;
+  border-radius: 2px;
+  background: transparent;
+  color: #A2AFA8;
+  font-family: 'Satoshi', sans-serif;
+  text-align: left;
+}
+
+.ff-help-ref__docs article.is-current {
+  border-color: #41ED98;
+  background: rgba(65, 237, 152, 0.08);
+}
+
+.ff-help-ref__tag {
+  color: #A2AFA8;
+  font-size: clamp(0.62rem, 0.72vw, 0.72rem);
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--brand);
-  align-self: start;
 }
-.ff-help__body { grid-column: 1 / -1; font-size: 0.9375rem; }
+
+.ff-help-ref__docs article.is-current .ff-help-ref__tag { color: #41ED98; }
+
+.ff-help-ref__docs strong {
+  margin-top: 2px;
+  color: #E9FFE1;
+  font-size: clamp(14px, 1.3vw, 18px);
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+
+.ff-help-ref__docs article > span:last-child {
+  color: #A2AFA8;
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+@media (min-width: 1500px) {
+  .ff-help-ref { padding-inline: clamp(4rem, 5vw, 7rem); }
+  .ff-help-ref__head button { width: clamp(3.1rem, 2.6vw, 3.7rem); height: clamp(3.1rem, 2.6vw, 3.7rem); }
+  .ff-help-ref__intro { font-size: clamp(0.8rem, 0.6vw, 0.92rem); }
+  .ff-help-ref__tag { font-size: clamp(0.7rem, 0.55vw, 0.84rem); }
+}
+
+@media (max-width: 600px) {
+  .ff-help-ref {
+    inset: auto 0 0 0;
+    width: 100%;
+    height: 86dvh;
+  }
+}
 
 /* ── Shared page furniture ────────────────────────────────────────────────  */
 
@@ -4673,21 +4780,6 @@ html.no-motion .ff-prob__rail { transition: none; }
    bottom of this file, under the `.ff-ll` prefix. The token-scale card list
    that stood here is gone with its component — dead CSS ships in every
    browser, and §33.11.3 reads what ships.                                   */
-
-/* ── The help drawer, from a page the earlier ones cannot be reached from ──
-   §10's claim invalidates the draft token, so from stage 3 an earlier card is
-   reading rather than a jump. It keeps its explanation and loses the control
-   that would fail (§1.4).                                                   */
-.ff-help__card.is-closed {
-  cursor: default;
-  opacity: 1;
-}
-.ff-help__closed {
-  grid-column: 1 / -1;
-  color: var(--moss);
-  font-size: 0.875rem;
-  font-style: italic;
-}
 
 @media (max-width: 599.98px) {
   .ff-hexrow .btn { width: 100%; justify-content: center; }
@@ -12859,9 +12951,6 @@ html.no-motion .ff-story__say { transition: none; }
   line-height: 1.45;
   color: #013F17;
 }
-
-/* §12's helper resources, inside the drawer the reference's HELP opens. */
-.ff-help__extra { margin: 0 0 var(--sp-24); }
 
 /* The reference's own one media query for this screen. Everything else is the
    stage, and the stage scales rather than reflowing. */

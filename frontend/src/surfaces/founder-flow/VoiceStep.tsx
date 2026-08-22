@@ -74,7 +74,6 @@ import {
 import { Navigate, useParams } from 'react-router';
 import {
   BRAND_VOICE_CHIP_FILLS,
-  BRAND_VOICE_IS_READ_BY_PEOPLE,
   BRAND_VOICE_NO_WORDS_YET,
   BRAND_VOICE_WORDS_ALL,
   BRAND_VOICE_WORDS_SHORT,
@@ -296,7 +295,6 @@ function VoiceScreen({
         <HelpDrawer
           pageId="voice"
           param={campaignId}
-          extra={<p className="ff-help__sub">{BRAND_VOICE_IS_READ_BY_PEOPLE}</p>}
           trigger={
             <button type="button" className="ff-vc__help">
               Help

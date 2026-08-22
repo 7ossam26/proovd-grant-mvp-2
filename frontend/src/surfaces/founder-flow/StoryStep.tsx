@@ -143,7 +143,6 @@ import { SurfaceLoading } from '../../features/public/states.js';
 import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { recIntro, sayHandoff, stageRelayIn } from '../../components/anim.js';
 import { describeSaveState } from '../../lib/autosave.js';
-import { HelperResources } from '../founder/HelperResources.js';
 import { transcribeStory, type WorkspaceState } from '../founder/api.js';
 import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
 import { speechSupported, startSpeech, type SpeechSession } from './speech.js';
@@ -769,8 +768,6 @@ function StoryScreen({
   const cards = Math.max(0, founderFlowIndex('story') + 1);
   const backTitle = fromReview ? 'Last look' : (previous ? 'Your interview' : 'Last look');
 
-  const help = <HelperResources subject="story" />;
-
   return (
     <div className="ff-story" ref={root}>
       {/* The reference's own control, bottom-left. Its label names where it
@@ -806,7 +803,6 @@ function StoryScreen({
         <HelpDrawer
           pageId="story"
           param={campaignId}
-          extra={help}
           trigger={
             <button type="button" className="ff-story__help">
               Help
@@ -820,7 +816,6 @@ function StoryScreen({
       <HelpDrawer
         pageId="story"
         param={campaignId}
-        extra={help}
         trigger={
           <button
             type="button"
