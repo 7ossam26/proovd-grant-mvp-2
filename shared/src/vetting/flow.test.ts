@@ -16,8 +16,6 @@ describe('Founder Flow Stage 5', () => {
       { id: 'rewards', title: 'Your Backer rewards', path: '/campaigns/:campaignId/setup/rewards' },
       { id: 'payouts', title: 'How you get paid', path: '/campaigns/:campaignId/setup/payouts' },
       { id: 'in-review', title: 'Your campaign in review', path: '/campaigns/:campaignId/setup/in-review' },
-      { id: 'live', title: 'Your campaign is live', path: '/campaigns/:campaignId/setup/live' },
-      { id: 'password', title: 'Your password', path: '/campaigns/:campaignId/setup/password' },
     ]);
   });
 });

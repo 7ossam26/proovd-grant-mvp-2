@@ -84,8 +84,6 @@ import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
 import { InReviewReferenceStep } from './surfaces/founder-flow/InReviewReferenceStep.js';
-import { LiveStep } from './surfaces/founder-flow/LiveStep.js';
-import { PasswordStep as FounderPasswordStep } from './surfaces/founder-flow/PasswordStep.js';
 import {
   SAMPLE_IDEA_CAMPAIGN,
   SAMPLE_PRODUCT_CAMPAIGN,
@@ -138,6 +136,12 @@ function DraftResultRedirect() {
 function WorkspaceRedirect() {
   const { campaignId = '' } = useParams();
   return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
+}
+
+/** The supplied dashboard now owns the retired setup tail. */
+function FounderSetupTailRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderDashboardPath(campaignId)} replace />;
 }
 
 /**
@@ -389,8 +393,8 @@ const rootChildren: RouteObject[] = [
   },
   {
     /*
-      Founder Flow v2, Session B (2026-08-18) — the first four of twenty-six
-      full-bleed pages, each its own top-level route.
+      Founder Flow v2, Session B (2026-08-18) — the first four full-bleed
+      pages, each its own top-level route.
 
       Outside the public shell, because its header offers a nav bar of things to
       probe and these pages are reached by a personal link rather than by
@@ -401,7 +405,7 @@ const rootChildren: RouteObject[] = [
       One address per page, and `FOUNDER_FLOW_PAGES` is the one list of them —
       the help drawer and §33.11's flow register both read it, so a page cannot
       exist in the router and be missing from either. DNA §5.12 wants position
-      to survive interruption, and twenty-six screens is twenty-six positions a
+      to survive interruption, and one route per screen preserves the position a
       single stateful page would destroy on reload.
 
       `draft/:token` is the address in the invitation email and does not move.
@@ -853,25 +857,15 @@ const rootChildren: RouteObject[] = [
     element: <InReviewReferenceStep />,
   },
   {
+    // Retired because campaign state now lives in the supplied dashboard.
     path: 'campaigns/:campaignId/setup/live',
-    element: <LiveStep />,
+    element: <FounderSetupTailRedirect />,
   },
   {
-    /*
-      The last page of the flow (2026-08-20, product direction).
-
-      §10 took the password at a screen near the beginning; it is here now, and
-      the account is created by submitting the §9 answers instead — §13's
-      Stripe onboarding is keyed to a real user, so it could not wait.
-      `backend/src/vetting/claim.ts` records the deviation in full.
-
-      Inside the same Founder group as its twenty neighbours — no guard of its
-      own, because by the time anybody reaches it they have had a session since
-      submission, and a second `RequireRole` here would be a second answer to a
-      question the group already asks.
-    */
+    // Retired because the supplied dashboard begins with the same password
+    // setup. Existing bookmarks hand directly to that intro.
     path: 'campaigns/:campaignId/setup/password',
-    element: <FounderPasswordStep />,
+    element: <FounderSetupTailRedirect />,
   },
   {
     /*
@@ -940,8 +934,8 @@ const rootChildren: RouteObject[] = [
       product's first non-Admin authenticated shell: four chapters — Choose,
       Live, Get paid, Wrap — at ONE address.
 
-      The address does not move. `LiveStep`'s "Go to your campaign home" link,
-      every §27 email that points here, and any bookmark all keep working; the
+      The address does not move. The setup flow's final handoff, every §27 email
+      that points here, and any bookmark all keep working; the
       chapter is `?chapter=` beneath it (DNA §5.12), so a position survives a
       reload without minting a second address for one campaign.
 

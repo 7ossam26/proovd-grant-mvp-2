@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router';
+import { founderDashboardPath } from '@proovd/shared';
 import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { FlowPage, HelpDrawer, useFlowNav } from './FlowPage.js';
@@ -82,7 +83,7 @@ export function InReviewReferenceStep() {
 }
 
 function ReviewBody({ roster }: { roster: RosterView | null }) {
-  const { param, swapToPage } = useFlowNav();
+  const { param, leave } = useFlowNav();
   const [accepted, setAccepted] = useState(1);
   const creators = useMemo(
     () =>
@@ -96,13 +97,13 @@ function ReviewBody({ roster }: { roster: RosterView | null }) {
   useEffect(() => {
     const second = window.setTimeout(() => setAccepted(2), 1500);
     const third = window.setTimeout(() => setAccepted(3), 3000);
-    const live = window.setTimeout(() => swapToPage('live'), 5000);
+    const dashboard = window.setTimeout(() => leave(founderDashboardPath(param), 1), 5000);
     return () => {
       window.clearTimeout(second);
       window.clearTimeout(third);
-      window.clearTimeout(live);
+      window.clearTimeout(dashboard);
     };
-  }, [swapToPage]);
+  }, [leave, param]);
 
   return (
     <section className="ff-review-ref">

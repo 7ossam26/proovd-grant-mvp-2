@@ -10,11 +10,13 @@
  * somewhere that does not exist.
  *
  * ── It holds only the pages that EXIST ──────────────────────────────────────
- * Twenty-six were planned and twenty-five are here. On 2026-08-20, by
+ * Twenty-six were planned and twenty-three remain here. On 2026-08-20, by
  * explicit product direction, the reach orbit and the problem confirm were
  * added from the reference, and the account-claim screen (`claim`) was removed
  * outright. The reference's `match` relevance signal returned on 2026-08-21,
- * between Details and the existing money flow. So this is every page the flow
+ * between Details and the existing money flow. The duplicate final password
+ * page and the separate live-status page were retired when the supplied
+ * dashboard took ownership of those moments. So this is every page the flow
  * has, and the help drawer's "everything before it" is a fact rather than an
  * aspiration.
  *
@@ -393,40 +395,6 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     param: 'campaignId',
     title: 'Your campaign in review',
     help: 'Where your campaign stands between being submitted and going live: our review, your Creators’ decisions, and the coordinated launch.',
-    stage: 5,
-  },
-  {
-    id: 'live',
-    path: '/campaigns/:campaignId/setup/live',
-    param: 'campaignId',
-    title: 'Your campaign is live',
-    help: 'Your page is public and your Creators’ links are working. Everything after this happens on your campaign home.',
-    stage: 5,
-  },
-  {
-    /*
-      The password — the LAST page of the flow (2026-08-20, product direction).
-
-      §10 creates the account and chooses the credential in one act, at a screen
-      near the beginning. Those are two acts here and this is the second: the
-      account exists from submission, because §13's Stripe onboarding is keyed
-      to a real user and every page from `visuals` onward is behind
-      `requireRole('founder')`, so it cannot wait. What CAN wait is the
-      password, and the direction was to put it at the end.
-
-      `backend/src/vetting/claim.ts` records the deviation in full, including
-      the eight §10 items that no longer gate the claim and what each was
-      replaced by. This entry is the position; that file is the reasoning.
-
-      It is stage 5 and campaign-addressed like its neighbours, because by the
-      time somebody reaches it they have had a Founder session for twenty
-      pages. The parameter is only there to give the audit row a campaign.
-    */
-    id: 'password',
-    path: '/campaigns/:campaignId/setup/password',
-    param: 'campaignId',
-    title: 'Your password',
-    help: 'The last step. Choose a password so you can sign back in — until now your account has been held open by this browser alone.',
     stage: 5,
   },
 ];

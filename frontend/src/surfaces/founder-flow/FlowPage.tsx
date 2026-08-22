@@ -15,12 +15,12 @@
  * control names its destination — and §33.11.2's rule that the thing a person
  * is looking at is a heading.
  *
- * ── Position survives, twenty-six times ─────────────────────────────────────
+ * ── Position survives across the flow ───────────────────────────────────────
  * Every page is its own top-level route, outside every layout and guard, and
  * `FOUNDER_FLOW_PAGES` is the one list of them. DNA §5.12 requires position to
  * survive interruption and a URL is the cheapest durable position there is; a
- * twenty-six-step sequence held in one component's state is twenty-six
- * positions a reload destroys.
+ * a multi-step sequence held in one component's state is a set of positions a
+ * reload destroys.
  *
  * ── The exit runs before the route changes ──────────────────────────────────
  * `leave` fades the outgoing page and navigates in the tween's callback, with

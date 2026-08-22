@@ -23,10 +23,9 @@
  * ── But it is not where the flow ENDS ───────────────────────────────────────
  * That control was the last step's only forward control until 2026-08-20, and
  * it leaves the flow: nothing in the product navigated into `in-review`, so
- * `in-review`, `live` and `password` were an unreachable island and no Founder
- * ever arrived at the screen where they choose a password. The reference's own
- * chain is build → `campreview` → `live`, so the primary continues to
- * `in-review` and the build page stays one control to the left of it.
+ * `in-review` was an unreachable island and no Founder ever arrived at the
+ * dashboard handoff. The primary continues to `in-review` and the build page
+ * stays one control to the left of it.
  */
 
 import type { ReactNode } from 'react';
@@ -146,11 +145,10 @@ function BuildStepNav({ build, stepId }: { build: BuildFlowState; stepId: string
               See what is left on your campaign
             </Button>
             {/* The reference's own next beat: its last build step goes to
-                `campreview`, and from there to `live`. Ours are `in-review`,
-                `live` and `password` — and until this edge existed nothing in
-                the product navigated into any of the three, so the flow ended
-                here and no Founder ever reached the screen where they choose a
-                password. `in-review` reads §23.1 rather than deciding it, so a
+                `campreview`. Ours is `in-review`, and until this edge existed
+                nothing in the product navigated into it, so the flow ended here
+                and no Founder ever reached the dashboard handoff. `in-review`
+                reads §23.1 rather than deciding it, so a
                 campaign that is still `affiliate_response_and_build` is told
                 exactly that and offered the build page again. */}
             <Button tier="primary" onClick={() => leaveToPage('payouts')}>

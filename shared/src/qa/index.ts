@@ -185,7 +185,7 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_page_build',
-    label: 'Creator pay, the four build steps, and going live',
+    label: 'Creator pay, the four build steps, and campaign review',
     specRef: '§14.3, §14.4, §15, §17',
     audience: 'founder',
     // Founder Flow v2 Session F (2026-08-19). Its own entry rather than seven
@@ -199,7 +199,6 @@ export const PRINCIPAL_FLOWS = [
       '/campaigns/:campaignId/setup/faqs',
       '/campaigns/:campaignId/setup/rewards',
       '/campaigns/:campaignId/setup/in-review',
-      '/campaigns/:campaignId/setup/live',
     ],
     keyboardPathRequired: true,
   },

@@ -28,7 +28,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
-import { NOTHING_HERE_IS_A_TIMER, ROSTER_CHIPS_ARE_RECORDED } from '@proovd/shared';
+import {
+  NOTHING_HERE_IS_A_TIMER,
+  ROSTER_CHIPS_ARE_RECORDED,
+  founderDashboardPath,
+} from '@proovd/shared';
 import { Button, StatePanel, Tag, NO_ACTION } from '../../components/index.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { FlowPage, useFlowNav } from './FlowPage.js';
@@ -140,13 +144,13 @@ function Body({
   build: BuildState;
   roster: RosterView | null;
 }) {
-  const { leave, leaveToPage } = useFlowNav();
+  const { leave } = useFlowNav();
   const status = build.campaignStatus;
   const stage = WHERE_IT_STANDS[status];
   const live = status === 'live';
 
   // §17: a campaign is live because a launch record exists. This page does not
-  // decide that — it reads the lifecycle and offers the live screen when the
+  // decide that — it reads the lifecycle and hands to the dashboard when the
   // lifecycle already says so.
   if (live) {
     return (
@@ -155,7 +159,7 @@ function Body({
           Your campaign is live
         </h1>
         <div className="ff-nav" data-anim="cta">
-          <Button tier="primary" onClick={() => leaveToPage('live')}>
+          <Button tier="primary" onClick={() => leave(founderDashboardPath(campaignId), 1)}>
             See your campaign
           </Button>
         </div>

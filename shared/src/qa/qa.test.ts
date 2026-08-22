@@ -303,8 +303,10 @@ describe('the Founder onboarding flow', () => {
   it('holds only the pages that exist', () => {
     // Twenty-six were planned; on 2026-08-20 the reach orbit and the
     // problem confirm were added and the claim screen was removed. The match
-    // screen returned after Details on 2026-08-21, so this is every live page.
-    expect(FOUNDER_FLOW_PAGES).toHaveLength(25);
+    // screen returned after Details on 2026-08-21. The duplicate final password
+    // and live-status pages now belong to the dashboard, so this is every live
+    // flow page.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(23);
   });
 
   it('addresses a page by the parameter its own auth regime has', () => {

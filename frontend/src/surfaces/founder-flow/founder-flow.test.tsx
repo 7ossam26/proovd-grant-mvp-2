@@ -32,7 +32,6 @@ import {
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
   BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD,
-  LIVE_MEANS_A_LAUNCH_RECORD,
   LISTING_FEE_CHECKOUT_CANCELED,
   NOTHING_HERE_IS_A_TIMER,
   ORDER_THRESHOLD_IS_A_COUNT,
@@ -2438,8 +2437,8 @@ describe('the build steps (23–26)', () => {
   it('continues into the flow rather than ending at the campaign build', async () => {
     // The last step's only forward control used to leave the flow for
     // `/campaigns/:id/build`, and nothing in the product navigated into
-    // `in-review` — so `in-review`, `live` and `password` were an unreachable
-    // island and no Founder ever arrived at the screen that sets a password.
+    // `in-review` — so it was an unreachable island and no Founder ever arrived
+    // at the dashboard handoff.
     // The reference's own chain is build → `campreview` → `live`.
     const user = userEvent.setup();
     stubStage5();
@@ -2479,23 +2478,14 @@ describe('the two waiting states (19, 26)', () => {
     expect(screen.getByText('Reviewing')).toBeInTheDocument();
   });
 
-  it('refuses to celebrate a campaign that has not launched (§17)', async () => {
-    stubStage5({ campaignStatus: 'approved' });
-    renderAt(at('live'));
-    await screen.findByRole('heading', { name: /not live yet/i });
+});
 
-    expect(document.body.textContent).not.toMatch(/you.{0,3}re live/i);
-    expect(screen.queryByRole('button', { name: /campaign home/i })).not.toBeInTheDocument();
-  });
-
-  it('hands over to §20’s campaign home once a launch record exists', async () => {
+describe('the founder dashboard handoff', () => {
+  it.each(['live', 'password'])('redirects the retired %s URL to the dashboard intro', async (tail) => {
     stubStage5({ campaignStatus: 'live' });
-    renderAt(at('live'));
-    await screen.findByRole('heading', { name: /you.{0,3}re live/i });
+    renderAt(`/campaigns/${CAMPAIGN}/setup/${tail}`);
 
-    expect(screen.getByText(LIVE_MEANS_A_LAUNCH_RECORD)).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /go to your campaign home/i }),
-    ).toBeInTheDocument();
+    const frame = await screen.findByTitle<HTMLIFrameElement>('Founder dashboard');
+    expect(new URL(frame.src).pathname).toBe('/founder-dashboard-final.html');
   });
 });
