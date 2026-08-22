@@ -1,43 +1,6 @@
-/**
- * Screen 18 — how Creators are paid — Founder Flow v2, Session F.
- *
- * The screen for **deviation 3**, the fixed-payment openness record: whether the
- * Founder would consider funding an optional fixed Creator payment, and nothing
- * else. It sits after the listing fee because Phase 11's effect 4 is what opens
- * the formal Creator opportunity — before that there is no Creator to be open
- * to.
- *
- * ── It is not a choice of pay structure, and that is the whole design ───────
- * The reference draws a pager over two structures with a Select button. §16
- * makes the optional fixed Creator payment the CREATOR's request, accepted
- * bilaterally through one §14.2 proposal version — so a Founder picking one
- * here would be making the offer only a Creator may make. What is collected is
- * an openness: three answers, no amount, no percentage, no proposal reference,
- * and a record with no column for any of them.
- *
- * ── An Idea campaign gets an explanation and no control at all ──────────────
- * §14.3 prohibits the fixed Creator payment there. The server answers
- * `applicable: false`, the page renders the explanation, and there is no
- * control to disable — the absence IS the rule (§1.4). The database refuses it
- * twice more regardless (a 0052 CHECK and a shape trigger).
- *
- * ── The percentages are the settings ────────────────────────────────────────
- * §14.3's 30% and 20% are `affiliate_base_percent_standard` and
- * `affiliate_base_percent_with_fixed`, read on every request. Phase 06's rule:
- * a hardcoded number is a bug even when it is right. There is no number in this
- * file.
- */
-
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
-import {
-  FIXED_PAYMENT_BINDS_NOBODY,
-  FIXED_PAYMENT_IDEA_EXPLAINER,
-  FIXED_PAYMENT_STANCES,
-  FIXED_PAYMENT_TERMS_COME_LATER,
-  type FixedPaymentStance,
-} from '@proovd/shared';
-import { Button, Choice, StatePanel, NO_ACTION } from '../../components/index.js';
+import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import {
   fetchOpenness,
@@ -45,7 +8,30 @@ import {
   FounderRequestError,
   type OpennessState,
 } from '../founder/api.js';
-import { FlowPage, useFlowNav } from './FlowPage.js';
+import { FlowPage, HelpDrawer, useFlowNav } from './FlowPage.js';
+
+const STAGE_WIDTH = 2496;
+const STAGE_HEIGHT = 1542;
+const PAGE_SCALE = 0.78;
+
+const PAYMENT_MODELS = [
+  {
+    stance: 'not_open' as const,
+    title: 'No upfront fee',
+    art: '/assets/pie-cursor.png',
+    body: 'Creators take a % of the preorders so you pay nothing upfront',
+  },
+  {
+    stance: 'open' as const,
+    title: 'Upfront fee',
+    art: '/assets/cash-hand.png',
+    body: 'Creators take an upfront fee for a lower % cut of your preorders so you keep more',
+  },
+] as const;
+
+function fittedScale(): number {
+  return Math.min(window.innerWidth / STAGE_WIDTH, window.innerHeight / STAGE_HEIGHT) * PAGE_SCALE;
+}
 
 export function CreatorPaymentStep() {
   const { campaignId = '' } = useParams();
@@ -55,8 +41,8 @@ export function CreatorPaymentStep() {
   useEffect(() => {
     let cancelled = false;
     fetchOpenness(campaignId)
-      .then((result) => {
-        if (!cancelled) setOpenness(result.openness);
+      .then(({ openness: result }) => {
+        if (!cancelled) setOpenness(result);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -66,27 +52,23 @@ export function CreatorPaymentStep() {
             : 'We could not open this step.',
         );
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [campaignId]);
 
   if (failure) {
     return (
       <FlowPage pageId="creator-payment" param={campaignId}>
-        <div className="ff-money">
-          <StatePanel
-            state="We could not open this step"
-            whatHappened={failure}
-            next="Reload the page. Nothing about your campaign has changed."
-            owner="Proovd"
-            nextUpdate="As soon as you reload"
-            action={NO_ACTION}
-            reference={campaignId}
-            getHelp={{ href: '/support' }}
-            ring
-          />
-        </div>
+        <StatePanel
+          state="We could not open this step"
+          whatHappened={failure}
+          next="Reload the page. Nothing about your campaign has changed."
+          owner="Proovd"
+          nextUpdate="As soon as you reload"
+          action={NO_ACTION}
+          reference={campaignId}
+          getHelp={{ href: '/support' }}
+          ring
+        />
       </FlowPage>
     );
   }
@@ -94,139 +76,145 @@ export function CreatorPaymentStep() {
   if (!openness) return <SurfaceLoading subject="this step" reference="Your campaign" />;
 
   return (
-    <FlowPage pageId="creator-payment" param={campaignId} badge>
-      <Body openness={openness} campaignId={campaignId} onRecorded={setOpenness} />
+    <FlowPage pageId="creator-payment" param={campaignId}>
+      {openness.applicable ? (
+        <PaymentPicker openness={openness} campaignId={campaignId} onRecorded={setOpenness} />
+      ) : (
+        <PaymentExplainer campaignType={openness.campaignType} />
+      )}
     </FlowPage>
   );
 }
 
-function Body({
-  openness,
-  campaignId,
-  onRecorded,
-}: {
+function ReferenceChrome({ backLabel }: { backLabel: string }) {
+  const { param, swapToPage } = useFlowNav();
+  return (
+    <>
+      <button type="button" className="ff-paypick__back" aria-label={backLabel} onClick={() => swapToPage('match', -1)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 8 12l7 7" /></svg>
+        Back
+      </button>
+      <header className="ff-paypick__top">
+        <img className="ff-paypick__logo" src="/assets/proovd-logo.svg" alt="proovd" />
+        <HelpDrawer
+          pageId="creator-payment"
+          param={param}
+          trigger={<button type="button" className="ff-paypick__help">Help</button>}
+        />
+      </header>
+    </>
+  );
+}
+
+function PaymentPicker({ openness, campaignId, onRecorded }: {
   openness: OpennessState;
   campaignId: string;
   onRecorded: (next: OpennessState) => void;
 }) {
-  const { leaveToPage, swapToPage } = useFlowNav();
-  const [chosen, setChosen] = useState<string>(openness.stance ?? '');
+  const { swapToPage } = useFlowNav();
+  const stage = useRef<HTMLDivElement>(null);
+  const [index, setIndex] = useState(openness.stance === 'open' ? 1 : 0);
+  const [modal, setModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const model = PAYMENT_MODELS[index];
 
-  const save = useCallback(async () => {
-    if (!chosen) return;
+  useLayoutEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const fit = () => { el.style.transform = `translate(-50%, -50%) scale(${fittedScale()})`; };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+
+  const choose = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      const result = await recordOpenness(campaignId, chosen as FixedPaymentStance);
+      const result = await recordOpenness(campaignId, model.stance);
       onRecorded(result.openness);
-      // The reference changes state immediately here; the review screen owns
-      // the grow-first entrance that makes the transition visible.
-      swapToPage('application-review', 1, {
-        campaignType: result.openness.campaignType,
-      });
-    } catch (e: unknown) {
+      if (model.stance === 'open') {
+        setModal(true);
+        setBusy(false);
+      } else {
+        swapToPage('application-review', 1, { campaignType: result.openness.campaignType });
+      }
+    } catch (cause: unknown) {
       setBusy(false);
       setError(
-        e instanceof FounderRequestError
-          ? (e.detail.whatHappened ?? e.detail.title)
+        cause instanceof FounderRequestError
+          ? (cause.detail.whatHappened ?? cause.detail.title)
           : 'We could not record that. Nothing has changed.',
       );
     }
-  }, [campaignId, chosen, onRecorded, swapToPage]);
+  }, [campaignId, model.stance, onRecorded, swapToPage]);
 
-  /* ── §14.3: an Idea Campaign has nothing to be open to ─────────────────── */
-
-  if (!openness.applicable) {
-    return (
-      <div className="ff-pay">
-        <h1 className="ff-money__title" data-anim="head">
-          How Creators are paid
-        </h1>
-        <p className="ff-money__lede" data-anim="sub">
-          Creators take {openness.standardBasePercent}% of what your campaign collects, before
-          sales tax. They are paid when you are — never before.
-        </p>
-        {/* No control, because there is nothing to answer. §14.3 prohibits the
-            fixed Creator payment on an Idea Campaign, and a disabled control
-            would imply a decision somebody could make (§1.4). */}
-        <p className="ff-pay__explainer" data-anim="panel">
-          {FIXED_PAYMENT_IDEA_EXPLAINER}
-        </p>
-        <div className="ff-nav" data-anim="cta">
-          <Button
-            tier="primary"
-            onClick={() =>
-              swapToPage('application-review', 1, { campaignType: openness.campaignType })
-            }
-          >
-            Start your campaign page
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const move = (delta: number) => setIndex((current) => (current + delta + PAYMENT_MODELS.length) % PAYMENT_MODELS.length);
 
   return (
-    <div className="ff-pay">
-      <h1 className="ff-money__title ff-money__title--small" data-anim="head">
-        How Creators are paid
-      </h1>
-      <p className="ff-money__lede" data-anim="sub">
-        Creators take {openness.standardBasePercent}% of what your campaign collects, before sales
-        tax. They are paid when you are — never before.
-      </p>
-
-      <div className="ff-pay__panel" data-anim="panel">
-        <h2 className="ff-money__sub">One Creator may ask for something different</h2>
-        <p className="ff-money__lede">
-          On a Product Campaign a Creator can ask to be paid a fixed amount as well. Where that is
-          agreed, their share of what the campaign collects drops from{' '}
-          {openness.standardBasePercent}% to {openness.withFixedBasePercent}%.
-        </p>
-        {/* Pinned. A screen that collected this without saying it reads as the
-            offer, which is the one thing §16 says a Founder does not make. */}
-        <p className="ff-pay__pinned">{FIXED_PAYMENT_BINDS_NOBODY}</p>
-        <p className="ff-pay__pinned">{FIXED_PAYMENT_TERMS_COME_LATER}</p>
-      </div>
-
-      <fieldset className="ff-pay__choice">
-        <legend className="ff-money__sub">
-          Would you consider funding a fixed Creator payment?
-        </legend>
-        <Choice
-          label="Would you consider funding a fixed Creator payment?"
-          value={chosen}
-          onValueChange={setChosen}
-          entries={FIXED_PAYMENT_STANCES.map((stance) => ({
-            value: stance.value,
-            label: stance.label,
-            sub: stance.meaning,
-          }))}
-        />
-      </fieldset>
-
-      {openness.stance ? (
-        <p className="ff-money__foot">
-          Your answer is recorded. Choosing another one replaces it, and we keep both.
-        </p>
-      ) : null}
-
-      {error ? (
-        <div className="notice notice--warn" role="alert">
-          <p>{error}</p>
+    <section className="ff-paypick" data-paypick="1">
+      <ReferenceChrome backLabel="Back to Creator match" />
+      {modal ? (
+        <div className="ff-paypick__modal-layer" role="presentation">
+          <div className="ff-paypick__modal" role="dialog" aria-modal="true" aria-labelledby="upfront-title" data-pay-modal="1">
+            <span id="upfront-title" className="ff-paypick__modal-tag">Upfront fee</span>
+            <p>A proovd representative will get in touch with you to lock down the upfront fee.</p>
+            <button type="button" onClick={() => swapToPage('application-review', 1, { campaignType: openness.campaignType })}>Got it</button>
+          </div>
         </div>
       ) : null}
-
-      <div className="ff-nav" data-anim="cta">
-        <Button tier="tertiary" onClick={() => leaveToPage('match', -1)}>
-          Back to Creator match
-        </Button>
-        <Button tier="primary" onClick={() => void save()} disabled={busy || !chosen}>
-          {busy ? 'Recording…' : 'Save and start your campaign page'}
-        </Button>
+      <div className="ff-paypick__stage" data-page-stage="1" ref={stage}>
+        <div className="ff-paypick__column">
+          <span className="ff-paypick__note" data-anim="note">Choose your creator payment structure</span>
+          <h1 className="ff-paypick__title" data-anim="head">{model.title}</h1>
+          <div className="ff-paypick__art-row" data-anim="art">
+            <ArrowButton direction="left" onClick={() => move(-1)} />
+            <span key={model.art} className="ff-paypick__art" data-pay-art="1" style={{ backgroundImage: `url(${model.art})` }} role="img" aria-label={model.title} />
+            <ArrowButton direction="right" onClick={() => move(1)} />
+          </div>
+          <p className="ff-paypick__body" data-anim="body">{model.body}</p>
+          {error ? <p className="ff-paypick__error" role="alert">{error}</p> : null}
+          <button type="button" className="ff-paypick__cta" data-anim="cta" disabled={busy} onClick={() => void choose()}>
+            {busy ? 'Selecting…' : 'Select'}
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
+  );
+}
+
+function ArrowButton({ direction, onClick }: { direction: 'left' | 'right'; onClick: () => void }) {
+  return (
+    <button type="button" className="ff-paypick__arrow" aria-label={`${direction === 'left' ? 'Previous' : 'Next'} payment structure`} onClick={onClick}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d={direction === 'left' ? 'M15 5 8 12l7 7' : 'm9 5 7 7-7 7'} /></svg>
+    </button>
+  );
+}
+
+function PaymentExplainer({ campaignType }: { campaignType: OpennessState['campaignType'] }) {
+  const { swapToPage } = useFlowNav();
+  const stage = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const fit = () => { el.style.transform = `translate(-50%, -50%) scale(${fittedScale()})`; };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+
+  return (
+    <section className="ff-paypick ff-paypick--explainer" data-pay="1">
+      <ReferenceChrome backLabel="Back to Creator match" />
+      <div className="ff-paypick__stage" data-page-stage="1" ref={stage}>
+        <div className="ff-paypick__explainer-column">
+          <img className="ff-paypick__explainer-art" data-anim="art" src="/assets/pie-cursor.png" alt="" />
+          <h1 className="ff-paypick__explainer-title" data-anim="head">Creators take a % of the preorders<br />so you pay nothing upfront</h1>
+          <button type="button" className="ff-paypick__explainer-cta" data-anim="cta" onClick={() => swapToPage('application-review', 1, { campaignType })}>I understand</button>
+        </div>
+      </div>
+    </section>
   );
 }

@@ -19,8 +19,10 @@
  *
  * No branch of that function names `fee`, so this screen takes `pageScale`
  * alone — unlike Last look's `s *= .9` or `problem`/`solution`'s `s *= 1.38`.
- * Measured against the reference in Chrome at 1320x900 it reports
- * `scale(0.4125)`, which is exactly that expression.
+ * The supplied reference keeps this screen at its authored `scale(0.37)` on
+ * desktop. The responsive calculation is therefore capped at `0.37`: smaller
+ * viewports can still shrink the stage, while wider ones no longer enlarge
+ * its words and controls beyond the reference composition.
  *
  * Inside the stage sits a 2220px column, centred, `flex-direction: column;
  * align-items: center`, and every child carries the reference's own pixel value
@@ -149,9 +151,23 @@ const FIT_W = 2496;
 const FIT_H = 1542;
 /** The prototype's `pageScale` prop default. */
 const PAGE_SCALE = 0.78;
+/** The desktop scale authored directly on the reference fee stage. */
+const MAX_REFERENCE_SCALE = 0.37;
+
+/**
+ * TODO(stripe-setup): remove this pitch bypass once the Founder Stripe account
+ * and tax configuration are ready to exercise end to end.
+ *
+ * Local Vite development renders the reference fee screen and lets `Pay &
+ * Start` continue to the builder without opening Checkout. Set
+ * `VITE_PITCH_DEMO=false` to restore the real payout/Stripe gate locally.
+ * Production can never enter this branch.
+ */
+const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
 
 function stageScale(): string {
-  const s = Math.min(window.innerWidth / FIT_W, window.innerHeight / FIT_H) * PAGE_SCALE;
+  const fitted = Math.min(window.innerWidth / FIT_W, window.innerHeight / FIT_H) * PAGE_SCALE;
+  const s = Math.min(fitted, MAX_REFERENCE_SCALE);
   // `s.toFixed(4)` is the reference's own — it writes the transform as a string
   // and rounds there, so this is the same number to the digit rather than one
   // that agrees to five decimal places.
@@ -460,7 +476,7 @@ function FeeScreen({
 
   // §13: the incomplete and restricted states offer no way to pay, so they do
   // not get a screen whose whole composition is an amount and a Pay control.
-  if (!paid && !listing.checkoutAvailable) {
+  if (!PITCH_DEMO && !paid && !listing.checkoutAvailable) {
     const restricted = listing.onboardingState === 'restricted';
     const taxOff = listing.taxAvailable === false;
     return (
@@ -542,7 +558,7 @@ function FeeScreen({
   const freeUntil = paid ? new Date(payment!.freeCancellationDeadlineAt) : null;
   const withinFreeWindow = freeUntil !== null && freeUntil.getTime() > Date.now();
 
-  const sheetOpen = sheet !== 'none';
+  const sheetOpen = !PITCH_DEMO && sheet !== 'none';
 
   return (
     <Shell rootRef={root} inert={sheetOpen}>
@@ -598,9 +614,13 @@ function FeeScreen({
             aria-label={
               paid
                 ? 'Start your campaign page — your brand voice'
-                : 'Pay & Start — your billing address and total'
+                : PITCH_DEMO
+                  ? 'Pay & Start — continue the pitch demo without payment'
+                  : 'Pay & Start — your billing address and total'
             }
-            onClick={() => (paid ? leaveToPage('voice') : startPaying())}
+            onClick={() =>
+              paid || PITCH_DEMO ? leaveToPage('voice') : startPaying()
+            }
           >
             {paid ? 'Start your campaign page' : 'Pay & Start'}
           </button>

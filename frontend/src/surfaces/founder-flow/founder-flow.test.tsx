@@ -32,10 +32,6 @@ import {
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
   BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD,
-  FIXED_PAYMENT_BINDS_NOBODY,
-  FIXED_PAYMENT_IDEA_EXPLAINER,
-  FIXED_PAYMENT_STANCES,
-  FIXED_PAYMENT_TERMS_COME_LATER,
   LIVE_MEANS_A_LAUNCH_RECORD,
   LISTING_FEE_CHECKOUT_CANCELED,
   NOTHING_HERE_IS_A_TIMER,
@@ -2256,40 +2252,25 @@ function stubStage5(build: Record<string, unknown> = {}, openness: Record<string
 }
 
 describe('how Creators are paid (18)', () => {
-  it('offers three answers, and no amount anywhere', async () => {
+  it('clones the Product campaign payment-structure picker', async () => {
     stubStage5();
     renderAt(at('creator-payment'));
-    await screen.findByRole('heading', { name: /how creators are paid/i });
+    await screen.findByRole('heading', { name: 'No upfront fee' });
 
-    // §14.3's percentages, from the settings the server sent — never typed
-    // into this file. The lede states the standard rate and the panel states
-    // both, which is why the standard one appears twice.
-    expect(screen.getAllByText(/30%/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/20%/)).toBeInTheDocument();
+    expect(screen.getByText('Choose your creator payment structure')).toBeInTheDocument();
+    expect(screen.getByText('Creators take a % of the preorders so you pay nothing upfront')).toBeInTheDocument();
 
-    for (const stance of FIXED_PAYMENT_STANCES) {
-      expect(screen.getByRole('radio', { name: new RegExp(stance.label, 'i') })).toBeInTheDocument();
-    }
-    expect(screen.getByText(FIXED_PAYMENT_BINDS_NOBODY)).toBeInTheDocument();
-    expect(screen.getByText(FIXED_PAYMENT_TERMS_COME_LATER)).toBeInTheDocument();
-
-    // §16: the terms are the Creator's to propose. There is no field here that
-    // could carry an amount, and the record has no column for one.
-    const page = document.querySelector('.ff') as HTMLElement;
-    for (const input of page.querySelectorAll('input')) {
-      expect(input.getAttribute('type')).toBe('radio');
-    }
-    expect(page.textContent).not.toMatch(/\bupfront\b/i);
-    expect(page.textContent).not.toMatch(/US\$/);
+    await userEvent.click(screen.getByRole('button', { name: 'Next payment structure' }));
+    expect(screen.getByRole('heading', { name: 'Upfront fee' })).toBeInTheDocument();
+    expect(screen.getByText('Creators take an upfront fee for a lower % cut of your preorders so you keep more')).toBeInTheDocument();
   });
 
-  it('records the answer and carries on into the build', async () => {
+  it('records the selected structure and goes to Application Review', async () => {
     stubStage5();
     renderAt(at('creator-payment'));
-    await screen.findByRole('heading', { name: /how creators are paid/i });
+    await screen.findByRole('heading', { name: 'No upfront fee' });
 
-    await userEvent.click(screen.getByRole('radio', { name: /would consider it/i }));
-    await userEvent.click(screen.getByRole('button', { name: /save and start/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Select' }));
 
     await waitFor(() =>
       expect(
@@ -2297,22 +2278,20 @@ describe('how Creators are paid (18)', () => {
       ).toBe(true),
     );
     const sent = requests.find((r) => r.url.includes('fixed-payment-openness') && r.method === 'PUT');
-    // The body carries the stance and nothing else — no amount to strip.
-    expect(Object.keys(sent!.body ?? {})).toEqual(['stance']);
-    await waitFor(() =>
-      expect(document.querySelector('[data-flow-page="voice"]')).not.toBeNull(),
-    );
+    expect(sent!.body).toEqual({ stance: 'not_open' });
+    await screen.findByRole('heading', { name: 'Application in review' });
+    expect(screen.getByText('We’re reviewing your Product this won’t take long')).toBeInTheDocument();
   });
 
-  it('gives an Idea campaign the explanation and no control at all (§14.3)', async () => {
+  it('gives an Idea campaign the reference explainer instead of the picker', async () => {
     stubStage5({}, { applicable: false, campaignType: 'pre_build' });
     renderAt(at('creator-payment'));
-    await screen.findByRole('heading', { name: /how creators are paid/i });
+    await screen.findByRole('heading', { name: /creators take a % of the preorders/i });
 
-    expect(screen.getByText(FIXED_PAYMENT_IDEA_EXPLAINER)).toBeInTheDocument();
-    // The absence IS the rule. Not a disabled control — none at all.
-    expect(screen.queryAllByRole('radio')).toHaveLength(0);
-    expect(document.body.textContent).not.toMatch(/would consider it/i);
+    expect(screen.queryByText('Choose your creator payment structure')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'I understand' }));
+    await screen.findByRole('heading', { name: 'Application in review' });
+    expect(screen.getByText('We’re reviewing your Idea this won’t take long')).toBeInTheDocument();
   });
 });
 

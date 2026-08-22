@@ -79,7 +79,7 @@ import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
 import { ApplicationReviewStep } from './surfaces/founder-flow/ApplicationReviewStep.js';
 import { VoiceStep } from './surfaces/founder-flow/VoiceStep.js';
-import { CreatorPayExplainerStep } from './surfaces/founder-flow/CreatorPayExplainerStep.js';
+import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
 import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
@@ -808,16 +808,12 @@ const rootChildren: RouteObject[] = [
   },
   {
     /*
-      Founder Flow v2 Session F (2026-08-19) — stage 5, and the end of the flow.
-
-      After the fee because Phase 11's effect 4 is what opens the formal Creator
-      opportunity: before it there is no Creator to be open to, and §15's review
-      has nothing to review. `threshold` is Idea-only — §14.4 gives a Product
-      campaign no public threshold — and `buildFlowStepsFor` decides the walk, so
-      a Product Founder is never routed there.
+      The reference branches here: Product campaigns choose between its two
+      payment cards, while Idea campaigns receive the percentage explainer.
+      Both branches continue to the passive Application Review beat.
     */
     path: 'campaigns/:campaignId/setup/creator-payment',
-    element: <CreatorPayExplainerStep />,
+    element: <CreatorPaymentStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/application-review',

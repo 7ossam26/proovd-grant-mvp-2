@@ -16696,6 +16696,261 @@ html.no-motion .ff-story__say { transition: none; }
 @keyframes ff-payx-drawer-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes ff-payx-drawer-down { from { transform: translateY(0); } to { transform: translateY(100%); } }
 
+/* ═════════════ CREATOR PAYMENT — reference `scPayPick` + `scPay` ══ */
+.ff[data-flow-page='creator-payment'] .ff__top,
+.ff[data-flow-page='creator-payment'] .ff__badge { display: none; }
+.ff[data-flow-page='creator-payment'] .ff__stage { padding: 0; gap: 0; }
+.ff[data-flow-page='creator-payment'] .ff__body {
+  display: block;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ff-paypick {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 25;
+  background: #FAFAFA;
+  color: #013F17;
+  font-family: 'Satoshi', sans-serif;
+  font-size: 16px;
+  line-height: normal;
+}
+.ff-paypick__back {
+  position: absolute;
+  left: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font: 900 clamp(10px, .8vw, 12px)/1 'Satoshi', sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-paypick__back:hover { color: #013F17; }
+.ff-paypick__back svg {
+  width: 11px;
+  height: 11px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ff-paypick__top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 3vw, 46px);
+}
+.ff-paypick__logo { display: block; width: auto; height: clamp(26px, 2.4vw, 36px); }
+.ff-paypick__help {
+  min-height: 40px;
+  padding: 10px 22px;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  font: 900 clamp(12px, 1vw, 15px)/1 'Satoshi', sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ff-paypick__help:hover { background: #E9FFE1; }
+.ff-paypick__stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2496px;
+  height: 1542px;
+  transform: translate(-50%, -50%) scale(.37);
+  transform-origin: center;
+}
+.ff-paypick__column {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1700px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-paypick__note { color: #013F17; font-size: 44px; font-weight: 700; letter-spacing: -.02em; }
+.ff-paypick__title {
+  margin: 70px 0 0;
+  color: #013F17;
+  font-size: 110px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -.03em;
+  text-align: center;
+}
+.ff-paypick__art-row {
+  width: 100%;
+  height: 520px;
+  margin-top: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ff-paypick__arrow {
+  width: 124px;
+  height: 124px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #41ED98;
+  border-radius: 2px;
+  background: transparent;
+  color: #41ED98;
+  cursor: pointer;
+  transition: transform .25s cubic-bezier(.22, 1, .36, 1);
+}
+.ff-paypick__arrow:hover { transform: scale(1.06); }
+.ff-paypick__arrow svg {
+  width: 55px;
+  height: 55px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ff-paypick__art {
+  display: block;
+  width: 480px;
+  height: 480px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  mix-blend-mode: multiply;
+  animation: ff-paypick-card .25s cubic-bezier(.22, 1, .36, 1) both;
+}
+.ff-paypick__body {
+  width: 1150px;
+  margin: 110px 0 0;
+  color: #013F17;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.36;
+  letter-spacing: -.02em;
+  text-wrap: pretty;
+}
+.ff-paypick__cta,
+.ff-paypick__explainer-cta {
+  width: 1150px;
+  height: 134px;
+  margin-top: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 2px;
+  background: #41ED98;
+  color: #FAFAFA;
+  font: 900 58px/1 'Satoshi', sans-serif;
+  letter-spacing: -.02em;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(255, 255, 255, .42) inset;
+}
+.ff-paypick__cta:hover,
+.ff-paypick__explainer-cta:hover { background: #3BDC8C; }
+.ff-paypick__cta:disabled { cursor: wait; opacity: .72; }
+.ff-paypick__error { width: 1150px; margin: 26px 0 -54px; color: #B42318; font-size: 30px; font-weight: 700; }
+
+.ff-paypick__modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(1, 63, 23, .35);
+}
+.ff-paypick__modal {
+  width: min(720px, 86vw);
+  box-sizing: border-box;
+  padding: clamp(56px, 6.4vw, 92px) clamp(28px, 3.4vw, 48px);
+  border: 3px solid #41ED98;
+  border-radius: 2px;
+  background: #FAFAFA;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: ff-paypick-modal .34s cubic-bezier(.215, .61, .355, 1) both;
+}
+.ff-paypick__modal-tag { color: #7FD9A4; font-size: clamp(11px, 1vw, 14px); font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+.ff-paypick__modal p { margin: clamp(26px, 2.8vw, 38px) 0 0; color: #013F17; font-size: clamp(18px, 1.8vw, 26px); font-weight: 700; line-height: 1.4; letter-spacing: -.02em; text-wrap: pretty; }
+.ff-paypick__modal button { width: 100%; height: clamp(52px, 5vw, 68px); margin-top: clamp(40px, 4.4vw, 60px); border: 0; border-radius: 2px; background: #41ED98; color: #FAFAFA; font: 900 clamp(16px, 1.5vw, 22px)/1 'Satoshi', sans-serif; letter-spacing: -.02em; cursor: pointer; box-shadow: 0 3px 12px rgba(255, 255, 255, .42) inset; }
+
+.ff-paypick__explainer-column {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1900px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.ff-paypick__explainer-art { display: block; width: 640px; height: auto; mix-blend-mode: multiply; }
+.ff-paypick__explainer-title { margin: 110px 0 0; color: #013F17; font-size: 78px; font-weight: 500; line-height: 1.34; letter-spacing: -.02em; text-align: center; }
+.ff-paypick__explainer-cta { width: 1180px; height: 150px; margin-top: 150px; font-size: 62px; }
+
+@keyframes ff-paypick-card { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes ff-paypick-modal { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 600px) {
+  .ff-paypick__back { bottom: 20px; }
+  .ff-paypick__stage {
+    inset: 0;
+    width: auto;
+    height: auto;
+    transform: none !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  .ff-paypick__column,
+  .ff-paypick__explainer-column {
+    position: static;
+    width: 100%;
+    transform: none;
+  }
+  .ff-paypick__note { font-size: min(3.8vw, 17px); text-align: center; }
+  .ff-paypick__title { margin-top: 16px; font-size: min(8vw, 36px); }
+  .ff-paypick__art-row { height: 26vh; margin-top: 4vh; }
+  .ff-paypick__arrow { width: 48px; height: 48px; }
+  .ff-paypick__arrow svg { width: 21px; height: 21px; }
+  .ff-paypick__art { height: 100%; width: auto; aspect-ratio: 1; }
+  .ff-paypick__body { width: 100%; margin-top: 4vh; font-size: min(4.4vw, 20px); }
+  .ff-paypick__cta { width: 100%; height: 60px; margin-top: 4vh; flex: none; font-size: min(5.4vw, 24px); }
+  .ff-paypick__error { width: 100%; margin: 10px 0 -10px; font-size: 14px; }
+  .ff-paypick__explainer-art { width: 72vw; max-width: 340px; }
+  .ff-paypick__explainer-title { margin-top: 5vh; font-size: min(6.6vw, 30px); }
+  .ff-paypick__explainer-cta { width: 100%; height: 60px; margin-top: 6vh; font-size: min(5.4vw, 24px); }
+}
+
 /* ══════════════════════ PHASE 67 — screen 23, add your FAQ’s, rebuilt 1:1
    from the reference (Founder Flow v2, `[data-faq]` / `kindWide`), 2026-08-21.
 
@@ -18085,10 +18340,11 @@ html.no-motion .ff-story__say { transition: none; }
 
        let s = Math.min(innerWidth/2496, innerHeight/1542) * (pageScale || .78);
 
-   No branch of that function names `fee`, so this screen takes `pageScale`
-   alone. The component owns the scale and writes the whole transform on mount
-   and on resize; the `scale(0.4125)` below is what renders for the one frame
-   before the layout effect runs, and is the value measured at 1320x900.
+   The component owns the scale and writes the whole transform on mount and on
+   resize. For this screen the fitted result is capped at the reference's
+   authored `scale(0.37)`, so desktop viewports do not enlarge its typography
+   and controls beyond the supplied composition; narrow viewports can still
+   shrink it. The fallback below uses that same cap for the first frame.
 
    Inside it, a 2220px column centred on the stage, `flex-direction: column;
    align-items: center`. Every child carries the reference's own pixel value on
@@ -18358,7 +18614,7 @@ html.no-motion .ff-story__say { transition: none; }
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) scale(0.4125);
+  transform: translate(-50%, -50%) scale(0.37);
   transform-origin: center center;
   color: #013F17;
   font-size: 16px;

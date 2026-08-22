@@ -12,6 +12,8 @@
  * unconfigured deployment renders no chat at all rather than promising one.
  */
 interface ImportMetaEnv {
+  /** Local-only Founder Flow prototype bypass; set false to exercise Stripe. */
+  readonly VITE_PITCH_DEMO?: string;
   readonly VITE_TAWK_PROPERTY_ID?: string;
   readonly VITE_TAWK_WIDGET_ID?: string;
   /** IANA zone the staffed hours below are stated in, e.g. `America/New_York`. */
