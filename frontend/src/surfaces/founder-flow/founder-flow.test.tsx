@@ -1418,6 +1418,31 @@ describe('the five §12 answers (10–14)', () => {
     expect(screen.getByRole('button', { name: 'Remove Logo 1 added' })).toHaveTextContent('x');
   });
 
+  it('keeps Socials to the reference input and Add controls only', async () => {
+    stubStage3({
+      socials: [
+        {
+          id: 'social-1',
+          url: 'https://instagram.com/proovd',
+          platform: 'instagram.com',
+          handle: 'proovd',
+          accessible: false,
+          rejection: 'unreachable',
+          controlsConfirmed: false,
+          checkedAt: '2026-08-18T10:00:00.000Z',
+        },
+      ],
+    });
+    renderAt(founderFlowPath('socials', 'camp-social-reference'));
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.getAllByRole('button', { name: 'Add' })).toHaveLength(4);
+    expect(screen.queryByText('I control this profile')).toBeNull();
+    expect(screen.queryByText('Check it again')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    expect(screen.queryByText('That is not a web address we can open.')).toBeNull();
+  });
+
   it('names the missing §6 settings instead of offering a slot', async () => {
     stubStage3();
     renderAt(at('interview'));

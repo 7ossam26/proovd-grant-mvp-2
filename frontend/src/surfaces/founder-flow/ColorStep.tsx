@@ -727,11 +727,11 @@ function ColorScreen({
               code. It is kept to one line at this column width for the same
               reason — two lines plus a save status is taller than the gap. */}
           <div className="ff-col__gap">
-            <p className="ff-col__note" id="ff-col-note">
-              {locked
-                ? 'Your listing fee is paid, so your brand direction stays as it was checked.'
-                : 'Up to three. Each one lands in your brand direction, where you say what it is for.'}
-            </p>
+            {locked ? (
+              <p className="ff-col__note" id="ff-col-note">
+                Your listing fee is paid, so your brand direction stays as it was checked.
+              </p>
+            ) : null}
             <p className="ff-col__status" data-state={autosave.state.status}>
               {describeSaveState(autosave.state)}
             </p>

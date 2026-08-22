@@ -10168,11 +10168,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
    line-height 1.6 reaches the whole stage — the reference's own body sets
    neither, so the stage resets both.
 
-   ── The one block the reference does not draw ─────────────────────────────
-   `.ff-soc__meta` is §28.4's control claim and §27.1's check result. It is
-   ABSOLUTELY positioned inside the 66px gap the composition already leaves
-   between rows, so not one reference box moves for it. See `SocialsStep`'s
-   header for why it has to exist at all.
    ═════════════════════════════════════════════════════════════════════════ */
 
 /* `FlowPage`'s chrome is not drawn on this screen — and the reason is not that
@@ -10387,10 +10382,7 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   gap: 66px;
 }
 
-/* `position: relative` is not the reference's — it is what lets the one added
-   block sit inside the 66px gap without touching anything above it. */
 .ff-soc__row {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 64px;
@@ -10481,97 +10473,6 @@ html.no-motion .ff-reach__cta { opacity: 1; }
 }
 .ff-soc__cta:hover { background: #3BDC8C; }
 .ff-soc__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
-
-/* ── §28.4's claim and §27.1's answer, in the gap ────────────────────────── */
-
-.ff-soc__meta {
-  position: absolute;
-  left: 142px;   /* the icon's 78px plus the row's own 64px gap */
-  right: 0;
-  top: 100%;
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 26px;
-  font-size: 34px;
-  font-weight: 500;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  color: #4E6B58;
-  pointer-events: auto;
-}
-.ff-soc__claim {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: #013F17;
-  font-weight: 700;
-  cursor: pointer;
-}
-.ff-soc__claim input {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 34px;
-  height: 34px;
-  margin: 0;
-  flex: none;
-  border: 3px solid #7FE7B0;
-  border-radius: 2px;
-  background: #FAFAFA;
-  cursor: pointer;
-  outline: none;
-}
-.ff-soc__claim input:checked {
-  border-color: #41ED98;
-  background: #41ED98;
-  /* The reference's own tick, at the reference's own weights, as a mark rather
-     than a second SVG element — a control claim is one control (§28.4). */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FAFAFA' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12.5 9.5 18 20 6.5'/%3E%3C/svg%3E");
-  background-size: 78%;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-.ff-soc__claim input:focus-visible { outline: 3px solid #013F17; outline-offset: 3px; }
-.ff-soc__note { color: #4E6B58; }
-.ff-soc__note.is-ok { color: #2C8F5C; }
-.ff-soc__mini {
-  padding: 0;
-  border: none;
-  background: none;
-  font-family: 'Satoshi', sans-serif;
-  font-size: 34px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  color: #013F17;
-  text-decoration: underline;
-  text-underline-offset: 6px;
-  cursor: pointer;
-  outline: none;
-}
-.ff-soc__mini:hover { color: #2C8F5C; }
-.ff-soc__mini:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
-
-/* A record the four rows could not hold. Absolutely positioned under the
-   column, so it can never move the composition. */
-.ff-soc__extra {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  margin: 26px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  font-size: 34px;
-  font-weight: 500;
-  line-height: 1.15;
-  color: #4E6B58;
-}
-.ff-soc__extra li { display: flex; align-items: center; gap: 26px; }
 
 .ff-soc__live { position: absolute; }
 

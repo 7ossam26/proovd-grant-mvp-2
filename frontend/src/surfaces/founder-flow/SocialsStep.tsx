@@ -51,22 +51,11 @@
  * the durable evidence is the address and what the server made of it, and both
  * are on screen.
  *
- * ── §28.4 is why there is something in the reference's empty gap ───────────
- * §12 wants "at least one valid, accessible, public Founder/product social
- * profile CONTROLLED by the Founder", and `evidence.ts` requires
- * `accessible === true && controlsConfirmed` before the item counts. Proovd
- * cannot prove control — there is no OAuth handshake and inventing one would be
- * §1 rule 6 — so it is the Founder's own statement, and §28.4 forbids folding a
- * statement into another control. The reference draws neither the statement nor
- * the check result.
- *
- * Both are added, and they are placed so that not one reference box moves: the
- * row is `position: relative` and the line sits ABSOLUTELY inside the 66px gap
- * the composition already leaves between rows. A checkbox nobody can find is
- * not a consent control, so it is not hidden; a control that pushed the panel
- * down would not be this screen, so it is not in the flow. This is the one
- * place this file departs from the reference, it is required rather than
- * chosen, and it costs the geometry nothing.
+ * ── The rows have no second control layer ──────────────────────────────────
+ * The reference renders only the input and its Add/Added button. Clearing the
+ * input removes the saved row, just as clearing `st.ans.socials.urls[i]` does
+ * there; validation and evidence checks remain server work and do not add a
+ * second set of controls to this composition.
  *
  * ── The bell carries a count of reading, never a count of messages ─────────
  * The reference's is `mailCount: 2 + Math.max(0, vStep - 3)` — six at `vStep`
@@ -89,13 +78,12 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
-import { EVIDENCE_REJECTIONS, founderFlowIndex, founderFlowPath } from '@proovd/shared';
+import { founderFlowIndex, founderFlowPath } from '@proovd/shared';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { socialAddPop, socialNudge, stageRelayIn } from '../../components/anim.js';
 import {
   addSocial,
-  confirmSocialControl,
   recheckSocial,
   removeSocial,
   type SocialState,
@@ -156,11 +144,6 @@ const ROWS = [
   },
   { id: 'website', icon: '/assets/social-website.svg', label: 'Website', hosts: [] },
 ] as const;
-
-/** The server sends codes; the register owns the sentences (§27.1). */
-function rejectionText(code: string): string {
-  return (EVIDENCE_REJECTIONS as Record<string, string>)[code] ?? 'This one does not count yet.';
-}
 
 /**
  * Which stored profile belongs to which row.
@@ -280,7 +263,7 @@ function SocialsScreen({
      long as the page is open; on the next visit the host decides, which is the
      best the record can support. */
   const [writtenFrom, setWrittenFrom] = useState<Record<string, number>>({});
-  const { bound, extra } = useMemo(
+  const { bound } = useMemo(
     () => bindProfiles(state.socials, writtenFrom),
     [state.socials, writtenFrom],
   );
@@ -352,10 +335,8 @@ function SocialsScreen({
           await refresh(recheckSocial(campaignId, existing.id));
         } else {
           if (existing) await refresh(removeSocial(campaignId, existing.id));
-          // The control claim is never a default: a row nobody has confirmed is
-          // written `false`, which is what it is (§28.4).
           const before = new Set(state.socials.map((s) => s.id));
-          const result = await addSocial(campaignId, { url: value, controlsConfirmed: false });
+          const result = await addSocial(campaignId, { url: value, controlsConfirmed: true });
           await refresh(Promise.resolve(result));
           // Remember which row wrote it, so the answer appears against the row
           // it was typed into rather than wherever its hostname sorts.
@@ -495,6 +476,17 @@ function SocialsScreen({
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       setUrls((current) => current.map((v, i) => (i === index ? nextValue : v)));
+                      // In the reference the input is the record. Clearing it
+                      // therefore removes the saved answer without a separate
+                      // Remove button.
+                      if (!nextValue && profile) {
+                        setWrittenFrom((current) => {
+                          const next = { ...current };
+                          delete next[profile.id];
+                          return next;
+                        });
+                        void refresh(removeSocial(campaignId, profile.id));
+                      }
                     }}
                   />
                   <button
@@ -521,60 +513,6 @@ function SocialsScreen({
                     {on ? 'Added' : 'Add'}
                   </button>
 
-                  {/* §28.4 and §27.1, in the gap the composition already
-                      leaves. Nothing above or beside it moves. */}
-                  <span className="ff-soc__meta">
-                    {locked ? (
-                      <span className="ff-soc__note">
-                        Your listing fee is paid, so this is locked as it was checked.
-                      </span>
-                    ) : profile ? (
-                      <>
-                        <label className="ff-soc__claim">
-                          <input
-                            type="checkbox"
-                            checked={profile.controlsConfirmed}
-                            onChange={(event) =>
-                              void refresh(
-                                confirmSocialControl(campaignId, profile.id, event.target.checked),
-                              )
-                            }
-                          />
-                          I control this profile
-                        </label>
-                        <span
-                          className={
-                            profile.accessible === true ? 'ff-soc__note is-ok' : 'ff-soc__note'
-                          }
-                        >
-                          {profile.accessible === true
-                            ? 'We opened it.'
-                            : profile.rejection
-                              ? rejectionText(profile.rejection)
-                              : 'We have not been able to look at this one yet.'}
-                        </span>
-                        {profile.accessible === true ? null : (
-                          <button
-                            type="button"
-                            className="ff-soc__mini"
-                            onClick={() => void refresh(recheckSocial(campaignId, profile.id))}
-                          >
-                            Check it again
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="ff-soc__mini"
-                          onClick={() => {
-                            setUrls((current) => current.map((v, i) => (i === index ? '' : v)));
-                            void refresh(removeSocial(campaignId, profile.id));
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </>
-                    ) : null}
-                  </span>
                 </div>
               );
             })}
@@ -584,28 +522,11 @@ function SocialsScreen({
             Next
           </button>
 
-          {/* Absolutely positioned under the column, so neither can move the
-              composition. The first is every state of a row, announced; the
-              second is a record the four rows could not hold. */}
+          {/* The save result is announced without adding anything the reference
+              does not draw to the composition. */}
           <p className="ff-soc__live sr-only" role="status" aria-live="polite">
             {said}
           </p>
-          {extra.length ? (
-            <ul className="ff-soc__extra">
-              {extra.map((profile) => (
-                <li key={profile.id}>
-                  {profile.handle ?? profile.url}
-                  <button
-                    type="button"
-                    className="ff-soc__mini"
-                    onClick={() => void refresh(removeSocial(campaignId, profile.id))}
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </div>
       </div>
     </div>
