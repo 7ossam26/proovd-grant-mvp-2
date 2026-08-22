@@ -124,17 +124,6 @@ const RELAY = ['panel', 'art', 'cta'] as const;
  */
 const EDITABLE_STATUSES: readonly string[] = ['affiliate_response_and_build', 'changes_required'];
 
-/**
- * §12's guidance for this answer, in the drawer this flow puts reading in.
- *
- * The reference's own resource line for this page is `The five FAQs backers
- * always ask.pdf — Delivery, refunds, shipping, timelines, and who you are.`
- * There is no PDF here (§12's object storage is Track A4), so what ships is the
- * sentence rather than a link to a file nobody can open (§1.4).
- */
-const FAQ_GUIDE =
-  'Answer the real objection rather than a softball. Delivery timing, refunds, shipping, and who you are come up most — and every answer here renders on your public page exactly as you write it.';
-
 /** The reference's `faqPreviewTitle` fallback, with its own curly apostrophe. */
 const previewTitleFor = (index: number) => `You’ll see FAQ ${String(index + 1)} here`;
 /** Its `faqPreviewBody` fallback. */
@@ -421,7 +410,6 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
         <HelpDrawer
           pageId="faqs"
           param={campaignId}
-          extra={<p className="ff-help__sub">{FAQ_GUIDE}</p>}
           trigger={
             <button type="button" className="ff-faq__help">
               Help
@@ -481,7 +469,6 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
               <HelpDrawer
                 pageId="faqs"
                 param={campaignId}
-                extra={<p className="ff-help__sub">{FAQ_GUIDE}</p>}
                 trigger={
                   <button type="button" className="ff-faq__guide">
                     Our guide on FAQ&rsquo;s

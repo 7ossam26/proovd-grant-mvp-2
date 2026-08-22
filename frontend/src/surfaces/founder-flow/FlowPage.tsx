@@ -35,23 +35,18 @@ import {
   useContext,
   useLayoutEffect,
   useRef,
-  type ReactElement,
   type ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  FOUNDER_FLOW_EARLIER_STAGE_CLOSED,
-  FOUNDER_FLOW_HELP_SUBHEAD,
-  FOUNDER_FLOW_HELP_TITLE,
-  FOUNDER_FLOW_PAGES,
-  founderFlowIndex,
   founderFlowPath,
-  founderFlowReachableFrom,
 } from '@proovd/shared';
 import { Button } from '../../components/Button.js';
-import { Drawer } from '../../components/Drawer.js';
 import { pageExit, relayIn } from '../../components/anim.js';
 import { useProovdMotion } from '../../motion/MotionProvider.js';
+import { HelpDrawer } from './HelpDrawer.js';
+
+export { HelpDrawer } from './HelpDrawer.js';
 
 /**
  * Which way the next page's relay runs.
@@ -81,7 +76,6 @@ let transitionGuardTimer: number | null = null;
 export function flowDirection(): 1 | -1 {
   return pendingDirection;
 }
-
 /**
  * A full-viewport screen that does not render `FlowPage` still has to consume
  * a backwards arrival before its next forward navigation. `FlowPage` normally
@@ -238,108 +232,5 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
         </div>
       </main>
     </FlowNavContext.Provider>
-  );
-}
-
-/**
- * The help drawer — §27.1's sixth question, answered for the whole flow.
- *
- * *How do I get help without losing context* is normally answered per surface,
- * and per surface it costs a support route on every one of twenty-six pages.
- * Here it is structural: one card per page already passed, the current one
- * first and marked, each a title and a one-line explanation, and tapping one
- * goes there. Nothing is lost by opening it, because the flow's position is the
- * URL and every answer is already saved.
- *
- * It lists what is behind and never what is ahead. A drawer that listed the
- * pages to come would be a progress bar with reading attached, and it would
- * offer to jump to addresses that refuse.
- *
- * ── Some of what is behind has no address left (Session D) ──────────────────
- * §10's claim invalidates the draft token, and every page from the five §12
- * answers on is addressed by the campaign instead. So from stage 3 the earlier
- * cards cannot be jumped to at all — the address they need does not exist any
- * more. `founderFlowReachableFrom` decides it from the two pages' own
- * parameters rather than from a stage number, so it stays right when stage 4
- * and 5 land. An unreachable card keeps its reading, which is the half worth
- * having, and renders the reason where the control would be (§1.4) instead of
- * offering a jump to the unusable-link page.
- */
-export function HelpDrawer({
-  pageId,
-  param,
-  trigger,
-  extra,
-}: {
-  pageId: string;
-  /** The value for this page's own route parameter. */
-  param: string;
-  trigger: ReactElement;
-  /**
-   * Page-specific reading, above the flow's own cards.
-   *
-   * §12's helper resources are four subjects of static, copy-ready guidance,
-   * and the pages rebuilt to the reference have no room in their composition
-   * for a four-section accordion — HELP is where the reference puts help. This
-   * is how that guidance stays in the product without a box being added to a
-   * screen the reference draws without one. Optional, so every other page's
-   * drawer is byte-for-byte what it was.
-   */
-  extra?: ReactNode;
-}) {
-  const navigate = useNavigate();
-  const index = founderFlowIndex(pageId);
-  const visible = index < 0 ? [] : FOUNDER_FLOW_PAGES.slice(0, index + 1).reverse();
-
-  return (
-    <Drawer
-      trigger={trigger}
-      title={FOUNDER_FLOW_HELP_TITLE}
-      eyebrow={FOUNDER_FLOW_HELP_SUBHEAD}
-    >
-      <p className="ff-help__sub">{FOUNDER_FLOW_HELP_SUBHEAD}</p>
-      {extra ? <div className="ff-help__extra">{extra}</div> : null}
-      <ul className="ff-help__list">
-        {visible.map((page) => {
-          const current = page.id === pageId;
-          const reachable = current || founderFlowReachableFrom(pageId, page.id);
-
-          if (!reachable) {
-            return (
-              <li key={page.id}>
-                <div className="ff-help__card is-closed">
-                  <span className="ff-help__title">{page.title}</span>
-                  <span className="ff-help__state">Done</span>
-                  <span className="ff-help__body">{page.help}</span>
-                  <span className="ff-help__closed">{FOUNDER_FLOW_EARLIER_STAGE_CLOSED}</span>
-                </div>
-              </li>
-            );
-          }
-
-          return (
-            <li key={page.id}>
-              <button
-                type="button"
-                className={current ? 'ff-help__card is-current' : 'ff-help__card'}
-                aria-current={current ? 'page' : undefined}
-                onClick={() => {
-                  if (current) return;
-                  // A jump backwards out of an overlay: the drawer closes with
-                  // the route change, and the relay on the destination runs
-                  // backwards because that is the direction of travel.
-                  pendingDirection = -1;
-                  void navigate(founderFlowPath(page.id, param));
-                }}
-              >
-                <span className="ff-help__title">{page.title}</span>
-                <span className="ff-help__state">{current ? 'This page' : 'Done'}</span>
-                <span className="ff-help__body">{page.help}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </Drawer>
   );
 }
