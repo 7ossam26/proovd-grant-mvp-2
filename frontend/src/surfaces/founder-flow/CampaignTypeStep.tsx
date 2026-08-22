@@ -298,13 +298,21 @@ function KindScreen({ token, loaded }: { token: string; loaded: VettingState }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // Paging. Skipped on the first pass, where the entrance owns these elements.
-  const firstPage = useRef(true);
+  // Paging. Skipped on arrival, where the entrance owns these elements.
+  //
+  // The guard compares the index rather than counting mounts. A `useRef(true)`
+  // flag cleared on the first run does not survive StrictMode, which mounts,
+  // unmounts and remounts every component in development: the first pass
+  // cleared the flag and the remount then ran the pager on arrival. That staged
+  // the sticker at `x:34, scale:.94` and, 450ms later, `clearProps`-ed the
+  // transform out from under `kindIntro`'s own tween — so the reference's
+  // drop-in never played and the sticker simply appeared, already upright and
+  // full size. Comparing is idempotent: a remount carrying the same index is
+  // not a page turn, however many times the effect is invoked.
+  const shown = useRef(index);
   useLayoutEffect(() => {
-    if (firstPage.current) {
-      firstPage.current = false;
-      return;
-    }
+    if (shown.current === index) return;
+    shown.current = index;
     if (phase === 'pick') kindSlide(root.current, slide.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
