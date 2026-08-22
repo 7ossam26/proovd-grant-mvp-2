@@ -138,6 +138,56 @@ function stageScale(): number {
 const RELAY = ['head', 'field', 'cta'] as const;
 
 /** The reference's own shape test, verbatim: `/.+@.+\..+/`. */
+/* ── Fitting the address to the field ───────────────────────────────────────
+   The reference's field is a 1290px row holding the input, a 26px gap and a
+   52px pencil, so the address itself gets 1212px at 104px/700/-0.035em. Its
+   own sample — `ahmed.ehab@teeb.com` — measures 1080px and fits, which is why
+   the prototype never shows this: a real address often does not. Measured in
+   the running app, `ahmedhamerty112@gmail.com` needs 1387px and the input
+   scrolls, hiding `@gmail.com` entirely.
+
+   An `<input>` has no ellipsis and cannot wrap, so that overflow is silent:
+   the field looks perfectly correct while the value it shows is wrong, on the
+   one screen whose whole job is confirming that value.
+
+   Width scales linearly with font-size — the tracking is in `em`, so it scales
+   with it — which means one measurement at the stylesheet's own size gives the
+   exact fit in a single step. The size is reduced ONLY when it has to be, so
+   every address that fitted before still renders at the reference's 104px and
+   the composition is untouched. Nothing else moves: the column, the row, the
+   gap, the dashed rule, the pencil and the button are all as they were, and
+   the field's height is driven by the pencil rather than by the text. */
+
+/** The floor. Below the pencil's own 52px the address reads as a caption
+ *  beside the icon rather than as the field's value, and an address long
+ *  enough to reach it (about 47 characters) is far past anything real. */
+const EMAIL_MIN_SIZE = 52;
+
+/** The width of `text` in an unscaled, detached span carrying the same face.
+ *  A span rather than a canvas because `measureText` ignores letter-spacing,
+ *  and this face is tracked at -0.035em — about 3.6px a character at 104px,
+ *  which over a 25-character address is 91px of error. */
+function textWidth(
+  text: string,
+  family: string,
+  weight: string,
+  sizePx: number,
+  trackingPx: number,
+): number {
+  const probe = document.createElement('span');
+  probe.textContent = text;
+  probe.style.cssText =
+    'position:fixed;left:-9999px;top:0;visibility:hidden;white-space:pre;padding:0;margin:0;border:0;';
+  probe.style.fontFamily = family;
+  probe.style.fontWeight = weight;
+  probe.style.fontSize = sizePx + 'px';
+  probe.style.letterSpacing = trackingPx + 'px';
+  document.body.appendChild(probe);
+  const width = probe.getBoundingClientRect().width;
+  probe.remove();
+  return width;
+}
+
 function looksLikeAddress(value: string): boolean {
   return /.+@.+\..+/.test(value.trim());
 }
@@ -202,6 +252,7 @@ function VerifyScreen({ token, loaded }: { token: string; loaded: ClaimView }) {
   const { leave } = useFlowNav();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLInputElement>(null);
 
   // Read once, during the first render: `FlowPage` resets the module value in
   // its own layout effect, and a later re-render would read the reset.
@@ -232,6 +283,54 @@ function VerifyScreen({ token, loaded }: { token: string; loaded: ClaimView }) {
   useLayoutEffect(() => {
     return stageRelayIn(root.current, direction.current ?? 1, RELAY);
   }, []);
+
+  // Keep the whole address on screen. Runs on every change because the value
+  // is editable here, and again once Satoshi has settled — measuring the
+  // fallback face gives a width the real one does not have (DNA §6.4's own
+  // reasoning, applied to a measurement rather than to a split).
+  useLayoutEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    let cancelled = false;
+    const fit = () => {
+      if (cancelled || !field.current) return;
+      const input = field.current;
+      // Clear both first, so the base reads are the stylesheet's own rather
+      // than whatever this effect set last time.
+      input.style.fontSize = '';
+      input.style.height = '';
+      const style = getComputedStyle(input);
+      const base = Number.parseFloat(style.fontSize);
+      const available = input.clientWidth;
+      // The row's height at the reference's own size. A smaller font gives a
+      // shorter line box, which would lift the dashed rule and carry the
+      // button up with it — so the box is pinned to its base and only the
+      // glyphs inside it get smaller. Nothing below the field moves.
+      const baseHeight = input.clientHeight;
+      if (!Number.isFinite(base) || !available || !input.value) return;
+      const needed = textWidth(
+        input.value,
+        style.fontFamily,
+        style.fontWeight,
+        base,
+        Number.parseFloat(style.letterSpacing) || 0,
+      );
+      // One character's worth of slack: the caret sits past the last glyph,
+      // and a value that measured exactly to the edge would still scroll.
+      if (needed <= available - 4) return;
+      input.style.fontSize =
+        Math.max(
+          EMAIL_MIN_SIZE,
+          Math.floor((base * (available - 4)) / needed),
+        ) + 'px';
+      input.style.height = baseHeight + 'px';
+    };
+    fit();
+    void document.fonts?.ready.then(fit);
+    return () => {
+      cancelled = true;
+    };
+  }, [address]);
 
   const status = describeSaveState(autosave.state);
   const valid = looksLikeAddress(address);
@@ -293,6 +392,7 @@ function VerifyScreen({ token, loaded }: { token: string; loaded: ClaimView }) {
 
           <div className="ff-verify__field" data-stage-anim="field">
             <input
+              ref={field}
               className="ff-verify__input"
               type="email"
               inputMode="email"
