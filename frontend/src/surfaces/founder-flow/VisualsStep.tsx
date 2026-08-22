@@ -54,8 +54,7 @@
  * So the row is drawn at the reference's own geometry and is honestly
  * unavailable: the control says so before anybody types rather than taking a
  * link and dropping it, which is the R2 arrangement this flow already uses in
- * three places. `VISUALS_LINK_ABSENT` sits in the 130px gap the composition
- * already leaves above the CTA, so not one reference box moves for it.
+ * three places.
  *
  * ── What the reference's file row does not carry ───────────────────────────
  * Its row is a label and an `x`. §12 needs two more things on it: which state
@@ -141,13 +140,6 @@ const RELAY = ['pill', 'head', 'panel', 'cta'] as const;
 
 /** The reference's own `isUrl`, character for character. */
 const URL_SHAPE = /^(https?:\/\/)?(www\.)?[\w-]+(\.[\w-]+)+(\/[^\s]*)?$/i;
-
-/**
- * Why the link row is drawn and not wired. See the header — it is a §12
- * evidence decision, so the sentence names what does count instead.
- */
-const VISUALS_LINK_ABSENT =
-  'Pasting a link is not switched on: a visual counts once we have fetched the file and looked at it, and a link is not something we can check that way yet. Add the picture or the clip itself and it counts straight away.';
 
 /** The server sends codes; the register owns the sentences (§27.1). */
 function rejectionText(code: string): string {
@@ -311,7 +303,7 @@ function VisualsScreen({
       return;
     }
     socialAddPop(addButton.current);
-    setSaid(VISUALS_LINK_ABSENT);
+    setSaid('This link was not added.');
   }
 
   /** `visualsNext:()=>this.afterSection({vStep:4,brandStage:'logo'})` — Your brand. */
@@ -427,14 +419,14 @@ function VisualsScreen({
                       Your listing fee is paid, so these stay as they were checked.
                     </span>
                   </>
-                ) : state.uploadsAvailable ? (
+                ) : (
                   <>
                     <span className="ff-vis__droplabel">
                       {busy ? 'Adding your file…' : 'Tap to add a file'}
                     </span>
                     <span className="ff-vis__droptypes">PNG, JPG, MP4</span>
                   </>
-                ) : null}
+                )}
               </label>
 
               <div className="ff-vis__linkrow">
@@ -444,7 +436,6 @@ function VisualsScreen({
                   type="url"
                   placeholder="paste your link"
                   aria-label="Paste a link to your product"
-                  aria-describedby="ff-vis-link-note"
                   value={linkDraft}
                   onChange={(event) => setLinkDraft(event.target.value)}
                   onKeyDown={(event) => {
@@ -466,7 +457,6 @@ function VisualsScreen({
                   ref={addButton}
                   type="button"
                   className="ff-vis__add"
-                  aria-describedby="ff-vis-link-note"
                   onClick={addLink}
                 >
                   Add
@@ -523,12 +513,7 @@ function VisualsScreen({
           </button>
 
           {/* Absolutely positioned inside the 130px gap the composition already
-              leaves above the CTA, so neither of these can move a reference
-              box. The first is why the row above is drawn and not wired; the
-              second is whatever just happened, announced. */}
-          <p className="ff-vis__note" id="ff-vis-link-note">
-            {VISUALS_LINK_ABSENT}
-          </p>
+              leaves above the CTA, so a failure cannot move a reference box. */}
           {failure ? (
             <p className="ff-vis__failline" role="alert">
               {failure}

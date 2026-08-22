@@ -13604,12 +13604,9 @@ html.no-motion .ff-story__say { transition: none; }
    field treatment, and `body`'s 18px / line-height 1.6 reaches the whole stage
    — the reference's own body sets neither, so the stage resets both.
 
-   ── The two blocks the reference does not draw ────────────────────────────
-   `.ff-vis__note` (why the link row is drawn and not wired) and
-   `.ff-vis__filemeta` (§12's state and §28.4's approval). The first is
-   ABSOLUTELY positioned inside the 130px gap the composition already leaves
-   above the CTA; the second is INSIDE the reference's own `#DEF6FF` block. Not
-   one reference box moves for either.
+   ── The block the reference does not draw ─────────────────────────────────
+   `.ff-vis__filemeta` carries §12's state and §28.4's approval INSIDE the
+   reference's own `#DEF6FF` block. Not one reference box moves for it.
    ═════════════════════════════════════════════════════════════════════════ */
 
 /* `FlowPage`'s chrome is not drawn on this screen — and the reason is not that
@@ -14097,9 +14094,8 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-vis__cta:hover { background: #3BDC8C; }
 .ff-vis__cta:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
 
-/* Inside the 130px gap the CTA's own margin already leaves — so the note and
-   any failure sit between the panel and the button without moving either. */
-.ff-vis__note,
+/* Inside the 130px gap the CTA's own margin already leaves — so any failure
+   sits between the panel and the button without moving either. */
 .ff-vis__failline {
   position: absolute;
   left: 0;

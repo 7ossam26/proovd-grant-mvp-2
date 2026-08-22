@@ -1126,6 +1126,57 @@ describe('positioning', () => {
       expect(screen.queryByRole('button', { name: word })).toBeNull();
     }
   });
+
+  it('retries inside the recording row without replaying the microphone handoff', async () => {
+    const user = userEvent.setup();
+    const recognitions: MockRecognition[] = [];
+
+    class MockRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = '';
+      onresult = null;
+      onerror = null;
+      onend: (() => void) | null = null;
+      onaudiostart: (() => void) | null = null;
+      aborted = false;
+
+      constructor() {
+        recognitions.push(this);
+      }
+
+      start() {
+        window.setTimeout(() => this.onaudiostart?.(), 0);
+      }
+
+      stop() {
+        window.setTimeout(() => this.onend?.(), 0);
+      }
+
+      abort() {
+        this.aborted = true;
+        window.setTimeout(() => this.onend?.(), 0);
+      }
+    }
+
+    vi.stubGlobal('SpeechRecognition', MockRecognition);
+    stubVetting({ ...ANSWERED, transcription: { available: true } });
+    const { container } = renderAt(at('positioning'));
+
+    await user.click(await screen.findByRole('button', { name: /say it instead/i }));
+    const firstRow = await waitFor(() => {
+      const row = container.querySelector('[data-rec-row]');
+      expect(row).not.toBeNull();
+      return row;
+    });
+
+    await user.click(container.querySelector('button.is-retry')!);
+
+    await waitFor(() => expect(recognitions).toHaveLength(2));
+    expect(recognitions[0]?.aborted).toBe(true);
+    expect(container.querySelector('[data-rec-row]')).toBe(firstRow);
+    expect(container.querySelector('[data-say-row]')).toBeNull();
+  });
 });
 
 describe('the flow is operable over Session C pages', () => {

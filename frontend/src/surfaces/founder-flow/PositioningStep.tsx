@@ -574,7 +574,7 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
    * `heard` is everything this session has produced, never a delta, so the box
    * is always `base + heard` and a dropped callback cannot lose a word.
    */
-  function startLiveRun(): (() => void) | null {
+  function startLiveRun(replayHandoff = true): (() => void) | null {
     /**
      * Two signals have to land before the recording state appears, and neither
      * one alone is right.
@@ -642,7 +642,7 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
       // thing left, and if it is not configured either there is nothing to run.
       if (portReady) {
         engine.current = 'port';
-        startPortRun();
+        startPortRun(replayHandoff);
         return null;
       }
       toIdle();
@@ -672,7 +672,7 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
    * between. Unchanged in every particular; it is now the fallback rather than
    * the only path.
    */
-  function startPortRun() {
+  function startPortRun(replayHandoff = true) {
     // The tween is created BEFORE the microphone is asked for, and the order is
     // load-bearing rather than tidy: `getUserMedia` can hold the main thread for
     // tens of milliseconds, and measured against the prototype frame by frame
@@ -692,7 +692,7 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
       return pending;
     };
 
-    sayHandoff(root.current, () => {
+    const start = () => {
       void acquire().then((stream) => {
         if (!stream) {
           toIdle();
@@ -726,13 +726,19 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
         media.start();
         enterRecording();
       });
-    });
+    };
 
-    // …and asked for immediately after, so the prompt and the 0.38s handoff run
-    // at the same time rather than one after the other. On a second visit the
-    // permission is already granted and the stream is there before the mic has
-    // finished widening, which is the reference's own instant handoff.
-    void acquire();
+    if (replayHandoff) {
+      sayHandoff(root.current, start);
+
+      // …and asked for immediately after, so the prompt and the 0.38s handoff run
+      // at the same time rather than one after the other. On a second visit the
+      // permission is already granted and the stream is there before the mic has
+      // finished widening, which is the reference's own instant handoff.
+      void acquire();
+    } else {
+      start();
+    }
   }
 
   /**
@@ -792,10 +798,16 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
    * every word this recording put in goes, and no word the Founder typed does.
    */
   function retry() {
+    setAlert(null);
     if (engine.current === 'speech') {
       speech.current?.abandon();
       speech.current = null;
       write(base.current);
+      const armed = startLiveRun(false);
+      // Retry in the reference calls startDict directly. The recording row
+      // never disappears and the microphone handoff never plays a second time;
+      // only enterRecording's recIntro is replayed for the fresh session.
+      armed?.();
     } else {
       const session = recorder.current;
       if (session) {
@@ -803,12 +815,9 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
         session.media.stop();
       }
       recorder.current = null;
+      startPortRun(false);
     }
-    setPhase('idle');
-    setAttempt((n) => n + 1);
     setSeconds(0);
-    // A frame for the say-row to mount before the handoff measures it.
-    window.requestAnimationFrame(() => beginHandoff());
   }
 
   /**
