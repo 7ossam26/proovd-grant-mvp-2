@@ -188,3 +188,11 @@ export * from './posts.js';
 // refusals are in the CHECK; an approved request grants no access, because
 // `exportBackerRows` takes no argument one could arrive as.
 export * from './backer-data.js';
+
+// The Admin Founder panel (migration 0059, 2026-08-22): the eleven-stage
+// reference's own records — a Founder-scoped note stream, the Admin compensation
+// OFFER (which is deliberately not a proposal version, so §14.2's bilateral
+// acceptance is untouched), the final-campaign send, the §9-shaped application
+// review the lifecycle has no state for, and the append-only trail behind every
+// Admin content edit.
+export * from './admin-founder-panel.js';

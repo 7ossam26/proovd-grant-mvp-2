@@ -789,6 +789,18 @@ export const UNGATED_ADMIN_WRITES = [
     reason:
       'Removes a note from view — softly. The row survives with who removed it and when, the app role cannot hard-delete (revoked), and a deleted task decides nothing anywhere else in the product.',
   },
+  {
+    route: 'POST /api/admin/founders/:prospectId/notes',
+    specRef: '§26.8, §25.6',
+    reason:
+      'Records Proovd’s own note about its own work on a Founder. Insert-only, author taken from the session, and the body never reaches a timeline — a timeline is the view that gets pasted into a customer message. It moves no money, changes no configuration, enforces against nobody, and reaches nobody.',
+  },
+  {
+    route: 'PUT /api/admin/founders/:draftId/prefills',
+    specRef: '§7, §9',
+    reason:
+      'Writes the Invite stage’s prefills on an unsent draft — the same act as composing the invitation beside it, and gated the same way. It reaches nobody, a key absent from the patch writes nothing, and Send re-decides server-side whatever this wrote.',
+  },
 ] as const;
 
 export type UngatedAdminWrite = (typeof UNGATED_ADMIN_WRITES)[number];

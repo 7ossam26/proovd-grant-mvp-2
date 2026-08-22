@@ -301,12 +301,11 @@ describe('the Founder onboarding flow', () => {
   });
 
   it('holds only the pages that exist', () => {
-    // Twenty-six were planned; on 2026-08-20 the reach orbit and the
-    // problem confirm were added and the claim screen was removed. The match
-    // screen returned after Details on 2026-08-21. The duplicate final password
-    // and live-status pages now belong to the dashboard, so this is every live
-    // flow page.
-    expect(FOUNDER_FLOW_PAGES).toHaveLength(23);
+    // Twenty-six were planned; the current routed sequence has twenty-seven
+    // distinct pages after splitting the confirm and branding beats, restoring
+    // Match, and keeping the later build, payout, and review screens explicit.
+    // The retired standalone password and live-status pages remain absent.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(27);
   });
 
   it('addresses a page by the parameter its own auth regime has', () => {
@@ -318,19 +317,18 @@ describe('the Founder onboarding flow', () => {
     }
   });
 
-  it('puts Stripe before the listing fee, because the server does', () => {
-    // `founder-flow-reconciliation.md` §1, move 2. The reference draws the fee
-    // at 20 and payouts at 25; `beginListingCheckout` refuses without a
-    // complete `founder_seller` account, so drawn that way screen 20 offers a
-    // payment the server declines. §23.1 orders the two states the same way.
+  it('keeps the listing fee before the later Stripe payout handoff', () => {
+    // The shipped Founder walk pays the listing fee before the page-build
+    // screens, then hands the completed build to Stripe payout onboarding.
     const payouts = founderFlowIndex('payouts');
     const fee = founderFlowIndex('fee');
     expect(payouts).toBeGreaterThan(-1);
-    expect(fee).toBeGreaterThan(payouts);
-    expect(founderFlowPage('payouts')?.stage).toBe(4);
+    expect(payouts).toBeGreaterThan(fee);
+    expect(founderFlowPage('payouts')?.stage).toBe(5);
     expect(founderFlowPage('fee')?.stage).toBe(4);
-    // And after Last look, which is where stage 3 ends.
+    // Both remain after Last look, which is where the optional answers end.
     expect(payouts).toBeGreaterThan(founderFlowIndex('last-look'));
+    expect(fee).toBeGreaterThan(founderFlowIndex('last-look'));
   });
 
   it('offers a jump only where the parameter carries over', () => {

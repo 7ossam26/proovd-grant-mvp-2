@@ -311,23 +311,12 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 3,
   },
   {
-    /*
-      The reference's post-Match sequence: Creator pay, the passive Application
-      review beat, then the Listing fee. Payout setup belongs after the build.
-    */
+    /* Creator-pay openness leads directly to the real listing-fee step. */
     id: 'creator-payment',
     path: '/campaigns/:campaignId/setup/creator-payment',
     param: 'campaignId',
     title: 'How Creators are paid',
     help: 'Creators take a share of the preorders, so there is nothing to pay upfront.',
-    stage: 4,
-  },
-  {
-    id: 'application-review',
-    path: '/campaigns/:campaignId/setup/application-review',
-    param: 'campaignId',
-    title: 'Review',
-    help: 'We read every campaign by hand. This is usually minutes, not days.',
     stage: 4,
   },
   {

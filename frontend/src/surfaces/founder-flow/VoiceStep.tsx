@@ -372,6 +372,7 @@ function VoiceScreen({
             type="button"
             className="ff-vc__cta"
             data-stage-anim="cta"
+            aria-label={build.state?.model === 'idea' ? 'Continue to your pre-order threshold' : 'Continue to your FAQs'}
             onClick={() => void goOn()}
             disabled={busy}
           >

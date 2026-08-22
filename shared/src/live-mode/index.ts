@@ -187,11 +187,11 @@ export const LIVE_MODE_CONDITIONS: readonly LiveModeCondition[] = [
     key: 'samples_collect_nothing',
     ordinal: 7,
     requirement:
-      'Sample campaigns prove no-charge-today consent and collect no cards — no form, no input, no iframe, no provider script.',
+      'Production exposes no static example campaign routes; campaign pages can collect card details only through the real reviewed checkout path.',
     specRef: '§34, §18, Appendix A.6',
-    verification: 'recorded',
+    verification: 'suite',
     cannotBeAutomatedBecause:
-      'The suite already asserts the built sample routes mount no payment field, and that assertion stands. What it cannot see is the deployed origin — a tag manager, an injected widget, or a reverse proxy adding a script are all outside the bundle the test reads. §34 asks about the sample campaigns as served, not as built.',
+      'The suite proves the production route table and public navigation contain no static example campaign. A deployed-origin smoke check still has to confirm that a proxy or injected script did not add an unreviewed payment surface.',
     trackAItem: 'A4',
   },
   {
@@ -296,7 +296,7 @@ export const RECORDABLE_CONDITION_KEYS: readonly string[] = LIVE_MODE_CONDITIONS
  * what Phases 06 through 23 built and what the gate must not touch.
  */
 export const PERMITTED_WHILE_GATE_CLOSED: readonly string[] = [
-  'public demos',
+  'public information pages',
   'interest collection',
   'Founder and Affiliate onboarding',
   'campaign drafting',

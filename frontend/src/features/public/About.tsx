@@ -6,7 +6,6 @@
  * so rather than implying a scale that does not exist.
  */
 
-import { Link as RouterLink } from 'react-router';
 import { Measure, Mode, Section } from '../../components/index.js';
 import { LEGAL_ENTITY, SUPPORT_EMAIL } from './site.js';
 
@@ -79,17 +78,6 @@ export function About() {
               person replies within one business day, Monday to Friday, excluding
               U.S. federal holidays — that is our actual commitment, and it is at
               the bottom of every page on this site.
-            </p>
-            <p>
-              If you want to see the product before you talk to anyone, open the{' '}
-              <RouterLink to="/campaign/sample-pre-build">
-                sample Idea Campaign
-              </RouterLink>{' '}
-              or the{' '}
-              <RouterLink to="/campaign/sample-pre-launch">
-                sample Product Campaign
-              </RouterLink>
-              .
             </p>
           </Measure>
         </Section>

@@ -83,6 +83,22 @@ export interface FounderListRow {
   currentCampaign: { campaignId: string; name: string; status: string } | null;
 
   attention: FounderAttention;
+
+  /*
+   * The Admin Founder panel's four columns (migration 0059/0060).
+   *
+   * Optional on the CONTRACT because every other Admin surface that reads a
+   * directory row predates them; they are always composed by `listFounders`.
+   */
+
+  /** Every campaign record this person owns, archived ones included. */
+  campaignCount?: number;
+  /** Where the record IS — one of the eleven workflow stages, or null. */
+  workflowStage?: string | null;
+  /** The ratchet the stage menu unlocks from. Never lower than the current. */
+  workflowStageReached?: string | null;
+  /** `founder_prospects.last_active_at`, written on the Founder's own requests. */
+  lastActiveAt?: string | null;
 }
 
 /**

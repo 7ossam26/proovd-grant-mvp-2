@@ -137,6 +137,18 @@ export const founderProspects = pgTable(
      * having nowhere to record a cadence is what keeps this from becoming one.
      */
     lastContactAt: timestamp('last_contact_at', { withTimezone: true }),
+    /**
+     * Admin prefill, shown read-only to the Founder (migration 0059).
+     * No UNIQUE index: nothing in the Spec makes this an identifier, and
+     * inventing uniqueness would be inventing a rule.
+     */
+    username: text('username'),
+    /**
+     * The directory's `Last active` column. Written by `founderStandingGate`,
+     * which already runs on every Founder request — deliberately NOT inferred
+     * from `created_at`/`updated_at` (§33.12.1 scans for exactly that).
+     */
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }),
 
     /* ── Provenance (§7, §26.1) ────────────────────────────────────────────*/
     invitationSource: text('invitation_source'),
@@ -216,6 +228,23 @@ export const campaignDrafts = pgTable(
 
     status: invitationStatus('status').notNull().default('draft'),
 
+    /*
+     * The Invite stage's prefills (migration 0059).
+     *
+     * They live here rather than on `campaign_vetting` because they are the
+     * personalised content of ONE invitation — which is exactly what this table
+     * holds and what §25.8's sweep anonymises. `views_range` on the vetting
+     * record is a different fact: a Founder-answered range, retired from
+     * collection, with §9 provenance semantics an Admin integer does not share.
+     */
+    prefillViewsCount: integer('prefill_views_count'),
+    prefillAffiliateMatches: integer('prefill_affiliate_matches'),
+    /** One of `PREFILL_AFFILIATE_TYPES` — nine values, CHECK-pinned. */
+    prefillAffiliateType: text('prefill_affiliate_type'),
+    /** Two independent controls in the reference, so two columns. */
+    prefillBrandVoice1: text('prefill_brand_voice_1'),
+    prefillBrandVoice2: text('prefill_brand_voice_2'),
+
     /** Set by the retention sweep, in the same transaction as the revocation. */
     anonymisedAt: timestamp('anonymised_at', { withTimezone: true }),
 
@@ -277,6 +306,13 @@ export const campaignInvitationSends = pgTable(
      * retention clock cannot be edited.
      */
     notificationId: text('notification_id'),
+    /**
+     * The Invite stage renders both (migration 0059). `opened_at` is stamped
+     * when the delivered token is first verified, `accepted_at` when the claim
+     * completes — two different facts, and the reference shows them as two rows.
+     */
+    openedAt: timestamp('opened_at', { withTimezone: true }),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
 
     /** The token this send delivered. Its raw value is nowhere (§28.1). */
     tokenId: uuid('token_id').notNull(),

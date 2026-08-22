@@ -1091,6 +1091,7 @@ function CompetScreen({ token, loaded }: { token: string; loaded: VettingState }
                 type="button"
                 className="ff-compet__next"
                 data-say-next="1"
+                aria-label="Next — submit your answers and continue to campaign visuals"
                 disabled={busy}
                 onClick={() => void submit()}
               >

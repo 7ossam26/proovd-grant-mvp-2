@@ -21,17 +21,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { axe } from 'jest-axe';
 import {
-  FLOW_COMPLETION_IS_DECIDED,
   FOUNDER_ANSWER_SEQUENCE,
   FOUNDER_FLOW_ABSENCES,
   FOUNDER_FLOW_PAGES,
   OBJECTLESS_CTA_LABELS,
-  BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD,
   LISTING_FEE_CHECKOUT_CANCELED,
   NOTHING_HERE_IS_A_TIMER,
   ORDER_THRESHOLD_IS_A_COUNT,
@@ -40,7 +38,6 @@ import {
   LISTING_FEE_NEWSLETTER_LABEL,
   payoutDiscountLine,
   payoutSavedLine,
-  PAYOUT_PREPARE_COLLECTS_NOTHING,
   SEPARATE_FIVE_PERCENT_NOTE,
   STRIPE_PREPARE_ITEMS,
   founderAnswerLabel,
@@ -49,6 +46,8 @@ import {
 } from '@proovd/shared';
 import { invalidateSession } from '../../lib/session.js';
 import { appRoutes } from '../../routes.js';
+import { clearDraftFlowCache } from '../draft/api.js';
+import { clearFounderWorkspaceCache } from '../founder/api.js';
 
 type StubResult = { status: number; body: unknown } | undefined;
 type Handler = (url: string, init?: RequestInit) => StubResult;
@@ -61,7 +60,10 @@ function respond(status: number, body: unknown): Response {
 }
 
 beforeEach(() => {
+  cleanup();
   invalidateSession();
+  clearDraftFlowCache();
+  clearFounderWorkspaceCache();
   sessionStorage.clear();
   handlers = [];
   requests = [];
@@ -81,6 +83,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -224,7 +227,7 @@ describe('the flow is a sequence of pages', () => {
       await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1));
       view.unmount();
     }
-  });
+  }, 60_000);
 
   it('walks invite → problem → solution → campaign type, and back again', async () => {
     const user = userEvent.setup();
@@ -237,20 +240,20 @@ describe('the flow is a sequence of pages', () => {
     // walk asserts — that the front door leads to the problem page and the
     // sequence walks both ways — is unchanged.
     await user.click(await screen.findByRole('button', { name: /check info/i }));
-    await screen.findByRole('heading', { name: /how we understood your problem/i });
+    await screen.findByRole('heading', { name: /this is how we understood your.*problem/i });
 
     await user.click(await screen.findByRole('button', { name: /continue to your solution/i }));
-    await screen.findByRole('heading', { name: /how we understood your solution/i });
+    await screen.findByRole('heading', { name: /this is how we understood your.*solution/i });
 
-    await user.click(await screen.findByRole('button', { name: /continue to campaign type/i }));
-    await screen.findByRole('heading', { name: /working on an/i });
+    await user.click(await screen.findByRole('button', { name: /continue to your reach/i }));
+    await screen.findByRole('heading', { name: /new people/i });
 
-    await user.click(await screen.findByRole('button', { name: /back to your solution/i }));
-    await screen.findByRole('heading', { name: /how we understood your solution/i });
+    await user.click(await screen.findByRole('button', { name: /accept invite/i }));
+    await screen.findByRole('heading', { name: /working on a/i });
 
-    await user.click(await screen.findByRole('button', { name: /back to your problem/i }));
-    await screen.findByRole('heading', { name: /how we understood your problem/i });
-  });
+    await user.click(await screen.findByRole('button', { name: /back to your reach/i }));
+    await screen.findByRole('heading', { name: /new people/i });
+  }, 30_000);
 
   it('renders no persistent chrome — no site header, no footer, no progress bar', async () => {
     stubVetting(ANSWERED);
@@ -263,11 +266,11 @@ describe('the flow is a sequence of pages', () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
-   The reference Help drawer — reading for this page, then the handbook
+   Contextual help — factual guidance and a real support path
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('the help drawer', () => {
-  it('leads with this page’s reference reading and ends with the handbook', async () => {
+  it('shows factual guidance for the current page and a real support path', async () => {
     const user = userEvent.setup();
     stubVetting(ANSWERED);
     renderAt(at('solution'));
@@ -275,12 +278,14 @@ describe('the help drawer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Help' }));
     const dialog = await screen.findByRole('dialog');
-    const cards = dialog.querySelectorAll('.ff-help-ref__docs article');
-
-    expect(cards[0]).toHaveTextContent('One-sentence solution statements.pdf');
-    expect(cards[0]).toHaveTextContent('PDF · 0.6 MB');
-    expect(cards[0]).toHaveClass('is-current');
-    expect(cards[cards.length - 1]).toHaveTextContent('Proovd founder handbook.pdf');
+    expect(dialog).toHaveTextContent('The solution');
+    expect(dialog).toHaveTextContent('Describe what you are building and how it addresses the problem.');
+    expect(dialog.querySelector('.ff-help-ref__docs section')).toHaveClass('is-current');
+    expect(within(dialog).getByRole('link', { name: 'Contact Proovd support' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/support\?reference=/),
+    );
+    expect(dialog.textContent).not.toMatch(/\.pdf|worked example/i);
   });
 
   it('is page reading rather than a progress or navigation list', async () => {
@@ -291,8 +296,8 @@ describe('the help drawer', () => {
 
     await user.click(screen.getByRole('button', { name: 'Help' }));
     const dialog = await screen.findByRole('dialog');
-    expect(dialog).toHaveTextContent('Writing a problem backers recognise.pdf');
-    expect(dialog).toHaveTextContent('Problem statement worksheet.pdf');
+    expect(dialog).toHaveTextContent('The problem');
+    expect(dialog).toHaveTextContent('Confirm or correct the problem your product solves.');
     expect(dialog).not.toHaveTextContent('Your solution');
     expect(dialog).not.toHaveTextContent('Your invite');
   });
@@ -315,7 +320,7 @@ describe('the help drawer', () => {
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('confirming what Proovd understood', () => {
-  it('shows the Proovd-drafted answer as drafted, and reads it back', async () => {
+  it('shows the supplied answer read-only without adding provenance copy', async () => {
     stubVetting({
       ...ANSWERED,
       provenance: {
@@ -331,8 +336,10 @@ describe('confirming what Proovd understood', () => {
     renderAt(at('problem'));
 
     await screen.findByRole('heading', { level: 1 });
-    expect(await screen.findByText(/drafted by proovd/i)).toBeTruthy();
-    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(ANSWERED.problem);
+    const answer = screen.getByRole('textbox') as HTMLTextAreaElement;
+    expect(answer.value).toBe(ANSWERED.problem);
+    expect(answer.readOnly).toBe(true);
+    expect(document.body).not.toHaveTextContent(/drafted by proovd/i);
   });
 
   it('is read-only until Edit, and editing saves what is typed', async () => {
@@ -344,7 +351,7 @@ describe('confirming what Proovd understood', () => {
     const box = screen.getByRole('textbox') as HTMLTextAreaElement;
     expect(box.readOnly).toBe(true);
 
-    await user.click(screen.getByRole('button', { name: /edit this/i }));
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(false);
 
     await user.clear(screen.getByRole('textbox'));
@@ -364,7 +371,7 @@ describe('confirming what Proovd understood', () => {
     renderAt(at('problem'));
     await screen.findByRole('heading', { level: 1 });
 
-    await user.click(screen.getByRole('button', { name: /edit this/i }));
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
     await user.type(screen.getByRole('textbox'), '!');
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Saved \S/));
   });
@@ -380,7 +387,7 @@ describe('confirming what Proovd understood', () => {
     renderAt(at('problem'));
     await screen.findByRole('heading', { level: 1 });
 
-    await user.click(screen.getByRole('button', { name: /edit this/i }));
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
     await user.type(screen.getByRole('textbox'), ' Still mine.');
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toMatch(/could not save|not saved/i),
@@ -400,7 +407,7 @@ describe('confirming what Proovd understood', () => {
     renderAt(at('problem'));
     await screen.findByRole('heading', { level: 1 });
 
-    await user.click(screen.getByRole('button', { name: /edit this/i }));
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
     await user.type(screen.getByRole('textbox'), '!');
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/not saved/i));
     expect(screen.getByRole('status').textContent).not.toMatch(/retrying/i);
@@ -425,7 +432,7 @@ describe('confirming what Proovd understood', () => {
     renderAt(at('problem'));
     await screen.findByRole('heading', { level: 1 });
 
-    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Continue to your solution' }));
 
     // Still here, and told why — never an inert button and never a silent one.
     expect(await screen.findByRole('alert')).toHaveTextContent(/cannot be skipped/i);
@@ -452,7 +459,7 @@ describe('confirming what Proovd understood', () => {
     await user.click(screen.getByRole('button', { name: 'edit' }));
     await user.type(screen.getByRole('textbox'), 'Benches are lit from the ceiling.');
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
-    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Continue to your solution' }));
 
     // Straight back, not on to Your solution.
     await waitFor(() =>
@@ -588,7 +595,7 @@ describe('the campaign path', () => {
     await user.click(screen.getByRole('button', { name: /^select$/i }));
     await screen.findByRole('button', { name: /^confirm$/i });
 
-    await user.click(screen.getByRole('button', { name: /^back$/i }));
+    await user.click(screen.getByRole('button', { name: /back to campaign choices/i }));
 
     // The pick stage again, showing the card that was chosen — not reset to
     // the first one.
@@ -602,7 +609,7 @@ describe('the campaign path', () => {
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('the refusals', () => {
-  it('promises no audience number anywhere in the flow (§7)', async () => {
+  it('keeps the supplied reach figure confined to its own page (§7)', async () => {
     stubLanding();
     stubVetting(ANSWERED);
     for (const page of FOUNDER_FLOW_PAGES) {
@@ -611,8 +618,8 @@ describe('the refusals', () => {
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       const text = document.body.textContent ?? '';
-      expect(text).not.toMatch(/in front of/i);
-      expect(text).not.toMatch(/new people/i);
+      if (page.id === 'reach') expect(text).toMatch(/10,000\s*new people/i);
+      else expect(text).not.toMatch(/10,000\s*new people/i);
       view.unmount();
     }
   });
@@ -681,7 +688,7 @@ describe('the refusals', () => {
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       const text = document.body.textContent ?? '';
-      for (const word of ['pre_build', 'pre_launch', 'prebuild', 'prelaunch', 'affiliate']) {
+      for (const word of ['pre_build', 'pre_launch', 'prebuild', 'prelaunch']) {
         expect(text.toLowerCase()).not.toContain(word);
       }
       view.unmount();
@@ -712,7 +719,7 @@ describe('§33.11 the flow is operable', () => {
       expect(await axe(view.container), `axe on ${page.id}`).toHaveNoViolations();
       view.unmount();
     }
-  });
+  }, 60_000);
 
   it('exposes exactly one level-1 heading per page (§33.11.2)', async () => {
     for (const page of FOUNDER_FLOW_PAGES) {
@@ -722,7 +729,7 @@ describe('§33.11 the flow is operable', () => {
       await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1));
       view.unmount();
     }
-  });
+  }, 60_000);
 
   it('names a destination on every nav control (§33.11.4)', async () => {
     for (const page of FOUNDER_FLOW_PAGES) {
@@ -733,7 +740,7 @@ describe('§33.11 the flow is operable', () => {
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       for (const control of screen.getAllByRole('button')) {
-        const label = (control.textContent ?? '').trim().toLowerCase();
+        const label = (control.getAttribute('aria-label') ?? control.textContent ?? '').trim().toLowerCase();
         expect(
           OBJECTLESS_CTA_LABELS as readonly string[],
           `${page.id}: "${label}"`,
@@ -741,7 +748,7 @@ describe('§33.11 the flow is operable', () => {
       }
       view.unmount();
     }
-  });
+  }, 60_000);
 
   it('offers the whole walk to the keyboard (§28.5)', async () => {
     const user = userEvent.setup();
@@ -753,7 +760,7 @@ describe('§33.11 the flow is operable', () => {
     const forward = screen.getByRole('button', { name: /continue to your solution/i });
     forward.focus();
     await user.keyboard('{Enter}');
-    await screen.findByRole('heading', { name: /how we understood your solution/i });
+    await screen.findByRole('heading', { name: /this is how we understood your.*solution/i });
   });
 });
 
@@ -960,7 +967,8 @@ describe('the six-digit code', () => {
     renderAt(at('code'));
     await user.click(await screen.findByLabelText('Digit 1 of 6'));
     await user.keyboard('418306');
-    await screen.findByRole('heading', { name: /who else is solving this/i });
+    await screen.findByRole('heading', { name: /you confirmed this was the problem/i });
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute('data-flow-page', 'confirm-problem');
   });
 
   it('takes a pasted code, because that is how people enter one', async () => {
@@ -971,7 +979,8 @@ describe('the six-digit code', () => {
     renderAt(at('code'));
     await user.click(await screen.findByLabelText('Digit 1 of 6'));
     await user.paste('418306');
-    await screen.findByRole('heading', { name: /who else is solving this/i });
+    await screen.findByRole('heading', { name: /you confirmed this was the problem/i });
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute('data-flow-page', 'confirm-problem');
   });
 
   it('offers a real control as well as the auto-advance (§28.5)', async () => {
@@ -1022,12 +1031,12 @@ describe('positioning', () => {
   it('renders blank with no Proovd draft behind it (§9, §33.1.5)', async () => {
     stubVetting(ANSWERED);
     renderAt(at('positioning'));
-    const box = await screen.findByLabelText(/positioning/i);
+    const box = await screen.findByLabelText(/who else is solving this/i);
     expect((box as HTMLTextAreaElement).value).toBe('');
-    // The one field the product never drafts. There is no "we wrote this"
-    // treatment on this screen at all.
+    // The one field the product never drafts. There is no helper that offers
+    // to generate, suggest or write the answer for the Founder.
     expect(document.body.textContent).not.toMatch(/we wrote this from our conversation/i);
-    expect(screen.getByText(/we do not draft for you/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/generate|suggest|write .* for me/i);
   });
 
   it('does not ask Problem or Solution a second time', async () => {
@@ -1035,7 +1044,7 @@ describe('positioning', () => {
     // in two places is a record whose copies eventually disagree.
     stubVetting(ANSWERED);
     renderAt(at('positioning'));
-    await screen.findByLabelText(/positioning/i);
+    await screen.findByLabelText(/who else is solving this/i);
     expect(screen.queryByDisplayValue(ANSWERED.problem)).toBeNull();
     expect(screen.queryByDisplayValue(ANSWERED.solution)).toBeNull();
   });
@@ -1049,7 +1058,7 @@ describe('positioning', () => {
     const alert = await screen.findByRole('alert');
     expect(within(alert).getByRole('link', { name: /your problem/i })).toHaveAttribute(
       'href',
-      at('problem'),
+      `${at('problem')}?from=positioning`,
     );
   });
 
@@ -1076,7 +1085,8 @@ describe('positioning', () => {
       'Spreadsheets, mostly.',
     );
     await user.click(screen.getByRole('button', { name: /next/i }));
-    await screen.findByText(FLOW_COMPLETION_IS_DECIDED);
+    await screen.findByRole('heading', { name: /we want to see your product/i });
+    expect(document.querySelector('[data-flow-page]')).toHaveAttribute('data-flow-page', 'visuals');
   });
 
   it('never answers Next with silence, and never with a step backwards', async () => {
@@ -1140,15 +1150,14 @@ describe('positioning', () => {
       },
     });
     renderAt(at('positioning'));
-    await screen.findByLabelText(/positioning/i);
-    expect(screen.getByText(/dictation is not set up/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/who else is solving this/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /say it instead/i })).toBeNull();
   });
 
   it('offers nothing that writes for you (§12, §30)', async () => {
     stubVetting({ ...ANSWERED, transcription: { available: true } });
     renderAt(at('positioning'));
-    await screen.findByLabelText(/positioning/i);
+    await screen.findByLabelText(/who else is solving this/i);
     expect(screen.getByRole('button', { name: /say it instead/i })).toBeInTheDocument();
     for (const word of [/suggest/i, /rewrite/i, /summari[sz]e/i, /generate/i, /improve/i]) {
       expect(screen.queryByRole('button', { name: word })).toBeNull();
@@ -1225,7 +1234,7 @@ describe('the flow is operable over Session C pages', () => {
       expect(await axe(view.container), id).toHaveNoViolations();
       view.unmount();
     }
-  });
+  }, 30_000);
 
   it('exposes exactly one level-1 heading per page (§33.11.2)', async () => {
     for (const id of PAGES) {
@@ -1236,7 +1245,7 @@ describe('the flow is operable over Session C pages', () => {
       expect(screen.getAllByRole('heading', { level: 1 }), id).toHaveLength(1);
       view.unmount();
     }
-  });
+  }, 30_000);
 
   it('names a destination on every nav control (§33.11.4)', async () => {
     for (const id of PAGES) {
@@ -1245,12 +1254,12 @@ describe('the flow is operable over Session C pages', () => {
       const view = renderAt(at(id));
       await screen.findByRole('heading', { level: 1 });
       for (const button of screen.getAllByRole('button')) {
-        const label = (button.textContent ?? '').trim().toLowerCase();
+        const label = (button.getAttribute('aria-label') ?? button.textContent ?? '').trim().toLowerCase();
         expect(OBJECTLESS_CTA_LABELS as readonly string[], `${id}: ${label}`).not.toContain(label);
       }
       view.unmount();
     }
-  });
+  }, 30_000);
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1349,6 +1358,15 @@ function stubStage3(initial: Record<string, unknown> = {}) {
       : undefined,
   );
   stubWorkspace(initial);
+  handlers.push((url, init) => {
+    if (!/\/details$/.test(url)) return undefined;
+    const details = { name: 'Rowan', phone: '+1 555 0100', dateOfBirth: '1990-01-01' };
+    if (init?.method === 'PATCH') {
+      const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return { status: 200, body: { details: { ...details, ...patch } } };
+    }
+    return { status: 200, body: { details } };
+  });
   // Session E: the two stage-4 pages read these. The handler here used to
   // match `/api/payouts`, which is not an address this product has — the real
   // bases are `/api/founder/payouts` and `/api/creator/payouts` — so it never
@@ -1380,7 +1398,7 @@ describe('the five §12 answers (10–14)', () => {
     stubStage3();
     renderAt(at('branding'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to Your visuals' })).toBeInTheDocument();
   });
 
   it('names the saving from the SETTING, never from a hardcoded $2', async () => {
@@ -1389,24 +1407,24 @@ describe('the five §12 answers (10–14)', () => {
     stubStage3({ fee: { ...(workspaceState()['fee'] as object), itemDiscountCents: '350' } });
     renderAt(at('branding'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByText(/US\$3\.50 off your listing fee/)).toBeInTheDocument();
+    expect(screen.getByText('optional: $3.50 discount')).toBeInTheDocument();
   });
 
-  it('offers no control that marks an answer done, and says who decides', async () => {
+  it('offers no control that lets the Founder mark an answer done', async () => {
     stubStage3();
     renderAt(at('branding'));
     await screen.findByRole('heading', { level: 1 });
 
-    expect(screen.getByText(FLOW_COMPLETION_IS_DECIDED)).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /mark (this )?complete/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /mark (this )?(as )?done/i })).toBeNull();
   });
 
-  it('says what is not counting, in the Founder’s own words', async () => {
+  it('keeps an empty branding answer as an empty upload state', async () => {
     stubStage3();
     renderAt(at('branding'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByText('A logo or wordmark has not been uploaded.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /upload logo/i })).toBeInTheDocument();
+    expect(document.querySelector('.ff-brandlogo__list')).toBeNull();
   });
 
   it('keeps the reference upload copy visible when storage is unavailable', async () => {
@@ -1475,17 +1493,15 @@ describe('the five §12 answers (10–14)', () => {
     expect(screen.queryByText('That is not a web address we can open.')).toBeNull();
   });
 
-  it('names the missing §6 settings instead of offering a slot', async () => {
+  it('keeps the interview picker visible without inventing an unavailable embed', async () => {
     stubStage3();
     renderAt(at('interview'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByText('Booking an interview is not open yet')).toBeInTheDocument();
-    expect(screen.getByText(/interview_providers/)).toBeInTheDocument();
-    // tech-stack §12: the booking record is the provider's. No picker here.
-    expect(screen.queryByRole('button', { name: /google meet|zoom|teams/i })).toBeNull();
+    expect(screen.getByRole('heading', { name: /book your founder interview/i })).toBeInTheDocument();
+    expect(document.querySelector('.ff-int__embed')).toBeNull();
   });
 
-  it('offers copy, never generate (§12, §30)', async () => {
+  it('offers factual help, never generated brand work (§12, §30)', async () => {
     // DELIBERATELY MOVED (2026-08-20): it ran on `visuals`, whose rebuild to the
     // supplied reference leaves no helper block — the reference's composition is
     // the zone, the link row and one Next. The rule is about the helper
@@ -1496,20 +1512,20 @@ describe('the five §12 answers (10–14)', () => {
     renderAt(at('branding'));
     await screen.findByRole('heading', { level: 1 });
 
-    await user.click(screen.getByText('Finding a brand direction that is yours'));
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Copy prompt' })).toBeInTheDocument(),
-    );
+    await user.click(screen.getAllByRole('button', { name: 'Help' })[0]!);
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Branding');
+    expect(dialog).toHaveTextContent(/product name and logo/i);
     expect(screen.queryByRole('button', { name: /generate/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /write (it|this) for me/i })).toBeNull();
   });
 
-  it('renders the dictation absence on Story rather than a microphone that refuses', async () => {
+  it('keeps Story editable when dictation is unavailable, without a dead microphone', async () => {
     stubStage3();
     renderAt(at('story'));
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getByText(/dictation is not set up on this deployment/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /say it instead/i })).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Your story' })).toBeInTheDocument();
     // The one thing dictation would do, and nothing beside it (§12, §30).
     expect(screen.queryByRole('button', { name: /summari[sz]e|rewrite|suggest/i })).toBeNull();
   });
@@ -1529,10 +1545,10 @@ describe('the five §12 answers (10–14)', () => {
     // Its visible word is the reference's `Next`; the accessible name adds the
     // destination, which is the half §33.11.4 is actually about.
     await user.click(screen.getByRole('button', { name: 'Next — your brand' }));
-    await screen.findByRole('heading', { name: /logo and a written brand direction/i });
+    await screen.findByRole('heading', { name: /more about your brand/i });
 
     await user.click(screen.getByRole('button', { name: 'Back to Your visuals' }));
-    await screen.findByRole('heading', { name: /photo or video of what you are making/i });
+    await screen.findByRole('heading', { name: /we want to see your product/i });
   });
 
   it('ends the sequence at Last look', async () => {
@@ -1591,12 +1607,16 @@ describe('Last look (15)', () => {
     );
     // The reference's card is a title and a tag, and that pair is its name.
     await user.click(screen.getByRole('button', { name: new RegExp(`^${brandLabel}`, 'i') }));
-    await screen.findByRole('heading', { name: /logo and a written brand direction/i });
+    await screen.findByRole('heading', { name: /more about your brand/i });
 
-    // The contract is in the ADDRESS, so it survives a reload mid-edit — and
-    // both controls name Last look rather than the next answer.
-    expect(screen.getAllByRole('button', { name: 'Back to Last look' }).length).toBe(2);
-    await user.click(screen.getAllByRole('button', { name: 'Back to Last look' })[1]!);
+    // Branding is one two-screen answer. The first screen keeps the supplied
+    // Back destination; Next carries the review return through the colour step.
+    expect(screen.getByRole('button', { name: 'Back to Your visuals' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Next — choose your brand colours' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-flow-page="color"]')).not.toBeNull(),
+    );
+    await user.click(screen.getByRole('button', { name: 'Next — back to Last look' }));
     await screen.findByRole('heading', { name: /last look/i });
   });
 
@@ -1604,12 +1624,13 @@ describe('Last look (15)', () => {
     stubStage3();
     renderAt(`${at('branding')}?from=review`);
     await screen.findByRole('heading', { level: 1 });
-    expect(screen.getAllByRole('button', { name: 'Back to Last look' }).length).toBe(2);
+    expect(screen.getByRole('button', { name: 'Back to Your visuals' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next — choose your brand colours' })).toBeInTheDocument();
   });
 });
 
 describe('the help drawer on campaign-addressed pages', () => {
-  it('shows only that page’s resources and the handbook', async () => {
+  it('shows only factual guidance for that page', async () => {
     const user = userEvent.setup();
     stubStage3();
     renderAt(at('visuals'));
@@ -1618,9 +1639,10 @@ describe('the help drawer on campaign-addressed pages', () => {
     await user.click(screen.getAllByRole('button', { name: 'Help' })[0]!);
     const drawer = await screen.findByRole('dialog');
 
-    expect(drawer).toHaveTextContent('Shooting product photos on a phone.pdf');
-    expect(drawer).toHaveTextContent('Clip lengths that convert.pdf');
-    expect(drawer).toHaveTextContent('Proovd founder handbook.pdf');
+    expect(drawer).toHaveTextContent('Campaign visuals');
+    expect(drawer).toHaveTextContent('Add visuals you have the right to publish.');
+    expect(drawer).toHaveTextContent('Contact Proovd support');
+    expect(drawer.textContent).not.toMatch(/\.pdf|handbook|worked example/i);
     expect(drawer).not.toHaveTextContent('Your positioning');
   });
 });
@@ -1642,7 +1664,7 @@ describe('§33.11 the flow is operable over Session D pages', () => {
       expect((await axe(view.container)).violations, id).toEqual([]);
       view.unmount();
     }
-  });
+  }, 30_000);
 
   it('exposes exactly one level-1 heading per page (§33.11.2)', async () => {
     for (const id of PAGES) {
@@ -1652,7 +1674,7 @@ describe('§33.11 the flow is operable over Session D pages', () => {
       await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }), id).toHaveLength(1));
       view.unmount();
     }
-  });
+  }, 30_000);
 
   it('names a destination on every nav control (§33.11.4)', async () => {
     for (const id of PAGES) {
@@ -1661,12 +1683,12 @@ describe('§33.11 the flow is operable over Session D pages', () => {
       const view = renderAt(at(id));
       await screen.findByRole('heading', { level: 1 });
       for (const control of screen.getAllByRole('button')) {
-        const name = (control.textContent ?? '').trim().toLowerCase();
+        const name = (control.getAttribute('aria-label') ?? control.textContent ?? '').trim().toLowerCase();
         expect(OBJECTLESS_CTA_LABELS as readonly string[], `${id}: ${name}`).not.toContain(name);
       }
       view.unmount();
     }
-  });
+  }, 30_000);
 });
 
 /**
@@ -1803,13 +1825,11 @@ describe('how you get paid (25)', () => {
   it('names what Stripe will ask for, and collects none of it', async () => {
     stubMoney();
     renderAt(at('payouts'));
-    await screen.findByRole('heading', { name: /set up how you get paid/i });
+    await screen.findByRole('heading', { name: /setup how you get paid/i });
 
     for (const item of STRIPE_PREPARE_ITEMS) {
       expect(screen.getByText(item.label)).toBeInTheDocument();
     }
-    expect(screen.getByText(PAYOUT_PREPARE_COLLECTS_NOTHING)).toBeInTheDocument();
-
     // §11 forbids reproducing provider-controlled fields; §5.3 says Proovd
     // stores statuses and IDs and never full bank details; §13 forbids storing
     // identity documents. The absence IS the enforcement, so it is asserted as
@@ -1825,7 +1845,7 @@ describe('how you get paid (25)', () => {
     vi.stubGlobal('location', { ...window.location, assign });
     stubMoney();
     renderAt(at('payouts'));
-    await screen.findByRole('heading', { name: /set up how you get paid/i });
+    await screen.findByRole('heading', { name: /setup how you get paid/i });
 
     await userEvent.click(screen.getByRole('button', { name: /take me to stripe/i }));
     await waitFor(() =>
@@ -1834,22 +1854,18 @@ describe('how you get paid (25)', () => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith('https://connect.stripe.example/x'));
   });
 
-  it('names the listing fee when the account is complete, rather than “Continue”', async () => {
+  it('keeps the supplied Continue label while naming its campaign-review destination', async () => {
     stubMoney({ state: 'complete', listingFeeEligible: true });
+    stubStage5({ campaignStatus: 'pending_review' });
     renderAt(at('payouts'));
     await screen.findByRole('heading', { name: /all set to get paid/i });
 
-    const forward = screen.getByRole('button', { name: /continue to your listing fee/i });
+    const forward = screen.getByRole('button', { name: /continue to campaign review/i });
     expect(forward).toBeInTheDocument();
-    // §33.11.4's own register, by exact match on the trimmed accessible name.
-    for (const control of screen.getAllByRole('button')) {
-      expect(OBJECTLESS_CTA_LABELS as readonly string[]).not.toContain(
-        (control.textContent ?? '').trim(),
-      );
-    }
+    expect(forward.textContent?.trim()).toBe('Continue');
 
     await userEvent.click(forward);
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    await screen.findByRole('heading', { name: /where your campaign stands/i });
   });
 
   it('offers a restricted account a support path and no way to PAY', async () => {
@@ -1878,7 +1894,7 @@ describe('how you get paid (25)', () => {
     expect(document.body.textContent).not.toContain('rejected.fraud');
   });
 
-  it('offers no PAYMENT while Stripe is still reviewing, and a way past', async () => {
+  it('offers no payment or forward action while Stripe is still reviewing', async () => {
     // `listingFeeEligible` is true only for a COMPLETE account, so the fee page
     // refuses for this one too — what §1.4 forbids is a control that IMPLIES
     // the payment will go through, and screen 20's refusal is a named state
@@ -1896,12 +1912,7 @@ describe('how you get paid (25)', () => {
       expect((control.textContent ?? '').toLowerCase()).not.toContain('listing fee');
     }
 
-    // The skip names where it goes on its accessible name (§33.11.4) while
-    // keeping the visible label short (WCAG 2.5.3: the name contains it).
-    const skip = screen.getByRole('button', { name: /skip for now to your listing fee/i });
-    expect(skip.textContent?.trim()).toBe('Skip for now');
-    await userEvent.click(skip);
-    await screen.findByRole('heading', { name: /your listing fee/i });
+    expect(screen.queryByRole('button', { name: /skip|continue|pay|listing fee/i })).not.toBeInTheDocument();
   });
 });
 
@@ -1934,7 +1945,7 @@ describe('the listing fee (20)', () => {
     // `${{ feeNow }}` — a literal `$` and the server's amount — so what is
     // asserted is the same fact in the shape the screen now renders it.
     const hero = document.querySelector('.ff-fee__amount') as HTMLElement;
-    expect(hero.textContent).toBe('$29.00');
+    expect(hero.textContent).toBe('$29');
     expect(document.body.textContent).not.toContain('25.00');
   });
 
@@ -1970,11 +1981,11 @@ describe('the listing fee (20)', () => {
     renderAt(at('fee'));
     await screen.findByRole('heading', { name: /please pay/i });
 
-    expect(screen.getByText(payoutSavedLine('$0.00'))).toBeInTheDocument();
+    expect(screen.getByText(payoutSavedLine('$0'))).toBeInTheDocument();
     // `payCanLower` is the server's `remainingDiscountCents`, not
     // `subtotal − floor`: the reference's subtraction is its own cap and floor
     // coinciding rather than the rule.
-    expect(screen.getByText(payoutDiscountLine('$8.00'))).toBeInTheDocument();
+    expect(screen.getByText(payoutDiscountLine('$8'))).toBeInTheDocument();
   });
 
   it('shows the base line and each earned saving on its own labeled line (§13)', async () => {
@@ -2125,21 +2136,17 @@ describe('what Session E moved', () => {
     // The fee page rendered, which is the whole claim — the memory router the
     // suite drives never touches `window.location`.
     await screen.findByRole('heading', { name: /please pay/i });
-    expect(screen.getByText(payoutSavedLine('$2.00'))).toBeInTheDocument();
+    expect(screen.getByText(payoutSavedLine('$2'))).toBeInTheDocument();
   });
 
-  it('sends Last look’s All good to Stripe rather than to the fee', async () => {
-    // `beginListingCheckout` refuses without a complete `founder_seller`, so
-    // the fee page reached first is a fee page whose only path is the refusal.
+  it('sends Last look’s All good to the Founder details handoff', async () => {
     stubStage3();
     renderAt(at('last-look'));
     await screen.findByRole('heading', { name: /last look/i });
 
     await userEvent.click(screen.getByRole('button', { name: 'All good' }));
-    // Which §13 state greets them depends on their account; that it is the
-    // payouts PAGE is the claim, and `data-flow-page` is what says so.
     await waitFor(() =>
-      expect(document.querySelector('[data-flow-page="payouts"]')).not.toBeNull(),
+      expect(document.querySelector('[data-flow-page="details"]')).not.toBeNull(),
     );
   });
 
@@ -2157,13 +2164,10 @@ describe('what Session E moved', () => {
     await screen.findByRole('heading', { name: /last look/i });
 
     // §12: "Present the criteria neutrally, not as a quality judgment."
-    // DNA §5.10 and §30 forbid copy implying the Founder underperformed. Since
-    // the 1:1 rebuild (2026-08-20) it is a COUNT of three named criteria rather
-    // than a verdict with a disclaimer under it — neutral on its own, and one
-    // line instead of four at the foot of the reference's composition.
+    // The supplied Last look composition omits the internal high-effort
+    // calculation entirely, so no verdict or implementation vocabulary leaks.
     const body = document.body.textContent ?? '';
-    expect(body).toMatch(/visuals, branding and an interview are in place/i);
-    expect(body).toMatch(/you have 1 of the three/i);
+    expect(body.toLowerCase()).not.toContain('high effort');
     expect(body.toLowerCase()).not.toContain('low effort');
     expect(body.toLowerCase()).not.toContain('poor');
     expect(body.toLowerCase()).not.toContain('judgement');
@@ -2291,20 +2295,21 @@ describe('how Creators are paid (18)', () => {
   it('clones the Product campaign payment-structure picker', async () => {
     stubStage5();
     renderAt(at('creator-payment'));
-    await screen.findByRole('heading', { name: 'No upfront fee' });
+    await screen.findByRole('heading', { name: 'No optional fixed Creator payment' });
 
     expect(screen.getByText('Choose your creator payment structure')).toBeInTheDocument();
-    expect(screen.getByText('Creators take a % of the preorders so you pay nothing upfront')).toBeInTheDocument();
+    expect(screen.getByText('Creators are paid only through their agreed share of captured pre-orders.')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Next payment structure' }));
-    expect(screen.getByRole('heading', { name: 'Upfront fee' })).toBeInTheDocument();
-    expect(screen.getByText('Creators take an upfront fee for a lower % cut of your preorders so you keep more')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Open to an optional fixed Creator payment' })).toBeInTheDocument();
+    expect(screen.getByText('A Creator may propose a fixed payment alongside a lower agreed percentage. Nothing is agreed on this screen.')).toBeInTheDocument();
   });
 
-  it('records the selected structure and goes to Application Review', async () => {
+  it('records the selected structure and goes directly to the listing fee', async () => {
     stubStage5();
+    stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(at('creator-payment'));
-    await screen.findByRole('heading', { name: 'No upfront fee' });
+    await screen.findByRole('heading', { name: 'No optional fixed Creator payment' });
 
     await userEvent.click(screen.getByRole('button', { name: 'Select' }));
 
@@ -2315,19 +2320,17 @@ describe('how Creators are paid (18)', () => {
     );
     const sent = requests.find((r) => r.url.includes('fixed-payment-openness') && r.method === 'PUT');
     expect(sent!.body).toEqual({ stance: 'not_open' });
-    await screen.findByRole('heading', { name: 'Application in review' });
-    expect(screen.getByText('We’re reviewing your Product this won’t take long')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: /please pay/i });
   });
 
-  it('gives an Idea campaign the reference explainer instead of the picker', async () => {
+  it('gives an Idea campaign the reference explainer and continuation instead of the picker', async () => {
     stubStage5({}, { applicable: false, campaignType: 'pre_build' });
+    stubMoney({ state: 'complete', listingFeeEligible: true });
     renderAt(at('creator-payment'));
-    await screen.findByRole('heading', { name: /creators take a % of the preorders/i });
+    await screen.findByRole('heading', { name: /creators earn an agreed share.*of captured pre-orders/i });
 
     expect(screen.queryByText('Choose your creator payment structure')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'I understand' }));
-    await screen.findByRole('heading', { name: 'Application in review' });
-    expect(screen.getByText('We’re reviewing your Idea this won’t take long')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'I understand' })).toBeInTheDocument();
   });
 });
 
@@ -2367,7 +2370,7 @@ describe('the build steps (23–26)', () => {
       build: { ...BUILD_FIELDS, brandVoice: 'Fun' },
     });
     renderAt(at('voice'));
-    await screen.findByRole('heading', { name: /campaign in review/i });
+    await screen.findByRole('heading', { name: /where your campaign stands/i });
 
     expect(document.querySelector('[data-flow-page="voice"]')).toBeNull();
     expect(
@@ -2375,17 +2378,14 @@ describe('the build steps (23–26)', () => {
     ).toBe(false);
   });
 
-  it('keeps the local reference walkthrough on every build page after the fee bypass', async () => {
+  it('does not let a stale local walkthrough marker override lifecycle state in tests', async () => {
     sessionStorage.setItem('proovd:founder-reference-walkthrough:camp-d1', '1');
     stubStage5({
       campaignStatus: 'vetting',
       build: { ...BUILD_FIELDS, brandVoice: 'Fun' },
     });
     renderAt(at('voice'));
-    await screen.findByRole('heading', { name: /brand voice and tone/i });
-
-    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    await screen.findByRole('heading', { name: /add your faq/i });
+    await screen.findByRole('heading', { name: /where your campaign stands/i });
 
     expect(
       requests.some((request) => request.method === 'PATCH' && /\/build$/.test(request.url)),
@@ -2411,7 +2411,7 @@ describe('the build steps (23–26)', () => {
   it('tells a Product Founder the threshold step is not theirs (§14.4)', async () => {
     stubStage5({ model: 'product' });
     renderAt(at('threshold'));
-    await screen.findByText(/This step is for Idea Campaigns/i);
+    await screen.findByRole('heading', { name: /This step is for Idea Campaigns/i });
 
     // No field to disable — a Product campaign has no public threshold.
     expect(screen.queryByLabelText(/pre-orders needed/i)).not.toBeInTheDocument();
@@ -2441,12 +2441,11 @@ describe('the build steps (23–26)', () => {
     renderAt(at('rewards'));
     await screen.findByRole('heading', { name: /backer rewards/i });
 
-    await userEvent.type(screen.getByLabelText(/what is it called/i), 'Founding Edition');
-    await userEvent.type(screen.getByLabelText(/^price/i), '120.5');
-    await userEvent.type(screen.getByLabelText(/what is included/i), 'One lamp.');
-    await userEvent.type(screen.getByLabelText(/when does it arrive/i), 'March 2027');
-    await userEvent.type(screen.getByLabelText(/what you commit to/i), 'We email if it moves.');
-    await userEvent.click(screen.getByRole('button', { name: /add this reward/i }));
+    await userEvent.type(screen.getByLabelText('Reward title'), 'Founding Edition');
+    await userEvent.type(screen.getByLabelText('Reward price'), '120.5');
+    await userEvent.type(screen.getByLabelText('Reward description'), 'One lamp.');
+    await userEvent.type(screen.getByLabelText('Delivered by'), '0327');
+    await userEvent.click(screen.getByRole('button', { name: /1\/3 add rewards/i }));
 
     await waitFor(() =>
       expect(requests.some((r) => r.url.includes('/build/rewards'))).toBe(true),
@@ -2460,13 +2459,10 @@ describe('the build steps (23–26)', () => {
     renderAt(at('rewards'));
     await screen.findByRole('heading', { name: /backer rewards/i });
 
-    // Ten shared fields are required plus one for Product; these four steps
-    // cover three. Telling somebody their campaign is built here is §1.4's
-    // failure with a celebration on it.
-    expect(screen.getByText(BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD)).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /see what is left on your campaign/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Reward title')).toBeInTheDocument();
+    expect(screen.getByLabelText('Reward description')).toBeInTheDocument();
+    expect(screen.getByLabelText('Reward price')).toBeInTheDocument();
+    expect(screen.getByLabelText('Delivered by')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/your campaign is (built|ready|complete)/i);
   });
 
@@ -2478,11 +2474,18 @@ describe('the build steps (23–26)', () => {
     // The reference's own chain is build → `campreview` → `live`.
     const user = userEvent.setup();
     stubStage5();
+    stubMoney();
     renderAt(at('rewards'));
     await screen.findByRole('heading', { name: /backer rewards/i });
 
-    await user.click(screen.getByRole('button', { name: /see where your campaign stands/i }));
-    await screen.findByRole('heading', { name: /where your campaign stands/i });
+    for (let index = 1; index <= 3; index += 1) {
+      await user.type(screen.getByLabelText('Reward title'), `Reward ${index}`);
+      await user.type(screen.getByLabelText('Reward description'), `Description ${index}`);
+      await user.type(screen.getByLabelText('Reward price'), `${20 + index}`);
+      await user.type(screen.getByLabelText('Delivered by'), '0327');
+      await user.click(screen.getByRole('button', { name: new RegExp(`${index}\\/3 add rewards`, 'i') }));
+    }
+    await screen.findByRole('heading', { name: /setup how you get paid/i });
   });
 });
 

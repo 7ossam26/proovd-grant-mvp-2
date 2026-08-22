@@ -6,7 +6,10 @@
  * Voice reads the still-pre-payment status and correctly redirects to Campaign
  * Review, accidentally skipping the reference build pages in the demo.
  */
-export const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
+export const PITCH_DEMO =
+  import.meta.env.DEV &&
+  import.meta.env.MODE !== 'test' &&
+  import.meta.env.VITE_PITCH_DEMO !== 'false';
 
 const key = (campaignId: string) => `proovd:founder-reference-walkthrough:${campaignId}`;
 

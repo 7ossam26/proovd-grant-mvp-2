@@ -85,14 +85,6 @@ export function SiteHeader() {
               {route.label}
             </NavLink>
           ))}
-          <NavLink
-            to="/campaign/sample-pre-build"
-            className={({ isActive }) =>
-              isActive ? 'site-nav__link is-current' : 'site-nav__link'
-            }
-          >
-            See a sample campaign
-          </NavLink>
         </nav>
         <div className="site-header__account">
           <NavLink

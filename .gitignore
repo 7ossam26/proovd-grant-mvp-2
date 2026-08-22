@@ -49,3 +49,11 @@ docs/fonts/
 # is kept on disk so the prototype runs standalone, but the binaries are not ours
 # to redistribute. Delete the folder and re-copy from the bundle if it goes missing.
 docs/design-refrence/**/fonts/
+
+# The built SPA, assembled into the backend image at build time.
+#
+# The Dockerfile copies `frontend/dist` here in its runtime stage, and running
+# the production build locally does the same. It is 29MB of generated output
+# whose sources are already tracked — committing it would put a second, stale
+# copy of the frontend in every diff.
+backend/public/

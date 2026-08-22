@@ -17,15 +17,15 @@ const PAGE_SCALE = 0.78;
 const PAYMENT_MODELS = [
   {
     stance: 'not_open' as const,
-    title: 'No upfront fee',
+    title: 'No optional fixed Creator payment',
     art: '/assets/pie-cursor.png',
-    body: 'Creators take a % of the preorders so you pay nothing upfront',
+    body: 'Creators are paid only through their agreed share of captured pre-orders.',
   },
   {
     stance: 'open' as const,
-    title: 'Upfront fee',
+    title: 'Open to an optional fixed Creator payment',
     art: '/assets/cash-hand.png',
-    body: 'Creators take an upfront fee for a lower % cut of your preorders so you keep more',
+    body: 'A Creator may propose a fixed payment alongside a lower agreed percentage. Nothing is agreed on this screen.',
   },
 ] as const;
 
@@ -80,7 +80,7 @@ export function CreatorPaymentStep() {
       {openness.applicable ? (
         <PaymentPicker openness={openness} campaignId={campaignId} onRecorded={setOpenness} />
       ) : (
-        <PaymentExplainer campaignType={openness.campaignType} />
+        <PaymentExplainer />
       )}
     </FlowPage>
   );
@@ -138,7 +138,7 @@ function PaymentPicker({ openness, campaignId, onRecorded }: {
         setModal(true);
         setBusy(false);
       } else {
-        swapToPage('application-review', 1, { campaignType: result.openness.campaignType });
+        swapToPage('fee', 1);
       }
     } catch (cause: unknown) {
       setBusy(false);
@@ -157,10 +157,10 @@ function PaymentPicker({ openness, campaignId, onRecorded }: {
       <ReferenceChrome backLabel="Back to Creator match" />
       {modal ? (
         <div className="ff-paypick__modal-layer" role="presentation">
-          <div className="ff-paypick__modal" role="dialog" aria-modal="true" aria-labelledby="upfront-title" data-pay-modal="1">
-            <span id="upfront-title" className="ff-paypick__modal-tag">Upfront fee</span>
-            <p>A proovd representative will get in touch with you to lock down the upfront fee.</p>
-            <button type="button" onClick={() => swapToPage('application-review', 1, { campaignType: openness.campaignType })}>Got it</button>
+          <div className="ff-paypick__modal" role="dialog" aria-modal="true" aria-labelledby="fixed-payment-title" data-pay-modal="1">
+            <span id="fixed-payment-title" className="ff-paypick__modal-tag">Optional fixed Creator payment</span>
+            <p>A Proovd representative will help both sides record a proposal. Nothing is agreed until the Creator and Founder accept the same version.</p>
+            <button type="button" onClick={() => swapToPage('fee', 1)}>Got it</button>
           </div>
         </div>
       ) : null}
@@ -192,7 +192,7 @@ function ArrowButton({ direction, onClick }: { direction: 'left' | 'right'; onCl
   );
 }
 
-function PaymentExplainer({ campaignType }: { campaignType: OpennessState['campaignType'] }) {
+function PaymentExplainer() {
   const { swapToPage } = useFlowNav();
   const stage = useRef<HTMLDivElement>(null);
 
@@ -211,8 +211,8 @@ function PaymentExplainer({ campaignType }: { campaignType: OpennessState['campa
       <div className="ff-paypick__stage" data-page-stage="1" ref={stage}>
         <div className="ff-paypick__explainer-column">
           <img className="ff-paypick__explainer-art" data-anim="art" src="/assets/pie-cursor.png" alt="" />
-          <h1 className="ff-paypick__explainer-title" data-anim="head">Creators take a % of the preorders<br />so you pay nothing upfront</h1>
-          <button type="button" className="ff-paypick__explainer-cta" data-anim="cta" onClick={() => swapToPage('application-review', 1, { campaignType })}>I understand</button>
+          <h1 className="ff-paypick__explainer-title" data-anim="head">Creators earn an agreed share<br />of captured pre-orders</h1>
+          <button type="button" className="ff-paypick__explainer-cta" data-anim="cta" onClick={() => swapToPage('fee', 1)}>I understand</button>
         </div>
       </div>
     </section>

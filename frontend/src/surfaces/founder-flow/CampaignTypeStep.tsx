@@ -385,7 +385,12 @@ function KindScreen({ token, loaded }: { token: string; loaded: VettingState }) 
     <div className="ff-kind" ref={root}>
       {/* The reference's `[data-back]`: bottom-left, uppercase, brand ink,
           with its own 11px chevron. */}
-      <button type="button" className="ff-kind__back" onClick={back}>
+      <button
+        type="button"
+        className="ff-kind__back"
+        aria-label={phase === 'confirm' ? 'Back to campaign choices' : 'Back to your reach'}
+        onClick={back}
+      >
         <svg
           viewBox="0 0 24 24"
           width="11"

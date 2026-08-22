@@ -518,7 +518,7 @@ function SocialsScreen({
             })}
           </div>
 
-          <button type="button" className="ff-soc__cta" data-stage-anim="cta" onClick={next}>
+          <button type="button" className="ff-soc__cta" data-stage-anim="cta" aria-label="Continue to Last look" onClick={next}>
             Next
           </button>
 

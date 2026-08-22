@@ -3870,7 +3870,8 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   gap: clamp(10px, 1.2vw, 16px);
 }
 
-.ff-help-ref__docs article {
+.ff-help-ref__docs article,
+.ff-help-ref__docs section {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -3884,7 +3885,8 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   text-align: left;
 }
 
-.ff-help-ref__docs article.is-current {
+.ff-help-ref__docs article.is-current,
+.ff-help-ref__docs section.is-current {
   border-color: #41ED98;
   background: rgba(65, 237, 152, 0.08);
 }
@@ -3897,7 +3899,8 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   text-transform: uppercase;
 }
 
-.ff-help-ref__docs article.is-current .ff-help-ref__tag { color: #41ED98; }
+.ff-help-ref__docs article.is-current .ff-help-ref__tag,
+.ff-help-ref__docs section.is-current .ff-help-ref__tag { color: #41ED98; }
 
 .ff-help-ref__docs strong {
   margin-top: 2px;
@@ -3909,12 +3912,24 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   text-wrap: pretty;
 }
 
-.ff-help-ref__docs article > span:last-child {
+.ff-help-ref__docs article > span:last-child,
+.ff-help-ref__docs section > span {
   color: #A2AFA8;
   font-size: clamp(12px, 1.1vw, 15px);
   font-weight: 500;
   line-height: 1.45;
   text-wrap: pretty;
+}
+
+.ff-help-ref__docs a,
+.ff-goal-help__docs a,
+.ff-fee-help__docs a,
+.ff-payout-ref__docs a {
+  width: fit-content;
+  margin-top: 6px;
+  color: #41ED98;
+  font-weight: 800;
+  text-underline-offset: 3px;
 }
 
 @media (min-width: 1500px) {
@@ -5357,7 +5372,7 @@ html.no-motion .ff-prob__rail { transition: none; }
   background: transparent;
   text-align: left;
   font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
-  cursor: pointer;
+  cursor: default;
 }
 .ff-payout-ref__doc:hover { border-color: #41ED98; }
 .ff-payout-ref__doc.is-current {
@@ -18301,7 +18316,8 @@ html.no-motion .ff-story__say { transition: none; }
   text-transform: uppercase;
 }
 .ff-goal-help__docs { display: flex; flex-direction: column; gap: clamp(10px, 1.2vw, 16px); }
-.ff-goal-help__docs button {
+.ff-goal-help__docs button,
+.ff-goal-help__docs section {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -18313,9 +18329,10 @@ html.no-motion .ff-story__say { transition: none; }
   color: #A2AFA8;
   font-family: 'Satoshi', sans-serif;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
-.ff-goal-help__docs button.is-current { border-color: #41ED98; background: rgba(65,237,152,.08); }
+.ff-goal-help__docs button.is-current,
+.ff-goal-help__docs section.is-current { border-color: #41ED98; background: rgba(65,237,152,.08); }
 .ff-goal-help__docs button:hover { border-color: #41ED98; }
 .ff-goal-help__tag {
   color: #A2AFA8;
@@ -18334,7 +18351,8 @@ html.no-motion .ff-story__say { transition: none; }
   letter-spacing: -.02em;
   text-wrap: pretty;
 }
-.ff-goal-help__docs button > span:last-child {
+.ff-goal-help__docs button > span:last-child,
+.ff-goal-help__docs section > span {
   font-size: clamp(12px, 1.1vw, 15px);
   font-weight: 500;
   line-height: 1.45;
@@ -18587,7 +18605,8 @@ html.no-motion .ff-story__say { transition: none; }
   flex-direction: column;
   gap: clamp(10px, 1.2vw, 16px);
 }
-.ff-fee-help__docs button {
+.ff-fee-help__docs button,
+.ff-fee-help__docs section {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -18599,9 +18618,10 @@ html.no-motion .ff-story__say { transition: none; }
   color: #A2AFA8;
   font-family: 'Satoshi Payout Reference', 'Satoshi', sans-serif;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
 }
-.ff-fee-help__docs button.is-current {
+.ff-fee-help__docs button.is-current,
+.ff-fee-help__docs section.is-current {
   border-color: #41ED98;
   background: rgba(65, 237, 152, 0.08);
 }
@@ -18624,7 +18644,8 @@ html.no-motion .ff-story__say { transition: none; }
   letter-spacing: -0.02em;
   text-wrap: pretty;
 }
-.ff-fee-help__docs button > span:last-child {
+.ff-fee-help__docs button > span:last-child,
+.ff-fee-help__docs section > span {
   font-size: clamp(12px, 1.1vw, 15px);
   font-weight: 500;
   line-height: 1.45;

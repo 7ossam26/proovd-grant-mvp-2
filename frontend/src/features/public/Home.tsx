@@ -38,8 +38,8 @@ export function Home() {
             discloses up front.
           </p>
           <div className="cta-row">
-            <Button tier="primary" href="/campaign/sample-pre-build">
-              See a sample campaign
+            <Button tier="primary" href="/about">
+              See how Proovd works
             </Button>
             <Button tier="secondary" href="/how-payments-work">
               Read how payments work

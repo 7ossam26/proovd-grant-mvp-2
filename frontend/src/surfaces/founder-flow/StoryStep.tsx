@@ -959,6 +959,7 @@ function StoryScreen({
                 type="button"
                 className="ff-story__next"
                 data-say-next="1"
+                aria-label={fromReview ? 'Next — back to Last look' : 'Next — your socials'}
                 onClick={forward}
               >
                 Next

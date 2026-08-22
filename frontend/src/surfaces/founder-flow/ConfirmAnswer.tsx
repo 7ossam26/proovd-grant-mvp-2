@@ -519,6 +519,7 @@ function PaperScreen({
             type="button"
             className="ff-prob__cta"
             data-prob-part="cta"
+            aria-label={`Continue to ${config.nextPageId === 'solution' ? 'your solution' : 'your reach'}`}
             onClick={() => void next()}
             style={{
               height: editing ? 0 : CTA.height,

@@ -590,6 +590,7 @@ function InterviewScreen({
             type="button"
             className="ff-int__cta"
             data-stage-anim="cta"
+            aria-label={fromReview ? 'Next — back to Last look' : 'Next — your story'}
             disabled={busy}
             onClick={() => void next()}
           >

@@ -3,7 +3,7 @@
  *
  * The header opens with the skip link — first in the tab order — and `<main>`
  * is its target, because §33.11.1 requires a complete keyboard path and a
- * nav plus a fourteen-link footer sitemap in front of the content is exactly
+ * nav plus the complete footer sitemap in front of the content is exactly
  * the trap that requirement exists for.
  *
  * Route changes reset scroll and move focus into the new page. A single-page

@@ -185,6 +185,20 @@ export const campaigns = pgTable(
     /** Lifecycle ONLY (§23.1). Payment flags live in campaign_payment_flags. */
     status: campaignStatus('status').notNull().default('invited_draft'),
 
+    /**
+     * The furthest workflow stage this campaign has ever reached — the Admin
+     * panel's stage menu unlocks on this and nothing else (migration 0059).
+     *
+     * It cannot be derived from `status`, which moves BACKWARD:
+     * `changes_required` follows `pending_review`, and `capture_retry_window`
+     * follows `closed_pending_capture`. An index-of-current would relock a
+     * screen somebody has already used.
+     *
+     * A trigger refuses a lower index, so the ratchet is a database fact rather
+     * than a service rule a careless UPDATE could bypass.
+     */
+    workflowStageReached: text('workflow_stage_reached').notNull().default('invite'),
+
     /** §23.2 — parallel tracks, separate columns. `review_ready` is derived
         in shared/states, never stored (§23.2). */
     affiliateRosterStatus: affiliateRosterStatus('affiliate_roster_status')

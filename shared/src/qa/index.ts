@@ -170,7 +170,7 @@ export const PRINCIPAL_FLOWS = [
   },
   {
     key: 'founder_money',
-    label: 'Setting up payouts and paying the listing fee',
+    label: 'Choosing Creator pay and paying the listing fee',
     specRef: '§13, §24.6',
     audience: 'founder',
     // Founder Flow v2 Session E (2026-08-19). Its own entry rather than two
@@ -178,26 +178,27 @@ export const PRINCIPAL_FLOWS = [
     // thing here (a connected account and a listing state, not a workspace),
     // and §28.5 grades a payment path on its own terms.
     routes: [
-      '/campaigns/:campaignId/setup/payouts',
+      '/campaigns/:campaignId/setup/creator-payment',
       '/campaigns/:campaignId/setup/fee',
     ],
     keyboardPathRequired: true,
   },
   {
     key: 'founder_page_build',
-    label: 'Creator pay, the four build steps, and campaign review',
+    label: 'The four build steps, payout setup, and campaign review',
     specRef: '§14.3, §14.4, §15, §17',
     audience: 'founder',
-    // Founder Flow v2 Session F (2026-08-19). Its own entry rather than seven
+    // Founder Flow v2 Session F (2026-08-19). Its own entry rather than six
     // more routes on `founder_build`: that flow is the campaign-build SURFACE,
     // which a Founder returns to for the whole life of a campaign, and this is
-    // the sequence they walk once. The sweep stubs different reads for each.
+    // the sequence they walk once. The sweep stubs different reads for each,
+    // including the later Stripe payout handoff.
     routes: [
-      '/campaigns/:campaignId/setup/creator-payment',
       '/campaigns/:campaignId/setup/voice',
       '/campaigns/:campaignId/setup/threshold',
       '/campaigns/:campaignId/setup/faqs',
       '/campaigns/:campaignId/setup/rewards',
+      '/campaigns/:campaignId/setup/payouts',
       '/campaigns/:campaignId/setup/in-review',
     ],
     keyboardPathRequired: true,

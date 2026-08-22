@@ -3,7 +3,7 @@
  * with partial credit toward §33.11.5 and §34's sample-campaign condition.
  *
  * These are §33's own words: requirements, not examples. The scans below walk
- * every one of §18's fourteen public routes, because a banned word on one page
+ * every registered public route, because a banned word on one page
  * is a banned word on the site.
  */
 
@@ -26,7 +26,7 @@ import {
   TRUST_STRIP_TEXT,
 } from './trust-strip.js';
 import { SAMPLE_BANNER } from './campaign/consent.js';
-import { SAMPLE_IDEA_CAMPAIGN, SAMPLE_PRODUCT_CAMPAIGN } from './campaign/samples.js';
+import { SAMPLE_IDEA_CAMPAIGN, SAMPLE_PRODUCT_CAMPAIGN } from './campaign/campaign.test-fixtures.js';
 
 /* ══════════════════════════════════════════════════════════ §18 route inventory */
 
@@ -40,8 +40,18 @@ describe('§18 public route inventory', () => {
     expect(normalize(container.textContent).length).toBeGreaterThan(400);
   });
 
-  it('renders exactly fourteen routes in the inventory', () => {
-    expect(PUBLIC_ROUTE_PATHS).toHaveLength(14);
+  it('ships only the twelve real static public pages', () => {
+    expect(PUBLIC_ROUTE_PATHS).toHaveLength(12);
+    expect(PUBLIC_ROUTE_PATHS.some((path) => path.includes('sample'))).toBe(false);
+  });
+
+  it('does not advertise or link to example campaigns', () => {
+    for (const path of ['/', '/about']) {
+      const { container, unmount } = renderRoute(path);
+      expect(anchors(container).some((link) => link.href.includes('sample-pre-'))).toBe(false);
+      expect(normalize(container.textContent)).not.toMatch(/sample campaign/i);
+      unmount();
+    }
   });
 
   it('answers an unknown address with a recovery surface, not a blank page', () => {
@@ -205,18 +215,6 @@ describe('§33.11.3 — vocabulary is consistent and nothing internal leaks', ()
     const text = normalize(container.textContent);
     for (const { pattern, why } of BANNED_TERMS) {
       expect(pattern.test(text), `${path} matched ${pattern} (${why})`).toBe(false);
-    }
-  });
-
-  it('keeps `sample-pre-build` and `sample-pre-launch` in URLs only (§3.1)', () => {
-    for (const path of ['/campaign/sample-pre-build', '/campaign/sample-pre-launch']) {
-      const { container, unmount } = renderRoute(path);
-      // Visible text carries the customer-facing names…
-      const text = normalize(container.textContent);
-      expect(text, path).not.toMatch(/pre-build|pre-launch/i);
-      // …while the URLs the Spec fixes are still linked.
-      expect(anchors(container).some((a) => a.href.includes('sample-pre-'))).toBe(true);
-      unmount();
     }
   });
 

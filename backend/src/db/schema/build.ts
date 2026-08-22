@@ -55,6 +55,14 @@ export const campaignBuild = pgTable(
     closesAt: timestamp('closes_at', { withTimezone: true }),
     orderThreshold: integer('order_threshold'),
     internalTargetCents: bigint('internal_target_cents', { mode: 'bigint' }),
+    /**
+     * The Admin panel's `Draft campaign version` (migration 0059).
+     *
+     * Deliberately not `max(material_changes.new_version)`, which counts
+     * MATERIAL changes only — a typo fix would leave the draft version standing
+     * still, which is not what the number means on the reference.
+     */
+    draftVersion: integer('draft_version').notNull().default(1),
     brandPerception: text('brand_perception'),
     brandVoice: text('brand_voice'),
     requiredWording: text('required_wording'),
@@ -391,6 +399,13 @@ export const approvedCampaignSnapshots = pgTable(
       .references(() => campaignReviews.id),
     snapshot: jsonb('snapshot').notNull(),
     creatorTerms: jsonb('creator_terms').notNull(),
+    /**
+     * `Public campaign version` on the Admin panel — stamped from
+     * `campaign_build.draft_version` at approval (migration 0059). The snapshot
+     * table is already the immutable approved record, so the published number
+     * belongs on it rather than on `campaigns`.
+     */
+    publishedVersion: integer('published_version'),
     approvedBy: text('approved_by').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

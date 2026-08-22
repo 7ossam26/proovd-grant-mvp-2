@@ -223,6 +223,11 @@ export const listCampaigns = (): Promise<{
 
 const workspaceCache = new Map<string, { workspace: WorkspaceState }>();
 
+/** Clears session-scoped Founder workspace reads when a consumer starts fresh. */
+export const clearFounderWorkspaceCache = (): void => {
+  workspaceCache.clear();
+};
+
 export const fetchWorkspace = async (
   campaignId: string,
 ): Promise<{ workspace: WorkspaceState }> => {

@@ -5,12 +5,12 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router';
-import { NO_ACTION, StatePanel } from '../../components/index.js';
+import { ORDER_THRESHOLD_IS_A_COUNT } from '@proovd/shared';
+import { Button, NO_ACTION, StatePanel } from '../../components/index.js';
 import {
   referenceDrawerClose,
   referenceDrawerOpen,
   stageRelayIn,
-  thresholdFloorPop,
 } from '../../components/anim.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { FlowPage, flowDirection, useFlowNav } from './FlowPage.js';
@@ -45,12 +45,7 @@ export function ThresholdStep() {
   if (build.state.model !== 'idea') {
     return (
       <FlowPage pageId="threshold" param={campaignId}>
-        <div className="ff-goal__state">
-          <StatePanel state="This step is for Idea Campaigns"
-            whatHappened="A Product Campaign has no public order threshold."
-            next="Carry on with your FAQs." owner="You" nextUpdate="No further update needed"
-            action={NO_ACTION} reference={campaignId} />
-        </div>
+        <ProductCampaignNotice campaignId={campaignId} />
       </FlowPage>
     );
   }
@@ -61,12 +56,28 @@ export function ThresholdStep() {
   );
 }
 
+function ProductCampaignNotice({ campaignId }: { campaignId: string }) {
+  const { swapToPage } = useFlowNav();
+  return (
+    <div className="ff-goal__state">
+      <h1 className="sr-only">This step is for Idea Campaigns</h1>
+      <StatePanel
+        state="This step is for Idea Campaigns"
+        whatHappened="A Product Campaign has no public order threshold."
+        next="Carry on with your FAQs."
+        owner="You"
+        nextUpdate="No further update needed"
+        action={<Button tier="primary" onClick={() => swapToPage('faqs')}>On to your FAQs</Button>}
+        reference={campaignId}
+      />
+    </div>
+  );
+}
+
 function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlowState }) {
   const { swapToPage } = useFlowNav();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const timer = useRef<number | null>(null);
   const direction = useRef<1 | -1 | null>(null);
   if (direction.current === null) direction.current = flowDirection();
 
@@ -76,7 +87,6 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
   const [drawer, setDrawer] = useState(false);
   const amount = Number(digits || 0);
   const empty = digits === '';
-  const low = !empty && amount < 500;
 
   useLayoutEffect(() => {
     const el = stage.current;
@@ -87,7 +97,6 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
     return () => window.removeEventListener('resize', fit);
   }, []);
   useLayoutEffect(() => stageRelayIn(root.current, direction.current ?? 1, RELAY), []);
-  useEffect(() => () => { if (timer.current !== null) window.clearTimeout(timer.current); }, []);
 
   const write = useCallback((next: string) => {
     const onlyDigits = next.replace(/[^0-9]/g, '');
@@ -96,22 +105,14 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
   }, [build.autosave]);
 
   const continueToFaqs = useCallback(() => {
-    if (empty) return;
-    if (amount < 500) {
-      setDigits('500');
-      build.autosave.queue({ orderThreshold: 500 });
-      void build.autosave.flush();
-      thresholdFloorPop(input.current);
-      timer.current = window.setTimeout(() => swapToPage('faqs'), 450);
-      return;
-    }
+    if (empty || amount <= 0) return;
     void build.autosave.flush();
     swapToPage('faqs');
   }, [amount, build.autosave, empty, swapToPage]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Enter' || event.isComposing || drawer || amount < 500) return;
+      if (event.key !== 'Enter' || event.isComposing || drawer || amount <= 0) return;
       event.preventDefault();
       continueToFaqs();
     };
@@ -137,24 +138,21 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
 
       <div className="ff-goal__stage" data-page-stage="1" ref={stage}>
         <div className="ff-goal__column">
-          <h1 className="ff-goal__note" data-stage-anim="note">Set your order goal</h1>
-          <span className="ff-goal__sub" data-stage-anim="sub">(USD)</span>
+          <h1 className="ff-goal__note" data-stage-anim="note">Set your order threshold</h1>
+          <span className="ff-goal__sub" data-stage-anim="sub">Unique Backers</span>
           <div className="ff-goal__panel" data-stage-anim="panel" data-empty={empty ? 'true' : 'false'}>
-            <input id="goalInput" ref={input} className="ff-goal__input" inputMode="numeric"
-              aria-label="Order goal in US dollars"
-              value={empty ? '' : `$${amount.toLocaleString('en-US')}`}
+            <input id="thresholdInput" className="ff-goal__input" inputMode="numeric"
+              aria-label="Active pre-orders needed at close"
+              value={digits}
               onChange={(event) => write(event.currentTarget.value)} />
             {empty ? (
               <span className="ff-goal__placeholder" aria-hidden="true">
-                <span className="ff-goal__example">Ex:</span>
-                <span className="ff-goal__example-value">$1,000</span>
-                <span className="ff-goal__minimum">Min.&nbsp;&nbsp;$500</span>
+                <span className="ff-goal__example-value">Enter a number</span>
               </span>
             ) : null}
           </div>
-          {empty ? <p className="ff-goal__body">This should be high enough that you and the affiliates are excited, and low enough that you and the backers belive its achievable.</p> : null}
-          {low ? <span className="ff-goal__hint">Minimum goal is $500</span> : null}
-          {!empty ? <button type="button" className="ff-goal__continue" data-stage-anim="cta"
+          <p className="ff-goal__body">{ORDER_THRESHOLD_IS_A_COUNT}</p>
+          {!empty && amount > 0 ? <button type="button" className="ff-goal__continue" data-stage-anim="cta"
             onClick={continueToFaqs}>Continue</button> : null}
         </div>
       </div>
@@ -178,7 +176,7 @@ function GoalHelpDrawer({ campaignId, onClose }: { campaignId: string; onClose: 
   return (
     <>
       <div className="ff-goal-help__scrim" ref={scrim} onClick={close} />
-      <aside className="ff-goal-help" ref={aside} aria-label="Help">
+      <aside className="ff-goal-help" ref={aside} role="dialog" aria-modal="true" aria-label="Help">
         <div className="ff-goal-help__head"><span>Help</span>
           <button type="button" onClick={close} aria-label="Close help">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
@@ -187,12 +185,13 @@ function GoalHelpDrawer({ campaignId, onClose }: { campaignId: string; onClose: 
             </svg>
           </button>
         </div>
-        <div className="ff-goal-help__intro">Reading for this page</div>
+        <div className="ff-goal-help__intro">Help for this page</div>
         <div className="ff-goal-help__docs">
-          <button type="button" className="is-current"><span className="ff-goal-help__tag">PDF · 0.8 MB</span>
-            <strong>Setting a goal you can deliver.pdf</strong><span>Sizing a target against your production run.</span></button>
-          <button type="button"><span className="ff-goal-help__tag">GUIDE · 4.2 MB</span>
-            <strong>Proovd founder handbook.pdf</strong><span>Every step of the flow in one document. Worth a skim.</span></button>
+          <section className="is-current">
+            <strong>Order threshold</strong>
+            <span>{ORDER_THRESHOLD_IS_A_COUNT}</span>
+            <a href={`/support?reference=${encodeURIComponent(campaignId)}`}>Contact Proovd support</a>
+          </section>
         </div>
         <span className="ff-goal-help__reference">{campaignId}</span>
       </aside>

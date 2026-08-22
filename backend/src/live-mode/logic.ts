@@ -29,7 +29,7 @@ export const CONDITION_VERIFICATION: Readonly<Record<string, ConditionVerificati
   policies_published: 'automatic',
   key_separation: 'automatic',
   test_cards_and_idempotency: 'suite',
-  samples_collect_nothing: 'recorded',
+  samples_collect_nothing: 'suite',
   admin_security: 'suite',
   p0_pass: 'suite',
   human_reconciliation: 'recorded',

@@ -45,7 +45,7 @@ export const SERVICE_SLA_BLOCK = [
 export const STRIPE_CONNECTED_ACCOUNT_AGREEMENT =
   'https://stripe.com/connect-account/legal';
 
-export type PublicRouteKind = 'site' | 'policy' | 'sample';
+export type PublicRouteKind = 'site' | 'policy';
 
 export interface PublicRoute {
   path: string;
@@ -55,9 +55,9 @@ export interface PublicRoute {
 }
 
 /**
- * §18's public route inventory. All fourteen. The route shape for approved live
- * campaigns — `/campaign/:slug` — is deliberately absent: Phase 14 fills it,
- * and a route that resolves to nothing is a broken link today.
+ * The public site inventory. Approved live campaigns use the dynamic
+ * `/campaign/:campaignId` route and therefore do not belong in this static
+ * sitemap. Production ships no example campaign routes.
  */
 export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   { path: '/', label: 'Home', kind: 'site' },
@@ -72,8 +72,6 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   { path: '/aup', label: 'Founder Acceptable Use Policy', kind: 'policy' },
   { path: '/affiliate-aup', label: 'Creator Acceptable Use Policy', kind: 'policy' },
   { path: '/ip-agreement', label: 'Creator IP and Confidentiality Agreement', kind: 'policy' },
-  { path: '/campaign/sample-pre-build', label: 'Sample Idea Campaign', kind: 'sample' },
-  { path: '/campaign/sample-pre-launch', label: 'Sample Product Campaign', kind: 'sample' },
 ] as const;
 
 export const PUBLIC_ROUTE_PATHS: readonly string[] = PUBLIC_ROUTES.map((r) => r.path);
@@ -82,7 +80,7 @@ export const PUBLIC_ROUTE_PATHS: readonly string[] = PUBLIC_ROUTES.map((r) => r.
  * The account doors — §5.1, §5.2, §5.3, §5.5.
  *
  * Deliberately NOT in `PUBLIC_ROUTES`. That list is §18's own inventory of the
- * public *site*, its length is fixed at fourteen, and the acceptance suite
+ * public *site*, and the acceptance suite
  * sweeps every entry for banned vocabulary, heading structure, landmarks, and
  * axe violations as a public marketing page. A sign-in form is none of those
  * things: it has no §18 content requirement, and adding it would change a
@@ -109,7 +107,7 @@ export const ACCOUNT_ROUTE_PATHS: readonly string[] = ACCOUNT_ROUTES.map((r) => 
  *
  * Its own entry rather than a fifteenth `PUBLIC_ROUTES` row, for the reason
  * `ACCOUNT_ROUTES` records: that list is §18's inventory of the public site,
- * its length is fixed at fourteen, and the acceptance suite sweeps every entry
+ * the acceptance suite sweeps every entry
  * as a marketing page. A support page has no §18 content requirement.
  *
  * Not in `HEADER_ROUTES` or `REQUIRED_FOOTER_LINKS` either: §31.4 fixes what

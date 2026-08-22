@@ -502,6 +502,7 @@ function Screen({
                 type="button"
                 className="ff-hl__cta"
                 data-stage-anim="cta"
+                aria-label="Next — your creator match"
                 onClick={advance}
               >
                 {CTA_LABEL}

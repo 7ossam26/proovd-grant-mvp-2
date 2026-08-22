@@ -284,6 +284,19 @@ export interface ClaimPatch {
 
 const claimCache = new Map<string, ClaimView>();
 
+/**
+ * Discard session-scoped token-flow reads.
+ *
+ * Browser consumers normally keep these records for the lifetime of the
+ * invitation flow. Tests and explicit fresh-session consumers need a narrow
+ * way to prevent one token-flow scenario from reusing another scenario's
+ * cached answers or claim profile.
+ */
+export const clearDraftFlowCache = (): void => {
+  vettingCache.clear();
+  claimCache.clear();
+};
+
 export const fetchClaim = async (token: string): Promise<ClaimView> => {
   const cached = claimCache.get(token);
   if (cached) return cached;

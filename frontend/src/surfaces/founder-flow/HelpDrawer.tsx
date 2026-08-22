@@ -1,122 +1,136 @@
-/** The reference's Help drawer: reading for this page, never flow navigation. */
+/** Contextual help for Founder onboarding. Every item is real product guidance. */
 import { useLayoutEffect, useRef, useState, type ReactElement } from 'react';
 import { Dialog } from 'radix-ui';
 import { referenceDrawerClose, referenceDrawerOpen } from '../../components/anim.js';
 
-interface HelpDoc {
+interface HelpTopic {
   title: string;
   body: string;
-  tag: string;
 }
 
-const HANDBOOK: HelpDoc = {
-  title: 'Proovd founder handbook.pdf',
-  body: 'Every step of the flow in one document. Worth a skim.',
-  tag: 'GUIDE · 4.2 MB',
+const HELP: Readonly<Record<string, HelpTopic>> = {
+  invite: {
+    title: 'Claiming your invitation',
+    body: 'Review the invitation prepared for you. Claiming it starts this campaign’s onboarding; it does not publish a page or charge anything.',
+  },
+  problem: {
+    title: 'The problem',
+    body: 'Confirm or correct the problem your product solves. Your answer becomes campaign source material and stays editable until submission.',
+  },
+  solution: {
+    title: 'The solution',
+    body: 'Describe what you are building and how it addresses the problem. Be concrete; this is not a feature checklist.',
+  },
+  reach: {
+    title: 'Audience reach',
+    body: 'Record the audience information you can support. Proovd uses it for Creator recruitment and campaign planning.',
+  },
+  'campaign-type': {
+    title: 'Campaign type',
+    body: 'Choose Idea Campaign when the order threshold determines whether cards are charged. Choose Product Campaign when every active pre-order is charged at close.',
+  },
+  email: {
+    title: 'Your account email',
+    body: 'Use the email address you will keep access to. We send a verification code before linking the claimed invitation to your account.',
+  },
+  code: {
+    title: 'Email verification',
+    body: 'Enter the latest code sent to your account email. Requesting another code makes the earlier one unusable.',
+  },
+  'confirm-problem': {
+    title: 'Confirm the problem',
+    body: 'Check the wording before later campaign sections build on it. Correct anything that changes what a Backer would understand.',
+  },
+  'confirm-solution': {
+    title: 'Confirm the solution',
+    body: 'Check that this says what the product does without promising work or outcomes you cannot support.',
+  },
+  positioning: {
+    title: 'Positioning',
+    body: 'Name the alternatives people use today and explain the meaningful difference. This can include direct competitors and manual workarounds.',
+  },
+  visuals: {
+    title: 'Campaign visuals',
+    body: 'Add visuals you have the right to publish. They remain private draft material until the campaign is approved and launched.',
+  },
+  branding: {
+    title: 'Branding',
+    body: 'Confirm the product name and logo that should appear on this campaign. Do not upload marks you do not own or have permission to use.',
+  },
+  color: {
+    title: 'Campaign colour',
+    body: 'Choose the primary colour used to frame this campaign. It changes presentation only, not the campaign terms.',
+  },
+  interview: {
+    title: 'Founder interview',
+    body: 'Schedule or join the recorded campaign interview step shown here. The campaign cannot move past a required interview until its real status is recorded.',
+  },
+  story: {
+    title: 'Founder story',
+    body: 'Tell the product story in your own words. Keep claims specific and supported; the review team reads this before approval.',
+  },
+  socials: {
+    title: 'Public profiles',
+    body: 'Add only profiles that belong to you or the product. They help review and may be shown on the approved campaign page.',
+  },
+  'last-look': {
+    title: 'Review your answers',
+    body: 'Check the complete onboarding record before moving into campaign build. Nothing is public at this point.',
+  },
+  details: {
+    title: 'Founder details',
+    body: 'Use accurate identity and business details. Stripe collects its own identity, tax, and bank information on Stripe’s hosted pages, not here.',
+  },
+  match: {
+    title: 'Creator matching',
+    body: 'This shows the recorded recruitment state for your campaign. Proovd owns Creator outreach and records each real response.',
+  },
+  'creator-payment': {
+    title: 'Creator compensation',
+    body: 'Record whether you are open to a fixed Creator payment alongside an agreed percentage. Nothing becomes binding until both sides accept the same proposal.',
+  },
+  fee: {
+    title: 'Listing fee',
+    body: 'Your exact listing fee and any earned discounts are shown before payment. Sales tax is calculated from the billing address you provide.',
+  },
+  voice: {
+    title: 'Campaign voice',
+    body: 'Choose language that sounds like you and remains accurate. This guides the campaign draft; it does not change the transaction terms.',
+  },
+  threshold: {
+    title: 'Order threshold',
+    body: 'For an Idea Campaign, set the number of unique Backers with active pre-orders needed at close before saved cards can be charged.',
+  },
+  faqs: {
+    title: 'Campaign questions',
+    body: 'Answer the questions a Backer needs before reserving: delivery, access, cancellation, support, and what happens if plans change.',
+  },
+  rewards: {
+    title: 'Reward packages',
+    body: 'Each package needs an exact price, included digital items, fulfilment method, and delivery commitment.',
+  },
+  payouts: {
+    title: 'Stripe onboarding',
+    body: 'Stripe opens its own hosted onboarding. Proovd never asks you to enter bank, tax, or identity-document details into this page.',
+  },
+  'in-review': {
+    title: 'Campaign review',
+    body: 'This page reads the stored campaign and Creator-roster state. It changes only when the Founder, a Creator, or Proovd records the next real action.',
+  },
+  live: {
+    title: 'Campaign live',
+    body: 'Once launch is recorded, your campaign dashboard shows the live campaign state and the actions that belong to you.',
+  },
 };
 
-const DOCS: Readonly<Record<string, readonly HelpDoc[]>> = {
-  invite: [
-    { title: 'Your Proovd invite, explained.pdf', body: 'What claiming commits you to, and what it does not.', tag: 'PDF · 0.4 MB' },
-    { title: 'Founder onboarding at a glance.pdf', body: 'The eight questions, the fee, and how long each part takes.', tag: 'PDF · 1.1 MB' },
-  ],
-  problem: [
-    { title: 'Writing a problem backers recognise.pdf', body: 'Four rewrites of a real problem statement, worst to best.', tag: 'PDF · 0.8 MB' },
-    { title: 'Problem statement worksheet.pdf', body: 'Fill-in-the-blank sheet you can paste straight in.', tag: 'WORKSHEET · 0.2 MB' },
-  ],
-  solution: [
-    { title: 'One-sentence solution statements.pdf', body: 'How to say what you built without a feature list.', tag: 'PDF · 0.6 MB' },
-  ],
-  reach: [
-    { title: 'How creator reach is counted.pdf', body: 'Where the audience number comes from and what it excludes.', tag: 'PDF · 0.5 MB' },
-  ],
-  'campaign-type': [
-    { title: 'Idea or Product: picking your campaign.pdf', body: 'Which one raises more, by category, from 400 campaigns.', tag: 'PDF · 1.3 MB' },
-  ],
-  email: [
-    { title: 'Why we verify your email.pdf', body: 'How sign-in ties your campaign and payouts to you.', tag: 'PDF · 0.3 MB' },
-  ],
-  code: [
-    { title: 'Why we verify your email.pdf', body: 'How sign-in ties your campaign and payouts to you.', tag: 'PDF · 0.3 MB' },
-  ],
-  'confirm-problem': [
-    { title: 'Problem and solution checklist.pdf', body: 'Six checks before the rest of your answers build on these.', tag: 'PDF · 0.4 MB' },
-  ],
-  'confirm-solution': [
-    { title: 'Problem and solution checklist.pdf', body: 'Six checks before the rest of your answers build on these.', tag: 'PDF · 0.4 MB' },
-  ],
-  positioning: [
-    { title: 'Competitor mapping worksheet.pdf', body: 'Direct rivals, indirect rivals, and the workaround people use now.', tag: 'WORKSHEET · 0.3 MB' },
-    { title: 'Naming rivals without selling them.pdf', body: 'How to be specific and still come out ahead.', tag: 'PDF · 0.7 MB' },
-  ],
-  visuals: [
-    { title: 'Shooting product photos on a phone.pdf', body: 'Window light, one surface, no tripod.', tag: 'PDF · 2.4 MB' },
-    { title: 'Clip lengths that convert.pdf', body: 'What backers actually watch to the end.', tag: 'PDF · 0.9 MB' },
-  ],
-  branding: [
-    { title: 'How to make AI logos that do not look AI.pdf', body: 'Prompts, cleanup, and the four tells to remove.', tag: 'PDF · 3.1 MB' },
-    { title: 'Picking one brand colour.pdf', body: 'Why a single colour beats a palette on a campaign page.', tag: 'PDF · 0.8 MB' },
-  ],
-  color: [
-    { title: 'How to make AI logos that do not look AI.pdf', body: 'Prompts, cleanup, and the four tells to remove.', tag: 'PDF · 3.1 MB' },
-    { title: 'Picking one brand colour.pdf', body: 'Why a single colour beats a palette on a campaign page.', tag: 'PDF · 0.8 MB' },
-  ],
-  interview: [
-    { title: 'What happens on the founder call.pdf', body: 'Who joins, what we ask, and what you get after.', tag: 'PDF · 0.4 MB' },
-  ],
-  story: [
-    { title: 'Founder story prompts.pdf', body: 'Nine questions that get a story out of you in ten minutes.', tag: 'PDF · 0.6 MB' },
-    { title: 'Dictating instead of writing.pdf', body: 'Speaking your answer, then tidying the transcript.', tag: 'PDF · 0.3 MB' },
-  ],
-  socials: [
-    { title: 'Which socials backers actually check.pdf', body: 'Ranked by how often backers click through.', tag: 'PDF · 0.5 MB' },
-  ],
-  'last-look': [
-    { title: 'Bonus answers and your listing fee.pdf', body: 'Every bonus section, what it costs you in time, what it saves.', tag: 'PDF · 0.4 MB' },
-  ],
-  details: [
-    { title: 'ID and payout name matching.pdf', body: 'Why the name here has to match your ID exactly.', tag: 'PDF · 0.3 MB' },
-  ],
-  match: [
-    { title: 'How we match creators.pdf', body: 'Category, audience overlap, and past campaign fit.', tag: 'PDF · 0.7 MB' },
-  ],
-  'creator-payment': [
-    { title: 'Creator commission, worked example.pdf', body: 'A $40,000 campaign, line by line, both pay models.', tag: 'PDF · 0.9 MB' },
-  ],
-  'application-review': [
-    { title: 'What our review looks for.pdf', body: 'The seven things we check, and the usual reasons for a rejection.', tag: 'PDF · 0.6 MB' },
-  ],
-  fee: [
-    { title: 'Listing fee breakdown.pdf', body: 'What the fee covers and how the discounts stack.', tag: 'PDF · 0.3 MB' },
-  ],
-  voice: [
-    { title: 'Brand voice adjectives that are not filler.pdf', body: 'Sixty words that mean something, and the ones to drop.', tag: 'PDF · 0.7 MB' },
-  ],
-  threshold: [
-    { title: 'Setting an order threshold you can deliver.pdf', body: 'Sizing a target against your production run.', tag: 'PDF · 0.8 MB' },
-  ],
-  faqs: [
-    { title: 'The five FAQs backers always ask.pdf', body: 'Delivery, refunds, shipping, timelines, and who you are.', tag: 'PDF · 0.5 MB' },
-  ],
-  rewards: [
-    { title: 'Rewards that beat discounts.pdf', body: 'In-app perks, early access, and why price cuts attract the wrong backers.', tag: 'PDF · 1.2 MB' },
-    { title: 'Delivery dates you can keep.pdf', body: 'Working back from your production lead time.', tag: 'PDF · 0.4 MB' },
-  ],
-  payouts: [
-    { title: 'Stripe onboarding checklist.pdf', body: 'Every document Stripe asks for, in the order it asks.', tag: 'PDF · 0.6 MB' },
-    { title: 'SSN or EIN for payouts.pdf', body: 'Which one applies to you, and what changes if you incorporate.', tag: 'PDF · 0.4 MB' },
-  ],
-  'in-review': [
-    { title: 'What we check before you go live.pdf', body: 'Page, rewards, and creator line-up.', tag: 'PDF · 0.5 MB' },
-  ],
-  live: [
-    { title: 'Your first week live.pdf', body: 'What to post, when to email, and the day-three dip.', tag: 'PDF · 1.4 MB' },
-  ],
+const GENERAL_HELP: HelpTopic = {
+  title: 'Founder onboarding help',
+  body: 'Nothing on this page is public until the campaign passes review and launch is recorded. Contact Proovd if the stored state does not match what happened.',
 };
 
 export function HelpDrawer({
   pageId,
-  param: _param,
+  param,
   trigger,
 }: {
   pageId: string;
@@ -127,7 +141,7 @@ export function HelpDrawer({
   const closing = useRef(false);
   const drawer = useRef<HTMLElement>(null);
   const scrim = useRef<HTMLDivElement>(null);
-  const docs = [...(DOCS[pageId] ?? []), HANDBOOK];
+  const topic = HELP[pageId] ?? GENERAL_HELP;
 
   useLayoutEffect(() => {
     if (open) referenceDrawerOpen(drawer.current, scrim.current);
@@ -151,6 +165,8 @@ export function HelpDrawer({
     });
   }
 
+  const supportHref = `/support?reference=${encodeURIComponent(param)}`;
+
   return (
     <Dialog.Root open={open} onOpenChange={change}>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
@@ -171,15 +187,13 @@ export function HelpDrawer({
                 </button>
               </Dialog.Close>
             </div>
-            <div className="ff-help-ref__intro">Reading for this page</div>
+            <div className="ff-help-ref__intro">Help for this page</div>
             <div className="ff-help-ref__docs">
-              {docs.map((doc, index) => (
-                <article className={index === 0 ? 'is-current' : undefined} key={`${doc.title}-${index}`}>
-                  <span className="ff-help-ref__tag">{doc.tag}</span>
-                  <strong>{doc.title}</strong>
-                  <span>{doc.body}</span>
-                </article>
-              ))}
+              <section className="is-current">
+                <strong>{topic.title}</strong>
+                <span>{topic.body}</span>
+                <a href={supportHref}>Contact Proovd support</a>
+              </section>
             </div>
           </aside>
         </Dialog.Content>

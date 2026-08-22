@@ -4,7 +4,7 @@
  *
  * §33.11 makes accessibility a mandatory acceptance test, not a polish pass.
  * What can be proved in jsdom is proved here: axe on every one of §18's
- * fourteen routes, a complete keyboard path into the content, heading
+ * every registered route, a complete keyboard path into the content, heading
  * structure, landmark structure, and accessible names on every control.
  *
  * What cannot be proved here — 320px reflow, real focus visibility, 44px tap

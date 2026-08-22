@@ -226,7 +226,12 @@ function RewardsBody({
 
   return (
     <section className="ff-reward-ref">
-      <button type="button" className="ff-reward-ref__back" onClick={() => leaveToPage('faqs', -1)}>
+      <button
+        type="button"
+        className="ff-reward-ref__back"
+        aria-label="Back to your FAQs"
+        onClick={() => leaveToPage('faqs', -1)}
+      >
         <Chevron direction="left" small /> Back
       </button>
       <header className="ff-reward-ref__top">

@@ -1,9 +1,9 @@
 /**
- * The two sample campaigns — Spec §18 "Sample campaigns", §34.
+ * Test-only campaign-page fixtures. Production imports none of this file and
+ * exposes no static example-campaign route.
  *
- * §18: `sample-pre-build` renders a realistic safe Idea Campaign,
- * `sample-pre-launch` a realistic safe Product Campaign, both showing the
- * complete campaign, rewards, delivery, merchant-of-record disclosure, and a
+ * The test routes render a realistic safe Idea Campaign and Product Campaign,
+ * both showing the complete campaign, rewards, delivery, merchant-of-record disclosure, and a
  * correct consent preview; both permanently display the Appendix A.6 banner;
  * neither accepts real card data. §34 gates live mode on proving that last
  * point, so nothing in this file or the component that renders it touches a

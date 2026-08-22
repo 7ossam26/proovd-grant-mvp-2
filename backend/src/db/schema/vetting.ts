@@ -241,6 +241,25 @@ export const founderClaimProfiles = pgTable(
     emailEditedAt: timestamp('email_edited_at', { withTimezone: true }),
     /** Derived from how the address arrived, never asserted (§5.2). */
     emailOwnership: emailOwnership('email_ownership'),
+    /**
+     * When the six-digit EMAIL code was accepted (migration 0059) — the Admin
+     * panel's `Verified by six-digit code · <time>`.
+     *
+     * Named `email_code_verified_at` and not `*_verified_*` near phone on
+     * purpose: §33.1.8 scans the tree to keep phone unverifiable, and this is
+     * an email fact. Without it the instant was only recoverable from the
+     * token row, which is not a fact a workspace should have to reconstruct.
+     */
+    emailCodeVerifiedAt: timestamp('email_code_verified_at', { withTimezone: true }),
+
+    /**
+     * Admin prefill, shown read-only to the Founder (migration 0059), carrying
+     * the same provenance quartet every other claim field has.
+     */
+    username: text('username'),
+    usernameSupplier: fieldSupplier('username_supplier'),
+    usernamePrefilled: text('username_prefilled'),
+    usernameEditedAt: timestamp('username_edited_at', { withTimezone: true }),
 
     /** §5.2: collected, never verified. No OTP path exists (§33.1.8). */
     phone: text('phone'),

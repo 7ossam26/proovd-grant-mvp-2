@@ -78,6 +78,7 @@ import {
   type ProfileOverrideKey,
 } from './logic.js';
 import { actorName, daysUntil, formatDay, formatInstant, resolveActorNames } from './format.js';
+import { stageForStatus } from './panel/workflow.js';
 import { historyCountsOf, readFounderHistory } from './history.js';
 import { composeCommunications, composeOperations } from './operations.js';
 import {
@@ -735,6 +736,28 @@ export async function listFounders(deps: FounderListDeps): Promise<FounderListRo
           }
         : null,
       attention,
+
+      /*
+       * The Admin panel's own four columns (migration 0059/0060).
+       *
+       * `campaignCount` counts EVERY campaign record this person owns, archived
+       * ones included — §9's wrong-type path archives and restarts, and both
+       * records are real. Counting only the live one would report `1 campaigns`
+       * for somebody with three.
+       *
+       * `workflowStage` is where the record IS; `workflowStageReached` is the
+       * ratchet the stage menu unlocks from. They are separate because
+       * `campaigns.status` moves backward and the mark must not.
+       *
+       * `lastActiveAt` is `founder_prospects.last_active_at`, written on the
+       * Founder's own requests — deliberately not `updated_at`, which moves
+       * whenever an Admin edits the record and would report Proovd's activity
+       * as the Founder's (§33.12.1).
+       */
+      campaignCount: owned.length,
+      workflowStage: current ? stageForStatus(current.campaign.status) : null,
+      workflowStageReached: current?.campaign.workflowStageReached ?? null,
+      lastActiveAt: prospect.lastActiveAt?.toISOString() ?? null,
     });
   }
 

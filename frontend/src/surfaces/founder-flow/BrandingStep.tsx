@@ -190,7 +190,7 @@ function BrandLogoScreen({
 
   return (
     <div className="ff-brandlogo" ref={root}>
-      <button type="button" className="ff-brandlogo__back" onClick={back}>
+      <button type="button" className="ff-brandlogo__back" aria-label="Back to Your visuals" onClick={back}>
         <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M15 5 8 12l7 7" />
         </svg>
@@ -231,6 +231,7 @@ function BrandLogoScreen({
               id="ff-brandlogo-file"
               className="ff-brandlogo__fileinput"
               type="file"
+              aria-label="Upload logo file"
               accept="image/png,image/jpeg,video/mp4"
               disabled={!canUpload}
               onChange={(event) => {

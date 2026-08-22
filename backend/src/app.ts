@@ -18,6 +18,7 @@ import { policyReacceptanceGate } from './enforcement/reacceptance.js';
 import { crossOriginWriteGuard } from './auth/origin-guard.js';
 import { creatorStandingGate, founderStandingGate } from './enforcement/standing.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
+import { createAdminFounderPanelRouter } from './routes/admin-founder-panel.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAdminCreatorsRouter } from './routes/admin-creators.js';
 import { createAdminCampaignsRouter } from './routes/admin-campaigns.js';
@@ -544,6 +545,17 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         : {}),
     }),
   );
+  // The Admin Founder panel's own records (migration 0059) — the eleven-stage
+  // workflow position, the application-review decision §9 defines no lifecycle
+  // state for, the Admin offers §14.2 keeps out of `proposal_versions`, the
+  // internal notes, the invitation prefills, and the one route that changes a
+  // saved campaign value directly with its prior value read under lock.
+  //
+  // Mounted AFTER the workspace router on purpose: its `GET /founder-panel/:id`
+  // is a supplement to that read, not a replacement for it, and its two
+  // `/api/admin/founders/...` writes are distinct path segments that the
+  // workspace router does not claim.
+  app.use(createAdminFounderPanelRouter({ db, auth }));
   // Phase 08a (§8, §5.3, §25.4, §33.2.1). Campaign-specific Creator
   // recruitment and the private invitation. Behind the same guards: §33.2.1's
   // "no public signup" is partly the fact that every route that can create an

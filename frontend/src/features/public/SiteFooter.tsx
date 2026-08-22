@@ -13,7 +13,7 @@
  * an edit here fails the suite rather than quietly rewording a commitment.
  *
  * The rest of the §18 inventory is listed below the required links. §31.4
- * states a floor, and a site that publishes fourteen public routes and links
+ * states a floor, and a site that publishes a complete public route inventory and links
  * to nine of them fails DNA §5.12's wayfinding rule.
  */
 

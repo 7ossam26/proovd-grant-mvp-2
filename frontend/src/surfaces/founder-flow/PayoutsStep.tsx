@@ -58,13 +58,13 @@ import { flowDirection, FlowPage, useFlowNav } from './FlowPage.js';
  * deliberately separate rather than shared, because either screen may need to
  * leave the demo independently of the other.
  */
-const PITCH_DEMO = import.meta.env.DEV && import.meta.env.VITE_PITCH_DEMO !== 'false';
+const PITCH_DEMO =
+  import.meta.env.DEV &&
+  import.meta.env.MODE !== 'test' &&
+  import.meta.env.VITE_PITCH_DEMO !== 'false';
 
 const PAYOUT_ASSETS = {
-  logo: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg',
-    import.meta.url,
-  ).href,
+  logo: '/assets/proovd-logo.svg',
   stripe: new URL(
     '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/stripe.svg',
     import.meta.url,
@@ -85,44 +85,7 @@ const PAYOUT_ASSETS = {
     '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/piggy.png',
     import.meta.url,
   ).href,
-  font400: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-400.woff2',
-    import.meta.url,
-  ).href,
-  font500: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-500.woff2',
-    import.meta.url,
-  ).href,
-  font700: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-700.woff2',
-    import.meta.url,
-  ).href,
-  font900: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/fonts/Satoshi-900.woff2',
-    import.meta.url,
-  ).href,
 };
-
-const PAYOUT_HELP_DOCS = [
-  {
-    tag: 'PDF · 0.6 MB',
-    title: 'Stripe onboarding checklist.pdf',
-    body: 'Every document Stripe asks for, in the order it asks.',
-    current: true,
-  },
-  {
-    tag: 'PDF · 0.4 MB',
-    title: 'SSN or EIN for payouts.pdf',
-    body: 'Which one applies to you, and what changes if you incorporate.',
-    current: false,
-  },
-  {
-    tag: 'GUIDE · 4.2 MB',
-    title: 'Proovd founder handbook.pdf',
-    body: 'Every step of the flow in one document. Worth a skim.',
-    current: false,
-  },
-] as const;
 
 interface PayoutGsap {
   from: (target: unknown, vars: Record<string, unknown>) => void;
@@ -252,6 +215,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
               type="button"
               data-payout-anim="cta"
               className="ff-payout-ref__paid-cta"
+              aria-label="Continue to campaign review"
               onClick={() => leaveToPage('in-review')}
             >
               Continue
@@ -325,6 +289,7 @@ function Body({ payouts }: { payouts: PayoutState }) {
 }
 
 function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () => void }) {
+  const { campaignId = '' } = useParams();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerClosing, setDrawerClosing] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
@@ -365,13 +330,12 @@ function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () 
 
   return (
     <section className="ff-payout-ref">
-      <style>{`
-        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font400}') format('woff2');font-weight:400;font-display:swap;font-style:normal;}
-        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font500}') format('woff2');font-weight:500;font-display:swap;font-style:normal;}
-        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font700}') format('woff2');font-weight:600 700;font-display:swap;font-style:normal;}
-        @font-face{font-family:'Satoshi Payout Reference';src:url('${PAYOUT_ASSETS.font900}') format('woff2');font-weight:800 900;font-display:swap;font-style:normal;}
-      `}</style>
-      <button type="button" className="ff-payout-ref__back" onClick={onBack}>
+      <button
+        type="button"
+        className="ff-payout-ref__back"
+        aria-label="Back to your Backer rewards"
+        onClick={onBack}
+      >
         <svg
           viewBox="0 0 24 24"
           width="11"
@@ -397,7 +361,7 @@ function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () 
       {drawerOpen ? (
         <>
           <div ref={scrimRef} className="ff-payout-ref__scrim" onClick={closeDrawer} />
-          <aside ref={drawerRef} className="ff-payout-ref__drawer">
+          <aside ref={drawerRef} className="ff-payout-ref__drawer" role="dialog" aria-modal="true" aria-label="Help">
             <div className="ff-payout-ref__drawer-head">
               <span>Help</span>
               <button
@@ -424,19 +388,13 @@ function ReferenceShell({ children, onBack }: { children: ReactNode; onBack: () 
                 </svg>
               </button>
             </div>
-            <div className="ff-payout-ref__drawer-intro">Reading for this page</div>
+            <div className="ff-payout-ref__drawer-intro">Help for this page</div>
             <div className="ff-payout-ref__docs">
-              {PAYOUT_HELP_DOCS.map((doc) => (
-                <button
-                  type="button"
-                  className={doc.current ? 'ff-payout-ref__doc is-current' : 'ff-payout-ref__doc'}
-                  key={doc.title}
-                >
-                  <span className="ff-payout-ref__doc-tag">{doc.tag}</span>
-                  <span className="ff-payout-ref__doc-title">{doc.title}</span>
-                  <span className="ff-payout-ref__doc-body">{doc.body}</span>
-                </button>
-              ))}
+              <section className="ff-payout-ref__doc is-current">
+                <span className="ff-payout-ref__doc-title">Stripe payout onboarding</span>
+                <span className="ff-payout-ref__doc-body">Stripe collects and verifies identity, tax, and bank details on its hosted page. Proovd stores only the resulting account status and identifiers.</span>
+                <a href={`/support?reference=${encodeURIComponent(campaignId)}`}>Contact Proovd support</a>
+              </section>
             </div>
           </aside>
         </>

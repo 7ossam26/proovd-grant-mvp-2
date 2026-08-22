@@ -12,11 +12,11 @@ import { Safety } from './features/public/Safety.js';
 import { SupportPage } from './features/public/SupportPage.js';
 import { PolicyPage } from './features/public/PolicyPage.js';
 import { NotFoundSurface, PageLoading } from './features/public/states.js';
-import { CampaignPage } from './features/public/campaign/CampaignPage.js';
 import { LiveCampaignPage } from './features/public/campaign/LiveCampaignPage.js';
 import { AdminLayout } from './features/admin/AdminLayout.js';
 import { AdminSignIn } from './features/admin/AdminSignIn.js';
 import { SectionPlaceholder, AdminAddressRetired } from './features/admin/SectionPlaceholder.js';
+import { FoundersPanel } from './features/admin/founders/FoundersPanel.js';
 import { RequireRole, RedirectIfAuthenticated } from './lib/routeGuards.js';
 import { roleHome } from './lib/session.js';
 import { CampaignBuild } from './surfaces/founder/CampaignBuild.js';
@@ -77,17 +77,12 @@ import { DetailsStep } from './surfaces/founder-flow/DetailsStep.js';
 import { MatchStep } from './surfaces/founder-flow/MatchStep.js';
 import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
-import { ApplicationReviewStep } from './surfaces/founder-flow/ApplicationReviewStep.js';
 import { VoiceStep } from './surfaces/founder-flow/VoiceStep.js';
 import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
 import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
-import { InReviewReferenceStep } from './surfaces/founder-flow/InReviewReferenceStep.js';
-import {
-  SAMPLE_IDEA_CAMPAIGN,
-  SAMPLE_PRODUCT_CAMPAIGN,
-} from './features/public/campaign/samples.js';
+import { InReviewStep } from './surfaces/founder-flow/InReviewStep.js';
 
 /**
  * `/draft/:token/vetting` — retired by Founder Flow v2 Session C.
@@ -142,6 +137,12 @@ function WorkspaceRedirect() {
 function FounderSetupTailRedirect() {
   const { campaignId = '' } = useParams();
   return <Navigate to={founderDashboardPath(campaignId)} replace />;
+}
+
+/** The reference-only application-review timer never represented stored state. */
+function ApplicationReviewRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
 }
 
 /**
@@ -246,17 +247,7 @@ const rootChildren: RouteObject[] = [
       */
       { path: 'support', element: <SupportPage /> },
       ...policyRoutes,
-      {
-        path: 'campaign/sample-pre-build',
-        element: <CampaignPage campaign={SAMPLE_IDEA_CAMPAIGN} />,
-      },
-      {
-        path: 'campaign/sample-pre-launch',
-        element: <CampaignPage campaign={SAMPLE_PRODUCT_CAMPAIGN} />,
-      },
-      // Phase 14b (§18, §33.6). Approved live campaigns, by id. The two static
-      // sample paths above take precedence over this dynamic one, so
-      // `/campaign/sample-pre-build` still renders the sample. A `/c/:code`
+      // Phase 14b (§18, §33.6). Approved live campaigns, by id. A `/c/:code`
       // tracking-link click redirects here after setting the attribution cookie.
       {
         path: 'campaign/:campaignId',
@@ -317,6 +308,33 @@ const rootChildren: RouteObject[] = [
     ),
   },
   {
+    /*
+      The Founders panel — built to `ProovdAdminFounder.html`, 2026-08-22.
+
+      OUTSIDE `AdminLayout`, and that is the whole reason it can be the
+      reference verbatim. The reference authors its own `main.admin-shell` with
+      its own `header.topbar` and `.wordmark`; nesting it inside `AdminLayout`
+      would put two topbars on screen and let the two stylesheets fight over
+      `.topbar`, `.wordmark` and `.primary` — ten class names collide, and the
+      reference additionally carries seven `:root` token blocks.
+
+      Rendering it as the whole page means nothing is on screen to collide
+      with, so `admin-founders.css` loads byte-for-byte as authored, scoped to
+      nothing and modified nowhere. It is attached on mount and removed on
+      unmount, so its tokens govern this panel and stop governing when you
+      leave it.
+
+      Same guard as the rest of `/admin`: `RequireRole` decides what renders,
+      and `requireAdmin` on the server decides what is allowed, per request.
+    */
+    path: 'admin/founders/:prospectId?',
+    element: (
+      <RequireRole allow={['admin']} signInPath="/admin/signin">
+        <FoundersPanel />
+      </RequireRole>
+    ),
+  },
+  {
     // Phase 06 (§6, §26). The Admin panel stands outside the public shell: it
     // is the only dashboard-density surface in the MVP (§26), and sharing the
     // site header, footer sitemap, and live-chat gate is how that density
@@ -366,10 +384,6 @@ const rootChildren: RouteObject[] = [
         The server is untouched. Every `/api/admin/*` router is still mounted
         and still tested, so a rebuilt section has its data on day one.
       */
-      {
-        path: 'founders/*',
-        element: <SectionPlaceholder name="Founders" did="hold every Founder's record — their invitation, campaign, money and history" />,
-      },
       {
         path: 'creators/*',
         element: <SectionPlaceholder name="Affiliates" did="hold every Affiliate's record — their verification, campaigns, earnings and standing" />,
@@ -821,7 +835,7 @@ const rootChildren: RouteObject[] = [
   },
   {
     path: 'campaigns/:campaignId/setup/application-review',
-    element: <ApplicationReviewStep />,
+    element: <ApplicationReviewRedirect />,
   },
   {
     path: 'campaigns/:campaignId/setup/fee',
@@ -854,7 +868,7 @@ const rootChildren: RouteObject[] = [
       somebody may have bookmarked.
     */
     path: 'campaigns/:campaignId/setup/in-review',
-    element: <InReviewReferenceStep />,
+    element: <InReviewStep />,
   },
   {
     // Retired because campaign state now lives in the supplied dashboard.

@@ -2,14 +2,12 @@
  * The campaign page's view model — Spec §18's campaign page content order and
  * campaign-type difference table.
  *
- * Phase 05 renders two samples from static fixtures; Phase 14 renders approved
- * live campaigns from the database. The shape is defined here now, in §18's own
- * terms, so Phase 14 inherits a structure that already carries every required
- * element rather than growing one field at a time.
+ * Approved live campaigns render from the database. Test-only fixtures use the
+ * same contract so campaign-page verification exercises the production
+ * component without shipping invented campaigns in the production route table.
  *
- * Naming is §3.1 throughout: the URLs may keep `sample-pre-build` and
- * `sample-pre-launch`, but nothing in the rendered model does. `model` is
- * `idea` / `product`, never `pre_build` / `pre_launch`; a saved-card commitment
+ * Naming is §3.1 throughout: `model` is `idea` / `product`, never
+ * `pre_build` / `pre_launch`; a saved-card commitment
  * is a pre-order, never a reservation.
  */
 
@@ -151,7 +149,7 @@ export interface FounderRefundPolicy {
 }
 
 export interface CampaignView {
-  /** The route slug. §3.1 permits `sample-pre-build` / `sample-pre-launch` here. */
+  /** The public campaign identifier. */
   slug: string;
   model: CampaignModel;
   title: string;

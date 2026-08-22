@@ -768,6 +768,7 @@ function Shell({
 
 /** The reference's page-specific HELP drawer for `[data-paynow]`. */
 function FeeHelpDrawer({ onClose }: { onClose: () => void }) {
+  const { campaignId = '' } = useParams();
   const aside = useRef<HTMLElement>(null);
   const scrim = useRef<HTMLDivElement>(null);
 
@@ -810,18 +811,13 @@ function FeeHelpDrawer({ onClose }: { onClose: () => void }) {
             </svg>
           </button>
         </div>
-        <div className="ff-fee-help__intro">Reading for this page</div>
+        <div className="ff-fee-help__intro">Help for this page</div>
         <div className="ff-fee-help__docs">
-          <button type="button" className="is-current">
-            <span className="ff-fee-help__tag">PDF · 0.3 MB</span>
-            <strong>Listing fee breakdown.pdf</strong>
-            <span>What the fee covers and how the discounts stack.</span>
-          </button>
-          <button type="button">
-            <span className="ff-fee-help__tag">GUIDE · 4.2 MB</span>
-            <strong>Proovd founder handbook.pdf</strong>
-            <span>Every step of the flow in one document. Worth a skim.</span>
-          </button>
+          <section className="is-current">
+            <strong>Listing fee</strong>
+            <span>The page shows the stored base fee, earned discounts, sales tax, and exact total before you agree to pay.</span>
+            <a href={`/support?reference=${encodeURIComponent(campaignId)}`}>Contact Proovd support</a>
+          </section>
         </div>
       </aside>
     </>
