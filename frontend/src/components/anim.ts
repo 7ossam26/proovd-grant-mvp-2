@@ -955,6 +955,7 @@ function revealHead(
   head: HTMLElement,
   onDone: () => void,
   onNearly?: () => void,
+  fontsSettled = false,
 ): () => void {
   const g = gsap();
   let nearly = false;
@@ -976,6 +977,46 @@ function revealHead(
   if (!g || !motionLive()) {
     finish();
     return () => {};
+  }
+
+  /* The reference does not split immediately. It waits for the Satoshi face
+     to settle (with a 400ms ceiling), then measures the real headline and
+     creates the detached copy. Measuring the fallback face here makes
+     SplitText choose different word widths; the sticker then appears to pop
+     in with the whole heading instead of following the reference's
+     word-by-word reveal and separate scale-in. `problemIntro` has already
+     hidden the real headline synchronously, so deferring this work cannot
+     flash the page. */
+  if (!fontsSettled) {
+    let cancelled = false;
+    let started = false;
+    let childStop: (() => void) | null = null;
+    const start = () => {
+      if (cancelled || started) return;
+      started = true;
+      childStop = revealHead(head, onDone, onNearly, true);
+    };
+    const fonts = document.fonts?.ready;
+    if (!fonts) {
+      start();
+      return () => {
+        cancelled = true;
+        childStop?.();
+      };
+    }
+    const timer = window.setTimeout(start, 400);
+    void Promise.race([
+      fonts,
+      new Promise<void>((resolve) => window.setTimeout(resolve, 400)),
+    ]).then(() => {
+      window.clearTimeout(timer);
+      start();
+    });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      childStop?.();
+    };
   }
 
   let clone: HTMLElement | null = null;
@@ -1004,6 +1045,33 @@ function revealHead(
       clone = head.cloneNode(true) as HTMLElement;
       clone.removeAttribute('data-prob-part');
       clone.setAttribute('aria-hidden', 'true');
+
+      /* The reference writes the sticker's height, margins and baseline
+         offset inline, so its detached clone keeps them automatically. Ours
+         normally receives those values from
+         `.ff-prob[data-answer] .ff-prob__sticker`; after the clone is moved to
+         `document.body` that ancestor no longer exists and the image expands
+         to its intrinsic size. Freeze the original sticker's computed
+         geometry onto the clone before it leaves the screen's CSS context. */
+      const sourceImage = head.querySelector<HTMLImageElement>('img');
+      const clonedImage = clone.querySelector<HTMLImageElement>('img');
+      if (sourceImage && clonedImage) {
+        const imageStyle = getComputedStyle(sourceImage);
+        Object.assign(clonedImage.style, {
+          display: imageStyle.display,
+          // The source can still be decoding when this layout effect runs;
+          // its computed width is then 0px. The reference explicitly keeps
+          // width:auto, allowing the intrinsic ratio to arrive with the file.
+          width: 'auto',
+          height: imageStyle.height,
+          marginTop: imageStyle.marginTop,
+          marginRight: imageStyle.marginRight,
+          marginBottom: imageStyle.marginBottom,
+          marginLeft: imageStyle.marginLeft,
+          verticalAlign: imageStyle.verticalAlign,
+        });
+      }
+
       Object.assign(clone.style, {
         position: 'fixed',
         left: r.left + 'px',
