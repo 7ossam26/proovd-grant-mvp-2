@@ -1386,6 +1386,38 @@ describe('the five §12 answers (10–14)', () => {
     expect(document.querySelector('#ff-vis-file')).toBeDisabled();
   });
 
+  it('uses the reference ordinal label for an added logo instead of its filename', async () => {
+    stubStage3({
+      brand: {
+        colors: null,
+        typography: null,
+        notes: null,
+        approved: false,
+        logos: [
+          {
+            id: 'logo-1',
+            filename: 'founder-final-logo-v7.png',
+            contentType: 'image/png',
+            state: 'stored',
+            rejection: null,
+            approved: true,
+            width: 1200,
+            height: 1200,
+            byteSize: '48120',
+          },
+        ],
+      },
+    });
+    // A unique address avoids the workspace read-through cache populated by
+    // earlier Branding renders in this suite.
+    renderAt(founderFlowPath('branding', 'camp-logo-row'));
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.getByText('Logo 1 added')).toBeInTheDocument();
+    expect(screen.queryByText('founder-final-logo-v7.png')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove Logo 1 added' })).toHaveTextContent('x');
+  });
+
   it('names the missing §6 settings instead of offering a slot', async () => {
     stubStage3();
     renderAt(at('interview'));

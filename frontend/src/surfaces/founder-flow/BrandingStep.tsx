@@ -17,7 +17,6 @@ import {
   removeAsset,
   requestUpload,
   verifyUpload,
-  type AssetState,
   type WorkspaceState,
 } from '../founder/api.js';
 import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
@@ -256,7 +255,6 @@ function BrandLogoScreen({
                 {state.brand.logos.map((asset, index) => (
                   <LogoRow
                     key={asset.id}
-                    asset={asset}
                     index={index}
                     locked={locked}
                     onRemove={() => {
@@ -278,8 +276,10 @@ function BrandLogoScreen({
   );
 }
 
-function LogoRow({ asset, index, locked, onRemove }: { asset: AssetState; index: number; locked: boolean; onRemove: () => void }) {
-  const label = asset.filename ?? `Logo ${index + 1} added`;
+function LogoRow({ index, locked, onRemove }: { index: number; locked: boolean; onRemove: () => void }) {
+  // The reference names the slot, not the local file. Removing a row therefore
+  // closes the gap and the remaining labels are numbered again on render.
+  const label = `Logo ${index + 1} added`;
   return (
     <li className="ff-brandlogo__file" data-brandlogo-file-row="1">
       <span title={label}>{label}</span>
