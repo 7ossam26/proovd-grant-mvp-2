@@ -80,7 +80,10 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 const TOKEN = 'b'.repeat(43);
 
@@ -171,6 +174,39 @@ const ANSWERED = {
   solution: 'A clamp lamp with a magnetic arm that holds its position.',
   completeness: { problem: true, solution: true, competition: false },
 };
+
+describe('the phone and tablet handoff', () => {
+  it('asks the Founder to claim the invite from a desktop', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query.includes('pointer: coarse'),
+          media: query,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    stubLanding();
+
+    renderAt(at('invite'));
+
+    await screen.findByRole('heading', {
+      name: 'We want you to have a great experience',
+    });
+    expect(
+      screen.getByText('To claim your invite please open this link from your desktop'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Proovd' })).toHaveAttribute(
+      'src',
+      '/assets/proovd-logo.svg',
+    );
+    expect(screen.queryByRole('button', { name: /open my form/i })).not.toBeInTheDocument();
+  });
+});
 
 
 /* ══════════════════════════════════════════════════════════════════════════

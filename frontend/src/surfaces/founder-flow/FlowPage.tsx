@@ -19,7 +19,7 @@
  * Every page is its own top-level route, outside every layout and guard, and
  * `FOUNDER_FLOW_PAGES` is the one list of them. DNA §5.12 requires position to
  * survive interruption and a URL is the cheapest durable position there is; a
- * a multi-step sequence held in one component's state is a set of positions a
+ * multi-step sequence held in one component's state is a set of positions a
  * reload destroys.
  *
  * ── The exit runs before the route changes ──────────────────────────────────
@@ -33,8 +33,10 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type ReactNode,
 } from 'react';
 import { useNavigate } from 'react-router';
@@ -59,6 +61,28 @@ export { HelpDrawer } from './HelpDrawer.js';
  */
 let pendingDirection: 1 | -1 = 1;
 let transitionGuardTimer: number | null = null;
+
+const PHONE_OR_TABLET_QUERY =
+  '(max-width: 1024px), (hover: none) and (pointer: coarse)';
+
+function usePhoneOrTablet(): boolean {
+  const [matches, setMatches] = useState(() =>
+    typeof window.matchMedia === 'function'
+      ? window.matchMedia(PHONE_OR_TABLET_QUERY).matches
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia(PHONE_OR_TABLET_QUERY);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  return matches;
+}
 
 /**
  * Which way THIS page's relay runs, for a page that owns its own entrance.
@@ -131,6 +155,7 @@ interface FlowPageProps {
 export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps) {
   const navigate = useNavigate();
   const stageRef = useRef<HTMLDivElement>(null);
+  const phoneOrTablet = usePhoneOrTablet();
 
   // Content under `data-*` motion attributes changes with the page, so the
   // runtime has to be re-bound (DNA §6). Skipping this is how animations die
@@ -195,7 +220,23 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
   return (
     <FlowNavContext.Provider value={{ leave, leaveToPage, swapToPage, param }}>
       <main className="ff" data-flow-page={pageId}>
-        <div className="ff__stage" ref={stageRef}>
+        <section
+          className="ff-device-gate"
+          aria-labelledby="ff-device-gate-title"
+          hidden={!phoneOrTablet}
+        >
+          <img
+            className="ff-device-gate__mark"
+            src="/assets/proovd-logo.svg"
+            alt="Proovd"
+          />
+          <div className="ff-device-gate__body">
+            <h1 id="ff-device-gate-title">We want you to have a great experience</h1>
+            <p>To claim your invite please open this link from your desktop</p>
+          </div>
+        </section>
+
+        <div className="ff__stage" ref={stageRef} hidden={phoneOrTablet}>
           <div className="ff__top">
             {/* Not a link. A draft address is not a site, and the way out of a
                 Founder's own half-finished form should not be the brand. */}
