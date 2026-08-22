@@ -1,661 +1,160 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code (claude.ai/code) working in this repository.
 
-Proovd MVP. A founder-led crowdfunding platform: vetted Founders run campaigns, hand-recruited Creators promote them, Backers save a card and are charged later under a disclosed rule, and Admin operates almost everything manually behind a polished surface.
+**Read in this order:** *What Proovd is* → *Authority* → *How a session works*. Then read only
+what your task needs. If you are about to change something that looks wrong, check
+**Recorded deviations** before you "fix" it — several of the strangest-looking things in this
+codebase are deliberate and were built by explicit product direction.
 
-You are building this one phase at a time. **Read the phase file you were given, then read the Spec sections it names.** Do not work from memory or from paraphrase.
+`§N` always means a section of the **Engineering Spec**. The unified brief is cited as
+**Brief §N**, the design document as **DNA §N**, and the stack document as **tech-stack §N**.
+Those numbering systems are unrelated; do not mix them.
+
+---
+
+## What Proovd is
+
+A founder-led crowdfunding platform where crowdfunding is the mechanism and **paid validation is
+the product**. Four actors:
+
+- **Founders** are vetted, invited privately, and run one campaign at a time. Each is the
+  **merchant of record** for their own campaign on their own Stripe Standard connected account.
+  Proovd is the software platform and is MoR for nothing except its own listing fee.
+- **Creators** (internally: affiliates / distribution partners) are hand-recruited **per campaign**
+  and privately invited — never matched from a browsable pool. They are the retention engine:
+  Founders churn structurally after success or failure, strong distributors recur. Where Founder
+  convenience and Creator trust genuinely conflict, **Creator trust wins** unless payment safety,
+  law, or platform integrity requires otherwise (Brief §0).
+- **Backers** have no account at all. They save a card by SetupIntent and are charged later by
+  off-session PaymentIntent — never at pre-order time.
+- **Admin** operates almost everything manually behind a polished surface.
+
+**Two campaign types, one rail.** An **Idea Campaign** (internal `pre_build`) charges only if the
+disclosed order threshold — a count of unique Backers with active pre-orders — holds at close. A
+**Product Campaign** (internal `pre_launch`) charges every active pre-order on the close date and
+is keep-what-you-raise; its internal target is momentum, not a refund gate.
+
+**The money.** Checkout is tax-exclusive: `subtotal + tax = total authorized`. Sales tax sits
+outside Proovd's 5%, every Creator percentage, the Idea threshold, and the US$50,000 cap. The
+provisional Creator amount is a **liability, never Proovd revenue**; the unearned remainder returns
+to the Founder exactly once. Idea pays the Founder once (100% at Day 3); Product pays 40% at Day 3
+and 60% at Day 14, with a narrow evidence-gated early exception that never skips the Day 14 review.
+
+**The posture.** Manual behind a polished surface — and never pretending automation exists where it
+does not. A manual step is valid **only when the app records it**. Live money is gated by §34 until
+every condition is actually satisfied.
+
+Everything above is background. It does not override the Spec, and it is not licence to change
+anything — see *Authority*.
 
 ---
 
 ## Authority
 
-1. `docs/spec/Proovd-MVP-Engineering-Implementation-Spec-v1_0.md` — behavior, roles, data, state, money, tax, acceptance. Wins on all of it (§1.8).
-2. `docs/spec/Proovd_DNA.md` + `frontend/public/proovd.css` — visual, interaction, motion, content design. Wins where the Spec is silent on visual treatment.
-3. `docs/tech-stack-v2.md` — implementation mechanics.
-4. `docs/master-plan.md` — sequencing.
+1. **`docs/spec/Proovd-MVP-Engineering-Implementation-Spec-v1_0.md`** — behaviour, roles, data,
+   state, money, tax, acceptance. **Wins on all of it (§1.8).**
+2. **`docs/Proovd-Unified-MVP-Brief-v5.6.md`** — the product, operations, CX, and Stripe-approval
+   source of truth. This is the **why**: what the product is for, who each actor is, what the
+   commercial rules mean, and what Stripe was told. Where it and the Spec disagree on *behaviour*,
+   §1.8 means the Spec wins. Where the Spec is silent on product intent, this explains it.
+   **Read it for context; never treat it as a warrant to change shipped behaviour without being
+   asked.**
+3. **`docs/spec/Proovd_DNA.md` + `frontend/public/proovd.css`** — visual, interaction, motion, and
+   content design. Wins where the Spec is silent on visual treatment.
+4. **`docs/tech-stack-v2.md`** — implementation mechanics.
+5. **`docs/master-plan.md`** — sequencing.
+6. **`docs/build-log-archive.md`** — the full 4,200-line engineering narrative this file used to
+   carry. Every decision below is summarised from it. When a summary is thinner than you need,
+   the long form is there; search by surface name, section number, or date.
 
-`§N` below always means a section of the Engineering Spec.
+---
+
+## How a session works
+
+**Verification is scaled to the change, and most changes are small.** Almost everything recorded
+in this file came out of *phase* work — whole surfaces, money paths, acceptance suites, browser
+passes. Do not read that as the bar for an ordinary edit. There are two kinds of work:
+
+- **A small change** — a copy fix, a style tweak, one component, one bug, a rename, a small
+  refactor. Make the change, run `npm run typecheck`, and run **only** the one test file that
+  covers what you touched (`npx vitest run <path>`). That is the whole verification. Do **not**
+  run `npm test`, a whole workspace project, the §33.11 sweep, or a browser pass, and do not write
+  a new test file — unless it is a bug fix whose bug a test would have caught, in which case one
+  focused case is enough. If no test file covers what you touched, typecheck is the verification.
+- **Phase work** — a `docs/phases/*.md` brief, or a multi-session rebuild brief. One phase per
+  session (master-plan §1.3): read the phase file, then read only the Spec sections it names — not
+  from memory — build, run **that phase's named §33 tests**, and commit only when every one passes.
+  Serial: never start a phase whose predecessors are not green. If the phase is too large for one
+  session, **stop and say so**; a truncated session produces code that looks finished and is not.
+
+When in doubt about which kind of work you were handed, **it is the small kind.** If a small change
+looks like it puts something wider at risk, say so in one sentence and let the user decide — do not
+run the wider thing on your own initiative, and do not report a change as unverified because you
+chose not to run a suite nobody asked for.
+
+**Phases 00–24 are complete. All 131 §33 acceptance tests have been written and pass in a single
+run.** The Founder onboarding flow, the Founder dashboard, the Creator flow, the Admin panel's
+eight sections, the public campaign page, and the Backer surfaces are all built. Phase sequencing
+lives in `docs/master-plan.md` §6; the per-phase splits and their reasoning are in the archive.
 
 ---
 
 ## Repository state — read this before looking for a file
 
-> ## ⚠ The Admin panel's screens were REMOVED on 2026-08-21, to be rebuilt tab by tab
+> ### ⚠ The Admin panel's screens were REMOVED on 2026-08-21, to be rebuilt tab by tab
 >
-> **Read this before looking for any Admin surface.** Everything below that
-> describes an Admin *screen* — the Founders workspace, the Creators/Affiliate
-> record, Campaigns, Backers, Support, Money & Fulfillment, Today, Live mode —
-> describes something that **no longer exists on disk**. Those sections are kept
-> rather than deleted because they are the specification the rebuild is measured
-> against, and because each records *why* a control was refused. Treat them as
-> the brief for what to rebuild, not as a map of what is there.
+> 75 files under `frontend/src/features/admin/` (8 workspace directories, ~1.7 MB), the 288 tests
+> that drove them, their routes, and ~4,900 lines of CSS are **gone from disk**. The archive's
+> Admin sections are the *specification for the rebuild*, not a map of what is there.
 >
-> **What was removed** — 75 files under `frontend/src/features/admin/`
-> (8 workspace directories, ~1.7 MB), the 288 tests that drove them, their
-> routes, and ~4,900 lines of CSS (PHASE 25–29, 31–32, 35–37, 47–48).
+> **What deliberately survives, and why:** the shell (`AdminLayout.tsx` and its eight nav tabs —
+> the nav is the map of what the panel IS); `SectionPlaceholder.tsx` (§1.4 makes an empty screen
+> indistinguishable from a broken one, and §33.11 sweeps these addresses for a heading);
+> `AdminSignIn.tsx`; `api.ts` cut from 1,289 lines to 179 (**despite its folder this is the app's
+> shared fetch helper** — `AdminRequestError` / `AdminError` are imported by the Founder-flow,
+> Creator, Draft, Payouts and Auth clients and by `lib/useAutosave`, and `fetchDraftLanding` is the
+> un-authenticated read three Founder-flow screens use; deleting it breaks Founder onboarding);
+> `ConfirmDialog.tsx`; the Tasks panel; and **the entire backend**.
 >
-> **What deliberately survives, and why each one:**
+> **All 19 `admin-*.ts` routers, `backend/src/admin/`, and every `shared/src/admin/` register are
+> untouched and still mounted.** This is not conservatism: commit `2f7aeed` once deleted admin
+> screens *and* took five backend services and an acceptance suite with them, and **two of the 131
+> named §33 tests silently stopped running** until an audit caught it. Those routers are also
+> driven by pg-boss jobs, Stripe webhooks, and the §33 suites directly — none of which is a screen.
 >
-> - **The shell** — `AdminLayout.tsx`, its eight nav tabs, the environment chip.
->   The nav is the map of what the panel IS; dismantling it too would leave
->   nothing to rebuild against. Every tab is a real link to a real address.
-> - **`SectionPlaceholder.tsx`** — what each tab renders until its section is
->   built. Not a blank page: §1.4 makes an empty screen indistinguishable from a
->   broken one, and §33.11 sweeps these addresses for a heading.
-> - **`AdminSignIn.tsx`** — an Admin still has to get in.
-> - **`api.ts`, cut from 1,289 lines to 179** — despite its folder this is the
->   app's shared fetch helper. `AdminRequestError` / `AdminError` are imported by
->   the Founder-flow, Creator, Draft, Payouts and Auth clients and by
->   `lib/useAutosave`; `fetchDraftLanding` is the un-authenticated `/api/draft/
->   :token` read three Founder-flow screens use. Deleting it breaks Founder
->   onboarding.
-> - **`ConfirmDialog.tsx`** — moved up from the deleted `founders/dialogs/`; the
->   Tasks panel is its last consumer and a rebuilt section will want it.
-> - **The Tasks panel** (`tasks/`) — kept by explicit product direction.
-> - **THE ENTIRE BACKEND.** All 19 `admin-*.ts` routers, `backend/src/admin/`,
->   and every `shared/src/admin/` register are **untouched and still mounted**.
->   This is not conservatism: commit `2f7aeed` deleted admin screens *and* took
->   five backend services and an acceptance suite with them, and **two of the 131
->   named §33 tests silently stopped running** until an audit caught it (see the
->   2026-08-19 restoration section). Those routers are also driven by pg-boss
->   jobs, by Stripe webhooks, and directly by the §33 suites — none of which is a
->   screen. A rebuilt section has its data waiting on day one.
+> **Routes are splats** (`path: 'campaigns/*'`), so a deep link minted by the Tasks panel or a §27
+> notice still lands on its section. **To rebuild a section:** point its route in `routes.tsx` at
+> the real component instead of `SectionPlaceholder`.
 >
-> **Routes are splats** (`path: 'campaigns/*'`), so a deep link minted by the
-> Tasks panel or by a §27 internal notice still lands on its section rather than
-> the 404 surface. The detail SCREENS are gone; the addresses answer.
->
-> **`PRINCIPAL_FLOWS.admin_panel` now sweeps the eight tab addresses** rather
-> than the previous six. That is not a wider coverage claim — a placeholder
-> proves nothing about a workspace that does not exist. It keeps the SHELL under
-> test: the skip link, the nav's keyboard path, landmark structure, one `h1` per
-> address. The two detail routes it used to sweep were dropped rather than
-> asserted against a 404.
->
-> **Rebuilding a section:** point its route in `routes.tsx` at the real component
-> instead of `SectionPlaceholder`. Nothing else refers to the placeholder
-> per-section; delete it when the last section lands.
->
-> **Verified at removal:** frontend and shared typecheck at **0 errors**; the
-> stylesheet's comments and braces balance and every `var()` resolves; **zero**
-> classes were orphaned by the CSS deletion (checked by diffing the
-> used-but-undefined set before and against after); no dangling import of a
-> deleted module remains. **The test suite was NOT run** — `node_modules` was
-> still installing on a degraded connection. Run `npm test` before trusting the
-> §33 suites.
-
-
-
-**Phases 00–24 are complete.** All 131 acceptance tests have been written and passed, and they pass in a single run. Phase 06 was built in two halves — 06a the configuration surface, 06b the invitation — Phase 08 in three: 08a recruitment, 08b the compact signup, 08c the preparing reveal — Phase 09 in two: 09a the workspace, 09b the interview integration — Phase 10 in two: 10a the payments substrate, 10b hosted onboarding and the tax gate — Phase 12 in two on the same precedent (its own brief named the seam): **12a** the formal opportunity, the three §14.2 decisions, the immutable proposal versions, and the §14.6 deadline evaluation; **12b** §14.4 campaign building, §15 roster readiness, review, and the general materiality machine — **Phase 14** on the §17/§18 seam: **14a** the coordinated launch (§17), first-post verification, and the §29.6 required-Creator failure; **14b** the live public campaign page, the §18 attribution contract, discovery timing, and the outcome-specific ended state; **14c** the §18 updates; **14d** the Creator active-partnership surface — **Phase 15** on the seam its own brief named: **15a** the pre-order flow, eligibility, the atomic cap, reservation-time tax, the SetupIntent and consent; **15b** the magic-link page, cancellation, the deduplication queue, and the pre-charge reminder — **Phase 16** on the seam between read-and-reconcile surfaces and case-and-action operations: **16a** the §26.5 ledger, §26.6 money controls, §31.7 risk inventory, and the general high-impact/override machine; **16b** §26.7/§27.8 support operations, suspend/kill, and the §26.8 chronological timeline. **Phase 13** (§16) fit one session: the optional fixed Creator payment as a fourth money stream and the §16 Creator-readiness checklist. And **Phase 17**, split on the seam added to its brief between the campaign as it is observed and the changes people make while it runs: **17a** the §20 Founder campaign home — Glance, one ranked Act, Explore — and the threshold/campaign event substrate underneath it; **17b** §20's three live-editing tiers, mid-campaign Creator addition, the Creator live surface, and the Backer before close including the §18 comment thread 14c left for the Backer identity. And **Phase 20b** — disputes, descriptors, post-capture enforcement, ended pages, and §29 — completing Phase 20 and §33.9. And **Phase 18** — `docs/master-plan.md` §6's "**the critical phase**" — split on the seam its own brief named: **18a** the §21 close batch, the Idea threshold decision, tax-usability validation, off-session capture, and the opening of the one 48-hour window; **18b** the retry window's end, the B.5 update-card recovery, results preparation with the Admin-reviewed narrative, and Admin reconciliation with the visibly-recoverable batch surface. And **Phase 19**, split on the Creator-money/Founder-money seam this session added to its brief: **19a** the §22.1 completion decisions and the five fixed-payment outcomes, earnings finalization with the §24.4 provisional/earned reconciliation, the one idempotent Affiliate Transfer under the §11 tax gate, and the §22.2 thank-you; **19b** the §22.3 W-9 block, the Idea single payment and the Product 40%/60% schedule, evidence-gated early remaining release that never skips Day 14, and the money-surface consistency pass. §33.1.1 through §33.1.9 all pass, §33.2.1 through §33.2.13 all pass, §33.3.1 through §33.3.11 all pass, §33.4.1 through §33.4.9 all pass, §33.5.1 through §33.5.13 all pass, **§33.6.1 through §33.6.13 all pass — §33.6 is complete**, **§33.7.1 through §33.7.12 all pass — §33.7 is complete** (1–2 built in 15b, 3–8 in 18a, 9–12 in 18b), **§33.8.1 through §33.8.14 all pass — §33.8 is complete** (1–8 and 14 built in 19a, 9–13 in 19b), and §33.12.4, §33.9.10, and §33.9.11 all pass. And **Phase 20**, split on the seam this session added to its brief (master-plan §1.3 step 6) between the refund money machine and the operations and enforcement that invoke it: **20a** the §24.8 cause register and allocation records, the reservation-refund lifecycle with Appendix B.6, the §24.9 Idea exceptions with no voluntary path, §24.10 hardening, the per-cause earnings treatments, `charge.refunded` on both endpoints, and the Admin refund surface; **20b** the §24.11 dispute records with the 24-hour Admin task and the assembled evidence packet, `charge.dispute.*` on both endpoints + `transfer.reversed` on Connect, the §24.12 descriptor consolidation (one kernel, suffix at capture, display everywhere), §26.7/§29.7 post-capture suspension/kill invoking 20a's machinery with the read-side funds hold, the outcome-specific ended pages, the §29.1–29.5/§29.8–29.10 enforcement records including the Backer support path and escalation, and the §33.9.12 timeline suppression record. **§33.9.1 through §33.9.13 all pass — §33.9 and Phase 20 are complete.** And **Phase 21a** — the first half of the last lifecycle phase, split on the seam this session added to its brief (master-plan §1.3 step 6) between what the Founder owes and what happens when they don't, and completion and what follows: §22.5 fulfillment with its four obligations and the Backer delivery notice, §22.6 delivery-date changes and their two approval paths, the §22.4 Day 14 Progress Check with its checklist, durable receipt, and per-type consequences, and the §22.7 one-strike ghost ban. **§33.10.1 through §33.10.4 pass**; 21b closed §33.10.5–§33.10.10. And **Phase 22a** — the first third of the notification sweep, split on the seam this session added to its brief (master-plan §1.3 step 6) between the coverage machine and the messages it governs: the deliberate-absence register that partitions all 121 §27 keys into 77 sent and 44 recorded-with-a-reason, the render catalog, the coverage suite, §27.2's rules and §3.3's money facts proved against every rendered message, §27.1's timezone rule, the §3 copy pass, the §30 absence tests, and the preview with its contract report. **§33.6.11 is reconfirmed and §33.9.10/§33.9.12 re-proved through the catalog**. And **Phase 22c** — the last third of the notification sweep, built out of order because it does not depend on 22b: §27.7's optional daily/weekly digest for all three roles, composed from activity records rather than deliveries so it can never carry a transactional message; the preference that no code path can set without a person choosing it; and the authenticated Founder/Creator/Admin notification history with the four ways it would have become a dashboard each asserted absent — plus §27.2's message preview, which 22a's machine had been waiting for a surface. **The §27.7 done-when passes.** And **Phase 22b** — the middle third, built last: all 44 missing senders, the §14.5 word-change derivation that decides which of nineteen association states earns a §27.3 roster message, the three §27.6 queue notices whose services carried no notifier, the §27.8 promise sweep, and §5.5's magic-link reissue with its non-enumerating public ask. **The register empties to the genuinely deferred: 3 `never` decisions and Phase 21b's 5 capabilities, with no `message` entry left. §27 is complete and Phase 22 is done.** And **Phase 23a** — the first half of the P0 pass, split on the line its own acceptance draws (§33.11 is what a person sees; §33.12 is what the system does under replay, a clock, and a stale session): the §33.11 registers, the principal-flow sweep that renders every customer and Admin surface with real data, the built-bundle scan, and the seven-surface cross-surface contract over one pre-order. **§33.11.1 through §33.11.7 all pass — §33.11 is complete**. And **Phase 23b** — the other half: the §33.12 registers (every deadline and the instant it is anchored on, the lifecycle/payment-flag separation, what makes an Admin action sensitive, and the state-changing paths with their mechanisms), the §32.5 test-card matrix with its retained §32.6 evidence log, the §32.7 direct-architecture test over one campaign, the §31.9 first-cohort scoreboard whose baseline is `not measured` until ten Founders, and the three adversarial idempotency cases on the money path. **§33.12.1 through §33.12.7 all pass — §33.12 and Phase 23 are complete, and with them all 131 §33 tests.** And **Phase 24** — the live-mode gate, which builds almost nothing and whose out-of-scope section is one word: §34's eleven conditions as a register with how each is decided and the Track A item behind it, the fail-closed refusal at the ONE Stripe gateway every service shares (which throws at boot on an operation nobody has classified), the campaign-scoped pilot check at every money entry point that creates exposure, the one named pilot enablement with its two owners and its five NOT NULL rollback-plan columns, the rollback that is one statement and takes effect on the next call, and Appendix C's four statements as recorded walks. **The gate is shut: ten of eleven conditions are unsatisfied and eight of those wait on Track A, which is not a coding task.** Every path this file names existed at the path it named until the 2026-08-21 Admin-screen removal above — which is exactly why that notice is at the top of this section. `docs/phases/phase-00.md` … `phase-24.md` are all present, alongside the un-numbered post-Phase-24 briefs. **Two of those are multi-session and BOTH are complete:** `creator-flow-v2.md` and `creator-flow-reconciliation.md` describe the Creator signup and dashboard rebuild; Session A built the record, the registers, and migration `0055` with **no surface at all**, Session B the shell and screens 0–3, Session C screens 4–8 and the claim, Session D the app shell and Home, **Session F — built before E, on the 22c-before-22b precedent, because E replaces the Pitches LIST and F's four surfaces depend on its position in the walk rather than on its code** — the work surface, Earnings, Resources and Settings, and **Session E last: the `Active`/`Pitches` lists and §14.1's opportunity as a four-step reveal and a recap, over `decisions.ts` byte-for-byte unchanged**. The Creator flow is complete: an invitation walks nine screens to a claimed account, and a signed-in Creator has a home, two lists, a pitch with §14.2's three decisions, a work surface, Earnings, Resources and Settings. See the Creator Flow sections of this file. And `founder-dashboard.md` describes the Founder's home after the flow in seven sessions, and **all seven have landed** — the owner ruling, then the shell with its four-chapter address and the `/support` route the whole product had been pointing at, then **Chapter 1, Choose** with §14.2's three responses, §14.3's bonus and the recorded meeting-request deviation, then **Chapter 2, Live** with §20's Glance/Act/Explore, the first UI §20's three live-editing tiers have ever had, §18's updates and the recorded post-acknowledgement deviation, then **Chapter 3, Get paid** with §21's stored retry window, §22.3's schedule through the ONE resolver and no payment request anywhere, §22.4's Day 14 checklist and the clarification answer the product had never had a control for, and §22.5's four obligations, then **Chapter 4, Wrap** with §22.8's recorded completion, §22.9's ask, §22.10's two gates finally routed, §22.11's resolution, and the Backers page carrying §19's mandatory operational share and §20's Explore-10 export — both of which had existed as records with no Founder route at all — then **Session G's §5.2 settings panel** at `/settings`, which absorbed Phase 22c's `/settings/notifications` and gave a Founder route to the ten §5.2 items that had none. **The Founder dashboard is complete.** See the last eight sections of this file, which say exactly what exists and what each later session owns.
-
-What exists on disk:
+> Verified at removal: frontend and shared typecheck at 0 errors; the stylesheet balances and every
+> `var()` resolves; zero classes orphaned; no dangling imports. **The test suite was NOT run** —
+> run `npm test` before trusting the §33 suites.
 
 | Area | State |
 |---|---|
-| `shared/` | money waterfall + USD formatting, three state machines, business-day calendar, notification registry, policy register, §6 settings register, the §9 vetting sequence and its copy, the §5.3 subtype/evidence register, the §8 recruitment fields, the §2.2 slot rule, the §12 optional-item register, its rejection vocabulary, the helper resources, the interview statuses, the Appendix A.5 listing-fee consent and its resolver, the §14.5 roster vocabulary and the decision promise sentences, the §14.4 build-ingredient register and the §15 six-rule roster-readiness derivation, the §16 thirteen-item Creator-readiness checklist and its all-or-nothing derivation, the permitted fixed-payment vocabulary, the §17 five-step launch order, the seven first-post verification checks and their three outcomes, the §18 attribution vocabulary and the Day 8 discovery window, the §18 update audiences and their per-model rule, **the Appendix A.3/A.4 pre-order consent templates and their resolvers, the §4.1 dedup-input normalisation, and the §19 survey validation**, the §26.5 eleven ledger dimensions and §25.7's permitted/restricted export classes, the §26.6 nine money-control lines, §22.3's `eligible`/`blocked`/`released` vocabulary with its banned-word list, the §31.7 ten risk signals and the four seller-tax-readiness facts, §33.12.4's overridable-field register with the raw-provider-code patterns, **the §26.7 support topics and owners, §27.8's two published commitments, the Appendix B.8 acknowledgement and its resolver, §26.8's four handoff fields, §26.7's eight enforcement reason categories and five pre-capture effects, and §26.8's timeline sources and five one-time relationship touches**, **the §20 five Act ranks and their ranking kernel, the exact Glance/caught-up copy with its bracket-refusing resolvers, the banned freshness vocabulary, the eleven Explore sections with their definitions, the four milestones, and the count-reconciliation and threshold-crossing derivations**, **§20's three live-editing tiers as a field register, the FAQ commitment detector, §18's comment rules with the email-local-part refusal, the seven §22.1 earnings states with Appendix B.7 and its resolver, and §20's seven Creator obligations**, **the §21 close-batch step register, the §33.7.8 capture-failure vocabulary and its classifier, the §4.1 merged-identity fold, the close threshold kernel, and Appendix B.5 with its bracket-refusing resolver and the pinned US$0 closure sentences**, **the §21 nine-item reconciliation register with its four required-for-results items, the five results-narrative fields, and the retry-window US$0 closure sentence**, **the §22.1 completion-outcome register and its consequence matrix, the earned-percentage and per-row §24.4 finalization kernels, the Appendix B.7 state transitions, the §22.1 Day-3 Transfer anchor, and the §22.2 thank-you constants with their three Admin-confirmed eligibility facts**, **the §22.3 W-9 machine and payment-schedule registers, the eligible-share and payment-amount kernels (remaining = the exact remainder), the four-proof early-release register with the pinned never-skips-Day-14 sentence, and the §22.3 six-fact status contract**, **the §24.8 cause register with its per-cause permitted-treatment matrix and the earnings-phase consistency kernel, the §24.9 eight-exception register with the pinned best-effort-recovery sentence, the refund lifecycle (`requested/submitted/succeeded/failed`), and Appendix B.6 with its bracket-refusing resolver and the `5–10 business days, typically` verified range**, **the §24.11 dispute register (the 24-hour task, the provider status vocabulary, the ten packet items), the §24.12 descriptor kernel (`suffix` + `display`, provider validation as named violations), the §29 enforcement registers (seven actions, seven grounds, five statement fields, the five-business-day appeal, termination validity, conflicts, self-pre-order conditions, the 14-day escalation, the pinned issuer-rights sentence), and §26.7's post-capture effects register**, **the §22.5 seven delivery mechanisms and four Founder obligations with their 48-hour and 30-day kernels, the five-item delivery-notice resolver, §22.6's two-path derivation and six material-update fields, the §22.4 per-type checklist with examples, five failure reasons, and per-type consequence matrix, and the §22.7 four-trigger register with its campaign-type exclusivity map and pure evaluation kernel**, **the §27.2 transactional-rule register, §3.3's money facts as four message classes with their detectors, §27.1's timezone tokens, the §3.1/§3.2 banned-term registers with their audience-aware scanner, and the money/deadline classification of every §27 key**, **§27.7's digest preference vocabulary with its pinned never-replaces-transactional sentence, the three-kind eligible-activity register with its `coveredBy` exclusion contract, the period/window kernels, the five digest prohibitions with their banned pressure terms, `NON_TRANSACTIONAL_KEYS`, and the two history delivery states**, **the §33.11 registers: the fifteen principal flows with §28.5's five keyboard paths, the objectless-CTA vocabulary, the six placeholder patterns, §27.1's six questions as surface detectors with their structural evidence, what a bundle scan can and cannot decide, and §33.11.5's seven surfaces and eight facts with the `crossSurfaceDisagreements` comparison**, **the §33.12 registers: every deadline with the instant it is anchored on and whether that instant is immutable, the two campaign row timestamps a deadline may never use, the §29.6 replacement-deadline contract, the lifecycle/payment-flag separation as a membership rule plus the five facts a flag carries, what makes an Admin action sensitive and the four ways a guard fails unsafely, the deliberately-ungated Admin writes with their reasons, the twelve state-changing paths with their mechanisms and stable keys, the three adversarial cases, §32.7's five direct-model claims and the separate-charge symbols that must not exist, §32.5's eleven required outcomes (no card number — `shared/` ships in the browser), and §32.6's evidence fields with their completeness validator**, **§31.9's four-metric scoreboard with its cohort gate, the `not measured` label, the three facts no metric may exclude, the thirteen secondary metrics with their sources or stated absence, and the tables a warehouse would arrive as**, **§34's eleven conditions with their verification kind, `cannotBeAutomatedBecause`, and Track A item, §34's two prose lists as a partition over every gateway operation with the §34 phrase deciding each, the thirteen money entry points split `gated`/`unwind` with the ungated ones carrying their reason, the pilot owner/preflight/rollback-plan registers, Appendix C's four statements as forty-nine walkable steps, and the three frozen refusal sentences**, **the §20 live-editing register's two new surfaces (`demo_moment`, `benefit_card`) with their twenty entries, and `COMMITMENT_CHECK_EXEMPT` — the three column-one fields the §20 loophole check does not run on, each with the property that makes it structurally unable to carry a promise**, **the §9 sequence reverted to Positioning with the campaign path back in the Founder's hands, `VIEWS_NOT_COLLECTED_LABEL` for the retired amount-of-views question, `CAMPAIGN_TYPE_LOCK_WARNING`, §10's six possible-creator disclosures, the Founder onboarding flow's eight-page register with its help copy and the eight elements the reference draws that the Spec refuses, the §9 step register carrying the reference's own `kind`/hint/placeholder and its `prefillable: false` on the one answer Proovd never drafts, and the six-digit code's constants with the two sentences that keep its screen from reading as a sign-in**, Zod schemas |
-| `backend/` | Express 5, Drizzle + Postgres, env guard, audit + idempotency tables, Better Auth, token service, guards, `policy_versions` + the §34 policy gate, `app_settings` + history + `production_prerequisites`, prospects/drafts/invitation sends, Resend + React Email, pg-boss retention sweep, `campaign_vetting` + provenance history, `founder_claim_profiles`, `possible_creator_results`, `policy_consents`, `affiliate_prospects`, §25.4 recruitment columns on `campaign_affiliate_associations`, `affiliate_invitation_sends`, the `affiliate_invitation` token scope, `campaign_workspace`, `campaign_assets`, `campaign_social_profiles`, `founder_interview_bookings` + events, `campaign_optional_items` + events, `high_effort_classifications`, `listing_fee_calculations`, the R2 presign port, the Cal.com port + signed webhook + the §27.3 interview emails + the reminder/reconciliation jobs, the pinned Stripe client, `stripe_connected_accounts` + `stripe_account_events`, the §32.4 `provider_objects` store, the two signed webhook endpoints, hosted onboarding for both roles, the §11 `tax_accountability_config` gate, `listing_fee_payments` + `listing_fee_refunds` + `campaign_cancellations`, the listing Checkout and its seven atomic effects, the single full refund, §31.6 cancellation, the two §6 clocks and their sweep, and the §27.3/§27.4 payment emails, **`proposal_versions` + `association_compensation_agreements` + `association_acceptance_confirmations` + `tracking_links` + `creator_bonuses` + `response_deadline_evaluations`, the three §14.2 decisions, the bilateral lock, the §14.6 evaluation inside the sweep, and the nine §27.3/§27.4 decision emails, **`campaign_build` + reward packages + FAQs, `campaign_readiness` + `association_readiness` and the six-rule launch derivation, `campaign_reviews` + `review_feedback_items`, `approved_campaign_snapshots`, and the general `material_changes` + `material_change_reacceptances` machine**, **`creator_payment_allocations` + `creator_payment_funding_attempts`, the §16 funding state machine and its exact-amount Checkout, the §16 readiness gathering/evaluation that moves an association `ready`/`readiness_blocked`, the Admin-configured funding deadline and its lapse cancellation, and the one `campaign_live_at` schedule**, **`campaign_launches` + the idempotent five-step `launchCampaign` and its scheduled sweep, `creator_post_submissions` + the §17 submit/verify with its three outcomes, `required_creator_failures` + the non-resettable §29.6 deadline (the backend's own drift-tested business calendar) and its miss-path allocation return + full-listing refund, the tracking-link `paused_at`, and the five §17 launch/first-post emails**, the `tracking_link_clicks` ledger and the §18 attribution ingest (`/c/:code`, the signed per-browser cookie, last-click-wins, the reason each ignored click earns nothing) and resolution, the public campaign endpoint (`/api/campaign/:id`) with its ended-state classifier, and the Day 8 `discovery_opened_at` switch + its sweep + the one Founder notice, `campaign_updates` (append-only) + the §18 posting rules and the §18 Creator active-partnership read at `/api/creator/campaigns/:id/partnership`, **`backer_identities` + `reservation_deduplication` + `deduplication_cases` + `founder_operational_shares` + `campaign_reservation_capacity`, the §19 twelve-step pre-order with its §33.5.4 "no reservation until SetupIntent succeeds" ordering, the database-atomic §2.2 cap, reservation-time tax, the A.3/A.4 consent with its stored version and hash, §20 cancellation with reference-safe detach, the §4.1 dedup queue, the magic-link read, and the pre-charge reminder**, **`campaign_seller_tax_readiness` + `high_impact_action_previews` + `admin_overrides`, the §26.5 ledger query with its eleven filters and §25.7's register-driven export, the §26.6 money-control read over the Phase 03 ledger columns, the ten §31.7 risk signals computed live, and the general §26.6 high-impact machine (preview → consume → override) that Phases 18–20 reuse**, **`support_cases` + `support_case_messages` + `support_case_handoffs` + `campaign_enforcement_actions` + `relationship_touches`, the §27.8 business-day response promise stored with its calendar version, the daily due/overdue queue, the context-preserving templates, the four-field handoff gate, §26.7's suspend/kill with its complete pre-capture effects, and the §26.8 timeline composed across every existing table — with no timeline store of its own**, **`campaign_home_deliveries` + `founder_campaign_last_seen` (the acknowledge-once receipt that makes §20's "successfully delivered" a fact), `campaign_threshold_crossings` with its alternation trigger, `campaign_milestones`, `act_rank_corrections`, the §20 counts composed from `reservation_status_history`, the five-source Act gather and its ranking, the eleven-section Explore read, the crossing evaluation wired into every Backer mutation plus its reconciliation sweep, and the two §27.3/§27.6 crossing notices keyed on the crossing — with no counters table**, **`campaign_live_edits` + `campaign_change_requests` + `campaign_comments` + `campaign_comment_flags` + `campaign_backer_numbers` + `mid_campaign_additions`, the one `applyLiveEdit` door that reads the §20 tier register and writes, routes, or refuses, the Admin decision that applies a request through Phase 12b's `recordMaterialChange` unchanged, the §18 thread with its per-campaign Backer number and route-to-a-person flag, and the mid-campaign addition with its frozen remaining-time terms and a new `activated_at`**, **`campaign_close_batches` (the §21 batch record with its immutable-at-close threshold decision and CHECK-pinned 48-hour window) + `reservation_capture_attempts` (the stable key claimed BEFORE the provider call), the `runCloseBatch`/`sweepCampaignCloses` §21 machine (threshold-miss US$0 path, tax-usability validation writing `tax_close_usable`, one off-session PaymentIntent per eligible reservation, the capture ledger at both levels, `Campaign ended` at close), the `payment_intent.*` Connect webhooks through the same applier, the close-anchor cancellation gate, and the five §27 close messages including Appendix B.5**, **the §21 recovery machine (`close/retry.ts`): the B.5 update-card retry under the next stable key (`reservation-capture:<id>:2`), the `requires_action` customer-action path completed by the same Connect webhooks, and the window-end sweep (recoveries count as captured, the rest drop at US$0 with reference-safe detach); `campaign_results` + `campaign_reconciliations` (0029, both insert-only), `prepareResults` — the one `founder_results_ready` sender, gated on the window, the four required reconciliation items, and the five-field narrative — the `results_ready` §23.3 flag, the Founder results read computed live from the ledger, the Creator close read with server-rendered B.7, and the §33.7.12 close-operations queue with resume**, **`creator_completion_decisions` (append-only, waiver only with both agreements) + `creator_earnings` (the §24.4 identity CHECK-pinned, amounts and B.7 transitions trigger-enforced) + `creator_earnings_state_history` + `affiliate_transfers` (one per association, claimed BEFORE the provider call, `created` immutable) + `contractual_recovery_records` + `thank_you_records` (0030), the §22.1 decide → finalize → approve → transfer services under the §11 tax gate and the Day-3 anchor, the fixed-allocation return under Phase 13's key with terminal `returned`/`paid`, the `affiliate-transfer-retry` sweep, the `payout.paid`/`payout.failed` Connect handlers, and the §26.6 thank-you line plus the four §22.1/§24.4 reconciliation derived facts**, **`founder_w9_records` + `founder_w9_events` + `founder_payments` + `early_release_evidence` + `early_release_requests` (0031), the §22.3 services (W-9 request at close-batch completion, receipt and decision, create/release refusing without a verified W-9 by trigger, the evidence-gated early release), the ONE `readFounderPaymentStatus` resolver every §22.3 surface and email renders, and the `founder-payment-schedule` sweep that enters `captured_pending_w9` and sends the §27.6 due notices**, **`refund_cause_allocations` (insert-only, the §24.8 cause/treatment matrix as a CHECK) + `reservation_refunds` (a refund cannot exist without its allocation; lifecycle trigger-enforced; the row is the claim, before the provider call, under `reservation-refund:<allocationId>`) + `reservation_refund_events` (0032, which also relaxes the 0030 recovery index to non-unique), the `recordRefundCase` → preview → `executeRefund` services reusing 16a's `high_impact_action_previews` consumed-once machine, the per-cause earnings treatments (`cancel_unfinalized` folded into the finalization kernel's earned-zero path; `cancel_unpaid_invalid`/`contractual_recovery` through the ONE `applyCauseBasedAffiliateAdjustment` exported from `close/earnings.ts`), `charge.refunded` on both endpoints (confirm-or-route-to-Admin, never guess), the three §27.5 B.6 senders deduped per refund row, the §22.3 `causeBasedAdjustmentsCents` now summing `founder_liability_cents`, and the §26.8 timeline `refund` source**, **`payment_disputes` + events + the recorded evidence assembly with the `charge.dispute.*`/`transfer.reversed` handlers and the write-once dispute classification through 20a's register, the §24.12 descriptor consolidation (the one kernel; capture sends the suffix; the magic link gained the display field), the post-capture enforcement branch with `campaignEnforcementHold` refusing `enforcement_hold` at the three money edges and real role notifications, the record-driven ended classifier with the Admin explanation, the §29 records (`affiliate_enforcement_actions` + final appeals + disclosures + `policy_reacceptance_requirements` with its `/api/founder`//`/api/creator` gate and `/api/account/policy-reacceptance`), the Backer support routes on `/api/link/:token/support` with the one-per-case §29.10 escalation, and the timeline's per-subject notification sets with first-class suppression entries**, **`campaign_fulfillment` + `delivery_commitments` (the insert-only sequence whose row 1 is the original promise) + `delivery_change_requests` (the §22.6 approval path with its five-business-day deadline) + `day_14_reviews` + `day_14_evidence_submissions`/`_items` (the durable insert-only receipt) + `day_14_clarification_requests` + `founder_ghost_bans` (0034), the §22.5 fulfillment services with the ONE `applyDeliveryRevision` door, the §22.4 open/submit/clarify/decide machine with its `day-14-review` sweep, the derived `day14PaymentBlock` refusing `day_14_failed` at both §22.3 money edges, and `recordGhostBan` refusing every unmet trigger by name**, **the §27 coverage machine: `notifications/unsent.ts` (the 44 recorded absences with their kind, owner, and record), `notifications/catalog.ts` (every sent key → the render function its sender calls), `notifications/preview.ts` + `contract-logic.ts` (the §27.2 report over a rendered message, restated from shared and drift-tested), and `templates/plain.tsx` — the one structured notice the fourteen senders that emitted `<p>${summary}</p>` now share**, **`notification_digest_preferences` + `_events` (0035, the preference existing only because someone chose it, its subject immutable and its history trigger-written and insert-only), `notifications/preferences.ts` (the one writer, with no default anywhere), `digest.ts` (the composer that reads `campaign_updates`/`campaign_comments`/`association_status_history` and touches `notification_deliveries` only to EXCLUDE an already-sent item, plus the two cadence sweeps that send nothing when there is nothing), `history.ts` (a read over `notification_deliveries` with the audience prefix keeping `internal_*` off a customer surface — no new table, no stored body, no read-state), and `templates/digest.tsx`**, **`affiliates/roster-notifications.ts` (the §27.3 roster update, deduped on the `association_status_history` row and decided by `rosterUpdateFor`, with its `roster-update-notices` sweep), `support/promises.ts` (§27.8's promised checkpoint and §27.6's SLA breach, both keyed on the deadline INSTANT, with its `support-promises` sweep), `notifications/internal-queue.ts` (the three §27.6 queue notices, each loading its own facts from the record it names), and `reservations/magic-link-reissue.ts` + `POST /api/link/request` (§5.5's non-enumerating ask, one frozen acknowledgement for every outcome including the rate limit, answering before the work)**, `/api/admin`, `/api/admin/close`, `/api/admin/refunds`, `/api/admin/disputes`, `/api/admin/fulfillment`, `/api/draft`, `/api/creator`, `/api/founder`, `/api/backer`, `/c/:code`, `/api/campaign/:id`, `/api/webhooks/calcom`, **`secure_tokens.first_used_at`, `possible_creator_results.first_rendered_at`, and `campaign_results.first_viewed_at` (0037 — three write-once stamps recording the FIRST occurrence of something already being recorded, because `last_used_at` is the wrong tense for a duration; the two insert-only tables grant exactly that one column by name), `campaign_payment_flags` finally append-only, and `measurement/` — a read across seven tables that owns none of them, writes nothing, and gates every metric through one cohort check**, **`live_mode_condition_verifications` + `pilot_campaign_enablements` + `pilot_campaign_owners` + `pilot_preflight_confirmations` + `appendix_c_walkthroughs` (0038, all insert-only — UPDATE granted on exactly two columns by name: the rollback trio and an owner handover), `live-mode/gate.ts` (the fail-closed read — an unanswered condition, an unimplemented check, and a database error all block; nothing cached), `live-mode/pilot.ts` (enable/rollback/preflight and the Appendix C walks), `live-mode/guard.ts` (the gateway decorator that refuses to construct on an undecided operation, plus `checkLiveMoneyPermitted` for the campaign scope), and `/api/admin/live-mode`**, **`campaign_demo_moments` + `campaign_benefit_cards` (0049, the demo stage and the benefit cards — optional presentation with a signal-XOR-action CHECK and a closed three-shape vocabulary), ten optional copy columns on `campaign_build`, `badge` on a reward package, the both-or-neither metric pair on `campaign_updates`, the FAQ/demo/benefit authoring services and their six `/api/founder` routes, `countActiveForRewards` (the ONE predicate the page's "N left" and checkout's sold-out refusal both read), and the public payload's `remaining`/`preorderCounts`/`thresholdProgress` — the last of which had been hardcoded `null` since Phase 14b**, **`founder_fixed_payment_openness` (0052, insert-only, one live row per campaign, CHECK- and trigger-refused on an Idea campaign, with no amount/percentage/proposal column at all), `VETTING_RESUME_POSITIONS` separating where a Founder can BE from what they answer, `viewCreatorSignal` + `GET /api/draft/:token/creator-signal` collapsing zero and unrecorded before serialization, and `record_vetting_edits()` deriving the campaign path's supplier from the ACTOR rather than hard-coding Proovd**, **§14.3's three openness answers with the four sentences that stop the screen reading as an offer, the four build steps with the Idea-only threshold and the pinned not-the-whole-build sentence, and the two waiting states' pinned no-timer and recorded-roster lines**, **the §13 `Prepare:` register with its pinned collects-nothing sentence, the §24.6 fee-screen copy (what still lowers it, what stops it lowering, and what payment fixes), and the two stage-4 flow pages — Stripe before the fee, because `beginListingCheckout` refuses without a complete `founder_seller`**, **the §12 answers as a sequence over two registers that stay two (`FOUNDER_ANSWER_SEQUENCE` — the order, the owner and the page for each of the eight, and nothing that would let a §12 completion become a Founder assertion), the flow register’s `param` and `founderFlowReachableFrom`, and the four Session D sentences (completion is decided from what you provide, Last look returns you here, the age check is your own statement, and what creating the account does to your invitation link)**, **the six-digit email code on `secure_tokens` (0053/0054 — a fifth `token_scope`, a fourth `email_ownership` meaning verified, and the fifth scope-binding branch; stored as an HMAC over draft + address + code rather than a SHA-256 that would collide two live codes on the UNIQUE hash index, with `failed_attempts` as the brute-force counter and one frozen rejection for every failure mode), `vetting/email-code.ts` with its answer-before-the-work ask route, `campaign/openness.ts` — the one writer and one read over Session A’s 0052 record, with no amount, percentage or proposal column to write, and §14.3’s two base percentages read from the §6 settings on every request — and `transcription/` — a port that throws when unconfigured, transcribes and does nothing else, and has nowhere to store audio; `POST /api/founder/campaigns/:id/transcribe` is that same port behind the Founder guard, because §10’s claim invalidates the token the Positioning step’s route sits behind, and the Founder workspace read carries §9’s three answers read-only plus the dictation absence so Last look can render all eight**, `/api/webhooks/stripe/{platform,connect}` |
-| `frontend/` | design-system components, `MotionProvider`, the fourteen §18 public routes, the Admin shell at `/admin` — **eight sections and nothing parked (2026-08-19)**: Today, Founders, Campaigns, Backers, Creators, Support, Money & Fulfillment, and Live mode; the Tasks panel floats over every one (see the 2026-08-16 section below), **the Founder onboarding flow's twenty-four full-bleed pages — `/draft/:token` (the invite), `/problem`, `/solution`, `/campaign-type`, `/email`, `/code`, `/positioning`, `/match` and `/claim` on the draft token, then `/campaigns/:campaignId/setup/{visuals,branding,interview,story,socials,review,payouts,fee,creator-payment,voice,threshold,faqs,rewards,in-review,live}` behind the Founder guard — each its own top-level address under `FOUNDER_FLOW_PAGES`, which carries whether a page is addressed by the token or by the campaign because §10's claim invalidates the first; all inside the `FlowPage` shell with its help drawer, whose earlier cards become reading rather than jumps once the link is spent. **The rebuild is complete — see the 2026-08-19 sections below** (the retired `/vetting` and `/result` addresses redirect to the positioning page and the claim), the Creator's signup and preparing kit, the retired campaign workspace at `/campaigns/:campaignId/workspace`, now a redirect to the listing-fee page — its five §12 steps moved onto the flow pages above in Session D and its payout and listing-fee panels in Session E, and the address survives only because §27.3/§27.4 emails and Appendix C’s §34 walk steps point at it, **the Creator's pitch at `/creator/campaigns/:associationId/opportunity` — §14.1's opportunity as a four-step reveal and a recap carrying §14.2's three decisions, with `?view=recap` reachable from the first step so no decision sits behind a gesture (§28.5) — the `Active`/`Pitches` lists that replaced Phase 08c's single list at `/creator/campaigns`, the Creator app shell wrapping every signed-in Creator surface but `/creator/welcome`, the §14.4 build at `/campaigns/:campaignId/build`, and the §15 Backer-facing preview at `/campaigns/:campaignId/preview`**, **the retired `/campaigns/:campaignId/roster` and `/campaigns/:campaignId/creator-readiness` addresses, both now redirects into the dashboard's Chapter 1, which absorbed §14.5's roster and §16's readiness checklist whole (Session C, 2026-08-19) — the addresses survive their components because §27.3/§27.4 emails and Appendix C's §34 walk steps point at them — and the Admin `/admin/creator-readiness` verification/scheduling panel**, the live public campaign page at `/campaign/:campaignId` (the same §18 `CampaignPage` the samples use, carrying the "You came through [handle]" attribution banner, the outcome-specific ended state, the Days 1–7 `noindex` switch, and the real §18 updates in item 12), the retired `/campaigns/:campaignId/updates` address, now a redirect into the dashboard's Chapter 2, which absorbed §18's authoring surface whole (Session D, 2026-08-19) — the address survives its component because §27's campaign emails point at it, the Creator active-partnership dashboard at `/creator/campaigns/:associationId/partnership`, **the §19 Backer checkout drawer and its A.3/A.4 consent, and the campaign-scoped magic-link page at `/backer/:token`**, **and the Admin operations surfaces at `/admin/ledger` (the §26.5 filters and the export that names what it withholds), `/admin/money` (the nine §26.6 lines, an unfilled one saying so rather than showing a zero), and `/admin/risk` (the ten §31.7 signals with their three states, and the four-fact seller tax readiness gate)**, **`/admin/support` (the daily queue with its three overdue badges, the case with all its context, the editable templates, and the handoff gate) and `/admin/campaign-operations` (the read-only timeline, suspend/kill, and the one-time relationship touches)**, **the Founder's home at `/campaigns/:campaignId/home` — the product's first non-Admin authenticated shell, four chapters under one address (`?chapter=`): Choose (built Session C — the §14.5 roster, §14.2's three responses, §14.3's bonus, §16's readiness and the meeting request), Live (built Session D — §20's Glance with a COUNT rather than money as its hero, one ranked Act or the caught-up ending, Explore as a first-class space with no ranking anywhere in it, the three live-editing tiers' first UI behind one route, §18's updates, and the post acknowledgement; it mints exactly one delivery receipt per render and refreshes through `/home/explore`), Get paid (built Session E — §21's stored retry window read from the close batch, §22.3's W-9 as a secure action rather than an upload and its schedule with no request control, §21's results and the Admin-reviewed narrative, §22.5's four obligations with the original commitment first, and §22.4's checklist with the clarification answer), and Wrap (built Session F — §22.8's recorded completion per Creator with no ranking of any kind, §22.9's ask offered on that record rather than on a sales figure, §22.11's resolution with its item keys kept off a customer surface, and Phase 21b's `NextCampaign` panel rendered for the first time)**, plus §5.2's settings panel at `/settings` — eleven items at one account-level address, the four correctable claim-profile fields with the reason §25.6 requires, the password change that forces `revokeOtherSessions`, §13's payout block and §22.3's W-9 status through their own resolvers, Phase 22c's digest and history embedded, and the §25.8 closure ask that records and erases nothing (the retired `/settings/notifications` redirects here) — and the Backers page at `/campaigns/:campaignId/backers` — §19's operational share, the §20 Explore-10 export with its withheld columns named before the button, and §25.7's data request whose two refused purposes are refused by a CHECK, **the §18 comment thread on the Backer's magic-link page — the only surface where a Backer is authenticated at all**, **the B.5 update-card recovery state on the magic-link page (the exact B.5 body, one `Update card` action, the Stripe-hosted card field, and the `requires_action` customer-action state), the retired `/campaigns/:campaignId/results` address, now a redirect into the dashboard's Chapter 3 (Session E, 2026-08-19) — the address survives its component because §27's `Results ready` message points at it, the Creator close view at `/creator/campaigns/:associationId/close` (Appendix B.7 rendered, no ranking), and `/admin/close` (incomplete batches first with Resume, retry windows, §21 reconciliation, and results preparation)**, **the §22.1 Creator-earnings queue on `/admin/close` (decide → finalize → approve → transfer, and the §22.2 recognition-or-payment form that computes nothing), and the Creator close view rendering the recorded B.7 state with the finalized commission/bonus/fixed breakdown**, **the §22.3 Founder payment panel, now Chapter 3's (W-9 state and secure action, the schedule with named blockers, the early-release ask) and the Admin founder-payment queue on `/admin/close` (W-9 receipt/decision, create/release, the four-proof evidence form, the request decision)**, **the `/admin/refunds` queue (the §24.8 case form whose treatment options are constrained by the chosen cause's register row, the Founder-issued provider refunds awaiting classification, preview-then-execute, and the §24.9 best-effort sentence wherever recovery is discussed) and the exact B.6 block on the Backer's magic-link page with its one help action**, **the §24.11 dispute panel on `/admin/refunds` (overdue 24-hour tasks first, the packet with each item's presence or named absence, record-assembly, and the register-constrained classification), the seven-kind outcome-specific ended banner with the Admin's recorded explanation, the magic-link statement-descriptor line and the §29.9/§29.10 support form with its case list, B.8 acknowledgement, issuer-rights sentence, and escalation**, **the retired `/campaigns/:campaignId/fulfillment` address, now a redirect into the dashboard's Chapter 3, which absorbed §22.5's four obligations, the commitment history, §22.6's stated path and §22.4's checklist whole (Session E, 2026-08-19) — the address survives because §27's Day-14 and delivery messages point at it — and `/admin/fulfillment` (the Day 14 queue overdue-first with its decision and clarification forms, and the ghost-ban candidates whose trigger control offers only triggers the record already meets)**, **the §27.7 notification settings at `/settings/notifications` and `/creator/settings/notifications` — the first account-level address either role has had, one component for both — the same digest control embedded on the Backer's magic-link page, and `/admin/notifications` (delivery history for any address, plus §27.2's message preview reporting the contract and sending nothing)**, **and §5.5's `Already pre-ordered?` reissue ask on the public campaign page — the campaign is the URL, so the only thing a locked-out Backer supplies is their address, and the one acknowledgement renders for every outcome**, **and the §33.11 QA harness at `frontend/src/features/qa/` — the stub server, the typed fixtures for one campaign, and the sweep that renders every principal flow (not a surface; the thing that checks them)**, **and `/admin/measurement` — the §31.9 first-cohort scoreboard, four cards reading `not measured` with the reason and the count until ten Founders have been invited, each carrying its own definition, numerator, and denominator; no bar, no trend line, and no control that submits anything**, **and the rebuilt Founder build surface at `/campaigns/:campaignId/build` — every §14.4 ingredient now has a box (twelve had none, four of them required, so an Idea campaign could not reach `complete` through the product at all), plus the FAQ repeater the table has waited for since Phase 12b, the demo-moment and benefit-card repeaters, the reward badge and limited quantity, and the page's own optional copy**, dev-only gallery at `/_gallery`, `/link-unavailable`. **`/admin/live-mode` — §34's eleven conditions with the kind of evidence each rests on, the one pilot with its two owners and three preflight checks, the rollback, and Appendix C's forty-nine walks; no override, and the enable form is absent rather than disabled while the gate is shut (2026-08-19). And the rebuilt public campaign page at `/campaign/:campaignId` and both sample routes — hero with its interactive demo stage, benefit cards, the story pull quote, the threshold panel, the `.pc-seller` band carrying §18's items 2/7/8 above every control that can open checkout, selectable rewards, updates with `Follow build`, FAQ, comments, and the dark support band, plus the restyled §19 checkout modal and the two follow pages at `/follow/confirm/:token` and `/follow/stop/:token` — token addresses, deliberately outside the `site.ts` inventory, that act on a click and never on being fetched. The campaign-page-v2 rebuild is complete — see the 2026-08-18 section below** |
-| `frontend/public/` | `proovd.css`, `proovd-motion.js`, `vendor/gsap/*.min.js`, `gsap-check.html` |
-
-Six gaps to know about, none of them a bug:
-
-- **`frontend/public/fonts/` is empty in a fresh clone, and that is a deploy problem rather than a local one (corrected 2026-08-20).** The two woff2 files exist on this machine, but `.gitignore:31` (`frontend/public/fonts/*.woff2`) keeps the licensed binaries out of the repo on purpose, so `git ls-files` returns only `.gitkeep`. Any build that starts from a git checkout — which is every Docker/Dokploy build — therefore ships a `dist/` with no fonts, and production 404s on `/fonts/Satoshi-Variable.woff2`. **This is not fixed by editing code**: the binaries have to reach the image some other way (commit them, fetch them at build time, or mount them), and that is a licensing decision, not an implementation one. Until then the fail-loud font notice is *correct* behaviour, not something to suppress.
-- **All eight policy documents are `draft`.** Track A2 is in legal review; §1 rule 6 forbids inventing the text and §31.4 forbids substituting a summary. See "Policies" below.
-- **Because they are drafts, the account claim refuses, in the open.** §10 requires Terms + Founder AUP + privacy acceptance and a consent may cite only a published version, so `completeClaim` returns `policies_unpublished` and the surface renders the reason instead of the button. That is the correct state, not a bug to route around — see "Vetting and the account claim" below.
-- **Six §6 settings ship with no value, and the prerequisites panel blocks.** That is the designed state, not unfinished work — see "Global configuration" below.
-- **No email provider is configured, so the transport refuses loudly.** `unconfiguredTransport` throws rather than swallowing a message, the failure is recorded, and the prerequisites panel already blocks on it (§1.4). Do not replace it with a no-op.
-- **No R2 bucket and no Cal.com account are configured, and the four §6 interview settings are unset.** All Track A4. `unconfiguredStorage` and `unconfiguredScheduler` both throw exactly as `unconfiguredTransport` does; the workspace renders no upload control and no booking embed, and the webhook accepts nothing. Do not stub any of them.
-
-### What Phase 08 owns, and where it was split
-
-`docs/phases/phase-08.md` bundles three independent deliverables — §8's recruitment and invitation, §11's compact signup and payout surface, and §10's preparing reveal with the Campaign kit. That is more than one session, the same way Phase 06's brief was, so it was split against one brief on the 06a/06b precedent:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **08a** | §8 recruitment, §5.3 verification evidence, §25.4 per-campaign association facts, the private invitation, §2.2 slot accounting, the Founder-visible roster | **§33.2.1** | **built** |
-| **08b** | §11 compact signup, the account claim, the `Finish payout setup` surface and its status states, the named waiting state | §33.2.2, §33.2.3 | **built** |
-| **08c** | §10's preparing reveal on `founder_signup_complete`, the Campaign kit, access logging and revocation | §33.2.4, the second half of §33.1.9 | **built** |
-
-**Phase 07 emitted `founder_signup_complete`; 08c consumes it.** `routes/vetting.ts` calls `revealPreparingCampaign` after the claim transaction commits, outside it — the reveal is idempotent, so a crash between the two costs a retry rather than correctness, and holding a row lock across an email provider call would be a much more expensive way to be no safer. Admin can re-run it from `POST /api/admin/affiliates/reveal`.
-
-### What Phase 09 owns, and where it was split
-
-`docs/phases/phase-09.md` bundles the §12 workspace and its evidence rules, the R2 upload path, the high-effort classification, the itemised listing fee, *and* a Cal.com integration with four notifications. That is more than one session, so it was split on the 06a/06b and 08a/08b/08c precedent:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **09a** | The workspace flow, §12's five items and their objective evidence, the R2 presign path, the interview *booking record and its lifecycle*, high-effort, the listing-fee calculation and preview, the helper resources, Admin's evidence/invalidation/override surface | **§33.3.1, §33.3.2, §33.3.3, §33.3.4** | **built** |
-| **09b** | Cal.com Cloud embed, the signed webhook, the reconciliation and reminder jobs, and §27.3's four interview notifications | — (its rules are tested through 09a's record; `interview-webhook.test.ts` covers the vendor layer) | **built** |
-
-### What Phase 10 owns, and where it was split
-
-`docs/phases/phase-10.md` bundles the payments substrate *and* two customer-facing onboarding surfaces *and* the §11 tax gate. Split on the same precedent as 06, 08, and 09:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **10a** | The pinned client and the extended §32.2 env guard, both signed webhook endpoints, the idempotent handler registry, the §32.4 provider-object store, the connected-account record, and §13's four derived states | — (§33 names none; the brief's done-when list is the contract) | **built** |
-| **10b** | Founder connected-account onboarding and its four return surfaces, `Finish payout setup` wired to Creator recipient onboarding with §11 reuse, the incomplete-onboarding gates, and the §11 tax-accountability record | — (`stripe-onboarding.test.ts` covers the brief's done-when list) | **built** |
-
-**10a stopped before anything a customer sees.** The states existed and moved on their own from `account.updated`; 10b added the account-link creation, the return/refresh routes, and the four surfaces §13 requires — including the one that offers *no* path to listing-fee payment.
-
-**The booking record is 09a's, not 09b's, and the split ran there for a reason.** tech-stack §12: "The booking record in our database is the source of truth, populated from Cal.com webhooks." So the domain state, its four §12 conditions, its reschedule history, and the §33.3.3 recalculation were all built and tested first; 09b added the vendor that *feeds* them. Phase 09's own trap — "Cal.com is a source of events, not truth… don't leave `confirmed` reachable only by webhook" — is satisfied because the reconciliation path shipped before the webhook did.
-
-### What Phase 12 owns, and where it was split
-
-`docs/phases/phase-12.md` names its own seam — "Split this phase if context runs out. Natural seam: 12a = formal opportunity, decisions, proposals, the deadline (§14). 12b = campaign building, roster readiness, review, materiality (§14.4, §15)." Thirteen named tests is the most of any phase, so it was split there, on the 06a/08a/09a/10a precedent:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **12a** | The §14.1 formal opportunity, the three §14.2 decisions, immutable proposal versions and the bilateral lock, §14.3 Creator-specific bonuses, the §14.5 roster view, the §14.6 no-acceptance evaluation and its refund | **§33.2.5–§33.2.13** | **built** |
-| **12b** | §14.4 campaign building, §15 roster readiness, review readiness and preview, Admin review, materiality and reacceptance | **§33.3.9, §33.3.10, §33.4.1, §33.4.2** | **built** |
-
-### What Phase 14 owns, and where it was split
-
-`docs/phases/phase-14.md` bundles two full deliverables, each with its own five named tests: §17's coordinated launch, first-post verification, and active-partnership surface (plus §29.6's Creator failure), and §18's public campaign page, attribution contract, discovery timing, and updates/comments. The brief does not name a seam, but the §17/§18 boundary is the natural one — the same shape as 12a/12b — and the dependency runs one way, so it was split there on the 06a/08a/09a/10a/12a precedent. §18 itself then split again at a real dependency: the named acceptance §33.6.1–5 is entirely the page + attribution + discovery core, while the Creator active-partnership surface and the comment thread wait on the Backer identity and magic-link session the **Phase 15** pre-order flow mints. So **14b** is the test-gated core and **14c** the surfaces that depend on Backers:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **14a** | The §17 coordinated launch (page → links, idempotent), tracking-link activation, first-post submission + Admin verification with its three outcomes, and the §29.6 required-Creator failure with its non-resettable three-business-day deadline, allocation return, and full-listing refund | **§33.4.5–§33.4.9** | **built** |
-| **14b** | The §18 live public campaign page for real campaigns (Appendix A.2 verbatim, the Idea/Product difference table, the outcome-specific ended state), the attribution contract (`/c/:code` click ingest, the signed per-browser cookie, last-click-wins, provisional-until-verified, link-test exclusion), and discovery timing (Days 1–7 known-link-only → the Day 8 switch and its one Founder notice) | **§33.6.1–§33.6.5** | **built** |
-| **14c** | The §18 updates: Founder-authored `campaign_updates`, append-only; the audience-by-model rule with the Idea-only milestone trigger; the material-delivery-change prior/revised pairing; the live-gate; public rendering in item 12 and the Founder authoring surface | — | **built** |
-| **14d** | The Creator active-partnership surface (link/disclosure with copy confirmation, locked terms, status-level readiness, first-post and fixed-payment state, and clicks from the §18 ledger; the pre-order/conversion/earnings/payout metrics reported as pending, never a fabricated zero) | — | **built** |
-
-The §18 **comment thread was the one piece of §18 left unbuilt here**, and deliberately: a comment needs the Backer identity and magic-link session Phase 15 mints, and §33.6.6–13 are **Phase 17's** named tests. It was built in **17b**, with the rest of the Backer-before-close scope. It was never an outstanding 14c debt.
-
-### What Phase 15 owns, and where it was split
-
-`docs/phases/phase-15.md` names its own seam — "**15a** = the pre-order flow, eligibility, cap, tax, SetupIntent, consent (§19 through the success state). **15b** = magic-link page, cancellation, deduplication queue, pre-charge reminder." Thirteen named tests, so it was split exactly there:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **15a** | The §19 twelve-step pre-order, §2.2 eligibility and the database-atomic cap, reservation-time tax, the A.3/A.4 consent with its stored version and hash, the SetupIntent, and §19's immediate Founder operational share | **§33.5.1–§33.5.6, §33.5.9–§33.5.12** | **built** |
-| **15b** | The campaign-scoped magic-link page, §20 cancellation with reference-safe detach, the §4.1 practical-deduplication queue, and the pre-charge reminder | **§33.5.7, §33.5.8, §33.5.13, §33.7.1, §33.7.2** | **built** |
-
-### What Phase 16 owns, and where it was split
-
-`docs/phases/phase-16.md` bundles six deliverables against three named tests — the §26.5 ledger, §26.6 money controls, the §31.7 risk inventory, §26.7/§27.8 support operations, suspend/kill, and the §26.8 timeline. The brief does not name a seam, but there is a real one: the first three are **read-and-reconcile** surfaces over records that already exist, and the last three are **case-and-action** operations that create new records and new customer messages. The acceptance tests fall the same way — §33.12.4 is the contract the read surfaces are built under, §33.9.10/§33.9.11 are about support cases. So it was split there on the 12a/12b precedent:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **16a** | The §26.5 reservation and charge ledger with its eleven filter dimensions and §25.7's permitted export, the §26.6 money controls read against the Phase 03 ledger columns, the ten §31.7 risk signals plus the four-fact seller tax readiness gate, and the general §26.6 high-impact machine (reauthentication, customer-consequence preview, idempotency, immutable audit) with §33.12.4's insert-only override record | **§33.12.4** | **built** |
-| **16b** | §26.7/§27.8 support operations — cases with stable reference, owner, due time, the daily due/overdue queue, editable context-preserving templates, and the handoff note — plus suspend/kill with its reason category and complete pre-capture behaviour, and the §26.8 read-only chronological timeline per campaign, reservation, and association | **§33.9.10, §33.9.11** | **built** |
-
-### What Phase 18 owns, and where it was split
-
-`docs/phases/phase-18.md` names its own seam — "**18a** = the close batch, threshold resolution, tax validation, capture. **18b** = the 48-hour retry window, recovery surfaces, results preparation, reconciliation." Twelve named tests, the most dangerous phase in the plan, so it was split exactly there:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **18a** | The §21 close batch (lock, exclude, stop, resolve duplicates, decide the Idea threshold, validate tax usability, one off-session PaymentIntent per eligible reservation under a stable key), the threshold-miss US$0 path, the `payment_intent.*` webhooks, the capture ledger at both levels, `Campaign ended` at close, and the opening of the one 48-hour window | **§33.7.3–§33.7.8** (§33.7.1/2 were 15b's) | **built** |
-| **18b** | The retry window's end (recoveries count as captured, the rest drop to zero everywhere), the Update-card recovery surface and its `requires_action` path, `Results ready` and the Founder/Creator/Backer close surfaces, and Admin reconciliation with the visibly-recoverable-batch surface | **§33.7.9–§33.7.12, the results done-when** | **built** |
-
-### What Phase 19 owns, and where it was split
-
-`docs/phases/phase-19.md` bundles fourteen named tests — more than Phase 12's thirteen, which split, and Phases 14–18 all split at less. The brief did not name a seam, so this session added one to the file (master-plan §1.3 step 6): scope 1–5 are **Creator money** — completion verification, earnings finalization, the one Transfer, the §24.4 reconciliation, the thank-you — and scope 6–7 are **Founder money**: the W-9 block and the payment schedules. The dependency runs one way through the eligible-Founder-share formula (§22.3 subtracts the *finalized* Creator compensation 19a produces), and the tests fall the same way; scope 8 (§33.8.13, one source many renderers) closes 19b once both halves' amounts exist:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **19a** | §22.1 completion decisions and the five fixed-payment outcomes, earnings finalization and the B.7 state machine, the one idempotent Transfer with its synchronous-failure retry sweep, the §24.4 provisional/earned reconciliation, the §11 tax gate on every Transfer, and the §22.2 thank-you | **§33.8.1–§33.8.8, §33.8.14**, the tax-gate done-when | **built** |
-| **19b** | §22.3 W-9 request/verification and the block, the Idea single payment, the Product 40%/60% schedule, evidence-gated early release that never skips Day 14, and the money-surface consistency pass | **§33.8.9–§33.8.13** | **built** |
-
-19a writes no Founder payment object and no W-9 record. 19b reads 19a's finalized amounts rather than recomputing them.
-
-### What Phase 20 owns, and where it was split
-
-`docs/phases/phase-20.md` bundles thirteen named tests — level with Phase 12, which split — and two of them (§33.9.10, §33.9.11) already passed from Phase 16b. The brief did not name a seam, so this session added one to the file (master-plan §1.3 step 6), on the boundary between **the refund money machine** and **the operations and enforcement that invoke it**. The dependency runs one way: a post-capture kill *invokes* the refund/reversal/recovery policy, and a dispute's allocation reuses the same §24.8 cause register:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **20a** | The §24.8 cause register and allocation records (feeding 19b's `causeBasedAdjustmentsCents`), the reservation-refund lifecycle `requested/submitted/succeeded/failed` with Appendix B.6, the §24.9 Idea exception register with no voluntary-refund path, §24.10 hardening (the consent's policy snapshot preserves text + hash), the earnings treatments per cause, `charge.refunded` on both endpoints, and the Admin refund-case surface | **§33.9.1–§33.9.5**, the allocation half of **§33.9.6** | **built** |
-| **20b** | §24.11 dispute records, the 24-hour Admin task, and the evidence packet; `charge.dispute.*` + `transfer.reversed`; §24.12 descriptor consolidation across the seven surfaces; §26.7/§29.7 post-capture suspension/kill invoking 20a's machinery; the outcome-specific ended pages; §29.1–29.5 and §29.8–29.10 enforcement including the Backer support path; the §33.9.12 suppression record | **§33.9.7–§33.9.9**, the dispute half of **§33.9.6**, **§33.9.12**, **§33.9.13** | **built** |
-
-20a builds no dispute object and no enforcement change; 20b classifies its dispute and kill cases through 20a's cause register rather than a second one.
-
-### What Phase 21 owns, and where it was split
-
-`docs/phases/phase-21.md` bundles nine deliverables against ten named tests — level with Phase 12 and above Phase 17, both of which split. The brief did not name a seam, so this session added one to the file (master-plan §1.3 step 6), on the boundary between **what the Founder owes and what happens when they don't** and **completion, and what comes after it**:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **21a** | §22.5 fulfillment and the four Founder obligations, §22.6 delivery-date changes and their two approval paths, the §22.4 Day 14 Progress Check with its checklist, durable receipt, five-business-day clarification window, and per-type consequences, and the §22.7 one-strike ghost ban | **§33.10.1–§33.10.4**, plus the update-cadence done-when | **built** |
-| **21b** | §22.8 Creator `successfully_completed`, §22.9 the work-again request, §22.10 Founder next-campaign readiness, §31.8 Backer status progression and satisfaction, and §22.11 campaign resolution | **§33.10.5–§33.10.10**, plus the `closed_resolved`/`fulfilled` done-when | **built** |
-
-The dependency runs one way: §22.8's fourth criterion reads 21a's Day-14 failure and ban records, §31.8's satisfaction step only exists after 21a records a delivery, and §22.11's reconciliation compares against 21a's fulfillment state. **21a writes no Creator completion status, no work-again record, and no satisfaction response.**
-
-### Completion, future work, satisfaction, and resolution (§22.8–§22.11, §31.8, built Phase 21b)
-
-`shared/src/completion/index.ts` owns the §22.8 five-criterion register, the §22.9 vocabulary with its two pinned promises, the §22.10 gates and cooldown kernel, §31.8's progression and satisfaction registers, and §22.11's five areas mapped onto §21's nine reconciliation items; `backend/src/completion/logic.ts` restates them (drift-tested); `service.ts`, `work-again.ts`, `next-campaign.ts`, `satisfaction.ts`, `resolution.ts`, and `notifications.ts` own the services; migration 0036 the guarantees. **§33.10.5 through §33.10.10 pass — §33.10 and Phase 21 are complete.**
-
-- **The five criteria are evaluated, never asserted (§33.10.5).** §22.8 says "Only Admin can assign it … when all five hold", which is two rules that collapse easily into one. The Admin decides; the criteria are READ from readiness, post verification, the §22.1 decision, enforcement, and money. `gatherCompletionFindings` takes no judgement from the caller, and `assignCompletionStatus` refuses a completion whose findings are short — naming which criterion. `completionEligible` also refuses a *short* finding set and a duplicate-padded one, because `.every()` over four entries is true and that is exactly how "all five" quietly becomes four.
-- **The findings are stored on the decision.** §22.8 asks for the evidence; a decision pointing at a live read would silently change its own justification the next time a record moved. A disqualification carries its reason (CHECK-required), a completion cannot (CHECK-refused), and both are immutable by trigger — a correction is a NEW row and the superseded one survives (§22.9's "without deleting history"). The retiring UPDATE points at a pre-minted successor id, because the immutability trigger refuses any later write to a superseded row.
-- **Zero sales cannot block completion, because the number is never fetched (§33.10.6).** No sales term in the register, no revenue column read anywhere in the module, and both suites scan the register for `sales`/`revenue`/`conversion`/`performance`. The integration test completes a Creator whose earnings row is finalized at US$0 — which is a *resolved* fact, not a missing one, and is why criterion 5 reads "resolved or recorded" rather than demanding a Transfer.
-- **§22.8.4 is an absence criterion, and the test breaks it by adding rather than skipping.** Omitting a seed cannot violate "no unresolved case exists"; the per-criterion walk inserts a real §29 pause for that one, which is also the shape it has in production.
-- **The work-again request is built so there is nothing to misread (§33.10.8).** No campaign to create, no terms, no percentage, no amount — the suite asserts the columns' absence in `information_schema` — and the accept path has no branch that does anything but write the answer. The test compares the campaign row byte-for-byte, counts campaigns before and after, and asserts no readiness record appeared and the cooldown did not move. `WORK_AGAIN_ACCEPTANCE_GRANTS_NOTHING` states each of §22.9's four bypasses separately, and rides the response the Founder reads first.
-- **Eligibility is enforced twice (§33.10.7).** The service refuses by name and a 0036 trigger refuses regardless — a hand-written INSERT against a disqualified Creator gets the same answer, and one citing a *superseded* status is refused too. "Not completed" and "not decided yet" deliberately give the same answer: distinguishing them would tell a Founder that an Admin decision is pending on someone else's record.
-- **It routes through Proovd and there is no channel (§30).** One message at request time, immutable afterwards; one response note; no thread, no reply route, no way to add a second message. That absence is what keeps §22.9 from becoming the direct messaging §30 defers permanently.
-- **The two §22.10 gates are independent, and the surface renders two things (§33.10.9).** `readyForNextCampaign` is derived at the point of use and never stored — a stored flag can be true while an input is false. The cooldown is a pure function of `campaign_close_at` (immutable, §21) and the §6 setting, computed on every read: §29.6's rule inverted, since a stored date is the one that drifts. The anchor is chosen rather than invented — §6 names months and no anchor, and `campaign_close_at` is the only immutable stored instant meaning "this campaign ended"; anchoring on fulfillment would make the wait depend on how long shipping took, which turns a cooldown into a second penalty. Months, not 90 days, and **clamped**: 31 January + 3 is 30 April, not 1 May.
-- **Satisfaction is one interaction, and "under 30 seconds" is the absence of steps (§33.10.10).** One call records the answer with no prerequisite; the reason is a separate optional call afterwards; a unique index makes a second ask impossible and the service answers "we have it" rather than asking again. 3 of 5 is **neutral** — a follow-up on a shrug trains people to stop answering — and a negative answer opens exactly ONE case through 16b's `openSupportCase`, owned by Proovd rather than the Founder, because the Backer did not ask for anything and handing a Founder an unsolicited complaint is not §29.10's routing.
-- **There is nowhere to put a newsletter.** §31.8's "does not coerce newsletter consent" is a table with no consent column (asserted in `information_schema`), a module that writes none, and a surface with no checkbox and no marketing word (asserted in the rendered output). The strongest form of a promise not to ask is having nowhere to record an answer.
-- **The progression never predicts.** Outcome steps — `no_charge`, `failed`, `refunded` — are returned only when they happened; a Backer whose charge is due does not see "Failed" greyed out ahead of them, because a greyed-out step is still a step the product put in front of someone. `delivery_due` and `delivered` are the same reservation status distinguished by the fulfillment record, not by the money.
-- **`closed_resolved` and `fulfilled` stay two states, structurally.** §22.11's five areas map onto §21's nine items — covering all nine, exactly once, asserted against the register — and resolution is the conjunction, refusing by naming the short areas. `resolveCampaign` touches nothing about fulfillment and `markFulfilled` checks nothing about money; the resolution row RECORDS whether fulfillment was still active, so the independence is a stored fact rather than a convention someone could tidy away. The suite marks a campaign `fulfilled` with nothing reconciled at all.
-- **The five §27 keys that had waited since 22a now send.** `affiliate_work_again_request`, `founder_work_again_response`, and `internal_work_again_request` dedup on the request ROW (a Founder may ask again on a later campaign); `founder_ready_next_campaign` on the DECISION (a `not_ready` that becomes `ready` is a second thing to hear); `backer_satisfaction_survey` on the RESERVATION, because §31.8 permits one response and therefore one ask. The survey links to the Backer's own magic link rather than a one-click-from-the-email token: a link that records an answer on being *fetched* records answers that email scanners give.
-
-### What Phase 22 owns, and where it was split
-
-`docs/phases/phase-22.md` audits, completes, and proves all four §27 inventories. The registry holds **121 keys and 44 had no sender**; closing them, proving §27.2 over ~110 rendered messages, and building §27.7's digest and history layer is more than one session. The brief did not name a seam, so this session added one to the file (master-plan §1.3 step 6):
-
-| Third | Scope | Acceptance | State |
-|---|---|---|---|
-| **22a** | The deliberate-absence register, the render catalog, the coverage suite, §27.2's rules and §3.3's money facts proved over every rendered message, §27.1's timezone rule, the §3 copy pass, the §30 absence tests, and the preview with its contract report | **§33.6.11 reconfirmed**, §33.9.10/§33.9.12 re-proved through the catalog | **built** |
-| **22b** | The 44 missing senders and their templates — every §27.3–27.6 bullet whose *capability* already exists | the register empties to the genuinely deferred | **built** — **all 44 sent**; the register holds 8: 3 `never` decisions and 5 Phase 21b capabilities. The `message` kind is empty |
-| **22c** | §27.7 — the optional daily/weekly digest for all three roles, and the authenticated notification history that must not become a dashboard | the §27.7 done-when | **built** |
-
-**The order is Phase 09's and 10's, rerun.** The audit has to exist before anyone can know what to fill, and the contract test has to exist before forty-odd new templates are written *against* it — a contract applied afterwards is a retrofit, and a retrofit is how the one message that violates it survives. **22a adds no new sender and no new template for an unsent key**; its output is the guarantee, not the content.
-
-**What 22b built, and the shape of what it left.** 24 senders across four groups: §15's **review round** (4, all deduped on the review ROW so a resubmission is owed its own receipt), §16's **fixed Creator payment** (6 — success keys on the allocation, failure on (allocation, failure KIND), because a wrong amount and an expired Checkout are two things to act on and a repeat of one is not), §20's **mid-campaign addition** (10, all on the `mid_campaign_additions` row, and the senders no-op for an ordinary Creator by looking for that row rather than by asking the caller), plus `internal_invitation_claimed`, `founder_password_reset`, and `affiliate_disclosure_tracking_available`. Three structural changes came with them: `transitionAssociation` returns the `association_status_history` row id (a module-scoped "last id" was written and then deleted — two requests interleave at every `await`); `INTERNAL_NOTIFICATION_EMAIL` exists and is threaded to both the app and the scheduler, so §27.6's notices finally have an inbox (Phase 21a's `internal_day_14_due` had a sender and no recipient); and `sendResetPassword` is optional on `AppConfig`, with `createApp` building the notifier before auth so §5.5's reset goes through the same dedup, audit, and §27.2 template as everything else. **`internal_risk_flag` moved to `never`**: §31.7's ten signals are computed live on every panel read with nothing stored to key on, so a sender would need an invented cadence and `tax_not_collecting` would re-fire forever.
-
-**The last seven, and why each needed more than a template.** They were recorded in `unsent.ts` rather than declared, because `events.ts` carries one rule — a key appears when something SENDS it — and a template with no caller is the §1.4 failure the register exists to make impossible. All seven now send:
-
-- **`founder_roster_update` — the judgement, not the wiring.** §27.3 asks for "roster updates" and names no list; the association machine has nineteen states, and announcing every transition is the engagement stream §30 forbids. So the answer is **derived**: a Founder is owed a message when the *word on their roster card* changes. `FOUNDER_ROSTER_STATUS_LABELS` is §14.5's own list and is deliberately lossy — `formal_decision_open`/`reviewing` are both "Reviewing", `readiness_blocked`/`ready` are both "Accepted" — and those collapses are §14.5 declining to show a Founder the difference. That single rule silences the noisiest loop for free (readiness churning while a Creator finishes onboarding). The second filter is `ROSTER_UPDATES_COVERED_ELSEWHERE`, listed as **pairs** because the destination alone is not enough: arriving at `active` from `ready` is the coordinated launch, and arriving from `paused` is a suspension being lifted, which nothing else reports. It reads history rather than being called at eighteen call sites across ten modules — the fact is already recorded, append-only, and the dedup entity **must** be the `association_status_history` row for 22c's digest exclusion to bind.
-- **The three §27.6 queue notices.** `internal_interview_changed`, `internal_proposal_awaiting_response`, `internal_post_verification_due` — each needed a notifier threaded into a service that had none (the last needed `createCreatorRouter`'s signature widened). Each **loads its own facts from the record** and takes only an id, so a caller cannot describe a change differently from what was stored, and every call site is one line. `internal_interview_changed` keys on the `interview_booking_events` ROW, not `<booking>:<time>` — the obvious choice, and wrong, because a cancel-then-rebook to the same slot collides under it. The Admin's own cancel route deliberately sends nothing: it would email an Admin about their own click, and the change is already on the screen they are looking at.
-- **`internal_support_sla_breach` + `backer_support_followup` — the sweep, not the message.** 16b stored all three of §27.8's clocks and 16a's queue showed them; nothing ran. The breach keys on **(case, clock, the instant that lapsed)** because a case has three clocks that move independently; the follow-up keys on the **promised instant** so a second promise earns a second update. The promise is discharged only once the update is actually out — clearing it unconditionally would mean a deployment with no notifier silently dropping a commitment while the Admin badge went quiet.
-- **`backer_magic_link_reissue` — a missing ASK.** Every magic-link route sits behind a working magic link, so a Backer whose link expired had nothing to trigger. The route is an oracle by default: given a leaked address list and a campaign id, a route that answers differently for a hit and a miss is a Backer roster. So `MAGIC_LINK_REISSUE_ACK` is frozen and identical for a hit, a miss, a nonexistent campaign, a malformed address, and **a caller over the rate limit** — Phase 04's reasoning, that a limiter announcing itself is the same oracle wearing a different hat. It answers **first** and does the work after, because minting-and-sending versus returning immediately is measurable even when the bodies match. The surface is on the **campaign page**, not `/link-unavailable`: that page is shared by every token kind and varies on nothing, and it would have to ask for a campaign id, which is exactly what someone holding a dead link does not have.
-
-**22c did not wait on 22b, and that is not a shortcut.** The digest composes from *activity records* — `campaign_updates`, `campaign_comments`, `association_status_history` — never from `notification_deliveries`, so the senders 22b still owed changed how many rows the history shows and nothing about whether the digest works. The one place the two touch is the exclusion (a digest item whose covering transactional key already delivered is dropped), and that binds through a contract 22a's `unsent.ts` recorded against `founder_roster_update`: **its dedup entity must be the `association_status_history` row id.** 22b honoured it, and the suite asserts the entity on the delivery row. Building the exclusion before the sender is the same ordering as building the contract before the templates.
-
-**Two new sweeps, and neither is a check-in (§33.6.11).** `roster-update-notices` (hourly) and `support-promises` (hourly) both read facts that already exist and send nothing when there are none — no branch turns a date into a message. §33.6.11's job-name guard in `live-operations.test.ts` refuses both by property, not by exemption: neither name matches the check-in pattern, unlike the two digest jobs which are exempted by exact name with the empty-send proof cited.
-
-### What Phase 23 owns, and where it was split
-
-`docs/phases/phase-23.md` is §32.1's step 17 — the P0 pass — and bundles seventeen done-when items across **two complete acceptance sections**, fourteen named tests, every one of them a sweep over everything built so far. The brief did not name a seam, so this session added one to the file (master-plan §1.3 step 6), on the line the brief's own acceptance draws:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **23a** | The accessibility sweep across every principal flow, content QA including the built bundle, and the seven-surface cross-surface contract | **§33.11.1–§33.11.7** | **built** |
-| **23b** | The adversarial idempotency sweep, the §32.5 test-card matrix and its §32.6 evidence log, the §32.7 direct-architecture test, the §31.9 measurement baseline, and the time/security confirmations | **§33.12.1–§33.12.7** plus the three §32 done-when items | **built** |
-
-§33.11 is what a person **sees**; §33.12 is what the system **does** under replay, a clock, and a stale session. **23a builds no test clock, no evidence log, and no scoreboard**, and 23b renders no customer surface.
-
-### The system contract under replay, a clock, and a stale session (§33.12, §32.5–32.7, §31.9, built Phase 23b)
-
-`shared/src/qa/system.ts` owns the §33.12 registers and `test-cards.ts` the §32.5/§32.6 ones; `shared/src/measurement/` owns §31.9, restated in `backend/src/measurement/logic.ts` and drift-tested. `backend/src/measurement/service.ts` is the scoreboard, `system-contract.test.ts` proves §33.12.1–5, `p0-pass.test.ts` proves scope 4, 5, and 6 over one campaign, `measurement.test.ts` proves §33.12.6/7. Migration 0037 the three stamps and one revoke. **§33.12.1 through §33.12.7 all pass — §33.12 and Phase 23 are complete, and all 131 §33 tests have now been written and passed at least once.**
-
-- **The suite found two things nothing was holding, and both were fixed rather than reclassified.** `campaign_payment_flags` was granted `UPDATE` and `DELETE` at the start and no service ever used either; a trail the application role can rewrite is not §33.12.3's "independently auditable", so 0037 revokes the grant and a correction is a new row like every other record in the product. And thirteen Admin write routes ran without the freshness gate.
-- **The freshness sweep is a partition, not a demand.** The first draft required every write under `/api/admin` to refuse on a stale session, which is the wrong answer: `admin.ts` has recorded since Phase 06a that reauthenticating for ordinary work teaches people to do it reflexively, and a gate cleared without thinking is not a gate. So the suite walks the **mounted router**, drives every write with a two-day-old session, and requires the result to partition exactly — gated, or recorded in `UNGATED_ADMIN_WRITES` with the sensitive property it lacks. Both directions are asserted, so the register cannot rot either way, and a new route belongs to neither set until somebody decides. Composing an invitation and opening a support case are on the ungated side; Phase 20b's own decision that §29.1 disclosures record what someone told us — while the §29.4 action and the appeal change standing and take the gate — is preserved as written.
-- **One register was wrong and the product was right.** §33.12.3 read flatly says a payment flag is not a lifecycle state, and the first draft enforced "no payment word in `campaigns.status`" — which fires on `captured_pending_w9`, `single_payment_released`, `first_payment_released`, `remaining_payment_released`, and `refunded_no_creator`, five of §23.1's **own committed states**. Renaming them to satisfy a register nobody asked for is §1 rule 6 in the other direction. The checkable rule is membership: no value is both a `campaign_status` and a `payment_flag`, and none of the five facts a flag carries (`set_at`, `amount_cents`, `actor`, `evidence`, `provider_object_ids`) is a column on `campaigns`.
-- **The anchor scan is scoped to three columns, not to a coding style.** The invariant names `campaigns.listing_paid_at`, `campaign_live_at`, and `campaign_close_at`. A first draft flagged any `createdAt.getTime() + …` and caught `support/backer-support.ts`, where a support case's `created_at` **is** its opening instant and §29.10's escalation window measures from it correctly. That check would have had to be silenced, and a silenced check is worse than none — so `FORBIDDEN_ANCHOR_COLUMNS` is qualified (`campaigns.created_at`, `campaigns.updated_at`) and the scan is for a campaign anchor being read out of a row timestamp, which nothing does.
-- **Every entry in the deadline register points at a real column, and the suite is what proves it.** Two anchors were wrong on the first pass (`support_cases.opened_at` and `owner_assigned_at`, neither of which exists) and the `information_schema` check caught both. The deadlines that are CHECK-pinned are asserted from `pg_get_constraintdef` rather than from the migration source, because Postgres renders a constraint back without the quoting it was written with — and because a constraint is what survives a service rewrite.
-- **§32.5's card numbers are in the suite and nowhere else, and the gateway is driven by the outcome.** §32.2 forbids test cards in production UI and `shared/` ships in the browser bundle, so `REQUIRED_TEST_OUTCOMES` carries the scenario, the expected provider code, and the domain result it must produce — and no digits. The numbers live in `p0-pass.test.ts`, a test walks `backend/src`, `shared/src`, and `frontend/src` asserting none appears in shipped source, and the memory gateway takes an outcome name rather than a card. When the provider retires a number, the matrix still exercises the behaviour and one table needs re-checking.
-- **Each decline scenario asserts where the code went, not merely that it failed.** The raw provider code lands on `reservation_capture_attempts.failure_code` and the suite asserts it appears in no sent message — §33.9.11 and §25.6, checked at the point a real charge produced it rather than as a template review. The two card-save failures assert an **absence**: §33.5.4's "no reservation until SetupIntent succeeds" is proved by counting reservations, because a failed card save that left a row is a Backer holding a pre-order they never completed.
-- **The §32.6 log is written by the run that produced it.** `docs/evidence/stripe-test-matrix.md` is regenerated on every suite run, so it can never describe a run that did not happen, and `evidenceLogViolations` refuses it if a §32.5 outcome went unexercised or a field is blank. Every row records `marked_invalid_artifact` and the file says why in full: the in-memory gateway creates nothing at the provider, so §34 condition 10's human reconciliation of provider test results to internal ledgers **still needs a run against a real test-mode account** with the CLI forwarding webhooks. That is an open item, stated in the artifact rather than implied by its absence.
-- **§32.7 is one campaign proving five claims, and the fifth is the one that would otherwise be assumed.** SetupIntent and Customer on the Founder's connected account and not the platform's; the PaymentIntent on the same account for exactly `subtotal + tax`; the Founder as merchant of record with the campaign's own descriptor rather than `PROOVD LISTING`; the §24.3 identity (`5% + provisional + founder share = pre-tax subtotal`, with tax outside all three); and a decline entering the retry window rather than dropping. "Nothing can run both models" is an absence — `on_behalf_of` and `transfer_group` appear in no shipped file, and `STRIPE_TEST_BACKUP_MODE_ENABLED` is read in exactly one place (`env.ts`), so the flag is a declaration rather than a switch. `application_fee_amount` is recorded as permitted-but-not-built rather than forbidden, so a later phase enabling §24.1's "where supported" fee does not read as a violation.
-- **The idempotency sweep adds what no phase suite could see, and duplicates none of them.** Every phase already proves its own path; re-driving all of them is how a sweep gets slow and then gets skipped. What this adds is that the **register is complete**, that each of the twelve paths has its mechanism as a real unique index rather than as its author's intention, and that the three adversarial cases hold on the money path. `crash_midway` is the one a replay test cannot see: the transport dies after the attempt row is claimed and before the result is known, and the resumed batch finishes under the **same** key — a path that called the provider first and recorded second would charge twice exactly there.
-- **The baseline is a state before it is a number, and `gateOnCohort` never runs the computation early.** §33.12.6's "no invented baseline exists" is satisfied by there being no number in the payload at all below ten invited Founders — not a number that is hidden, one that was never computed, so there is nothing for a later refactor to start rendering. `cohort_incomplete` and `no_observations` stay two answers: "too early to know" and "ten Founders, none of them did this yet" are different facts, and §16a's "not yet populated is not zero" is why a rate over an empty denominator is never `0%`.
-- **"Invited" means a send happened.** The cohort counts distinct prospects with a `campaign_invitation_sends` row, not prospects — otherwise the baseline could be declared complete by typing names into a table.
-- **Three columns were added and they record nothing new.** `secure_tokens.first_used_at`, `possible_creator_results.first_rendered_at`, `campaign_results.first_viewed_at` — each stamping the FIRST occurrence of something the system already causes, beside a value that was the wrong tense for a duration (`last_used_at` is overwritten on every visit; `recorded_at` is when an Admin recorded the §10 assessment, not when the Founder was shown it; `prepared_at` is when results became ready, not when anyone came back). All three are write-once by trigger — a first a later visit can move is a last with a misleading name, and the metric would drift toward zero as people returned — and set with `coalesce(...)` in SQL rather than read-then-write, so two concurrent loads cannot race. The two insert-only tables grant exactly that one column by name, the 0005 `campaign_invitation_sends` arrangement reused.
-- **The rendering stamp is off by default and passed only by the two Founder-facing reads.** An Admin opening the record is not the Founder being shown it, and "time to first magic" measured from our own click would be measuring ourselves.
-- **§31.9's first sentence is enforced as an absence.** No table, no tracker, no event: the module is a read across seven existing tables, and a test scans it for `.insert(`, `.update(`, and `.delete(` — because the schema check passes right up until somebody adds one. `FORBIDDEN_MEASUREMENT_TABLES` names the six shapes a warehouse arrives as.
-- **§33.12.7 is checked as a filter that is absent.** Dropping the Founders who canceled inside the §31.6 window raises `founder_completion` immediately, so the query has no status filter at all, and a source scan asserts the words are not there. Cancellations, support requests, and failed payments are **counted** in §31.9's secondary set rather than removed from the primary one, which is the opposite of the exclusion §33.12.7 forbids.
-- **Two secondary metrics report their gap instead of a proxy.** There is no autosave-failure count because §9's autosave reports its outcome to the person and retries, and a client-side beacon to produce one is the warehouse arriving through the front door. There is no email-open rate because §27 ships no tracking pixel and adding one would put a silent read receipt inside a transactional message — delivery and cancellation are both recorded, and the entry says which half is missing rather than reporting the metric as available.
-- **`/admin/measurement` has no write route and no control that submits.** §33.12.6's prohibition is strongest as an absence: not a rule a service enforces, but a surface and an API with nowhere to record a baseline. The suite posts, puts, patches, and deletes at the route and asserts 404 on all four. There is no bar, no sparkline, and no arrow either — a trend needs two baselines and there is not yet one.
-
-### What Phase 24 owns, and what is left
-
-`docs/phases/phase-24.md` is the live-mode gate. Its out-of-scope section is one word — "Everything. If something needs building, the gate stays closed." — so the phase adds no behaviour and no commercial rule; it adds the gate, and the gate is code because the trap says a checklist someone can proceed past is not one.
-
-`shared/src/live-mode/index.ts` owns the registers; `backend/src/live-mode/logic.ts` restates the keys, the partition, and the three frozen refusals (drift-tested; the prose is deliberately NOT restated); `gate.ts`, `pilot.ts`, and `guard.ts` own the services; `routes/admin-live-mode.ts` the API; migration 0038 the guarantees; `tests/live-mode.test.ts` is the artifact (36 tests). `docs/rollback-plan.md` is §34's written plan. **The gate is shut, and every §33 test passes in one run.**
-
-- **The refusal is at the one chokepoint, and it refuses to construct on an unknown operation.** Every money-or-card operation in the product goes through one `StripeGateway` object built at boot, so wrapping it means a service written in a later phase inherits the refusal without knowing this file exists. The decorator is built by walking `GATEWAY_DISPOSITION` rather than by listing method names, and `assertPartitionCoversGateway` **throws before the server listens** if the gateway carries a callable member nobody classified. A phase adding a money method and forgetting to decide its §34 disposition therefore ships a deployment that does not start, rather than an ungated path that looks exactly like a gated one. That is 23b's `UNGATED_ADMIN_WRITES` arrangement with a louder failure, because the subject is money. `client` is withheld (set null) because it is the only member that could reach Stripe around every refusal, and a test asserts nothing in `backend/src` reads it anyway.
-- **The blocked list is §34's six, and refunds and detaches are deliberately NOT on it.** §34 names six things and every one CREATES exposure: real card data, a live SetupIntent or PaymentIntent, a live application fee, live fixed funding, an Affiliate Transfer, a payout promise. A refund and a card detach UNWIND it, and are only reachable from a live charge or a live saved card that already exists — exactly the state a rollback leaves behind. Blocking them would mean a closed gate stranding the people §34's own rollback requirement is written for, and §1 rule 6 forbids adding a seventh item the Spec does not state, particularly one whose only effect falls on somebody owed money back. The first draft blocked both; the register was corrected, not the reasoning.
-- **The gate throws rather than returning a normalized failure, and that is the one exception in this codebase.** Every caller treats a thrown error as "the provider call did not happen" and retries under the same idempotency key, which is the truth. A returned failure would look to `close-batch.ts` like a DECLINE — which enters the retry window, tells a Backer their card failed, and starts a 48-hour clock over a charge nobody attempted.
-- **Three verification kinds, because a server cannot watch its own test run.** `automatic` is the two facts this process genuinely decides on every read (the eight documents published; the environment separating test from live). `suite` is the three §34 conditions that are "…tests pass" — a fact about a CI run, filed with what was run and where the output is; calling those `automatic` would be the first trap dressed as rigour. `recorded` is the six human judgements. Both non-automatic kinds need a row and both block while unanswered; they are kept apart because the EVIDENCE differs and the surface has to say which it is (§1.4). The 0038 CHECK admits only the nine — an automatic condition has **no row shape**, so an attestation cannot outlive the fact it describes (somebody signs off that the policies are published, one is later revised to `draft` for a correction, and the gate keeps reading the signature).
-- **Every non-automatic condition carries `cannotBeAutomatedBecause` in the type.** Writing down why the process cannot answer it is what makes a later session adding a heuristic that "usually" gets it right a visible edit rather than a quiet one — and a heuristic that usually gets it right is precisely how §34's first trap happens.
-- **Fail-closed is four mechanisms, not a posture.** An unanswered condition is unsatisfied (`composeGate` walks the eleven and fills a gap with a refusal, so this function forgetting one closes the gate); a database error blocks all eleven and names the failure; the automatic pair is re-decided on every read; and **nothing is cached** — a cached gate is a rollback that does not take effect, and §34 asks for a rollback owner precisely because somebody may need it to take effect in seconds. One read on a path already making a network call to Stripe is the cheapest thing in the module.
-- **Two layers, and the second could not be inferred.** Layer one is the decorator (gate open AND a pilot enabled, or nothing moves). Layer two is the campaign scope: §6 limits live enablement to one named pilot, and the gateway does not know which campaign a call belongs to. It must not guess — a campaign id read out of provider metadata is a value somebody chose, which is 09b's Cal.com mistake — so `checkLiveMoneyPermitted` is called at the services that already hold the campaign, and `MONEY_ENTRY_POINTS` splits thirteen entry points `gated`/`unwind` with a source scan asserting both directions. It refuses with **three distinct codes** (`gate_closed`, `no_pilot_enabled`, `not_the_pilot`) because they lead to three different next actions, and collapsing them would tell an operator the gate was shut when it was open.
-- **`createFounderPayment`/`releaseFounderPayment` are gated with no gateway leg at all.** Under the direct-charge configuration the captured funds already sit on the Founder's account, so §22.3's release moves no provider money — but §34's blocked list ends with "any payout promise", and creating the payment object IS that promise. Their mode comes from `configuredStripeMode()`, set once at boot by the decorator; unset reads as `test`, because a live process without the decorator has no gate at all, which is a deployment that cannot happen rather than a default to tune.
-- **`__testControls` is on the memory double, declared as a list.** The partition assert walks the object it is handed, and the double carries controls the real port does not. Declared by name rather than detected by a naming convention, so a control added and not listed FAILS the partition — the safe direction for a marker whose whole job is to exempt things. The real gateway declares nothing, so in production this exempts nothing.
-- **One live enablement in the whole system, by a unique index over a constant.** Not one per campaign and not one per Founder. A second pilot is refused by the database rather than by a service that counted first. The five rollback-plan facts are NOT NULL: "written before cutover, not after a problem" has exactly one enforceable form, which is that the row cannot exist without it. The enablement is immutable by trigger apart from the rollback trio, and the rollback is write-once — re-enabling is a NEW record with its own gate snapshot, because why live money stopped is not a fact to erase. Owners are rows rather than JSON, one live per role, retired by a `superseded_at` granted alone (the 0005 arrangement) so who was on the hook when something happened survives a handover.
-- **A team alias and "whoever's on call" are refused by name, and nothing subtler is.** §34's trap twice. `NON_PERSON_OWNER_PATTERNS` is deliberately short and about FORM: a database cannot tell a surname from a team alias, and a longer list would start refusing real names — a check that refuses a correct answer teaches people to work around it. Whether the named person actually knows is condition 11's recorded judgement, which is why `acknowledgedBy` is its own required column.
-- **The gate snapshot is stored, never re-read.** 21b's completion-findings reasoning applied to the decision with the largest blast radius in the product: an enablement pointing at a live gate would silently rewrite its own justification the next time a condition moved.
-- **Appendix C is walked, and "yes, but" is a column.** The brief says verify by walking the flow rather than reading the code, so the record is of a person reaching a surface. `undocumented_knowledge_required` is the point of the table: Appendix C's condition is "without undocumented operator knowledge", so a walk that only succeeded because the walker knew a trick is a FAILED walk with a passing feeling — refused in the service and unrepresentable by CHECK. `readAppendixCCoverage` keeps `unwalked` separate from `failed` (§16a's rule: not yet populated is not zero).
-- **§2.1 runs in both directions, and the state is derived.** Phase 05 shipped conditional architecture wording because approval did not exist; the brief adds that hedged copy must not survive the hedge becoming false. `approvalCopyState` reads condition 1 rather than a flag, so "the conditional sentence is correct" and "it is now stale" can never disagree with whether approval exists. **Track A1 is open, so the conditional wording stays** — replacing it today would be the first violation.
-- **Filing an answer, enabling, and rolling back all take the freshness gate; recording an Appendix C walk does not**, and it is registered in 23b's `UNGATED_ADMIN_WRITES` with the property it lacks. Writing down "I walked the Founder build and it worked" changes no standing and moves no money, and requiring reauthentication for it is the reflexive gating `admin.ts` has warned about since Phase 06a.
-- **The `/admin/live-mode` surface was built on 2026-08-19** — see the section of that date below. The paragraph that follows described the gap while it was open, and is kept because it is also the specification the page was built to. Everything §34 needs recording is reachable through `/api/admin/live-mode`, and the phase's done-when names no surface — but §1.1 does, so this is a real gap rather than a decision. A page for it renders the eleven conditions with their evidence and Track A item, the pilot enablement form with its five plan fields, the rollback control, the three preflight confirmations, and Appendix C's forty-nine steps; the registers already travel with the payload so nothing about it needs a second hardcoded list. **There must be no override on it and nowhere to add one** — the `/admin/prerequisites` posture since Phase 06a.
-
-### The P0 accessibility and content sweep (§33.11, §28.5, DNA §5.13, built Phase 23a)
-
-`shared/src/qa/index.ts` owns the registers; `frontend/src/features/qa/` owns the sweep (`fixtures.ts`, `server.ts`, `qa.test.tsx`, `bundle.test.ts`); `backend/src/tests/cross-surface.test.ts` owns §33.11.5. **§33.11.1 through §33.11.7 pass — §33.11 is complete.** Nothing here adds behaviour: §32.1 step 17 verifies what exists, and every fix below is a defect the sweep found.
-
-- **The flows are a register, so "every principal flow" is a count rather than a claim.** `PRINCIPAL_FLOWS` names fifteen flows and the addresses each occupies, and the suite walks it — a surface added to the router and not to the register has no fixture, and a flow in the register with no fixture fails on an unstubbed request. `keyboardPathRequired` reproduces §28.5's own five rather than a judgement about which screens feel important.
-- **A surface showing its error state is not the flow (§33.11.1).** The stub server records every unmatched request and the sweep asserts the list is empty *and* that no surface rendered the fixture-missing panel. Without that, a 404 fixture would render an error page, pass axe with nothing on it, and report a flow as swept.
-- **Fixtures are typed against the api modules' own interfaces**, so a response shape that drifts fails `npm run typecheck` before it produces a half-rendered surface — and there is ONE campaign, ONE reward, ONE Founder across all of them, because a fixture set where each surface invents its own title cannot notice a disagreement.
-- **`textContent` is not what a reader sees.** It concatenates adjacent nodes with nothing between them, so a `dt`/`dd` pair reads as `NextAsk whoever sent the link` — a word that is in neither the label nor the sentence, and the reason the six-question scan reported states as unanswered that answered fine. Every scanner reads through `visibleText`, which joins text nodes with a space.
-- **Question 5 cannot be read from text (§33.11.7).** "What can I do now" is answered by a control, and a scanner accepting the *word* `action` would pass a panel saying "no further action is possible at this time" and offering nothing. So `missingStateQuestions` takes structural evidence — whether an operable control and a support route are actually present — and the shared suite proves the distinction with that exact sentence.
-- **A loading state answers five of the six, and the sixth is named rather than dropped.** §33.11.7 lists loading beside failure, so the sweep renders every flow against a read that never resolves. `SurfaceLoading` joins Phase 05's `PageLoading` for the five surfaces that rendered a single sentence — results, fulfillment, the Creator close view, the Backer page, notification settings. `Get help` stays absent on both: §27.1's sixth question asks to preserve a context that has not arrived, and a support control a fraction of a second into a read is one nobody needs (DNA §5.6). The moment the read fails, the failure state replaces it and owes all six — asserted on the same routes.
-- **Six failure states did not answer §27.1's six questions, and now do.** Results, fulfillment, the Creator campaign list and close view, the Backer magic link, and notification settings each rendered a title and a sentence. Each gained a `StatePanel`. Two are worth naming: the Backer's is written so every sentence is true of an expired link, a revoked one, and a server that is simply down (§5.5 requires those to be indistinguishable), and `CreatorCampaigns` no longer treats *any* failure as a signed-out session — only 401/403 does, because showing a sign-in form when the server is unavailable asks someone to retype a password that cannot help (§1.4).
-- **Three `dt`/`dd` pairs had no `dl` above them** — the review feedback a Founder is told to act on, the preview's rewards, and the fixed-payment rows — so a screen reader met orphaned terms. Fixed at the markup, which is where axe's `dlitem` was pointing.
-- **The Founder's live campaign home had no `h1` at all.** The Glance number is the hero (DNA §5.1), but a hero is not a title, and a Founder arriving from a bookmark had nothing naming the page. The sweep now settles on the arrival of an `h1`, which is both the right wait condition and the §33.11.2 assertion.
-- **`Continue` and `Back` name where they go now (§33.11.4).** They were the same two words on every flow in the product; `Flow` and the vetting sequence name the destination from the step's own label (DNA §5.13's one vocabulary — the same word the overview menu shows), the step title became an `h2` (which is also what put an accordion's `h3` under the `h1`), and the first step renders no Back control rather than a permanently disabled one. `OBJECTLESS_CTA_LABELS` is deliberately short and exact-match: `Cancel` is absent because on the magic-link page cancelling *is* the action.
-- **The bundle scan decides §3.2 and the DOM decides §3.1, and the split is stated in the register.** One bundle carries the Admin panel and the Backer's page, and §3.1 permits `reservation` in Admin — so a bundle-wide scan for it would flag correct copy and have to be silenced, and a silenced check is worse than none. §3.2's replacements bind every audience including identifiers, so those are scanned across the whole build; §3.1 is scanned against the *rendered text* of every customer-facing flow, which is stronger than a grep. The scan rebuilds when `dist` is older than the source, because a stale bundle passes while the code it came from has the violation.
-- **What the bundle scan found:** `all-or-nothing`, shipped in every browser inside a §22.8 register's description of the readiness checklist — invisible to any grep of `frontend/`, because the string lives in `shared/`. That is the §33.11.3 trap, exactly as written.
-- **An unresolved `[MARKER]` is not decidable in a bundle**, and the test says so rather than being deleted quietly: the build contains §20's and the Appendices' templates beside the resolvers that fill them, so a bracket there is a template. Only a rendered surface can tell a template from a defect, which is where that check lives.
-- **Two documented exceptions, both checked rather than assumed.** Appendix A.1 is exact-text mandatory and the Spec writes it with "content creators / affiliates / marketers", so the trust strip is excluded from the §3.1 scan — and a test asserts the excluded node contains only the pinned Appendix paragraphs, so copy cannot be smuggled into a block the scanner skips. And §3.2's `equity` pattern was narrowed from the bare word to the forms that make a claim about the reader's money: `/safety` lists `investment` among the prohibited business categories and `/about` says "we are not an investment platform" — both are §3.2's own position, stated.
-- **§33.11.5 is one pre-order read seven ways, and the values are canonicalised on purpose.** The ledger stores `12000`, the checkout renders `120.00`, the email says `US$120.00`; comparing strings would report a disagreement that is not one while saying nothing about whether the amount is right. So money becomes cents and an instant becomes a UTC minute — including `formatUtcInstant`'s `September 12, 2026 at 5:00 PM UTC`, which `Date` cannot parse back. The **descriptor is deliberately not canonicalised**: §33.9.13 is about the exact string, and the suite asserts at least five surfaces render it and that the set of distinct values is one.
-- **Three facts are absent by design, and the register says why for each.** The campaign page carries no amounts (§24.3 has no billing address to tax against) and no descriptor (§30: asserting one where no charge exists implies a charge); the Admin ledger row and the evidence packet carry the reservation's state and stored snapshots rather than the campaign's charge rule. `absentBecause` is required wherever `requiredOn` is short of all seven, and the shared suite asserts it.
-- **The SLA is compared as Appendix B.8's `Human response due:` line, not as §27.8's sentence.** The published sentence lives in the site footer, which is not one of the seven surfaces; what a Backer asking for help is actually told is the deadline that promise produced, rendered twice — once into the HTTP response the magic-link page shows, once into the acknowledgement email. Comparing that line is how 16b's "the string on screen and the string in the inbox are literally the same" stops being a claim about how the code is arranged.
-- **What the sweep cannot prove is stated, not implied.** 320px reflow, real focus visibility, 44px tap targets, colour contrast, and an actual screen-reader pass need a browser with layout and a person with a screen reader. Those stay the manual gate `a11y.test.tsx` has named since Phase 05, and the contrast exception (tech-stack §3.6, brand-fill buttons only) is 23b's to verify as recorded and scoped.
-
-### The §27 coverage machine (§27.1, §27.2, §3, §30, built Phase 22a)
-
-`shared/src/notifications/contract.ts` + `classification.ts` own the registers; `backend/src/notifications/unsent.ts`, `catalog.ts`, `preview.ts`, and `contract-logic.ts` (drift-tested) own the machine; `templates/plain.tsx` is the template fourteen senders were missing; `tests/notification-coverage.test.ts` is the artifact. **§33.6.11 passes, §33.9.10 and §33.9.12 hold, and every one of the 110 renderable messages satisfies §27.2.**
-
-- **Coverage is a partition, and the failure message names the key.** `events.ts` always carried one rule — a key appears when something sends it, never before (§1.4) — which kept the sent list honest and left the unsent ones invisible across eleven phases of comments. `unsent.ts` is the other half: every registry key is sent **or** recorded with a reason and an owner, and the suite asserts the two lists partition the 121 exactly (none in both, none in neither). Adding a key to the shared register without either building its sender or recording its absence fails the suite.
-- **The three kinds of absence are not one.** `never` is a decision the Spec itself makes — §27.3's "public-route email verification **if later enabled**" against §5's invitation-only signup, and "failed-payment spike" against §6 fixing no threshold (§1 rule 6). Those own nothing and the suite asserts `owner: 'none'`. `capability` is a message whose *behaviour* does not exist (21b's work-again and satisfaction survey, 22c's digest) — Phase 22's own brief assigns those to the phase that owns the behaviour. `message` is a message whose behaviour exists and is recorded, and it must name the **record** that already holds the fact, so it cannot be a `capability` absence wearing the cheaper label.
-- **The catalog is a render index, not a rewrite.** Each sent key maps to the *same* render function its sender calls, with representative variables. That is what turns "every event has a template" into an enumeration and §27.2's rules — properties of a *rendered message* — into assertions. Samples are realistic (a campaign name, real amounts, a real descriptor) because a contract asserted against `subject: 'x'` proves the assertion runs, not that the message satisfies it.
-- **Fourteen senders were emitting `<p>${summary}</p>`, and that is not a §27.2 message.** No plain-text support route, no stable reference, not even a complete HTML document. Each was locally reasonable — an internal queue notice does not need a designed template — and collectively it was the largest hole in the contract, which is exactly what a coverage sweep exists to find. `renderInternalNotice`/`renderPlainNotice` is one template with two entry points, and the difference is real: an Admin notice is exempt from §3.1's customer-facing names (a queue notice saying `reservation` is naming the table the Admin will open) and never from §3.2's, because §3.2 is about honesty rather than audience and an internal habit of writing `escrow` is exactly how it leaks.
-- **Money messages come in four classes, because one would demand a descriptor on a cancellation.** Read flatly, §27.2 asks every money email for amount, seller/MoR, descriptor, and status — which would put a statement descriptor on the one message where §30 makes it most important not to imply money moved, and on a Founder payment release that appears on nobody's statement. So: `charge` (money off a card now) owes all four; `scheduled` (money off this card later) owes all four **plus** the explicit not-charged statement — the pre-order confirmation and the pre-charge reminder, §30's two most sensitive messages; `payout` (a release, a Transfer, a refund) has no card statement and no seller, so owes neither; `no_charge` owes the not-charged statement instead of a descriptor, and is exempt from `status` because its status is that there is none.
-- **The classification is deliberately not exhaustive.** A key absent from `MONEY_MESSAGE_CLASS` is not "not about money" — it is a message whose money content varies by the record behind it. §26.7's suspension/kill notices are the clear case: the same key carries "nothing was charged" before capture and "your charge stands" after, and forcing them into one class would make the register assert something untrue for half the sends.
-- **The sweep found five real defects and they were fixed, not reclassified.** The Backer pre-charge reminder named an amount, a seller, and a descriptor and **never said the card had not been charged** — §30's saved-card/charge confusion in the one message most likely to cause it. The listing receipt named no merchant of record, on the single charge in the product where that is Proovd rather than the Founder. The Transfer-failure notice told a Creator something had gone wrong with an unnamed sum. The Day 14 result, the delivery notice, and all three enforcement notices carried no stable reference. The early-release result named neither an amount nor a status. Each is now in the template and read from the one §22.3 resolver rather than recomputed (§33.8.13).
-- **A deadline names its zone, and `Z` does not count.** §27.1: "deadline emails spell out timezone." The Day 14, dispute, money-decisions, and charge-batch notices all rendered `toISOString()` — canonical UTC that spells nothing out to someone reading it at 22:00 in Denver. The suite refuses a bare ISO instant anywhere, and the register names which messages carry a deadline at all: `internal_deliverable_verification_due` is deliberately excluded because it says work is due *now* and carries no future instant, and demanding a timezone would push its sender to invent a deadline §22.1 does not state.
-- **The detectors read rendered output, and they are families rather than pinned sentences.** `not charged`, `has not been charged`, `nothing has moved`, `card is saved` are all honest ways to say the same thing; one exact string would force every message into one voice, and a detector that knew only one would pass the message that says the other. Multi-word phrases match `\s+` rather than a literal space, because a plain-text part wraps at a column and `on its way` can arrive with a newline inside it.
-- **The source scan strips comments first.** These files explain, at length, what they refuse to say — `send.ts`'s header documents that there is no unsubscribe path, and every template names the words it avoids. A scan that could not tell an explanation from a usage would force the explanations out, and the reasoning is the more valuable of the two.
-- **The preview reports; it does not refuse.** §27.2's "previewed with final variables before manual send" was already honoured where a human actually composes and sends: §7's and §8's invitation gates scan the *rendered* message, and §26.8's support reply is a filled draft with no one-click send anywhere. What was missing was a machine-checkable statement of what correct means. `previewNotification` renders through the same catalog entry the sender uses and returns the message beside a report of every decidable §27.2 rule. A second refusing gate beside the two that already exist would block on a heuristic and train an Admin to work around it. **The Admin surface for it is 22c's, beside notification history.**
-- **The audience is derived from the key prefix, not restated.** `contract-logic.ts` is the backend's runtime copy (the `rootDir` constraint, as always), and it restates the facts, the banned terms, and the classification — all drift-tested against shared. It does **not** restate the audience table: the shared register already guarantees every key is prefixed with its own audience, so the prefix *is* the audience. Deriving cannot drift; a fourth copy could.
-
-### The optional digest and the notification history (§27.7, §30, built Phase 22c)
-
-`shared/src/notifications/digest.ts` owns the preference vocabulary, the eligible-activity register, the window kernels, the prohibitions, and the history states; `backend/src/notifications/digest-logic.ts` restates them (drift-tested); `preferences.ts`, `digest.ts`, and `history.ts` own the services; `templates/digest.tsx` the one template; migration 0035 the guarantees. `frontend/src/surfaces/notifications/` is the surface both roles render and the Backer page embeds. **The §27.7 done-when passes: the preference is capturable for all three roles and the history exists without becoming a dashboard.**
-
-- **The digest is the one opt-out-able message, so it may never carry a transactional one.** §27.2's first rule is that transactional email is not opt-out-able; §27.7's first word is "optional". Those are compatible only while the two are disjoint — the moment a receipt or a deadline can appear in a digest, someone who turned it off has opted out of something §27.2 says they cannot, and someone who turned it on gets the same fact twice. So the composer reads **activity records**, never `notification_deliveries`. The obvious implementation — "everything we emailed you since last time" — is exactly the one that breaks the rule, and a test counts the single permitted use of the deliveries table in the whole module.
-- **`NON_TRANSACTIONAL_KEYS` names the exception, and the opt-out check inverts rather than being waived.** A digest that merely avoided the words a scanner looks for would satisfy §27.2 by accident while being the one message that owes the reader a way out. `checkTransactionalContract` now reports `optOutRule: 'forbidden' | 'required'`, and a digest with no route to its own preference **fails** the contract. `OPT_OUT` gained `change how often` for the same reason 22a's other detectors are families rather than pinned sentences.
-- **§27.7 names three activity kinds and the register carries exactly three.** "Such as" is an invitation to add and §1 rule 6 is why it is declined. Each entry declares `coveredBy` — the transactional key that already announces it — and the composer drops an item whose covering key delivered to that address, so turning the digest on can add activity and never restate a message. `campaign_update` and `campaign_comment` are `null` because §27 gives them no transactional key at all; §27.5 names the digest as the delivery mechanism for updates and names no per-update email.
-- **The audiences differ, and getting them backwards is a §18 failure rather than a digest bug.** A Backer of a campaign may see its `backer_only` updates; a Creator promoting it may not. The two visible-audience lists are named constants, not a default.
-- **An empty digest is not sent, and that is what keeps it out of §33.6.11.** A summary of nothing is a scheduled generic message with a subject line. `sendDigest` composes first and returns `skipped_no_activity` with no delivery recorded. 17a's job-name guard in `live-operations.test.ts` still refuses every check-in-shaped job name and exempts the two digest jobs **by exact name**, with the empty-send proof cited — the property, not the name, is what separates them.
-- **"First magic-link visit" is the absence of a preference row, because there was nothing else to use.** `secure_tokens.last_used_at` is a *last*-seen, stamped on every verification, and `mintOrReissueMagicLink` rotates the lineage — so the one candidate timestamp is both the wrong tense and destroyed by rotation. Building a first-visit marker would mean a second read-state store beside §20's to decide whether to render one control. No row means nobody has answered; `off` is a recorded answer and stops the asking. That is also why `off` is a stored value rather than the absence of a row (§1.4).
-- **Nothing sets a frequency without a person choosing it (§30).** No default in the column, no backfill, no path that creates a row as a side effect — a test reads the preference, composes a digest, and asserts no row appeared. The control preselects nothing while `chosen` is false, and `Save` is disabled until something is picked.
-- **`Choice` exists because three cadences are exclusive and `Option` is a checkbox.** Three checkboxes that clear each other announce one thing and behave as another, and give keyboard users tab-per-option instead of arrow keys (§33.11). Radix `RadioGroup`, the same Selection treatment, always controlled with `''` for "nothing chosen".
-- **`DIGEST_NEVER_REPLACES_TRANSACTIONAL` is pinned and sits with the control, not under it.** Someone reading "No summary emails" will hear "stop emailing me" unless told otherwise — and the next message they receive is a charge receipt they believe they unsubscribed from.
-- **The history needs no table and stores no body.** `notification_deliveries` already records event, recipient, entity, provider id, and confirmation; 0035 adds only the `(target, created_at DESC)` index the dedup index cannot serve. Storing rendered bodies would put a second copy of every personal fact we have emailed into a table §25.8 must then sweep, to show people text they already hold. The label is resolved in the browser from the shared registry — the backend returns the key, so there is no fourth copy of 123 descriptions to drift.
-- **The audience prefix is what keeps `internal_*` off a customer surface.** One `LIKE '<audience>_%'` condition, on the guarantee the shared register already makes. A customer history with no address to scope it refuses rather than returning everything.
-- **Not a dashboard, and the suite asserts each of the four ways it would become one.** No count in the payload (its keys are exactly `entries` and `nextCursor`), no read-state write anywhere in the router (the only write verb is the preference `PUT`), no `unread`/`read_at`/`last_opened_at` column in `information_schema`, and no mention of `notificationDeliveries` or the digest in §20's `act.ts`/`home.ts`/`glance.ts`. It lives at its own address — the first **account-level** page either role has had, since every other authenticated route is campaign- or association-scoped.
-- **Dedup is the period, not the run.** The entity is `<preference id>:<period key>`, and the period key derives from the UTC day number rather than the job's clock, so two workers minutes apart compute the same key and a job that runs twice sends once. The cron hour is an operational schedule, not a deadline: §6 fixes none, no message names a delivery time, and moving it changes when a digest arrives and never whether one is owed.
-- **The window's upper bound is `now`, and Postgres microseconds beat JS milliseconds.** A row stamped by `now()` in the same millisecond as the passed instant sorts *after* it. Immaterial in production — no sweep runs in the same millisecond as the activity it summarises, and a boundary item falls inside the next window's lower bound — but the suite passes an explicit `sweepInstant()` rather than racing the clock, which is why it is not flaky.
-
-### Refunds and cause-based allocation (§24.8, §24.9, §24.10, Appendix B.6, built Phase 20a)
-
-`shared/src/refunds/index.ts` owns the §24.8 cause register with its per-cause permitted-treatment matrix, the earnings-phase consistency kernel, the §24.9 exception register, the refund lifecycle, and B.6 with its bracket-refusing resolver; `backend/src/refunds/logic.ts` restates them (drift-tested); `backend/src/refunds/service.ts` + `notifications.ts` own the services; migration 0032 the guarantees. **§33.9.1–§33.9.5 pass, plus the allocation half of §33.9.6.**
-
-- **The cause IS the decision, and the matrix is a CHECK.** §24.8's five causes each name the affiliate treatments they may record; what is ABSENT from a row is the phase's guarantee. A Founder-caused case cannot record `cancel_unpaid_invalid` or `contractual_recovery` — §33.9.3's "most tempting wrong simplification" is unrecordable at the service (refused by name) and at the database (the `refund_allocations_cause_matrix` CHECK). A Proovd/system error permits only `not_attributed`/`earnings_remain` (§33.9.5). An unrelated Backer dispute has the same ceiling as the Founder row (§33.9.6) — a case with real Affiliate-causation evidence is *classified* `affiliate_fraud_or_breach`, because reclassifying is how the stronger treatments become reachable.
-- **The treatment must match where the money stands, and the phase is derived.** `treatmentsForEarningsPhase` maps `not_attributed / unfinalized / finalized_untransferred / transferred_or_later` to what §24.8 permits there; `deriveEarningsPhase` reads the earnings record, never the caller. Canceling "unfinalized" earnings that finalized last week is refused as `treatment_inconsistent_with_earnings_phase` — the clawback wearing a different word.
-- **A refund cannot exist without its classification (§33.9.2).** `allocation_id` is NOT NULL and unique on `reservation_refunds`; the allocation is insert-only with §24.8's whole answer (cause, fee treatment, affiliate treatment, the invalid amount where applicable, Founder liability, recovery note, evidence, mandate, Admin, timestamps). The lifecycle `requested → submitted → succeeded/failed` with the `failed → submitted` retry edge is trigger-enforced with append-only events; the refund row is the claim, written before the provider call, and the stable key `reservation-refund:<allocationId>` makes a retry the same refund at Stripe. §24.1: the Refund is created on the Founder's connected account — refunded where it was charged (`createRefund` gained `connectedAccountId`).
-- **§24.9 is the absence of an enum member.** An Idea-campaign refund must carry one of the eight exceptions (service refusal by name AND a shape trigger reading the §9-locked type); a Product refund must not. There is no `change_of_mind` value anywhere, so the voluntary refund has no representable row. The pinned `BEST_EFFORT_RECOVERY_SENTENCE` rides the queue payload and the Admin surface — recovery beyond the available balance is never promised.
-- **The earnings treatments execute where the money fact exists.** `cancel_unfinalized` writes nothing at refund time: finalization's source filter widened to ever-captured statuses (`captured/refunded/reversed/disputed` — dropping refunded rows would leave the §24.4 identity unresolvable) and folds the recorded cancel into the kernel's earned-zero path, so the canceled row still resolves (`earned 0 + returned = provisional`) and only the refunded transaction cancels (§33.9.4). `cancel_unpaid_invalid`/`contractual_recovery` run at refund success through the ONE `applyCauseBasedAffiliateAdjustment` in `close/earnings.ts` — earnings move to `adjusted` through the same state machine, finalized amounts stay trigger-immutable, and the recovery record carries ONLY the invalid amount, never the whole Transfer. 0032 relaxed 0030's one-recovery-per-association unique index: a §22.1 disqualification and a later refund-driven recovery are different facts, and idempotency lives at the writers (the conditional state move), not in a uniqueness the second legitimate record would collide with.
-- **`earnings_remain` means byte-identical, and the tests assert it that way.** A Founder-caused, Proovd-error, or unrelated-dispute refund leaves the `creator_earnings` row, the per-reservation columns, and the recovery table untouched — compared as whole rows, not as spot checks.
-- **§24.10 was mostly built; 20a closed the transaction's own copy.** `campaign_build` has carried the five refund-policy columns since 12b and 15a snapshotted the four identity fields into `reservations.policy_versions`; 20a added the exact `text` and its `textHash` to that snapshot, because a live-edit change request CAN rewrite the build row and the transaction's record is what §24.10 protects. §33.9.1's test edits the build after reserving and asserts the stored snapshot and consent text are byte-identical; a new reservation cites the new version.
-- **The eligible share finally subtracts something.** 19b's `causeBasedAdjustmentsCents` stub now sums `founder_liability_cents` across the campaign's allocations — an Admin-recorded judgement with evidence, never a number the product derives (§31.7's posture). `readFounderPaymentStatus` renders the term and the reduced share.
-- **Execution is 16a's high-impact machine, reused.** Reauthentication is the route's freshness gate; `previewRefundExecution` stores the customer-consequence lines in `high_impact_action_previews` under a payload hash of (refundId, amount); `executeRefund` consumes it exactly once (`consumed_at` + `consumed_by`, the 0024 CHECK) and refuses `preview_required/consumed/expired/mismatch` by name. A replay after success needs no preview and changes nothing.
-- **`charge.refunded` confirms or routes — never guesses (§1 rule 6).** The Connect handler matches by provider refund id and applies through the same `applyRefundSuccess` the execute path uses (a duplicate delivery matches nothing and sends nothing); an unmatched refund — §24.10 lets the Founder as MoR issue one from their own dashboard — is recorded under §32.4 and surfaces in the Admin queue until a case classifies it (`recordRefundCase` takes a `providerRefundId` for exactly that record-only path, which walks the lifecycle without a provider call and sends only the completed notice). The platform handler reconciles the listing stream Phase 11 confirms synchronously.
-- **B.6 is one resolver, many renderers.** The email templates and the magic-link page render the same resolved block — amount, destination where safely available (card metadata is not §32.4-stored, so the truthful fallback names the original payment method), start date, `5–10 business days, typically` as the verified range (never an exact settlement date), status, and the quotable `RF-…` reference (16b's alphabet). The three §27.5 keys dedup per refund row; `backer_refund_failed` sends only from `submitted` — a never-announced refund announces no failure. Raw provider codes stay on the internal columns (§33.9.11's rule, applied here).
-- **A full refund is a state; a partial refund is a record.** Cumulative succeeded refunds are trigger-bounded by the captured total; only the whole amount moves the reservation `captured → refunded` (with history) and flips the operational share to do-not-fulfill. The §26.5 `refund_dispute` ledger dimension works unchanged — it always derived from the status. The timeline gained its `refund` source (composing `reservation_refunds` + `refund_cause_allocations`), not a new event store.
-
-### Disputes, descriptors, post-capture enforcement, and §29 (§24.11, §24.12, §26.7, §29, built Phase 20b)
-
-`shared/src/disputes/index.ts` owns the §24.11 register (the 24-hour task, the provider status vocabulary, the ten packet items with the two conditional ones named); `shared/src/payments/descriptors.ts` the §24.12 kernel; `shared/src/enforcement/index.ts` the §29 registers (seven actions, seven grounds, five statement fields, five-business-day appeal, termination validity, conflicts, self-pre-order conditions, `ESCALATION_WAIT_DAYS`, `ISSUER_RIGHTS_SENTENCE`); `POST_CAPTURE_EFFECTS` sits beside 16b's pre-capture five in `shared/src/support`. Backend restatements in `disputes/logic.ts`, `payments/descriptors.ts`, `enforcement/logic.ts`, `support/logic.ts` — all drift-tested. Migration 0033 the guarantees. **§33.9.6–§33.9.9, §33.9.12, §33.9.13 pass — §33.9 is complete.**
-
-- **A dispute is classified through 20a's register, never a second one.** `payment_disputes` is unique per (mode, provider id); `allocation_id` is write-once and must be a `case_kind = 'dispute'` allocation of the same reservation (trigger). The ingest (`charge.dispute.created/updated/closed`, both endpoints; the platform side is the listing stream — recorded under §32.4 and routed, no reservation to bind) moves `captured → disputed` and touches NO earnings — §33.9.6's dispute half is the absence of that write. `won` restores `captured`; `lost` moves to `reversed` and flips do-not-fulfill. `classifyDispute` runs the same cause/phase validation as `recordRefundCase` and executes post-transfer treatments through the ONE `applyCauseBasedAffiliateAdjustment`; `cancel_unfinalized` folds at finalization because the fold never filtered `case_kind`.
-- **The 24-hour task is a fact of arrival.** `task_due_at` is CHECK-pinned to `opened_at + 24 hours` and trigger-immutable; the queue leads with overdue tasks (open work only); `internal_dispute_opened` finally has its sender, deduped per dispute row.
-- **The packet is assembled, never re-derived (§33.9.7).** `readDisputeEvidencePacket` composes the ten §24.11 items from stored records — the reservation's own consent text/version/hash, the §24.10 policy snapshot, the A.2 identity facts, amounts/tax/billing/descriptor, the reward's delivery promise, the §32.4 SetupIntent/PaymentIntent/charge ids, updates + support + notification history. Survey answers appear only where the Backer consented; fulfillment evidence honestly names Phase 21. `recordDisputeEvidenceAssembly` refuses an incomplete packet by naming what is missing and stores what was assembled, by whom, when (§1.3).
-- **One descriptor kernel, and the capture sends the SUFFIX (§33.9.13).** `computeCampaignDescriptor` returns `{suffix, display}` where display = `PROOVD* <suffix>` — the provider's own prefix-`* `-suffix concatenation (the seller account is created with the `PROOVD` prefix). The display is computed once at pre-order, stored on the reservation, and READ back by the campaign page (via the preview, which now computes it too), checkout, reminder, receipt, magic link (new field), support context, and evidence packet; `campaignDescriptorSuffix(display)` is what `close-batch`/`retry` send — pre-20b the full display went out as the suffix, which would have rendered `PROOVD* PROOVD …` on a real statement. `campaignDescriptorViolations` is the provider validation as named facts; one `DESCRIPTOR_UNKNOWN_LABEL` replaces the three drifting fallbacks.
-- **Post-capture enforcement is applied, not deferred (§33.9.8).** A post-capture KILL closes only the still-uncharged reservations (`pending_capture`/`capture_failed_retrying` → `killed_no_charge`, §29.7 — a suspension closes nothing, it is reinstateable); charged reservations are never rewritten. "Invoke the refund/reversal/recovery policy" opens the §24.8 path (every refund stays an Admin-recorded case through 20a's preview → execute); "restrict unreleased funds" is the read-side `campaignEnforcementHold` — derived from the lifecycle, no flag to forget — refusing `enforcement_hold` by name at `createFounderPayment`, `releaseFounderPayment`, and `createAffiliateTransfer`, and naming the hold in `readFounderPaymentStatus`'s blockers. 16b's two wiring gaps closed: the detach account resolves PER CAMPAIGN, and `notifyRoles` is real (`enforcement-notifications.ts` — Founder/Creators/Backers with audience-specific money facts, deduped on the enforcement key; `founder_payment_blocked` sends per held payment row).
-- **Ended pages are records, not statuses (§33.9.9).** `EndedKind` is now seven outcomes; `resolveEndedState` consults the close batch's immutable threshold decision, the §31.6 cancellation, and the enforcement action's recorded phase — and carries the Admin's customer explanation to the page. The frontend composes distinct why/charged/next per kind; the four §33.9.9 outcomes are pairwise distinct by test.
-- **§29 is records with refusals, not timers.** `affiliate_enforcement_actions` has no row shape without all five customer-statement fields (CHECK + service + raw-code refusal); the appeal deadline is five business days on the committed calendar, stored with its version; the appeal decision is write-once ("final") and an overturned PAUSE restores the partnership while a terminal removal never revives (§23.4). A §29.1 disclosure requires both certifications (CHECKed true) and moves an own-link reservation's attribution to `blocked` — finalization counts only `verified`, so "earns no commission" needs no second rule. §29.8 reacceptance: a requirement cites only a PUBLISHED version (trigger), satisfaction is an ordinary `policy_consents` row, and the gate on `/api/founder`/`/api/creator` answers 403 naming the document — the acceptance route lives outside both prefixes.
-- **The Backer support path the copy promised now exists (§29.9, §29.10).** `POST /api/link/:token/support` opens a 16b case born with full context; not-as-described/delivery/campaign questions go `founder_coordinated` first, money questions to Proovd. The B.8 acknowledgement is emailed (`backer_support_received`) with the pinned issuer-rights sentence; an Admin's outbound customer-facing reply on a Backer case relays to their inbox (`backer_support_founder_response`) — the response the 14-day arm measures is one the Backer received. Escalation is one recorded row per case (`no_response_14_days` after the wait, or `not_resolved` once a response exists), moves the case to Proovd, and refuses early by name with the date the arm opens. Inbound customer messages skip the §33.9.11 code check — it polices what WE send.
-- **§33.9.12 is the notifier's suppression, made visible.** The timeline's notification source now reads per-subject entity sets (reservation → its refunds and campaign; association → its transfers and enforcement) and composes `notification.duplicate_suppressed` audit rows as first-class suppression entries — excluded from the generic admin-action rendering so nothing appears twice. The register's "delivery state, and suppression" label is finally true; disputes compose into the `refund` timeline kind (same §24.8 family), still no timeline table.
-
-### Fulfillment, Day 14, and the one-strike ghost ban (§22.4–§22.7, built Phase 21a)
-
-`shared/src/fulfillment/index.ts` owns the §22.5 mechanism and obligation registers with their deadline kernels, the delivery-notice resolver, §22.6's path derivation and material-update fields, the §22.4 checklist/failure/consequence registers, and the §22.7 trigger register with its evaluation kernel; `backend/src/fulfillment/logic.ts` restates them (drift-tested); `service.ts`, `day14.ts`, `ghost-ban.ts`, `payment-block.ts`, and `notifications.ts` own the services; migration 0034 the guarantees. **§33.10.1–§33.10.4 pass.**
-
-- **The original delivery promise is preserved by having nowhere to go (§33.10.2).** `delivery_commitments` is an insert-only sequence; row 1 IS the original and is what the delivery notice, the §24.11 evidence packet, and §22.7's third trigger read. A revision is `sequence + 1`; the 0034 trigger refuses to move a recorded month, date, wording, reason, path, or authorising request, and DELETE is revoked. "Preserves the original" is not a rule the service remembers — there is no statement that would break it.
-- **The §22.6 path is derived, and the row cannot fake it.** `deliveryChangePathFor` reads the campaign type and whether the remaining payment released; an Idea campaign has no remaining payment, so it is never on the approval path. `applyDeliveryRevision` is the ONE door (17b's one-route reasoning): on `admin_preapproval` it refuses without an APPROVED request for its own campaign — in the service AND by a 0034 trigger — so "notify Backers, ask later" has no representable row. On the notice path no request is opened at all: a review nobody owes is a delay nobody agreed to. Both paths still require all six §22.6 fields, and the Backer-visible notice is a §18 update carrying 14c's prior/revised pairing rather than a channel of its own.
-- **The prior value is the commitment before the one being filed.** On the approval path `decideDeliveryChange` already wrote the revision, so taking the highest sequence blindly would render the revised date as its own predecessor. The resolver excludes the row being notified — §22.6's pairing shows two different things or it shows nothing.
-- **The delivery notice is one resolver with five required items (§33.10.1).** §22.5's list — reward, access instructions, original commitment, Founder support, Proovd escalation — is a register and `resolveDeliveryNotice` throws on a blank one, so a delivery email with no access instructions cannot be produced rather than being produced empty. Founder support is the Founder's own route, never Proovd's substituted for it (§29.10 routes to the Founder first). §22.5's sixth item, the satisfaction response, is deliberately NOT folded in: §27.5 names "Delivery and satisfaction survey" as two events and `backer_satisfaction_survey` is 21b's, so linking to a control that does not exist yet would be the §1.4 failure. Deduped per RESERVATION, and a `do_not_fulfill` share is never told its reward is ready.
-- **The obligations are deadlines over stored anchors, and §6 names none of them.** 48 hours from `campaign_close_at` for the close confirmation; 30 days from the FIRST capture for the update cadence (a later in-window recovery must not restart everyone's clock). §6 fixes neither, so on 19a's `TRANSFER_EARLIEST_DAY` precedent the Spec's own numbers are pinned constants rather than settings nobody agreed to. The cadence stops at delivery — §22.5's "from charge to delivery" — which is also why a delivered campaign cannot accrue §22.7 silence. One resolver, `readFulfillmentStatus`, is what the Founder surface, the Admin panel, and the Day-14 queue all render.
-- **§22.4's checklist is one function, two readers.** §22.4: "Admin and Founder see the same checklist and evidence list", so `day14Checklist(campaignType)` is called by both routes and there is no Admin-only or Founder-only item to drift. Product gets §22.4's own "may show actual feature/reward access" as an OPTIONAL fourth item; every item carries an example, because a checklist without one is a demand.
-- **The receipt is durable because it is insert-only (§22.4).** `day_14_evidence_submissions` and `_items` have no UPDATE and no DELETE grant; a resubmission is a NEW receipt with its own `D14-…` reference (16b's alphabet) and the earlier one survives. The quoted decision due time is the campaign's own Day 14 anchor — `campaign_close_at + 14 days`, §22.4's own number, because §6 fixes `product_remaining_payment_day` for the *payment* and §22.4 applies the review to every campaign including Idea ones whose payment day is 3. A late submission's receipt says the decision is overdue rather than inventing a fresh promise (16b's rule).
-- **Outcome and findings can never disagree.** `day14OutcomeIsConsistent` refuses a pass with no adequate progress evidence, a pass with no required communication, a pass carrying failure reasons, and a fail carrying none — by name in the service and by CHECK in 0034. The decision is write-once by trigger. §29.4's rule holds at the customer explanation: 16a's `containsRawProviderCode` refuses a provider or fraud code at the point an Admin can still fix it.
-- **The consequences differ by campaign type, and only the block is automatic (§33.10.3).** Product failure blocks the unreleased remaining payment; an Idea campaign has no unreleased payment, so §22.4 makes its review enforcement-only and the two lists differ by exactly that line. `day14PaymentBlock` is 20b's `campaignEnforcementHold` shape applied to a recorded review — DERIVED, so there is no flag to set or forget — refusing `day_14_failed` by name at `createFounderPayment` and `releaseFounderPayment` and naming the §22.4 findings in `readFounderPaymentStatus`'s blockers. It blocks the REMAINING payment only: a released first payment is not "unreleased", and recovering it is §22.4's separate best-effort line, which is an Admin-recorded §24.8 case (20a) and never an automatic reversal. Every recovery consequence is `automatic: false` for the same reason — a review outcome must not walk past 20a's cause, preview, and execute.
-- **A permanent ban is unreachable without a defined trigger (§33.10.4).** `ghostBanTriggersMet` is pure over stored timestamps and returns the met triggers, possibly none; `recordGhostBan` refuses any trigger not among them, by name. There is no `other`/`discretionary` enum member, no free-text trigger column, and no override parameter, so "seems inactive" has nowhere to enter. Two triggers are campaign-type-exclusive and the kernel gates on a map rather than an `if` a later edit could drop. Where §22.7 joins conditions ("without an updated timeline AND the required notice or approval", "failure to deliver PLUS failure to communicate") the kernel requires BOTH — for a permanent sanction the conjunctive reading is the recoverable-side error.
-- **The evidence for a trigger has to be a record.** A `failed_day_14` ban is refused by a 0034 trigger unless it cites a Day 14 review of its own campaign whose outcome is actually `fail`; the evaluated facts are stored on the ban row so the decision is reproducible. All five §22.7 fields are NOT NULL and non-blank, the notice is refused for a raw provider code, and one row per Founder by unique index makes "one strike" the database's answer.
-- **Permanent means there is no lift.** `founder_ghost_bans` has no UPDATE and no DELETE grant, no `lifted_at`-shaped column, and no `liftGhostBan` anywhere — §22.7 states the ban is permanent and names no reversal, so writing one would be §1 rule 6. The ban does NOT kill the campaign: §26.7's suspend/kill is 20b's recorded decision with its own reason category and complete effects, and §23.1's only edge into `banned_founder` is from `killed` — so this takes that edge when, and only when, the kill has already happened through 20b's machinery.
-- **`fulfilled` and `closed_resolved` are different states, structurally.** Delivery enters §23.1's `fulfilled` and writes §23.3's independent `fulfillment_active` flag row; §22.11's reconciliation is 21b's and nothing in 21a writes it. Money reconciled does not mean the product shipped, and here that is two different columns on two different records rather than a convention.
-- **`internal_day_14_due` finally has its sender**, once per campaign from the hourly `day-14-review` sweep, which also opens the review — idempotent by the one-per-campaign unique index. `founder_day_14_review_result` is sent by the decision, deduped per review row: 19b left the key deliberately unsent because the review itself was out of scope, and this is it. There is deliberately NO ghost-ban notification key — §27 names none, §22.7's "notice" is a recorded field on the ban, and §27.3's suspension/kill notices are what a Founder receives when enforcement also stops their campaign.
-
-### Creator earnings, the one Transfer, and the thank-you (§22.1, §22.2, §24.4, built Phase 19a)
-
-`shared/src/close/earnings.ts` owns the §22.1 completion-outcome register, the earned-percentage and per-row finalization kernels, the B.7 state transitions, `TRANSFER_EARLIEST_DAY`, and the §22.2 constants; `backend/src/close/earnings-logic.ts` restates them (drift-tested); `backend/src/close/earnings.ts` + `earnings-notifications.ts` own the services; migration 0030 the guarantees. **§33.8.1–§33.8.8 and §33.8.14 pass, and the §11 tax gate gates every Transfer.**
-
-- **The five §22.1 cases are a register, and the fifth is a parameter.** Four outcomes an Admin records (`no_valid_post`, `valid_post_later_incomplete`, `complete_verified`, `disqualified`); "no fixed arrangement: commission only" is the absence of an allocation, so `completionConsequence(outcome, hasFixedArrangement)` decides the matrix. §33.8.6's trap — cancel everything — is structurally impossible: the second row's `commissionDisposition` is `genuine`, and §33.8.7's is `eligible_full` whatever the sales were. Decisions are append-only (a disqualification discovered after the Transfer is a NEW row and the earlier answer survives); the SAME outcome twice is refused, which makes a double-submit safe without making history rewritable. A waiver is recorded only with BOTH the Founder's and Admin's agreement — CHECK and service, each naming the missing half.
-- **Finalization happens once, and the §24.4 identity is a CHECK.** `finalizeCreatorEarnings` computes the earned percentage (locked total + triggered bonus, bounded by the bonus's own cap and the §6 ceiling) over the captured, VALIDLY attributed (`attribution_status = 'verified'`), pre-tax subtotal, per reservation — earned per row, remainder returned per row, so `earned + returned = provisional` holds at the row, the finalization record (CHECK-pinned), and the campaign aggregate 16a's `provisionalReconciles` compares. One transaction writes the unique `creator_earnings` row, the bonus's set-once earned result, the reservation columns, and the aggregates; a second call finds the row and changes nothing (§33.8.2). Amounts are trigger-immutable; an adjustment is its own recorded act, never an edit.
-- **The unearned return has no provider leg today, and the comment says why.** Under the approved direct-charge configuration no platform-side fee is debited at capture (§24.1's "where supported" is not yet enabled), so the unearned remainder is already WITH the Founder — the return is the ledger resolution of the liability, written once. If production later collects the application fee, the return gains its provider leg through the application-fee refund path; the ledger contract does not change. Provisional never becomes Proovd revenue: the 5% is untouched by finalization and the suite asserts it.
-- **The one Transfer is the capture-attempt pattern rerun (§33.8.3, §33.8.4).** `affiliate_transfers` is unique per association; the row is claimed `initiated` BEFORE the provider call under the stable key `affiliate-transfer:<associationId>`; a synchronous creation failure (there is NO `transfer.failed` webhook, §32.3) records `failed` and the `affiliate-transfer-retry` sweep re-drives it under the SAME key — the retry is the same Transfer at Stripe, and the memory gateway's key cache is what the suite counts. The total is CHECK-pinned to `commission + bonus + fixed`; a `created` row is trigger-immutable. Gates in order, each refusing by name: earnings `approved_for_transfer` (a named Admin signed the number off), Day 3 from `campaign_close_at` (§6 names no setting; §22.1's number is the value), `readTransferGate` (Phase 10b's gate finally has its money caller), and a payouts-capable recipient account. US$0 finalized refuses approval with `nothing_to_transfer` — approving a Transfer of nothing is a promise nothing will honour (§1.4).
-- **The fixed return is Phase 11's refund shape under Phase 13's key.** `returnFixedAllocation` claims `creator-payment-return:<allocationId>` before refunding the §24.7 funding charge whole; `returned` and `paid` are terminal by trigger — §33.8.8's "cannot repeat" is the database's answer (a support-script UPDATE gets the same refusal the service does). The Transfer that includes the fixed component moves the allocation to `paid` in the same transaction, with §16's `Fixed Creator payment paid` label waiting in `labels.ts`.
-- **The association's `affiliate_id` is the §8 prospect id, not the account.** The Creator's account identity for the recipient connected account is `affiliate_signup_profiles.claimed_user_id` — `loadAssociationContext` joins through the profile, and anything keying a connected-account lookup off `affiliate_id` would route money at a UUID nobody owns.
-- **B.7 is one source, many renderers (§33.8.13's 19a half).** The Creator close view renders the recorded state and amounts from the one `creator_earnings` row (estimated remains the honest pre-finalization state); the finalized/transfer/payout emails render the SAME `resolveAffiliateMoneyStatus` block; the Admin queue (`readCampaignEarnings`, on `/admin` close operations) serves the same stored record. `payout.paid`/`payout.failed` on the Connect endpoint move `transferred → paid_out / payout_failed` per earnings row (balance-level at the provider, so per destination account), deduped per earnings row and payout id; `payout_failed`'s action is the Stripe-managed update path, and the raw code stays internal (§25.6). Transitions are enforced by trigger — an illegal reversal is impossible, not merely unwritten — and every move is an insert-only history row.
-- **The thank-you computes nothing, and cannot reach campaign money (§33.8.14).** `thank_you_records` is recognition-or-payment with the mixture CHECK-refused: a recognition carries no amount and no provider object (§22.2: "Admin may record recognition but cannot promise or send money"); a payment needs the typed amount, the recorded tax/accounting approval, the tax treatment, the approved recipient path, and all three Admin-confirmed eligibility facts. The funding source is CHECK-pinned to `proovd_retained_listing_fee_revenue` and the gate is evidence: a listing payment exists, unrefunded, no §31.6 cancellation pending, and the amount fits inside the retained subtotal. The provider Transfer carries no campaign reference and no `source_transaction`; the table has no reservation/charge column (asserted in `information_schema`); one payment per association by partial unique index; and there is deliberately NO §27 thank-you notification key — an automated congratulations is the promise §22.2 forbids.
-- **`internal_money_decisions_due` and `internal_deliverable_verification_due` remain deliberately unsent.** §27.6 names them but no §6 setting fixes a due time distinct from what the Admin close queue already surfaces; a key with no sender claims a message the product does not send (§1.4), and the queue is where the due work is visible. 19b revisits them with the Day 3/Day 14 schedule objects.
-- **The reconciliation register's four §22.1/§24.4 items now carry derived facts.** `readReconciliation` fills `creator_deliverables`, `creator_bonus_triggers`, `provisional_vs_earned` (with the identity compared), and `unearned_return` from the new records — the verification is still an Admin's recorded judgement; these are what they verify against.
-
-### The Founder W-9, the payment schedule, and early remaining release (§22.3, §24.5, built Phase 19b)
-
-`shared/src/close/founder-payments.ts` owns the W-9 machine, the schedule register, the eligible-share and payment-amount kernels, and the four-proof early-release register; `backend/src/close/founder-payments-logic.ts` restates them (drift-tested); `backend/src/close/founder-payments.ts` + `founder-payment-notifications.ts` own the services; migration 0031 the guarantees. **§33.8.9–§33.8.13 pass — §33.8 is complete.**
-
-- **A Founder payment cannot exist without a verified W-9, at the level a hand-written INSERT cannot bypass (§33.8.9).** `founder_payments.w9_record_id` is NOT NULL and the 0031 shape trigger refuses any row whose W-9 record is not `verified` for its own campaign — the service refuses first by name (`w9_missing`/`w9_not_verified`), the database refuses regardless. The W-9 is requested at close-batch completion (the 08c after-transaction shape — idempotent by the one-per-campaign unique index; the schedule sweep re-drives a missed one) and only when something captured: a tax form behind no payment is a burden nothing justifies (§1.4). `requested → submitted → verified` with the recorded resubmission edge `submitted → requested`; `verified` is terminal and a verified row is immutable — payments were released on its basis. No column can take a TIN (the 0015 CHECK, reapplied), receipt is an Admin's recorded fact (never a Founder self-assertion, §12's rule), and the prompt dedups per W-9 EVENT row so a genuinely new resubmission request sends while a retry does not.
-- **The release moves no provider money, and the header says why.** Under the approved direct-charge configuration the captured funds settled to the Founder's own account at capture (§24.1), so §22.3's release is Proovd's recorded decision — the payment row, the two §23.3 flags (`founder_payment_eligible` at creation, `founder_payment_paid` at release, each with amount and evidence), the §23.1 lifecycle move (`single_payment_released` / `first_payment_released` / `remaining_payment_released`, conditional UPDATE + history), and the notice (deduped per payment row). There is no gateway dependency in the module at all — 19a's unearned-return posture. Nothing is a §3.2 account, and the suite scans every 19b file and both API payloads for the banned vocabulary.
-- **The eligible share is read, never recomputed, and refuses to exist early.** eligible share = captured pre-tax subtotal − 5% − FINALIZED Creator compensation − cause-based adjustments − allocated Stripe fees, every term a stored ledger column (`affiliate_earned_cents` is 19a's finalization; the adjustments term is the sum of the §24.8 records that exist — Phase 20 writes them, so today it is honestly zero; the Stripe-fee term is what capture recorded, §24.5). A payment refuses `creator_earnings_not_finalized` until every provisioned cent resolved (`provisional = earned + returned` at the aggregate); before that the status shows the provisional-based floor labelled "at minimum" (§1.4). The exact share lands in `founder_net_cents` at creation — §26.6's "what is actually payable" line finally has its writer. Tax has no field in the kernel's input type (§24.3).
-- **One payment object per (campaign, kind), and the model decides the kinds (§33.8.10).** Unique index on (campaign, kind); the shape trigger refuses a `single_payment` on a Product campaign and a `first_payment`/`remaining_payment` on an Idea campaign against the §9-locked type. Day 14 for an Idea campaign is fulfillment/enforcement review — the sweep creates nothing, no route creates a second object, and the suite runs the sweep at Day 15 and counts one row. `due_at` is CHECK-pinned to the stored close anchor + `scheduled_day` in HOURS (0028's DST reasoning); the day and percent are read from the §6 settings at creation and frozen on the row; a released payment is immutable and `eligible → released` is the only legal move. Time gates live in the service (injected clock), never in triggers — 18b's rule: tests move time, not the anchor.
-- **The remaining payment is the exact remainder, enforced against its sibling (§33.8.11).** `remaining = eligible share − first payment`, so first + remaining = share to the cent — never two independent floors. The shape trigger requires a RELEASED first payment on the same eligible share and the exact remainder amount. The §22.3 Idea single payment additionally requires the recorded payment/risk checks note and a named approver (CHECK + service) — the §31.7 rule holds: the checks are an Admin's recorded judgement, never a computed score that refuses automatically.
-- **Early release is a request, evidence, a decision, and only then a payment — each gate refusing by name.** The §6 control (`product_early_remaining_payment_enabled`) ships disabled and gates both the decision and the create path. The Founder's ask is `early_release_requests` (one pending per campaign by partial unique index, §31.6's shape; ack + result notifications dedup on the request row). The four §22.3 proofs are `early_release_evidence` — insert-only, latest wins, every answer CHECK-required to carry its detail, and `delivery_available: false` with an "internal readiness" detail refuses exactly as §22.3 demands. Approval requires all four true + Day 3 passed + W-9 verified + first released; the early-created payment stores `released_early` and its evidence FK (CHECK-tied). Nothing about the early path skips Day 14 (§33.8.12): the machine keeps `remaining_payment_released → day_14_review`, the pinned `EARLY_RELEASE_NEVER_SKIPS_DAY_14` sentence rides the decision, the release notice, and the status view, and no Day-14 record exists in 19b for an early release to have satisfied (the review is Phase 21's).
-- **One resolver, many renderers (§33.8.13).** `readFounderPaymentStatus` is the only place the §22.3 status is composed — exact amount affected, requirement/blocker by name (`blocked` without a reason is the forbidden word respelled), the pinned secure action, submitted/verified state, next review date, `No action needed` while under review. The Founder route (`GET /api/founder/campaigns/:id/payments`), the Admin queue (`GET /api/admin/close/:id/founder-payments`), the §26.6 `founder_payment`/`early_release_evidence` lines (no longer hardcoded `populated: false`), and every email body render its output; the suite deep-compares the Founder and Admin payloads and the email amounts.
-- **The §27.6 internal notices are finally sent, and one key still deliberately is not.** The schedule objects give `internal_money_decisions_due` and `internal_deliverable_verification_due` their §6-derived due time (the model's first payment day), so the `founder-payment-schedule` sweep sends both, once per campaign — exactly what 19a said it was waiting for. The same sweep moves a still-unverified campaign `closed_reconciling → captured_pending_w9` (§23.1's own state, entered at the moment its entry rule describes) and sends `founder_w9_block` with the exact amount affected. `founder_payment_blocked` remains unsent: every block 19b can detect is the W-9 (its own key) or a judgement whose records are Phase 20's; `founder_day_14_review_result` is Phase 21's.
-
-### What Phase 17 owns, and where it was split
-
-`docs/phases/phase-17.md` bundles eight deliverables against eight named tests — Glance, Act, Explore, live editing, threshold events, the Creator live surface, mid-campaign addition, and the Backer before close. The brief did not name a seam, so this session added one to the file (master-plan §1.3 step 6): scope 1–3 and 5 are the **observed campaign** — what the Founder reads, and the counting and event substrate under it — while 4 and 6–8 are the **changes people make while it runs**. The acceptance tests fall the same way:
-
-| Half | Scope | Acceptance | State |
-|---|---|---|---|
-| **17a** | §20's Glance, Act, and Explore, plus the threshold/campaign event substrate: derived new/canceled/net counts, threshold crossings, the four milestones, and the absence of any scheduled engagement email | **§33.6.6–§33.6.11** | **built** |
-| **17b** | Live editing's three tiers, the Creator live surface, mid-campaign Creator addition, and the Backer before close — including the §18 comment thread 14c left for the Backer identity | **§33.6.12, §33.6.13** | **built** |
-
-17a builds **no write path for campaign content and no roster change**. 17b reuses 17a's Act candidate sources rather than adding a second ranking.
-
-### The close batch, the threshold decision, and capture (§21, §4.1, §24.2–§24.4, built Phase 18a)
-
-`shared/src/close/index.ts` owns the §21 step register, the §33.7.8 failure vocabulary, the §4.1 merged-identity fold, and Appendix B.5 with its bracket-refusing resolver; `backend/src/close/` owns the services (restating all of it in `logic.ts`/`restated.ts`, drift-tested); migration 0028 the guarantees. **§33.7.3 through §33.7.8 pass.**
-
-- **Idempotency is the phase, and it is mechanisms, not care (§33.7.7).** The batch row is unique per campaign — a second run resumes, never restarts. Every status move is a conditional UPDATE + history row. Every PaymentIntent is created under the stable key `reservation-capture:<id>:1`, claimed as a `reservation_capture_attempts` row BEFORE the provider call, so a crash anywhere between claim, call, and record retries as the SAME intent at Stripe. The ledger write claims `reservation_captured:<id>` inside the transaction that moves the status. Every message dedups on the reservation or campaign. The suite runs the batch twice, replays signed webhooks under both the same and fresh event ids, and kills the transport mid-batch — all three change nothing.
-- **The webhooks and the batch share one applier.** `payment_intent.succeeded/payment_failed/requires_action` are registered on the **Connect** endpoint (§24.1: direct charges live on the Founder's account) and call the same `applyCaptureSuccess`/`applyCaptureFailure` the batch calls, bound through the stored §32.4 object and cross-checked against the delivery's metadata. A delivery that does not reconcile is recorded and routed to Admin, never guessed into place.
-- **The threshold is decided once, from the state at exactly close, and the database keeps it (§33.7.5).** The decision (required, unique count, met, decided-at) lives on the batch row and an immutability trigger refuses to move it — a later payment failure moves the campaign to `capture_retry_window`, never back to `ended_no_charge`. An open §4.1 case **blocks the decision**: the batch parks as `waiting_dedup_resolution` rather than inventing an Admin judgement (§1 rule 6), and the sweep resumes it once `decideDeduplicationCase` has run. A `merged` decision folds transitively — the close suite proves three identities with one merge decide as two.
-- **The miss path creates nothing (§33.7.4).** No gateway call exists on it: reservations move to `threshold_not_met_no_charge` (a terminal state — future-charge eligibility is removed by the machine, not a flag), capacity releases, operational shares flip to do-not-fulfill, cards detach reference-safely (the 15b/16b comparison, decided before anything closes), and the campaign ends `ended_no_charge`. No PaymentIntent, no refund object — there is nothing to refund.
-- **An unusable tax calculation means no charge, never a substituted total (§21 step 6).** `validateCaptureUsability` is pure over the stored snapshot — calculation present, unexpired, US billing, reward association, and `total_authorized = subtotal + tax` exactly — and writes `tax_close_usable` (the §25.2 column 15a left for this phase; `reservation.tax_close_usable` is already in 16a's override register for the Admin who disagrees). Unusable → `capture_failed_dropped` with `tax_calculation_unusable` recorded, a US$0 notice, do-not-fulfill — and no PaymentIntent.
-- **One window, anchored at the FIRST failure, fixed three ways (§21 step 8).** The hours are read from the §6 `capture_retry_window_hours` setting at batch start and stored on the batch row (§29.6); a conditional UPDATE (`WHERE first_failure_at IS NULL`) anchors the window once; a CHECK pins `retry_deadline_at = first_failure_at + make_interval(hours)`; the trigger refuses to move either. All three §33.7.8 kinds — decline, insufficient funds, requires-action — enter `capture_failed_retrying` under it, and `requires_action` is deliberately not converted to a failure at the provider (`error_on_requires_action` unset) because §21 routes it to a customer-action recovery.
-- **Appendix B.5 is exact text with one action, and the raw code never reaches it.** The resolver throws on any surviving bracket; the decline code lives on the attempt row and in the audit reason (§25.6), and the suite asserts the B.5 email contains neither `generic_decline` nor `insufficient_funds`. The money-moved line is the pinned `NO_MONEY_MOVED_STATE` — §21's "whether any money moved", stated as a fact.
-- **The ledger is written at capture, both levels, in one transaction (§21, §24.3, §24.4).** Reservation columns and campaign aggregates together — 16a's money controls read the aggregates and mark them populated once the lifecycle arrives. The provisional slot holds the **maximum** the attributed Creator could be owed (locked total + conditional bonus, bounded by the bonus's own cap and the §6 ceiling), the Founder gross share is the exact remainder, and the backend's `captureLedger` is drift-tested against the one shared waterfall. Unattributed charges provision zero.
-- **`Campaign ended` fires at close and is not `Results ready` (§33.7.11's 18a half).** One key, deduped on the campaign, sent by the batch with the outcome stated factually; `founder_results_ready` is deliberately **not** restated in `events.ts` — a key with no sender claims a message the product does not send (§1.4), and 18b's preparation is its sender.
-- **The anchors gate, not the sweep tick.** `campaign_close_at` itself ends Backer cancellation (`cancelReservation` refuses `campaign_closed` at the instant) and mid-campaign joining (17b's `already_closed`); the `campaign-close` job (its own 5-minute cron) only notices. `retrying` is a §23.3 payment-flag row with the window facts, written once beside the `capture_retry_window` transition — never a lifecycle value.
-- **An incomplete batch is the honest state, and resuming it is the design (§33.7.12's substrate).** A transport error leaves the attempt row unresolved, the reservation locked in `pending_capture`, and `completed_at` NULL; the sweep (`sweepCampaignCloses`) picks up every `closed_pending_capture` campaign and finishes under the same keys. 18b's `/admin/close` renders and operates this.
-
-### The retry window's end, recovery, results, and reconciliation (§21, §33.7.9–§33.7.12, built Phase 18b)
-
-`shared/src/close/index.ts` gained the §21 reconciliation register, the five results-narrative fields, and the retry-window US$0 sentence; `backend/src/close/retry.ts`, `results.ts`, `reconciliation.ts`, and `creator-close.ts` own the services; migration 0029 the guarantees (`campaign_results` + `campaign_reconciliations`, both insert-only). **§33.7.9 through §33.7.12 pass — §33.7 is complete.**
-
-- **The update-card retry is the close batch's own mechanisms, re-run (§33.7.9).** A new card is a fresh SetupIntent on the same Customer (the original `setup_intent_id` is trigger-immutable and stays — §23.5); the retry claims the NEXT stable attempt key (`reservation-capture:<id>:2`) as a row BEFORE the provider call, exactly as attempt 1 was claimed. Context preservation is structural: the service writes only the four payment-method columns, and the suite asserts survey, consent, reward, amounts, and the original SetupIntent are byte-identical after recovery. Success flows through the ONE `applyCaptureSuccess` — `capture_failed_retrying → captured` is what removes the stale failure; nothing hides it optimistically.
-- **`applyCaptureSuccess` now reports the state it applied FROM, and §27.5's two messages stay two.** A capture from `pending_capture` sends the charge receipt; one from `capture_failed_retrying` sends `backer_retry_success` — whether it arrived synchronously from the retry or asynchronously from the `payment_intent.succeeded` webhook after a `requires_action` confirmation. A recovery is never two emails and never a second receipt.
-- **`requires_action` is routed, never silent (§21).** The gateway result carries the intent's client secret; the route answers `requires_action` with it; the magic-link surface renders the customer-action state ("your bank asks you to confirm — nothing has been charged yet"); the Connect webhook completes the capture through the same applier when the Backer acts. The attempt row records `requires_action` and the reservation stays in the window.
-- **The magic-link failed state IS Appendix B.5 (§21).** `readBackerPage` resolves the same B.5 body the email carried — money-moved fact, amounts, deadline in UTC — with the one `Update card` action, and `available` turns false at the stored deadline: the anchor gates, not the sweep tick, and `updateCardAndRetry` refuses independently after it.
-- **The window's end drops at zero by construction (§33.7.10).** The ledger is written only at capture, so a dropped reservation's revenue/commission/share columns were never written — the suite asserts the campaign aggregates are byte-identical before and after the drop, and that a dropped *attributed* charge provisioned nothing. B.5 promised "canceled after the retry window", so the drop reference-safely detaches the card (the §33.7.2 comparison, run against every state that might still charge), flips do-not-fulfill, and sends the pinned US$0 closure under the same `backer_retry_dropped` key the tax-unusable drop uses. An in-flight attempt found at the deadline is resolved under its own key FIRST — dropping it blind could drop a charge that succeeded at the provider — and an unresolvable one keeps the campaign visibly in the window for the next tick.
-- **The batch's stored deadline is immutable, so the tests move TIME, not the anchor.** `endRetryWindow`/`sweepRetryWindowEnds` take `now`; asserting window-end behaviour means passing `deadline + 1s`, never editing `retry_deadline_at` (the 0028 trigger refuses).
-- **`Results ready` is a gate with three conditions, and one sender (§33.7.11).** Charge/retry outcomes final (`closed_reconciling`/`ended_no_charge` — "reconciliation begins only after the window closes" refuses by name), the four required-for-results reconciliation items verified (latest row per item wins), and the five-field narrative recorded. `prepareResults` inserts the unique `campaign_results` row, writes the §23.3 `results_ready` payment flag in the same transaction, and sends `founder_results_ready` — a different key from `founder_campaign_ended`, which is the whole of §33.7.11.
-- **The results numbers are computed, the narrative is recorded.** `readFounderResults` reads every §21 number live from the reservation ledger, the status history (failed = ever entered the window; recovered = history rows `retrying → captured`), the attempts, and the click ledger — a snapshot table would be §26.8's drifting-second-store trap with a Founder acting on the drift. The narrative — strongest signal, weakest signal, leading survey reason, what this proves, what this does NOT prove — is Admin-authored (§1 rule 6 forbids the product inventing causality) and insert-only. Survey answers appear only under the Backer's optional consent; Creators are public handles only (§11); a conversion rate over zero clicks is `null`, never 0%.
-- **The §21 reconciliation register is why "all nine items" is assertable.** Four are required for results (batch completeness, tax/charge reconciliation, attribution/post verification, refund/risk/dispute flags); the five money items name what they wait on (Phase 19/20) rather than reading as done (§1.4). A verification row needs both the result AND a non-blank note (CHECK + service), the item key is CHECK-pinned to the register, and the history is append-only — a discrepancy later resolved gets a new row and the earlier answer survives.
-- **The Creator close view computes estimated earnings and says why they are not final.** B.7 renders server-side now (the resolver restated in `campaign/editing-logic.ts`, drift-tested) because there is finally an amount: the locked percentage over captured attributed pre-tax subtotal. Finalization, the bonus, and the fixed-payment completion are §22.1's, Phase 19's, and the surface says so. No field of the view is a rank — §30's leaderboard ban is structural, and the `affiliate_campaign_closed` notice (deduped per association, sent from whichever path finalizes outcomes first: clean completion, window end, or threshold miss) carries the same facts.
-- **Resume is the same machine, not a recovery path (§33.7.12).** `/admin/close` leads with incomplete batches — locked counts, unresolved attempts, open §4.1 cases — and its Resume runs `runCloseBatch` + `endRetryWindow`, the exact idempotent services the sweep runs. "Retry does not double-charge or duplicate receipts" is the stable keys and per-entity dedups, not the route being careful. Reads are `admin`; resume, reconciliation, and results take the freshness gate.
-- **`internal_failed_payment_spike` remains deliberately unsent.** "Spike" needs a threshold and §6 names none; inventing one is §1 rule 6, and a key with no sender claims a message the product does not send (§1.4). `internal_retry_reconciliation_complete` IS sent, once per campaign, when the window ends.
-
-### The Founder campaign home and the live event substrate (§20, §31.9, built Phase 17a)
-
-`shared/src/live/index.ts` owns the registers and the pure derivations; `backend/src/live/` owns the services (restating the registers in `logic.ts` and drift-testing them); migration 0026 the guarantees; `frontend/src/surfaces/founder/CampaignHome.tsx` the surface. **§33.6.6 through §33.6.11 pass.**
-
-- **"Successfully delivered" is a receipt, not an assumption (§33.6.6).** §20 says last-seen advances "only after the rendered state is successfully delivered", and a server cannot assert that about its own response — the connection can drop after the last byte. So `readGlance` issues a `campaign_home_deliveries` row carrying exactly the count it rendered and **advances nothing**; `acknowledgeDelivery` is a separate write and the only thing that moves the position. A render that threw never acknowledges, the receipt stays open, and the next read computes the same delta. The surface's acknowledgement lives in an effect that runs *after* React commits, for the same reason. The advance goes to the *receipt's* count, never the count at acknowledgement time — otherwise acknowledging a delta you read would consume one that arrived while you were reading it. Acknowledge-once is a trigger, the position is monotonic by trigger, and both are per viewer.
-- **There is no counters table, and that is the design (§33.6.9).** §20 asks that new pre-orders, cancellations, and net change be "stored separately"; `reservation_status_history` already stores one row per transition and is append-only, which is separately in the strongest form available. A second set of counters would be 16b's timeline mistake in a different phase — except worse, because a Founder reads this one and acts on the drift. `readPreorderCounts` partitions one set (every reservation that ever became active) by *current* status, so `active + canceled + otherExits = new` holds by construction and `reconcileCounts` throwing is a genuine impossibility. `otherExits` is its own number because a §26.7 kill is not a Backer changing their mind.
-- **A crossing is deduplicated by state transition, and the database enforces alternation (§33.6.10).** `crossingFor` compares against the last crossing actually recorded, so a campaign that crosses up, down, and up again emits three events and a hundred evaluations with no movement emit none. That is what makes it safe to run on *every* pre-order and *every* cancellation — which is where it has to run, because a sweep alone would miss a cross-and-recross between two runs. Three mechanisms: the campaign row locked `FOR UPDATE`, the 0026 trigger refusing a second same-direction row (and refusing a `lost` on a campaign that never reached), and the notification keyed on **the crossing row** rather than the campaign — keying on the campaign would satisfy §27.2 and swallow the second crossing, §7's resend failure in another phase. A Product campaign never crosses: §14.4 gives it no public funding gate.
-- **Rank 4 is not a cadence, deliberately (§33.6.11).** §20 names "Required campaign update due" and neither §6 nor §14.4 states an update cadence. §1 rule 6 forbids inventing one and §33.6.11 forbids what an invented one becomes, so an update is *required* only when a material delivery change has been recorded and §18's prior/revised pairing has not been published — a real consequence with a real record. Every one of the five Act candidates comes from an existing table; there is no branch that produces one from a date, a duration, or an absence, and no notification key, job name, or schedule column anywhere in the phase that a check-in could hang off.
-- **The caught-up ending has no fallback branch.** §20: "show no manufactured CTA"; DNA §5.4 makes it a designed done-moment. `decideAct` returns `caught_up` with the exact §20 sentence and no href, and the surface renders no button — there is nowhere for one to be added without deleting the code that says not to. The documented safety override promotes a **real** candidate or promotes nothing; an override naming a kind with no record cannot manufacture an action.
-- **Every correction stores prior rank, reason, actor, and time, insert-only (§31.9).** §20 names three kinds and they mean different things — a dismissal says it should not have been shown, a reclassification says it was the wrong rank, a correction says the record was wrong — so collapsing them would destroy §31.9's next-action correction rate. The safety override is a fourth kind in the same table, because a second table would leave two places to look for why the Founder saw what they saw. One live override per campaign by partial unique index; withdrawing it is its own recorded act, not an edit.
-- **Explore is a first-class space, not a bin (§33.6.8).** DNA §5.2. Eleven sections in §20's order, each carrying the definition of what its numbers count — §20's last bullet made structural rather than one panel at the bottom, because two people reading "conversion" differently is the ordinary failure of a metrics screen. 16a's rule carries through: a section whose phase has not run names what it is waiting for instead of showing a zero, and a conversion rate over zero clicks is `null` rather than 0%. §11's Founder boundary holds — public handles only, and survey answers only where the Backer consented.
-- **Never "real time".** §20 says freshness reads `Updated 3:40 PM` and §30 bans the claim. `BANNED_FRESHNESS_TERMS` is a register scanned across every Phase 17a payload and file by test; the payload states `freshnessBasis: 'refresh'` rather than implying otherwise.
-
-### Live editing, the comment thread, and mid-campaign Creators (§20, §15, §18, built Phase 17b)
-
-`shared/src/live/editing.ts` + `earnings.ts` own the registers; `backend/src/campaign/live-editing.ts`, `comments.ts`, and `affiliates/mid-campaign.ts` own the services (restating the registers in `campaign/editing-logic.ts` and `affiliates/obligations.ts` and drift-testing them); migration 0027 the guarantees. **§33.6.12 and §33.6.13 pass, completing §33.6.**
-
-- **The tier is a property of the field, not of the Founder's opinion (§33.6.12).** §15 makes materiality an Admin judgement recorded with its reason, and 12b's `recordMaterialChange` was built to *take* a classification rather than guess one. So nothing asks the Founder what kind of change they are making: `tierFor` looks the field up in the §20 register and the answer decides. A `requires_review` field has no direct write path while live, whatever anybody calls the edit — which is what makes "material edits cannot publish directly" structural rather than a promise about behaviour. **There is exactly one Founder edit route**, not one per tier: a route per tier would let a caller choose which rules apply by choosing a URL.
-- **Column three is a different answer, not a slower column two.** A `never_direct` field is refused with its reason and **no request is opened** — the suite posts at the campaign type, the Idea threshold, the internal target, a reservation's reward snapshot, and an accepted percentage, and asserts nothing moved and no request exists. Most already have a database guarantee behind them (the §9 type-lock trigger, the §14.2 agreement immutability, the write-once reservation snapshot); the register names them so the absence is checkable.
-- **The FAQ loophole is closed by routing, not by refusing (§20).** An FAQ answer is a column-one field, so without a check it would be the one unreviewed path to every promise in column two — §20 names the trap by example: "a Founder editing 'when will I get it?' in the FAQ must not effectively move a delivery date." `commitmentsIn` finds date, price, refund, and delivery statements and the edit becomes a change request instead. It is deliberately **broad**: a false positive costs a review, a false negative moves a delivery date nobody accepted, and the asymmetry decides the tuning. It does not judge whether the text *contradicts* the build — that is §15's judgement, and this only decides which desk the edit lands on.
-- **The prior value is read from the row (§33.12.4's rule, restated).** A caller that supplies both halves can supply a flattering pair, so `campaign_live_edits.prior_value` comes from the stored row and the history is insert-only. "With version history" means both halves or it means nothing.
-- **Applying a request runs §15's machine unchanged.** The phase trap — "Don't rebuild materiality. Phase 12 owns it." `decideChangeRequest` writes the value and calls `recordMaterialChange` with Admin's classification and the affected Creators; a CHECK refuses an `applied` request with no `material_change_id`, so an applied change always has a version and its reacceptance tasks behind it. Applying without a classification is refused by name.
-- **A comment is what people read, and it is frozen.** §18's one general thread plus one per update is one table with a nullable `update_id` — a per-update thread is a filter, not a different record. The author display is resolved at post time and stored, because resolving it on read would let a later name change silently rewrite what other people already saw. `backer_identity_id` is NOT NULL, so there is no row shape for an anonymous or Founder comment.
-- **`Backer ###` is a per-campaign sequence, and the local part is refused outright.** The number is derived from nothing about the person — one derived from an id or an address is a handle that leaks whichever value produced it — and it restarts per campaign so it leaks no platform volume either. A chosen name equal to the Backer's own email local part is refused, which is stricter than §18's "never by default": someone typing their own local part has probably not realised the thread is public, and a CHECK refuses an address at the database level regardless.
-- **Flagging routes to a person and hides nothing.** §18 gives no automatic moderation and §1 rule 6 forbids inventing one, so a flagged comment stays visible until an Admin decides; auto-hiding would hand every reader a removal button. One open flag per comment per reporter. A removal names who and why (§25.6) and the row survives.
-- **"No retroactive attribution" needed no new code, and that is worth knowing.** The 14b ingest decides every click against the link's own `activated_at` and writes `ignored/before_activation` into the ledger. So the guarantee was already structural; 17b's job was only to set the new link's `activated_at` to **now** rather than to `campaign_live_at` — which is what 14a's launch does for the initial roster and would have been exactly wrong here.
-- **The remaining-time terms are frozen because they are what was accepted.** A Creator who joined with nine days left accepted a nine-day deliverable; recomputing it later would show them a window that has shrunk since they agreed. `mid_campaign_additions` stores the remaining hours, the close instant, the campaign's **locked** high-effort result (copied, not re-read), and the deliverable sentence, and a trigger refuses every update. The §2.2 cap is checked before the Creator is asked to accept — telling someone they cannot activate after they have agreed is asking them to agree to something they could not do.
-- **The addition touches nothing else.** No write to `campaign_build`, no write to another association, no write to `campaigns.status` — §20 forbids changing public terms or existing Creators' locked terms and forbids reopening review, and the suite asserts the build row and the other Creator's row are byte-identical afterwards.
-- **Almost every earnings state is Phase 19's, and the surface says so.** `estimated` is the honest state during a live campaign: nothing has been captured, so nothing has been earned. Appendix B.7 is pinned and its resolver throws on an unfilled bracket or a missing reason — but it is **not rendered** while there is no amount, because "US$0.00 recorded" reads as "you earned nothing" rather than "this has not happened yet" (§1.4).
-
-### The coordinated launch, first-post verification, and the §29.6 failure (§17, §29.6, built Phase 14a)
-
-`shared/src/launch/index.ts` owns the §17 launch-step order, the seven first-post checks, and the three outcome effects; `backend/src/launch/` owns the services (restating the checklist in `logic.ts` and the business calendar in `business-calendar.ts`, both drift-tested); migration 0020 the guarantees. **§33.4.5 through §33.4.9 pass.** The two §14 tracks are done; from `campaign_live_at` the campaign goes public in a strict order.
-
-- **Page first, links second, and the order is a database fact, not a comment.** `launchCampaign` is one transaction: it moves `creator_prep → live` and stamps `campaign_close_at` from the approved build (step 1), then activates each `ready` Creator's tracking link with `activated_at = campaign_live_at` and moves the association `ready → active` (step 2). A link is therefore never active while its page is not live — the phase's first trap. Steps 3–5 (Creators publish, submit, Admin verifies) are the human sequence in `post-verification.ts`; a post cannot exist before its link is live and a verification cannot exist before its post.
-- **"One state, one set of messages, no money" is three mechanisms (§33.4.6).** The `campaign_launched:<id>` idempotency key claimed first, the unique `campaign_launches` row behind it, and the conditional `creator_prep → live` UPDATE. Launch writes no payment flag, no refund, and touches no allocation — the suite asserts the absence, and the campaign-live emails dedup on the campaign (Founder) and the association (each Creator).
-- **First-post verification releases US$0 (§33.4.7).** `creator_post_submissions` carries no amount, no percentage, no ledger column — there is nowhere for money to move. The outcome decides only whether traffic may later finalize: `passed` leaves it provisional; `correction_needed` and `rejected` pause the link (`paused_at`, keeping `active`/`activated_at` so the 0017 CHECK holds) and the Creator (`active → paused`), and `rejected` additionally records the enforcement reason and preserves evidence. `campaigns.status` is never touched — a rejected post does not unlaunch the page (§33.4.8), and the absence of any write to `campaigns` is the enforcement. A corrected resubmission (permitted while `paused`) that passes resumes both.
-- **The §29.6 deadline is computed once and the database refuses to move it (§33.4.9, §33.12.2).** `recordCreatorFailure` is idempotent by the unique `required_creator_failures` row — a retry returns the first record unchanged — and moves `creator_prep → creator_replacement`; the deadline is three business days from the committed calendar, stored with its version, and an immutability trigger refuses any later edit. The miss path is §14.6's twin: `failReplacement` claims the idempotency key first, sets the roster `failed`, moves to `refunded_no_creator`, returns every funded allocation (`status = returned`, eligibility recorded; the Transfer reversal is Phase 19), and refunds the full listing total through Phase 11's one `refundListingFee` path (trigger `creator_replacement_failed`, already reserved in 0016). A replacement that becomes ready first returns the campaign to `creator_prep`.
-- **The backend restates the business calendar because it cannot import shared at runtime.** `business-calendar.ts` embeds the `us-federal.v1` holidays and the business-day arithmetic verbatim and `launch.test.ts` drift-tests the data and the computed deadline against `@proovd/shared` — Phase 14a is the first backend code to need business-day math, and the answer is the restate-and-drift-test one the enums, settings, and notification keys already use.
-- **The two sweeps live in the scheduler beside the listing clocks.** `campaign-launch` launches every campaign whose scheduled `campaign_live_at` has arrived and is independently idempotent; `creator-replacement-deadline` fails a lapsed §29.6 window and reuses the listing gateway for its refund. Both are safe to run twice.
-
-### The live campaign page, attribution, and discovery (§18, §25.2, built Phase 14b)
-
-`shared/src/attribution/index.ts` owns the §18 vocabulary (the click outcomes, the ignored reasons, the four attribution statuses, the Day 8 window); `backend/src/attribution/` owns the ingest, the signed cookie, and the resolution; `backend/src/campaign/public-page.ts` + `discovery.ts` the page assembly and the Day 8 switch; `frontend/src/features/public/campaign/LiveCampaignPage.tsx` the surface. Migration 0021 the guarantees. **§33.6.1 through §33.6.5 pass.** The Creator active-partnership surface and updates/comments are 14c — they need the Backer identity Phase 15 mints.
-
-- **A click is decided at the click, and the ledger records why it earned nothing (§33.6.3).** `recordClick` reads the link's state at the instant the click arrives — never anything the visitor controls — and writes a `tracking_link_clicks` row with the outcome and, when ignored, the reason: `before_activation`, `paused`, `after_close`, `campaign_not_live`, or `link_test`. A mid-campaign Creator's link activates later, so a click before that Creator's own `activated_at` is `before_activation` — the same rule, which is why "mid-campaign prior traffic earns nothing" needs no separate branch. The ledger is append-only (§25.6): a reservation's attribution and a dispute's evidence reconcile against it.
-- **The winner is a per-browser cookie, and it ends at close (§33.6.1, §33.6.2).** `/c/:code` (the URL a Creator shares — no session, whoever clicks is a visitor) records the click, and on a *valid* one sets `pv_attr_<campaignId>` with `Expires = campaign_close_at`, so the browser drops it at close — the cookie dies at close, not after a fixed window. It is HMAC-signed with `BETTER_AUTH_SECRET` (the `interviews/reference.ts` shape) so a client cannot forge a linkId. A later valid click overwrites it (last-write-wins); an *ignored* click never touches it (a direct return, or a click that cannot win, preserves the earlier winner). The read endpoint `/api/campaign/:id` never writes a cookie — only `/c/:code` does — so a direct return cannot replace one. A separate long-lived `pv_vid` groups a browser's clicks and is the whole of §18's "same browser" limitation: no cross-device promise is made or built.
-- **Provisional until verified, computed live (§33.6.4).** `resolveAttribution` reads the winner from the cookie's linkId and computes the status from the link's *current* state — because a link can pause after the click. A paused link (a §17 correction/rejection) is `blocked`; a link whose first post `passed` is `verified`; anything else is `provisional`. The status is never stored, because storing it would freeze an answer the next verification changes. Nothing here moves money (§33.4.7's rule, downstream): the status only decides whether a later capture (Phase 15/19) may finalize.
-- **The safe link-test contaminates nothing (§14.1).** `/c/:code?proovd_link_test=1` — the marker read by its exact `LINK_TEST_MARKER` name — records the click `ignored/link_test` with `link_test = true`, sets no cookie, and cannot replace or clear an earlier winner. A CHECK ties `link_test` to exactly that outcome, so an attributed click can never be a test and a test can never attribute.
-- **The page renders from the frozen build, and the ended state is outcome-specific (§18).** `buildPublicCampaign` reuses `buildCampaignPreview` — the one assembly of a campaign's public content — so a real campaign and the Founder preview never drift; §15 refuses a build save once live, so the live build *is* the approved content (snapshot-diffing is Phase 17's). A pre-live status has no public page (404); after close/suspension/kill the page stays accessible, disables the pre-order, and the frontend composes copy from `ended.kind` and the campaign facts — never one generic "Campaign ended" (§18). The real page shows no example consent amount: the full A.3/A.4 consent with a real tax total is the checkout drawer's (Phase 15), and Appendix A.2 renders verbatim through the same `expandedMorBlock` the samples use.
-- **Discovery opens once, seven days after live, and rewrites nothing (§33.6.5).** `campaigns.discovery_opened_at` is NULL through Days 1–7 (the page is still reachable through any known link — the endpoint never gates on discovery — it just renders `noindex`); the `campaign-discovery` sweep stamps it seven days after `campaign_live_at`, sends the Founder the one factual notice (deduped on the campaign; §18's browse/organic/house/Creator attribution difference), and a trigger refuses to move it. The open touches no click and no cookie — its only write to a campaign is `discovery_opened_at` — so the switch rewrites no attribution. Safe to run twice: the open is a conditional UPDATE and the notice dedups.
-
-### The formal decisions and the bilateral lock (§14.2, §14.3, §14.6, built Phase 12a)
-
-`shared/src/affiliates/decisions.ts` owns the §14.5 vocabulary and the promise sentences; `backend/src/affiliates/decisions.ts` the three decisions and the versions; `backend/src/affiliates/deadline.ts` the §14.6 evaluation; migration 0017 the guarantees.
-
-- **Two versions can never lock, and the database is what makes that true.** Four layers: every response locks the association row first (`FOR UPDATE`); every state change is a conditional UPDATE on the version's current state, so a stale response *matches nothing*; the partial unique indexes `proposal_versions_one_open` and `proposal_versions_one_locked` refuse a second open or a second locked version for any writer; and the agreement row is unique on the association. §33.2.9/10 test concurrent accept-and-counter through real HTTP.
-- **A version is immutable; a revision is a new version.** The transition trigger refuses value changes, refuses any change to a resolved version, and refuses a recorded decision changing. The proposer's decision is `proposed`, stamped at creation — authoring a version is that side's explicit agreement to its exact values, recorded as what it was.
-- **A counter supersedes FIRST, then inserts, pointing at a pre-minted id.** The one-open index requires the old version to stop being open before the counter can exist, so `superseded_by_version_id`'s FK is DEFERRABLE INITIALLY DEFERRED — the 10b tax-configuration supersession shape, reused for the same reason: the alternative was an exception in the index, and an exception is how two versions come to be awaiting after all.
-- **The §14.3 matrix is read from `app_settings` at decision time.** `resolveCell` restates the shared `resolveCompensation` kernel over the three §6 percentage settings; the suite walks all six cells through both. The Idea-Campaign fixed-payment prohibition is *also* a database trigger on version insert and on agreement insert (§33.2.8), and the ≤50 ceiling is a CHECK on both tables (§33.2.12).
-- **Accept is `accepted`, never `active`.** The tracking link is minted at acceptance with `active=false`, a CHECK pins `active` to `activated_at`, identity is immutable by trigger, and nothing in Phase 12 can flip it — activation is Phase 14's. The safe link test appends the shared `LINK_TEST_MARKER` query parameter, which Phase 14's attribution ingest must exclude by that exact name.
-- **The four §14.2 acceptance requirements are four separate controls (§28.4)** recorded in `association_acceptance_confirmations`, and the §31.5 instance is a `policy_consents` row — so a draft `ip-agreement` refuses acceptance in the open with `policies_unpublished`, exactly as the claims do. The Founder's acceptance of a Creator's version locks compensation without the Creator's confirmations (they authored the terms); §15's readiness rule 6 (12b) is where those records are enforced for the roster.
-- **Admin mediates; Admin never agrees.** `adminRejectVersion` moves a version to `rejected_by_admin`, a terminal state with no path to `locked`; no admin acceptance route exists, and the suite asserts the 404.
-- **The §14.6 evaluation runs inside the deadline sweep, exactly once.** Claimed on `response_deadline_evaluated:<campaignId>` plus a unique evaluation row; both outcomes expire unfinished proposals (§14.2's last bullet); failure sets `affiliate_roster_status = failed`, moves the campaign to `refunded_no_creator`, and refunds through Phase 11's ONE path (`refundListingFee`, triggers `zero_eligible_recruits`/`no_mutual_acceptance`). The refund runs after the decision commits and an unconfirmed one is retried by every later sweep under the same provider idempotency key. A late response meets terminal association states and a campaign no longer in `affiliate_response_and_build` — it cannot revive anything (§33.2.11).
-- **The Founder roster projection keeps Phase 08a's §11 boundary** — no email, no legal name, no quality tier, no verification evidence — and renders status only through the §14.5 vocabulary in `roster-labels.ts` (restated from shared, drift-tested), so no internal §23.4 name can reach a Founder (§3.1). The §14.5 pending-proposal note is Phase 11's shared `PENDING_PROPOSAL_NOTE`, not a second wording.
-- **Bonuses store §14.3's six facts** in `creator_bonuses` — trigger unit, threshold, additional percentage, maximum combined percentage, proposal version, earned result (null until a later phase records it, once, by trigger). The ceiling check runs against the locked agreement when one exists; the earned-result computation is Phase 03's `earnedBonusPercent`, whose attribution filter is the only way a bonus sees money (§33.2.13).
-
-### Campaign building, readiness, review, and materiality (§14.4, §15, built Phase 12b)
-
-`shared/src/build/index.ts` owns the §14.4 ingredient register and the pure §15 six-rule readiness (the frontend imports it, the backend restates it in `backend/src/build/logic.ts` and drift-tests); `backend/src/build/` owns the services; migration 0018 the guarantees. The two §14 tracks run in parallel on the same campaign from `listing_paid_at` — the build routes and the 12a decision routes operate at once, which is the phase's defining structure.
-
-- **`campaign_build_status` and `affiliate_roster_status` are derived, never set.** The build status is recomputed from the stored §14.4 content on every save (`deriveBuildStatus`), and the roster status from the six-rule snapshot (`deriveRosterReadiness`) on every readiness event — a Founder cannot mark their own build complete and an Admin cannot mark a roster ready by hand, because `review_ready` (`deriveReviewReady`, the one shared definition) would then drift from its inputs (§33.3.10). `review_ready` is never a column.
-- **The six §15 rules are a pure function over a gathered snapshot.** `readiness.ts` reads each association's agreement, open proposals, disclosure, tracking, readiness record, and pending reacceptance, and `deriveRosterReadiness` decides — so §33.3.9 is assertable as a fact. Rule 5 blocks only a *required* pending Creator; a declined/removed/non-required Creator recorded as `excluded` (or `included` but not required) stops blocking once Admin records the decision. A `failed` roster (§14.6) is never revived by a readiness recompute.
-- **A Founder cannot publish a material change directly (§15).** The build save and reward-package save refuse outside `affiliate_response_and_build`/`changes_required` — a direct edit to a submitted or approved campaign could be a material change to terms Creators accepted, so it routes through Admin review. The absence of a write path is the enforcement, the 10b posture.
-- **The materiality machine is general, because Phase 17 reuses it verbatim (§15).** `materiality.ts` takes a *classified* change (the classification is an Admin judgement recorded with its reason, never guessed) and does §15's consequence: non-material records and preserves readiness and manufactures no reacceptance task (§33.4.2's trap — a typo fix must not train Creators to click through); material versions, invalidates the affected Creators' readiness (`reacceptance_required`), and creates one `material_change_reacceptances` task per affected Creator carrying the exact changed fields. Readiness drops below `launch_ready` until every affected Creator accepts. The `material_changes` CHECK ties classification to versioning so a non-material row can never carry a version or a reacceptance state.
-- **Review rounds are append-only; a resubmit is a new round.** `changes_required` records grouped `Required before resubmission` / `Optional improvements` feedback with a deep link, owner, due expectation, and enforcement flag (§33.4.1), and preserves all valid work — the build, roster, agreements, and readiness all survive. Approval writes an immutable `approved_campaign_snapshots` row (the build + the locked Creator terms; bigints serialized to strings for JSONB) and moves to `approved`.
-- **The preview is the Backer's `CampaignView`, and it collects no payment.** `preview.ts` assembles the same view model the public campaign page renders from; the frontend reuses the exact A.3/A.4 `consentPreview`. There is no card input, no Stripe mount, and no submit path — §18/§34's sample rule applied to the preview — and the example subtotal/tax/total are labelled as an example because there is no Backer address to tax against.
-
-### The fixed Creator payment and Creator readiness (§16, §24.7, built Phase 13)
-
-`shared/src/creator-payment/index.ts` owns the §16 thirteen-item checklist, its all-or-nothing derivation, and the permitted vocabulary; `backend/src/creator-payment/` owns the fourth money stream and the readiness services (restating the checklist in `logic.ts` and drift-testing it); migration 0019 the guarantees. **§33.4.3 and §33.4.4 pass.**
-
-- **It is a fourth money stream, and no percentage touches it (§24.7).** `creator_payment_allocations` + `creator_payment_funding_attempts` carry no reservation id, no Backer-ledger column, no Connect-account column, and no percentage — §33 asserts the absence in `information_schema`. The funding charge is a platform Checkout with descriptor `PROOVD CREATOR PAY` and **no tax line** (§24.7 excludes sales tax from the stream); the Transfer to the Creator's recipient account is Phase 19.
-- **`ensureAllocation` creates exactly ONE allocation for the exact accepted amount**, read from the locked agreement's `fixed_payment_cents` — which only exists when a proposal version was mutually accepted (§14.2). Idempotent by the unique association index. An Idea Campaign is refused **three ways**: the 0017 version trigger, the 0017 agreement trigger, and the new 0019 allocation trigger — "an Idea Campaign cannot reach a fixed-payment allocation by any path."
-- **Funded is not paid, and partial funding is rejected outright (§33.4.3).** `applyAllocationFunding` marks `funded` only on the *exact* full amount; a partial, over-, or wrong amount records a `failed` attempt and leaves the allocation `payment_failed`, never `funded`. Three idempotency mechanisms: `provider_events` on the event id, `creator_payment_funded:<allocationId>` claimed before marking funded, and the unique attempt session — a replayed or duplicate delivery changes nothing. `funded` is not `paid`; §22.1's completion outcome decides that in Phase 19.
-- **`creatorPaymentKeys` names all four §16 keys** — funding, return, finalization, Transfer — so Phase 19 reuses the scheme rather than inventing a second one. Only funding is implemented here; the return/completion/Transfer columns exist on the allocation for §24.7 completeness.
-- **Readiness is all-or-nothing, derived, and mirrors onto the association status (§33.4.4).** `gatherCreatorReadiness` reads the thirteen §16 facts and `deriveCreatorReadiness` decides; `evaluateCreatorReadiness` moves the association between `ready` and `readiness_blocked` — never set by hand. The fixed-allocation item applies only when a fixed payment was accepted ("if applicable"); twelve of thirteen still blocks.
-- **The two views keep their boundaries.** The Founder sees each Creator's readiness and funding status, the exact blockers, the owner, and the next date — through the public-handle projection only (§11), with `canAskToBegin: false` and **no nudge route** (§16 makes that a product constraint). Admin verifies every item, sets the Admin-configured funding deadline, and schedules **one exact `campaign_live_at`** (`scheduleCampaignLive`, conditional on every launch-required Creator being `ready`); the launch itself is Phase 14.
-- **Missing the funding deadline cancels the association, and the 20% base stops applying.** `cancelAssociationForFundingLapse` removes the association (`§23.4` terminal) and closes the allocation — a removed association has no live compensation, so the reduced base no longer governs. A *funded* allocation is never a lapse.
-- **Never a §3.2 holding-account word**, anywhere — schema, code, logs, copy. A test scans every Phase 13 file for the banned vocabulary.
-
-### The reservation ledger, money controls, risk, and the override machine (§26.5, §26.6, §31.7, §33.12.4, built Phase 16a)
-
-`shared/src/admin/` owns the four registers; `backend/src/admin/` owns the surfaces (restating the registers in `logic.ts` and drift-testing them); migration 0024 the guarantees. **§33.12.4 passes.** This is the surface through which every manual decision is recorded, so weak audit capture here would undermine §1.3 everywhere else.
-
-- **Every §26 list is a register, so "all eleven dimensions" is assertable.** §26.5 names eleven filter dimensions, §26.6 nine money-control lines, §31.7 ten risk signals. A list in prose is a list nobody can test, so each is a shared register the backend restates and drift-tests, the query builder walks, and the suite asserts. A twelfth filter added without a §26.5 line fails the drift test; a dimension quietly dropped fails it too. `readMoneyControls` and `readRiskPanel` additionally **throw** if any registered key is missing from the panel they built — a control an Admin no longer performs would otherwise disappear silently.
-- **Seeing is not exporting (§25.7).** `listLedger` returns everything an Admin may look at, restricted columns included, because support and risk work needs the Backer's email in front of a person. `exportLedger` reads its column list from the register, never from the caller — §25.7's limits apply to what Admin can *hand out*, and a limit the requester can widen is not a limit. There is no override parameter and no "full export" flag. The surface names the withheld columns *before* the button is pressed, and the suite asserts the restricted *values* appear nowhere in the CSV, not merely that the headers are absent.
-- **Not yet populated is not zero (§1.4).** Every Phase 03 ledger column defaults to 0, so a naïve money panel says "Proovd's 5%: US$0.00" for a campaign whose close batch has not run — indistinguishable from one that captured nothing. Each §26.6 line carries a `populated` flag derived from the campaign lifecycle and names what it is waiting for. The same distinction runs through §31.7 as `notYetObservable`: a Radar check that cannot run until Phase 18 creates PaymentIntents reports *not yet observable*, never "no risk found".
-- **`not_collecting` is a risk, always, and no view resolves it to clean.** §31.7's own sentence — "zero tax caused by missing collection configuration is not treated as proof that no tax is due" — is why `tax_not_collecting` is `blocking`, counts every such reservation, and counts an unrecorded seller tax readiness as an instance in its own right. It is `STRIPE_TAX_ENABLED`'s refusal at the listing Checkout, moved to the campaign charge.
-- **No risk score, no index, no automatic refusal.** Signals are counted and named, never summed or ranked. §1 rule 6 forbids inventing an eligibility condition, and a risk score is exactly that with arithmetic in front of it — the first phase wanting an automatic refusal would find a number already sitting there to compare against a threshold nobody agreed to.
-- **§31.7's seller tax readiness is four facts, all four, recorded and superseded.** Four booleans rather than one, because §31.7 names four separate things and a single flag would let three-quarters read as done; a CHECK refuses a recorded fact with a blank detail, since §31.7 asks for the location, the code, and the registration themselves. Re-recording supersedes on the 10b tax-configuration precedent — the record is the basis on which live tax was collected, so it is history the moment anything relies on it, and the DEFERRABLE FK exists so retire-and-point is one statement.
-- **§26.6's fourth requirement had no home, so it became a record.** Reauthentication is a guard, idempotency is a key, audit is a row — but a *preview* that is merely rendered is a preview nothing enforces, because the next caller posts straight to the execute route. So `previewHighImpactAction` stores the customer-visible consequences with a hash of the exact payload, and `recordOverride` refuses without a preview id, refuses an expired or already-consumed one, and refuses one whose hash does not match what is being executed — the consequences the Admin read were the consequences of the *old* payload. The preview is consumed once by trigger and by unique index. **Phases 18–20 call this rather than inventing a second one.**
-- **The "before" is read, never supplied (§33.12.4).** A caller that supplies both halves can supply a flattering pair, so `recordOverride` reads the current value from the row itself, under `FOR UPDATE`, inside the transaction that changes it. `admin_overrides.prior_value` is NOT NULL and insert-only — UPDATE and DELETE are revoked from the app role — because the value §33.12.4 protects is worthless if it can be rewritten afterwards. A genuinely absent prior value is stored as JSON `null`, not SQL NULL: the two are different facts, and SQL NULL here would mean "no before was recorded", which is the state the constraint exists to forbid.
-- **Overridable fields are a register, not free text.** A route accepting any string for `field` would happily record an override of something that does not exist, and the audit trail would look complete while pointing at nothing. `AUTO_POPULATED_FIELDS` states §26.2's other half explicitly — those have no write path anywhere, and the suite posts forged values at four plausible routes and asserts nothing moved.
-- **§33.9.11 is enforced here first, because the money surfaces reach it first.** `containsRawProviderCode` refuses a customer explanation containing a Stripe decline code, an object prefix, or a Radar rule — at the point an Admin can fix it, rather than after it has been sent. The internal reason may name it; §25.6 keeps the two in separate columns for exactly this.
-- **§22.3's vocabulary is established here because Phase 19 depends on it.** `eligible`, `blocked` with the named requirement, `released` — and no constant for `held`. The `blocked` branch makes the reason mandatory in the *type*, because `blocked` without a reason is `held` wearing a different word. A test scans every Phase 16a service, route, and schema file for the §3.2 holding-account vocabulary.
-- **`admin_overrides` is not a second audit log.** Every override writes an `audit_events` row in the same transaction and neither is derived from the other. This is not the "second event store that drifts" the phase warns about — that warning is about the §26.8 timeline, which must compose rather than duplicate (16b). An override is a distinct kind of Admin act, and listing every one for a campaign without filtering a general event stream by action name is the difference between a reviewable record and a grep.
-- **Reads are `admin`; writes take the freshness gate.** Making an Admin reauthenticate to *look* at the ledger teaches them to reauthenticate reflexively, which is how the gate stops meaning anything — the reasoning `admin.ts` already records for settings. The preview takes `fresh` too: it is the step that makes the override possible, and letting it run on a stale session would mean the reauthentication happened after the Admin had already decided.
-
-### Support, suspension, and the composed timeline (§26.7, §26.8, §27.8, §29.7, built Phase 16b)
-
-`shared/src/support/` owns the registers and Appendix B.8; `backend/src/support/` owns the services (restating both in `logic.ts` and drift-testing them); migration 0025 the guarantees. **§33.9.10 and §33.9.11 pass.** This is the case-and-action half of §26 — what Admin *does*, as distinct from 16a's read surfaces.
-
-- **The SLA is a business-day deadline, so §29.6 governs it.** §27.8's published promise is "within one (1) business day, Monday–Friday, excluding U.S. federal holidays" — a business-day deadline in exactly the sense §29.6 means. So a case's response due time is computed from the committed versioned calendar, stored with the version that produced it, and a trigger refuses to move it or the case reference afterwards. It calls the same `business-calendar.ts` the §29.6 replacement window does; a second calendar would be a second answer to "one business day from now", and the two would disagree on a holiday.
-- **§33.9.10's five facts are five separate things, and the fifth is context.** Reference (a quotable `PVD-xxxxx-xxxxx`, random rather than sequential so it leaks no case volume, and drawn from an alphabet with no O/0 or I/1 confusion), owner, due time, the 48-hour Founder follow-up, and the campaign/reservation/charge facts the case carries so §26.8's "users are never asked to repeat already-known facts" is structural. The follow-up timestamp is set **only** when a Founder actually owes the response — a case Proovd owns has no Founder to follow up with, and stamping it anyway would put a promise in the record nothing will honour (§1.4).
-- **Appendix B.8 is exact text, pinned like A.1, A.3, A.4, A.5, and §27.8's contact block.** The resolver substitutes its three variables and throws on any bracket left in the rendered output — the §7/§8 preview gate applied to a template. The acknowledgement is produced once in the service, so the string on screen and the string in the inbox are literally the same (§33.11.5).
-- **§33.9.11 is about which column a code may be read out of, not about storing it.** §26.8 permits raw provider and fraud codes "as secondary support detail in the Admin view", so `support_case_messages.customer_facing` is the distinction: an internal note may carry `card_declined` and `pi_…`, and a customer-facing reply may not. The refusal uses 16a's single pattern list rather than a second copy, and it fires on the reply, on the kill's public explanation, and nowhere else. **No shipped template contains a code**, because a template that did would put an Admin one keystroke from a violation — and the suite renders every one and asserts it.
-- **The queue shows overdue, not just due.** The phase trap: "An SLA nobody can see breached is an SLA that gets breached." The query has no lower bound, so a case that went past its deadline last week is still in the queue and sorts first. Three separate clocks, because §27.8 makes three promises — the response, the next promised update, the 48-hour follow-up — and a case can be fine on one and late on another. An **internal note does not clear the response breach**: a case that looked answered while the person waiting had heard nothing would be the SLA failing silently.
-- **The handoff note and the owner change are one transaction (§26.8).** Four facts — verified facts, current owner, next customer promise, statements to keep consistent — all NOT NULL and CHECKed non-blank in the database, and refused by name in the service so the Admin reads which one is missing. A handoff recordable after the fact is one the new owner can skip and backfill, and §26.8 requires the note *before* the case moves. The 48-hour clock restarts when the Founder acquires the case, not when it opened — a Founder cannot be late for a case handed to them five minutes ago.
-- **A template is a starting point, never a send button.** §26.8 asks for editable templates; there is no route that sends one. `renderTemplate` returns the draft *and* the facts that filled it, so the Admin sees what came from the record. A one-click send would answer a person with a machine (§1.4).
-- **The enforcement phase is derived, never passed in.** `enforcementPhaseFor` reads the campaign's own §23.1 lifecycle. A caller that could declare "this is pre-capture" could close reservations that have already been charged — the one mistake in this file that would move real money the wrong way. Pre-capture runs §26.7's five effects in full; post-capture records the decision, the audit, and the notification and **executes no refund and no reversal**, because those are Phase 20's and a second refund path beside Phase 11's single one is exactly what the brief said not to build.
-- **A kill closes reservations without charge and the SetupIntent survives.** `killed_no_charge` is §23.5's own state, distinct from the Backer's `reserved_canceled` — who ended it is a fact worth keeping. §29.7: "Successful SetupIntents remain historical, never rewritten as canceled", so nothing here writes `setup_intent_id`. Capacity is released and the Founder's operational record flips to `do_not_fulfill`, exactly as a cancellation does. Reference-safe detach reuses Phase 15's `paymentMethodStillActive` rather than reimplementing it, and the decision is made *before* the close so every reservation is still active when it is compared (§33.7.2).
-- **Reason category AND free text, both, always.** §26.7's own sentence, enforced as a CHECK and in the service: a category alone is a classification nobody can review; free text alone is a decision nobody can count. The customer explanation is a third column because §18 forbids one generic `Campaign ended` and §25.6 keeps internal wording out of customer copy.
-- **The timeline composes and there is no `timeline_events` table.** The phase trap: "A second event store that drifts from the first is worse than no timeline." `readTimeline` is a read across `campaign_status_history`, `association_status_history`, `reservation_status_history`, `campaign_payment_flags`, `campaign_updates`, `campaign_enforcement_actions`, `support_cases`, `support_case_messages`, `notification_deliveries`, `audit_events`, `admin_overrides`, and `relationship_touches` — every entry names the table it came from, so the claim is checkable from the response, and a test asserts no timeline-shaped table exists. A reservation's timeline includes its campaign's events, because a Backer asking what happened to their pre-order needs the kill on it. **An internal note's body never reaches the timeline** — a timeline is exactly the kind of view that gets pasted into a customer message.
-- **A relationship touch cannot be scheduled, and the absence is the enforcement.** §26.8's five kinds, one row per campaign per kind by unique index, insert-only. There is no `scheduled_for`, no `recurrence`, no `template_id`, no `next_send_at`, and no job that creates one — a test asserts those columns do not exist in `information_schema`. A second attempt is refused rather than silently updated: an Admin logging a second mid-campaign welcome has either made a mistake or started a sequence, and §26.8 says these must never become one (§30).
-
-## How a session works
-
-**Verification is scaled to the change, and most changes are small.** Almost everything below this line in this file is a record of *phase* work — whole surfaces, money paths, acceptance suites, 1280/320 browser passes. Do not read that narrative as the bar for an ordinary edit. There are two kinds of work and they get different amounts of checking:
-
-- **A small change** — a copy fix, a style tweak, one component, one bug, a rename, a small refactor. Make the change, run `npm run typecheck`, and run **only** the one test file that directly covers what you touched (`npx vitest run <path>`). That is the whole verification. Do **not** run `npm test`, do not run a whole workspace project, do not run the §33.11 sweep or the bundle scan, do not do a browser or screenshot pass, and do not write a new test file — unless it is a bug fix whose bug a test would have caught, in which case one focused case is enough. If no test file covers what you touched, typecheck is the whole verification.
-- **Phase work** — a `docs/phases/phase-NN.md` brief, or a multi-session rebuild brief. One phase per session (`docs/master-plan.md` §1.3): read the phase file, then read only the Spec sections it names — not from memory — build, run **that phase's named §33 acceptance tests**, and commit only when every one passes. Serial: never start a phase whose predecessors aren't green. If the phase is too large for one session, stop and say so; a truncated session produces code that looks finished and isn't. Phase sequencing and the 00–24 table live in `docs/master-plan.md` §6.
-
-When in doubt about which kind of work you were handed, it is the small kind. If a small change looks like it puts something wider at risk, **say so in one sentence and let the user decide** — do not run the wider thing on your own initiative, and do not report a change as unverified because you chose not to run a suite nobody asked for.
-
-## Toolchain (established Phase 1, per `docs/tech-stack-v2.md` §2, §11, §13)
-
-- **Repo:** npm workspaces — `frontend/` (React 19 + Vite), `backend/` (Express 5), `shared/` (Zod schemas, money waterfall, state machines, calendar). One root `package.json`, one multi-stage `Dockerfile`.
-- **DB:** Postgres 16 + Drizzle; `drizzle-kit` generates and applies migrations. Money is integer cents in `bigint`.
-- **Commands:** `npm test` (all workspaces), `npm run typecheck`, `npm run build`, `npm run dev:backend`, `npm run dev:frontend`. Run one file with `npx vitest run <path>`, one test with Vitest's filter `npx vitest run -t "<name>"`, or one project with `npx vitest run --project shared`. **`npm test` is for phase work and for when the user asks for it** — an ordinary edit gets a typecheck and the one relevant file (see "How a session works").
-- **Tests — map §33 directly, do not invent a parallel plan:** Vitest for domain units; supertest + a real Postgres for API integration; Stripe **test clocks** for payment outcomes; Testing Library for consent/checkout/cancel/card-recovery surfaces; Playwright for the one full-lifecycle E2E; `axe-core`-in-Playwright plus manual keyboard/screen-reader passes for §33.11.
-- **Integration tests need a real Postgres.** `backend/src/tests/app-harness.ts` uses `TEST_DATABASE_URL` when set and otherwise starts a Testcontainers `postgres:16-alpine`, which needs Docker. The migrator runs `CREATE ROLE proovd_app`, so the connecting role needs `CREATEROLE` or superuser. With neither Docker nor a spare server, a throwaway cluster works: `initdb -D <tmp> -U postgres --auth=trust`, `pg_ctl -o "-p 55432"` start, `createdb`, point `TEST_DATABASE_URL` at it, and stop it afterwards.
-- **A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`**, one failing statement per transaction — the first error aborts the block, so a second assertion in the same one only observes the abort. `policy-versions.test.ts` is the pattern. A test that must commit restores what it changed in a `finally`.
-- **Testing Library's `waitFor` deadline is 10s, set in `src/tests/setup.ts`.** `testTimeout` does not govern it — a `waitFor` gives up on its own clock, and the 1s default is a bet on how fast the machine is. A render that settles in 40ms alone can take over a second beside the backend suites, which surfaces as `Unable to find role="alert"` and blames the surface for being wrong when it was only late.
-- **The frontend project runs on four workers with a 30s `testTimeout`.** Phase 23a's sweep roughly triples the jsdom work in that project, and `npm test` runs it beside the backend's Postgres suites. Unbounded workers had a dozen jsdom+axe renders competing for the same cores: a single axe pass that takes 40ms alone took 24 seconds, blew the timeout, and left axe-core mid-run — so the next three assertions failed instantly with `Axe is already running` and blamed the page. Cap the pool and the timing is ordinary again. A suite that fails on machine load is a suite people stop believing.
-- **The frontend suite builds the production bundle in `globalSetup`, not in a test.** §33.11.3's scan reads what ships rather than the source, so `frontend/vitest.global-setup.ts` runs `vite build` when `frontend/dist` is older than `frontend/src` or `shared/src`, and `bundle.test.ts` only reads it. Doing the build inside the test file put `vite build` alongside the jsdom workers and timed out three unrelated suites at five seconds — a flaky suite blaming the wrong file. Global setup runs before the pool exists.
-- **Each harness-based test file gets its own database.** Pass a label: `startHarness({}, 'settings')`. On `TEST_DATABASE_URL` this provisions `proovd_t_<label>_<hex>` and drops it on `stop()`; on Testcontainers the container already isolates it.
-- **Local Stripe:** the Stripe CLI forwards webhooks; its signing secret lives in local env only. Mount raw-body parsing on webhook routes **before** `express.json()`.
-- **Email templates are TSX.** `backend/tsconfig.json` sets `jsx: react-jsx` and adds `DOM` to `lib` for that reason alone. React Email is a template language here; the backend serves no React of its own. `@react-email/render` is async — await it.
-- **Jobs run on pg-boss**, in the same Postgres, wired in `backend/src/jobs/scheduler.ts`. `startScheduler` throws if it will not start: a deployment whose retention sweep never runs keeps personal data past §25.8's window and should fail at boot rather than serve traffic while quietly doing so.
-- **Env:** copy `.env.example` (variable names only; `docs/tech-stack-v2.md` §17). `backend/src/env.ts` is Zod-validated and fails closed on any live/test key or mode mismatch.
-- **`backend/tsconfig.json` sets `declaration: false` on purpose.** Declaration emit forces TypeScript to name every inferred type, and Better Auth's instance type reaches into its own bundled Zod, which this package cannot name (TS2742). The backend is an application; nothing imports its `.d.ts`.
+| `shared/` | The money waterfall + USD formatting, three state machines, business-day calendar, notification registry (121 §27 keys), policy register, §6 settings register, and the pure kernels and **registers** every phase is built on — §9 vetting sequence, §5.3 subtypes/evidence, §2.2 slot rule, §12 optional items, §14.3 compensation matrix, §14.4 build ingredients, §15 six-rule readiness, §16 thirteen-item checklist, §17 launch order + first-post checks, §18 attribution + update audiences, §19 consent templates + dedup normalisation, §20 Act ranks + Explore sections + live-editing tiers, §21 close/reconciliation steps, §22 completion/W-9/payment/fulfillment/ghost-ban, §24 refund causes + descriptors, §26 ledger/money-control lines, §27 contract + digest, §29 enforcement, §31.7 risk signals, §31.9 metrics, §33.11/§33.12 QA registers, §34 live-mode conditions, and the Founder/Creator flow registers. Plus Zod schemas. |
+| `backend/` | Express 5, Drizzle + Postgres, env guard, Better Auth, token service, guards, audit + idempotency tables, pg-boss scheduler, Resend + React Email, the pinned Stripe client with two signed webhook endpoints, the R2 and Cal.com ports, and the full domain: vetting, invitations, workspace, listing fee, affiliates + decisions + readiness, campaign build/review/materiality, launch + attribution, reservations + close batch + retry, earnings + transfers, founder payments, refunds + disputes, fulfillment + Day 14, enforcement, support, notifications + digest, measurement, and live-mode. 58 migrations. |
+| `frontend/` | Design-system components, `MotionProvider`, the fourteen §18 public routes, the Admin shell (eight sections, all placeholders except Tasks — see the notice above), the Founder onboarding flow's twenty-four full-bleed pages, the Founder dashboard (four chapters at one address + Backers page + `/settings`), the Creator flow (nine onboarding screens + app shell + Home/Pitches/pitch/work/Earnings/Resources/Settings), the public campaign page + both samples + checkout modal + follow pages, the Backer magic-link page, the §33.11 QA harness, a dev-only gallery at `/_gallery`. |
+| `frontend/public/` | `proovd.css`, `proovd-motion.js`, `vendor/gsap/*.min.js`. |
+
+**Six gaps to know about — none is a bug, and none should be "fixed" by stubbing:**
+
+1. **`frontend/public/fonts/` is empty in a fresh clone.** `.gitignore:31` keeps the licensed woff2
+   binaries out of the repo on purpose, so every Docker/Dokploy build ships a `dist/` with no fonts
+   and production 404s on them. **Not fixable by editing code** — the binaries have to reach the
+   image another way, and that is a licensing decision. The fail-loud font notice is *correct*.
+2. **All eight policy documents are `draft`** (Track A2, in legal review). §1 rule 6 forbids
+   inventing the text; §31.4 forbids a summary.
+3. **Because they are drafts, the account claim refuses, in the open.** A consent may cite only a
+   published version, so `completeClaim` returns `policies_unpublished` and the surface renders the
+   reason instead of the button. Correct state, not a bug to route around.
+4. **Six §6 settings ship with no value and the prerequisites panel blocks.** Designed state — §6
+   names them and fixes no value, and §1 rule 6 forbids inventing one.
+5. **No email provider is configured, so the transport refuses loudly.** `unconfiguredTransport`
+   throws rather than swallowing a message. Do not replace it with a no-op.
+6. **No R2 bucket and no Cal.com account** (Track A4). `unconfiguredStorage` and
+   `unconfiguredScheduler` both throw exactly as the transport does. Do not stub any of them.
 
 ---
 
@@ -663,9 +162,11 @@ When in doubt about which kind of work you were handed, it is the small kind. If
 
 ### Invent nothing (§1 rule 6)
 
-No new commercial rule, deadline, fee, eligibility condition, payout rule, campaign state, or consent. If a case isn't expressly automated, route it to Admin review and preserve a complete audit record. If something seems missing, say so — do not fill the gap.
+No new commercial rule, deadline, fee, eligibility condition, payout rule, campaign state, or
+consent. If a case is not expressly automated, route it to Admin review and preserve a complete
+audit record. **If something seems missing, say so — do not fill the gap.**
 
-### Naming (§3)
+### Naming (§3, Brief §2.4–§2.5)
 
 | Internal only | Customer-facing |
 |---|---|
@@ -676,3966 +177,473 @@ No new commercial rule, deadline, fee, eligibility condition, payout rule, campa
 | `single_payment` | Single Founder payment |
 | `first_payment` / `remaining_payment` | First payment / remaining payment |
 
-Also internal: `captured_charge`, `listing_fee`, `platform_fee`, `founder_share`, `affiliate_compensation`.
+Also internal: `captured_charge`, `listing_fee`, `platform_fee`, `founder_share`,
+`affiliate_compensation`.
 
-**Banned everywhere, including table, column, job, and log names:** `pledge`, `donate`, `MBP`, `tranche`, `goal` (for an Idea threshold), `escrow`, `custody`, `trust`, `held in a Proovd account`, `all-or-nothing`, `Day 30`. Internal names leak into Admin panels, error messages, and support transcripts — §3.1 treats that as a real risk, not a style preference.
+**Banned everywhere, including table, column, job, and log names:** `pledge`, `donate`, `MBP`,
+`tranche`, `goal` (for an Idea threshold), `escrow`, `custody`, `trust`, `held in a Proovd
+account`, `all-or-nothing`, `Day 30`, `upfront (fee|payout|payment)`.
 
-`pre-build` / `pre-launch` / `reservation` / `tranche` must never render to a Founder or Backer. Sample URLs may keep `sample-pre-build` / `sample-pre-launch`.
+Internal names leak into Admin panels, error messages, and support transcripts — §3.1 treats that
+as a real risk, not a style preference. **§33.11.3 scans the built bundle**, where a prop name
+survives minification: `goal` has been caught there three times (`progress.goal`, `PRIVATE BETA
+GOAL`, `goalAmount`). Sample URLs may keep `sample-pre-build` / `sample-pre-launch`.
 
 ### Money
 
 - **Integer cents in `bigint`.** Never floats, never `NUMERIC` arithmetic in app code.
-- **Sales tax is excluded from** the Proovd 5%, every Creator percentage, the Idea threshold, and the $50,000 cap (§24.3).
-- **One implementation** of the waterfall, in `shared/money`. Both the checkout preview and the close batch call it. Never write a second one.
-- The provisional Creator amount is a **liability account and is never Proovd revenue** (§24.4). Unearned remainder returns to the Founder exactly once.
-- Three streams never commingle: campaign charges (Connect, Founder is MoR), listing fee (direct Checkout, Proovd is MoR, `PROOVD LISTING`), fixed Creator payment (own allocation, no percentage applies).
+- **Sales tax is excluded from** the Proovd 5%, every Creator percentage, the Idea threshold, and
+  the $50,000 cap (§24.3).
+- **One implementation** of the waterfall, in `shared/money`. Both the checkout preview and the
+  close batch call it. **Never write a second one.**
+- The provisional Creator amount is a **liability account and is never Proovd revenue** (§24.4).
+  The unearned remainder returns to the Founder exactly once.
+- Three streams never commingle: campaign charges (Connect, Founder is MoR), listing fee (direct
+  Checkout, Proovd is MoR, `PROOVD LISTING`), fixed Creator payment (own allocation, no percentage
+  applies).
+- **One resolver, many renderers.** §22.3's status is composed only by `readFounderPaymentStatus`;
+  Appendix B.7 only by `resolveAffiliateMoneyStatus`. A surface that recomputes an amount is a
+  second answer waiting to disagree (§33.8.13).
 
 ### State (§23)
 
 - `campaigns.status` is **lifecycle only**. Never put a payment flag in it.
-- `affiliate_roster_status` and `campaign_build_status` are separate columns. `review_ready` is derived, never stored as truth.
-- Payment/reconciliation flags are independent rows with timestamp, amount, actor, evidence, provider IDs.
+- `affiliate_roster_status` and `campaign_build_status` are separate columns. `review_ready` is
+  derived, never stored.
+- Payment/reconciliation flags are independent rows with timestamp, amount, actor, evidence,
+  provider IDs.
 - Association status (19 states) and reservation status (11 states) are their own enums.
-- Every transition is append-only history. Illegal reversals must be impossible. A successful SetupIntent stays historical even after the reservation is canceled.
+- Every transition is append-only history. Illegal reversals must be **impossible**, not merely
+  unwritten — prefer a trigger over a service rule. A successful SetupIntent stays historical even
+  after the reservation is canceled.
 
 ### Idempotency — three mechanisms, all required
 
-1. `provider_events` — unique on the Stripe event ID. Insert-or-skip before any domain work.
-2. `idempotency_keys` — stable domain keys for close-batch attempts, capture retries, fixed-payment funding, Transfers, refunds.
+1. `provider_events` — unique on the Stripe/Cal.com event ID. Insert-or-skip before any domain work.
+2. `idempotency_keys` — stable domain keys for close-batch attempts, capture retries, fixed-payment
+   funding, Transfers, refunds.
 3. `notification_deliveries` — unique on (event, target, entity).
 
-A duplicate event may update audit. It may never duplicate domain state, money, or a message. Running the close batch twice, receiving duplicate webhooks, or crashing mid-batch must all be safe (§33.7.7).
+A duplicate event may update audit. It may never duplicate domain state, money, or a message.
+Running the close batch twice, receiving duplicate webhooks, and crashing mid-batch must all be
+safe (§33.7.7). **Claim the row before the provider call**, never after: a crash then costs a retry
+under the same key rather than money that moved with no record.
 
 ### Time
 
-- `timestamptz` everywhere, stored UTC, rendered local with UTC secondary (§27.1).
-- The three anchors — `listing_paid_at`, `campaign_live_at`, `campaign_close_at` — are dedicated columns. **Never infer them from `created_at`/`updated_at`** (§21).
-- Business-day deadlines use the committed versioned holiday calendar in `shared/calendar`, and the version string is stored alongside the computed timestamp. A retry or edit can never silently reset a deadline (§29.6).
+- `timestamptz` everywhere, stored UTC, rendered local with UTC secondary (§27.1). A bare
+  `toISOString()` on a deadline is a §27.1 violation — `Z` spells nothing out to a reader.
+- The three anchors — `listing_paid_at`, `campaign_live_at`, `campaign_close_at` — are dedicated
+  columns. **Never infer them from `created_at`/`updated_at`** (§21, §33.12.1 scans for it).
+- Business-day deadlines use the committed versioned holiday calendar in `shared/calendar`, and the
+  version string is stored alongside the computed timestamp. A retry or edit can never silently
+  reset a deadline (§29.6).
+- **The anchor gates; the sweep only notices.** Cancellation ends at `campaign_close_at` itself,
+  not when the cron fires.
 
 ### Audit (§25.6)
 
-Insert-only. `UPDATE` and `DELETE` are revoked from the app role at the database level. Every manual or high-impact action records actor, MFA/reauth context, target, action, time, internal reason **and** customer-facing explanation as separate columns, prior and new value, amount, provider IDs, evidence links, notification IDs.
+Insert-only. `UPDATE` and `DELETE` are revoked from the app role **at the database level**. Every
+manual or high-impact action records actor, reauth context, target, action, time, internal reason
+**and** customer-facing explanation as separate columns, prior and new value, amount, provider IDs,
+evidence links, notification IDs. **The prior value is read from the row under lock inside the
+transaction that changes it** — a caller that supplies both halves can supply a flattering pair
+(§33.12.4).
 
 ### Never imply automation that doesn't exist (§1.4)
 
-The MVP is manual behind a polished surface. Present manual steps truthfully as guided review, safety control, or human support. Manual work is valid **only when the app records it** (§1.3).
+The MVP is manual behind a polished surface. Present manual steps truthfully as guided review,
+safety control, or human support. Manual work is valid **only when the app records it** (§1.3).
+Corollaries that keep recurring: a key with no sender claims a message that does not exist; a
+control whose route does not exist is worse than no control; "not yet populated" is not zero; a
+disabled control invites someone to work out how to enable it, so prefer **absent with the reason
+rendered where the control would be**.
 
-### The §34 live-mode gate (§34, §2.1, built Phase 24)
+### The §34 live-mode gate (§34, §2.1)
 
-No live money moves while the gate is closed, and the refusal is at the ONE Stripe gateway every service receives — not at each caller, which is the only form of "checked at every money-touching entry point" that survives a phase that forgets. The decorator throws at boot if the gateway carries a callable member with no recorded §34 disposition.
+No live money moves while the gate is closed, and the refusal is at the **one** Stripe gateway
+every service receives — not at each caller. The decorator throws at boot if the gateway carries a
+callable member with no recorded §34 disposition.
 
 - **Never cache the gate.** A cached gate is a rollback that does not take effect.
-- **Never add an override.** No route sets `open`; `enablePilotCampaign` reads the gate rather than taking it from the caller, so no request body opens live mode. §34 is released by satisfying it.
-- **Refunds and card detaches are permitted while the gate is closed**, deliberately. §34 blocks six things and all six create exposure; blocking the two that unwind it would strand the people the rollback plan exists for.
-- **An unanswered condition is unsatisfied**, and a gate that cannot read its own conditions is shut.
-- Test mode is untouched — §34 permits test-mode engineering by name, and every condition is verified by a product that runs.
+- **Never add an override.** No route sets `open`. §34 is released by satisfying it.
+- **Refunds and card detaches are permitted while the gate is closed**, deliberately. §34 blocks
+  six things and all six *create* exposure; blocking the two that *unwind* it would strand the
+  people the rollback plan exists for.
+- An unanswered condition is unsatisfied, and a gate that cannot read its own conditions is shut.
 
-### Auth — four actors, two mechanisms (§5, built Phase 04)
-
-This is not four login types. Admin, Founder, and Affiliate have accounts in Better Auth (`backend/src/auth/auth.ts`); Backers have none at all.
+### Auth — four actors, two mechanisms (§5)
 
 | Actor | Mechanism |
 |---|---|
-| Admin | Email + password, freshness gate on sensitive actions. **No second factor** — see below |
+| Admin | Email + password, freshness gate on sensitive actions. **No second factor** — see *Recorded deviations* |
 | Founder | Email + password **or** Google OAuth |
-| Affiliate | Email + password, private campaign-specific invitation only |
-| Backer | **No account.** Campaign-scoped magic link, via the token service |
+| Creator | Email + password, private campaign-specific invitation only |
+| Backer | **No account.** Campaign-scoped magic link via the token service |
 
-- **No public signup exists, for any role.** `disableSignUp: true` closes the HTTP route. Accounts are created server-side through `backend/src/auth/seed.ts` (`seedAccount`), which always takes an explicit `role` and has no HTTP surface. Do not add one — §33.2.1 is exactly this.
-- **`role` has no database default.** Every creation path states it. Google sign-in maps to `founder` because §5.1 seeds Admins and §5.3 admits Affiliates by invitation only, so neither has an OAuth route.
-- **The Admin second factor was removed on 2026-08-10, by product direction.** §5.1 and §28.2 make Admin MFA mandatory, so this is a **recorded deviation from the Spec**, not a defect to "fix" by reinstating it in a later session without the same instruction. Gone: the Better Auth `twoFactor` plugin, the `two_factor` table and `user.two_factor_enabled` (migration 0041), the `admin_mfa_required` §6 setting, `scripts/totp.ts`, and every enrolment path and TOTP screen. What did NOT change, and must not: the Admin still presents a real credential, `requireAdmin` still refuses every non-`admin` role server-side, and `requireFreshSession` still gates high-impact actions — it is now the **only** control between a long-lived stolen session and a money-moving action, so it is the one thing in `auth/` that must never be loosened casually. No bypass, dev shortcut, or hardcoded Admin replaced the factor. §34's live-mode condition 8 was restated to describe the controls that exist rather than the one that does not.
-- **Guards fail closed** (`backend/src/auth/guards.ts`): `requireSession`, `requireRole`, `requireAdmin`, `requireFreshSession`. No session, unreadable session, database error, missing or unrecognised role, a role this area does not admit, stale session — every one blocks. None logs a warning and proceeds (§33.12.5). `requireAdmin` is the single place the Admin boundary is decided: 45 call sites, and nothing calls `requireRole(auth, 'admin')` directly.
-- **Account standing is an access decision, per request** (`backend/src/enforcement/standing.ts`, mounted on `/api/founder` beside the §29.8 reacceptance gate). §26.7 suspension and the §22.7 ban used to change only what the Admin workspace *said*: an existing session kept full Founder access until it expired. `founderStandingGate` reads `founder_access_actions` and `founder_ghost_bans` on every request, so a suspension takes effect on the next call and a restore does too. There is deliberately no Creator equivalent — §29 records Creator enforcement per *association*, not per account, and inventing an account-level one would be §1 rule 6.
-- **The frontend is not the boundary, and `lib/session.ts` says so in its header.** The SPA ships one static `index.html` to everybody; `RequireRole` / `RedirectIfAuthenticated` (`frontend/src/lib/routeGuards.tsx`) decide what to *render*. What they buy is the removal of the protected-shell flash and deterministic already-signed-in behaviour — not authorization.
-- **The Admin reauthentication window lives in `app_settings`, not in env.** `ADMIN_REAUTH_WINDOW_SECONDS` is now only the first-boot seed: `seedAdminReauthWindow` writes it while the setting is still NULL and is a no-op afterwards, because an Admin cannot reach the settings surface before the app is running and guarded. `requireFreshSession` takes a resolver and reads the setting per request, so a change applies to the next sensitive action. It **fails closed on `null`** with a 503 that names the settings route — §6 fixes no number and a guard that invents one has invented a security policy.
-- **Phone is never verified.** A CHECK constraint pins `user.phone_verified` false. There is no SMS OTP path and the acceptance suite scans the source tree to keep it that way (§33.1.8).
-- **`emailAndPassword.disableSignUp` does not cover social sign-up, and that is not obvious.** Better Auth checks the two independently — `sign-up.mjs` reads the email/password flag, while the OAuth callback reads only the *provider's* own `disableSignUp`. Without it, `oauth2/link-account.mjs` creates a user for any Google identity it has not seen, and `mapProfileToUser` stamps it `founder`: public signup (§33.2.1) through a route no Proovd surface renders a button for. `disableSignUp: true` now sits on the Google provider, so Google signs in an account that already exists and creates none — §5.2 read as written. It was never exploitable while `GOOGLE_CLIENT_ID` was unset (the provider is omitted entirely then), but the env vars are one edit away. Asserted at the config, because the exploit needs a real Google round trip; the test builds the *configured* case on purpose, since the harness leaves Google unset and a loop over it would pass by having nothing to check.
-- **An identity is never taken from a request body.** The account claim used to read `googleUserId` from the body and bind the draft — and the campaign — to whatever id it was handed, so a caller holding a draft link could attach that campaign to another person's Founder account. It now reads the id off a real Better Auth session (`routes/vetting.ts`), and `getSession` fails closed. Nothing shipped used it: no surface renders a Google button and no test drove the branch, which is exactly why it survived — it was reachable only by calling the API directly.
-- **CSRF is two layers, and the second one is new** (`backend/src/auth/origin-guard.ts`). `SameSite=Lax` on the session cookie is what actually stops a malicious page attaching it; the CORS allow-list blocks *nothing* — `cors()` decides response headers, and a POST whose response the attacker never reads is a CSRF that succeeded. Verified rather than assumed: before this, a request carrying a valid Admin cookie and `Origin: https://evil.example` was answered 200 on a settings **write**. `crossOriginWriteGuard` refuses a state-changing request whose Origin is present and untrusted — the same check Better Auth already applies to `/api/auth/*` (it answers `MISSING_OR_NULL_ORIGIN` / `INVALID_ORIGIN`), extended to the rest of the API. A **missing** Origin passes, deliberately: that is a non-browser caller with no ambient cookie to borrow, and it includes both signed webhook endpoints — refusing it would break Stripe and Cal.com for no security. Only state-changing methods are checked; a cross-site GET carries the cookie under Lax anyway, and there are no state-changing GETs under `/api`.
-- **`TRUST_PROXY_HOPS` decides what `req.ip` is, and therefore what every rate limiter keys on.** It defaults to `0` — nothing in front of this process. Behind a TLS terminator that is wrong in the *safe* direction: every request keys to the proxy, so §28.1's per-address limits collapse into one global bucket that throttles too much rather than not at all. The alternative default — trusting the header — lets any caller mint a fresh bucket per request and removes the limit entirely. Never express it as a boolean: `trust proxy: true` takes the left-most forwarded address whoever wrote it.
-- **An unhandled route error answers JSON, not Express's default** (the handler at the bottom of `app.ts`). There was none before, so a throw fell through to Express: a **stack trace in the response body** outside production, and an HTML body in every environment. Both API clients decide by parsing JSON, so an HTML 500 became `opaqueFailure(500)` — "the server answered 500 with no explanation, so it is not certain whether the change was applied", which on an Admin money surface is the worst sentence the product can produce (§30). The handler logs the real error server-side and returns a fixed body carrying **no** message from the exception, because an error string is written by whoever threw it and may quote a row, a token, or a provider payload.
+- **No public signup exists, for any role.** `disableSignUp: true` closes the HTTP route; accounts
+  are created server-side through `seedAccount`, which always takes an explicit `role` and has no
+  HTTP surface. Do not add one — §33.2.1 is exactly this. **`disableSignUp` must also sit on the
+  Google provider**: Better Auth checks email/password and social independently, and without it the
+  OAuth callback creates a user for any Google identity it has not seen and stamps it `founder`.
+- **`role` has no database default.** Every creation path states it.
+- **Guards fail closed** (`backend/src/auth/guards.ts`). No session, unreadable session, database
+  error, missing/unrecognised role, wrong role, stale session — every one blocks. None logs a
+  warning and proceeds (§33.12.5). `requireAdmin` is the single place the Admin boundary is
+  decided; nothing calls `requireRole(auth, 'admin')` directly.
+- **An identity is never taken from a request body.** The account claim reads the Google id off a
+  real session; `assignToSelf` and every actor field resolve from the session.
+- **The frontend is not the boundary.** `RequireRole` decides what to *render*, not what is allowed.
+- **CSRF is two layers.** `SameSite=Lax` is what actually stops a malicious page attaching the
+  cookie; the CORS allow-list blocks nothing (a POST whose response the attacker never reads is a
+  CSRF that succeeded). `crossOriginWriteGuard` refuses a state-changing request whose Origin is
+  present and untrusted. A **missing** Origin passes deliberately — that is a non-browser caller
+  with no ambient cookie, and it includes both signed webhook endpoints.
+- **`TRUST_PROXY_HOPS` decides what `req.ip` is** and therefore what every rate limiter keys on. It
+  defaults to `0`. Never express it as a boolean.
+- **Phone is never verified.** A CHECK pins `user.phone_verified` false; §33.1.8 scans the tree to
+  keep it that way.
+- **Account standing is an access decision, per request.** `founderStandingGate` reads
+  `founder_access_actions` and `founder_ghost_bans` on every request, so a suspension takes effect
+  on the next call.
 
 ### Tokens (§28.1)
 
-Backers have **no account**. Use `backend/src/auth/token-service.ts` — never Better Auth's magic-link plugin, which creates accounts and sessions. Raw tokens exist only in the delivered URL: never at rest, never in a log, never in an error. Every rejection returns the identical value; invalid, expired, revoked, claimed, and never-existed are indistinguishable to the caller (§5.5).
+Backers have **no account**. Use `backend/src/auth/token-service.ts` — never Better Auth's
+magic-link plugin, which creates accounts and sessions. Raw tokens exist only in the delivered URL:
+never at rest, never in a log, never in an error.
 
-Wired in Phase 04, and the parts that are easy to undo by accident:
+- **One rejection, one status, one body.** `token-rejection.ts` holds a frozen constant. Nothing
+  per-request goes in it. **Rate limiters on token routes return *this*, never a 429** — a limiter
+  that announces itself is the same enumeration oracle wearing a different hat.
+- **Never add a reason field.** The reason goes to the audit log, where support can read it and the
+  caller cannot.
+- **An ask route answers before it works.** Mint-and-send versus return-immediately is measurable
+  even when the bodies match. `MAGIC_LINK_REISSUE_ACK`, `EMAIL_CODE_ACK` and `FOLLOW_ACK` are
+  frozen and identical for a hit, a miss, a malformed address, an unknown campaign, and a caller
+  over the limit.
+- Concurrent claim is a **conditional `UPDATE`**, never select-then-update.
 
-- **One rejection, one status, one body.** `backend/src/auth/token-rejection.ts` holds a frozen constant. Nothing per-request goes in it — no incident id, no timestamp, no retry hint. Rate limiters on token routes return *this*, never a 429: a limiter that announces itself is the same enumeration oracle wearing a different hat.
-- **Never add a reason field.** `TokenInvalid` carries none by design. The reason goes to the audit log, where support can read it and the caller cannot.
-- **Token URLs are redacted in one place.** `backend/src/auth/token-routes.ts` owns both the route shapes and `redactTokenUrl`; Sentry's `beforeSend`/`beforeBreadcrumb` in `index.ts` read from it. Two copies of that list would drift, and the drift is invisible until a token shows up in a log.
-- **Concurrent claim is a conditional `UPDATE`**, never select-then-update, backed by the partial unique index `secure_tokens_one_live_per_lineage`.
-- The database also enforces scope binding, token-identity immutability, and append-only `claimed_at` (migration `0002_auth_and_tokens.sql`, hand-written section).
+### Forbidden patterns (§30, DNA §5.10, Brief Appendix H.11)
 
-### Policies and the §34 gate (§18, §31.4, §29.8, built Phase 05)
+No confetti, streaks, or countdown pressure that confuses a saved card with a charge. No fake
+scarcity, fabricated popularity, or live-viewer counts. No AI support presented as human. **No
+public leaderboards or ranking of any kind** — and note that a *sorted list* is still a ranking,
+because the order is the claim. No prechecked optional consent. No live chat without staffing. No
+"real time" claims for refresh-based data. No generic errors without money/data status and
+recovery. No competing actions in payment, cancel, refund, or card-recovery states. No scheduled
+"check your campaign" messages — a notification fires only for a real required action or
+consequence.
 
-The eight §31.4 documents are a **register, not text**. `shared/src/policies/documents.ts` holds one record per document — slug, route, title, version, status, effective date, and §31.4's required coverage. `backend`'s `policy_versions` table mirrors it row for row, and `backend/src/tests/policy-versions.test.ts` fails the suite if they drift, the same way the state enums are drift-tested.
+---
 
-- **Every document is `draft` today, and that is the correct state.** §18 and §31.4 forbid placeholder, "coming soon", and summary-only text at launch; §1 rule 6 forbids inventing the real text. So the routes render the versioned record and say honestly that it is in legal review. **Do not write policy prose to fill the gap, and do not ship a coverage list as the policy.**
-- **`draft` blocks §34 condition 4.** `backend/src/policies/policy-gate.ts` (`readPolicyGate`) is the authority; it fails closed on a missing record as loudly as on a draft one. Phase 06's Admin prerequisites panel renders it; Phase 24 releases it *by publishing*, never by routing around it.
-- **Publication is one-way and version identity is immutable**, enforced by trigger in `0003_policy_versions.sql`. A revision is a new row with a new version — that is what §29.8's reacceptance flow compares. A consent record may cite only a published version.
-- **Published documents open with a Glance overview and the full text one gesture below** (DNA §5.12). Nothing is cut; it is staged.
+## Recorded deviations — do not "fix" these
 
-### Public site (§18, §31.4, §27.8, built Phase 05)
+Each was built by **explicit product direction** and departs from the Spec. They are recorded here
+so a later session does not delete one as a defect, and does not read one as licence for its
+neighbours. Reversing any of them needs the same kind of instruction that created it.
 
-- **`frontend/src/features/public/site.ts` is the single route inventory.** The router, the header, the footer, and the §33.11.6 broken-link scan all read it. A second copy is how a footer link outlives its route.
-- **`app.proovd.co` owns all fourteen routes**, including the marketing-shaped ones. `proovd.co/<path>` 301s here for every path in the inventory except `/`, which stays the marketing home. §18's attribution cookie is first-party or it is nothing (tech-stack §10).
-- **Appendix A.1 is exact text, and so is the sentence after it.** `trust-strip.ts` keeps A.1 verbatim and derives the shipped strip by replacing exactly one sentence — the architecture claim — with truthful conditional wording, because Stripe underwriting (Track A1) is open and §2.1 forbids claiming approval before it exists. When A1 closes, delete the replacement. Edit it for nothing else.
-- **The §27.8 contact block is exact text**, rendered line for line in `SiteFooter.tsx` and compared against the constant by test.
-- **Sample campaigns mount no payment field at all** — no form, no input, no iframe, no provider script. "Disabled" is not absent, and §34 gates live mode on this. They carry the Appendix A.6 banner permanently and reproduce A.2/A.3/A.4 in full with sample figures.
-- **Live chat renders only inside staffed hours, and not at all outside them.** §31.4 names the hours as a setting and fixes no number, so `VITE_SUPPORT_CHAT_*` has no default anywhere and an unconfigured deployment renders no chat. Days come from the committed calendar, not from configuration.
-
-### Global configuration and the §6 prerequisites (§6, §25.6, §29.6, built Phase 06a)
-
-**Every operating constant is a setting, and later phases read the setting.** `shared/src/settings/registry.ts` is the register — one record per §6 constant, mirrored row for row by `app_settings`, drift-tested in `backend/src/tests/admin-settings.test.ts` exactly like the policy register and the state enums. `shared/src/money/constants.ts` is now **seed defaults only**: it is what the register and the migration read to agree on the §6 numbers. Importing a name from it to decide a live fee, deadline, or percentage is the bug Phase 06's trap names — *"a hardcoded duration is a bug even when the number is right."* Read the setting.
-
-- **Three provenances, and the distinction is load-bearing.** `specified` — §6 states the value; it seeds and Admin may change it. `operator` — §6 names the setting and fixes **no** value, so it has no default anywhere and ships unset; six settings are in this state and an unset one **blocks** (§1 rule 6). `derived` — the value follows a committed artifact; the holiday-calendar version and its timezone are the whole set, and a trigger refuses to edit them because §29.6 forbids an edit silently moving a deadline already computed and promised.
-- **The backend never imports `@proovd/shared` at runtime.** It exports TypeScript source, the backend compiles under `rootDir: src`, and the production image ships only `backend/dist`. So `kind`, `provenance`, `minimum`, `maximum`, and `spec_ref` are columns on `app_settings`, and `backend/src/settings/values.ts` validates from the row it is validating. This is the same constraint `db/schema/domain.ts` documents for the state enums; the answer is the same — restate the data, drift-test it, never import across the boundary. Labels and help text are **not** mirrored: the Admin surface imports the register through Vite.
-- **History is a trigger, not a service call.** `app_settings.updated_by` and `update_reason` are NOT NULL, so an update that does not say who and why never commits; an AFTER trigger writes `app_setting_versions`. A service that wrote the history row is a service one careless `db.update()` can bypass. The §25.6 audit row is still written by `updateSetting`, in the same transaction, because the database cannot see MFA context.
-- **`production_prerequisites` is insert-only.** Ten items: five the app re-checks on every load, five a named person verifies and records with note and evidence (§34's own words: "recorded as complete"). A missing record is **unsatisfied**, never unknown. Presenting a recorded item as system-verified would be the §1.4 failure, so the surface labels which is which.
-- **Fail closed means the control is gone.** `frontend/src/features/admin/PrerequisitesPage.tsx` renders no override, no "proceed anyway", no enable-live-mode button, and there is nowhere to add one. §34 is released by satisfying it.
-
-### Admin surfaces (§26, DNA §5.2, built Phase 06a)
-
-- **`/admin` stands outside the public shell.** No `PublicLayout`, no site footer, no live-chat gate. §26 licenses dashboard density **here and nowhere else**, and shared chrome is how that density leaks into a Founder surface. DNA §5.14 still applies: every settings row is Glance (value + provenance) → Act (inputs) → Explore (change history behind one control).
-- **Guards are mounted for real now.** Everything under `/api/admin` goes through `requireAdmin`; every write additionally through `requireFreshSession`. `backend/src/tests/admin-settings.test.ts` proves no session, wrong role, and stale session all fail closed on a real product surface rather than on a probe route.
-- **`Saving…` / `Saved [time]` / `Could not save — retrying`** is the §9 autosave vocabulary. It lives in `frontend/src/lib/autosave.ts` — moved there by Phase 07, because the vetting flow, the account claim, and the settings surface all speak it and a Founder surface importing its status vocabulary out of `features/admin` was one refactor away from two of them. `retrying` appears **only** while a retry is genuinely scheduled; a 4xx is a decision, not a transient failure, and claiming to retry one would be §1.4's failure in miniature.
-- **Backend test files each get their own database.** `startHarness(overrides, label)` provisions one when `TEST_DATABASE_URL` points at a shared server. §33.1.1 asserts that opening a draft link creates *no* user row, which is only checkable if nothing else is creating user rows concurrently — making that assertion defensive instead would have quietly weakened the one that matters.
-
-### The Founder invitation and the retention sweep (§7, §25.8, built Phase 06b)
-
-The first phase where a real person receives something. Three tables:
-`founder_prospects` (the person), `campaign_drafts` (the personalised content the sweep removes), `campaign_invitation_sends` (append-only, the nine facts §7 requires a send to store).
-
-- **Preview is a gate, enforced server-side.** `renderFounderInvitation` scans the *rendered* subject, HTML, and text for bracketed markers; `sendInvitation` refuses while any remain. Checking the input record instead would test the caller's list of required fields rather than what the Founder would receive. The Admin surface disables Send on the server's answer, and the send route re-decides independently — a disabled button is not authorization (§1.1).
-- **The notification dedup key is the SEND, not the draft.** §27.2 forbids a duplicate delivery producing a second email; §7 requires resend to work. Keying on the draft satisfies the first and breaks the second. `createNotifier` claims the `notification_deliveries` row *before* sending, so a crash leaves an unconfirmed claim — visible, honest, and recoverable by resending — rather than two emails.
-- **The send row is written BEFORE the provider call**, with `notification_id` NULL, and confirmed afterwards. Writing it after would leave a crash-shaped hole: an email delivered with no send row, therefore no retention clock, therefore a draft §25.8 would never sweep. §25.8 sets a maximum, not a minimum — a clock that starts early deletes sooner, which is the safe side. `notification_id` NULL is a *state* ("recorded, not confirmed"), the draft stays out of `sent` until confirmed, and Admin renders it as exactly that (§1.4).
-- **The retention clock is `max(sent_at)`.** Not creation, not `updated_at`, not the token's `expires_at`. §33.1.3 names it precisely, which is why `campaign_invitation_sends` is insert-only apart from three columns granted by name: the two recipient fields the sweep must null (migration 0005) and `notification_id` (migration 0006). `sent_at`, `token_version`, `draft_id`, and `status` are outside every grant.
-- **A claimed draft is exempted twice, on purpose.** `findDueDrafts` filters on `founder_prospects.claimed_user_id` *and* `campaign_drafts.status <> 'claimed'`. The first is the claim flow's job; the redundancy means two things have to be wrong before the sweep destroys a live Founder's record. A revoked draft is still swept — revocation kills the link, not the data.
-- **Revocation and anonymisation are one transaction.** `tokens.revokeDraftTokens(draftId, reason, tx)` takes the executor so both land together. A revoked token beside live draft content is not compliance, and a crash between them would leave that state permanently.
-- **Anonymisation is irreversible at the database level.** Triggers refuse to clear `anonymised_at` or write content back. A draft that could be un-anonymised was never anonymised, only hidden.
-- **`NO_GUARANTEE_TEXT` and `PROCESS_SUMMARY` are constants, not columns.** §7 forbids Admin promising acceptance, results, reward pricing, or a named Creator's participation, and an editable disclaimer is one that gets softened under pressure. The compose surface renders them read-only; there is no route that writes them, and a test asserts the sent body contains the text verbatim.
-- **A prospect is anonymised only when it was their last draft**, and never once claimed — §25.8 keeps Founder account data for account life + 7 years.
-- **Backend event keys are restated in `notifications/events.ts`**, drift-tested against the shared §27 register. A key appears there when something starts sending it, never before: a key with no sender claims a message exists when it does not (§1.4).
-
-### The Admin Dashboard was replaced, and only Founders was rebuilt (§26.1, post-Phase-24 change)
-
-The old Admin Dashboard is gone and a new one took its place, built from a supplied reference bundle. At the time this section was written **only the Founders workspace existed**, and the shell's other sections — Today, Campaigns, Creators — were parked: visible, `aria-disabled`, and honest when clicked. **Creators was built on 2026-08-11, Support on 2026-08-13, and Campaigns on 2026-08-15**, each from its own supplied reference, and **Today on 2026-08-19** — nothing is parked now. Nothing about it is invented, and no route, service, or table was created for it.
-
-- **The workspace is keyed on the PERSON, and that is a correction.** The old surface was keyed on `draftId`, so a Founder whose campaign was archived-and-restarted (§9's wrong-type path) appeared twice with no relationship between the rows, and "their previous campaigns" was not a question the product could answer. `founder_prospects` is the record that survives a restart — a restart makes a new campaign, draft, and vetting record for the *same* prospect — so it is the person, and `/admin/founders/:prospectId` is the address.
-- **Five panes, and every number is composed rather than copied.** `backend/src/founders/workspace.ts` reads the records that already exist: identity from `founder_prospects` + `founder_claim_profiles` + `user`; invitation from `campaign_drafts` + `campaign_invitation_sends` + `secure_tokens`; campaigns from `campaigns` + `campaign_build` + `campaign_reviews`; money from the ONE `readFounderPaymentStatus` resolver plus the onboarding view plus the listing payment's own `discountLines` (§33.8.13's rule — one source, many renderers). Nothing is duplicated onto a Founder row, because a second copy of a number somebody is paid is how the two come to disagree.
-- **The account state is derived from three records and stored in none.** `deriveAccountState` reads the claim, `founder_ghost_bans`, and the latest `founder_access_actions` row. A ban outranks a suspension (§22.7 is permanent; a suspension is a review that ends) and both outrank "not created" — a person can be suspended or banned before claiming, because the invitation is live and worth stopping. A stored status is one a failed write can strand out of step with the reason that justified it.
-- **The per-invitation override is the information model, and it had to reach the message.** `campaign_drafts` gained five nullable `override_*` columns (0040): the profile is the source, ONE invitation may say something else, and the difference is labelled rather than flattened. Editing the prospect instead would silently rewrite the Founder's own record to fix one email. `resolvedRecipient()` in `invitations/service.ts` is the ONE resolver the preview gate, the send row, the transport, and the rendered body all read — four places that must not disagree, or Admin approves one address and the message reaches another. A send row snapshots what was delivered, so a later profile edit cannot rewrite history. Setting an override equal to the profile value CLEARS it rather than storing a duplicate.
-- **Two new person-level records, both insert-only.** `founder_access_actions` (§26.7 suspend/restore — distinct from the campaign-scoped `campaign_enforcement_actions`, which closes reservations and moves `campaigns.status`) and `founder_deletion_requests` + `_reviews` (§25.8). The deletion table has no `deleted_at`, no purge schedule, and no `approved` state: retention obligations outlive the account, so a column implying otherwise would be the first step toward a "delete everything" action the Spec does not permit. The ban reuses `recordGhostBan` — there is no second ban path.
-- **Three things the reference asked for that the Spec forbids, and what happened instead.** The §9 setup answers (Problem, Solution, Competition) have **no editable key** — an absence, so no route can write them however it is called, and the drift test asserts it. The **activity summary** is rendered read-only with its reason: §27.7's frequency exists only because a person chose it, and §30 forbids the product answering for them. The **identity check** is derived from Stripe's account state rather than stored, because §13 forbids holding the documents.
-- **`CAMPAIGN_STATUS_LABELS` is total, and that is the guarantee.** §23.1 has 27 machine values and §3.1 forbids several of them reaching a person. The register is typed as a total map, so a 28th lifecycle state without a human label fails the build rather than rendering `banned_founder` to somebody on a support call. The raw value rides alongside, under "Technical details" — the reference's own arrangement.
-- **The history is a pure read with no table.** `backend/src/founders/history.ts` composes across the invitation sends, tokens, status history, audit events, overrides, listing payments, W-9 events, Founder payments, Stripe account events, support cases, enforcement, access actions, deletion records, and bans; every entry names the table it came from. §26.8's trap applies unchanged — a second event store that drifts from the first is worse than no timeline.
-- **What the removal cost, and what it did not.** The Admin *screens* for global configuration, support, campaign operations, notifications, Creators, optional items, and Creator readiness are deleted. Their **backends are untouched** and still mounted: they encode acceptance-tested §6/§26.7/§27.7/§34 machinery, jobs and §33 suites drive them directly, and deleting them would have gutted safety rules to remove a page. `requireFreshSession`'s 503 no longer links to `/admin/settings`, because naming a page that does not exist is the §1.4 failure that guard is otherwise careful to avoid.
-
-### The Creators workspace was built (§26.1, §8, §5.3, §11, §29, post-Phase-24 change, 2026-08-11)
-
-The Admin shell's Creators section stops being parked. Built from a supplied reference bundle at `docs/admin-affiliate-reference/` — a single-file React prototype (`app/page.tsx`) plus a 249-row traceability matrix and a machine acceptance audit — the same way the Founders workspace was. Today was the only parked section left at the time (Campaigns was built on 2026-08-15; Today itself on 2026-08-19).
-
-`shared/src/admin/creator-workspace.ts` owns the registers; `backend/src/affiliates/workspace/{types,labels,directory,record,relationship,history,mutations,audit-actions}.ts` own the reads and the three new writes; `backend/src/routes/admin-creators.ts` the API; migration 0044 the guarantees; `frontend/src/features/admin/creators/` the surfaces; proovd.css `PHASE 26` the styles. Suites: `creator-workspace.test.ts` (33), `creator-workspace-registers.test.ts` (21), `creator-relationship.test.ts` (17), `creators.test.tsx` (38), `relationship.test.tsx` (30).
-
-- **It is keyed on the PERSON, and that is the correction.** Every affiliate read in the product before this one was campaign-scoped — `listCampaignAffiliates(db, campaignId)`, the roster, the readiness panel — which is right for a Founder who may only ever see their own campaign's roster (§11), and meant the product could not answer "who have we recruited" or "what else is this person running". `affiliate_prospects` is the person, so the address is `/admin/creators/:prospectId` and the §2.2 slot count is derived across every campaign rather than per campaign. `listCreatorDirectory` is that missing read: six batched queries with `inArray` fan-out, nothing inside a loop.
-- **Three ids, and confusing them is the one mistake that moves money wrongly.** `prospectId` is the person; `associationId` is one campaign relationship and is what earnings, transfers, the tracking link, the invitation, enforcement, readiness, post submissions, and proposals all key on; `claimedUserId` on `affiliate_signup_profiles` is the Better Auth account. And `campaign_affiliate_associations.affiliate_id` holds the PROSPECT id, not an account id — `types.ts`'s header states it, because anything keying a connected-account lookup off it would route money at a UUID nobody owns.
-- **The filters are the SERVER's answer.** `filters.adminWork`, `.verification`, `.payout` are booleans on the row, derived from the attention register. §26.2 needs a `prior_value` to override against and a browser-derived value has none — and more practically, two derivations of "does this need Admin work" is two answers waiting to disagree. The attention register itself names, for every kind, the RECORD it is derived from: an attention line with no record behind it is a nudge, and §30 forbids those.
-- **Two label registers over §23.4, and they must never be swapped.** `ADMIN_ASSOCIATION_STATUS_LABELS` is one-to-one over all nineteen states. `FOUNDER_ROSTER_STATUS_LABELS` is §14.5's projection and is lossy on purpose — `readiness_blocked` and `ready` are both "Accepted" there, because §14.5 declines to show a Founder the difference. An Admin who cannot see it cannot do the work; a drift test asserts the two disagree exactly there.
-- **The history composes across fifteen tables and stores nothing.** No `affiliate_history` table, every entry names the source table it came from, and a test asserts the module contains no `.insert(`, `.update(`, or `.delete(` after comments are stripped. `audit_events` is read through an ALLOWLIST — an unmapped action is skipped rather than rendered raw, because an audit action name is an internal identifier and reading `affiliate.prospect_updated` aloud on a support call is the §3.1 leak.
-- **Provenance is the information model, not decoration.** Four badges — Affiliate supplied, Admin researched, Evidence + Admin decision, Stripe supplied · read only — and the answer decides what may be edited. The Stripe block has no edit control anywhere: §13 makes Proovd the holder of a status and an id and never of the data behind them, and the absence of the route is the enforcement.
-- **The relationship read is four panes in one call, and only the active one mounts.** An Admin opening Money has already decided something on Overview; a round trip per tab is a second chance for the two to disagree about what state the relationship is in. The rail is a hand-built tablist with roving tabindex and Arrow/Home/End, for the reason the Founder workspace records: §26.1's stylesheet uses different markup from `components/Tabs.tsx`.
-- **The reference's "upfront fee" is refused, and §3.2's own replacement ships instead.** This is the one place the reference and the Spec are exact inverses: the reference's acceptance audit refuses `fixed payment` by name and mandates "upfront fee", while §3.2 lists `upfront (fee|payout|payment)` among the UNIVERSALLY banned terms and §33.11.3 scans the whole shipped bundle for them. §1.8 decides — the Spec wins on all of it — so the surface says **Fixed Creator payment**, which is §3.2's own mandated replacement ("optional fixed Creator payment / Creator payment funded") and §24.7's name for the record. It was caught by the bundle scan, not by review, which is what that scan is for. Everything the reference was protecting survives: the Product-only rule, §24.7's seven-state chain, and `FIXED_PAYMENT_FUNDED_IS_NOT_PAID` pinned beneath it — the sentence both rules exist to make true.
-- **`estimated` is not US$0.00 earned, and the hero says so.** Before close nothing has been captured, so nothing has been earned; a zero in a hero would read as "this Creator earned nothing". Every unpopulated block names what it is waiting for (§16a), and a conversion over zero clicks is `null` rather than `0%`.
-- **The money decisions are not duplicated here.** Finalizing, approving, and creating the one Transfer are §22.1's services and are driven from the close queue, which owns the ordering and the §11 tax gate. A second set of buttons would be a second path into the one Transfer per association — exactly what its stable idempotency key exists to prevent. A test asserts no control on the Money pane says "create" or "transfer".
-- **Pausing a link is not enforcement, and the two are kept apart structurally.** `setTrackingLinkPaused` writes the three pause columns and never `active`/`activated_at` — §18 decides every click against the activation instant, so moving it would silently re-decide clicks already in the ledger with the reason each earned nothing. It does not move the association either: a paused LINK stops attribution, a paused CREATOR is §29's action with its five customer-facing statement fields and its five-business-day appeal window. A test compares the association row before and after.
-- **The §17 review posts to the route that already owns it.** `/api/admin/post-submissions/:id/verify`, addressed by SUBMISSION rather than by association, because a corrected resubmission is a new record with its own decision. Approve is disabled until all seven checks are marked, and that is a courtesy — `verifyPost` re-decides from the recorded checklist and its refusal is what an Admin reads (§1.1).
-- **§29.6 is offered only against a Creator §15 marked required for launch.** `launchFailure` reads `association_readiness.launch_required` and any `required_creator_failures` row matched on `failed_association_id`, so recording a failure to post is unreachable for somebody nobody is waiting on — starting a three-business-day replacement clock for a roster that is already whole is the mistake worth making structurally impossible. The stored `due_at` and its calendar version are rendered together and the copy states the window is **non-resettable**, because 14a's whole guarantee is that a retry returns the first record unchanged (§33.12.2). What a lapse costs — every funded fixed Creator payment returned, the full listing fee refunded — is stated as the SWEEP's act rather than this surface's, which is true and is what stops an Admin reading the control as the thing that does it.
-
-**Two recorded deviations, both by product direction and both narrow.**
-
-- **Account-level suspend/restore exists.** `enforcement/standing.ts` had said since Phase 20b that an account-level Creator sanction would be §1 rule 6, and the reference asked for one exactly as the Founders reference asked for `founder_access_actions`. The same answer was given, and the header now records it rather than contradicting the code. What did NOT change: there is no ban. `affiliate_access_actions.action` admits two values by CHECK, there is no `affiliate_ghost_bans` table, `creatorStandingGate` has no ban branch to reach, and §29's association-scoped enforcement is untouched. The gate matches on the account id OR through the prospect, so a suspension recorded before the claim still binds afterwards — which is the whole reason `user_id` is nullable.
-- **`campaignFit` is no longer required by `POST /api/admin/affiliates`.** The column is nullable and stays; the reference removes the control an Admin filled it from (its audit refuses a visible "Why fit" field by name), which left one route demanding a value with no surface behind it — and the only way past a required box is to type something into it. §5.3's reasoning, already recorded in `recruitment.ts`: an honestly incomplete record beats a placeholder somebody invented to get through a form. It is still written when supplied, still rendered, and still editable through the research record.
-
-**Every operation whose backend already exists is wired, and the ones that are not are the nine in `CREATOR_PARKED_MESSAGES`.** Wired against routes that already owned their rules — nothing here reimplements one: §29's enforcement action with its five customer-facing statement fields and the sixth internal one kept apart (`POST /api/admin/associations/:id/enforcement`), the §29.4 appeal decision, §29.1 and §29.2's two disclosures, §14.2's proposal rejection (the only Admin move on a version, offered only while one is open), §16's confirm-deliverables / re-derive / funding-deadline, §31.5's kit access log, revocation, and the §10 reveal, and §22.8's completion decision. Each ends in a re-read.
-
-The gap register is nine entries, and each says what is missing rather than that something broke: per-deliverable evidence and availability verification (no record exists, and the Spec fixes no availability period); the payout reminder (§27 defines no such message); a live Stripe read (the block shows what Stripe last reported, and says so); evidence FILE upload and the visual kit (the §12 R2 bucket is unconfigured — Track A4 — so there is nothing to show, and every kit read is still logged); compliance/support case intake (§26.7's console owns that queue with the §27.8 clock and the handoff gate); the password-recovery send (§5.5 makes the reset an ask the person makes); and asking an Affiliate to correct their own record (§27 defines no correction-request message). A register test refuses an entry that does not name its absence.
-
-**The `/` palette finds a person from anywhere in the section.** It searches the SAME server-composed `searchText` the directory filters on — one source, so the two can never disagree about what matches, and the campaign names being in it is why typing a campaign finds the Creators on it. `/` is suppressed inside inputs and textareas: without that guard a slash typed into an enforcement reason opens an overlay on top of the form and eats the keystroke.
-
-**Two nouns, and the split is the reference's own.** The shell tab is **Creators** — §3.1's substitution, and what every other Admin surface in this product says. Inside the workspace the record vocabulary is **Affiliate**, because the reference pins it there and its first requirement resolves the question the same way: Founder-facing distribution partners are called Creator; internal records may use Affiliate. §3.1's risk is an internal name reaching a *customer*, and nothing here does — `listFounderVisibleRoster`'s seven-column projection is untouched, and a copy test scans every rendered Creator surface for the §3.1 and §3.2 vocabularies plus the reference's own retired terms.
-
-### The Support workspace was built (§26.7, §26.8, §27.8, §29.9, post-Phase-24 change, 2026-08-13)
-
-The Admin shell's Support section. Built from a supplied reference bundle at `docs/design-refrence/Proovd-Support-Admin.html` — a single-file HTML/CSS/vanilla-JS prototype — the same way the Founders and Creators workspaces were. **Today was the only parked section left at the time** — Campaigns was built on 2026-08-15, and Today itself on 2026-08-19.
-
-**A ticketing domain already existed, and this EXTENDS it.** Phase 16b shipped `support_cases` + `support_case_messages` + `support_case_handoffs` with §27.8's business-day deadline stored beside the calendar version that produced it, the §33.9.11 customer-facing/internal split, the §26.8 four-fact handoff gate, and real editable templates. A parallel ticket table would have been a second answer to "when did we promise this person a response". The reference needed six things no record held — a subject, a named ADMIN, who the case is blocked on and what they owe, evidence, coordination outside the thread, and resolution/closing/reopening — and those are migration 0045.
-
-`shared/src/admin/support-workspace.ts` owns the registers; `backend/src/support/workspace/{logic,types,read,mutations}.ts` the restatement, the two reads, and the writes; `backend/src/routes/admin-support.ts` gained eleven routes; migration 0045 the guarantees; `frontend/src/features/admin/support/` the surfaces; proovd.css `PHASE 27` the styles. Suites: `support-workspace.test.ts` (46) and `support.test.tsx` (24). **Phase 16b's own 36 tests are untouched and still pass.**
-
-- **Three places the reference and the Spec disagree, and §1.8 decides all three.** Its **thirteen categories** lose to §26.7's ten — a case opened by a Backer through §29.9 and one opened by an Admin must be classifiable on ONE list, or the queue counts two different things; the reference's extra distinctions live in the free-text subcategory. Its **priority "drives queue order and response expectations"**, and the second half would be a new commercial rule: §27.8 publishes one response promise for every case, so triage orders the Admin's own queue and `TRIAGE_NEVER_CHANGES_THE_PROMISE` rides the control that sets it. Its **`ME` constant and flat `ADMINS` list** become real Better Auth accounts, and `assignToSelf` resolves from the SESSION — a caller that could name its own actor could attribute a decision to somebody else, which is the identity mistake `routes/vetting.ts` records.
-- **`closed` is a stamp, not a fifth status, and that is load-bearing.** Five modules read `status <> 'resolved'` to mean "still open" — the §27.8 queue, `support/promises.ts`, `backer-support.ts`'s §29.10 escalation arm, `completion/satisfaction.ts`, and `live/act.ts`. A fifth enum member would have put every closed case straight back into the SLA queue and started breaching promises on cases finished weeks ago. So closing is `closed_at` on a case that is already `resolved`, a CHECK refuses every other combination, and a test asserts the enum still has exactly Phase 16b's four values.
-- **`waiting_on` and `status` cannot disagree, because a CHECK pins them rather than every writer remembering.** The new column is the finer-grained "who is this blocked on right now"; §26.7's `owner` stays the accountable ORGANISATION and is what Appendix B.8 tells the customer. **The first CHECK draft was too tight** and made "a Backer's tracking question blocked on a Creator" unrepresentable — which would have forced the record to claim the Backer was holding it up. It was relaxed to pin only what genuinely says the same thing: `awaiting_customer` must equal the requester, `awaiting_founder` must be the Founder, and `open` admits every party because PROOVD still owes the customer the answer while it chases somebody.
-- **The migration's CHECK found three real callers, and they were fixed rather than exempted.** `openSupportCase`, `resolveCase`, and `transferCaseOwnership` all wrote `status` without the paired `waiting_on`; all three now write both. That is the constraint doing its job on day one.
-- **§27.8's 48-hour Founder clock starts on ENTERING `awaiting_founder` and clears on leaving.** A clock left running against somebody who no longer owes anything is a breach the queue would report forever.
-- **Evidence is a REFERENCE, never a file.** §12's object storage is Track A4 and `unconfiguredStorage` throws, so there is no upload path, no `storage_key` column (asserted absent in `information_schema`), no `<input type="file">` on the surface (asserted absent in the DOM), and `EVIDENCE_IS_A_REFERENCE` says so above the list rather than leaving an Admin to discover it. `linked_kind` is CHECKed against a register because evidence pointing at free text can point at nothing — which reads as complete inside a §24.11 dispute packet while proving none of it.
-- **Contacting a party RECORDS and does not send.** §27 defines four support keys — the Backer acknowledgement, the Founder-response relay, the SLA breach, the promised follow-up — and none is "an Admin contacted a party about a case". Inventing a fifth would be §1 rule 6 applied to a message, so `CONTACT_IS_RECORDED_NOT_SENT` is the consequence line and a test asserts no `notification_deliveries` row appears. There is no `remind_at`, no `recurrence`, and no job that reads the table (§30) — the absence is asserted in `information_schema`, the `relationship_touches` arrangement reused. `outcome` is the one mutable column on any new table, granted by name and write-once by trigger.
-- **The history composes and there is no `support_case_events` table.** §26.8's trap unchanged: a second event store that drifts from the first is worse than no timeline. Every entry names the table it was read from — so the claim is checkable from the response — and **an internal note's BODY never reaches it**, because a history is exactly the view that gets pasted into a customer message (§33.9.11). A test writes a note containing `card_declined`, asserts it is on the thread, and asserts it is not in the history.
-- **Reopening destroys nothing.** The prior resolution is copied onto the reopen row before it is cleared, which is the ONE combination the closure trigger permits — editing a resolution in place is refused, and reopening is the recorded path that replaces it.
-- **Every new write is registered in §33.12.5's `UNGATED_ADMIN_WRITES` with the property it lacks**, and a test asserts all eleven are there with a reason and a spec reference. They are the same class as the three case routes already registered: they record what an Admin did, move no money, change nobody's eligibility, and are superseded by a later record rather than being destructive. `admin-support.ts` has recorded since Phase 16b that a freshness gate on routine daily work is how the prompt stops meaning anything.
-- **`POST /support/cases/:caseId/resolve` now requires a resolution.** The `resolveCase` service is untouched and still exported for its other callers; no route reaches it. A case finished from a human surface always says why, and §33.9.11's refusal applies to that text because it is written to be read by the customer.
-- **The workspace queue is a different address from §27.8's.** `/support/queue` stays exactly as Phase 16b built it and is what the `support-promises` sweep drives; `/support/workspace` includes finished cases, because a workspace that hid them could not answer "what did we tell this person last month". A test asserts a resolved case appears in one and not the other.
-- **The context panel's record links are shown-but-unavailable, and that is a decision rather than an unfinished edge.** §26.8's panel points at the Founder, the Creator relationship, the campaign, and the pre-order. Two of those have no address to point at: the Campaigns workspace is not built, and a pre-order has no Admin workspace of its own at all. §1.4 gives two honest options — hide the control, or show it and say what it IS — and hiding would make Support describe a smaller product than the one being built. So `SupportRecordLink` carries `href: null` plus a required `unavailableBecause`, the surface renders the reason where the destination would be, and the control is `aria-disabled` rather than `disabled` so a keyboard user meets the explanation a sighted user can see (§28.5). **When the Campaigns workspace lands, the campaign link becomes a real `href` and its `unavailableBecause` becomes null** — the shape already exists, so that is a value change in `composeContext` (`backend/src/support/workspace/read.ts`) and not a surface rewrite. The Creator relationship link stays deliberately addressed through the Creators workspace, because that workspace owns the relationship end to end and a second route into it would be a second place to operate one. **It became a real `href` on 2026-08-17** (Affiliate rebuild, Session C), in the `?rel=` shape the record now uses — the same value change the campaign link took. **And the pre-order link became a real `href` on 2026-08-19**: a pre-order still has no record page of its own — the Backers reference's own promise — but the Backers workspace has a POSITION for one, so the link lands on that Backer's row scoped to this campaign. Nothing in this panel is shown-but-unavailable any more.
-- **`.sr-only` was used by three controls and defined by nothing, since 2026-08-11.** `CreatorsDirectory.tsx` and `CreatorSearch.tsx` carry the class and `proovd.css` never had the rule, so "Search Affiliates" and the palette's title and description have been rendering as visible text. axe cannot catch it — the accessible name is correct either way and a visible label is not a violation — so only a person looking at the page or a grep of the class against the stylesheet finds it. The rule is now defined once in `PHASE 27`, which fixes the Creators surfaces as a side effect; it is filed there because that is where it was found, not because it belongs to Support.
-- **One test-harness bug worth knowing about.** `useButtonProgress` hands the runtime the PROMISE, not the callback — MotionProvider's own header records why. Mocking it as `(el, work) => await work()` looks equivalent and is not: it calls a promise, throws `work is not a function` into the swallowing catch, and **resolves immediately** — so `ConfirmDialog` reads a refusal that has not been assigned yet and closes the panel on a decision the server refused. Every server-refusal assertion behind that hook would pass for the wrong reason. `support.test.tsx` mocks it as a promise and states this. **`creators.test.tsx`, `relationship.test.tsx`, and `founders.test.tsx` carried the callback-shaped mock until 2026-08-15**; all three now take the promise. They were not wrong at the time — no test in them asserted a server refusal through a `ConfirmDialog` — but the trap only stays harmless until somebody writes that test, which is why they were fixed rather than annotated.
-
-### The Campaigns workspace was built (§26.1, §23.1, §18, §26.8, post-Phase-24 change, 2026-08-15)
-
-The Admin shell's Campaigns section. Built from a supplied reference bundle at `docs/design-refrence/Proovd-Campaigns-Admin_2.html`. **Today was the only parked section left; it was built on 2026-08-19.**
-
-**It is a read-only HUB, and that is the whole design.** The reference says so five times in its own copy — "the details and action stay in the admin page that owns this work", "totals only", "detailed work stays in the admin page where it happened" — and its prototype contains no mutating control at all. Its only real interactions are copying the public link and opening the public page; everything else is a navigation stub. So the API behind this section is **two GETs**, and `campaign-workspace.test.ts` drives POST/PUT/PATCH/DELETE at both addresses and asserts 404 on all eight. Every campaign operation already has a router another workspace owns (§15's review, §16's readiness, §17's launch, §20's live edits, §21's close, §22.1's earnings, §24.8's refunds, §26.7's suspend/kill), and a duplicate control here would be a second door into rules those encode — a second way to decide a threshold, or a second path into the one Transfer per association.
-
-`shared/src/admin/campaign-workspace.ts` owns the registers; `backend/src/campaigns/workspace/{logic,types,facts,derive,read,history}.ts` the restatement, the batched gather, the derivations, the two reads, and the composed history; `backend/src/routes/admin-campaigns.ts` the API; `frontend/src/features/admin/campaigns/` the surfaces; proovd.css `PHASE 28` the styles. Suites: `campaign-workspace.test.ts` (36) and `campaigns.test.tsx` (26). **No migration — no schema changed.**
-
-- **Nothing is stored, and the absences are asserted.** No `campaign_events` table (§26.8's trap: a second event store that drifts from the first is worse than no timeline — and this page reads five domains at once, which is exactly the condition under which somebody proposes caching them), no `group`/`state_kind`/`blocker` column on `campaigns`, and no `.insert(`/`.update(`/`.delete(` anywhere in `campaigns/workspace/`. All four are `information_schema` or source-scan assertions.
-- **The pill says the LIFECYCLE; the tone says the trouble.** The reference's `state` is a mix — sometimes "Live", sometimes "Support case open". Doing that would give the product a second campaign-state vocabulary beside §23.1's 27, which `campaigns.status` is the single authority for. So the pill's text is always `campaignStatusLabel(status)` and only `stateKind` moves: a live campaign with an open support case reads `Live` in the risk tone beside "2 support cases are open", which is both facts where the reference showed one twice.
-- **`blocked` and `clear` are not opposites, and §21's retry window is why.** A campaign whose cards are failing carries a real blocker sentence that nobody at Proovd owes. So `blocked` (a NAMED party owes the next step) drives the routing control and the `needs` filter, `clear` (the text is genuinely `NO_BLOCKER_LABEL`) drives the band's "Current blocker"/"On track" pill, and `system` is a first-class answer that suppresses routing — offering "Open System" would be manufacturing an action (§20's caught-up ending, DNA §5.4).
-- **The blocker order is severity for the CAMPAIGN.** Suspension → §29.6's replacement window → §21's retry window → §27.8's support promise → `changes_required` → `pending_review` → the lifecycle's own waiting states. Every branch names a RECORD; there is no branch that produces a blocker from a date, a duration, or an absence, which is §33.6.11's rule applied to an Admin surface.
-- **An unpublished campaign has NO public address, structurally.** Not a disabled control: `publicUrl` is null for every pre-live status, so there is nothing for a copy or an open control to use, and the header says why. §18 gives those campaigns no public page at all, so a link would be both a leak and a broken promise.
-- **The Idea denominator is `campaign_build.order_threshold`, and an unset one draws no bar.** The prototype hardcodes 120; §14.4 makes the threshold the Founder's own build value, so an unset one is a fact to state rather than a default to invent. The progress property is named `threshold`, **never `goal`** — §3.2 bans the word for an Idea threshold in every audience *including identifiers*, and a property name survives minification. §33.11.3's bundle scan caught `progress.goal` in the first draft, which is exactly what that scan is for.
-- **Three of six destinations did not exist, and each said which. All six exist now (2026-08-19).** `CAMPAIGN_DESTINATIONS` carried `absentBecause` on exactly the unbuilt ones (Backer Admin, then Money & Fulfillment, then Tasks) and a test asserts `href` and `unavailableBecause` are never both set or both null — which is now the whole check, because nothing is unbuilt. `money_admin` was the last, and its own sentence ("the amounts here come from its records") was the promise the Money console was written to keep. A fourth case — a blocker Proovd itself owes whose decision surface does not exist (§15's review, §16/§17's scheduling) — carries `PROOVD_DECISION_HAS_NO_SCREEN` rather than routing to the Founder workspace: a wrong destination presented as a right one is worse than none. **The first draft did route it there, and the register test caught it.**
-- **`listCampaignIds` never reads `campaigns.created_at`.** The first draft used it as a sort tiebreak and §33.12.1's scan failed — that check treats reading either row timestamp AT ALL as the failure. Respecting it rather than exempting it is the point; the cost is that a campaign with no anchor sorts last by id, which is honest because there is no instant that orders it.
-- **Ten batched queries for the whole directory**, `inArray` fan-out, nothing in a loop — and the single-record read passes an array of one, so a row of the list and the record it opens are the same code path.
-- **The payload carries no Backer identity and no support-case body.** Counts only from `reservations` and `support_cases`; §26.7's enforcement rows contribute their customer explanation and never the internal reason beside it (§25.6). Asserted by seeding both and scanning the response.
-- **The Support workspace's campaign link is now real.** It rendered shown-but-unavailable from 2026-08-13 until this landed; the shape was built so closing the gap would be a value change, and it was — plus `RecordLink` became a `RouterLink`, since this is its first destination that actually exists and an `<a href>` would drop the Admin shell.
-- **Two defects only a browser found.** The status pill was dark-green ink on a 5% fill, correct on the directory and **invisible** on the record's dark header — axe cannot catch it, because the text is present and contrast is computed against the pill's own declared background rather than the band showing through it. And the fixed-layout table let long §23.1 labels spill into the blocker column. Both are corrected in `PHASE 28`; the screenshot pass is what found them, which is why §33.11 keeps contrast on the manual list.
-
-### What the Campaigns tab inherited — the routes it deliberately does NOT call (2026-08-11)
-
-The Creators workspace is wired to every route it could reach. What it deliberately did **not** wire is campaign-scoped: it answers "what is true of this campaign", not "what is true of this person", and putting it on a person's record would make the Creators tab the second place a campaign is operated from. **The Campaigns hub does not call any of these either** — it is a read, and every route below is a decision that belongs to the workspace whose rules encode it. The list stays because it is the inventory a future campaign-operations surface starts from: every route already exists, is mounted, and is driven by an acceptance suite.
-
-| Route (exists, mounted, untouched) | What it does | Spec |
+| Deviation | Departs from | What keeps it narrow |
 |---|---|---|
-| `GET /api/admin/campaigns/:id/decisions` | The whole roster's proposals, agreements, bonuses, and the §14.6 deadline evaluation in one read | §14 |
-| `POST /api/admin/campaigns/:id/creator-readiness/…` | The roster-wide §16 verification, re-derivation, and the funding deadline — the Creators tab shows ONE relationship's | §16 |
-| `POST /api/admin/campaigns/:id/schedule-live` | The one exact `campaign_live_at`, conditional on every launch-required Creator being ready | §16, §17 |
-| `POST /api/admin/campaigns/:id/launch` | The idempotent five-step launch | §17 |
-| `POST /api/admin/campaigns/:id/creator-replacement/resolve` | The campaign-level half of §29.6. The Creators tab records the failure and marks a replacement ready per relationship; the roster-wide view of who is still missing belongs here | §29.6 |
-| `/api/admin/live/*` — mid-campaign terms, addition, activation, live edits, change requests, comments, comment flags | §20's three live-editing tiers and the mid-campaign addition with its frozen remaining-time terms | §18, §20 |
-| `POST /api/admin/campaigns/:id/review/*` | §15's review rounds, the grouped feedback, and approval with its immutable snapshot | §15 |
-| `POST /api/admin/policy-reacceptance` | §29.8, audience-wide rather than per person | §29.8 |
-| `GET /api/admin/affiliates/founder-view?campaignId=` | The seven-column projection a Founder actually sees of their own roster | §11 |
-
-**Two routers were deleted with their screens. Both are back, and so is everything else that commit removed (2026-08-19).** `2f7aeed` removed `admin-close.ts` (972 lines) and `admin-refunds.ts` (243 lines) along with the old dashboard — and, as the audit that restored them found, five backend SERVICES and an acceptance SUITE as well. `backend/src/tests/measurement.test.ts` is the integration half of §33.12.6 and §33.12.7, so from that commit until this one **two of the 131 named §33 tests were not being run**. Everything is restored and the Money & Fulfillment console operates it — see the two 2026-08-19 sections below. **Restoring a route is not rewriting one**: the file to bring back is in git history at `2f7aeed^`.
-
-**Support was waiting for this tab, and the wiring was one value — now closed.** The §26.8 context panel on every support case points at the case's campaign; from 2026-08-13 that link rendered shown-but-unavailable with its reason, and on 2026-08-15 it became `href: '/admin/campaigns/<id>'` in `composeContext` (`backend/src/support/workspace/read.ts`). The shape was built so this would be a value change rather than a surface rewrite, and it was. **The pre-order link stays unavailable**: a reservation has no Admin workspace of its own and its facts live on the case and in the §26.5 ledger.
-
-**Where the seam actually is.** A Creator's record answers for the person — their §2.2 slots across every campaign, their verification, their standing, their history. A campaign answers for the roster — who is on it, whether it can launch, what the close batch did. The two meet at the **relationship**, which the Creators tab owns end to end, and that is the right place for it: §29 records enforcement per relationship and §22.1 finalizes earnings per relationship. The Campaigns hub links INTO the Creators workspace rather than rebuilding those four panes — and because the Creators workspace is keyed on the PERSON while a campaign has a roster, it links to the directory with the campaign name pre-searched (`/admin/creators?q=…`) rather than to one relationship. That is a real limitation, stated in `affiliateHrefOf`, not a shortcut. **`?q=` was ignored by `CreatorsDirectory` until 2026-08-15** — the search term was local state, so that link promised a pre-search and delivered an unfiltered list. The term now lives in the URL beside `?filter=`, which is the same DNA §5.12 point that file already recorded for the filter, and the empty-state reset clears both in ONE `setParams` call: two sequential writes would each rebuild from the same closed-over snapshot and the second would restore what the first removed.
-
-### The Admin Tasks panel was built (§26, §30, §25.6, §28.5, post-Phase-24 change, 2026-08-16)
-
-> The `CAMPAIGN_DESTINATIONS.tasks` entry and `PARKED_MESSAGES.today` are both
-> resolved as of 2026-08-19 — see the Today section at the end of this file.
-
-
-A floating work panel in the Google-Tasks shape, built from the supplied reference at `docs/design-refrence/Proovd-Tasks.html`: a launcher pill in the bottom-right corner of every Admin route, a panel that slides in from the right, shared lists, tasks with notes, an optional due date, and a reference that points at the record the work belongs to. **It is not a numbered phase and it is not Spec-mandated, and neither fact is papered over**: §26 names no task list, §1 rule 6 forbids inventing commercial machinery, and a private note an operator writes to themselves is none of rule 6's seven items — composed under §1 rule 2's licence, exactly as the five workspace shells were. `docs/phases/admin-tasks.md` is the brief.
-
-`shared/src/admin/tasks.ts` owns the registers (the five reference kinds with their address patterns, the due-state kernels, the pinned sentences, `TASKS_BANNED_TERMS`, `TASKS_PARKED_MESSAGES`); `backend/src/tasks/{logic,service}.ts` the drift-tested restatement, the reads, the writes, and the reference resolution; `backend/src/routes/admin-tasks.ts` the API; migration 0046 the guarantees; `frontend/src/features/admin/tasks/` the panel, mounted in `AdminFrame` after `</main>` — inside `RequireRole`, so it renders on every Admin route and none outside `/admin`; proovd.css `PHASE 30` the styles, in the previously free 850–899 layer band (below `.scrim` at 940, so a `ConfirmDialog` correctly dims it). Suites: `admin-tasks.test.ts` (30) and `tasks.test.tsx` (17).
-
-- **It becomes a rule-6 violation the moment the due date binds anything, so the date binds nothing — five mechanisms, each asserted.** (1) No schedule-shaped column exists: `remind_at`, `notify_at`, `recurrence`, `repeat_interval`, `next_send_at`, `template_id`, `cadence`, `snooze_until`, `escalate_at`, `priority`, and `sla_*` are asserted absent from `information_schema` beside the columns that must be present, so the check cannot pass by the table having been renamed away. (2) No §27 registry key matches `/task/` — nothing could carry "your task is due" even if somebody wrote a sender. (3) No file under `backend/src/jobs/` names either table. (4) `due_on` is an opaque `YYYY-MM-DD` string to the server — a source scan proves nothing outside the tasks module reads it, and the `late`/`today`/`future` pill is computed by the ONE surface that renders it, against the viewer's own day. It is a `date`, not a `timestamptz`, because §27.1's timezone rule governs deadlines the product promises to people and this is a day in the author's own head. (5) The pinned `TASK_DUE_DATE_IS_CHECKED` sentence rides the due-date control — the support workspace's "a date you check rather than one that chases anybody", re-articulated without the word `reminder`, which is banned here precisely because it is real product vocabulary elsewhere (§20's pre-charge reminder) and reusing it would imply a send that does not exist.
-- **There is no `assigned_to`, and its absence is asserted — this is the one place the brief overrides the obvious reading of "shared team task list".** Assignment already exists: `support_cases` carries an owner, a waiting party, a due time, a four-fact handoff gate, and §27.8's published response promise, and a second way to hand work to a named person would be a second door into rules that machinery encodes. If a task turns out to be work somebody is owed, the answer is a support case, not a column here.
-- **Every list is shared, so deletion is soft and completion records who.** Every Admin sees every list; `created_by` is rendered ("Written by …"). A hard delete would destroy another person's note with no record, so `deleted_at`/`deleted_by` are set, reads filter them, DELETE is revoked from the app role on both tables, and a 0046 trigger makes a deleted task *settled* — even a direct UPDATE is refused, and the deletion cannot be cleared. The recorded author and creation time are trigger-immutable. Completing records `completed_by` (a "done" nobody signed is a fact nobody can follow up on); reopening clears the pair, because a checkbox an Admin cannot untick is a punishment, not a record. Archiving a list refuses while it holds open tasks — hiding somebody else's work is the thing the refusal exists for — and an archived list is settled by trigger.
-- **The reference stores its label at write time and re-checks its destination on read.** All-or-nothing by CHECK (a `ref_id` with no `ref_kind` is a pointer at nothing, unrepresentable), kind CHECK-pinned to the five built workspaces — Founder, Creator relationship, Campaign, Backer, Support case. The label is resolved server-side and stored so a later rename cannot rewrite what somebody wrote down (the §18 comment thread's stored-author reasoning); the href is deliberately NOT stored, because whether the destination still answers is a fact about now. A target that no longer resolves renders the stored label with `unavailableBecause` where the destination would be — the reference bundle's own rule, kept: *a reference with nothing to navigate to is a label, not a dead button*. `href` and `unavailableBecause` are never both set and never both null, asserted in both directions. A Backer reference resolves to the campaign-filtered list (`/admin/backers?view=backers&campaignId=…`) because a pre-order has no record page of its own — the Backers workspace's promise, not a gap. Creating a task pointing at nothing refuses; the picker (`GET /targets`, bounded at 12 like the `/` palette) and the compose preview both render the label the create will store, so the two cannot drift.
-- **The author is the session, never the body.** `actorUserId` comes from `req.authUser` — the `assignToSelf` precedent — and the suite posts `createdBy` naming another Admin and asserts the row ignores it. One audit row per mutation, in the same transaction.
-- **No freshness gate, and every write is registered.** Writing down a note moves no money, changes no configuration, enforces against nobody, and decides no customer outcome, so the seven writes take `requireAdmin` only and each is in `UNGATED_ADMIN_WRITES` with a reason over 60 characters naming the sensitive property it lacks. §33.12.5's partition passes in both directions with them included, and the suite re-asserts all seven by name.
-- **The `CAMPAIGN_DESTINATIONS.tasks` entry flipped without calling its old reasoning wrong.** The comment that parked it — §30 forbids a scheduled queue that chases anybody — was right, and what shipped is not a queue: nobody is assigned, nothing is scheduled, no message is sent. Tasks is a panel, not an address, so the destination is the campaign's own record with `?tasks=new`: the shell reads the parameter, opens compose, and the context strip offers the campaign as the reference ("You are looking at X — Use this"), with the label resolved server-side before it is shown. The strip derives what the Admin is looking at from the ADDRESS (`contextFromPathname`), because the address is the one thing every workspace already maintains.
-- **The launcher's open-count badge is DNA §5.4, not its opposite.** A count of tasks the Admin wrote themselves, going to zero, is §5.4's finite-session pattern; what §5.4 forbids is *manufacturing* items, and nothing here can manufacture one — every row has a `created_by` who is a person. The overdue tone reuses the accent the toasts already use.
-- **Focus is managed and deliberately not trapped.** Focus enters the panel on open and returns to the launcher on close — deferred one commit, because the launcher is `hidden` while the panel is open and a hidden element cannot take focus. Escape closes compose first, then the panel. No focus trap: the panel is non-modal and blocks nothing, and trapping focus in a thing that is not blocking anything strands keyboard users. Compose COVERS the panel (`absolute; inset: 0`) rather than stacking a second floating layer, and changing the reference's kind clears the narrower choice beneath it. The shortcut is **Ctrl/Cmd+Shift+U** — the reference bound Ctrl+Shift+T, which is "reopen closed tab" in every major browser — with the `CreatorSearch` input-suppression guard, asserted by typing the chord into the notes field.
-- **The vocabulary is scanned word-bounded, against payloads and the rendered surface.** `goal` (§3.2, including identifiers — the built bundle is scanned and carries none), `reminder`, `nudge`, `streak`, `snooze`, `escalate`, `sla`, `assigned to`, `auto`. `Overdue` is deliberately permitted — §27.8 uses it for the support queue. Matching is `\b`-bounded because a random account id can contain any three letters, which is also why the scan is not a bare substring check.
-- **Retention is a named gap, not a filled one.** §25.8 defines seven windows and none covers Admin-authored internal content; the migration header says so and stops — the precedent is `support_case_messages` and `relationship_touches.note`, neither swept, and inventing a window would be §1 rule 6. `TASKS_PARKED_MESSAGES` names the rest of what is deliberately absent: bulk actions, list merge, export, attachments (Track A4), and a shell-wide palette.
-- **`ConfirmDialog` is reused for the three destructive-ish acts** (new list, archive list, remove task), with the promise-shaped `buttonProgress` mock in the suite — the trap `support.test.tsx` records, carried correctly from day one this time.
-
-### The Founders workspace was rebuilt to a new reference — complete, Sessions A–C (§26.1, §7, §9, §10, §12, §13, §14, §15, §20, §22, §23.1, post-Phase-24 change, 2026-08-16/17)
-
-The Founders tab was rebuilt to a second supplied reference bundle (`docs/design-refrence/Proovd-Founder-Admin.html` — a compiled React bundle, walked by serving and driving it in Chrome rather than read; `docs/phases/admin-founders-rebuild.md` is the brief, `docs/phases/admin-founders-reconciliation.md` the walk with every element bucketed and every §1.8 conflict resolved). **The rebuild is complete — all three sessions have shipped.** Session A: the directory, the record shell with its eight-section nav, the Overview in final shape, all register changes, and migration 0047. Session B (2026-08-17): Onboarding's four sub-tabs in final shape, the five-step Create Founder compose page, and the Edit Founder sheet — every write surface the record has. Session C (2026-08-17): the six read-and-route sections in their final tab shapes — Campaign (Details · Review · Live · Page & Updates), Affiliates (Relationships · Requests · Performance & Completion), Backers & Demand (Demand · Responses · Backers), Money & Fulfillment (Close · Payments · Fulfillment · Refunds & Recovery), Support & Enforcement (Support · Cancellation · Enforcement), and History's Timeline/Communications split — with the three interim panes (`panes/{Campaigns,Money,History}.tsx`) deleted.
-
-`shared/src/admin/founder-workspace.ts` gained the directory registers (`FOUNDER_DIRECTORY_FILTERS`, `FOUNDER_TYPE_FILTERS`, `PROPOSED_TYPE_LABEL`, `FOUNDER_NEXT_STEP_LABELS` — total over §23.1, null meaning "this state asks nothing of the Founder"), `FOUNDER_RECORD_SECTIONS` (eight sections, twenty-one sub-tabs, the shape Sessions B/C fill), `MEETING_NOTE_FIELDS`/`RESEARCH_ENTRY_FIELDS`, and the parked-key surgery; `backend/src/founders/directory.ts` is the pure kernel (type chip, composed lifecycle, the two action cells, filter membership) the list AND the record header feed from the same facts, so the row an Admin clicked and the record that opens cannot disagree; `backend/src/founders/workspace.ts` gained `composeDiscovery` + `composeCampaignFacts`; `mutations.ts` gained `addMeetingNote`/`addResearchEntry`; migration 0047 the guarantees; `frontend/src/features/admin/founders/` the rebuilt `FoundersList`, `FounderWorkspace`, and `sections/OverviewSection.tsx`; proovd.css `PHASE 31` the styles. Suites: backend founder-workspace 65 (56 + 9 new), registers 19 (16 + 3 new), frontend founders 36 — all green, plus the four gates the brief names: §33.12.5 partition 20/20, §33.11 sweep 295/295, §33.11.3 bundle scan 15/15, §33.8.13 untouched.
-
-- **The reference asked for the three refused things again, plus four more, and the Spec won on every one.** `Edit Problem`/`Edit Solution` (two places each) render read-only with provenance — no editable key exists and none was added, the drift test still asserts the absence. `Edit Founder story` is not even a row on the Overview: §12 makes the Founder's approval the completing act, and the Story is Session B's Optional Items tab. The **Competition block with `Edit` and `Record agreed correction`** — the reference's most thoughtfully-drawn §1.8 violation, built for a field 0042 removed six days earlier — renders legacy answers read-only with no editor and no correction route. `Potential audience — 49,000 potentially relevant viewers`, free-form editable, renders the recorded `views_range` from the closed list with `CREATOR_MATCH_CAVEAT` riding it. The Type filter's third value `Proposed` is derived from the ABSENCE of a §9 lock — it appears in the filter vocabulary and the composed label and in no type register, and a registers test asserts `CAMPAIGN_TYPE_LABELS` still has exactly two members. The Owner dropdown of three named people stays free text offering the values in use (the brief's own decision). `View live campaign` renders only when `campaign_live_at` exists — §18 gives a pre-live campaign no public address, however the mock draws the button.
-
-- **The directory's two action columns are one severity order, derived, never stored.** The Admin cell reuses the attention kernel (one thing or nothing, §20's ranking) plus the one genuinely-Admin-owed state it cannot see — an invitation composed and never sent. The Founder cell reads `FOUNDER_NEXT_STEP_LABELS` plus the pre-claim derivations from the invitation record, refined where a finer record answers better: a `day_14_review` campaign with a submitted receipt stops asking for evidence. Every no-action state carries its reason (`No action — Priya owns the next step`), and the two cells read each other's answer — `Waiting on Proovd` appears only when the Admin cell is genuinely due. The pre-claim lifecycle is finer than `campaigns.status` because `invited_draft` covers four situations an Admin acts differently on: `Invite draft`, `Invite sent`, `Invite delivery unconfirmed` (the Phase 06b `notification_id NULL` state, surfaced), and `Founder form draft`.
-
-- **`F-XXXXX` is minted by the DATABASE.** Migration 0047 gives `founder_prospects.record_reference` a volatile DEFAULT calling `mint_founder_record_reference()` — the `PVD-`/`D14-` alphabet, random so it leaks no volume — so no creation path (route, seed, or test insert) can produce a prospect without one; the shape is CHECK-pinned, a trigger refuses any change, and it survives §25.8 anonymisation because it names nobody. The header's eyebrow and the row's search text carry it.
-
-- **Meeting notes are insert-only in the strong sense, and the §25.8 sweep learned them.** `founder_meeting_notes` (0047) holds the reference dialog's five required facts; the two-shape CHECK admits exactly a live row or an anonymised one, so a half-filled and a half-swept note are both unrepresentable, and the only UPDATE the trigger passes is the anonymising write. UPDATE is granted on the content columns by name; `prospect_id`, `created_by`, `created_at` are outside the grant — the fact a meeting was recorded outlives its text, the `draft_field_edits` arrangement. `anonymiseDraft` nulls note content when the prospect anonymises. No `remind_at`, no recurrence, no job reads the table (§30), asserted in `information_schema` and against `scheduler.ts`. A research entry is one composed line appended to §7's `discovery_evidence` — the same record the intake writes, deliberately not a second structure. Both writes are in `UNGATED_ADMIN_WRITES` (internal context; reaches nobody, decides nothing) and the §33.12.5 partition passes in both directions with them.
-
-- **The stale cross-links are closed, and `tabs` was split before rewording.** The campaign links are real routes to `/admin/campaigns/:id` (list row → record header and Overview panels; the old `parked-campaign` attention action became `open-campaign`, which navigates); `View support cases` routes to `/admin/support` unfiltered — the support queue takes no search parameter yet, and the copy says the queue is what opens rather than promising a filter. `PARKED_MESSAGES.tabs` — one sentence doing double duty for the shell's Today nav AND the Money pane's W-9 action, false in the nav since 2026-08-10 — split into `today` and `w9Close`, each naming what its destination IS; `campaign` and `support` left the register with the reasons recorded on it; `parked.ts`'s header now describes the six-section shell with one parked section.
-
-- **The section rail says `Affiliates`, and the Founders suite's scan consciously changed.** The reference pins the word, and the Creators-workspace precedent (2026-08-11) already resolved it: the shell says Creators, an Admin RECORD may say Affiliate, §3.1's scope is what renders to Founders and Backers. The suite's stricter-than-§3.1 forbidden list dropped `affiliate` with the precedent named at the constant; §3.2's honesty terms all stay.
-
-- **The screenshot pass caught two defects nothing else could, again.** The record header's four new children were being squeezed into PHASE 25's three-column `.fhead` grid (garbled strip, cramped eyebrow), and the dark Current-campaign panel rendered its values near-black-on-dark — the Campaigns hub's invisible-pill lesson repeating on a different surface. Both fixed as scoped PHASE 31 overrides (`.frec-head { display: block }`; `.fov-campaign .fgroup dd { color: var(--mint) }`); PHASE 25's shell selectors are untouched, and the five other workspaces were not restyled.
-
-- **Session B added no route, no table, and no migration, and that is the finding.** Onboarding's four tabs are reads over records that already existed plus two payload additions — `InvitationView.facts` (send count, token version, an expiration SENTENCE, claimed, revoked — never a token value, asserted against the raw token) and `EligibilityView` — and every write drives a route the product already had. §33.12.5's partition is untouched.
-
-- **The Optional Items tab is the §12 admin surface reborn, not a second door.** It reads `/api/admin/campaigns/:id/workspace` — mounted and §33-tested since Phase 09a, screenless since 2026-08-10 — and its decisions drive the same freshness-gated invalidate (reason + Founder-readable explanation), reinstate, six-fact override, and interview confirm/cancel routes the old surface drove. The Founder's content renders read-only with `OPTIONAL_ITEM_CONTENT_IS_FOUNDERS` pinned beside it; uploads render as a named Track A4 absence, not a disabled control. The Stripe & Listing Fee tab shares the same one fetch: paid renders the payment row's own stored lines, unpaid the live §12 fee preview with `SEPARATE_STREAM_NOTE`, and `Open secure status` is a read-only Explore dialog of provider facts (§13: the status and the identifiers, never the documents).
-
-- **The Eligibility tab is read-only structurally, and the suite asserts the absence.** No input, no select, no textarea, no Edit control anywhere on the tab — `ELIGIBILITY_READ_ONLY_NOTE` (the reference's own sentence) is pinned beside an enforcement that is the absence itself. The 18+/US/sanctions facts render as the Founder's recorded REPRESENTATIONS (§10) — the product derives no age and never claims to have verified one — and the DOB renders presence only, with the value asserted absent from the whole view. Three-valued throughout (§16a): `null` is "no claim record yet", never "No". The acknowledgements absence has two different sentences — not-claimed versus claim-not-completed — because they are two different facts (§1.4).
-
-- **The Create Founder compose refuses nine reference boxes, by register.** `CREATE_FOUNDER_ABSENCES` names each refused box with its rule — Business explanation (no §9 record reads it), Audience (`views_range` is the Founder's closed-list choice, 0042), Founder story (§12: approval is the completing act), Social links (§12 workspace content), Meeting notes (0047's five-fact record, not prose), the viewer/Affiliate counts (§10's assessment is recorded after submission, and an estimate in the message reads as the promise §7 forbids), uploads, branding evidence, and interview scheduling — and the page renders the refusals as sentences where the reference put inputs, so a later session re-adding one fails the register walk. Campaign type defaults to "Not decided yet": the reference preselects Idea, which is a §9 decision nobody made. `Save draft` IS `Create prospect` (one act, both labels kept), "changes save as you type" is refused — a keystroke-created prospect is a worse record than an explicit one — and the rail's five-line checklist is a client courtesy the send route re-decides (§1.1); a send refusal lands on the record's Invite tab with the server's own list. Step 05 composes §7's REAL message fields (what we understood / why invited / expected setup time) through the same editable-field route the record uses — there is no headline/body pair to invent.
-
-- **The Edit Founder sheet is the editable core and one reason.** Exactly `FOUNDER_EDITABLE_FIELDS`' profile group, writing ONLY changed fields, each through the existing `PUT /fields/:key` with the sheet's one REASON / CONTEXT applied to every change — required when the account is claimed, mirroring `editReasonRequired`, which the server re-decides. Refused from the reference's sheet, each an asserted absence: the Problem/Solution/Story textareas (the three standing refusals), the FOUNDER / ACCOUNT STATUS picker (the account state is derived from three records and stored in none — a picker would mint a stored status), the audience box, and the socials repeater. A mid-batch refusal reports what saved and what was refused by name — the route offers no atomic batch and the sheet does not pretend one.
-
-- **The reference's inline click-away-to-save editing became dialog editing, deliberately.** A blur-saves edit cannot carry the reason and evidence §25.6 requires on a claimed record, so the affordance stays a row-level Edit and the mechanism is the existing field dialog. Panel-footer `History` buttons NAVIGATE to the record's History section — the walk established that is what the reference's own buttons do (read-and-route, again).
-
-- **`panes/Overview.tsx` and `dialogs/AddFounderDialog.tsx` are deleted**, fully absorbed by the Onboarding section and the compose page. Suites after Session B: backend founder-workspace 70 (65 + 5), registers 24 (19 + 5), frontend founders 46 (36 + 10) — with five Session A assertions consciously updated (the empty directory's Create Founder is a link; overrides render without a disclosure; the legacy Competition row is "Current text" under its own heading with `Record agreed correction` asserted absent; the tab hero is an h2). The 1280/320 screenshot pass found no visual defect this time.
-
-- **Session C added no route, no table, and no migration — the finding holds a third time.** The six sections render `detail.operations` (one composed view over the records other workspaces own: the build and its review rounds, the reservation ledger with the §19 survey and consents, the click ledger, the proposal versions with both parties' positions, the close batch and reconciliations, the ONE `readFulfillmentStatus` resolver, refunds, disputes, support cases, the §31.6 cancellation, and the enforcement actions) plus `detail.communications` (the `notification_deliveries` rows for the Founder's address — the row carries the §27 KEY and the label resolves in the browser from the shared registry, 22c's rule). `founders/operations.ts` contains no write call, a test scans it, and §33.12.5's partition is untouched by construction. Lists are bounded samples beside their totals — the reference's own shape — and the full list lives in the workspace that owns it.
-
-- **The reference's decision controls are refused by register, and the register renders.** The Session C walk found the first-pass "read-and-route" claim too generous: the reference draws `Approve campaign`, `Record Founder acceptance`, `Set bonus`, `Approve payment`, `Fail review`, `Suspend campaign`, `Ban Founder`, `End partnership` and more. `OPERATIONS_ABSENCES` names twelve refused controls with their rules, the surface renders each refusal as a sentence where the reference put the control, and a suite test walks every tab asserting every register entry's sentence appears somewhere — so re-adding a control means deleting the sentence that says why it must not exist. The deepest one: **Admin never agrees (§14.2)** — an Admin recording either side's proposal acceptance, counter, or decline would fabricate a party's agreement, so version facts render read-only with both positions and the row links to the Creators relationship record, where the one Admin move (proposal rejection) already lives.
-
-- **The Requests decision the brief named: no meeting or end-partnership record was built.** No Founder-facing surface can create one — §30 defers direct Founder–Creator messaging and §16's no-nudge posture is why §20's surfaces offer no ask-to-meet — so a table nobody can populate is §1.4's key-with-no-sender wearing a schema. `MEDIATED_REQUESTS_ABSENT` is pinned on the tab; the real mediated ask the product records (§22.9's work-again request, the Founder's own, created from the Founder session) renders read-only with its responses, and an Admin `Send work-again request` is refused for fabricating a Founder's ask. **`Send warning` is refused** the same way: no §27 key names a warning message, and a send the registry does not know is the §1.4 failure.
-
-- **The stricter-than-§3.1 scan caught the reference's own wording twice, and the register test now guards the copy at the source.** "…tracking and reservation events" (the demand subtitle) and "the reservation ledger" (this session's own draft of the export refusal) both tripped the Founders suite's rendered-pane scan; both were reworded rather than exempted, and the registers suite scans every Session C pinned sentence before a surface exists to render it.
-
-- **§25.6 holds at the payload: the §31.6 cancellation's internal reason never travels.** Only the customer explanation is composed (the Campaigns-hub posture), and a backend test seeds both columns and scans the JSON. Enforcement rows carry the reason category and customer explanation, never the internal reason beside them.
-
-- **What moved where when the panes were deleted.** The §22.10 next-campaign readiness controls (approve/remove, the one write the old Campaigns pane owned) live on Campaign → Details below the previous campaigns; the old Money pane's W-9/payments/blockers content became Money & Fulfillment → Payments (setup, identity, and listing lines had already moved to Onboarding → Stripe in Session B); the history timeline was absorbed into History → Timeline unchanged — and `Add internal note` there is the header's existing meeting-note dialog, because meeting notes already reach the feed through the audit-action allowlist ("Meeting note recorded") and nothing new is stored.
-
-- **Two conscious simplifications, recorded rather than smuggled.** The attribution split is two rows — Creator traffic and Direct & organic — because organic and Founder/house traffic are not distinguishable records and the reference's three-way split would have invented a source; drop-off feedback is a named data absence (no cancellation-reason record exists) and the range chips and day-part "best-performing window" analytics are not built. And a no-campaign prospect renders the reference's own absence state — the proposed type shown as editable intent, "not treated as Product or Idea truth" — rather than campaign-shaped zeros (§16a: a fresh campaign's conversion is `null` over zero clicks, never 0%).
-
-- **What stays deliberately absent after the rebuild** — each recorded on the surface that refuses it: the twelve `OPERATIONS_ABSENCES` controls (per-field campaign edits, review decisions, §14.2 recordings, bonuses, work-again sends, W-9 reminders, payment releases, Day-14 decisions, campaign suspend/kill, `Send warning`, a compose control, and free-form exports), the meeting/end-partnership request records (no record exists and nothing can populate one), and the decision consoles the refusals point at — §15 review, the close-operations queue, §24.8 refunds, and Admin fulfillment — whose routes are mounted and §33-tested while their screens await the console rebuild. Every campaign operation still belongs to the workspace whose rules encode it: the record shows state and routes there, which is the reference’s own read-and-route architecture ("System counts cannot be rewritten" is its copy, not ours). Suites after Session C: backend founder-workspace 74 (70 + 4), registers 28 (24 + 4), frontend founders 57 (46 + 11) — with four Session A/B assertions consciously updated (Money opens on `Campaign close`; the payments-waiting test navigates to its tab; the identity check is asserted on Onboarding → Stripe; the payload shape gained `operations` and `communications`). The 1280/320 screenshot pass across all six sections found no visual defect.
-
-### The Affiliate workspace was rebuilt — complete, Sessions A–C (§26.1, §8, §5.3, §11, §5.5, §14.2, §22.4, §24.8, §26.7, §29, post-Phase-24 change, 2026-08-17)
-
-The Creators workspace is being rebuilt to a second supplied reference (`docs/design-refrence/Proovd-Affiliate-Admin.html` — a compiled Vite/React bundle, walked by extracting its application line: the `Vj`/`Gj`/`Hg`/`Xj` registers, the fourteen seed records, and every component from the directory to the Add flow; `docs/phases/admin-affiliate-rebuild.md` is the brief, `docs/phases/admin-affiliate-reconciliation.md` the walk with every element bucketed into one of five verdicts). **All three sessions have shipped.** Session A: the reconciliation document, migration 0048, all register changes, the one-route record shell with the eight-tab / twenty-five-section navigation and the Selected-relationship switcher, and the Overview tab. Session B: the two person-level tabs and gaps 4/5/8/9. Session C: the four campaign-scoped tabs and History, the last five gaps, and the retirement of the three sibling addresses. Each session re-walked its own sections before writing code.
-
-`shared/src/admin/creator-workspace.ts` gained `AFFILIATE_RECORD_TABS` (the reference's own registers verbatim: eight tabs, twenty-five sections, `relationshipScoped` on exactly the three the switcher scopes), `AFFILIATE_EVIDENCE_CATEGORIES`, `AFFILIATE_EVIDENCE_METRICS`, `INVITATION_LIFECYCLE_STEPS`, `PROPOSAL_ACCESS_LABELS` + `PROPOSAL_ACCESS_IS_DERIVED`, `QUALITY_TIER_SUGGESTIONS`, `EVIDENCE_PICTURES_ACCEPTED`, and the pinned switcher pair (`SELECTED_RELATIONSHIP_LABEL`, `ACCOUNT_AND_CAMPAIGN_STATE_SEPARATE`); `backend/src/affiliates/workspace/{types,record}.ts` gained the three Selected-relationship facts; migration 0048 the six record families; `frontend/src/features/admin/creators/CreatorRecord.tsx` is the new shell; proovd.css `PHASE 32` the styles. Suites: backend creator-workspace 40 (33 + 7 for the 0048 guarantees), registers 25 (21 + 4 for the new registers, 1 contract consciously changed), frontend creators 44 (2 assertions consciously updated, 4 new), relationship 30 untouched — **the full suite is 2,861 tests and passes in one run**, including the §33.11.3 bundle scan and the §33.12.5 partition.
-
-- **The directory needed nothing, and that was the walk's first finding.** The hero (the H1 IS the filter label), the search, the four pills, the five-column rows, and both empty states already match the reference — the previous build had already converged on it. The reference's campaigns cell reads `{n} active`; ours reads `{n} of 3 active`, kept because removing the §2.2 ceiling to match a prototype would be fidelity to the wrong thing.
-- **One route now, and the view state lives in the URL.** `?tab=` (the eight), `?section=` (the tab's sections), `?rel=` (the selected relationship) — defaults deleted so the canonical address stays short, tab changes drop the section and keep the relationship. The `FounderWorkspace` pattern, reapplied. The old sibling addresses (`/profile`, `/controls`, `/history`, `/relationships/:associationId`) were absorbed by Sessions B and C and now REDIRECT into the tab that took each one, so a bookmark, the Support workspace's context link, or a Tasks reference minted before the rebuild still lands on the record it meant. `/review` keeps its own address: §17's decision is its own act.
-- **The Selected-relationship switcher replaces an address, and that is the largest structural change.** The reference scopes Campaigns, Content & Compliance, and Performance & Earnings by a persistent switcher rather than by a separate relationship page. The switcher, the selection, and the seven-fact strip (Relationship ID, Designation, Lifecycle state, Current owner, Agreement, Tracking link, Completion state — the three new facts composed server-side in the record read, batched, so the switcher, the Overview card, and Session C's fact card can never disagree) shipped in A; the tabs it scopes fill in B/C. The completion fact keeps §16a's rule: `Not due before close` and `Decision pending` are different facts, and only the second asks anything of an Admin.
-- **The interim sections carry real data before they carry an apology.** An un-rebuilt section renders its own h1 (the reference's eyebrow pattern per tab), the Selected-relationship strip where one is scoped, the sentence naming the surface that owns the content today with a real route to it, and the session that replaces it. Attention CTAs route straight to the operating surfaces (the review page, the profile, the controls) rather than through an interim — an extra hop on the one thing an Admin must DO would be the interim tax landing exactly where it hurts.
-- **The reference asked for seven §1.8 violations and the Spec won on each, both sides recorded.** (1) An invitation **`Opened`** step: §27 ships no tracking pixel and Phase 23b refused an email-open metric outright — a silent read receipt inside a transactional message — so `INVITATION_LIFECYCLE_STEPS` carries the step with `absentBecause` and the surface renders the reason where the value would be (the reference itself falls back to "Not supported / not recorded"; the register decides which of those it is, permanently). (2) The **admin account panel** — `MFA active` (the second factor was removed 2026-08-10), `Money authority · Enabled` and `Live Affiliate payments · Pilot gate enabled` (the §34 gate is SHUT, and a hardcoded panel claiming otherwise is §1.4's worst case beside real money), `Quarterly AUP review` (§6 fixes no cadence), and `Provider test evidence · passed` (the §32.6 log records an OPEN item) — four false claims in one panel; the Proovd shell has no per-Admin panel and this rebuild adds none. (3) **Tier A/B/C** as a closed dropdown: §8 makes the tier assessment data and `affiliate_quality_tier_not_numeric` stands, so `QUALITY_TIER_SUGGESTIONS` offers the three over the same free-text column — a combobox, never an enum. (4) **Proposal access Standard/Restricted with a control to set it** — the brief's "most likely to be missed": a stored eligibility flag is §1 rule 6 and the one field a later phase could read to refuse a proposal automatically, so the badge is DERIVED from §29's `restrict_bidding`/`demote` records and "changing" it records an enforcement action with its five statement fields; the suite asserts no `proposal_access` column exists anywhere. (5) **HEIC** in the upload copy: browsers cannot render it, and a stored file nobody can review is not evidence — `EVIDENCE_PICTURES_ACCEPTED` names what `ALLOWED_IMAGE_TYPES` accepts. (6) **`Red flags`** as a label renders `sanctions_notes`; the Add flow's separate sanctions box folds into the same column, because two boxes writing one column is two answers. (7) **`Why this Affiliate fits` returns as a visible control** — no conflict after all: the previous reference's audit banned the control, this one reinstates it, and `campaign_fit` never left. Recorded so the reversal does not read as drift.
-- **Migration 0048 is the six record families and nothing else**, in the 0044/0045 idiom, and its header states the absences: no proposal-access column, no schedule-shaped column, no job, no notification key, no `affiliate_history`. `affiliate_evidence_files` carries the `campaign_assets` lifecycle whole (pending at presign, stored/rejected once the bytes were read; storage key and category immutable; removal one-way; duplicates refused per live (prospect, checksum)). `affiliate_evidence_verifications` is the per-metric trail BENEATH the whole-record `verification_status`, never a second answer to it. The three deliverable tables are the §22.4 receipt idiom rescoped to the relationship, with the waiver CHECK-tied to its named recorder and reason in both directions. `association_availability_verifications` stores the AGREED term verbatim on every check — "Agreed campaign availability period", both parties' term, which is what dissolved the old parked objection. `proposal_mediation_notes` has no acceptance column: Admin mediates and never agrees, structurally. `association_termination_requests` CHECK-matrixes its money treatment to §24.8's own per-cause register — a Founder-caused termination cannot record `cancel_unpaid_invalid` here any more than in `refund_cause_allocations` — decides no money, ends nothing itself, allows one open ask per relationship, and its decision is write-once with the recorded ask immutable (all trigger-enforced, all asserted).
-- **`CREATOR_PARKED_MESSAGES` changed meaning, and its test contract changed with it — consciously.** Until now each entry named a reference element with no record behind it; the brief decided all nine capabilities ARE built, so each entry now names the record that exists (0048 where one was needed), the mechanism that will serve it, and the SESSION that ships the surface. The registers suite asserted every message contains "parked"; it now asserts every message names Session B or C — a checkable claim where "parked" was an open-ended one. An entry leaves the register the moment its control works, and the register goes when the last one does.
-- **Two frontend assertions were consciously updated, and one new refusal was added.** `View campaign relationship` now selects the relationship and opens Campaigns · Readiness & Active (the reference's own destination) rather than navigating to the old address — the test asserts the URL carries `tab`/`section`/`rel` and the switcher renders with its pinned sentence. The Stripe-owned attention now offers the reference's one control, `Send payout reminder`, parked (`aria-disabled`, explains itself) until Session C wires the existing §27 key — where the old test asserted no control at all. The Affiliate-owned attention still renders no control, and a new test pins that: their move stays theirs.
-- **The screenshot pass caught the browser-only defect again.** All eight tabs overflowed the shell at 1280 with the last two hidden behind a scroll with no affordance — invisible to jsdom and axe, found by headless Chrome against a stubbed API. The rail was tightened until the full set fits; below that width it scrolls inside its own container.
-- **What Session A deliberately did not build:** every write against the 0048 tables (B/C own the mutations, each registered in `UNGATED_ADMIN_WRITES` or gated when it lands), the two new §27 keys (`affiliate_password_reset`, `affiliate_correction_request` — Session B, because the five-part chain must land whole or the coverage partition fails), the per-metric verification surface, the evidence uploader, and the campaign-scoped tab content. `listFounderVisibleRoster` is byte-for-byte unchanged, `affiliate_access_actions` still admits exactly `suspend` and `restore`, and no money decision moved.
-
-**Session B shipped the two person-level tabs in final shape (2026-08-17)** — Profile & Verification (Profile · Audience & Metrics · Verification · Internal Context) and Account & Payout Setup (Account & Eligibility · Agreements · Stripe) — with the four gaps the brief assigned it (`stripeRefresh`, `evidenceUpload`, `passwordRecovery`, `requestCorrection`), the per-metric verification machine, and the retirement of the `/admin/creators/:prospectId/profile` address (`CreatorProfile.tsx` deleted; the attention controls and the relationship task that pointed there open the tabs). `sections/{ProfileSections,AccountSections}.tsx` are the surfaces; seven new routes on `admin-creators.ts`; no migration — 0048 already held every record. Suites: backend workspace 50, registers 27, frontend creators 50, all green beside the §33.12.5 partition and the §27 coverage partition.
-
-- **The walk found one new §1.8 conflict, and it is the quiet kind.** The reference draws `Require current policy reacceptance` on ONE Affiliate's Agreements section, which reads as a per-person requirement. §29.8's requirement follows a MATERIAL POLICY UPDATE — inherently audience-wide; requiring one person to reaccept a text everyone else already holds would be an enforcement act wearing a policy word. The control records the audience-wide requirement through the one existing route, `REACCEPTANCE_IS_AUDIENCE_WIDE` rides the dialog so nobody reads it as narrower, and while every §31.4 document is draft the control is ABSENT with the reason (a requirement may cite only a published version) rather than disabled without one.
-- **The reset key follows the account's role, and that fixed a real defect.** `sendPasswordReset` was recording every reset under `founder_password_reset`; Phase 22c's notification history filters on the audience prefix, so an Affiliate's reset was invisible on their own history. The ONE reset path now chooses `affiliate_password_reset` by the account's role — one template, two catalog entries pointing at the same shape, which is the truth rather than a shortcut. The Admin-initiated send calls Better Auth's own `requestPasswordReset` (there is no second reset mechanism to have built), refuses when nobody has claimed the account (§1.4: there is no password to reset), and the raw link appears nowhere in the response or the audit row (§28.1).
-- **One key carries both asks, deduped on the recorded ask.** `affiliate_correction_request` is §11's right to correct prefilled public information, exercised as an ask — an account field (the correction-request dialog) or an evidence metric (`more_evidence_needed` on the per-metric trail). Every ask exists as a record before it sends (§1.3): the §25.6 audit row for a field ask, the `affiliate_evidence_verifications` row for an evidence ask — so a deliberate second ask is a second message (§7's resend rule) and a replay is not. The route reports `{sent, reason}` beside the re-read, because a decision recorded with nothing sent is a state the Admin must SEE (§1.4), and the suite drives exactly that through a toast.
-- **The evidence uploader is Phase 09a's three steps against the person.** Presign (a courtesy), browser PUT, read-back — the bytes decide, and the suite proves it by storing HTML under a PNG declaration and watching it land `rejected/file_unreadable`. Pictures only: the reference's uploader also accepted `.pdf,.csv,.xlsx`, refused here because `inspectMedia` can only decide image and video bytes, and a stored file whose content nothing verified is exactly what step 3 exists to prevent. While the bucket is Track A4 the presign answers 503 naming it AND the payload carries `evidenceFiles.available: false` with the same sentence, so the surface renders the absence instead of a dead control.
-- **The account correction writes the person's own confirmed record, so it is the strictest write here.** A register of six field keys (never a free-text field name — 16a's overridable-field reasoning), the prior value read from the row UNDER LOCK inside the transaction (§33.12.4), reason required, gated — it rewrites the address every transactional message goes to. It refuses before the claim with the reason: pre-claim, the account fields ARE Admin research, corrected through the research route with its own provenance. The current value rides in the dialog's option labels (the reference's own `Username · @handle` pattern), which is display — the record's answer is the server's.
-- **The tier datalist cost a six-workspace change, and the suite caught the trap in it.** `DialogField` gained optional `suggestions` — a `<datalist>` on the free-text input, never a `<select>`, which is §1.8 item 3 as a control. The first draft wrapped the Input in a fragment inside `ConfirmDialog`, and two apparently unrelated tests failed: `Field` clones its ONLY child to wire the label's `htmlFor`, so the fragment swallowed the id and orphaned every label in every dialog. The datalist now sits BESIDE the Field. Additive — a field without suggestions renders exactly as before, and the other five workspaces' suites pass untouched.
-- **The parked register lost four entries and the contract tightened.** An entry leaves the moment its control works — the §1.4 failure in reverse is a parked message on a working control. Exactly the five Session C capabilities remain, and the registers suite now asserts the key set and that every message names Session C.
-- **The screenshot pass caught three defects nothing else could, again.** (1) Session A's tab rail was tightened until all eight tabs fit at 1280 — and a vertical scrollbar eats ~17px, so History fell off the right edge with no affordance; the rail now WRAPS instead of scrolling, because a second line is legible and a hidden tab is a missing tab. (2) The invitation card is a two-column grid and the new lifecycle `<dl>` auto-placed into the name column, overprinting it — it now claims a full row explicitly. (3) The fix for (2) declared columns outside a media query and silently overrode PHASE 26's 760px single-column stack, cutting the button at 320 — restated inside the breakpoint. All three are invisible to jsdom and axe.
-- **The invitation lifecycle renders its `Opened` refusal inline.** The nine steps compose from stored instants the read now carries (`createdAt` from the association, `signupStartedAt` from the §23.4 history, `claimedAt` from the signup profile — previously hardcoded null, a real fix — `tokenExpiresAt` from the latest send), and the `Opened` step renders the register's reason where the value would be. Proposal access renders as the §29-derived badge (`restricted` while a `restrict_bidding`/`demote` action stands un-overturned, the enforcement record named beside it), proved end-to-end by recording a real enforcement action and re-reading.
-
-**Session C shipped the four campaign-scoped tabs and History in final shape (2026-08-17)** — Campaigns (Relationships · Opportunities & Negotiations · Readiness & Active · Completion & Work Again), Content & Compliance (Posts · Deliverables · Agreements & Disclosures · Risk & Compliance), Performance & Earnings (Performance · Earnings · Transfers & Payouts · Adjustments), Support & Enforcement (Support · Relationship Requests · Enforcement · Appeals), and History (Timeline · Communications) — with the last five gaps (`deliverableEvidence`, `availability`, `payoutReminder`, `kitVisuals`, `caseIntake`), the §1.8 refusals as a register, and the retirement of `/relationships/:associationId`, `/history`, and `/controls`. `sections/{Campaign,Content,Performance,Support,History}Sections.tsx` are the surfaces; `affiliates/workspace/relationship-mutations.ts` the writes; nine new routes; no migration — 0048 already held every record. **The rebuild is complete: 114 files and 2,904 tests pass in one run.**
-
-- **The parked register is gone, and that was its own rule.** `CREATOR_PARKED_MESSAGES` said an entry leaves the moment its control works and the register goes when the last one does; Session C closed the final five, so the register, `parked.ts`, and `useCreatorParked` are deleted. What replaced it is the opposite kind of register: **`AFFILIATE_OPERATIONS_ABSENCES`**, seven controls the reference draws that the Spec forbids, each carrying the sentence the surface renders WHERE the control would have been — `Create Affiliate Transfer` (the one Transfer is the close queue's, under the §11 tax gate and the Day-3 anchor), the free-form earnings adjuster (finalized amounts are trigger-immutable and every adjustment is a §24.8 cause-classified case), the fixed-payment outcome (it follows from the §22.1 consequence matrix), `Reissue work-again request` (an Admin reissuing a Founder's §22.9 ask fabricates a party's ask — the Founders rebuild's refusal, repeated), campaign suspend/kill (§26.7's decision is against the CAMPAIGN), the combined tier/proposal-access setter (two real paths, deliberately apart — free text on the §8 record, and a §29 action; a combined setter would mint the stored eligibility flag §1 rule 6 forbids), and `Edit Admin-owned relationship data`. A suite test walks the register across the rendered tabs, so re-adding a control means deleting the sentence that refuses it.
-- **A deliverable restates the agreement, and with no agreement there is nothing to restate.** 0048's `source` is computed from the accepted agreement inside the service — the suite posts `source: 'A FORGED SOURCE'` and the row records `Standard terms acceptance` — and a relationship with no accepted agreement refuses the record by name rather than inventing a work item the Creator never agreed to (§1 rule 6). The receipt and the record are UNGATED (they reach nobody and decide nothing); the DECISION takes the freshness gate, for the metric-decision route's reason: it is the trail §22.8's completion criterion reads. The waiver is CHECK-tied to its named recorder and reason in BOTH directions — a waiver cannot omit them and a verified decision cannot smuggle them — and the service refuses each half by name first.
-- **The availability term is READ, never typed — which is what dissolved the parked objection.** §22.1 fixes no availability period, so the check would have been a period the product invented. `availabilityTermOf` composes it from records: the frozen `mid_campaign_additions.adjusted_deliverables` sentence for a Creator who joined mid-campaign (that IS the term they accepted), and otherwise §20's own `content_availability` obligation beside the campaign's stored close anchor. The dialog shows it read-only, the row stores it verbatim, and the suite asserts the stored `term_checked` is byte-identical to what the read composed — so a later change to the agreement vocabulary cannot rewrite what was verified.
-- **The payout reminder sends the message §27 already defines, and the copy has one source.** Gap 3 adds no key and no template: `sendAffiliatePayoutReminder` sits beside `notifyAccountStateChange` in `payments/account-notifications.ts` and renders from the SAME `STATE_COPY` row, so the words an Admin triggers and the words the state change sends cannot drift. What differs is the dedup entity — the state-change sender keys on `<account>:<state>` so a slip is announced once, and the Admin ask keys on the RECORDED ask (its audit row), so a deliberate second ask is a second message and a replay is not (§7's resend rule). It refuses unless the stored payout state genuinely carries an outstanding Stripe requirement: reminding somebody about nothing is §1.4's failure with a send button on it.
-- **The case intake creates no second queue, and the absence is asserted.** `openAffiliateSupportCase` CALLS `openSupportCase`, so the case is born with its `PVD-…` reference, its §27.8 business-day promise on the committed calendar, and its owner; this surface adds the subject, the free-text subcategory, and its audit row and nothing else. The suite asserts the row landed in `support_cases` with a real `human_response_due_at` and `calendar_version`, and that no `affiliate_cases`-shaped table exists in `information_schema`. It refuses before the claim: a case is anchored on the requester's account, and pre-claim there is none. The reference's ten "case kinds" are NOT case types — a conflict, a self-pre-order, a termination ask, and an appeal are each their own record on Relationship Requests and Enforcement, and the dialog says so.
-- **The termination request decides no money, and the §24.8 matrix constrains it twice.** The dialog is keyed on the chosen cause, so the treatment options are that cause's own `permittedAffiliateTreatments` — a Founder-caused termination cannot even OFFER `cancel_unpaid_invalid` — the service refuses an inconsistent pair by name, and 0048's CHECK refuses it regardless (the suite hand-writes the INSERT and watches it throw). One open ask per relationship by partial unique index; the decision is write-once and the recorded ask immutable, both by trigger.
-- **Communications is the delivery record itself.** The reference derives its list by regex over event titles, which is a mock; ours reads `notification_deliveries` filtered by the `affiliate_%` audience prefix (Phase 22c's rule, applied to the Admin read), returns the §27 KEY, and resolves the label in the browser from the shared registry — no fourth copy of the 123 descriptions. A row that is claimed but unconfirmed renders as `Recorded · not confirmed` rather than as delivered (§1.4's two states).
-- **The relationship read gained the blocks and the link route gained its declared shape.** `readCreatorRelationship` composes the six 0048 families plus the campaign's kit assets and the §22.9 requests in the same `Promise.all`, with the evidence and decisions batched by `inArray` afterwards — nothing in a loop. And `POST …/link` had been answering with the WORKSPACE read while `api.ts` declared the relationship type: a type lie the old page's stubbed test could never see, and one the campaign tabs would have rendered. It now answers with the relationship re-read, asserted.
-- **The three retired addresses redirect rather than 404.** `/relationships/:associationId` → `?tab=campaigns&rel=…`, `/history` → `?tab=history`, `/controls` → `?tab=support&section=enforcement`. The Support workspace's context link and the Tasks reference pattern were both moved to the `?rel=` shape at the same time — the Support link had been shown-but-unavailable since 2026-08-13 and is now a real href, resolved through the association's PROSPECT id. The §17 review keeps its own address: its decision is its own act, and an Admin part-way through seven checks who reloads gets them back.
-- **The screenshot pass caught three defects again, and one was a class-name confusion.** (1) The Relationship ID rendered inside `cr-mono` — which is the monogram AVATAR square, a 3rem mint tile — so the id broke mid-word into two green boxes; it now uses a real id treatment, and the dead `.cr-interim*` family went with the deleted component. (2) `.cr-version` is `auto | 1fr | auto` and expects a version badge first, so every Session C row without one (a mediation note, a case, an enforcement relationship, a delivery record) put its trailing state or control hard against the label at a different x per row — one rule fixes all of them. (3) `AVAILABILITY_TERM_IS_AGREED` said "the term below", which is true in the dialog and false on the section, where the term renders above it; the sentence is placement-neutral now. axe cannot see any of the three: the text is present and correct in every case.
-- **Eight `h3`s became `h2`s, and axe is what said so.** The absorbed panes' task and post cards were third-level under the old relationship page's own `h2` state band; a tab's `h1` has no such band, so the same markup jumped a heading level. The two PHASE 26 selectors moved with them — nothing outside the Session C files uses either class now.
-- **What is NOT built, and stays recorded:** the pre-existing 320px reflow of the record shell (the shell header and the tab rails overflow at 320 on EVERY tab, Session B's included — a PHASE 25/26 shell change with its own six-workspace screenshot pass, not a Session C regression) — **the SHELL half of that was fixed on 2026-08-19 in `PHASE 38`; every Admin route now measures clean at 320, so anything still overflowing inside this record is its own defect and no longer masked by the shell's**; the Today tab, which was still the one parked section of the Admin shell at the time (built 2026-08-19); and the Backer pre-order's own record page, which the Backers reference refuses by name — the Tasks panel's Backer reference resolves to that Backer's ROW instead.
-
-### The public campaign page was rebuilt — Session A of three, the record (§14.4, §18, §20, §30, §3.2, post-Phase-24 change, 2026-08-18)
-
-The §18 public campaign page is being rebuilt to a supplied reference (`docs/design-refrence/Proovd-Campaign-Page-v2.html` — a standalone single-file prototype: hero, interactive demo, benefit cards, story, threshold panel, selectable rewards, updates, FAQ, mobile dock, checkout modal). `docs/phases/campaign-page-v2.md` is the brief. **This is three sessions and only Session A has shipped: the RECORD. It writes no surface on the public page** — Session B is the page itself, Session C the checkout modal and the follow record.
-
-**§18 defines the page's content, not its design**, and says so in its own words: "Every campaign page exposes all of the following; **the DNA UX document controls presentation**." So a redesign is licensed and dropping an item is not — the reference drops four (the Founder identity block, the refund summary and its two routes, the always-visible MoR line with its A.2 expansion, and comments), and the brief places all four rather than losing them. Two things genuinely are new capability and are named rather than smuggled under a citation: the **demo stage** and the **benefit cards**. §14.4 lists thirteen shared ingredients and neither is among them; they are presentation of the Founder's own product, the class §14.4 already contains as "Hero preference" and "Product visuals and brand assets", and they carry no commercial rule — no price, no date, no threshold, no eligibility. Both are optional and a campaign with no rows renders no section.
-
-`shared/src/live/editing.ts` gained 20 register entries, two surfaces, and the commitment-check scope; `backend/src/campaign/editing-logic.ts` restates them; `service.ts` the FAQ/demo/benefit writers; `preview.ts` and `public-page.ts` the payload; migration 0049 the guarantees; `frontend/src/surfaces/founder/CampaignBuild.tsx` every box; `samples.ts` both fixtures; `tests/campaign-page-v2.test.ts` is the artifact (24 tests). **§33.6.1–5, §33.11.1–7, and §33.12.5 all still pass.**
-
-- **A column in Drizzle and the migration alone does nothing, and that is the finding that governs the session.** There is no Zod schema for a build patch anywhere in `shared/` and no route-layer whitelist — `founder-build.ts` passes `req.body` straight through as `BuildPatch`. The `assign(...)` calls inside `saveBuild` **are** the entire allowlist. So each of the ten new columns is wired in five places (Drizzle, the migration, `BuildPatch` + an `assign` line, `serializeBuild`, `BuildFields`) plus `buildCampaignPreview`, which is the ONE assembly the Founder preview and the public page both read — wiring it there fixes both and cannot let them drift. The round-trip test drives PATCH and the read and compares every field, because a column missing from `assign` is one no Founder can write and one missing from `serializeBuild` is one they can write and never read back.
-- **`assign` took the column name as a third argument, and it was the same string as the first in all twenty calls.** Drizzle's `set` takes the property name, not the snake_case column, and the key parameter was never read — so the pair was two chances to disagree with nothing deciding between them, and one line (`assign('heroPreference', …)`) was duplicated verbatim. One parameter now, and the key is what is written; the duplicate class is gone rather than the duplicate.
-- **An Idea campaign could not reach `complete` through the product at all, and that is closed here.** Twelve of the twenty-four build columns had no input on the Founder surface — including four §14.4-REQUIRED ones (`orderThreshold`, `deliveryWindow`, `earlyProductDisclaimer`, `risksAndChallenges`), `internalTargetCents`, and all five `refundPolicy*` — so `READINESS_FIELD_LABELS` named them under "Still needed in your build" and there was nowhere to type them. **No route, type, or migration change was needed**; the whole gap was missing JSX. It is fixed in the same session that adds ten more fields, because adding to a form that cannot be finished makes it worse. The test drives the ROUTES rather than the boxes: a surface test proves a control exists, and §1.1's point is that a control is not a capability.
-- **`campaign_faqs` had a read, a live-edit path, and a full CRUD grant since Phase 12b — and no production INSERT anywhere.** The only one in the repository was in a test. The §14.4 section rendered on the Founder's own preview with nothing behind it. The rebuilt page makes the FAQ a full section, so the authoring route ships with it rather than a heading a Founder cannot fill.
-- **`limitedQuantity` was §14.4's own field and the public payload dropped it on the floor.** It is restored with a computed `remaining`, and the page's number and checkout's refusal read the ONE `countActiveForRewards` — a page saying "3 left" over a different predicate from the one that refuses is a Backer told there is stock and then told there is not. Null means unlimited and renders **no** line at all, never the word "unlimited": inventing a scarcity signal where the record has none is §30's own prohibition. A sold-out reward stays visible and unavailable (§19), never hidden, and the test fills a reward to its limit and then asserts the refusal.
-- **`thresholdProgress` was hardcoded `null` from Phase 14b with the comment "needs reservation counts (Phase 15)".** Phase 15 shipped and the null stayed, so no real Idea campaign has ever drawn a progress bar — on what is the reference's largest single section. It is now §21's own measure, `uniqueActiveBackers`, composed from 17a's append-only transition history, so no second way of counting exists. `momentum` was the identical null one line below it with no comment at all; §18's Product hero is unique Backers and units reserved, and `preorderCounts` already carried both.
-- **The tagline was `brand_perception`, and that was the wrong column in a way that mattered.** It was a Phase 12b stand-in, and §20 puts `brandPerception` in column ONE — a brand note the Founder may publish directly while a campaign is live. Rendering it as the page's public promise line made an unreviewed field into a claim. It is `hero_subheadline` now, which is column two, which is where a public claim belongs.
-- **§20 names the FAQ loophole by EXAMPLE, not as the scope, so the check is no longer scoped to the FAQ.** A section heading reading "Shipping in March 2027" moves a delivery date exactly as an FAQ answer would, and this session added ten more column-one free-text fields. `commitmentCheckApplies` is the register's answer and `COMMITMENT_CHECK_EXEMPT` names the three fields it does NOT run on with the property that makes each safe — two URLs (the page renders link text, and a date-shaped path segment would trip the check on every correct edit) and the closed three-shape vocabulary (no text at all, so nothing for a commitment to be written into). Exempting by register rather than by an `if` is what keeps the next field somebody adds inside the check by default. `redirectedBy` gained a second value rather than being widened: the FAQ case and the general case read differently to a Founder, and collapsing them would lose which loophole was closed. **One Phase 17b assertion was consciously overturned**: `live-editing.test.ts` held that "a question edit is not scanned — only the answer states promises", which is a claim about English rather than about the record, and it does not hold — a Founder rewriting "When will I get it?" as "Will it arrive by March 2027?" has put a delivery claim on the public page through the other half of the same row. The test is now the correct pair: a benign question still publishes directly, and one stating a date goes to review with a message that names the FIELD rather than saying "that answer".
-- **The reference's `PRIVATE BETA GOAL` is `ORDER THRESHOLD`, and the word reaches no identifier.** §3.2 bans `goal` for an Idea threshold in every audience *including identifiers*, and §33.11.3's scan reads the built bundle where a prop name survives minification — the Campaigns hub hit that exact scan with `progress.goal` on its first draft. The suite is stricter and earlier: a recursive scan over the §20 register, the Founder build payload, and `information_schema` for all four tables, so the bundle scan never has to be the thing that catches it.
-- **`.streak-card` is `dots`, and the three treatments are named by SHAPE.** §30 lists streaks among the forbidden mechanics; more practically, a variant named for one campaign's copy is unusable by the next Founder. `bars` / `check` / `dots` is a closed list by CHECK, because a fourth value renders nothing at all and a card with an empty visual is worse than one that was refused (§1.4).
-- **A demo moment is a signal OR an action, and the database is what says so.** The two render differently and mean different things — a signal says the product left you alone, an action says it asked for something — and a row claiming both, or neither, would render a card with a dead control on it. The service refuses each half by name first so a Founder reads a sentence rather than a constraint name; the CHECK refuses a hand-written INSERT regardless, and the test drives both.
-- **`(campaign_id, sort_order)` is UNIQUE, and a count is not a free position.** The first draft defaulted `sortOrder` to 0 at the route and appended `list.length` from the surface — so the second row was a 23505 the Founder reads as the form having stopped working, and removing the first of two then adding one collided with the row still sitting at 1. An absent position means "append" now, decided by `nextSortOrder` on the server, and the test is written as exactly that removal-then-add sequence.
-- **An update's headline metric is both halves or neither.** A bare `86%` reads as nothing to a screen reader — the label IS its accessible name (§28.5) — and a label with no value is an empty promise (§1.4). Two CHECKs: the pair, and non-blank. `campaign_updates` needed the same five-place wiring the build columns did, which the brief lists for `campaign_build` only.
-- **The §33.11.6 sweep caught this session's own copy, and the copy changed rather than the scan.** A hint on the new page-copy card said the page "never shows an empty heading or a placeholder" — and `placeholder_policy` fired on the last word. The scan reads RENDERED text and cannot tell a promise not to show something from the thing itself; neither can a reader. That is the opposite of `notifications/`'s source scan, which strips comments first precisely because an explanation is not a usage — the distinction is whether a person sees the word.
-- **What is deliberately NOT in migration 0049:** no `goal` column of any spelling; no `follower_count` on `campaigns` (§30 — a public popularity number computed from a table nobody can audit); no `is_featured` on a reward (`featuredRewardSku` is already `sortOrder`'s answer, and a second mechanism would be a second answer); no schedule-shaped column on either new table and no job that reads them; no media column on `campaign_demo_moments` (§12's bucket is Track A4 and `unconfiguredStorage` still throws, so a column for an asset nobody can upload is the §1.4 failure wearing a schema). **§25.8 retention is stated rather than left implicit**: none of its seven windows covers a Founder's own published campaign content, `campaign_build`/`campaign_reward_packages`/`campaign_faqs` are not swept and never have been, and the two new tables are the same class — inventing a window where the Spec fixes none is §1 rule 6 in the other direction.
-- **`commentsEnabled` is hardcoded `false` and its comment was stale, not its value.** It said comments "arrive in Phase 14c" and went stale the moment 17b built the thread. §18 admits only a Backer holding a magic link and nobody on the public page is authenticated, so the thread lives on `/backer/:token` — the only surface where a Backer has an identity at all. Session B renders the §18 item-13 band pointing there; it does not host a thread it could not attribute a single post to.
-- **All three sessions have landed.** Session A was the record, Session B the page, and Session C the checkout modal's chrome and the follow record — the last of which is a **recorded deviation from §1 rule 6, built by explicit product direction**, stated in full below so a later session does not "fix" it by deleting it.
-### …and the modal and the follow record — Session C of three, the rebuild is complete (§19, §25.8, §27.7, §30, 2026-08-18)
-
-Session C is the checkout modal's chrome and the follow record. **The campaign-page-v2 rebuild is complete.** The modal is a restyle and adds no behaviour; the follow record is a deviation and is recorded as one below.
-
-**The checkout is a restyle, and the three steps did not move.** `Drawer` is already Radix `Dialog` — portal, overlay, focus trap, Escape, backdrop dismiss, GSAP open/close — so the reference's modal behaviour already worked, and `CheckoutForm`'s `details → review → success` already matched its two-steps-plus-done shell. What shipped is one optional `eyebrow` prop on `Drawer` (decorative and `aria-hidden`; `Dialog.Title` is still the accessible name), a two-segment rail and a `Step 1 of 2` line **inside** the form where the step state lives, the reference's summary card and its `US$0 today → US$N` pair wrapping values the §19 quote already returned, and the done-state check icon. Everything below the chrome is untouched: the survey, the billing fields, the server-rendered `consentText`, the three separate unchecked toggles (§28.4), the Stripe mount and its three branches, and the `PREORDER_SAVED_LEAD` line. **No card field was added** — the reference's `#cardInput` is a mockup artefact and §34 gates live mode on samples mounting none.
-
-- **The reference's `Founding user #248` is deliberately not rendered, and that is a correction to the brief.** It said to take the number from 17b's `campaign_backer_numbers`; that table's only writer is `campaign/comments.ts`, which mints on a Backer's first COMMENT. There is no number at checkout success. Producing one would mean minting it inside the §19 flow — a behaviour change in the one flow this rebuild is explicitly a restyle of — and inventing a display number would be a fabricated position in a queue (§30). The absence carries its reason in the file.
-- **Four §33.5 assertions were narrowed rather than loosened.** The summary card makes the total appear twice by design, so `getByText('US$27.00')` began finding two. The three amount assertions and the `US$0.00` one now query **inside `.checkout__amounts`**, which is where §33.5.2's contract — "subtotal + tax = total" — actually lives. That is stricter than the page-wide query it replaces: it names where the fact must be.
-
-**The follow record is a RECORDED DEVIATION from §1 rule 6, built by explicit product direction.** Capturing an email from somebody who has not pre-ordered, and sending them recurring mail, is a new commercial capability the Spec does not define. It is recorded here the way the 2026-08-10 Admin-MFA removal and the account-level Creator suspend/restore are — **so a later session does not "fix" it by deleting it, and does not read it as licence for more.** What keeps it narrow is asserted, not intended:
-
-- **ONE message, and it is a receipt.** `backer_follow_confirmation` (§27.7) confirms a consent; the thing consented to is §27.7's existing digest, which needs no key of its own — `DIGEST_EVENT_KEY['backer']` already carries the opt-out route and is already in `NON_TRANSACTIONAL_KEYS`. The receipt is transactional, so `optOutRule` stays `forbidden` and it carries no opt-out language at all. A test asserts exactly one registry key matches `_follow_`.
-- **No fifth notification audience.** `registry.test.ts` asserts the audience set equals exactly `{founder, affiliate, backer, internal}`, the key regex is a closed alternation, and `audienceOf` would throw on the hot render path for an unknown prefix. The `backer_` prefix names the DELIVERY CHANNEL and history scope, not a claim that this person pre-ordered — and it reaches no reader either, because `HISTORY_AUDIENCES` is founder/affiliate/admin and a Backer has no notification-history surface. The registry entry says so, so the next person to read the key does not conclude the product thinks a follower is a Backer.
-- **No fourth digest audience and no schema churn.** 0035's `digest_preference_subject_matches_audience` CHECK admits exactly two subject columns and three audiences, and both registers are asserted deep-equal between shared and backend, so the frequency lives on `campaign_followers` instead. `sweepDigests` gained a follower branch that composes through the SAME `sendDigest`, so §33.6.11's absence is structural for a follower too — there is still no branch anywhere that produces a message from a date, and the suite drives a quiet period and asserts nothing was sent.
-- **A follower takes the CREATOR visible-audience list, never the Backer one.** `backer_only` updates are for people who actually pre-ordered, so this is a §18 disclosure failure rather than a digest bug — which is why the branch keys on follower-ness and not on `input.audience`, a string a follower legitimately shares with a real Backer. The suite posts both kinds of update and asserts only the public one arrives.
-- **Double opt-in, and no scanner can complete it.** A row is `pending` until a person opens the link. Confirm and unfollow are **POSTs behind a page**, not one-click GETs: Phase 21b already decided that "a link that records an answer on being fetched records answers that email scanners give", and it binds twice as hard here — a GET confirm would let a scanner complete the double opt-in that exists to require a person, and a GET unfollow would unsubscribe somebody who never clicked. The suite drives GET at both addresses and asserts 404 and an unchanged row.
-- **The ask is an enumeration oracle by default, so it is the reissue route's shape point for point.** `FOLLOW_ACK` is frozen and byte-identical for a hit, a miss, a malformed address, an unknown campaign, a campaign that is not live, and a caller over the limit — the limiter answers that same body at **202, never a 429**, because a 429 on the fifth try tells you the first four were interesting. The route answers BEFORE the work (mint-and-send versus return-immediately is measurable even when the bodies match), the error path is a silent audit row, it is ONE query rather than two, and the client swallows every failure so the page cannot become the oracle the route refuses to be. The suite drives all six and compares the serialized bodies.
-- **One scope, two lineages — and a third thing the brief did not address.** The confirm link is single-use so it is claimed; the unfollow link must work for the life of the record, and `verify` rejects a claimed token, so it is a second lineage that is never claimed. Sharing a scope means either link would verify at either route, and that is not harmless: opening the unfollow link at the confirm route would CLAIM it and leave a dead unsubscribe link in somebody's inbox. They are separated by a property each lineage genuinely has — **`expiresAt`**. A confirmation link that still works a year later is a consent somebody can grant from a forwarded email, so the confirm lineage expires; an unfollow link that expires is an opt-out with a deadline, so it never does. `followTokenPurpose` is the one reader and the suite drives both swaps.
-- **A fresh unfollow token per digest, deliberately.** Rotating one lineage would kill the link in every message already delivered — a person unsubscribing from last week's summary would find a dead link, which is the one failure an opt-out route must not have. Every token is bound to that follow alone and all of them are revoked the moment it ends.
-- **Nothing chases anybody, and the absences are asserted.** No `remind_at`, `notify_at`, `recurrence`, `repeat_interval`, `next_send_at`, `cadence`, `template_id`, `escalate_at` or `snooze_until` on either table (checked in `information_schema`); no `follower_count` on `campaigns` (§30 defers public like signals, and a rolled-up number is also a second answer to a question one query answers); no file under `backend/src/jobs/` names the table except the retention sweep, which REMOVES content and sends nothing. The count that does exist is computed, is for the Admin record, and the suite asserts the public payload carries no follower field at all.
-- **The consent history is written by TRIGGER, not by a service.** "Did they ask for this, and when did they stop asking" is a fact we may have to prove, and a service that wrote it is a service one careless `db.update()` bypasses — `app_setting_versions` (06a), `draft_field_edits` (07) and `optional_item_events` (09a) all record the same reasoning.
-- **Retention is §25.8's own window 4 — "Marketing consent: until unsubscribe + 2 years".** A follower email IS a marketing consent, so deriving a window from campaign resolution would be §1 rule 6 in the other direction: inventing a rule where the Spec speaks. `sweepFollowConsent` is `invitations/retention.ts` copied for its reasons — one transaction with token revocation FIRST and inside it, every content column nulled and `anonymised_at` stamped together so the two-shape CHECK can never see a half-swept row, the provenance surviving because the column-scoped GRANT permits exactly the content and lifecycle columns, and exactly one audit row carrying no copy of what was deleted. **Irreversibility is a database property**: the suite hand-writes the un-anonymising UPDATE and watches the trigger refuse it.
-- **`List-Unsubscribe` does not ship, and the decision is written down rather than a test silenced.** `notification-coverage.test.ts` forbids the header in `send.ts` because §27.2 makes transactional email not opt-out-able and a blanket header would attach to every message — a receipt, a charge notice, a deadline. That test is untouched. The narrow fix the brief names — a per-key header — is a real option and is **not taken here**, for two reasons: `send.ts` is the single door every one of the 122 keys goes through, so a per-key branch there is a new classification axis beside `NON_TRANSACTIONAL_KEYS` that nothing else needs yet; and the digest already carries its opt-out as its single primary action, which for a follower IS the unfollow link, satisfying `oneActionAtMost` and `optOutRule: 'required'` at once. If a deliverability requirement later makes the header necessary, it attaches to `NON_TRANSACTIONAL_KEYS` and to nothing else, and that is its own decision with its own test — not a side effect of this rebuild.
-- **The digest's opt-out vocabulary stays "Change how often you get this".** It satisfies the preview's `hasOptOutPath` detector while staying clear of the coverage suite's narrower `unsubscribe|opt-out` ban, and follower copy uses the same words rather than the literal one.
-- **What a later phase must not read this as licence for.** The follow record has ONE message and NO schedule. A second follower message, a cadence, or a re-engagement sequence is §30's automated engagement sequence, and this deviation is not the licence for it.
-
-### …and the page itself — Session B of three (§18, §28.5, §30, DNA §5.1/§5.2/§5.12, 2026-08-18)
-
-Session B is the surface: `CampaignPage.tsx` rewritten (not patched) to the reference's band order, the `SiteHeader` campaign variant, reward selection as a real toggle group, `PHASE 33` in `proovd.css`, and the two new `anim.ts` helpers. **It adds no column, no route, and no register entry** — every deliverable is markup, CSS, motion, or a test. Session C (the checkout modal and the follow record) remains.
-
-- **§18 defines the content; the DNA document defines the presentation — so the band order moved and the item list did not.** The new order is hero → benefits → story → the campaign panel → **`.pc-seller`** → rewards → updates → FAQ → comments → the dark support band. The reference draws none of §18's items 2, 7, 8 or 13, and all four are placed rather than lost: 2, 7 and 8 became ONE band, sitting immediately before the reward cards because §18 puts the merchant-of-record disclosure "above the pre-order action" and that band is the last thing a reader passes before any control that can open checkout.
-- **The order test was rewritten deliberately, and a second test now guards what the first one cannot.** `public-site.test.tsx`'s `h1, h2[id]` list is the BAND order — a design decision that may change again. §18's fourteen items may not, so `exposes every one of §18's fourteen items, in document order` walks a stable anchor per item at whatever heading level the design put it, and compares positions rather than a second hand-written list. Splitting the two is the point: the old single test would have passed a page that had quietly dropped item 7 into a footer.
-- **The `h1` is the hero headline and the campaign title is the kicker above it.** §18 item 1 requires the title EXPOSED, not that it be the `h1`. When a campaign has written no hero headline the `h1` is the title itself and no kicker renders — an empty kicker above a duplicated title is the placeholder §33.11.3 forbids, and the id follows the element that actually carries the title so both shapes satisfy the anchor test.
-- **Four reserve-shaped controls, and the test counts them rather than naming one.** Two scroll (the nav and the hero) and two open checkout (the selected card and the phone dock) — the reference's own split, and what makes the seller band's placement true. The old suite asserted ONE disabled button, which would have passed while the other three were live on a sample; the new one partitions every control whose label mentions reserving and requires the live set to be empty.
-- **The reward cards are a real toggle group.** `aria-pressed` per choice, arrow keys across them (focus only — a roving SELECTION would announce a choice the reader had not made, and here that choice is what checkout opens against), and the chosen reward drives the hero CTA, the dock, the compact summary, and the drawer. A sold-out card stays visible and unavailable (§19), never hidden, and `remaining` renders nothing at all when the limit is null — never the word "unlimited", which is a scarcity signal invented where the record has none (§30).
-- **The demo stage stops advancing the first time a person touches it, permanently.** WCAG 2.2.2, and the three moment buttons are the mechanism, so no extra pause control exists and control once taken is never taken back. It carries no `aria-live`: announcing every 2.6s would talk over whatever the reader is doing, and the buttons' `aria-pressed` already announces a chosen moment. `reduced()` stops it before it starts.
-- **The demo's top line lost its wordmark, and that is a refusal.** The reference puts the product's short wordmark there; we have no such field, and `campaign.title` is a full descriptive line ("Loopnote — voice notes that write your weekly update") that reads as anything but a wordmark. Deriving one by cutting at the first dash would be guessing at a name the Founder never gave us (§1 rule 6), so the context label carries the line alone and the group's accessible name names the campaign.
-- **The browser pass found three defects, and none of them is visible to jsdom or axe.** This is the fourth rebuild in a row where that has been true.
-  - **The threshold bar rendered 100% full at 168 of 250.** `.progress__fill` rests at `scaleX(0)` and the runtime tweens it to the real value; `fillOnScroll` used `gsap.from`, which takes whatever scaleX it OBSERVES as its destination — the untouched 1. `fillOnScroll` now takes the end value as a required parameter and uses `fromTo`, so the number the bar draws and the number its `valueText` announces come from one expression. A progress bar that always reads complete is the worst thing this page could get wrong, and only a screenshot says so.
-  - **The sticky campaign header had no background**, so the sample banner and the hero scrolled through it. A sticky element needs its own ground; the reference's own treatment (page white, brand hairline) is what shipped.
-  - **`.accordion__head` has read a hardcoded `--darker` since Phase 02 with no mode slot**, so every Accordion inside a `mode-dark` band has rendered near-black on dark green — including §18's own "How this works" merchant-of-record expander, which has shipped that way **since Phase 14b**. Fixed at the slot (`.mode-dark .accordion__head`), so every dark band in the product gets it rather than this page alone. axe cannot see it: the accessible name is correct either way, and contrast is computed against the element's own declared background rather than the band showing through it — the same class of defect PHASE 28 and PHASE 31 each recorded.
-- **A restated date is a date that can disagree.** The reference's `Cancel before August 15` was first written as `formatCalendarDate(closesAt.toISOString())` — that helper splits on `-` and expects `YYYY-MM-DD`, so a full instant produced `NaN September 2026`. §33.11.6's scanner caught it, which is exactly what it exists for. The line now states the rule without a second copy of the close date; the row directly above already carries it local-primary with UTC beside it (§27.1).
-- **Chrome headless will not give you a 320px viewport, and a screenshot that claims otherwise is worse than none.** `--window-size=320,900` reports `clientWidth: 489` on Windows, so the first 320 pass showed the left 320px of a 489px render and read as horizontal overflow. Rendering the page inside a 320px-wide iframe gives a true viewport; at that width every band stacks to one column and the body does not scroll sideways (§33.11.1).
-- **The three campaign routes stay inside `PublicLayout`.** It is a thin shell and it does real §33.11.1 work — the skip link first in tab order, the scroll reset, and focus into `<main>` on navigation — so moving out to get a different header would have silently dropped all three. `SiteHeader` renders the campaign nav on `/campaign/*` and the site nav everywhere else; `<main>`, `SiteFooter` and `SupportChat` are untouched, so §27.8's pinned contact block and `a11y.test.tsx`'s landmark assertions do not move.
-- **The campaign panel is a real `<section>` with a name**, not a styled div — which is also what keeps `#campaign-dates`'s own §27.1 test meaningful, since it reads the nearest section.
-- **The updates archive is a genuine disclosure, and one Phase 14b assertion moved with it.** The latest update is the feature and the rest sit one gesture below (DNA §5.12); Radix unmounts a closed panel, so `campaign-live.test.tsx` now opens the archive before asserting the earlier update — a deliberate change, not an adjustment, because the alternative was a "disclosure" whose content was always in the DOM.
-- **The metric renders as value and label together.** 0049 made it both halves or neither; the page makes the label the number's accessible name rather than a caption floating beside it, because a bare `86%` reads as nothing at all (§28.5).
-- **`PHASE 33` records the reference's `:root` mapping rather than guessing it**, reuses `.btn`, `.kv`, `.doc-list`, `.accordion`, `.progress`, `.dock`, `.update`, `.consent` and `.sample-banner` untouched, and took `--mint` on every brand fill (proovd.css:158's hard rule — `#FAFAFA` on `#41ED98` is imperceptible, which is why the reference's own `--white` was not carried over). **That last decision was superseded on 2026-08-19 by the owner ruling** — brand fill takes `--white` now, and this page's six brand-filled rules moved with the token; see the Founder Dashboard Session A section at the end of this file. The observation that made it is still true (1.46:1 against 1.44:1); the ruling makes it the product's answer anyway. The prefix is `.pc-`: `.cmp-` is PHASE 28's Campaigns Admin and `.site-nav` is the site header's own.
-
-
-### The prospect intake is two acts, not one (§7, post-Phase-24 change)
-
-§7 describes creating a prospect after off-platform discovery, and then *separately* lists what "the invitation-creation surface contains". Those were one fifteen-field form; they are now two surfaces, and the split is §7's own.
-
-- **The intake asks what a discovery call produces: name, email, company/product, when we last spoke, Problem, Solution, and internal notes.** Everything else on §7's list — product name and URL, invitation source, internal campaign owner, launch frame, US/18+ fit, delivery feasibility, compensation expectations, the Creator-sourcing hypothesis, notes, evidence — moved to `ProspectFieldsPanel` on the draft surface, beside the message it feeds. No column was dropped and no §7 field lost its meaning; what changed is where Admin fills it in. A migration that dropped `product_name` would have destroyed the reference §7 requires in the invitation body.
-- **Send is where a blank costs something, and the gate is two mechanisms.** Anything that renders into the message is already covered: an empty product name comes out as `[PRODUCT NAME]` and the marker check refuses. The invitation source and the internal campaign owner appear nowhere in the email — and §7 requires the send row to store the source — so `missingInvitationFields` checks exactly those two by name, in `previewInvitation` and again in `sendInvitation`. The suite fills every rendered field, asserts `unresolved` is empty, and asserts Send still refuses.
-- **Requiring the whole list at intake did not make the record more complete.** It made an Admin type something into `invitationSource` to get past a form, which is a worse record than an honestly incomplete one — §5.3's verification-evidence reasoning, same shape.
-- **`last_contact_at` is a record, never a schedule.** §7's discovery record and §26.8's one-time relationship touches are the same posture. It is a bare instant: no next-contact column, no recurrence, no reminder, and no job that reads it — §30 forbids automated engagement sequences, and having nowhere to record a cadence is what keeps it that way. Both suites assert those column names are absent from `information_schema` and those labels absent from the surface. An unreadable date is refused rather than stored as NULL.
-- **The new column is anonymisable, and 0039 taught the trigger about it.** 0005 made anonymisation irreversible by refusing to write content back; a content column the trigger did not know would have been a hole in exactly that guarantee. The retention sweep nulls it with the rest.
-- **`PUT /api/admin/founders/:draftId/prospect` is registered in `UNGATED_ADMIN_WRITES`.** Same act as composing the message and gated the same way — it reaches nobody, and Send re-decides server-side. §33.12.5's partition is what caught it: the route belonged to neither set until somebody decided, which is the whole value of that register.
-- **A key absent from the request writes nothing** (§9's autosave rule), so saving the product name cannot blank an invitation source recorded on another visit. Asserted.
-- **Problem and Solution are written through `prefillVetting`, never as prospect fields.** §9 calls them "human-prefilled by Proovd from discovery" and the intake form *is* the discovery record, so the route calls it after the prospect transaction commits — 08c's precedent, since the prefill is idempotent and its own surface already exists, so a crash between the two costs a retry. The provenance survives: they land in the Founder's boxes only while untouched, `supplier` reads `proovd`, and a later Admin edit never overwrites words the Founder has since typed.
-- **Two boxes this form will keep being asked for, and must not grow.** They were both requested and both refused, so the reasons are recorded here rather than rediscovered. **Competition:** §9 Step 4 is three sentences — "Always blank. Written by the Founder. Must never be prefilled or represented as AI-generated" — and §33.1.5, the missing `competition_prefilled_*` columns, the `campaign_vetting_competition_is_founders` CHECK, and `prefillVetting`'s two parameters are four independent locks. **The campaign Story:** §12 makes it one of five optional items worth US$2 off the listing fee each, and says a "transcript, generated summary, or unapproved draft does not count" — the Founder's approval IS the completing act, so an Admin-written story would be Proovd's content earning the Founder a discount.
-- **Both go in `adminNotes` instead, and the difference is who reads it.** Recording what we heard about competitors, or why they are building this, is §7's "Admin notes and discovery evidence". Answering on their behalf is what §9 and §12 forbid. The note is internal, never rendered to the Founder, never read by the §9 prefill or the §12 evaluation, and swept by §25.8 — and the form says so where an Admin will read it. Three surface tests assert the two controls are absent and the note is present.
-
-### The vetting flow was simplified (§9, §10, post-Phase-24 change, 2026-08-10) — **WITHDRAWN 2026-08-18**
-
-> **This deviation was withdrawn on 2026-08-18 by the same kind of product direction that
-> introduced it.** The section is kept whole rather than deleted, because a later reader meeting
-> four undocumented reversals would conclude somebody invented four rules — the opposite happened.
-> What is true now is in **"The Founder onboarding is being rebuilt"** below; what each bullet
-> here says about the guarantees that did NOT change is still true and still worth reading.
-> **One half of it did not revert: the §10 result no longer gates the claim, and this brought back
-> the screen without bringing back the gate.**
-
-The Founder's Step 2 flow was simplified by product direction, on the Admin-2FA precedent: **a recorded deviation from the Spec, not a defect to "fix" back** without the same instruction. §9's five-item sequence (campaign path, Problem, Solution, Competition, the possible-creator result) is now three steps — **Problem → Solution → Amount of views** — and submitting lands directly on the account claim.
-
-- **The campaign path moved to Admin.** `setCampaignPath` (`vetting/service.ts`) writes `campaign_vetting.selected_type` via `PUT /api/admin/founders/:draftId/campaign-path` (registered in `UNGATED_ADMIN_WRITES`; freely revisable until submission), and the Overview pane's "Campaign type" section carries the control. **Submission still locks `campaigns.type` permanently** — the 0007 trigger is untouched, and `submitVetting` refuses (owning the wait, §27.1) while no path is set. The Founder PATCH route no longer accepts `selectedType`.
-- **The amount of views is a new answer**: `campaign_vetting.views_range`, one of four range ids owned by `VIEWS_RANGE_CHOICES` in `shared/src/vetting/steps.ts` (restated in the service, drift-tested), CHECK-pinned in migration 0042, history-tracked by the same trigger as the other answers, and nulled by the §25.8 sweep.
-- **Competition is no longer collected, and its guarantees outlive the question.** The columns, the never-prefill CHECK, the absent `competition_prefilled_*` shape, and the tree-wide no-prefill scan all survive; neither the Founder route nor any prefill path accepts the field. Legacy answers still render read-only in the Admin workspace. The 0042 completeness CHECK admits both shapes: a legacy submission (competition answered) and a new one (views answered).
-- **The possible-creator result no longer gates the claim.** `completeClaim` lost the `creator_signal_pending` refusal, the founder-facing `/creator-signal` route and the `/draft/:token/result` page are gone (the address redirects to the claim), and `CreatorResult.tsx` was deleted. The Admin recording (`possible_creator_results`, the `creator-signal` POST) stays, renders in the workspace, and blocks nothing — the "cannot continue" attention branch was removed from `founders/workspace.ts` accordingly.
-- **What did NOT change**: the type lock and archive-and-restart path (§33.1.7), the no-SMS-OTP rule (§33.1.8), `founder_signup_complete` exactly-once (§33.1.9), the claim's policy/representation/profile gates, the retention sweep, and the token model. The §33.1 suites were updated to test the deviation as built.
-
-### The Founder onboarding is being rebuilt — Session A of six (§9, §10, §12, §14.3, §16, post-Phase-24 change, 2026-08-18)
-
-The Founder's path from a pre-filled invitation to a live campaign becomes the twenty-six full-bleed
-steps in the supplied reference at `docs/design-refrence/Proovd-Founder-Flow-v2/`.
-`docs/phases/founder-flow-v2.md` is the brief; `docs/phases/founder-flow-reconciliation.md` is the
-walk, with every element bucketed and **the canonical stage order B–F are scoped against**.
-**This is six sessions and only Session A has landed: the record, the reversions, and the order.
-It writes no screen.**
-
-`shared/src/vetting/steps.ts` owns the reverted registers; `backend/src/vetting/service.ts` restates
-them; migration 0052 the one new record family and one corrected trigger;
-`backend/src/tests/founder-flow-v2.test.ts` is the artifact (18 tests). **`npm test` is 118 files
-and 2,987 tests, green in one run**, with §33.1.1–§33.1.9 updated to the reverted flow rather than
-around it.
-
-- **Four reversions, and saying so is load-bearing.** The 2026-08-10 simplification is withdrawn:
-  Positioning returns as §9's third required answer, the Founder chooses their own campaign path
-  again, §10's possible-creator result gets a Founder-facing read again, and the amount-of-views
-  answer retires. Every one is a return to §9 and §10 **as written**. A later session reading four
-  undocumented reversals would conclude somebody invented four rules; the register, the service
-  header, the migration header, and every inverted test carry a `DELIBERATELY INVERTED (2026-08-18)`
-  line naming which direction it moved.
-- **The one half that did NOT revert is the §10 gate.** §10 orders the result *before* account
-  creation and says nothing about blocking one. The 2026-08-10 change removed the gate; the screen
-  is back and the gate is not. A Founder whose result is unrecorded proceeds, the screen is skipped,
-  and Admin sees the gap on their own workspace. `§33.1.6 … is a record, not a gate` passes for the
-  reason it always did.
-- **`views_range` retires from COLLECTION only.** No step, no PATCH key, no surface asks it. The
-  column, its CHECK, its `draft_field_edits` history and every stored answer survive — a record is
-  not made wrong by a later product decision, and Admin still has to read what was collected. What
-  must not happen is a campaign onboarded after the retirement rendering as though the question had
-  been asked and left blank, so `VIEWS_NOT_COLLECTED_LABEL` says *"never asked on this campaign"*
-  (§16a: not yet populated is not zero — and here it is not even a gap).
-- **`0042`'s completeness CHECK is NOT tightened, and that is the trap.** It admits two shapes,
-  competition-answered or views-answered, and must keep admitting both: requiring competition would
-  validate against existing rows on `ALTER TABLE` and fail on every legacy views-only submission.
-  Competition is required in the **service**, where a refusal is a sentence a Founder reads rather
-  than a constraint name.
-- **Where a Founder can BE is now a different list from what they answer.** `VETTING_RESUME_POSITIONS`
-  adds `campaign_path` to the three answers. While there was no path screen, a stored `campaign_path`
-  position was mapped onto `problem` — correct then, and wrong in a new way the moment the screen
-  came back: it resumed a Founder one screen past where they stopped. Legacy `views` and
-  `possible_creator_result` map to `competition`, the answer that took the third slot.
-- **The campaign path has two suppliers again, and the supplier is DERIVED from the actor.** 0042
-  hard-coded `'proovd'` on every `selected_type` history row, honest while Admin was the only
-  writer. Admin's `setCampaignPath` STAYS — it is how a path is set from discovery and the Founder's
-  screen arrives pre-selected from it — and the Founder's own answer supersedes. A history row
-  claiming Proovd chose what the Founder chose would be a provenance record that is simply untrue,
-  so `record_vetting_edits()` reads `updated_by`: `draft:%` is the Founder (there is no account yet,
-  so that is the honest actor), anything else is Proovd. No new column, for `applyProvenance`'s own
-  reason — a request that could declare its own supplier could declare a flattering one. **The CASE
-  needs an explicit `::field_supplier` cast**; the literal branches beside it coerce from unknown
-  and it does not, and the failure is at runtime.
-- **Zero and unrecorded are collapsed BEFORE serialization (§10).** `viewCreatorSignal` returns
-  `with_admin` for both, so there is no branch in the route and no field in the response that could
-  tell them apart — asserted by comparing the two serialized bodies, not by spot-checking. `basis`
-  is Admin's own justification and never reaches a Founder (§10, §11), and nothing names a Creator.
-- **The reference's order is wrong in three places and a mechanism refuses each.** The five §12
-  answers move AFTER the claim (they write through `requireRole('founder')`; running them
-  pre-account would mean R2 objects and a Cal.com booking owned by nobody, and US$10 of discount
-  earned before any Terms acceptance). Stripe moves BEFORE the fee (`beginListingCheckout` refuses
-  without a complete `founder_seller`, so as drawn screen 20 offers a payment the server declines).
-  §10's match screen moves EARLIER, not later, to where §10's own first sentence puts it. All three
-  are recorded as moves in the reconciliation.
-- **The walk found three things the brief did not, and the worst is a unit error.** Screen 22
-  collects `(USD)` with a `Min. $500` — `campaign_build.order_threshold` is an integer **count of
-  pre-orders** (§4.1: "a number of Backers, not a dollar amount") and §14.4 fixes no minimum, so the
-  reference's screen is a different commercial instrument with an invented floor (§1 rule 6). Also:
-  a **third** `affiliate` leak the brief did not name (`…as soon as we get all your affiliates in
-  place`, on the review screens), and a **second** review screen that approves a *person* where §15
-  approves a campaign.
-- **`goal` is the third time.** 65 occurrences across the bundle including `goalAmount`, `goalInput`
-  and `BPAGES[1] === 'goal'`. §3.2 binds identifiers and §33.11.3 reads the built bundle, where a
-  prop name survives minification — the Campaigns hub hit it with `progress.goal`, campaign-page-v2
-  with `PRIVATE BETA GOAL`. `Trustworthy` in the voice list is deliberately NOT a §3.2 hit: the ban
-  is on `trust` as in *held in trust* and the scanner is word-bounded.
-
-**Deviation 3, recorded as a deviation: the Founder fixed-payment openness record.** §16 makes the
-optional fixed Creator payment the CREATOR's request, accepted bilaterally through one proposal
-version (§14.2), and not the default model — so a Founder answering a pay-model question during
-onboarding, before the listing fee is paid and before any Creator exists, has no place in that
-negotiation. Built by explicit product direction, and narrow by construction rather than intention:
-
-- **No amount column, no percentage column, no proposal-version reference.** A number would be the
-  proposal only a Creator may make; a rate would be a fourth answer to §14.3's three §6 settings.
-  The reference's own copy concedes it — *"A proovd representative will get in touch with you to
-  lock down the [fixed Creator payment]"* — which is §1.3's manual-but-recorded path. A test
-  asserts the exact column set.
-- **An Idea campaign cannot hold one, two independent ways.** A CHECK pins `campaign_type` to
-  `pre_launch` (§14.3), and a shape trigger requires the stored type to be the campaign's OWN —
-  without the trigger the CHECK is satisfiable by writing `pre_launch` onto an Idea campaign and
-  enforces nothing. Both directions are driven by hand-written INSERTs. It also refuses before the
-  §9 type lock: a stance recorded against an unlocked type could later find itself on an Idea
-  campaign.
-- **Insert-only, superseded rather than edited**, one live row per campaign by partial unique index,
-  `superseded_at` the only column UPDATE is granted on and write-once by trigger. An answer somebody
-  changed their mind about is two facts, and which was live when a Creator was approached is a
-  question that may have to be answered later.
-- **It is read by Admin when recruiting, and by nothing else.** A later phase asked to read it as a
-  default, a filter, or an eligibility condition is asking for the §1 rule 6 violation the missing
-  columns exist to prevent.
-
-**Deviations 1 and 2 are Session C's and are NOT built yet.** The six-digit emailed verification
-code verifies an email — it creates no account, mints no session, and does not touch `completeClaim`
-— and it lands with its screens, never before them, because a code screen built first grows a
-client-side "is this code right" check, which is the enumeration oracle the frozen rejection exists
-to prevent. The transcription port transcribes and does not generate, summarize, rewrite or suggest.
-**Neither is a licence for its neighbours**, and §33.1.8's no-SMS-OTP scan is the guardrail that
-stops the code drifting onto a phone number: it must pass unchanged, and if it ever needs editing
-that is the signal deviation 1 has grown past what was authorised.
-
-**What Session A deliberately did not build:** any surface (B–F); the code's storage (C, with its
-screens); a voice-adjective table (`campaign_build.brand_voice` is a §14.4-**required** text column
-that already means exactly this, and a repeater beside it would make §14.4's field and the Founder's
-chips two answers to one question); and an `answers` table merging §9's three answers with §12's
-five optional items — the flow PRESENTS them as one sequence and the registers stay two, because
-§12 completion is derived from objective evidence and a merged table would quietly make it a Founder
-assertion. All four absences are asserted.
-
-**Three things cannot complete today and none is stubbed:** the eight §31.4 documents are `draft` so
-`completeClaim` returns `policies_unpublished` and the screen renders the reason; R2 is unconfigured
-(Track A4) so Visuals and Branding render a named absence; Cal.com is unconfigured (Track A4) so the
-Interview step renders no embed. A screen whose dependency is missing says WHICH, in §27.1's
-six-question shape.
-
-**The interim surface changed with the records, and says so in its own header.** `VettingFlow.tsx`
-asked §9's four items again so the flow a Founder could walk matched what the server keeps; nothing
-in it was a design decision meant to survive Session B, and Session B duly took three of the four
-onto their own pages. It reuses `doc-list` rather than minting a class, because Session B owns
-`PHASE 34` and a bespoke rule here would have been a rule written twice.
-
-### …and the shell, and screens 1–4 — Session B of six (§7, §9, §27.1, §33.11, DNA §5.12, 2026-08-18)
-
-Session B is the presentation: the full-bleed page primitive every later screen renders inside, the
-help drawer, four motions, `PHASE 34`, and the first four of the twenty-six screens. **It adds no
-column, no server route, and no migration** — every deliverable is a surface, a register entry, a
-stylesheet section, or a test. Sessions C–F remain.
-
-`shared/src/vetting/flow.ts` owns `FOUNDER_FLOW_PAGES` and `FOUNDER_FLOW_ABSENCES`;
-`frontend/src/surfaces/founder-flow/` owns the shell and the screens; `components/anim.ts` gained
-four helpers; `PHASE 34` in proovd.css the styles; `founder-flow.test.tsx` is the artifact (27
-tests). **`npm test` is 119 files and 3,040 tests, green in one run**, with §33.11.1–§33.11.7
-passing over the four new addresses and the §33.11.3 bundle scan clean over a fresh `dist`.
-
-- **One register, three readers, so a page cannot exist in one and not the others.** The router, the
-  help drawer, and §33.11's `PRINCIPAL_FLOWS` all need to agree about what the pages ARE; three
-  hand-written lists is two chances to disagree, and the disagreement shows up as a help card that
-  jumps somewhere that does not exist. `FOUNDER_FLOW_PAGES` holds **only the four that are built** —
-  declaring the other twenty-two would be `events.ts`'s failure in a different file (§1.4), and the
-  drawer's "everything before it" is then always true rather than aspirational. `PRINCIPAL_FLOWS` is
-  `as const`, so the routes are restated there and drift-tested rather than spread in (a spread
-  widens every literal to `string`).
-- **`DraftLanding` was replaced, not kept beside.** The invitation email points at `/draft/:token`
-  and that address does not move; screen 1 IS that page, re-presented. The component and its ~140
-  lines of `.invite-landing` CSS are deleted, because dead CSS ships in every browser and
-  §33.11.3's scan reads what ships.
-- **The help drawer is §27.1's sixth question answered once for a twenty-six page flow.** *How do I
-  get help without losing context* costs a support route on every screen otherwise. It lists the
-  current page first and marked, the earlier ones marked done, each a title and one line, and taps
-  jump. It lists **what is behind and never what is ahead**: a drawer showing the pages to come is a
-  progress bar with reading attached, and it would offer to jump to addresses that refuse.
-- **Direction is module state, not routed state.** The relay runs forwards or backwards, and that is
-  a fact about the TRANSITION rather than about either page — the page being entered cannot know
-  where the reader came from, and putting it in the URL would make two addresses for one screen. A
-  fresh load leaves it forward, which is the README's own "first paint always runs forward".
-- **The exit's 520ms fallback ships inside `pageExit`, not at the call sites.** A tween in a
-  backgrounded tab does not progress; without the timer a Founder who switched tabs mid-transition
-  comes back to a page that faded and never left. It drives a NAVIGATION and never a status, so an
-  early fire costs a cut-short fade and nothing else.
-- **`relayIn` carries the README's stuck sweep, because the runtime's own cannot see it.**
-  `proovd-motion.js` force-reveals after 3 seconds, but only elements it registered through
-  `holdHidden` — that is `[data-reveal]`, and these are staged by an inline `fromTo`. A dropped
-  tween would otherwise leave a blank page with a working keyboard path, which is the worst failure
-  this flow has because nothing about it looks broken.
-- **Every duration is a §6.1 token, and each says which reference value it stands in for.** The
-  relay's 0.62s reads `slow` (0.60), the grow's `back.out(1.35)` reads `snap` (`back.out(1.4)`), the
-  0.28s exit reads `quick` with `exit`, the FLIP's 0.52s `power3.inOut` reads `slow` with `move`.
-  §6.1's ceiling is `grand: 0.90` — "nothing exceeds this" — and the reference's longest here is
-  0.62s, so nothing had to be cut to fit.
-- **The FLIP is two calls either side of a React state change**, which is React's own expression of
-  the reference's "invert set synchronously before paint, tween starts on the next frame". The pick
-  sticker and the confirm row's sticker are different DOM nodes, so they match by `data-flip-id`;
-  without that the captured state describes an element that no longer exists and Flip animates
+| **Admin second factor removed** (2026-08-10) | §5.1, §28.2 make Admin MFA mandatory | The plugin, table, column, setting, scripts and every enrolment path are gone (migration 0041). What did **not** change: the Admin still presents a real credential, `requireAdmin` still refuses every non-`admin` role server-side, and `requireFreshSession` is now **the only control** between a long-lived stolen session and a money-moving action — so it is the one thing in `auth/` that must never be loosened casually. No bypass, dev shortcut, or hardcoded Admin replaced it. §34 condition 8 was restated to describe the controls that exist. |
+| **Account-level Creator suspend/restore** | §29 records Creator enforcement per *association*, not per account | `affiliate_access_actions.action` admits exactly two values by CHECK. There is **no ban**: no `affiliate_ghost_bans` table, no ban branch in `creatorStandingGate`. §29's association-scoped enforcement is untouched. |
+| **Nine-screen Founder onboarding** and **nine-screen Creator onboarding** | §11 asks for "one compact flow" and forbids a "multi-page education sequence" | Every §11 content bullet is still collected; the five §28.4 confirmations are still five separate unchecked controls writing five columns; **no bank, routing, tax-id or identity input exists anywhere and no route could accept one**; no public route; the invitation still claims exactly one association (§33.2.1). §33.2.2 was re-authored in one test with one dated comment — the money half is load-bearing and stays. |
+| **Six-digit emailed verification code** (Founder flow) | §5.2 gives the Founder email/password or Google | It verifies an **email** — creates no account, mints no session, does not touch `completeClaim`. Stored as an **HMAC** over draft + address + code (a plain SHA-256 over six digits would collide two live codes on the UNIQUE hash index and be a rainbow table one row wide). Six wrong guesses finish the code. One frozen rejection for every failure mode. **§33.1.8's no-SMS-OTP scan is the guardrail** — if it ever needs editing, that is the signal this grew past what was authorised. |
+| **Transcription port** (dictation) | §30 defers AI rewriting | One method. **No generate, summarize, rewrite or suggest** — enforced by a source scan that strips comments first. **The audio is not kept**: no column, no bucket key, no job (§25.8 defines no window for it, and inventing one is §1 rule 6 in the other direction). The transcript lands as ordinary editable Founder text with supplier `founder`. |
+| **Founder fixed-payment openness record** (0052) | §16 makes the fixed payment the Creator's request, accepted bilaterally through one §14.2 version | **No amount column, no percentage column, no proposal reference** — the exact column set is asserted. An Idea campaign cannot hold one (a CHECK *and* a shape trigger, because the CHECK alone is satisfiable by writing `pre_launch` onto an Idea campaign). Insert-only, superseded rather than edited. Read by Admin when recruiting and by nothing else. |
+| **`campaign_followers`** (follow record) | §1 rule 6 — capturing email from someone who has not pre-ordered | **One message**, and it is a receipt. Double opt-in, and **confirm/unfollow are POSTs behind a page** — a GET confirm would let an email scanner complete the double opt-in that exists to require a person. A follower takes the **Creator** visible-audience list, never the Backer one. No `follower_count` on `campaigns`, no schedule column, no second message. Not licence for a cadence or a re-engagement sequence. |
+| **Founder→Creator meeting request** (0056) | §30 defers the meeting scheduler *and* direct messaging; §11 says the Founder cannot contact the Creator directly | **Not a scheduler**: no `scheduled_for`, `duration`, `timezone`, `platform`, `meeting_url` or `slot` column — asserted, and the route is driven with those fields in the body to prove they are ignored. **Not a thread**: one message, written once, immutable by trigger; a second ask is refused by a partial unique index. It decides nothing — the association row is compared byte-for-byte before and after. One §27 key. |
+| **Founder acknowledgement of a Creator's post** (0057) | §30 defers direct Founder–Creator messaging | **No free text** — the exact seven-column set is asserted, and the route ignores its body. **One-way at the database**: neither UPDATE nor DELETE is granted, so there is no un-acknowledge (a toggle would leave the record and the inbox disagreeing). Refuses a post Proovd has queried. One §27 key, deduped on the post. |
+| **Creator standing / tier** (0055) | Invents a score the Spec does not define | The table has seven columns and **none is a rate, floor, percentage, multiplier, or eligibility value**; **no `proposal_access` column exists anywhere in the database**. A source scan by path proves five named modules never read it. The weights are **in the register the surface renders from**, so the arithmetic is stated rather than hidden. Sales, response speed, and the §8 quality tier are refused as inputs by name. |
+| **Creator referral** (0055) | Invents an introduction path | An Admin task, not a signup route: no account, no prospect row, no association, no token scope, no public join address — all counted before and after. No amount, cents, percentage, commission or payout column. No state meaning the person joined. |
+| **Creator Resources screen** | §14.1: "All material lives in one Campaign kit" | `creator_resource_interest` has a key, a subject, and a timestamp — no asset, URL, file, or campaign column, so it cannot become the §31.5 kit. No download control, because there is no file. |
+| **Creator account-level Home and Earnings** | §26 makes the Admin panel the only dashboard-style product | Built to §20's Founder rules by analogy: no KPI tile wall, no counters table, no real-time claim, one thing waiting or the caught-up ending, every unpopulated block naming what it waits on. |
+| **The owner ruling** (2026-08-19) | DNA §1 / §2 / §10.1 | Radius is 2px on **both** postures, brand-green fill takes `#FAFAFA` text, and the inset highlight ships on brand-filled primaries. Verified at runtime across 192 brand-filled elements and 166 primaries. Two deliberate high-contrast pairings on brand (`--dark` on brand, 8.0:1) were **kept** — the ruling replaces `#E9FFE1`, it is not a mandate to destroy a readable pair. Every other DNA rule stands. |
+
+**Withdrawn, and kept recorded so the reversal does not read as drift:** the 2026-08-10 vetting
+simplification (Positioning, the Founder's own campaign-path choice, and §10's Creator signal all
+returned on 2026-08-18). **One half did not revert** — the §10 result no longer *gates* the claim.
+§10 orders the result before account creation and says nothing about blocking one.
+
+---
+
+## What each area learned
+
+Condensed from the archive. Each entry is a rule that cost something to discover.
+
+### Records, registers, and the shared/backend boundary
+
+- **The backend never imports `@proovd/shared` at runtime** — it compiles under `rootDir: src` and
+  the image ships only `backend/dist`. The answer is always the same: **restate the data in the
+  backend and drift-test it against shared.** Never restate the *prose*; restate only what a CHECK
+  or a runtime branch depends on, because two copies of a paragraph is how they start disagreeing.
+- **A list in prose is a list nobody can test.** Every "all N of these" claim in the Spec is a
+  shared **register** that the backend restates, the query walks, and the suite asserts. A twelfth
+  filter added without a §26.5 line fails the drift test; a dropped one fails it too.
+- **A column in Drizzle and the migration alone does nothing.** There is no Zod schema for a build
+  patch and no route-layer whitelist — the `assign(...)` calls in `saveBuild` **are** the entire
+  allowlist. Each new field is wired in five places (Drizzle, migration, `BuildPatch` + `assign`,
+  `serializeBuild`, `BuildFields`) plus the one preview assembly. A field missing from `assign` is
+  one no Founder can write; missing from `serializeBuild` is one they can write and never read back.
+- **History is a trigger, not a service call.** A service that writes the history row is one a
+  careless `db.update()` bypasses. `app_setting_versions`, `draft_field_edits`,
+  `optional_item_events` and the follow-consent history all record this reasoning.
+- **Insert-only means the grant, not the intention.** `UPDATE`/`DELETE` revoked from the app role;
+  where one column must move, grant **that column by name**. A correction is a new row.
+- **Register entries rot silently until something reads them.** Three of Session A's Creator-flow
+  `derivedFrom` strings named columns that did not exist — found the moment a surface first read
+  them. The fix that sticks: a test that parses every `table.column` out of the register and
+  asserts it exists in `information_schema`.
+
+### Money, Stripe, and the close path
+
+- **`affiliate_id` on `campaign_affiliate_associations` holds the PROSPECT id, not an account id.**
+  The account identity is `affiliate_signup_profiles.claimed_user_id`. Anything keying a
+  connected-account lookup off `affiliate_id` **routes money at a UUID nobody owns.** Four separate
+  `owns` helpers already re-implement that lookup; do not add a fifth silently.
+- **The gate throws rather than returning a normalized failure** — the one exception in this
+  codebase. Every caller treats a thrown error as "the provider call did not happen" and retries
+  under the same key, which is the truth. A returned failure would look to `close-batch.ts` like a
+  **decline**: it would enter the retry window, tell a Backer their card failed, and start a
+  48-hour clock over a charge nobody attempted.
+- **The threshold decision is made once, from the state at exactly close, and the database keeps
+  it.** A later payment failure moves the campaign to `capture_retry_window`, never back to
+  `ended_no_charge`.
+- **An unusable tax calculation means no charge, never a substituted total.** `tax_calculation_
+  unusable` is a real outcome with its own notice.
+- **`requires_action` is routed, not converted to a failure** at the provider — §21 sends it to a
+  customer-action recovery.
+- **Tests move time, not the anchor.** Stored deadlines are trigger-immutable, so a window-end test
+  passes `deadline + 1s` rather than editing the row.
+- **The unearned return has no provider leg today** — under direct charges no platform-side fee is
+  debited at capture, so the remainder is already with the Founder and the return is the ledger
+  resolution of the liability.
+- **§32.5's card numbers live in the suite and nowhere else.** `shared/` ships in the browser, so
+  the register carries the scenario and the expected provider code — no digits — and the memory
+  gateway takes an **outcome name** rather than a card.
+- **The raw provider code never reaches a customer surface.** It lives on the attempt row and in
+  the internal audit column; `containsRawProviderCode` refuses it at the point an Admin can still
+  fix it (§33.9.11, §25.6).
+
+### Admin
+
+- **Every workspace is keyed on the PERSON, not the draft or the association.** A Founder whose
+  campaign was archived-and-restarted appeared twice with no relationship between the rows until
+  this was corrected. Three ids and confusing them is the mistake that moves money wrongly:
+  `prospectId` is the person, `associationId` is one campaign relationship, `claimedUserId` is the
+  account.
+- **Nothing is stored.** No `timeline_events`, no `campaign_events`, no `affiliate_history`, no
+  `support_case_events`, no Today table — every timeline **composes** across existing tables and
+  names the table each entry came from, so the claim is checkable from the response. §26.8's trap:
+  *a second event store that drifts from the first is worse than no timeline.*
+- **An internal note's body never reaches a timeline** — a timeline is exactly the view that gets
+  pasted into a customer message.
+- **The freshness gate is a partition, not a demand.** Reauthenticating for ordinary work teaches
+  people to do it reflexively, and a gate cleared without thinking is not a gate. §33.12.5 walks
+  the **mounted router**, drives every write with a stale session, and requires the result to
+  partition exactly: gated, or registered in `UNGATED_ADMIN_WRITES` with the sensitive property it
+  lacks. A new route belongs to neither set until somebody decides.
+- **Overridable fields are a register, never free text.** A route accepting any string would record
+  an override of something that does not exist, and the trail would look complete while pointing at
   nothing.
-- **PHASE 34 mints NO new colour, and the twelve-colour decision is in its header.** Seven of the
-  reference's nineteen map straight across. Of the other twelve: the brand hover resolves to §7.1's
-  variant swap (a second hover mechanism would give the product two answers to what a hover is); the
-  three mid-greens collapse onto `--sage` and `--moss`, because three greens for three 5px dash
-  treatments is a distinction nobody can see and the palette already carries a mid-green ramp with
-  the same cast; the two yellows both read `--accent-yellow`, differing by border-vs-fill, which is
-  how this system already expresses that role difference; and the three **neutral** greys read
-  `--grey`, because every grey in proovd.css is green-tinted and a neutral ramp changes the cast of
-  the whole product rather than this flow.
-- **Both campaign paths render at once, and §9 is why.** The reference pages between them because
-  two 440px stickers do not fit a fixed 2496px stage. §9 requires the choice explained "in plain
-  language before it is chosen", and behind a pager half of that explanation is one interaction away
-  from a Founder who never presses the arrow. It is a real `Choice` radio group — arrow keys, one
-  tab stop, one question with two answers.
-- **The confirm field is a `readOnly` textarea, not a paragraph that swaps into one.** One element
-  in both states: a long answer scrolls natively either way, focus survives the mode change, and
-  there is no second DOM shape to keep accessible. Editing grows it — the reference's own 220 →
-  478px beat, expressed in rows.
-- **`Next` does not collapse while editing, and that is a deliberate departure.** The reference
-  animates its height and margin to zero; a disappearing primary action inside a twenty-six page
-  sequence is a trap at 320px, where `Done editing` and `Continue` need not be on screen together.
-  The collapse exists to stop a fixed-height stage overflowing, which responsive units remove.
-- **`~3 mins` is a record, never an estimate.** §7's invitation carries `expected_setup_time`,
-  filled in by the Admin who composed the message; a blank one renders nothing. An invented "about
-  three minutes" is a promise about somebody's evening that nobody made (§1.4), and the suite drives
-  both directions.
-- **The walk found three things Session A's did not**, and one of them was already shipped. `reach`
-  is a **fourteenth screen** the README does not number — forty phones orbiting behind "We can get
-  [product] in front of 10,000 new people", with the number hardcoded as a constant — refused under
-  §7 and §1 rule 6, with §10's match screen already the honest version of that beat. The reference
-  asks **Problem and Solution twice** (screens 2–3, then `probConfirm` at 7–8, whose own help copy
-  calls it "last look"); §9 has one of each, so screens 2–3 are those answers and Session C must not
-  collect either on a second screen. And the passive **`By continuing you're agreeing to Proovd's
-  Terms of Service`** — drawn by the reference and shipped on the Phase 06b landing since it was
-  built — is refused: §10 records acceptance at the claim as three separate controls (§28.4), and no
-  consent row exists for anything done on the invite page.
-- **`FOUNDER_FLOW_ABSENCES` is the `OPERATIONS_ABSENCES` arrangement applied to a flow.** These are
-  whole elements the reference draws that no surface renders, so unlike a control that can carry its
-  refusal in a sentence there is nowhere on a page to put the reason. A later session that wants one
-  back has to delete the entry that refuses it, and a test walks the register.
-- **The interim Positioning surface no longer re-asks what screens 2–4 own.** It names any missing
-  earlier answer and links back to the page that owns it. A record collected on two screens is a
-  record whose two copies eventually disagree — and a suite testing both copies would have made that
-  look correct.
-- **The browser pass found four defects and nothing else could — the fifth rebuild in a row.** A CSS
-  comment containing `*/` (the header explained the stage conversion as `--sp-*` `/clamp()`) closed
-  early and killed the entire `PHASE 34` token block, so every page rendered at browser-default type
-  with 8px of body margin; a file-wide comment-balance scan ran beside the fix. `.field__label`
-  matched nothing — the component's classes are `field-label`/`field-hint`, single hyphen — so the
-  dark panel's label rendered dark-green-on-dark-green while axe saw a correct accessible name. The
-  travelling sticker had zero size, because `.sticker` sets a width and no `display` and every other
-  sticker in the product sits in a flex or grid parent that blockifies it. And `--grey` on `--white`
-  is about 2.2:1 and was carrying a permanence warning, a legal line, and a save status; those five
-  lines read `--moss` now, which is what PHASE 33 uses for body copy.
-- **One test assertion was this session's own and was wrong.** `/^Saved \d/` asserts the machine's
-  locale rather than the product's behaviour: `formatSavedAt` renders through `toLocaleTimeString`,
-  so a correct render on this machine is `Saved ٠٥:٥٠ م`. It reads `/^Saved \S/`.
+- **The preview is a record, not a render.** A preview merely displayed is one nothing enforces,
+  because the next caller posts straight to execute. It is stored with a hash of the exact payload
+  and consumed once.
+- **Seeing is not exporting (§25.7).** The ledger read returns restricted columns because support
+  work needs them in front of a person; the **export reads its column list from the register, never
+  from the caller** — a limit the requester can widen is not a limit.
+- **Labels are total maps over the enum.** A 28th lifecycle state without a human label fails the
+  **build** rather than rendering `banned_founder` to somebody on a support call.
 
-**What Session B deliberately did not build:** any screen past 4; a `positioning` page id (Session C
-moved that screen behind the email and the code, and a register entry for a surface about to move is
-a register that lies); the six-digit code and the transcription port (both Session C's, both landing
-*with* their screens); and any change to `campaign_vetting`, its routes, or its provenance rules —
-Session A owns the record and that session read it.
+### Notifications (§27)
 
-### …and the end of the draft token — Session C of six (§5.2, §9, §10, §12, §28.5, §33.1, 2026-08-18)
+- **Coverage is a partition.** Every registry key is sent **or** recorded in `unsent.ts` with a
+  reason and an owner; the suite asserts the two lists partition exactly. Three kinds of absence —
+  `never` (a decision the Spec itself makes), `capability` (behaviour that does not exist yet), and
+  `message` (behaviour exists and is recorded) — and a `message` absence must name the record.
+- **The dedup entity is the decision, not the object.** Keying on the draft satisfies §27.2 and
+  breaks §7's resend. Keying an interview change on `<booking>:<time>` collides on a
+  cancel-then-rebook to the same slot. Key on the **row that records the thing happening**.
+- **The delivery row is written BEFORE the provider call** with `notification_id` NULL, and
+  confirmed after. Writing it after leaves a crash-shaped hole: an email delivered with no send
+  row, therefore no retention clock. NULL is a **state** — "recorded, not confirmed" — and surfaces
+  render it as exactly that.
+- **Money messages come in four classes.** One class would demand a statement descriptor on a
+  cancellation — the one message where §30 makes it most important not to imply money moved.
+- **The digest composes from activity records, never from `notification_deliveries`.** The obvious
+  implementation ("everything we emailed you") is exactly the one that breaks §27.2's
+  not-opt-out-able rule. The single permitted use of the deliveries table is to *exclude* an
+  already-sent item.
+- **A source scan must strip comments first.** These files explain at length what they refuse to
+  say; a scan that cannot tell an explanation from a usage forces the explanations out.
 
-Session C is everything still reachable on the invitation token: the address, the six-digit code,
-§9's third answer, and §10's relevance signal. It ends where `requireDraftToken` ends, and Session D
-opens with the claim. **It carries two of the phase's three deviations**, and both are recorded as
-deviations below so a later session does not delete them and does not read either as licence for its
-neighbours.
+### Founder and Creator flows
 
-`shared/src/vetting/email-code.ts` owns deviation 1's record and its constants;
-`shared/src/vetting/steps.ts` absorbed the reference's own step register rather than growing a second
-one beside it; `backend/src/transcription/index.ts` is deviation 2's port; the code rides
-`secure_tokens` through `issueFounderEmailCode`/`verifyFounderEmailCode` in the token service;
-migrations 0053 and 0054 add two enum labels and the fifth scope binding; `founder-flow-c.test.ts` is
-the artifact (21 tests). **`npm test` is 119 files and 3,100 tests, green in one run**, with
-§33.1.1–§33.1.9 passing **unchanged** and §33.11.1–§33.11.7 passing over eight addresses.
+- **A record collected on two screens is a record whose two copies eventually disagree** — and a
+  suite testing both copies makes that look correct. Every retired surface became a **redirect**
+  rather than a deletion, because §27 emails and Appendix C walk steps point at the old addresses.
+- **The register is the single source for the router, the help drawer, and §33.11.** Three
+  hand-written lists is two chances to disagree, and the disagreement shows up as a help card that
+  jumps somewhere that does not exist.
+- **A page appears in the register when something renders it, never before** — `events.ts`'s rule
+  applied to a screen.
+- **Where a Founder can BE is a different list from what they answer.** Resume positions and answer
+  keys diverged the moment a screen came back, and the stale mapping resumed people one screen past
+  where they stopped.
+- **The supplier is derived from the actor, never from the request.** A request that could declare
+  its own provenance could declare a flattering one.
+- **§9's Competition has nowhere to be prefilled** — no `competition_prefilled_*` column exists, the
+  prefill function takes two parameters, and a CHECK pins the supplier to `founder`. Three
+  independent locks plus a tree-wide scan (§33.1.5).
+- **The campaign type lock is a trigger**, so it holds for every future phase and every support
+  script. A wrong type **archives and restarts**; there is no migration path (§33.1.7).
 
-- **Deviation 1: the code verifies an email, and the scoping IS the design.** §5.2 gives the Founder
-  "Email/password or Google OAuth" and there was no OTP anywhere in this product: no `token_scope`
-  value, no Better Auth plugin (`plugins: []`, and `auth.ts` records that the magic-link plugin is
-  *deliberately* unused), no `email_ownership` value meaning verified. §5.2's own second sentence,
-  though, reads *"A private invitation or Google sign-in may establish invited-email ownership. A
-  future public onboarding route requires email verification."* — so verification is a mechanism §5.2
-  anticipates; what is new is applying it on the INVITED route. It **creates no account**: account
-  creation stays where §10 puts it and `completeClaim` is untouched, asserted rather than asserted-to.
-  The case that actually matters is the Founder who types a DIFFERENT address, which §5.2 has been
-  recording as `self_supplied_unverified` precisely because nothing could verify it.
-- **`founder_email_verification` already existed, and its `never` decision is unchanged.** §27.3
-  names "public-route email verification if later enabled" and 22a recorded it in `unsent.ts` because
-  §5 admits Founders by invitation only and `disableSignUp: true` closes that route. **That reason is
-  still true**, so the new key sits BESIDE it rather than reusing it — the invited route is a
-  different fact, and the coverage partition proves both.
-- **A six-digit code cannot be stored the way a 43-character token is, and that is the trap.**
-  `secure_tokens_hash_idx` is UNIQUE on `token_hash`; a plain SHA-256 over six digits has 10⁶
-  possible digests, so two live codes would eventually collide on that index — the second Founder
-  sent `418306` would get a constraint violation — and the digest itself would be a rainbow table one
-  row wide. The stored value is an **HMAC keyed on `BETTER_AUTH_SECRET` over the draft id, the
-  normalised address and the code**, domain-separated by a fixed label: `interviews/reference.ts`'s
-  construction, for the same reason. Binding the address in buys the third thing — a code stops
-  working the moment the Founder changes the address it was sent to, which is the correct answer
-  rather than an edge case, because the thing being verified is an address.
-- **The lookup is by DRAFT, not by hash, and the attempt counter is why.** The obvious
-  implementation hashes the submitted code and looks the digest up; a wrong code then hashes to
-  nothing, so there is no row to count the attempt against — and `failed_attempts` is the entire
-  reason 10⁶ is large enough. So the live row is found by draft and the comparison is `safeCompareHex`
-  in application code, which is the defence-in-depth case §28.1 names by hand. Six wrong guesses
-  finish the code; the counter is on the row, so it survives a restart and cannot be reset by
-  changing address, IP, or browser.
-- **One rejection, one status, one body, and the limiter answers it too.** Wrong, expired,
-  already-used, locked-out, never-requested and requested-for-a-different-address are the frozen
-  `TOKEN_REJECTION_BODY` at 401, padded to `REJECTION_FLOOR_MS`. The suite compares **serialized
-  bodies** rather than fields, because an extra key that varies is the same oracle as a different
-  sentence. The ASK route answers `EMAIL_CODE_ACK` at **202 for every outcome including over the
-  limit** — Phase 04's rule, and it answers before it works, `magic-link-reissue.ts`'s shape for its
-  reason. There is deliberately **no client-side "is this code right" check**: that is the
-  enumeration oracle the frozen answer exists to prevent, running in the browser.
-- **The route sends mail, so it takes the RESEND limiter, and the limit became configuration.**
-  Five an hour per address covers a person whose first mail landed in spam and does not cover a
-  script. `emailCodeLimit` exists because the suite shares one client address and would otherwise
-  exhaust the allowance after five requests, leaving every later test silently receiving no code —
-  which is exactly what the limiter's own test drives on purpose, on its own harness.
-- **`emailOwnership` is re-derived only when the address CHANGES**, and that was a latent bug this
-  session exposed rather than introduced. Recomputing on every save was harmless while all three
-  states were provenance — the answer never differed — and stopped being harmless the moment
-  `code_verified` existed: a Founder who verified and then typed the same address again would have
-  silently dropped back to `invited_link` and been asked to verify what they had just verified. The
-  other half must not be lost: changing the address DOES re-derive, so a verified state can never
-  outlive the address it was granted for, and the code agrees, because its hash binds that address.
-- **Deviation 2 transcribes, and the four things that keep it there are absences.** No generate,
-  summarize, rewrite or suggest — one method on the port, and a source scan over
-  `transcription/` and `vetting/` that strips comments first (the files explain at length what they
-  refuse to do). **The audio is not kept**: §25.8 defines seven retention windows and none covers a
-  dictation recording, so inventing one would be §1 rule 6 in the other direction — there is no
-  column, no bucket key, and no job, asserted in `information_schema`. The transcript lands in the
-  textarea as ordinary editable Founder text with supplier `founder`, which is what keeps §9's "never
-  represented as AI-generated" true on the one step §9 says it twice about. And it touches no Stripe
-  gateway, so it needs no §34 disposition.
-- **The port throws, and the configured check runs BEFORE the body parser.** `unconfiguredTranscription`
-  refuses exactly as `unconfiguredStorage`, `unconfiguredScheduler` and `unconfiguredTransport` do —
-  and an unconfigured deployment refuses without buffering the ten megabytes it is about to refuse.
-  `TRANSCRIPTION_UNAVAILABLE` is one constant, so the sentence on the screen and the reason in the
-  log cannot disagree, and it rides the vetting READ as `transcription: { available: false }` — the
-  Affiliate evidence uploader's arrangement, because a 503 at the point of use arrives after somebody
-  has already pressed record. The §6 prerequisites PANEL that would block on it went with the old
-  Admin dashboard on 2026-08-10, and R2, Cal.com and the email transport are all in the same
-  position: the refusal is the control that is actually running.
-- **The step register absorbed the reference's, rather than growing a second one.** `VSTEPS` carries
-  `kind`, a per-campaign-type hint and a placeholder for the same three ids `VETTING_STEPS` already
-  names, so they land there — two registers over the same three ids is two answers to what a step is,
-  and the copy in the one nobody updated is the copy that eventually ships. `prefillable: false` on
-  Positioning is the register's copy of a fact the database states three more ways, and the suite
-  asserts they agree. §12's five bonus answers stay in `OPTIONAL_ITEMS`: the flow presents all eight
-  as one sequence, and a merged register would quietly make §12 completion a Founder assertion.
-- **Screens 7–8 became nothing, and the interim `/vetting` address is retired.** The reference asks
-  Problem and Solution a second time; §9 has one of each. Positioning is its own page and it submits
-  — §9's lock is at submission and §10 puts the relevance signal "immediately after valid vetting" —
-  and a missing earlier answer is named there with a link back to the page that owns it.
-  `/draft/:token/vetting` redirects to it rather than 404ing, because the address shipped in Phase 07.
-- **The code screen keeps a submit control as well as the auto-advance.** The reference has none: the
-  sixth digit fires the check. That is right for the common case and cannot be the only path — a
-  rejected code leaves six full boxes and nothing to press, and a keyboard or screen-reader user needs
-  a control they chose to operate (§28.5, §33.11.4). Six inputs is the accessibility problem rather
-  than the layout problem: every box is labelled `Digit N of 6`, paste fills all six (a per-box
-  `maxLength=1` swallows five of them otherwise), backspace in an empty box clears the one before it,
-  and arrow keys move between them.
-- **`'418306'.includes('')` is TRUE**, so the obvious completion guard looked right and never fired
-  once. The check is over the slots.
-- **§10's screen states its own limits and refuses two things the reference draws.** The hero is
-  `3 Creators` (§3.1: `affiliate` is customer-facing-banned and a Founder is a customer), the six
-  `POSSIBLE_CREATOR_RESULT_DISCLOSURES` render in full, and zero and unrecorded produce the identical
-  screen — the server collapses them before serialization, and the suite compares rendered output.
-  Refused: `In your category are ready to promote this`, which claims people who have agreed to
-  nothing are ready to promote something (§10, §30), and the category breakdown, which
-  `possible_creator_results` does not hold. It **gates nothing**: the way forward is offered in both
-  states, because §10 orders the result before account creation and says nothing about blocking one.
-- **The email screen's headline is refused, and it is the quiet one.** `To save your progress verify
-  your email:` names the wrong mechanism — progress is already saved, by §9's autosave through the
-  draft token, and the invitation link is what brings a Founder back to all of it. §1.4 in one line,
-  and it is the line somebody reads while deciding whether they can close the tab.
-- **The browser pass found four defects and nothing else could — the sixth rebuild in a row.**
-  `gap: var(--sp-20)` against a scale with no `--sp-20`, so the declaration was dropped and the gap
-  collapsed to zero on the screen with the most stacked prose in it. The message badge sitting on the
-  primary control at 1280×520, because its stage clearance was inside the mobile media query while
-  the badge is fixed at every width. `.field-hint` at 2.2:1 carrying a sentence that changes what
-  somebody types — and the first fix for that was itself a defect, since `.ff .field-hint` ties
-  Session B's `.ff-panel .field-hint` on specificity and wins on order, painting the dark panel's
-  hint mid-green on dark green (`:where(.ff)` contributes nothing, which is exactly what was needed).
-  And `.cr-file { background: var(--paper) }` — a token this file has never defined, so the Affiliate
-  workspace's evidence rows have had no background since 2026-08-17.
-- **Two stylesheet scans now run on every commit** (`a11y.test.tsx`), because a silently-invalid
-  stylesheet has now shipped twice: every CSS comment opens and closes exactly once and never nests
-  (Session B's `*/`-inside-a-comment killed the whole `PHASE 34` token block), and every `var(--x)`
-  with **no fallback** names a property the file defines. `var(--x, fallback)` is exempt, and the
-  distinction is the point — `--track`, `--sweep`, `--p` and four others are set inline by a
-  component and carry their own default. Both scans strip comments first, because the first version
-  failed on its own comment naming `var(--paper)`.
+### Frontend, CSS, and motion
 
-**What Session C deliberately did not build:** any screen past the match; the claim surface (Session
-D's, and the flow's `Set up your account` goes to the existing `/draft/:token/claim`); any change to
-`completeClaim`, the type lock, the retention sweep, or the token model beyond one scope and one
-`email_ownership` value; and a fifth `email_ownership` state — the fourth is the only one that means
-verified and there is exactly one path that sets it. §33.1.8 is what stops this deviation drifting
-onto a phone number: `user.phone_verified` stays CHECK-pinned false, `founder_claim_profiles` still
-holds no column matching `%verif%`, and the suite re-asserts both. **If that test ever needs editing,
-that is the signal deviation 1 has grown past what was authorised.**
+- **jsdom has no layout.** Fourteen consecutive rebuilds each found at least one defect that only a
+  real browser could see, and axe could see none of them. When a session's deliverable is a
+  surface, the browser pass is not optional polish — it is the verification.
+- **Chrome will not give you a 320px viewport on Windows.** `--window-size=320` reports 489.
+  Use `Emulation.setDeviceMetricsOverride`, or render inside a 320px iframe.
+- **`textContent` is not what a reader sees** — it concatenates adjacent nodes with nothing between
+  them, so a `dt`/`dd` pair reads as one run-on word. Every scanner reads through `visibleText`.
+- **Phase numbers in `proovd.css` collide.** Two sessions in parallel derive the same next number;
+  it has happened three times, twice producing committed conflict markers that silently killed
+  every rule after them. **Always** run
+  `grep -oE "PHASE [0-9]+" frontend/public/proovd.css | sort -u -V | tail -1` and take the next.
+- **A silently-invalid stylesheet has shipped three times.** `a11y.test.tsx` now scans for comment
+  balance, brace balance, undefined `var()`, and conflict markers — added after `*/` inside a
+  comment killed a token block, an unclosed `@media` swallowed a whole phase, and a merge
+  interleaved two sessions' rules.
+- **A `.btn`/`.tag` is `inline-flex`; a flex item in a column is stretched** by the default
+  `align-items: stretch`. Four sessions lost a pass to this. **A `.btn` is `overflow: hidden`**
+  (it hosts the fill sweep), so a squeezed row clips its own label rather than wrapping.
+- **`.wrap` is `min(90vw, 1600px)` — a VIEWPORT width**, correct at top level and wrong nested.
+  Three surfaces overflowed on it. **`min-width: auto` on a grid item** is why a single-column grid
+  can be wider than its container; use `minmax(0, 1fr)`.
+- **A hardcoded light token inside `mode-dark` is invisible to axe** — the accessible name is
+  correct and contrast is computed against the element's own declared background, not the band
+  showing through it. Five phases each recorded a version of this.
+- **Known product-wide contrast gaps, deliberately NOT fixed on one surface:** `--moss` 3.37:1,
+  `--grey` ~2.2:1, `--mode-link` (= `--brand`) 1.46:1, `.btn--secondary` 1.46:1, `state-panel__key`
+  2.18:1, `Tag`'s mint pairs. Re-toning any is a product-wide decision with its own pass. The rule
+  applied instead: **a line that states a rule takes `--dark`; a caption stays quiet.**
+  `.btn--primary` at 1.44–1.46:1 is the documented, scoped **tech-stack §3.6 exception** for brand
+  fill — verified as recorded, and it covers brand fill wherever it appears, not just buttons.
+- **React 19 StrictMode double-invokes effects.** Any animation that measures the DOM must clear
+  its transform before measuring, or the second invocation measures mid-flight. `g.from` takes the
+  **current** state as its destination, so a double-invoked `from` animates nothing and snaps.
+- **`event.currentTarget` is null inside a functional `setState` updater** — the synthetic event is
+  recycled before the reducer runs. This threw into the ErrorBoundary on the first keystroke of a
+  control answering a review that blocks a payment.
+- **`useButtonProgress` hands the runtime the PROMISE, not the callback.** A callback-shaped mock
+  resolves immediately and swallows the error, so every server-refusal assertion behind it passes
+  for the wrong reason.
+- **GSAP is the only motion runtime** and is vendored, never imported from npm. Motion in React
+  goes through `MotionProvider`; skipping it makes animations die silently as the app grows.
 
-### …and the account, and §12 — Session D of six (§10, §12, §9, §28.4, §28.5, §33.1, 2026-08-18)
+---
 
-Session D is the boundary the whole flow turns on and the five answers behind it: §10's account
-claim, then Visuals, Branding, Interview, Story and Socials, with Last look reviewing all eight.
-**It adds no migration, no commercial rule, and one route** — the same transcription port behind
-the Founder guard, because §10's claim invalidated the token the Positioning step's uses.
+## Toolchain (tech-stack §2, §11, §13)
 
-`shared/src/vetting/answers.ts` is the eight-answer sequence over two registers that stay two;
-`flow.ts` gained `param`, `founderFlowReachableFrom`, four pinned sentences and five absences;
-`backend/src/workspace/projection.ts` carries §9's three answers and the dictation absence;
-`frontend/src/surfaces/founder-flow/` gained `ClaimStep`, `DateOfBirthField`, `AnswerPage`,
-`SetupUploads`, `Dictation` (lifted out of `PositioningStep`), the five steps, `LastLook` and
-`useSetup`; `PHASE 34`'s Session D block the styles; `founder-flow-d.test.ts` (13) and the flow
-suite's Session D half (33 of its 74) are the artifact. **`npm test` is 120 files and 3,206 tests,
-green in one run**, with §33.1.1–§33.1.9 and §33.11.1–§33.11.7 passing over fifteen addresses.
-
-- **The parameter changes at the claim, and that is what stage 2 IS.** Every page up to and
-  including the claim is addressed by the draft token; §10's successful claim invalidates it, and
-  every route behind the five §12 answers is `requireRole('founder')`. So `FounderFlowPage` gained
-  `param: 'token' | 'campaignId'`, one `founderFlowPath` substitutes whichever the page declares,
-  and a call site cannot pass the wrong one by writing the wrong template string — there is no
-  template string. `founderFlowReachableFrom` compares the two pages' parameters rather than their
-  stage numbers, so it stays right when stages 4 and 5 land.
-- **The help drawer keeps the reading and drops the jump.** From a stage-3 page every earlier card
-  needs an address that no longer exists, and offering it anyway would send somebody to the
-  unusable-link page from their own help drawer. An unreachable card renders
-  `FOUNDER_FLOW_EARLIER_STAGE_CLOSED` where the control would be (§1.4) — the half worth having
-  survives, which is the whole point of the drawer.
-- **`completeClaim` is not split, reordered, or made partial, and the session did not touch it.**
-  One transaction, the idempotency key claimed first, `claimDraft` inside it, the conditional
-  `vetting_submitted → account_claimed` UPDATE, the consents, the audit row. `vetting.test.ts`
-  passes **unchanged**, which is a stronger statement than a copy of it passing in the new suite —
-  so `founder-flow-d.test.ts` deliberately does not re-drive §33.1.9.
-- **Signing in afterwards is the browser doing what a person would.** §10's claim creates the
-  account and invalidates the token; it does not mention a session and `completeClaim` issues none.
-  The flow continues into `requireRole('founder')` territory, so somebody has to sign in — and
-  rather than put a second session-minting path on the most carefully guarded transaction in the
-  product, the screen posts the password the Founder just chose to `/api/auth/sign-in/email`. The
-  real route, its real rate limit, its real origin guard, no new server code, and no access the
-  password itself would not already buy. If it fails the ACCOUNT still exists, and the screen says
-  exactly that rather than implying the claim was lost.
-- **The claim still refuses in the open, and that is the correct state.** All eight §31.4 documents
-  are `draft`, a consent may cite only a published version (a trigger), so `completeClaim` returns
-  `policies_unpublished`, the control is not rendered at all, and the screen says why. The browser
-  fixture ships the three drafts for the same reason: a stub with no policies at all is a state the
-  product does not have.
-- **The date of birth is a text field with a calendar, not a calendar with a text field.** The typed
-  `YYYY-MM-DD` box is the primary path — it is what a password manager fills and what a screen
-  reader handles without any of the rest — and the calendar is a **disclosure** below it rather than
-  a popover, which removes positioning maths at 320px and a focus trap around something that blocks
-  nothing. The grid is one tab stop with arrows inside it, PageUp/PageDown for months,
-  Shift+PageUp/PageDown for years, and a year mode that pages by decade. Every calculation is on
-  `{ y, m, d }`: `new Date('1990-01-31')` parses as UTC midnight and renders as the 30th west of
-  London, which on a birthday field is an off-by-one only some Founders would ever see.
-- **The 18+ check is a courtesy over a recorded representation, and it gates nothing.** §10 collects
-  the date and lists the representations separately, as things the Founder states; Proovd derives no
-  age and never claims to have verified one, which is what the Admin Eligibility tab already
-  renders. `FLOW_AGE_IS_YOUR_STATEMENT` says so beside the field, and `completeClaim` refuses on a
-  missing date and never on a number this browser computed.
-- **§12 completion is decided by the server, and the screens say so where the checkbox is not.**
-  No control on any of the five sets `complete`, no patch key carries one, and `evaluateWorkspace`
-  re-derives all five on every save — the suite posts `complete`, `storyComplete`, `decisionSource`
-  and `completedAt` at the route and counts five rows still false. `FLOW_COMPLETION_IS_DECIDED`
-  rides every answer page, because a Founder who went looking for the box needs telling.
-- **The saving is the SETTING, never `$2`.** The reference hardcodes `FEE_BASE=35`, `FEE_PER=2`,
-  `FEE_FLOOR=25`; all four are §6 settings and Phase 06's rule is that a hardcoded number is a bug
-  even when it is right. Every amount renders `state.fee`'s own decimal strings, the tag renders
-  NOTHING rather than an invented number when there is no calculation to read, and a source scan
-  over `frontend/src/surfaces/` (shipped files only — a fixture is the server's answer written
-  down) asserts no fee arithmetic exists there. The backend suite changes the §6 setting to 300 and
-  watches the subtotal move.
-- **The eight answers are two registers, and `FOUNDER_ANSWER_SEQUENCE` only orders them.** A §9
-  answer is text; a §12 answer is COMPLETE or not, decided from objective evidence, and worth a
-  discount. One `answers` table — or one register with `complete` on every row — would quietly make
-  §12 completion a Founder assertion, which is the one thing §12 exists to prevent. The register
-  holds the order, the owner, and the page; the copy stays where it lives, and the suites assert
-  the two key sets are disjoint and that no answers-shaped table exists.
-- **Last look offers nothing on the three §9 cards, and that is a mechanism.** `editableAfterClaim`
-  is false for every §9 entry because §9 locks them at submission and the route that wrote them is
-  behind the token the claim just invalidated — there is no address to send anybody to. The card
-  renders what was submitted and a support path. Deriving "the first three" from an index would
-  work until somebody reordered the register.
-- **The return-from-Last-look contract is in the ADDRESS.** `?from=review`, so it survives a reload
-  in the middle of an edit; a component flag would not, and this sequence's position is the URL
-  everywhere else. Both nav controls on an edit opened that way name Last look rather than the next
-  answer.
-- **`/campaigns/:campaignId/workspace` kept its address and lost its five steps.** Two Founder
-  surfaces over the same five items would be two places to answer one question — the reasoning that
-  deleted `DraftLanding` in Session B and the interim vetting surface in Session C. What is left
-  there is payout onboarding and the listing fee, which are **Session E's screens 25 and 20**, and
-  Last look's `All good` points at it for exactly as long as that is true. The Founder's own
-  campaign list opens Last look for the pre-money states and the fee surface for the two money ones,
-  which is what those states are about.
-- **Five of the reference's own elements are refused, each in `FOUNDER_FLOW_ABSENCES`.** `Username:`
-  as the legal-name label (it writes `legal_name`, which is what Stripe is later given, and calling
-  it a username invites a nickname into the field the seller of record is identified by); the
-  details screen collecting three fields where §10 lists nine; the interview screen's own platform
-  tiles and time-slot chips (tech-stack §12 — the booking record is Cal.com's, and a second picker
-  is a second scheduler); the branding screen's draggable HSV plane (no keyboard equivalent, §28.5,
-  and §12 asks for saved direction rather than a colour value); and an edit affordance on all eight
-  Last look cards.
-- **The swatches are a READING of the colours box, not a second record.** A hex field appends a line
-  to the one `brand_colors` text and the chips render what that text contains, so there is still
-  exactly one record; each chip is `aria-hidden` with the hex beside it as its name, because a
-  colour a screen reader cannot say is not a label.
-- **Dictation on Story needed a second route and no second port.**
-  `POST /api/founder/campaigns/:id/transcribe` is the same `transcription` port behind the Founder
-  guard, with the configured check BEFORE `express.raw` so an unconfigured deployment refuses
-  without buffering ten megabytes it is about to refuse. Everything that keeps deviation 2 narrow is
-  a property of the port: one method, no generate/summarize/rewrite/suggest, and the audio is not
-  kept — no column, no bucket key, no job. The availability rides the workspace READ, because a 503
-  at the point of use arrives after somebody has already pressed record.
-- **The browser pass found two defects and nothing else could — the seventh rebuild in a row.** A
-  `.tag` is `inline-flex`, and an inline-flex FLEX ITEM in a column is stretched to the container
-  width by the default `align-items: stretch`, so `Not counting yet` and `Counts` rendered as bars
-  across the measure rather than as chips; axe reads a correctly named Tag either way. And §12's
-  completion rule is written as the finished state — `Your booking is confirmed.` — which is right
-  as a RULE and reads as a claim that it already happened when it is the lede under the question on
-  the one screen where nothing is booked (§1.4). Both now carry a label, and the register is
-  untouched.
-- **One Session C assertion was deliberately narrowed.** `registers Session C's four pages, all
-  still on the draft token` asserted that EVERY registered page was stage 1 — true while the draft
-  token was the only auth regime, and after Session D it would be asserting that Session D did not
-  happen. What Session C owns survives verbatim: its four pages, in order, after Session B's four,
-  every one of the eight token-addressed, and the claim as the last page the token reaches.
-
-**What Session D deliberately did not build:** any screen past Last look; screens 25 and 20 (the
-payout and fee surfaces stay at `/campaigns/:campaignId/workspace` until Session E gives them
-pages); any change to `completeClaim`, the §9 type lock, the retention sweep, or the token model;
-and a Google button — no Proovd surface has ever rendered one, and `completeClaim`'s Google path
-takes its identity from a real session rather than from a request body (`routes/vetting.ts`).
-
-### …and the money — Session E of six (§13, §24.6, §31.6, §11, §30, Appendix A.5, 2026-08-19)
-
-Session E is the two gates: §13's hosted payout onboarding, then §24.6's listing fee with Appendix
-A.5's consent. **It adds no migration, no commercial rule, and no route** — both screens run over
-services Phases 10b, 11 and 12 already shipped, and every deliverable is a surface, a register
-entry, a stylesheet section, or a test.
-
-`shared/src/vetting/money.ts` owns the two screens' registers and pinned sentences; `flow.ts` gained
-the two stage-4 pages and five absences; `qa/index.ts` split `founder_money` off `founder_workspace`;
-`frontend/src/surfaces/founder-flow/{PayoutsStep,FeeStep}.tsx` are the surfaces; `PHASE 34`'s
-Session E block the styles; `founder-flow-e.test.ts` (5), the flow suite's Session E half (16 of its
-93), and the repointed `listing-payment.test.tsx` (13) are the artifact. **`npm test` is 120 files
-and 3,236 tests, green in one run**, with §33.1, §33.3.5, §33.3.11 and §33.11.1–§33.11.7 all passing
-over seventeen flow pages.
-
-- **Stripe before the fee is a server refusal, not a preference.** `beginListingCheckout` refuses
-  without a complete `founder_seller` account and §23.1 orders the two campaign states the same way
-  (`stripe_onboarding_pending` precedes `listing_fee_pending`). The reference draws the fee at 20 and
-  payouts at 25, which is a payment control on a page the server declines. `founder-flow-e.test.ts`
-  drives exactly that refusal, asserts it names payout setup rather than failing generically, and
-  asserts no session reached the gateway.
-- **Only a complete account offers a way forward, and the other three states offer none.**
-  `listingFeeEligible` is true only for a COMPLETE seller account, so the fee page refuses for
-  `more_information_required`, `under_review` and `restricted` alike. A control that opens a page
-  whose server-side answer is already known to be a refusal is §1.4's failure with an arrow on it.
-  §13 is strongest about the restricted state — "no misleading ability to pay the listing fee" — and
-  the other two are the same fact with a happier ending, so they are treated the same way. The
-  reference draws only `not_started` and `complete`; the other three render through
-  `PayoutOnboarding`, which has held §13's four states since Phase 10b.
-- **The "Prepare:" list is a register because it is one input away from being a form.** §11 forbids
-  reproducing provider-controlled fields, §5.3 says Proovd stores statuses and IDs and "never full
-  bank details", §13 forbids storing identity documents — and `STRIPE_PREPARE_ITEMS` names what a
-  THIRD PARTY will ask for, on a page from the company that is not asking. Written inline it is three
-  strings a later session can give three inputs; written beside
-  `PAYOUT_PREPARE_COLLECTS_NOTHING` it means adding one deletes a promise. The suite asserts the page
-  renders no `input`, `select` or `textarea` at all.
-- **The walk found the README describing elements the prototype does not draw.** It says screen 20
-  shows "the original struck through … and a 'Saved $2' pulse toast when a bonus answer lands";
-  serving the prototype and reaching the screen shows one number, one savings line, one discount
-  button, and `Pay & Start`. Two stage-4 verdicts in the reconciliation had been written from the
-  README and were corrected. That is what the walk is for, on its fifth session.
-- **`You saved $0 by doing bonus tasks` is refused, and so is the discount arithmetic.** The
-  prototype renders the savings line whatever the saving is; telling somebody who completed none of
-  the optional answers that they saved nothing is the report they least need on the screen where
-  they can still change it. And `Discount $10 by completing tasks` is `fee() − FEE_FLOOR` computed in
-  the browser — Phase 09's named trap, and wrong in general: that subtraction equals the remaining
-  discount only because the reference's three constants line up, and §6 lets an operator change any
-  of them. The screen states a count of open answers and the per-item amount the server sent.
-- **`Pay & Start` is refused because Appendix A.5 fixes the action as well as the body.**
-  `resolveListingFeeConsent` returns `Agree and Pay US$[TOTAL]`, and the consent opens *"By clicking
-  Agree and Pay"* — any other label leaves that sentence describing a control that is not on the
-  page. `Continue` on the payouts-ready screen is refused for §33.11.4's own reason: it is in
-  `OBJECTLESS_CTA_LABELS` by exact match, and on that screen the next thing is money.
-- **Enter does not advance, and there is nothing to advance it.** The reference binds Enter to the
-  current page's primary action throughout; §30 forbids competing actions in a payment state and a
-  stray keystroke in a ZIP field must not authorize a charge. There is no key handler and no `<form>`
-  on the page, so the browser's own submit-on-Enter has nothing to submit either — the suite types
-  `97201{Enter}` and asserts no Checkout call and no consent.
-- **The message badge is absent from the fee page, and only from it.** It renders as a second
-  `.btn--primary`, and a small green button beside `Agree and Pay US$35.72` is exactly the
-  competition §30 means. Help is not lost: HELP is in the flow's top bar on every page, which is
-  where §27.1's sixth question is answered, and the suite asserts it is still there.
-- **`/campaigns/:campaignId/workspace` is retired to a redirect, not deleted.** Session D took its
-  five §12 steps and Session E takes its payout and listing-fee panels, so nothing is left to render
-  — and keeping it would be a second surface over the same money, which is what one address for §13
-  and §24.6 exists to stop. The address survives its component because things this session does not
-  own point at it: the §27.3/§27.4 campaign emails sent since Phase 12, Appendix C's §34 walkthrough
-  steps, and whatever a Founder bookmarked. `/draft/:token/vetting` was retired the same way in
-  Session C.
-- **The fee page is the ONE address for the listing fee, before and after payment.** It renders §13's
-  pre-payment surface, §24.6's record, and §31.6's cancellation decision — which is also why
-  Checkout's `success_url` and `cancel_url` moved onto it. Landing a payment on a redirect works and
-  is still wrong: the address a charge returns to is the one whose state it changed. The memory
-  gateway now records both URLs so that decision is one a test can see.
-- **`ListingPayment` and its thirteen-test suite moved rather than being deleted with the component.**
-  `listing-payment.test.tsx` reads Appendix A.5 out of the Spec file and compares it byte for byte,
-  which is the strongest assertion in the product about that text; it now drives the real route,
-  which additionally proves the page is reachable. §12's high-effort note went to **Last look**, not
-  to the fee page — it is derived from three of the answers on that page and changes nothing about
-  the listing fee, and §14.3's compensation ceiling is the one thing it touches.
-- **The QA sweep was rendering a payout panel that had never mounted.** The `/api/founder/payouts`
-  fixture was a flat object with different field names, so `result.payouts` was `undefined`,
-  `PayoutOnboarding` returned null by design, and §33.11 reported a surface it had not rendered —
-  the exact failure §33.11.1's stub-server check exists to catch, inside the harness itself. Both
-  payout fixtures are now the shape the routes answer with.
-- **`/stripe/return` gains a way back, and deliberately does not guess a campaign.** §32.2 gives
-  Connect one configured return address per deployment, so that page cannot know which campaign
-  somebody was working on — and it must not infer one, because a connected account belongs to the
-  PERSON and is reused across their campaigns (§11). The control names the campaign list, which
-  already opens each campaign at the surface its own state calls for.
-- **The browser pass found three defects and nothing else could — the eighth rebuild in a row.** The
-  page `h1` rendered smaller than `StatePanel`'s `<p>` head beneath it, so the title read as a
-  caption over the state (§33.11.2 passes either way: it counts `h1`s and checks levels, and the
-  panel head is not a heading). The cancellation control stretched to the full measure with its
-  label centred — Session D's `.tag` lesson on a button, since a `.btn` is `inline-flex` and a flex
-  item in a column is stretched by the default `align-items: stretch`. And the payouts screen named
-  the wrong destination in the sentence somebody reads immediately before leaving for a third party:
-  Stripe returns to `/stripe/return`, never to that page.
-- **One §27.1 gap the walk caught rather than the browser.** §31.6's free-cancellation deadline
-  rendered `toLocaleString()` — `1/1/2099, 11:00:00 AM`, the machine's locale, naming no zone at
-  all — on the one deadline on the page, after which cancellation stops being an automatic refund
-  and becomes a request an Admin decides. It renders local with UTC beside it now. The bug was
-  inherited from `ListingPayment` rather than introduced, which is exactly why moving a surface is
-  when to look at it.
-
-**What Session E deliberately did not build:** any screen past the fee; the §22.3 W-9 and payment
-surfaces (Phase 19b's, and not part of onboarding); a second refund path beside Phase 11's one
-`refundListingFee`; a campaign-scoped Connect return URL (the deployment's one address is §32.2's,
-and appending a campaign to it would be a caller-shaped value on a redirect); and any change to
-`beginListingCheckout`, `applyListingPayment`, the §12 lock, or the §31.6 window.
-
-### …and openness, the build, and live — Session F of six, the flow is complete (§14.3, §14.4, §15, §16, §17, §30, 2026-08-19)
-
-Session F is the last seven screens: the fixed-payment openness, the four build steps, and the two
-states between a submitted campaign and a live one. **The Founder onboarding rebuild is complete —
-twenty-four pages, from a pre-filled invitation to a live campaign.**
-
-`shared/src/vetting/build-flow.ts` owns the registers; `flow.ts` gained the seven stage-5 pages and
-nine absences; `backend/src/campaign/openness.ts` is deviation 3's one writer and one read, with two
-routes on `/api/founder`; `frontend/src/surfaces/founder-flow/` gained `CreatorPaymentStep`,
-`BuildStepPage` + `useBuild`, `VoiceStep`, `ThresholdStep`, `FaqsStep`, `RewardsStep`,
-`InReviewStep` and `LiveStep`; `PHASE 34`'s Session F block the styles; `founder-flow-f.test.ts`
-(11) and the flow suite's Session F half (13 of its 106) are the artifact. **It adds no migration —
-Session A built the record and no service, and this is that service.**
-
-- **Twenty-four pages, not twenty-six, and the two missing ones were decided in Session C.** The
-  reference's screens 7 and 8 ask Problem and Solution a SECOND time; §9 has one of each, so C built
-  nothing for them rather than a second surface over one record. The register now holds every page
-  the flow has, which is what makes the help drawer's "everything before it" a fact rather than an
-  aspiration.
-- **The openness is not a choice of pay structure, and that is the whole of deviation 3.** The
-  reference draws a pager over `No upfront fee` / `Upfront fee` with a Select button. §16 makes the
-  optional fixed Creator payment the CREATOR's request, accepted bilaterally through one §14.2
-  proposal version — so a Founder picking one during onboarding, before the listing fee is even
-  paid, would be making the offer only a Creator may make. What is collected is an openness: three
-  answers, no amount, no percentage, no proposal reference. The suite posts `fixedPaymentCents`,
-  `amountCents`, `basePercent` and `proposalVersionId` at the route and then asserts the table's
-  exact column set — the absence is the enforcement, not a filter somebody could widen.
-- **`upfront` is refused eleven times over, and §3.2's own replacement ships instead.** The word is
-  banned in every audience INCLUDING identifiers, §33.11.3 scans the built bundle, and §3.2's
-  mandated replacement — `optional fixed Creator payment` — is also §24.7's name for the record. The
-  Affiliate workspace resolved this identically on 2026-08-11, where the reference had *mandated*
-  the banned term.
-- **An Idea campaign gets §14.3's explanation and no control at all.** The server answers
-  `applicable: false`, the screen renders the explanation, and there is nothing to disable. The
-  route refuses by name, and 0052's CHECK and shape trigger refuse regardless — the trigger is what
-  makes the CHECK mean anything, since `campaign_type = 'pre_launch'` is otherwise satisfiable by
-  writing that value onto an Idea campaign.
-- **`goal` is the third time, and it does not appear.** Sixty-five occurrences in the reference,
-  including `goalAmount`, `goalInput` and `BPAGES[1] === 'goal'`. §3.2's last paragraph binds
-  identifiers and §33.11.3 reads the built bundle where a prop name survives minification — the
-  Campaigns hub hit it with `progress.goal`, campaign-page-v2 with `PRIVATE BETA GOAL`. A narrower,
-  earlier scan runs in `founder-flow-f.test.ts` so a failure points at the file rather than at a
-  build artifact.
-- **The threshold is a COUNT, and the reference collects an amount.** §4.1: "a number of Backers,
-  not a dollar amount". The reference labels it `(USD)` with `Ex: $1,000` and `Min. $500` — a
-  different commercial instrument with an invented floor, since §14.4 fixes no minimum at all. The
-  field strips everything but digits and `ORDER_THRESHOLD_IS_A_COUNT` sits beside it.
-- **The voice chips compose ONE field rather than becoming a second record.** `campaign_build.
-  brand_voice` is a §14.4-required text column that already means exactly this. A repeater beside it
-  would make §14.4's field and the Founder's chips two answers to one question, and the one nobody
-  updated is the one that ships. The textarea is always present, always editable, and always the
-  record. `Trustworthy` stays in the suggestions and the reason is recorded: §3.2's ban is on `trust`
-  as in *held in trust*, and the scanner is word-bounded.
-- **Neither cap ships.** §14.4 caps neither rewards nor adjectives; the reference stops at three and
-  six. A Founder with a fourth reward would be refused by a number nobody agreed to (§1 rule 6), and
-  the three-card pager is a layout. If product wants a cap it is a §6 setting with its own decision.
-- **The four steps do not complete a build, and the last one says so.** Ten shared fields are
-  required plus four for Idea or one for Product; these four cover three. The backend suite writes
-  everything the four steps write and asserts `buildStatus` is still `in_progress` with `title`
-  among what is missing. `BUILD_STEPS_ARE_NOT_THE_WHOLE_BUILD` renders on the last step and its
-  forward control opens `/campaigns/:campaignId/build`, which lists exactly what is left from the
-  server's own `missing`.
-- **Two build surfaces, permanently, and one rule keeps them honest.** Both this sequence and
-  `/campaigns/:campaignId/build` call the same `fetchBuild` / `saveBuild` / `saveFaq` /
-  `saveRewardPackage` and read the same three required-field registers. A field added to one and not
-  the other is exactly the drift that makes two surfaces a mistake rather than a choice.
-- **The threshold step is Idea-only, and the walk is derived.** `buildFlowStepsFor` decides which of
-  the four a campaign passes through, so a hand-written `voice → threshold → faqs` cannot send a
-  Product Founder to a page with nothing on it. One who types the address anyway is told which step
-  IS theirs and offered it — no field to disable, because §14.4 gives them no public threshold.
-- **Nothing in the flow advances on a clock, and the check is the property rather than the word.**
-  The reference auto-advances both waiting screens after five seconds and flips three Creator chips
-  to accepted on the way. The first draft of the scan banned `setTimeout` outright and caught
-  `CodeStep.tsx`, whose timer counts a resend cooldown down by one and moves nobody anywhere — a
-  check that has to be silenced is worse than no check. It asks what F4 actually asks: no timer
-  CALLBACK navigates, and the two waiting screens carry no timer of any kind.
-- **The roster chips are the recorded states.** §14.5's projection — seven columns, no email, no
-  legal name, no internal status word (§11, §3.1). A Creator nobody has heard from renders as
-  waiting with §14.5's own word, rather than animating into an acceptance that has not happened.
-- **`You're live` is unreachable without a §17 launch record.** The screen reads `campaigns.status`
-  and decides nothing; a campaign that has not launched is told where it actually is and offered the
-  waiting screen. The flow ends by handing over to §20's campaign home, which is the surface a live
-  campaign is operated from.
-- **There is no second review screen, because there is no second review.** The reference draws
-  `Application in review`, about the FOUNDER. §15 approves a campaign — it has review rounds,
-  grouped feedback with an owner and a deep link, and an immutable approved snapshot. A screen
-  saying a person is under review describes a decision this product does not make.
-- **The browser pass found four defects and nothing else could — the ninth rebuild in a row.** The
-  waiting screen's `h1` and `StatePanel`'s head read as two competing headlines (Session E's
-  inversion, on a different screen). `Accepted` rendered QUIETER than `Reviewing`, because `Tag`'s
-  `moss` is a mid-green fill with pale text while the default is dark ink on light — backwards on
-  the one screen where a Founder is looking for who said yes. The `<legend>` asking the screen's own
-  question lost its size to UA styling. And the live screen's two controls sat left of centre,
-  because Session B's `margin-left: auto` on a nav primary fights a centred lockup.
-
-**What Session F deliberately did not build:** a migration (Session A's 0052 is the record, and this
-is its first service); any Admin surface over the openness (it is read when recruiting, and a later
-phase asked to read it as a default, a filter or an eligibility condition is asking for the §1 rule 6
-violation the missing columns exist to prevent); a second writer for any §14.4 ingredient; a cap on
-rewards or adjectives; and any change to §15's review, §16's readiness, §17's launch, or §14's
-Creator decisions — this flow waits on all four and touches none of them.
-
-### The §34 live-mode surface was built (§34, §2.1, §6, Appendix C, post-Phase-24 change, 2026-08-19)
-
-Phase 24 built the gate, the pilot, the preflight and the Appendix C walks, and recorded its own
-gap: *"the API exists and is tested; there is no React page for it yet… §1.1 does [name one], so
-this is a real gap rather than a decision."* This is that page. **It adds no route, no register and
-no record** — every list it renders comes from `shared/src/live-mode/index.ts` and every fact from
-the read Phase 24 already served.
-
-`frontend/src/features/admin/live-mode/{api,LiveModePage}.tsx` are the client and the surface;
-`/admin/live-mode` is the route and the sixth nav entry; `PHASE 35` the styles; `live-mode.test.tsx`
-(13) is the artifact. **`npm test` is 122 files and 3,350 tests, green in one run.**
-
-- **There is no override on it, and the enable form does not exist while the gate is shut.** Not
-  disabled — absent, with the blocking conditions rendered where it would be. §34 is released by
-  satisfying it, and a disabled control is one somebody looks for a way around; the suite walks
-  every button on the shut page and asserts none of them says `override`, `proceed anyway`,
-  `force`, `skip`, or `enable live`. That is the `/admin/prerequisites` posture since Phase 06a,
-  made checkable.
-- **Every list is the register's.** The eleven conditions, the three preflight checks, the five
-  rollback-plan fields and Appendix C's forty-nine steps all render from `@proovd/shared`: the
-  server sends the STATE and the register supplies the definition. A twelfth condition would appear
-  here without this file being edited, and a removed one could not linger — the same arrangement
-  that keeps `/admin/measurement`'s definitions and §26.6's nine lines honest.
-- **Each row says which KIND of evidence it rests on, and where it cannot be automated, why.**
-  §1.4's whole point in Phase 24: `automatic` is a fact this process decides on every read, `suite`
-  is a fact about a CI run, `recorded` is a human judgement. An `automatic` condition therefore
-  offers no control to file an answer at all — an attestation cannot outlive the fact it describes,
-  and a control there would record a signature that goes stale the moment a policy is revised back
-  to draft.
-- **The frozen refusal renders verbatim.** `LIVE_MODE_BLOCKED_MESSAGE` is what a refused live
-  operation carries, and it is what an Admin reads on the shut gate. A softer paraphrase on the
-  operator's own screen would be the first place somebody learned the gate was negotiable.
-- **§2.1 renders in whichever direction is true, derived rather than stored.** The read computes
-  `approvalCopyState` from condition 1, so "the conditional sentence is correct" and "it is now
-  stale" can never disagree with whether approval exists. Both directions are asserted.
-- **Appendix C's `undocumented_knowledge_required` is a control, not a checkbox.** Its condition is
-  "without undocumented operator knowledge", so a walk that only succeeded because the walker knew
-  a trick is a FAILED walk. Typing anything into that field DISABLES `It worked` and leaves
-  `It did not` — the surface makes the same combination unreachable that the service refuses and a
-  CHECK makes unrepresentable. `unwalked` stays its own state beside `failed` (§16a).
-- **`.page-title` was used by two files and defined by nothing.** `StripeReturn.tsx` has carried it
-  since Phase 10b, so the payout return page has been rendering its `h1` SMALLER than the
-  `.section-title` beneath it for as long as it has existed. axe cannot see it — the heading level
-  is right and the accessible name is correct either way — and only a browser pass finds it. It is
-  the `.sr-only` defect of 2026-08-11 in a different class, fixed at the definition so the payout
-  page gets it too, and filed in `PHASE 35` because that is where it was found.
-- **The Admin shell's 320px overflow is confirmed and is not this page's.** At 320 the topbar,
-  wordmark and nav clip along with the content, exactly as the Affiliate record shell does — a
-  PHASE 25/26 shell change with its own six-workspace screenshot pass, not a defect of a surface
-  mounted inside it.
-  **Fixed 2026-08-19 in `PHASE 38` — and the diagnosis above is half wrong, which is why it is kept.**
-  The topbar and wordmark never clipped and the document never scrolled sideways. What actually
-  happened was the nav SCROLLING with no affordance from 900px down, and this page's own
-  `Section`/`.wrap` computing wider than `.views` and being clipped. See the last section of this
-  file: a guess about what a picture showed, versus a measurement of every box.
-- **The `Blocking` tag is the prominent one, and that is the opposite of the Founder flow's choice
-  on purpose.** On §20's waiting screen the affirmative state is what a Founder is looking for; here
-  the outstanding condition is what an Admin is looking for. Same reasoning, opposite outcome.
-
-**What it deliberately does not do:** open the gate by any path; skip, bypass or bulk-file a
-condition; cache anything (the read runs on every load, because a cached gate is a rollback that
-does not take effect); or offer a second enablement while one is live — the enable form is replaced
-by the pilot once one exists, and the database refuses a second regardless.
-
-### Vetting, the type lock, and the account claim (§9, §10, built Phase 07)
-
-The first real Founder journey, and the first irreversible decision in the product. `shared/src/vetting/steps.ts` owns §9's five-item sequence and its copy; `backend/src/vetting/` owns the record; `frontend/src/surfaces/draft/` owns the three surfaces.
-
-- **Competition has nowhere to be prefilled, in three places.** §9 states the rule twice and §33.1.5 tests it. `campaign_vetting` carries `problem_prefilled_*` and `solution_prefilled_*` and **no `competition_prefilled_*` of any kind** — absent, not unused; `prefillVetting` takes two parameters and there is no third; a CHECK constraint pins `competition_supplier` to `founder` so even a hand-written `UPDATE` cannot record it as Proovd's. A test scans the tree for a fourth way in. It is the one field that proves the Founder did their own thinking.
-- **The type lock is a database trigger, not a service rule.** Submission sets `campaigns.type` and `type_locked_at` in one conditional `UPDATE`; `enforce_campaign_type_lock` then refuses to change either, forever, for every future phase and every support script. §9: "No campaign-type migration exists." If a change proposes a "convert campaign type" affordance, that is §1 rule 6.
-- **A wrong type archives and restarts; it never converts.** `archiveAndRestartVetting` marks the old campaign `archived_at`/`replaced_by_campaign_id` and creates a **new campaign, draft, and empty vetting record** for the same prospect. Archive is deliberately *not* a `campaigns.status` value — §23.1 names no destination and inventing one is forbidden — so it is its own dimension beside the lifecycle, like §23.3's payment flags. The service reads no association, reward, payment, or consent table at all: the safest implementation of "nothing is copied" is code with no idea they exist. After `listing_paid_at` it refuses and says the cancellation and refund rules control (Phase 11's).
-- **The possible-creator result is a recorded Admin assessment, not a query.** §10 is explicit that it "is not the recruited/accepted roster", and Affiliate recruitment is Phase 08 — so there is nothing to count and a formula over an empty table would produce a meaningless number. A named Admin records the count *and its basis* into the append-only `possible_creator_results`; §1.3 is what makes that valid. **Zero and unrecorded produce the identical Founder-facing state** — a waiting state owned by Proovd — because telling them apart would tell the Founder a number §10 forbids showing. The basis never leaves Admin.
-- **The claim is one transaction anchored by two mechanisms.** `idempotency_keys` on `founder_signup_complete:<campaignId>` makes the event singular under retry; Phase 04's conditional `claimDraft` — which now takes an executor, so it runs *inside* the transaction — settles the race between two requests holding the same link. Better Auth's account creation happens **before** the transaction on purpose: a leftover account with no claim is recoverable by clicking the link again, while a claimed draft with no account strands someone behind a dead link.
-- **A draft policy blocks the claim, in the open.** A `policy_consents` row may cite only a `published` version — a trigger, not a service rule, because the failure is silent. All eight documents are drafts, so the claim refuses with `policies_unpublished` and the surface renders the reason and says nothing was lost. Do not soften this, do not stub a consent, do not accept a draft.
-- **The vetting record and the claim profile are draft content, so §25.8 sweeps them.** `anonymiseDraft` nulls the answers, the profile, *and* `draft_field_edits.prior_value`/`new_value` — that table holds a verbatim copy of every version of every answer, and emptying the source while leaving the history would be a retention policy with a hole in it. `field`, `supplier`, `edited_by`, and `occurred_at` are outside the grant, so the fact of each edit outlives its text.
-- **Provenance history is a trigger.** `record_vetting_edits` and `record_claim_profile_edits` write `draft_field_edits`; the anonymisation write is exempt, because recording "problem_text changed from *the Founder's words* to NULL" would file a copy of the deleted text somewhere insert-only.
-- **A save writes only the keys it was given.** `undefined` means "not in this request". §9's "a failed save never clears valid fields" starts here, and on the surface the typed value never comes back from the server — `useAutosave` takes a patch and reports an outcome, and cannot overwrite what is in the box. The obvious implementation, clear-on-error-and-refetch, is the single most common autosave bug.
-
-### Affiliate recruitment and the private invitation (§8, §5.3, §25.4, §2.2, built Phase 08a)
-
-The third actor arrives, and most of this phase is what they *cannot* do yet. `shared/src/affiliates/` owns the §5.3 subtype register, §8's nineteen facts, and §2.2's slot rule; `backend/src/affiliates/` owns the record and the invitation; `frontend/src/features/admin/CampaignCreators.tsx` is the surface.
-
-- **The internal quality tier is free text, and the type is the enforcement.** §8: "used only as assessment data—not as a commission floor." A ranked enum or an integer is a value that can be sorted and multiplied, and the first phase that needs a default percentage would find one sitting there — so the column is `text`, a CHECK constraint refuses a bare number or percentage (`affiliate_quality_tier_not_numeric`), the service refuses it with an explanation, and the shared register exports no `QUALITY_TIERS` to import. Naming tier levels would also invent an eligibility scheme §8 does not state. If a later phase wants to order by it, that is the §1 rule 6 violation the type exists to make visible.
-- **The token is bound to one association, and the database is what binds it.** §33.2.1: "an invitation claims only that Affiliate's account/association." `secure_tokens.association_id` carries it and the scope-binding CHECK (migration 0009) refuses a row that also carries a draft, campaign, or Backer id. Bound to the *association*, not the prospect: a Creator recruited to two campaigns holds two associations and receives two invitations, and binding to the person would make one link claimable against whichever campaign the request named.
-- **Migration 0008 adds the enum value; 0009 is its first use.** Postgres refuses to use an enum label in the transaction that added it and the Drizzle migrator runs one transaction per file. Do not merge them back together.
-- **`invitationStatus` moved to `db/schema/domain.ts`** and is re-exported from `invitations.ts`. It is still §7's enum; it moved only because the Affiliate invitation needs the same lifecycle on `campaign_affiliate_associations`, that table lives in `domain.ts`, and `invitations.ts` already imports from it. A second `pgEnum` declaration would be a second Postgres type with the same values.
-- **Two sentences in the invitation are template constants.** §8 requires the email to say the opportunity may still be preparing and that declining later does not harm standing. Both are promises about how Proovd behaves, so neither is Admin's to reword under pressure from a Founder who wants a roster filled — `PREPARING_NOTICE` and `DECLINE_NOTICE` sit beside §7's `NO_GUARANTEE_TEXT` for the same reason, are rendered read-only, and are compared verbatim by test.
-- **The preview gate, the dedup key, and the write ordering are §7's, restated.** The gate scans the *rendered* output; the dedup key is the SEND and not the association (keying on the association would satisfy §27.2 and break §8's resend); the send row lands before the provider call with `notification_id` NULL, which is a *state* — "recorded, not confirmed delivered" — and Admin renders it as exactly that. `affiliates/invitation.ts` and `invitations/service.ts` are deliberately parallel rather than merged: they differ in token scope, dedup entity, state machine, and required contents, and the branch that matters most is the one §33.2.1 is about.
-- **A resend does not re-transition the association.** `transitionAssociation` is a conditional UPDATE on the current status, so the second send matches nothing and writes no second history row. Two `prospect → invited` rows would misreport when the Creator was actually invited.
-- **Revocation kills the link and nothing else,** and the association does **not** return to `prospect` — §23.4's machine has no edge back and inventing one is §1 rule 6. The invitation status carries the revocation; the association status carries the relationship. The prospect, the recruitment provenance, and every send row survive, because §25.4 keeps invitation events per campaign.
-- **Slot occupancy is derived, never stored.** §2.2's slot "runs from tracking-link activation until campaign close or recorded removal", so `active` and `paused` occupy one and nothing else does — `paused` included, because a paused Creator is not a closed campaign and excluding it would let one Creator hold four campaigns by having one go wrong. A stored boolean would strand a Creator at three when a flag was never cleared. Phase 08 cannot reach a slot-occupying state at all; the count is rendered so Admin recruits knowing, and Phase 14's activation enforces the cap by reading it.
-- **The Founder projection is the authorization boundary.** §11: the Founder "cannot contact the Affiliate directly or inspect sensitive onboarding data." `listFounderVisibleRoster` never *selects* the email, phone, legal name, quality tier, verification evidence, conflict/sanctions notes, internal comments, or recruiting Admin — there is no filtering step to forget, because the columns are not in the projection. §30 defers direct Founder–Affiliate messaging and there is no message route to work around.
-- **Verification completeness is reported, not enforced — except on `verified`.** §5.3 qualifies inputs with "where appropriate" and Admin builds the record incrementally from public research, so `missingEvidence` reports the gap and an incomplete prospect saves. Refusing the save would push an Admin to type a placeholder into an evidence field, which is a worse record than an honestly incomplete one. `verified` is the one claim that requires the evidence behind it.
-
-### The Creator's compact signup and the waiting state (§11, §28.4, built Phase 08b)
-
-The third actor gets an account. `backend/src/affiliates/signup.ts` owns the record and the claim; `frontend/src/surfaces/creator/` owns the one page.
-
-- **One page, two primary actions, and no third.** §11 gives the flow one action (`Confirm and create account`) and then one more (`Finish payout setup`), and forbids the alternatives by name: "no welcome tour, multi-page education sequence, separate banking page, or public Affiliate signup." There is one route serving the whole flow, one `.btn--primary` on the page (a test counts them), no step index, and no route that collects a bank, tax, or identity field — §11 forbids reproducing provider-controlled fields, and the absence of the route is what makes that true. `affiliate_signup_no_bank_data` CHECKs that `connected_account_id` looks like `acct_…` and nothing else.
-- **`Finish payout setup` renders no control yet, on purpose.** Stripe is Phase 10 (§32.1 orders signup first). `payout_status` can only be `not_started`, the panel says so, and `onboardingAvailable: false` is what the surface reads. §1.4: a button that would do nothing is worse than no button.
-- **Two acceptances, not three.** §11 says "Terms and Affiliate AUP acceptance" — so `AFFILIATE_CLAIM_POLICY_SLUGS` is `['terms', 'affiliate-aup']` and privacy is *not* in it. §10's Founder claim takes privacy because §10's own list names it. Collecting an acceptance the Spec does not ask for is as wrong as skipping one it does. `ip-agreement` is §31.5's per-campaign agreement, required before *work*, and belongs to the phase that opens work.
-- **Both agreements are drafts, so the claim refuses in the open** — same as the Founder claim, same trigger, same reason. Do not soften it, do not stub a consent, do not accept a draft. **In tests, publication is one-way** (§29.8, enforced by `enforce_policy_version_immutability`), so the draft-refusal case has to run in its own describe *before* anything publishes. There is no `unpublish` helper and writing one would fight the invariant rather than test it.
-- **The five confirmations are five columns and five controls.** §28.4 forbids bundling; §11 names them as one sentence. Nothing in the save path can set more than one from a single flag, and the surface has no "accept all".
-- **`signup_field_supplier` is its own enum**, `('proovd','affiliate')`, not §9's `field_supplier` `('proovd','founder')`. The two say different things, and a shared enum would admit values neither table can legally hold.
-- **The channel subtype is shown, not editable.** §11's "ability to correct it" attaches to prefilled *public information*. The subtype is Admin's §5.3 classification and decides which verification evidence was recorded against it, so a Creator flipping it would silently invalidate a verification. The surface routes a correction to support; nothing in the save path can change it.
-- **The claim mirrors §10's exactly**: account created *before* the transaction (a leftover account is recoverable, a claimed invitation with no account is not), `idempotency_keys` for retry, the conditional token UPDATE for concurrency, and both §23.4 hops recorded even when the Creator never saved first — skipping the intermediate one would misreport the path they took.
-- **`preparing` is reported but not reviewable.** `readConditionalState` computes §11's real condition, and the surface renders the Founder-claimed case as "being prepared" with no `Review campaign` action. §10's handoff is 08c's, and offering the action before the Campaign kit exists would claim a capability the product does not have.
-- **`NO_ACTION` is exported from `StatePanel`** and read by the surfaces and the confirmation email. §11 puts "No action needed" in backticks and §33.2.3 tests for it; a paraphrase is a softer promise. One constant, three readers.
-- **The confirmation email is sent after the transaction commits**, keyed on the association. §8's invitation keys dedup on the *send* because §8 requires resend to work; a signup happens once, so only §27.2 applies here and the association is the right key. A provider refusal records the failure and returns — it does not roll back an account, because the account is the more valuable of the two.
-
-### The preparing reveal and the Campaign kit (§10, §31.5, built Phase 08c)
-
-The pilot pre-view: a Creator reads a Founder's unreleased product information having signed nothing. §31.5 permits it only while it stays **private, authenticated, logged, campaign-scoped, and revocable**, and every one of those is a mechanism rather than an intention.
-
-- **"Exactly once" is three mechanisms.** §10 says it twice — "appears automatically in `preparing` exactly once", and Admin sees "No duplicate visibility event or email may occur after retries". So: `idempotency_keys` on `affiliate_preparing_revealed:<associationId>`, the conditional status UPDATE `signed_up_waiting_for_founder → preparing`, and `notification_deliveries`. Any one would stop the common case; all three are there because §33.7.7's rule about duplicate events applies here as much as to a webhook.
-- **Each association is its own transaction.** One Creator's failure must not roll back another's reveal — they are independent grants to independent people, and an all-or-nothing batch would let one bad row hold a whole roster in the dark.
-- **Eligibility is `signed_up_waiting_for_founder`.** §10 reveals to an *authenticated* Affiliate; anything earlier has no account, so writing a `preparing` state for them would grant access to someone who cannot sign in to use it.
-- **Revocation is one-way at the database level**, and so is the reveal stamp (`enforce_kit_revocation_irreversible`). An access grant nobody consciously made is what the exception cannot survive; a reveal stamp that could be cleared is a second reveal waiting to happen. Re-granting is deliberately not built (§1 rule 6).
-- **`campaign_kit_access` is insert-only and records no content.** It is the evidence the exception was operated as described, so a log a later statement could edit is not evidence of anything — and copying any of the Founder's material into it would put a second copy somewhere no revocation could reach. `readPreparingKit` writes the row in the same call that returns the content, not in a middleware a later route could be added without.
-- **The preparing kit is much smaller than §14.1, and says so.** §14.1 is the *complete formal* opportunity — rewards, prices, base percentage, tracking links — almost none of which exists before Phase 09/11/12. §10's phrase is "currently available", so the projection returns Founder, Problem, Solution, Competition, and campaign type, plus a list of what is missing **and why**. Rendering empty sections would read as a campaign offering nothing rather than one that is early.
-- **No compensation reaches the projection at all.** §12 owns it from Phase 12. There is no percentage column selected, no control, and nothing to accidentally turn actionable — the trap's "showing the base percentage as information is fine" is moot because at preparing there is no percentage yet.
-- **Accept, decline, propose, activate are absent, not disabled.** §10 makes them unreachable until listing-fee payment, and there is no route and no control for any of them.
-- **`/api/creator/*` is the first non-Admin session surface**, behind `requireRole(auth, 'affiliate')`. No second factor: §5.3 gives the Affiliate email + password, and since 2026-08-10 no role has one. Every read filters on the session's user id *inside the query*, and someone else's association answers `not_found` — the same answer as one that does not exist.
-
-### The optional items, the evidence, and the listing fee (§12, §24.6, built Phase 09a)
-
-The first phase where a Founder's own work changes what they are charged, and the first upload surface. `shared/src/workspace/` owns the §12 register and the helper text; `backend/src/workspace/` owns the decisions; `backend/src/storage/` owns the bucket; `frontend/src/surfaces/founder/` owns the flow.
-
-- **Content is the Founder's; the decision is the server's.** No route, no patch key, and no column lets a Founder set `complete`. `evaluateWorkspace` re-derives all five decisions from the stored content inside the same transaction as every save, and `decideItems` is a pure function over a snapshot so §33.3.1's near-misses are assertable as facts rather than as a simulated network. Phase 09's trap in one sentence: an item that completes because someone clicked "done" defeats the whole discount.
-- **Approval is of a version, so editing revokes it.** §12 rejects "unapproved drafts", and a Founder who approves a story and then rewrites it has one again. `saveWorkspace` clears the approval in the same statement as the edit, and re-applies it afterwards if the same request also approved — so a save that both edits and approves approves what it just wrote.
-- **A recorded Admin override survives re-evaluation; a Founder's completion does not.** §12 requires an override to carry prior value, new value, reason, actor, time, and evidence, and one the next autosave silently withdrew would be none of those. `evaluateWorkspace` skips any item whose `decision_source` is `admin_override`; it is lifted only by `overrideItem` or `reinstateItem`, both of which say who and why. `reinstateItem` deliberately cannot *grant* a completion — that would be the self-assertion hole with a different actor.
-- **Three checks are in the database because they are the ones a service can forget.** `high_effort_classifications_rule` restates §12's boolean; `listing_fee_calculations_arithmetic` restates the cap and the floor; `campaign_optional_items_completion_accounted` refuses a completion with no timestamp and no source. The first is the number Phase 12's compensation matrix reads — a wrong classification is a commercial term that is wrong.
-- **Item history is a trigger, not a service call.** `record_optional_item_events` writes `optional_item_events`; `UPDATE` and `DELETE` are revoked. Same reasoning as `app_setting_versions` (06a) and `draft_field_edits` (07): the row a careless `db.update()` would skip is exactly the override someone later has to explain.
-- **Lockable in 09a, locked by Phase 11.** §12: "After payment, the calculation and evidence snapshot lock." 09a installed the triggers that refuse to edit a locked item or a locked calculation and set `locked_at` nowhere, so Phase 11 set one timestamp instead of writing a guard under deadline — which is exactly what `applyListingPayment` does. **§33.3.3's second direction is that lock, not an `if (paid)` branch** — `cancelBooking` always cancels and always re-evaluates, and after payment the re-evaluation finds nothing it may change. A rule written in a route is a rule the next route forgets.
-- **The fee is computed on the server, from `app_settings`, and never in the browser.** `backend/src/workspace/listing-fee.ts` reads the four §6 keys; `shared/src/money/listing-fee.ts` stays the Phase 03 kernel over the seed defaults, and `campaign-workspace.test.ts` walks all 32 combinations through both and asserts they agree. That is the restate-and-drift-test arrangement, not a second waterfall. The surface parses cents only to format them — there is no arithmetic on a fee anywhere in `frontend/src/surfaces/founder/`.
-- **No tax line and no "total due now" — in the workspace preview.** §12 puts sales tax on the Checkout via Stripe Tax (Phase 10 established the client, Phase 11 uses it). A `taxCents: 0` in the preview would be a claim nobody has made, and a total without tax is a number the Founder will not be charged, so `FeePreview` still shows the subtotal and says tax is added at payment. Phase 11's `ListingPayment` is the surface that shows tax and a total, and it shows them only once a real Stripe Tax calculation exists for a real address. `SEPARATE_STREAM_NOTE` travels with every preview because §24.6 makes the listing fee its own stream and §12 says the 5% is "separate and unchanged".
-- **Nothing touches the container's disk.** Presign → browser PUT → server reads the object back and decides. The signature covers the method, the exact key, `content-type`, *and* `content-length`, so a URL issued for a 400 KB JPEG cannot be replayed for a 40 MB anything. Keys are derived from the campaign id and a fresh UUID — never from a filename — and `storage_key` is immutable by trigger, because repointing an approved visual moves a Founder's approval onto material they never saw. SigV4 is ~80 lines of `node:crypto`; the AWS SDK is not a dependency.
-- **The bytes decide, not the declaration.** `inspectMedia` reads the format from magic bytes and the dimensions from the header. An HTML document declared as `image/png` is `file_unreadable`; SVG is excluded because browsers execute it. The placeholder floor is 320 px on the longest edge — the narrowest viewport §33.11 tests — chosen so the number is a product fact rather than an invented one. Video carries no dimension check and says so: inventing a byte-size floor would be inventing exactly what §1 rule 6 forbids.
-- **Duplicates are a partial unique index, not a `SELECT`.** On (campaign, checksum) over live rows, so two concurrent requests cannot both find nothing; removing a file and re-uploading it is permitted, because that is a correction. Drizzle wraps the driver error, so the `23505` check walks `cause` — without that the §12 rule surfaces as a 500.
-- **Fetching a Founder-supplied URL is the other quiet security mistake.** `checkSocialUrl` refuses anything not http(s), resolves the hostname *before* connecting and rejects every private, loopback, link-local, and unique-local address, and re-applies the whole test to each redirect rather than handing the follow to the runtime. The body is never read, never stored, and never returned — only a status code and a decision leave the module.
-- **Control of a social profile is a Founder statement, never a verification.** §12 asks for a profile "controlled by the Founder" and Proovd cannot prove it; there is no OAuth handshake and inventing one is §1 rule 6. It is stored as `controls_confirmed`, shown to Admin as `controlsConfirmedByFounder`, and is its own unchecked control (§28.4 forbids bundling).
-- **`/api/founder/*` is the first session-bearing Founder surface.** Behind `requireRole(auth, 'founder')`, no TOTP (§5.1 makes a second factor Admin's rule). Every route resolves the campaign through `findFounderCampaign`, which joins the caller's own claim profile *inside the query*; another Founder's campaign answers the identical 404 a non-existent one gets.
-- **The helper resources are text, and there is no generate button anywhere.** §12: "static, copy-ready guidance—not an embedded AI product." §30 defers AI rewriting by name. There is no model client in the tree, no generate route, and no column that would hold a generated result — a shared test scans the register for the promise.
-- **`useAutosave` moved to `frontend/src/lib/`.** Phase 07 moved the three status phrases there and left the hook in `surfaces/draft`; by Phase 09 four surfaces autosave and three of them were importing out of a fourth's folder. It now takes the request-error *class* rather than one surface's re-export.
-
-### The embedded interview and its webhook (§12, §27.3, §28.3, built Phase 09b)
-
-`backend/src/interviews/` owns the vendor layer; `frontend/src/surfaces/founder/InterviewBooking.tsx` owns the embed. Every transition still goes through 09a's `workspace/interview.ts` — the webhook has no privileged route of its own, which is what makes the reconciliation path real rather than aspirational.
-
-- **Two independent facts bind a booking to a campaign.** Cal.com lets the *booker* prefill metadata, so a campaign id in the payload is a value the Founder chose — trusting it would let one attach a booking, its US$2 discount, and the high-effort input that governs Phase 12's ceiling to someone else's campaign. The signature proves the payload came from Cal.com; it proves nothing about who typed what into it. So `interviews/reference.ts` mints an HMAC over the campaign id (`BETTER_AUTH_SECRET`, domain-separated by a fixed label) that the ingest recomputes, **and** the attendee's email must independently match that campaign's Founder. Either alone fails.
-- **A signed but unbindable delivery is recorded and routed to Admin, never guessed into place.** §1 rule 6 forbids guessing and §1.3 makes the manual route valid only when the app records it. It still answers 200: Cal.com retries a non-2xx, and retrying something already recorded as unbindable produces a queue of identical failures instead of the one audit row an Admin needs.
-- **`provider_events` is the idempotency pivot, with `provider = 'calcom'`.** No second table and no second mechanism to keep in step with Phase 10's. Claimed before any domain work; a redelivery increments `seen_count`, writes an audit row, and returns. The 09a services are independently idempotent underneath it, so even a defeated pivot cannot produce a second transition or a second email.
-- **Raw body before any JSON parser.** The signature covers the exact bytes; a re-serialised object is not the thing that was signed. `express.raw()` is mounted on this path only, capped at 256 KB, and `app.ts` still mounts no global `express.json()` — the same constraint Phase 10's Stripe endpoint needs. Comparison is `timingSafeEqual`.
-- **An iframe, not an injected script.** The workspace holds the Founder's session and their unreleased product information, and a third-party script in that page can read both. `SupportChat` injects a script because it runs on public pages with neither. The sandbox deliberately withholds `allow-same-origin`.
-- **The four dedup entities are different, and that is the whole design.** `confirmed` and `canceled` key on the booking; `rescheduled` and `reminder` key on the booking **and** the scheduled time. Keying a reschedule on the booking alone sends the first move and silently swallows every later one — §7's exact failure in a different phase. Keying the reminder on the booking alone means a Founder who reschedules gets no reminder for the new time.
-- **The fee sentence in an email is composed against the campaign's real state.** §12 makes a confirmed interview worth US$2 and makes cancelling *before* payment recalculate; after payment §12's lock means nothing moves. A template that hardcoded "this changes your fee" would be wrong for every Founder who has already paid, so `feeNoteFor` decides and the template renders.
-- **§6's reminder lead time is unset, so the reminder job sends nothing and logs that it did.** A default of "24 hours" would be a commercial rule invented in code. A silent no-op would look identical to "nothing was due" (§1.4).
-- **Abandonment is defined by a fact, not a window.** §12 names `abandoned` and does not say when a booking becomes one, so the sweep marks a booking that was never confirmed and whose slot has now passed — no invented grace period. It matters because `selected` counts toward high-effort and `abandoned` does not.
-- **`MEETING_PROVIDER_LABELS` is restated in `interviews/labels.ts`.** The backend cannot import `@proovd/shared` at runtime and an email is a customer-facing surface — `microsoft_teams` in a Founder's inbox is exactly the §3.1 leak. Drift-tested against the shared map.
-
-### Stripe foundations (§32.2, §32.3, §32.4, §13, §24.1, §28.3, built Phase 10a)
-
-`backend/src/payments/` owns the client, the connected-account record, and the §32.4 store; `backend/src/routes/stripe-webhooks.ts` owns the two endpoints. **No money moves in this phase and §34 stays shut.**
-
-- **The API version is locked, and not to the SDK's.** `STRIPE_API_VERSION` is required with no default — inheriting the version the package happens to ship would let an `npm update` change the shape of every object the ledger reads and §24.3 reconciles against. A value that is not a dated Stripe version is refused at boot.
-- **What the env guard can and cannot prove, said plainly.** It refuses a non-`acct_` value in an account field, a non-`whsec_` value in a secret field, a non-`ca_` OAuth client id, and — the one that matters — the *same* secret on both endpoints. It does **not** claim to detect a secret's mode: test and live signing secrets are both `whsec_…` and no string check can tell them apart, so the comment says so and verification at the endpoint is what actually fails closed. A check that pretended otherwise would pass while being wrong.
-- **Two endpoints, two secrets, two handler maps.** §32.3 splits the event sets and §24.1 splits the money the same way. `handlersFor(endpoint)` means a Connect delivery cannot reach a platform-side effect even if Stripe were configured to send it, and a delivery signed for one endpoint does not verify at the other (tested both directions).
-- **Raw body before any JSON parser.** Phase 10's first trap. `express.raw()` on these two paths only; `app.ts` still mounts no global `express.json()`, which the comment there has anticipated since Phase 01. Verification is Stripe's `constructEvent` — hand-rolling it would mean re-deriving the replay tolerance, and the suite signs with `generateTestHeaderString` so the real verifier is what runs.
-- **Idempotency is insert-first, in the table Cal.com already uses.** `provider_events` with `provider = 'stripe'`, claimed before any handler. A redelivery increments `seen_count`, writes an audit row, and returns. The claim is **not** rolled back when a handler throws — `processed_at` stays null, which is the honest state, and the endpoint answers 500 so Stripe retries. Rolling it back would make a handler that failed halfway re-runnable, which §28.3 forbids for anything that moved money.
-- **An unregistered event type is recorded and ignored, and answers 200.** Almost every §32.3 event belongs to an object a later phase creates. A no-op handler would read as "handled"; a non-2xx would build a queue of identical retries. The handler maps carry comments naming which phase owns each absent type.
-- **`account.updated` never creates an account.** A Connect platform receives it for every account connected to it; inventing an owner for one Proovd never onboarded would put a row in the ledger attributed to nobody. 10b creates the record when onboarding starts.
-- **§13's four states are derived, and every Stripe `disabled_reason` is named.** An unrecognised reason resolves to `restricted` — the safe direction, because §13's restricted state offers "no misleading ability to pay the listing fee". The role decides what `complete` means: §24.1 makes the Founder account the seller and the Affiliate account a recipient only, so one wants `charges_enabled` and the other `payouts_enabled`.
-- **No provider identity document, and four mechanisms saying so.** There is no column that could hold one, `readAccountFacts` drops anything in a requirements list that is not a requirement *name*, a CHECK constraint refuses a non-array, and no raw provider payload is stored anywhere. §32.4 lists the fields it wants; a full object carries more (§13, §25.7, §28.4).
-- **`provider_objects` is built in full now.** All fifteen §32.4 types as enum values, mode in the identity index and immutable by trigger, amounts as non-negative integer cents, and account context CHECK-tied to whether an account id is present. Later phases add rows, not columns — six migrations widening a table the ledger already reads is how a reconciliation query comes to mean different things depending on when a row was written. A partial write blanks nothing (§9's autosave rule, applied to a ledger).
-
-### Hosted onboarding and the tax gate (§13, §11, §5.3, §34, built Phase 10b)
-
-`backend/src/payments/onboarding.ts` and `tax-accountability.ts`; `frontend/src/surfaces/payouts/` owns the one component both roles render. **Still no money, and §34 stays shut.**
-
-- **Proovd issues a link and reads a status. It collects nothing.** §11 forbids reproducing provider-controlled fields, §5.3 says Proovd stores statuses and IDs and "never full bank details", §13 forbids storing identity documents. So there is no route that accepts a bank, tax, or identity field and no input on the surface — the absence is the enforcement, exactly as it was for the Creator signup in 08b. A test posts an account number at four plausible paths and at the link route, and asserts none of it lands anywhere.
-- **One component for both roles.** §13's four states are the same for a Founder and a Creator; the differences — what `complete` unlocks, what an incomplete account blocks — arrive from the server, where §24.1 draws the seller/recipient line. Two components would be two places for those sentences to drift.
-- **The role decides what `complete` means, and a recipient is never eligible to pay.** `listingFeeEligible` is true only for a *complete founder_seller*. §24.1: the Affiliate account "never processes the Backer charge and is never MoR", so no state of it can open Checkout.
-- **Restricted has no resume, and that is §13's sentence.** "Restricted/failed, with safe support path and **no misleading ability to pay the listing fee**." `canResume` is false, `beginOnboarding` refuses with a support path, and the surface renders no payment or retry control. Looping someone through onboarding that will fail again is §1.4's failure with a spinner on it.
-- **Returning re-reads the account rather than trusting the last webhook.** A Founder who finishes at Stripe and lands back within the second would otherwise see the state from before they started. Same position 09b took for bookings: a vendor is a source of events, not of truth.
-- **Reuse is the default (§11).** The account is keyed to a *person*, so a Creator recruited to a second campaign is already done. A second account per campaign would also fragment payouts across accounts Stripe treats as unrelated people. `findAccountForOwner` is scoped by mode and role, so a test account is never offered as a live one and a recipient is never reused as a seller.
-- **Stripe's requirement names are translated, and unknown ones are shown raw.** §13 wants the *exact* missing requirement. `REQUIREMENT_LABELS` turns the ones a person can act on into plain words; anything unrecognised renders as Stripe sent it, because an untranslated name is useful and a swallowed one is not.
-- **The §11 tax gate is built now, in Phase 10b, and it blocks Phase 19.** Seven columns for §11's seven facts, all NOT NULL and CHECK-non-blank, plus a named approver and an evidence reference (§34's "recorded as complete"). `readTransferGate` refuses on absence, on a superseded record, on the wrong mode, and on a database that will not answer — `readPolicyGate`'s fail-closed shape applied to money. A gate written in the phase it is meant to stop is a gate written under deadline by someone who wants it open.
-- **A TIN pasted into the tax record is refused by the database.** §11: "without duplicating sensitive provider-held data." Those fields name a party and a process; a value shaped like an SSN or EIN in one is a paste, not an answer, and the route says so rather than showing a constraint name.
-- **Supersession is one statement, and the FK is DEFERRABLE for that reason.** The partial unique index allows one live configuration per mode, so the old row must stop being live before the insert; the immutability trigger refuses any later write to a superseded row. That leaves exactly one shape — retire and point at the successor together, using an id minted before the insert. The alternative was an exception in the immutability trigger, and an exception is how a superseded record becomes editable after all.
-
-### The listing Checkout, the clocks, and the refund (§13, §24.6, §31.6, built Phase 11)
-
-The first real money, and the only place Proovd is merchant of record.
-`backend/src/payments/listing-checkout.ts` owns the payment, `listing-refund.ts`
-the refund and §31.6's decision, `listing-clocks.ts` the sweep;
-`frontend/src/surfaces/founder/ListingPayment.tsx` is the surface.
-
-- **Appendix A.5 is exact text, and it lives in `shared/src/checkout/consent.ts`.** The template is compared against the Spec's own appendix by test, the same way A.1's trust strip and §27.8's contact block are pinned. `resolveListingFeeConsent` substitutes exactly two amounts and **refuses a value that is not a formatted amount** — a consent rendered with a bracket in it is a consent to nothing. The surface renders it with `white-space: pre-line`; nothing paraphrases, shortens, or reflows it.
-- **Tax is calculated before the consent, not at Stripe.** A.5 names an exact `US$[TOTAL]`, so the pre-payment surface takes a billing address, the server creates a Stripe Tax calculation, stores it under §32.4, and the session charges subtotal + that tax. `automatic_tax` is deliberately off: the total the Founder agreed to is the total charged, never a substituted one (§19/§21's rule applied to Proovd's own fee). **An unconfigured `STRIPE_TAX_ENABLED` refuses loudly** — §31.7: a zero caused by missing configuration is not proof that no tax is due.
-- **Seven effects, one transaction, three idempotency mechanisms.** `applyListingPayment` does all of §13's seven or none: `idempotency_keys` on `listing_fee_paid:<campaignId>` is claimed first so everything shares its fate, the unique `listing_fee_payments` row on the campaign and on the session stops a second application, and `provider_events` stops the same delivery. A duplicate under a *fresh* event id still produces one payment, one clock, one association hop, and one set of emails — tested both ways.
-- **The clock starts at successful payment and nowhere else (§33.3.7).** Both windows are read from `app_settings` at payment, written onto the payment row with the hour values that were in force, and a CHECK pins each stored deadline to `paid_at + make_interval(hours => …)`. The immutability trigger refuses to move any of it. §29.6: a settings edit applies to later payments, never to a promise already made. The sweep only *notices* deadlines; it never recomputes one.
-- **The lock is total, and the high-effort half of it lives in `workspace/service.ts`.** Payment stamps `locked_at` on the calculation and on all five items. `evaluateWorkspace` already skipped locked items — Phase 11 added the other half: while locked it **reads** the stored classification instead of recomputing it, because the interview input reads the *live* booking and a cancellation after payment would otherwise flip a classification that was charged against. `recordListingFee` now prefers the locked row over the latest row, so a Founder editing between session creation and payment cannot leave a newer unlocked calculation as the answer.
-- **"The whole Checkout total, once" is three mechanisms.** A unique index on `payment_id` (never twice), a BEFORE INSERT trigger comparing the refund to the payment row (never partial — a service bug cannot under-refund quietly), and a stable provider idempotency key `listing-refund:<paymentId>` so a retry is the same refund at Stripe. The row is claimed **before** the provider call: a crash leaves an `initiated` claim — visible, honest, retryable — rather than money that moved with no record.
-- **One refund path, and Phase 12 and 14 call it.** `refundListingFee` takes which of §13's promises it is honouring. The brief's instruction was explicit: build it here so a later phase calls it rather than inventing a second one.
-- **§31.6 decides itself only inside the stored window.** Within the stored 48-hour deadline and not live: cancel, move to `ended_no_charge`, refund the whole charge. Otherwise: a `pending` request an Admin decides, with **no automatic refund** — and a discretionary refund is a separate, separately-recorded act. `campaign_cancellations` has a partial unique index on `pending`, so a second request while one waits is a duplicate rather than a new decision, and a decided one cannot be re-decided.
-- **A revoked Creator is not silently re-granted by a payment.** Effect 4 opens the formal opportunity for `preparing` associations **whose kit access was not revoked**; a revoked one is skipped, named in the audit row, and left to Admin. §31.5's revocation was a conscious withdrawal, and payment is not consent to reverse it.
-- **The webhook's metadata is Proovd's own, and is still cross-checked.** Unlike Cal.com's (Phase 09b), this metadata was written by Proovd's API call at session creation and the payer never holds it — but the ingest still reconciles it against the stored §32.4 session row and against the stored calculation's amounts. A signed delivery that does not reconcile is recorded as `listing.payment_unreconciled`, routed to Admin, and answers 200; it applies nothing.
-- **Listing money and campaign money never mix, structurally.** The three tables carry no `reservation_id`, no `association_id`, and no connected-account column — §33.3.6 asserts their absence in `information_schema` as well as against Admin's reconciliation view. The handlers are registered on the platform map only, so a Connect delivery cannot reach them.
-- **Never a promised settlement date.** "5–10 business days, typically" is the only shape §13 allows, and it is a constant in the refund template and in the Admin refund response.
-
-### Forbidden patterns (§30, DNA §5.10)
-
-No confetti, streaks, or countdown pressure that confuses a saved card with a charge. No fake scarcity, fabricated popularity, or live-viewer counts. No AI support presented as human. No public leaderboards. No prechecked optional consent. No live chat without staffing. No "real time" claims for refresh-based data. No generic errors without money/data status and recovery. No competing actions in payment, cancel, refund, or card-recovery states.
+- **Repo:** npm workspaces — `frontend/` (React 19 + Vite), `backend/` (Express 5), `shared/` (Zod,
+  money, state machines, calendar). One root `package.json`, one multi-stage `Dockerfile`.
+- **DB:** Postgres 16 + Drizzle; `drizzle-kit` generates and applies migrations. Money is integer
+  cents in `bigint`.
+- **Commands:** `npm test`, `npm run typecheck`, `npm run build`, `npm run dev:backend`,
+  `npm run dev:frontend`. One file: `npx vitest run <path>`. One test: `npx vitest run -t "<name>"`.
+  One project: `npx vitest run --project shared`. **`npm test` is for phase work and for when the
+  user asks** — see *How a session works*.
+- **Tests map §33 directly.** Do not invent a parallel plan. Vitest for domain units; supertest +
+  real Postgres for API integration; Stripe test clocks for payment outcomes; Testing Library for
+  consent/checkout/recovery surfaces; Playwright for the one full-lifecycle E2E;
+  `axe-core` + manual keyboard/screen-reader passes for §33.11.
+- **`export TEST_DATABASE_URL` first.** It lives in `.env`, which is not loaded into the shell.
+  Without it the harness falls back to Testcontainers, finds no Docker, and reports **~61 failed
+  FILES and 0 failed TESTS** — the identical summary line to the esbuild flake below, with a
+  different fix. Look for `PostgreSqlContainer.start` in the stack before batching anything.
+- **esbuild intermittently fails to read `tsconfig.base.json`** ("Access is denied"), aborting
+  project setup before any test runs. Concurrency-dependent and pre-existing. Signature: **many
+  failed FILES, zero failed TESTS**. Run the backend in batches of ~5 with retries and aggregate.
+- Integration tests need a real Postgres and the connecting role needs `CREATEROLE` or superuser
+  (the migrator runs `CREATE ROLE proovd_app`).
+- **Each harness-based file gets its own database:** `startHarness({}, 'label')`.
+- A backend test that mutates seeded rows wraps them in `BEGIN`/`ROLLBACK`, **one failing statement
+  per transaction** — the first error aborts the block.
+- **Testing Library's `waitFor` deadline is 10s**, set in `src/tests/setup.ts`; `testTimeout` does
+  not govern it. The frontend project runs **four workers with a 30s `testTimeout`** — unbounded
+  workers had a dozen jsdom+axe renders competing for the same cores, turning a 40ms axe pass into
+  24 seconds and leaving axe mid-run so the next assertions failed with `Axe is already running`.
+- **The frontend suite builds the production bundle in `globalSetup`**, not in a test — §33.11.3
+  scans what ships, and running `vite build` alongside the jsdom workers timed out three unrelated
+  suites.
+- **Mount raw-body parsing on webhook routes before `express.json()`**, or signature verification
+  fails. There is no global `express.json()`.
+- **Email templates are TSX.** `@react-email/render` is async — await it.
+- **Jobs run on pg-boss.** `startScheduler` throws if it will not start: a deployment whose
+  retention sweep never runs keeps personal data past §25.8's window.
+- **Env:** `backend/src/env.ts` is Zod-validated and fails closed on any live/test key or mode
+  mismatch. `backend/tsconfig.json` sets `declaration: false` on purpose (TS2742 via Better Auth's
+  bundled Zod); the backend is an application and nothing imports its `.d.ts`.
 
 ---
 
 ## Frontend rules
 
-- **`proovd.css` only.** No Tailwind, no shadcn, no CSS-in-JS. Never write a hex literal — read a var or a mode slot. Never write an arbitrary spacing value — use `--sp-*`. `px` is legal only for borders, radii, and the 44px touch minimum.
-- **Radix is headless.** Behavior and ARIA only; styled with `proovd.css` classes; default `data-state` transitions disabled.
-- **GSAP is the only motion runtime** (DNA §6). Never CSS transitions, never the Web Animations API, never another library — not as a fallback, not as a simplification. Never `import` gsap from npm; never install the package. The vendored files in `frontend/public/vendor/gsap/` are the source of truth.
-- **Motion in React** goes through `frontend/src/motion/MotionProvider.tsx`. Any subtree rendering `data-*` motion attributes on changing content calls `useProovdMotion(ref, deps)`. Anything driven by React state uses the imperative API. Hand-written GSAP is wrapped in `useGsapScope`. Skipping this makes animations die silently as the app grows.
-- **Fail loud, never silent.** If GSAP or Satoshi fails to load, the accent-yellow notice renders. Never suppress it.
-- **One question per moment, one hero, one delight** (DNA §5.1, §5.6, §5.8). Complexity is staged into Glance / Act / Explore, never deleted (§5.14).
-- **Accessibility is an acceptance test**, not a polish pass: 320px, keyboard, focus order, 44px targets, screen reader (§33.11). `frontend/src/features/public/a11y.test.tsx` runs axe, the keyboard path, heading structure, and landmark naming on every public route; 320px reflow, real focus visibility, 44px targets, and the screen-reader pass stay manual.
-- **New component styles extend `proovd.css` in a dated phase section** at the bottom of the file, in the same slot-reading style — never a second stylesheet, never a hex literal, never an arbitrary spacing value.
+- **`proovd.css` only.** No Tailwind, no shadcn, no CSS-in-JS. Never write a hex literal — read a
+  var or a mode slot. Never write an arbitrary spacing value — use `--sp-*`. `px` is legal only for
+  borders, radii, and the 44px touch minimum.
+- **Radix is headless.** Behaviour and ARIA only; styled with `proovd.css`; default `data-state`
+  transitions disabled.
+- **GSAP is the only motion runtime** (DNA §6). Never CSS transitions, never the Web Animations
+  API, never another library — not as a fallback, not as a simplification. Never `import` gsap.
+- **Motion in React** goes through `MotionProvider`. Subtrees rendering `data-*` motion attributes
+  on changing content call `useProovdMotion(ref, deps)`; state-driven motion uses the imperative
+  API; hand-written GSAP is wrapped in `useGsapScope`.
+- **Fail loud, never silent.** If GSAP or Satoshi fails to load, the accent-yellow notice renders.
+- **One question per moment, one hero, one delight** (DNA §5.1, §5.6, §5.8). Complexity is staged
+  into Glance / Act / Explore, never deleted (§5.14).
+- **Accessibility is an acceptance test**, not a polish pass: 320px, keyboard, focus order, 44px
+  targets, screen reader (§33.11). 320px reflow, real focus visibility, tap targets, colour
+  contrast, and an actual screen-reader pass stay **manual**.
+- **New component styles extend `proovd.css` in a dated phase section at the bottom** — never a
+  second stylesheet. Check the highest existing phase number first.
 
 ---
 
 ## Definition of done
 
-A surface is complete only with all of §1.1: content and actions; loading, empty, waiting, success, failure, expired, revoked, suspended, and retry states; server-side authorization; persistent records and version history; state-transition and idempotency protection; transactional notification and durable history; Admin visibility, ownership, due time, and recovery action; audit event; mobile, keyboard, focus, label, contrast, and screen-reader behavior; named acceptance tests including negative and duplicate-event cases.
+A surface is complete only with all of §1.1: content and actions; loading, empty, waiting, success,
+failure, expired, revoked, suspended, and retry states; server-side authorization; persistent
+records and version history; state-transition and idempotency protection; transactional
+notification and durable history; Admin visibility, ownership, due time, and recovery action; audit
+event; mobile, keyboard, focus, label, contrast, and screen-reader behaviour; named acceptance
+tests including negative and duplicate-event cases.
 
-Every waiting, review, payment, recovery, or exception state answers the six questions (§27.1): what happened, what next, who owns it, when's the next update, what can I do now, how do I get help without losing context.
+Every waiting, review, payment, recovery, or exception state answers the six questions (§27.1,
+Brief §1.2): what happened, what next, who owns it, when's the next update, what can I do now, how
+do I get help without losing context.
 
-**A phase is not done until its named §33 tests pass.** §33's own framing: these are requirements, not examples. Do not commit a phase with a failing named test.
+**A phase is not done until its named §33 tests pass.** These are requirements, not examples.
 
-**This section describes a surface built in a phase, and nothing above applies to an ordinary edit.** A small change is done when it does what was asked, typechecks, and the one test file covering it passes — see "How a session works". Re-verifying an untouched guarantee, re-running a suite nobody asked for, or opening a browser pass for a copy fix is not thoroughness; it is a change the user has to wait for and did not want.
+**This section describes phase work.** A small change is done when it does what was asked,
+typechecks, and the one test file covering it passes. Re-verifying an untouched guarantee or
+opening a browser pass for a copy fix is not thoroughness — it is a change the user waits for and
+did not want.
 
 ---
 
 ## Working notes
 
-- Stripe runs in **test mode**. Live-mode is gated by §34 and is not yet open. Never render test cards or test controls in production UI.
-- The Stripe model is **direct charges on the Founder connected account**. The backup separate-charges path is not built; `STRIPE_TEST_BACKUP_MODE_ENABLED=false`. Never run both for one transaction.
-- Mount raw-body parsing on webhook routes **before** `express.json()`, or signature verification will fail.
-- A Transfer creation failure is a synchronous API error and a retry-job case. There is no `transfer.failed` webhook to wait for (§32.3).
-- Environment fails closed on any live/test key or mode mismatch (§6).
-- If the phase you were given is too large for one session, **stop and say so.** A truncated session produces code that looks finished and isn't.
-
-### The deleted §26 services came back, and with them two §33 tests (§26.5, §26.6, §31.7, §31.9, §6, post-Phase-24 change, 2026-08-19)
-
-`2f7aeed` replaced the Admin dashboard and deleted more than screens. It also deleted five backend **services** and an acceptance **suite** — and that contradicts this file's own rule, recorded at the time, that a deleted screen keeps its backend because the backend encodes acceptance-tested machinery.
-
-| Deleted with the screens | What it is |
-|---|---|
-| `backend/src/admin/ledger.ts` | §26.5's eleven filter dimensions and §25.7's permitted export |
-| `backend/src/admin/money-controls.ts` | §26.6's nine money-control lines |
-| `backend/src/admin/risk.ts` | §31.7's ten signals and the four-fact seller tax readiness |
-| `backend/src/admin/prerequisites.ts` | §6's ten production items |
-| `backend/src/measurement/{logic,service}.ts` | §31.9's first-cohort scoreboard |
-| **`backend/src/tests/measurement.test.ts`** | **the integration half of §33.12.6 and §33.12.7** |
-
-- **Two of the 131 named §33 tests were not being run, and nothing went red.** `measurement.test.ts` is 18 tests: the warehouse absence, the write-once stamps at the database, the `not measured` label on an empty system, the completion denominator with no status filter, and the no-write-route assertion. The SHARED kernels (`shared/src/measurement/measurement.test.ts`) survived and passed, which is exactly why nobody noticed — the unit half was green while the half that drives a real Postgres was gone. All restored; §33.12.6 and §33.12.7 pass again.
-- **Everything is restored verbatim from `2f7aeed^` except three things the tree has moved past.** `admin-operations.ts` keeps its CURRENT `securityContext`, which says `password_session_admin_role_verified` — the old file said `totp_factor_registered`, and since 2026-08-10 there is no second factor to assert, so restoring it would have put a false record in the one table §25.6 exists to make trustworthy. `AppConfig` gains `prerequisiteEnvironment` beside `liveModeEnvironment`; both come from one `prerequisiteFacts(env)` call, so the §6 panel and the §34 gate cannot disagree about the deployment they describe. And the close and refund routers mount **inside** the `stripeGateway` block beside disputes, because their money acts are provider calls — a deployment with no gateway has no close operations rather than a console that fails at the last step.
-- **The §33.12.5 partition passes with ~30 restored write routes and needed no register entry.** Every one takes the freshness gate: they move money, decide a W-9, or execute a refund. That is the partition doing its job in the easy direction, and it is worth stating that it was checked rather than assumed.
-- **`routes/json-safe.ts` is new, and it fixes a live defect.** Money in this product is `bigint` all the way down, and `JSON.stringify` throws on one. `readCampaignEarnings` returns Drizzle rows directly, so `GET /api/admin/close/:id/earnings` answered **500 for any campaign that had earnings** — which is exactly the campaign an Admin opened it to work on. No test saw it because the §33.8 suites drive the services, not the routes. `bigintSafeJson` is mounted on the ROUTER rather than remembered per route, so a route added next year serializes correctly without its author knowing the file exists — the `live-mode/guard.ts` arrangement, applied to serialization.
-
-**The list of "routes that exist with no screen" is now empty.** What this file recorded as the state after the dashboard replacement — one restored route, two deleted routers, and a screenless §26 backend — is closed by the console below.
-
-### The Money & Fulfillment console was built (§21, §22.1–§22.7, §24.8, §24.11, §26.6, post-Phase-24 change, 2026-08-19)
-
-The Campaigns hub named this destination the day it shipped and carried `absentBecause: 'Money console not built yet — the amounts here come from its records.'` This is that console, and that sentence is the promise it keeps.
-
-`shared/src/admin/money-workspace.ts` owns the registers (six tabs, three queue groups, the pinned rules, and the nine refusals); `frontend/src/features/admin/money/{api,shared,MoneyQueue,MoneyRecord}.tsx` and `panes/{close,money,cases}.tsx` are the surface; `PHASE 36` the styles; `money.test.tsx` (17) is the artifact. **No migration, no new service, and no new commercial rule** — every control calls a router Phases 18b, 19a, 19b, 20a, 20b and 21a shipped and §33 drives.
-
-- **It operates services and owns none, and that is checkable.** There is no arithmetic in the feature at all: the earned percentage, the §24.4 identity, and §22.3's eligible share are resolved by the services that own them and rendered as they arrive. §33.8.13's "one source, many renderers" is only true while the renderers are renderers, so `shared.tsx` formats and never computes, and the suite reads amounts by FACT (`factValue('Earned')`) because a Creator whose whole earnings are commission legitimately shows the same number twice — that is the identity being visible, not a defect.
-- **The order of the six tabs is the dependency, not a preference.** Close → reconciliation → Creator earnings → Founder payment → refunds → fulfillment. Reconciliation waits on the retry window; §22.3's eligible share subtracts the FINALIZED Creator compensation and refuses until every provisioned cent has resolved. An Admin working left to right never meets a refusal they could have avoided.
-- **The cause NARROWS the treatment control.** `permittedAffiliateTreatments` is on the §24.8 cause, so a Founder-caused case cannot even present `cancel_unpaid_invalid` — §33.9.3's most tempting wrong simplification is unreachable in the form as well as refused by the service and by a CHECK. The picker sits OUTSIDE the dialog, because `ConfirmDialog` renders a static spec and a picker inside it could not re-narrow its own sibling; refunds and disputes hold their own, because classifying a dispute and recording a refund are two decisions.
-- **Preview, then execute — and the preview is a record.** §26.6 asks for reauthentication (the route's freshness gate), idempotency (the stable `reservation-refund:<allocationId>` key), immutable audit (insert-only rows), and a preview. The preview is the only one a SURFACE can get wrong: one merely rendered is one nothing enforces. This posts for it, shows exactly what came back, and sends its id with the execution, so the consequences the Admin read are the consequences of that payload.
-- **Nine refusals, rendered where their controls would be.** `MONEY_OPERATIONS_ABSENCES` — the threshold decision, the retry window, capture-now, editing a recorded verification, withdrawing results, typing an earnings amount, choosing the fixed-payment outcome, releasing without a W-9, and a goodwill refund. Re-adding one means deleting the sentence that says why it cannot exist. The `AFFILIATE_OPERATIONS_ABSENCES` arrangement, applied to money.
-- **§16a runs through the whole surface.** `earnings: null` renders "Not finalized yet" and never US$0.00, because a zero there reads as "this Creator earned nothing" rather than "this has not happened yet". A captured subtotal of exactly zero is deliberately NOT in that set — a `coalesce(sum(...), 0)` over no attributed captured pre-orders is a real zero, and hiding it would be the opposite error. The suite asserts both directions.
-- **Every row on the queue is a link and no row acts.** Resume, finalize, transfer, release, refund and decide all live on the campaign's own record, where the state that permits or refuses them is on screen. A Resume button on a list row is a money act taken against a summary — and a summary is exactly where the reason it would be refused is not shown.
-- **The browser pass found five things, and it is the tenth rebuild in a row where that is true.** (1) `p.helper` and `.grey` are `--grey`, which is **2.18:1** on white — and on this surface they carry "anything still failing when the window shuts closes at US$0.00" and all nine refusals. Re-toned scoped to `.mny` — a sentence that states a rule takes `--dark`, a caption takes `--moss` — and **not** at the definition, because `p.helper` is used by six workspaces and re-toning it product-wide is its own change with its own screenshot pass; the pre-existing gap is recorded rather than silently inherited. (2) Every `Record a verification` rendered as a full-width bar: a `.btn` is inline-flex inside a column flex, which Session D recorded for `.tag` and Session E for a `.btn` — third time, so the rule is scoped to a DIRECT child and `.mny-acts` is untouched. (3) `§21:` read aloud nine times, the Campaigns hub's recorded leak repeated; stripped for display, while `waitsOn` KEEPS its reference because it names which later rule owns the item and there is no other name for that. (4) `EXACTAMOUNT`, a camelCase derived key through an uppercasing `dt`. (5) `Release` was the prominent control on a payment line printed as blocked — the acts now render the line's state, and a released payment offers nothing at all (§20's caught-up rule on a money row).
-- **`.btn--primary` was checked and deliberately NOT changed.** Its `--mint` on `--brand` is **1.44:1**, and it is proovd.css:158's own hard rule plus tech-stack §3.6's documented, scoped exception for brand-fill buttons, verified as recorded in Phase 23b. Every primary in the product looks like this; overriding it here would be one surface disagreeing with the design system rather than a fix.
-- **What it did NOT build:** a second refund path, a second Transfer path, any capture control outside the batch, a reservation-status or earnings-state label register (the campaign pill uses §23.1's existing total map and the machine values render under Technical details — the Campaigns hub's own arrangement), and any write route of its own.
-
-### Today was built, and nothing in the Admin shell is parked any more (§26, §1.4, §30, post-Phase-24 change, 2026-08-19)
-
-`shared/src/admin/today.ts` owns the register; `backend/src/admin/today.ts` the composed read; `GET /api/admin/today` the route; `frontend/src/features/admin/today/TodayPage.tsx` the surface; `PHASE 37` the styles; `today.test.ts` (9) and `today.test.tsx` (8) the artifacts. **No migration and no new table.**
-
-- **It was parked for a real reason, and that reason is why it is this.** §26 has eight sub-sections — Users, Campaign detail, Affiliate recruitment, Creator proof, the reservation ledger, money controls, support/dispute/kill, the timeline — and none of them is an overview. There is no Today in the Spec. So it is composed under §1 rule 2 the way the five workspace shells and the Tasks panel were, it invents none of rule 6's seven things, and it could not have been built before the workspaces it summarises existed.
-- **Six counts, every one from a record with a deadline somebody agreed to.** §27.8's response promise, §24.11's CHECK-pinned 24-hour task, §21's stored retry deadline and its interrupted batches, §22.4's Day 14 anchor, and the campaigns whose results are not prepared. There is no line whose source is a duration, a date, or an absence — §33.6.11's rule, applied to an Admin surface — and `TODAY_SOURCES` is the whole list, so a line cannot be added without an entry naming the record behind it.
-- **`overdue` and `waiting` stay two facts.** A lapsed promise to somebody outside the company and open work nobody is late for are different things, and the hero counts only the first. Summing them would report urgency the records do not carry (§30), and the suite pins `retry_window` and `reconciling` to `waiting` for exactly that reason.
-- **It composes and owns nothing, asserted four ways.** No `today`/`overview`/`dashboard` table in `information_schema`; no `.insert(`/`.update(`/`.delete(` in the module (scanned with comments stripped, because the header explains at length what it refuses to do); no `db.select` and no `.from(` at all — every number comes from the queue function whose own workspace renders the same list, so a count and its list cannot disagree; and **no write route**, driven POST/PUT/PATCH/DELETE and asserted 404. That last one is §30 in its strongest form: a prohibition on manufactured engagement enforced by there being nowhere to record that anybody looked.
-- **The clear state offers nothing and there is nowhere to put a control.** §20's caught-up ending on the screen most tempted to fill itself. `TODAY_CLEAR` renders as a paragraph — not a card with an action in the corner — and the suite asserts no link into a workspace survives when every count is zero.
-- **"Checked and clear" is not "not checked" (§1.4).** The zero rows are named rather than dropped. The browser pass caught the first version doing this by lowercasing the row label, which produced `Clear: day 14 decisions past due` — a sentence that says the opposite of what it means — so every source now carries a `subject` alongside its `label`.
-- **`TODAY_ABSENCES` names the four things it must never become**, each rendered: work assigned to you (§26.7 already gives a support case an owner, a waiting party and a handoff gate, and a second way to hand work to a named person would be a second door into that machinery — the Tasks panel's own reasoning for having no `assigned_to`), a recent-activity feed (§26.8's second-event-store trap, one level up), trends and totals (§33.12.6 forbids an invented baseline and a sparkline on an overview is the shortest path to one), and reminders or streaks.
-- **`PARKED_MESSAGES` lost `today`, and the register's own rule is why.** An entry leaves the moment its control works — a parked message on a working control is §1.4's failure in reverse. `explorePanels`, `w9Close`, `creatorFit`, `photo` and `stripeHosted` remain; `w9Close` is now stale in the other direction and is superseded by the Money console.
-- **Four assertions were consciously inverted, across four suites.** They asserted Today was a parked button, which is what they existed to catch. What they were protecting survives in a different form: the old rule was `aria-disabled` never `disabled`, so a keyboard user meets what a sighted user sees; with nothing parked, the equivalent is that every entry is a real anchor with a real href.
-
-**And the last two shown-but-unavailable links closed on the same day.** The Campaigns hub's `money_admin` destination became `/admin/money/:id` — `built: true`, and the register's `absentBecause` deleted with it. And the §26.8 support context's `Pre-order` link, shown-but-unavailable since 2026-08-13, became `/admin/backers?view=backers&campaignId=…&backerSearch=…`: a pre-order still has no record page of its OWN — that is the Backers reference's own promise, *"One row per Backer. No extra record page."*, not a gap — but it has a POSITION, and scoping to both the campaign and the address matters because the same person may hold pre-orders on two campaigns and a case is about one of them. **Nothing in the product now renders a control that explains why it does not work.**
-
-### The Creator flow is being rebuilt — Session A of six, the record only (post-Phase-24 change, 2026-08-19)
-
-The Creator's signup and dashboard are being rebuilt to the supplied reference at `docs/design-refrence/Proovd-Creator-Flow-v2.html` — a `.dc` export, 2,682 lines, whose `startScreen` prop jumps to any of its fourteen screens. `docs/phases/creator-flow-v2.md` is the brief and `docs/phases/creator-flow-reconciliation.md` the walk. **Walk it; do not only read it.** Five of its decisions are behaviour rather than markup, and one of its own view-model fields (`verifySpec()`, line 2457) is computed and rendered nowhere — a genuine bug in the prototype whose output is good.
-
-**Six sessions, and only A has landed.** A = the record, `0055`, the registers, and **no surface**. B = the shell and screens 0–3. C = screens 4–8 and the claim, ending where `requireAffiliateInvitationToken` ends. D = the app shell and Home. E = Pitches and the Active list, adding **no decision service**. F = work, Earnings, Resources, Settings, and the money-surface consistency pass, adding **no second money path**. The seams are the auth-regime boundaries, so each session ends where a guard changes.
-
-`shared/src/creator-flow/{flow,voice,standing,referrals,resources,channels,settings}.ts` owns the registers; `backend/src/creator-flow/logic.ts` restates the four vocabularies a CHECK hardcodes (drift-tested); `backend/src/db/schema/creator-flow.ts` the Drizzle tables; migration `0055` the guarantees; `backend/src/tests/creator-flow.test.ts` is the artifact (33 tests). **`CREATOR_FLOW_PAGES` ships empty and a test asserts it** — `events.ts`' rule applied to a screen: a page appears in the register when something renders it, never before, or every "is this reachable" check answers yes about surfaces that do not exist.
-
-- **Session A found that the delete-account request already exists, and the gap is a ROUTE.** It drafted `affiliate_deletion_requests` and hit a name collision: **0044 shipped it** with the Creators workspace on 2026-08-11, already in the right shape — the record is of the ASK, with no `deleted_at`, no purge schedule, and no `approved` state, because §25.8's retention obligations do not end because somebody clicked a button. What is missing is that only an Admin can file one, which is precisely why its `received_via` column exists: today the ask arrives out of band and somebody writes down how it reached us. Session F adds the Creator's own route onto the SAME record with `received_via = CREATOR_DELETION_RECEIVED_VIA`. A second table would have been the duplicate this codebase refuses everywhere else — §26.8's "a second event store that drifts from the first is worse than no timeline", applied to a person's erasure request, where two copies disagreeing is the worst version of that failure. **The brief's A2 list named seven records; six were built.**
-- **Each of the three deviation records is narrowed by what its table CANNOT hold, and the tests are absences read out of `information_schema`.** `affiliate_standing_snapshots` has exactly seven columns and none is a rate, floor, percentage, multiplier, or eligibility value — and **no `proposal_access` column exists anywhere in the database**, asserted across every table rather than the new ones, because §29.4 makes `restrict bidding` an enforcement action and the Affiliate workspace already DERIVES proposal access from §29 records. A stored tier that changed it would be a second, contradictory answer to one question, and the two would disagree the first time an Admin restricted somebody with a high score. `affiliate_referrals` has no amount, cents, percentage, commission, rate, currency, or payout column — §24 has four money streams and a referral payment would be a fifth. `creator_resource_interest` has a key, a subject, and a timestamp, and no asset, URL, file, or campaign column, which is the whole of what keeps §14.1's "all material lives in one Campaign kit" true.
-- **The referral has no state meaning the person joined.** `recorded → reviewed → closed`, and a test asserts `accepted`, `joined`, `converted` and `paid` are none of them. Whether somebody was eventually recruited is §8's record; reporting it back would tell a Creator about another person's admission decision — and would give the referral an outcome, which is the shape a commission needs.
-- **The standing inputs each name the record they are counted from, and three plausible ones are refused.** Sales or revenue (§22.8 keeps revenue out of completion entirely and §33.10.6 asserts that absence — a score that read it would reintroduce it through the back door), response speed to an opportunity (§14.2 says declining carries no penalty and `DECLINE_NO_PENALTY_NOTE` already exists, so a score that fell for a decline would make that sentence untrue), and the §8 internal quality tier (assessment data, and an Admin's judgement rather than a record of what somebody did). A test scans the register for all of them.
-- **The nine channel tiles are presentation over §5.3's seven subtypes, and there is still exactly one subtype register.** The reference splits social into YouTube/TikTok/Instagram; a tile carries the subtype it belongs to plus, for those three, a platform — which lands in the `platform` evidence input `social_creator` already names, so the split costs no new field. `creatorChannelDisagreesWithSubtype` **reports** a Creator/Admin mismatch and never resolves it: overwriting `affiliate_prospects.subtype` would silently invalidate a recorded verification, which is the exact reason the subtype has rendered read-only since Phase 08b.
-- **The per-channel metrics are derived from `AFFILIATE_SUBTYPE_DEFINITIONS`, not from the reference's hard-coded switch, and the test runs both directions.** Forward: every one of the nine ids is an evidence input that register already names. Backward: `allCreatorChannelMetricIds()` equals the nine exactly, so a renamed evidence input fails the suite rather than leaving a CHECK pinning an id nothing produces. A subtype whose §5.3 evidence carries none of them — `student_affiliate` and `niche_marketer`, whose inputs are a promotion plan and a disclaimer — returns an empty list, and the screen says nothing is asked rather than inventing a figure. §16a in its strongest form: not zero, not asked.
-- **The metric value is TEXT deliberately.** "About 40k" and "12,300 on the main list" are real answers; a numeric column would refuse them and push somebody to type a figure they do not have. §8's verification is an Admin's judgement over evidence, not arithmetic over a column — `subtypes.ts`' own reasoning about honestly incomplete records.
-- **The post-claim correction record closes a §5.3 right the product has never had.** §5.3 lists the settings a Creator may change and **none of it is editable after the claim**: `affiliate_signup_profiles` has exactly three writers — `saveSignupProfile` (which hard-refuses once `claimed_at` is set), the claim itself, and Admin's `correctAffiliateAccountField` — and the three `/api/creator` routers that touch the table only READ it. So `requestAffiliateCorrection`, whose own parameter doc reads *"the field the Affiliate should review"*, has been emailing Creators since 2026-08-17 asking them to correct something they have no route to correct. `affiliate_profile_corrections` is that record, and it is **not** a relaxation of `saveSignupProfile`'s refusal — that refusal is load-bearing for screens 1–8 and stays. It inherits the Admin path's discipline: a required reason, `prior_value` NOT NULL (a genuinely absent prior is JSON `null`, never SQL NULL — 16a's distinction, because SQL NULL would mean "no before was recorded", the state the column exists to forbid), read `FOR UPDATE` inside the transaction that changes it (§33.12.4), and no UPDATE grant, because a prior value that can be rewritten afterwards is worthless.
-- **Field ids, never column names.** The correction record's `field_id` is CHECK-pinned to the settings register — 16a's overridable-field reasoning: a route accepting any string would happily record a correction of something that does not exist, and the trail would look complete while pointing at nothing. `legal_name` and `email` are in the register but in their own `CREATOR_SETTINGS_GUARDED` list, because one is the identity Stripe was given and the other is where every transactional message goes. The five §11 confirmations and the channel subtype are **not** in it at all.
-- **The tone survives its own re-authoring, and the sentence that makes it honest is pinned.** The reference asks "a tone we should write your scripts in"; §30 defers AI rewriting, §12 makes the helpers static, and there is no model client in this tree. Nothing writes anything in a tone. The field is kept because the answer is what a Founder reads on the §11 public card and is the Creator's own statement about what they are good at, and `VOICE_IS_NEVER_USED_TO_REWRITE` travels with the control. `flexible` is its own column rather than a seventh tone, because it says something about the OTHER answers — and the CHECK admits it alone, or the switch would be a control nobody can use on its own.
-- **Only what a CHECK hardcodes is restated in the backend.** Four vocabularies plus the referral states and the score bounds. The prose — help text, explanations, the absence register — is deliberately NOT copied: it is imported through Vite, and two versions of one paragraph is how they begin disagreeing. What makes the restatement worth having is that a drift is not a failing test somebody reads at leisure; it is a Creator picking a tile the register added last week and meeting a constraint violation naming nothing they can act on. The suite compares shared → backend → `pg_get_constraintdef`, three places and one truth.
-- **`CREATOR_FLOW_ABSENCES` holds 26 refused elements and `CREATOR_FLOW_OMISSIONS` the four the Spec requires that the prototype never draws** — §14.1's safe link test, §20's seven Creator obligations, §29.1's self-pre-order disclosure, and §29.2's conflict disclosure, all four of which have records already. A test walks both, requires every `absentBecause` to be over 60 characters (a one-word reason is how a register stops being an argument), and names the four that would cost the most: `Withdraw`, `No clawbacks`, `matchPct`, and `Agree and enter`.
-- **The suite's own first draft flagged a correct column, and the fix was to exclude it by name rather than narrow the pattern.** The standing table's forbidden-substring scan caught `percentile`, which contains `percent` and is a rank position rather than a rate. A scan tuned until it stops flagging a correct column is one that would also stop flagging a wrong one, so the exclusion is explicit and the exact-column-set assertion beside it is what actually holds the line.
-- **Two numbers in the brief were stale, and one moved again mid-session.** `0055` was free and is used. `PHASE 37` was already Today's when the brief was written, and `PHASE 38` went to an Admin-shell narrow-width fix hours later — so the stylesheet section was **`PHASE 39`** at the time — and it moved a third time on 2026-08-20, when the Founder dashboard landed on `main` first and took 39–42, which is why the Creator flow's four sections are **43–46**. **Do not trust any number in this paragraph**: run `grep -oE "PHASE [0-9]+" frontend/public/proovd.css | sort -u -V | tail -1`. `.crf-` is confirmed free, and the four prefixes it must avoid are all live: `.cr-` (PHASE 26/32, the Affiliate **Admin** workspace), `.cf-` (PHASE 31, Create Founder compose), `.ff-` (PHASE 34, the Founder flow), `.mny-` (PHASE 36, Money & Fulfillment).
-
-**The five deviations, each authorised by explicit product direction on 2026-08-19, each narrowed by mechanism rather than by intention.** They are recorded the way the 2026-08-10 Admin-MFA removal and the `campaign_followers` record are, so a later session neither deletes one as a mistake nor reads one as licence for its neighbours. Deviations 1 and 5 need no schema — they are a pagination and a layout — so nothing about them landed in Session A beyond the refusals:
-
-1. **The nine-screen onboarding** (Session B/C). §11 asks for "one compact account-and-profile flow" and forbids a "multi-page education sequence" by name; §30 defers general product tours. What must stay true and is asserted: every §11 content bullet still collected, the five confirmations still five separate unchecked controls writing five columns (§28.4), **no bank, routing, tax-id or identity input anywhere and no route that could accept one**, no public route, and the invitation still claiming exactly one association (§33.2.1). **§33.2.2 is re-authored, not deleted** — the half about money is load-bearing and stays; the half about the tour is what departs, in one test with one dated comment. Not licence for a public signup, a second invitation mechanism, or a tour anywhere else.
-2. **The Creator standing** (Session D). See the bullets above. Not licence for a public leaderboard, a score on any Founder or Backer surface, a ranking that decides who is recruited or who may bid, or confetti.
-3. **The referral** (Session D). An introduction producing an Admin task, not a signup route: no account, no prospect row, no association, no token scope, no public join address. Not licence for a public join page, a referral commission, or an affiliate-of-affiliate tree.
-4. **The Resources screen** (Session F). §14.1: "All material lives in one Campaign kit. No separate resource-library or education journey is required." Not licence for a content library, campaign material outside the kit, or an education journey.
-5. **The account-level home and Earnings address** (Session D/F). §26 makes the Admin panel the only dashboard-style product. What is built is §20's rules for the Founder home applied by analogy: no KPI tile wall, no counters table, no real-time claim, and every unpopulated block naming what it waits on. Not licence for a Backer dashboard.
-
-**Twenty-four §1 rule 8 conflicts are decided in the brief and indexed in the reconciliation's §3.** Four are worth carrying here because each has bitten before or moves money. **`Withdraw`** on two screens, against §22.1's own sentence that *"The Affiliate never requests a Proovd withdrawal and never receives Backer funds before Transfer creation"* — the control becomes Appendix B.7 from `resolveAffiliateMoneyStatus`, which already exists and already throws on an unfilled bracket. **`Your money is guaranteed` / `No clawbacks`**, printed above the agreement on the consent screen and named in the brief as the most dangerous string in the reference — §22.1 provides for cancelling unpaid invalid amounts and creating a contractual recovery record, §29.5 protects only *valid finalized* commission, and 20a's `applyCauseBasedAffiliateAdjustment` exists precisely because clawbacks happen. **`upfront`**, which §3.2 bans in every audience including identifiers — the **third** supplied reference in a row to ship it, after the Affiliate workspace on 2026-08-11 (where its own acceptance audit *mandated* the banned term) and Founder Flow Session F. And **`reservation` / `Reserves`**, which becomes `Pre-orders` in copy, prop names, state keys, and fixtures, because §33.11.3 scans the built bundle where a prop name survives minification. Session A's suite runs a narrower, earlier version of that scan over `shared/src/creator-flow/` so a failure points at the file rather than at a build artifact.
-
-**Three designed states must not be stubbed**, each already recorded above as correct behaviour: `terms` and `affiliate-aup` are both `draft`, so `completeAffiliateSignup` returns `policies_unpublished` and screen 7 renders the reason where the button would be; R2 is unconfigured (Track A4), so the profile photo and the screenshots render a **named absence** — the Affiliate evidence uploader's arrangement, where the presign answers 503 naming the gap AND the payload carries `available: false`; and no email transport is configured. A screen whose dependency is missing says **which** one, in §27.1's six-question shape.
-
-**The trap that has cost this codebase the most is repeated in the brief and is worth repeating here:** `campaign_affiliate_associations.affiliate_id` holds the **prospect** id, not an account id — the account identity is `affiliate_signup_profiles.claimed_user_id`, and anything keying a connected-account lookup off `affiliate_id` routes money at a UUID nobody owns. Four separate `owns` helpers already re-implement that lookup (`creator.ts`, `completion.ts`, `enforcement.ts`, `founder-build.ts`); do not add a fifth silently, and if you consolidate, consolidate all four.
-
-**This machine cannot run `npm test` as one command, and the next session will hit it.** esbuild intermittently fails to read `tsconfig.base.json` with *"Access is denied"*, which aborts project setup before any test runs. It is **concurrency-dependent and pre-existing** — reproduced on a clean tree with every Session A change stashed, in 2 of 3 attempts. Four test files at a time is reliable; twelve is not, and the whole backend project never is. The signature is unmistakable once seen: **many failed FILES and zero failed TESTS**, because the failure is at collection rather than in an assertion. Run the backend in batches of five with retries and aggregate. **After Session A: 127 files, 3,470 tests, 0 failures** — backend 1,697, shared 465, frontend 1,308.
-
-### …and the shell, and screens 0–3 — Session B of six (§11, §5.3, §28.4, §33.11, DNA §5.12, 2026-08-19)
-
-Session B is the presentation: the full-bleed page primitive every later screen
-renders inside, the help drawer, the splash helper, `PHASE 43`, and the first
-four of the nine onboarding screens. **It adds no table, no migration, and no
-commercial rule** — every deliverable is a surface, a register entry, a
-stylesheet section, or a reader for a column Session A already created.
-
-`shared/src/creator-flow/onboarding.ts` owns the load-bearing copy;
-`CREATOR_FLOW_PAGES` gained its first four entries and `CREATOR_AUDIENCE_NICHES`
-sits beside the tiles that already lived in `channels.ts`;
-`frontend/src/surfaces/creator-flow/` owns `CreatorFlowPage`, `draft.ts`,
-`useInvitation.ts` and the four screens; `playSplash` joins `anim.ts`; `PHASE 43`
-the styles; `creator-flow.test.tsx` is the artifact (25 tests). **128 files and
-3,540 tests pass** — backend 1,697, shared 465, frontend 1,378.
-
-- **One register, three readers, so a page cannot exist in one and not the
-  others.** The router, the help drawer, and §33.11's `PRINCIPAL_FLOWS` all need
-  to agree about what these pages ARE; three hand-written lists is two chances to
-  disagree, and the disagreement shows up as a help card that jumps somewhere
-  that does not exist. `PRINCIPAL_FLOWS` restates the routes rather than
-  spreading them — the register is `as const` and a spread widens every literal
-  to `string` — and drift-tests against the register.
-- **`creator_signup` became two entries, split on the auth regime.** It carried
-  `/creator-invitation/:token` and `/creator/campaigns` in one flow, which is an
-  invitation token and a session cookie in the same list. `creator_onboarding`
-  is the five token-addressed pages; `creator_campaigns` is the signed-in list.
-  It is `keyboardPathRequired: true` now, which it was not: nine screens where
-  the last one accepts two policies is not a flow a keyboard user may be
-  stranded in.
-- **The interim is a real page, not a placeholder, and it is deliberately NOT in
-  the register.** Phase 08b's compact signup moved to
-  `/creator-invitation/:token/finish` and finishes the account exactly as it
-  always did. It has no help card and `ChannelStep` addresses it directly rather
-  than through `creatorFlowPath`, because a register entry for a page about to be
-  deleted is a register that lies. The Founder flow's Session B handed off to
-  `/draft/:token/vetting` for the same stretch and Session C retired it; this is
-  the same arrangement and the same ending.
-- **The interim stopped asking what screens 2–3 own.** A record collected on two
-  screens is a record whose two copies eventually disagree, and a suite testing
-  both copies would have made that look correct. What is missing is NAMED with a
-  link back to the page that owns it rather than re-asked. §11's "one compact
-  flow with one primary action" is not weakened: there is still exactly one
-  `Confirm and create account` and it is still there.
-- **The password requirement list has ONE entry, and the server was not changed
-  to match the reference.** `completeAffiliateSignup` enforces twelve characters
-  and nothing else; the reference draws four live ticks starting at eight, so
-  shipping its list would tick everything green and be refused six screens later
-  — §1.1's failure with a green tick on it. Three reasons the server did not move
-  instead: the Founder and the Admin have no composition rule either and a
-  per-role password policy is a difference nobody asked for; Session F's password
-  change goes through Better Auth's own route, which would start refusing
-  passwords that already exist; and a checklist where three of four ticks decide
-  nothing teaches people that ticks are decorative.
-- **The password is module state and a reload loses it, which is correct rather
-  than a gap.** There is no account to send it to until the claim, and it must
-  not go into `sessionStorage` or `localStorage`, where a credential outlives the
-  tab and is readable by anything running in the page. A React Router navigation
-  does not reload, so it survives the six screens between where it is set and
-  where it is used; a reload costs one re-ask at the END and nothing else,
-  because every profile answer is saved as it is typed. Position survives while
-  the credential does not, and the screen that sets it says so — somebody asked
-  again should have been told it would happen rather than discovering it.
-  **Session C's Agree screen asks again rather than sending anybody backwards
-  through six screens they already completed.**
-- **The splash is deviation 1's narrowest part, and three mechanisms keep it
-  there.** A brand animation before a person may act is, at any length, a thing
-  that holds them. It is capped inside DNA §6.1's `grand` ceiling by `playSplash`
-  rather than running the reference's 2.6-second track; the Skip control is a
-  real button rendered from the first frame rather than something the animation
-  reveals (§28.5); and it plays once per token in memory, so navigating back does
-  not replay it. `reduced()` short-circuits it before it starts — the caller
-  never mounts it, which is the jump-cut rather than a second animated path. The
-  reference's 1.2s safety timeout is kept and tightened, because a tween in a
-  backgrounded tab does not progress and without it the overlay never lifts.
-- **The email is editable, and the reference renders it `Locked`.** §11 gives the
-  correction right, the column has carried a full supplier triple since Phase
-  08b, and `saveSignupProfile` has always accepted the key. It is also the
-  address every transactional message goes to, which makes it the most expensive
-  field on the screen to leave wrong. The suite asserts the input is neither
-  readonly nor disabled and that the word `locked` renders nowhere.
-- **The nine tiles never resolve the §5.3 subtype.** Nothing sends a subtype
-  under any key — the suite asserts the absence in the serialized patches — and a
-  tile that disagrees with the Admin's classification is REPORTED with
-  `CHANNEL_TYPE_IS_ADMIN_CLASSIFICATION` and left alone, because overwriting it
-  would silently invalidate a verification recorded against it. The ninth tile is
-  `niche_marketer`, a real subtype, rather than the reference's `Other`, which
-  maps to nothing.
-- **The niche is a closed list over a free-text column, and a stored value the
-  list does not contain survives.** An Admin who wrote "B2B SaaS founders" during
-  §8 research said something more useful than any list entry; a select that
-  silently dropped it would lose §11's prefill on first render and the Creator
-  would never know a value had been recorded.
-- **`You can edit all of this later under Profile.` is refused for now, in a
-  constant.** It is true only once Session F ships Settings — and §5.3 licenses
-  that right today while the product has no route for it, which is the gap the
-  last session closes. `CREATOR_CHANNEL_CORRECTIONS_TODAY` is what renders until
-  then, so the swap is one edit rather than a search.
-- **Three columns Session A created had no reader, and a column in Drizzle does
-  nothing on its own.** There is no Zod schema for an invitation patch and no
-  route-layer whitelist, so the `text(...)` calls in `saveSignupProfile` and the
-  `str(...)` calls in the router **are** the entire allowlist — each of
-  `channel_type`, `niche_description` and `outreach_plan` is wired in four places
-  plus the route and the client. `profile_photo_key` stays deliberately unread:
-  it is screen 5's, and R2 is unconfigured anyway.
-- **No global Enter handler.** The reference fires the current screen's primary
-  action on Enter; a stray keystroke must not advance a walk whose later screens
-  accept a §14.2 agreement. There is no key handler and no `<form>`, so the
-  browser's own submit-on-Enter has nothing to submit either — the suite types
-  the chord and asserts the page did not move.
-- **The GSAP shim was widened, and that is a correction rather than a new
-  capability.** Its `timeline` type declared only `from` and `to`; `fromTo` and
-  `kill` are real members of a GSAP timeline, and the shim describes the vendored
-  runtime rather than the subset somebody happened to use.
-- **The browser pass found four defects and two of them are pre-existing** — see
-  the reconciliation's §8. The two that belong to nobody are the ones worth
-  knowing about here: `.wrap` is a VIEWPORT width and `Section` renders one, so
-  any `<Measure><Section>` spills — the Creator's compact signup has lost its
-  right-hand 430px at 1280 since Phase 08b and pushed the document sideways at
-  320, which is a §33.11.1 failure on a shipped page. PHASE 38 fixed the same
-  thing inside the Admin view four days ago; `:where(.measure) .wrap { width: 100% }`
-  is the general form. And a `.kv` value holding a URL is one unbreakable token,
-  fixed at the definition this time because a `dd` that overflows rather than
-  wrapping is a defect at every call site.
-- **The interim rendered `student` where the channel goes** — an internal
-  identifier on a customer surface (§3.1), and invisible to every scan in the
-  product because it is a real English word. The register that owns the tiles
-  owns their words.
-
-**What Session B deliberately did not build:** any screen past the channel; the
-voice, presence, verification, agreement or all-set records (Session C's, landing
-with their screens); any change to `completeAffiliateSignup`, the five §28.4
-confirmations, the two policy acceptances, or the token model; a reader for
-`profile_photo_key`; and a second subtype register. `AFFILIATE_SUBTYPE_DEFINITIONS`
-is byte-for-byte unchanged, `listFounderVisibleRoster`'s seven-column projection
-is untouched, and no money decision moved.
-
-### …and screens 4–8, and the claim — Session C of six (§11, §5.3, §28.4, §31.5, §22.1, 2026-08-19)
-
-Session C is everything still reachable on the invitation token plus the one screen after it: the
-tone, the bio, the channel figures, the agreement, and the account. **It adds no table, no
-migration, and no commercial rule** — two routes over records Session A already built, five
-surfaces, and one defect that had been shipping since Phase 08b.
-
-`shared/src/creator-flow/onboarding.ts` gained screens 4–8's copy and `CREATOR_CONFIRMATIONS`;
-`flow.ts` the five pages; `backend/src/creator-flow/logic.ts` the one vocabulary Session C had to
-restate; `backend/src/affiliates/creator-profile.ts` the reads and writes; `PUT …/voice` and
-`PUT …/metrics` the API; `frontend/src/surfaces/creator-flow/{Voice,Presence,Verify,Agree,Done}Step`
-the surfaces; `PHASE 43`'s Session C block the styles. **128 files and 3,613 tests pass** — backend
-1,711, shared 465, frontend 1,437.
-
-- **Screen 8 could not be on the invitation token, and finding that out fixed a live defect.**
-  `completeAffiliateSignup` calls `claimAffiliateInvitation`, which sets BOTH `claimed_at` and
-  `revoked_at` — `affiliate-signup.test.ts` has asserted the one rejection on a repeat claim since
-  Phase 08b. But `CreatorSignup` re-read the invitation after a successful claim and rendered
-  §33.2.3's waiting state from `profile.claimedAt`, so that read **401s in production** and a
-  Creator who had just created their account was shown the unusable-link page. The frontend suite
-  never saw it because it stubbed a claimed profile rather than driving a real claim — §33.11.1's
-  own failure mode, inside a test harness. The waiting state has been unreachable since it was
-  written; screen 8 is `/creator/welcome` behind `RequireRole allow={['affiliate']}`, and a test
-  asserts nothing on it talks to `/api/affiliate-invitation` at all. **Session A anticipated the
-  shape of the answer** when it typed `param` as `'token' | 'none'`.
-- **The claim mints no session, so the Agree screen signs in afterwards.** §11 does not ask
-  `completeAffiliateSignup` for one and it issues none, so the password held in `draft.ts` is posted
-  to Better Auth's own `/api/auth/sign-in/email` — the real route, its real rate limit, its real
-  origin guard, no new server code. Founder Flow Session D made the same call. A failure there is a
-  failure to SIGN IN and gets its own sentence, because the account committed in its own
-  transaction and telling somebody otherwise sends them back to a link that no longer works.
-- **Three §11 fields the reference never draws, and a fifth omission for §2's list.** `dateOfBirth`,
-  `country` and `stateRegion` gate the claim and appear on no screen of the prototype, which bundles
-  four representations into one sentence instead. They sit on screen 7 because they are the factual
-  half of two of the five confirmations — the birth date beside "I am at least 18", the state beside
-  "I am based in the United States", which is where §10's Founder claim puts the same pair. Nothing
-  computes an age: §11 records what somebody states and the confirmation IS the statement.
-- **A PUT for the tone, not a PATCH.** The SET is the answer — dropping a chip is expressed by
-  sending the remaining ones, so a merge would make removal unrepresentable. Both writes retire
-  before they insert, inside one transaction, because the partial unique index permits one live row
-  and the immutability trigger means there was never an UPDATE path that would have avoided the
-  question.
-- **The one vocabulary Session C restated, and why it is the exception.** `VOICE_TONE_IDS` and the
-  three caps are NOT CHECK-pinned: 0055 bounds a tone set only by `affiliate_voice_says_something`,
-  deliberately, because a length cap in a CHECK refuses a row rather than telling somebody their
-  chip is long. That left the SERVICE as the only thing between a request body and the array, and
-  the browser is not the boundary.
-- **A metric is refused unless the Creator's own subtype asks for it.** 0055's CHECK pins the id to
-  the nine; what it cannot know is WHOSE subtype, and a podcast Creator posting `enrolled_students`
-  would satisfy it while storing a figure §5.3 never asks a podcaster for — which an Admin would
-  then verify against a question nobody put to them. `permittedMetricsFor` derives from
-  `REQUIRED_EVIDENCE` and a test drives all seven subtypes through it and through shared's
-  `creatorChannelMetricsFor`. Clearing a metric RETIRES its row and inserts nothing, because 0055
-  requires a non-blank value and "I would rather not say" is the absence of a live row (§16a).
-- **One §11 sentence stopped existing twice.** "Proovd owns this step…" has been in `CreatorSignup`
-  and in `templates/affiliate-signup-confirmed.tsx` since Phase 08b, written independently with
-  nothing comparing them. The owner of a wait is a promise about who is accountable for ending it,
-  and two copies is how one becomes "the Founder's fault". `CREATOR_PROOVD_OWNS_THE_WAIT` is
-  canonical; the backend restates it and the suite fails if they disagree.
-- **§33.2.2 is re-authored: one test, one comment, one date.** Deviation 1 departs from the "no
-  tour" half by explicit product direction. The load-bearing half is asserted unchanged — one
-  account action (exactly one `.btn--primary` on the screen that creates it), one Stripe payout
-  action still a handoff (Phase 10b's four assertions **verbatim**, only their entry point moved),
-  no bank/routing/tax-id/identity input anywhere and no route that could accept one, five
-  confirmations as five unchecked controls writing five columns (counted against
-  `CREATOR_CONFIRMATIONS`, which names each column, so the count is compared to the SCHEMA rather
-  than to a second list), and one PATCH key per control.
-- **The browser pass found five, and it is the eleventh rebuild in a row.** "Date of birth" rendered
-  twice, because `DateOfBirthField` renders its own label and was wrapped in a `Field`. The reused
-  field carried `FLOW_AGE_IS_YOUR_STATEMENT`, which says it checks 18+ "as a courtesy" — true on the
-  Founder claim, which computes it, and a claim about behaviour on a screen that computes nothing
-  (the note is a prop now; the Founder flow is unchanged). **§5.3's `basis` was rendering to a
-  Creator** — *"The audience-size metric §8 requires on the prospect"*, a Spec section reference on
-  a customer surface, the Campaigns hub's `§21:` leak with a worse audience; a test now walks every
-  screen and refuses `/§\s*\d/`. The tone help got HARDER to read at the moment somebody chose it
-  (`--moss` is ~3.4:1 on white and ~2.3:1 on the chip's mint fill). And `--brand` on white is
-  1.46:1, so both policy links on the agreement screen were unreadable — PHASE 34's
-  `.ff-claim__consent a` took the same position.
-- **Two contrast gaps are pre-existing and were deliberately NOT changed.** `--moss` body copy at
-  ~3.37:1 is what Session B ships on every lede in the flow and what Founder Flow Session C
-  established as the body-copy tone; `state-panel__key` at 2.18:1 and `tag--mint` at 2.66:1 are
-  Phase 02/05 primitives every workspace uses. Re-toning either is a product-wide edit with its own
-  screenshot pass, and doing it inside a five-screen session would be a change nobody could review.
-  Recorded rather than silently inherited.
-- **One probe result that is not a defect**, written down so the next pass does not chase it: an
-  `<input>` whose VALUE is longer than its box reports `scrollWidth > clientWidth` and the browser
-  scrolls it natively. The document does not scroll sideways and nothing is lost — the `.sr-only`
-  false positive in a different shape.
-
-**What Session C deliberately did not build:** any change to `completeAffiliateSignup` (not split,
-not reordered, not made partial — `affiliate-signup.test.ts`'s own assertions pass untouched, which
-is why the new suite does not re-drive §33.1.9); an upload route for the photo or the evidence
-screenshots (§12's bucket is Track A4, the payload carries `uploads.available`, and a test posts at
-four plausible addresses and asserts 404 on all four); a `matchPct` meter, a score, or an unlock (no
-threshold in §5.3 or §8 exists for one to measure); a third policy acceptance (§31.5's IP agreement
-is per campaign and due before work); and anything on screens 9–14 — Home, Pitches, Earnings,
-Resources and Settings are Sessions D–F, and none is in `CREATOR_FLOW_PAGES`.
-
-`/creator-invitation/:token/finish` is a redirect to `/agree` now, and `CreatorSignup.tsx` is
-deleted — the way the Founder flow retired `/draft/:token/vetting`.
-
-### …and the app shell, and Home — Session D of six (§20 by analogy, §26, §27.7, §22.9, 2026-08-19)
-
-Session D is the first persistent chrome a Creator has ever had — a rail, a menu drawer, and a
-notification drawer — and the account-level home behind it. **It adds no migration**: Session A's
-0055 held every record and this is its first service.
-
-`shared/src/creator-flow/app.ts` owns the rail register, Home's copy, and the twelve refusals;
-`standing.ts` gained the score kernel, the cohort minimum, and the percentile; `creator-flow/logic.ts`
-restates all three (drift-tested); `backend/src/affiliates/{standing,referrals,home}.ts` the
-derivation, the referral, and the one read; `GET /api/creator/home` and `POST /api/creator/referrals`
-the API; `frontend/src/surfaces/creator-app/` the shell and the page; `PHASE 44` the styles;
-`creator-flow-d.test.ts` (24) and `creator-home.test.tsx` (15) the artifact. **130 files and 3,662
-tests pass** — backend 1,735, shared 465, frontend 1,462.
-
-- **§26 makes the Admin panel the only dashboard-style product, so this needed deviation 5 to exist
-  at all — and what keeps it from becoming one is §20's rules, each with a visible consequence.**
-  One thing waiting, or the caught-up ending with **no control at all** (the suite asserts the branch
-  renders nothing operable, rather than that one particular button is missing — which would pass
-  while a different one was added). No counters table: the pitch count is a query over the
-  association states and `proposal_versions`, exactly as §20's counts compose from
-  `reservation_status_history`. Every number derived or not shown. And freshness reads
-  `GLANCE_FRESHNESS` rather than a second wording, with `BANNED_FRESHNESS_TERMS` scanned across the
-  rendered surface.
-- **The tier binds nothing, and a source scan by PATH is the enforcement.** `MUST_NOT_READ_STANDING`
-  names five modules and scans each for the table name, the Drizzle export, and the three functions —
-  comments stripped first, so a module may EXPLAIN that it must not read the standing without failing
-  (`notifications/send.ts`'s rule). The brief names `affiliates/readiness.ts` and there is no such
-  file: §15's roster readiness is `campaign/readiness.ts` and §16's is `creator-payment/readiness.ts`.
-  Both are in the register, because a scan naming a module that does not exist passes by finding
-  nothing — the first draft THREW on the missing path rather than skipping it, which is how that was
-  found.
-- **The score is invented, and the answer to that is transparency rather than a justification.**
-  There is no way to build one without choosing weights, which is why it is a recorded deviation. So
-  the weights are IN the register the surface renders from and "How this is worked out" states the
-  arithmetic rather than describing it (§33.12.6's posture on the measurement scoreboard). The
-  ordering says something: a completed campaign needs all five §22.8 criteria and an Admin decision;
-  a passed evidence check is something an Admin reviewed; a first post that passed is smaller and
-  repeatable; running to the end with no §29 action is the weakest, because it is the absence of
-  something.
-- **Three of Session A's register entries were wrong, and the first thing to read them found all
-  three.** Session A wrote no surface, so nothing exercised the `derivedFrom` strings until now.
-  `creator_post_submissions.outcome` does not exist — the column is `status`, named twice. And
-  `channels_verified` counted the wrong GRAIN: 0048 CHECK-pins
-  `affiliate_evidence_verifications.metric` to the five §5.3 evidence metrics, so a Creator with ONE
-  channel and three verified metrics would have scored three channels. It is `evidence_verified` now,
-  labelled `Evidence checks passed` — the name follows the record rather than the record being bent
-  to the name — and the one surviving "how to climb" task followed it. What stops this recurring is a
-  test that parses every `table.column` out of every `derivedFrom` and asserts it exists in
-  `information_schema`.
-- **The snapshot is written on a READ, and the write is caused by a record moving rather than by time
-  passing.** `ensureStandingSnapshot` appends only when the derived counts DIFFER from the latest
-  stored ones; there is no clock in the module, no sweep, and no job, and a Creator who reloads a
-  hundred times gets one row. Writing on a read has precedent — `readPreparingKit` writes its §31.5
-  access row in the same call that returns the content, and §20's `readGlance` issues its delivery
-  receipt — and what it buys over a sweep is that a Creator whose campaign completed an hour ago sees
-  it rather than seeing `STANDING_NOT_ENOUGH_HISTORY` until a cron fires. A recomputation is a NEW
-  row and the earlier one keeps its own inputs (21b's completion-findings reasoning).
-- **A Creator with no completed campaign gets no standing row at all**, which is §16a rather than an
-  optimisation: a stored zero would render as a lowest tier, which reads as a judgement about
-  somebody who has simply not started. The percentile and the leaderboard share one cohort gate
-  (`CREATOR_STANDING_COHORT_MINIMUM = 10`, §31.9's `COHORT_BASELINE_SIZE` reasoning), so the two can
-  never disagree about whether there is a cohort — and a ranking of three is a sentence about two
-  strangers.
-- **The leaderboard's projection is the enforcement.** Public handle, score and tier; there is no
-  earnings, campaign, legal-name or email column in the query to forget to filter out, which is
-  `listFounderVisibleRoster`'s own arrangement. A Creator with no recorded handle is not named and
-  there is no fallback to a legal name or an address. §11 has no Creator→Creator twin in the Spec, so
-  the brief states one and `STANDING_LEADERBOARD_SHOWS_HANDLES_ONLY` is where a reader meets it.
-- **The referral reaches an Admin through the history it already writes to.** §1.4: a form that
-  records something nobody will ever see is a promise. There is no §27 key for a referral and
-  inventing one would be inventing a message, so the destination is the record plus an `audit_events`
-  row rendered through the Creators workspace's own allowlist — `founder_meeting_notes`' arrangement.
-  The audit target is the REFERRER, because the referred person has no record to attach anything to
-  and creating one would be the signup route this refuses; the suite counts prospects, associations,
-  users and tokens before and after and asserts all four unchanged. The referrer comes from the
-  SESSION and the suite posts somebody else's id and watches it be ignored.
-- **The notification drawer renders 22c's own component against 22c's own client**, so there is no
-  second read and nowhere to put a badge. The reference draws `Updates · 2 new` in the menu and a `2`
-  on the rail; both are in `CREATOR_APP_ABSENCES`, and a badge would have to be computed from a
-  column that deliberately does not exist. The suite asserts the rail's text contains no digit at
-  all, the history payload's keys are exactly `entries` and `nextCursor`, no read-state column
-  exists, and opening the drawer performs no non-GET request.
-- **Every rail section is either reachable or explained, never both and never neither.** The
-  `CAMPAIGN_DESTINATIONS` arrangement, asserted in both directions. `Pitches` and `Settings` point at
-  addresses that already exist and are genuinely the section; `Earnings` and `Resources` have none
-  and render `aria-disabled` with a short honest line in the rail and the full reason one gesture
-  away in the menu (DNA §5.12's Glance, then Explore). `aria-disabled` rather than `disabled`, so a
-  keyboard user meets the explanation a sighted user can see (§28.5).
-- **The browser pass found six, and it is the twelfth rebuild in a row.** `--fs-step` is a flow step
-  TITLE (`clamp(1.625rem, 4vw, 2.5rem)`) and reading it as "one step down" put a 40px sentence in the
-  rail, a 40px eyebrow, and a 40px freshness line — three places, one misreading. A `.btn--primary`
-  IS the brand fill, so the hero's primary control was invisible on a brand-fill band and the hero's
-  own campaign links were brand-on-brand and simply absent (the hero carries `mode-dark` now, where
-  the primary is white — and the two hero states differ in treatment as well as content, which is DNA
-  §5.4's point). `toLocaleString()` rendered `8/18/2026, 12:15:00 PM` — the machine's locale, with
-  seconds. The percentile was off by one (`101 - percentile`). `Refer another Creator` wrapped to
-  three lines in the side column. And `.cra-drawer__lede` used `--moss`, a light-mode tone, inside
-  `.drawer`'s `--darker` ground — the class of defect PHASE 28, 31, 33 and 39 each recorded.
-- **One the §33.11 sweep caught rather than the browser:** the work-again row's `Yes` / `No` are
-  objectless CTAs (§33.11.4). With two requests on screen a bare Yes says nothing about what is being
-  agreed to, and §14.2's own word for the other half is Decline.
-- **Two contrast gaps are pre-existing and were deliberately NOT changed.** `--btn2-text` is
-  `--brand`, so every `.btn--secondary` in the product is about 1.46:1 on white — which on the
-  work-again row makes the accept control less legible than the decline beside it. That is DNA §7.1's
-  variant-2 definition and the same documented, scoped tech-stack §3.6 territory as
-  `.btn--primary`'s 1.44:1. And `--moss` body copy at ~3.37:1 is what Sessions B and C ship on every
-  lede in this flow. Fixing either on one surface would make that surface disagree with the design
-  system; both are recorded rather than silently inherited.
-
-**What Session D deliberately did not build:** any migration; a sweep, a job, or a schedule of any
-kind (the standing appears because a record moved); a notification count anywhere; any Pitches,
-Earnings, Resources or Settings surface (Sessions E and F); and an Admin surface for the standing or
-the referral — the referral reaches an Admin through the history it already writes to, and a later
-phase asked to read the standing as a default, a filter, or an eligibility condition is asking for
-the §1 rule 6 violation the missing columns exist to prevent.
-
-### …and work, Earnings, Resources and Settings — Session F of six (§17, §5.3, §22.1, §14.1, §29.5, 2026-08-20)
-
-Session F is the four rail sections that had no content: §17's own active-partnership list redrawn
-as the work surface, an account-level Earnings address, Resources, and the §5.3 settings the
-product has never let a Creator change. **It adds no migration** — 0055 and 0044 held every record
-— **and no second money path**: there is one Transfer per association and it is Admin's.
-
-**It was built before Session E, and that is a departure the brief's scope table did not license.**
-E replaces the Pitches LIST; F's four surfaces are reached from the rail and from the existing
-`/creator/campaigns`, which still works and still links to the partnership address. The dependency
-is one of position in the walk rather than of code — the 22c-before-22b precedent — and what it
-costs is that the end-to-end walk goes through Phase 08c's list until E lands.
-
-`shared/src/creator-flow/work.ts` owns §17's thirteen bullets as a register, §29.5's four reasons,
-and the pinned refusals; `money.ts` the Earnings copy; `settings.ts` and `resources.ts` are Session
-A's, first read here. `backend/src/creator-flow/logic.ts` restates the ten settings ids, the four
-resource keys and the four termination reasons (drift-tested against shared AND against
-`pg_get_constraintdef`); `backend/src/affiliates/{creator-settings,creator-money,creator-resources,creator-asks}.ts`
-own the services; nine routes on `creator.ts`; `frontend/src/surfaces/creator-app/Creator{Work,Earnings,Resources,Settings}.tsx`
-the surfaces; `PHASE 45` the styles; `creator-flow-f.test.ts` (22) and `creator-work.test.tsx` (21)
-the artifact. **132 files and 3,740 tests pass.**
-
-- **"Every §17 bullet has a field" is a count the suite performs.** `CREATOR_WORK_ITEMS` carries
-  §17's own words beside the payload field each is answered by, and the walk resolves every one
-  against a REAL `buildCreatorPartnership` payload — so a bullet that loses its field fails rather
-  than disappearing. `undefined` is the failure and `null` is an answer: a mid-campaign block on an
-  initial-roster Creator is legitimately null, and treating that as missing would have forced a
-  fake object into the payload.
-- **Phase 14d's `pending` block is gone, and its assertion is consciously inverted.** It named five
-  metrics as unavailable because Phase 15 had not created a reservation and Phase 19 had not moved
-  any money; both shipped, and a block still saying "not yet" about records that exist is §1.4's
-  failure in the other direction. What that assertion protected survives and is the stronger half:
-  a number nobody has computed is ABSENT, never a zero, so `conversionRate` over no clicks is
-  `null` and `creator-partnership.test.ts` asserts that instead — one test, one dated comment.
-- **The bonus is the Creator's own or there is none (§14.3).** The reference draws a platform-wide
-  "50 reservations to your bonus tier"; §14.3's bonus is per proposal version with a stored trigger
-  unit and threshold, so no agreement means no block. The progress figure is a RUNNING total over
-  rows still live or already charged and `note` says so — the bonus is decided at close on captured,
-  verified charges only, and reporting the finalization measure live would read 0 for every Creator
-  until the close batch runs, which is true and useless.
-- **The termination ask opens a §26.7 case and does NOT write 0048's row.** A decision, and it
-  departs from the brief's own sentence. `association_termination_requests` requires a §24.8 cause
-  and a money treatment from that cause's permitted matrix; both are an Admin's recorded judgement
-  (20a), every one of the five causes asserts fault about somebody, and there is no unclassified
-  shape — adding one would weaken a CHECK that exists to stop the strongest treatments becoming
-  reachable. Asking a Creator to pick one is asking them to classify a refund that does not exist.
-  So the Creator states §29.5's reason, the ask gets a real `PVD-` reference and §27.8's
-  business-day promise through `openSupportCase`, and the Admin's own control records the classified
-  row from it. The suite asserts both halves: a case with a real deadline appears, and
-  `association_termination_requests` stays empty.
-- **§5.3's settings gap is closed, and it is not a relaxation of anything.** `saveSignupProfile`
-  still hard-refuses once `claimed_at` is set — load-bearing for onboarding screens 1–8, untouched.
-  This is a different act with the Admin correction path's discipline: a required reason, the prior
-  value read `FOR UPDATE` inside the transaction that changes it (§33.12.4 — the route has no
-  parameter for the prior value, so a flattering pair is unrepresentable), an `audit_events` row in
-  the same transaction because the profile has no history table, and §11's supplier triple
-  recomputed so the source label stays true after a Creator edits their own record. Since
-  2026-08-17 `requestAffiliateCorrection` has emailed Creators asking them to correct something they
-  had no route to correct; this is that route.
-- **The field id is a register entry and never a column name.** 16a's overridable-field reasoning:
-  a route accepting free text would record a correction of something that does not exist and the
-  trail would look complete while pointing at nothing. Three places agree and the suite proves it —
-  shared's two registers, the backend restatement, and 0055's own CHECK read back through
-  `pg_get_constraintdef`.
-- **The delete-account ask writes 0044's OWN record**, with `received_via` naming this screen, which
-  is precisely what that column exists for. A second table would have been the duplicate this
-  codebase refuses everywhere else, and on a person's erasure request two copies disagreeing is the
-  worst version of that failure. Nothing is deleted: the suite asserts no `deleted_at`, `purge_at`,
-  `approved` or `approved_at` column exists on it.
-- **There is no withdrawal, and three scans say so.** §22.1: *"The Affiliate never requests a Proovd
-  withdrawal and never receives Backer funds before Transfer creation."* Every button and link on
-  both money surfaces is walked for `withdraw`, `cash out` and `request payout`; both money modules
-  are scanned with comments stripped first (they EXPLAIN at length that there is none —
-  `notifications/send.ts`'s rule); and two plausible route addresses are driven and asserted 404.
-  `EARNINGS_ARE_NOT_WITHDRAWN` stands where the reference put the control.
-- **Earnings is an address, not a second computation (§33.8.13).** Each row calls `readCreatorClose`
-  — the one resolver that renders Appendix B.7 and throws on an unfilled bracket — so a row and that
-  campaign's own close view agree because they are the same call. The lifetime figure sums RECORDED
-  rows only: an estimate folded in would have been wrong on the way to being right. §24.4's split
-  stays three separate stored numbers and the reference's `earned * 0.8` is refused.
-- **Deviation 4 is kept true by four absent columns.** `creator_resource_interest` has a key, a
-  subject, and a timestamp; the suite asserts `information_schema` holds no asset, URL, file,
-  storage or campaign column on it, so it cannot become the §31.5 kit. There is no download control
-  because there is no file, and a disabled one invites somebody to work out how to enable it. A
-  second ask is not an error and not a second row — the unique index answers, and telling somebody
-  their second tap failed reports a constraint as a problem with them.
-- **Four things the reference never drew now exist**, which is `CREATOR_FLOW_OMISSIONS`' whole
-  Session F list: §14.1's safe link test (the mechanism has existed since 14b and had no control),
-  §20's seven obligations, and the §29.1 self-pre-order and §29.2 conflict disclosures — both
-  records existed with only an Admin route, which is not what §29.1 describes.
-- **`NotificationSettings` gained one prop, and it was needed.** §27.7's control is embedded on
-  `/creator/settings` rather than duplicated, and its own `h1` would have been a second one on that
-  page (§33.11.2). `embedded` takes it to an `h2` and its history heading to an `h3`; the standalone
-  address is unchanged.
-- **The browser pass found five, and it is the thirteenth rebuild in a row.** `Measure` is a
-  max-width with NO gutter, so every `.card` sat flush against the viewport edge while the section
-  above it was inset by `.wrap` — two different left edges at 1280, fixed by using `.cra-page`,
-  which is Session D's own container. `.cra-amount` at `--fs-hero` is 348px wide and pushed the
-  document sideways at 320 (a §33.11.1 failure on the one page whose whole job is a number).
-  A nested `.wrap` overflowed Settings by **231px at 1280** — `min(90vw, 1600px)` is a VIEWPORT
-  width and the embedded `NotificationSettings` renders its own `Section`, which is PHASE 38's
-  defect on a different container, scoped the same way. Ten one-row `dl.kv` lists produced five
-  different value positions, because `.kv__row` sizes per list — a column that was not a column.
-  And the `Copy` button lost 8px of its own label at 320, the `.btn`-is-`overflow: hidden` property
-  that Session D and Founder Flow Sessions D and E each lost a pass to.
-- **One change the pass prompted rather than a defect:** the tracking link rendered the words "Your
-  tracking link" where the URL should be, so a Creator could copy their link and never read it. It
-  shows the URL now, which is also what the reference draws.
-- **Two probe results are NOT defects and are written down rather than silenced.**
-  `.copylink__url` reports as clipping and is `text-overflow: ellipsis`; a `span.sr-only` reports as
-  a 1px clipping box on every route and is the visually-hidden mechanism. A scan tuned until it
-  stops flagging a correct element would also stop flagging a wrong one.
-- **Two contrast gaps are pre-existing and were deliberately NOT changed.** `.kv__row dt` at
-  ~2.18:1 and `.btn--secondary` at ~1.46:1 are shared primitives every workspace uses and the
-  documented tech-stack §3.6 territory; re-toning either is a product-wide edit with its own
-  screenshot pass. PHASE 45 uses neither — a sentence that states a rule takes `--dark`, a caption
-  takes `--moss`.
-
-**What Session F deliberately did not build:** any migration; a second refund path or a second
-Transfer path; a 0048 termination row from a Creator route; a Creator-facing dispute surface (§30
-defers the in-product dispute centre and §29.9's support path is the Backer's); any new §27 key, so
-the coverage partition is untouched; and Session E's Pitches list — the rail pointed at
-`/creator/campaigns`, which was Phase 08c's until **E replaced it on 2026-08-20** (see the section
-below).
-
-### …and Pitches, the Active list, and the pitch — Session E of six, the rebuild is complete (§14.1, §14.2, §28.5, §5.3, §27.1, 2026-08-20)
-
-Session E is the two lists and the pitch behind one of them: §14.1's opportunity
-redrawn as a four-step reveal and a recap, with §14.2's three decisions on it.
-**The Creator Flow v2 rebuild is complete — the invitation walks nine screens to
-an account, and a signed-in Creator has a home, two lists, a pitch, a work
-surface, Earnings, Resources and Settings.**
-
-**It was built after Session F, which recorded the departure at the time.** F
-came first because E replaces the Pitches LIST while F's four surfaces are
-reached from the rail and from `/creator/campaigns`, which never moved. What it
-cost was one sentence — F5's end-to-end walk went through Phase 08c's list —
-and this is that closing.
-
-`shared/src/creator-flow/pitches.ts` owns the two tabs, the four reveal steps,
-the two sorts, §14.1's own list as `PITCH_RECAP_SECTIONS`, and the pinned
-refusals; `backend/src/creator-flow/logic.ts` restates the two sort ids the
-route validates against (drift-tested); `backend/src/affiliates/creator-pitches.ts`
-is the list read and the §14.1 content read; `GET /api/creator/pitches` the one
-new route; `frontend/src/surfaces/creator-app/Creator{Pitches,Pitch}.tsx` the
-surfaces; `PHASE 46` the styles; `creator-flow-e.test.ts` (23) and
-`creator-pitches.test.tsx` (32) the artifact. **134 files and 3,801 tests pass**,
-and **`decisions.ts` is byte-for-byte unchanged — §33.2.6 through §33.2.13 pass
-as they were**, which is the only form that claim can take.
-
-- **This session adds no decision service, and the suite proves it three ways.**
-  The module has no `.insert(`, `.update(` or `.delete(` anywhere (source-scanned
-  with comments stripped), exports nothing matching accept/decline/propose/
-  respond/submit, and `decisions.ts`'s five services are still the five
-  §33.2.6–§33.2.13 drives. `readPitch` calls `readFormalOpportunity` **verbatim**
-  and composes §14.1's material beside it — `creator-money.ts` calling
-  `readCreatorClose` and adding nothing to it, one session earlier and for the
-  same reason.
-- **The reconciliation was wrong about the recap, and the first thing to read it
-  found out.** It recorded the recap's fields as *"All §14.1 kit fields that
-  `readFormalOpportunity` already returns"*. That read returns the §14.3 cell,
-  high effort, the versions, the agreement and the link — the DECISION facts —
-  and none of the Founder's material: no Problem, no Solution, no rewards, no
-  dates, no claims, no refund policy. §14.1's kit is twenty-two bullets and the
-  surface was serving about five. Session D found three register entries wrong
-  the first time anything read them; this is the same finding one session later
-  and the same answer — correct the register, and make a test resolve every
-  entry against a real read so it cannot go stale again.
-- **`buildCampaignPreview` is the one assembly, and the recap reads it.** The
-  public page and the Founder preview already do, so a third set of queries
-  would be a third thing to drift. What is added beside it is what §14.1 asks a
-  CREATOR for and a Backer is never shown: the internal target *correctly
-  labelled*, the brand and claims notes, the Founder's prior Proovd history as a
-  count (§30 defers public Founder ratings, so never a rating), and their
-  connected-account readiness as a STATE — §13 makes Proovd the holder of a
-  status and an id and never of the documents behind them.
-- **The list does not record §14.5's `reviewing`, and opening a pitch does.**
-  `readFormalOpportunity` moves `formal_decision_open → reviewing` on first
-  read, which is correct — opening a pitch is the act that observes it. Calling
-  it from the LIST would mark every open invitation reviewed because somebody
-  looked at a list of them, which is a fact the record did not observe. Both
-  directions are asserted.
-- **One derivation for the count.** `PITCH_DECISION_OPEN_STATES` and
-  `pitchKindFor` moved out of `home.ts` into `creator-pitches.ts` and `home.ts`
-  imports them back, so §20's hero count and the Pitches tab are the same answer
-  rather than two that agree today; the suite compares the two reads over one
-  seeded Creator. `proposal_pending` is deliberately not in the state list — it
-  counts only when the open version is `awaiting_creator`, because a version
-  waiting on the FOUNDER is not something the Creator can act on and counting it
-  would put a number on a tab no control can reduce.
-- **The walk is optional, and that is the §28.5 decision.** The reference
-  advances by tapping anywhere on the screen; §28.5 names "Affiliate decisions"
-  among the five flows that must be completely operable from a keyboard, and
-  §14.2 forbids hiding any of the three outcomes — a walkthrough that must be
-  completed before the decisions appear hides all three behind four gestures.
-  So every step advances with a real named control, `Read the whole pitch` is
-  present from the FIRST step, `?view=recap` is in the address so a reload and
-  the back button land on the recap rather than restarting the walk, and a pitch
-  with nothing left to decide opens on the recap (DNA §5.4: a walk that
-  introduces a campaign somebody already accepted is a delay, not a reveal).
-- **Four steps and a destination, not five.** The reference draws five progress
-  segments and calls the last one the full card. Modelling the recap as a step
-  would make it something a person has to walk TO rather than somewhere they can
-  go, which is the whole point of the paragraph above.
-- **Two sorts, both over a stored column, and the route validates rather than
-  trusts.** `Match fit` has no score behind it — §14.1's "Why this fits your
-  audience" is two Admin-written sentences, not a number — so ordering by it
-  would be inventing a rank. `Commission` and `Price` are marketplace keys that
-  invite a Creator to rank one Founder's terms against another's, which is the
-  comparison a private invitation does not have. What is left is §14.6's stored
-  deadline and when the invitation arrived; a pitch with no recorded deadline
-  sorts LAST, because an absent deadline is not an urgent one. Every `column`
-  in the register is asserted to exist in `information_schema`.
-- **The Active list renders no amount, and says where the money is.** Two
-  surfaces already render it from `resolveAffiliateMoneyStatus` — the work
-  surface and Earnings — and a third rendering on a list row is a third chance
-  for them to disagree while adding nothing a Creator cannot reach in one tap
-  (§33.8.13).
-- **The banned-term register was a second copy, and Session A's own scan caught
-  it.** `PITCH_BANNED_TERMS` was first written with `upfront` and `reservation`
-  in it; this file ships in the bundle §33.11.3 reads, so a register naming the
-  banned words puts them in the bundle to say they are banned.
-  `UNIVERSALLY_BANNED_TERMS`/`CUSTOMER_ONLY_BANNED_TERMS` are the canonical
-  registers and `namingViolations` is their scanner — both suites run it against
-  the rendered surface and the payload. What is left is this surface's own
-  refusals: the marketplace framing §3 has no opinion about.
-- **`DECLINE_NO_PENALTY_NOTE` is the CONFIRMATION, and it was in the wrong
-  place.** It opens *"Your decline was recorded"*, so rendering it beside an open
-  decision tells somebody a decline happened that did not (§1.4).
-  `DECLINING_COSTS_YOU_NOTHING` is §14.2's promise said BEFORE a decision; the
-  confirmation stays where a decline was actually recorded, and the suite
-  asserts those four words appear nowhere on either surface.
-- **A §14.1 bullet with no record is null and named, not guessed.** §14.1 asks
-  for a product category and nothing holds one — not on the prospect, not on the
-  build — so the field is `null` and the surface says "Not recorded for this
-  campaign" rather than deriving one from the product name (§16a).
-- **One Session F defect this session's walk found.** Session D built
-  `CreatorAppShell` and `CreatorHome` rendered it itself, so the four surfaces
-  Session F added shipped with **no rail and no way back except the browser**.
-  It is a pathless layout route now — the arrangement the guard above it already
-  uses, and for the same reason: chrome that has to be remembered on each new
-  surface is chrome that eventually is not. `/creator/welcome` stays outside it
-  deliberately: it is the last screen of a full-bleed nine-screen sequence whose
-  job is to hand over to Home.
-- **The browser pass found six, and two of them are older than this session —
-  the fourteenth rebuild in a row where it found what nothing else could.**
-  (1) **`.tabs` has been broken product-wide since PHASE 25**: the Founder Admin
-  workspace took the bare design-system name for its own hand-built strip and
-  made it `display: flex`, which turns every `<Tabs>` into a horizontal row with
-  the tablist and each tabpanel side by side. Nothing caught it in four months
-  because the only users were the gallery and a jsdom test, and jsdom does no
-  layout; this list drew its two panels down the left gutter. The markup already
-  carried `.frec-tabs`, so the fix is a selector change and the bare name
-  returns to the design system — and the gallery is repaired as a side effect.
-  (2) `Continue to The problem`, and worse `Continue to You earn` — a nav label
-  built by concatenating a capitalised eyebrow; the register gained `navName`,
-  the step as a control refers to it mid-sentence. (3) **§27.1 on the one
-  deadline that matters**: `Decide by Aug 23, 2026, 8:00 PM` names no zone, and
-  that is §14.6's own instant — local with UTC beside it now, the pair the
-  Founder flow's fee screen already renders. (4) The SELECTED sort chip was the
-  harder one to read, `.btn--secondary` being ~1.46:1 — Session D's `Accepted`
-  reading quieter than `Reviewing`, on a different control, and fixed scoped
-  rather than at the primitive. (5) `.kv__row` sizes per ROW, so one card drew
-  four different value positions — Session F's Settings finding, same fix,
-  scoped. (6) The ended campaign's row said its link was "not active YET", which
-  is a promise about a campaign that is over.
-- **Two contrast gaps are pre-existing and were deliberately NOT changed.**
-  `.kv__row dt` at ~2.18:1 and `.btn--secondary` at ~1.46:1 are shared
-  primitives every workspace uses and the documented tech-stack §3.6 territory;
-  re-toning either is a product-wide edit with its own screenshot pass. PHASE 46
-  uses neither for anything load-bearing.
-
-**What Session E deliberately did not build:** any decision service or any
-change to one; a migration; a second campaign-content assembly; a meeting
-request, a predicted amount, a popularity signal, a per-Creator rate floor, or a
-counter recommendation (all in `CREATOR_FLOW_ABSENCES`, each rendering its
-refusal where the control would be); and any new §27 key, so the coverage
-partition is untouched.
-
-### The Admin shell's 320px overflow was fixed, and the recorded diagnosis was half wrong (§33.11.1, §26.1, DNA §5.12, post-Phase-24 change, 2026-08-19)
-
-Carried as a known gap since 2026-08-17 and restated twice — "the topbar, wordmark and nav clip
-along with the content" — this is the fix. It is `PHASE 38` in `proovd.css` and **nothing else**: no
-component changed, no route, no register, no test file. 132 lines of stylesheet, purely additive.
-
-**`PHASE 38` and not the 38 the Creator-flow brief expects.** `docs/phases/creator-flow-v2.md`
-reserves that number; PHASE 37 was already taken by Today on the same day, and its own trap list
-says to re-derive the heading by grep rather than trust the brief. So the Creator flow takes 39, and
-this is the second time that number has moved — which is the argument for the grep, not against it.
-
-- **The recorded diagnosis was a guess from a screenshot, and half of it was wrong.** The topbar and
-  the wordmark never clipped, and the document never scrolled sideways at any width. What was
-  actually happening was two different defects that a picture cannot tell apart from each other, and
-  the reason both survived three sessions of screenshot passes is that a screenshot shows you a
-  symptom and not a box. The fix started by building a probe instead: every Admin route rendered
-  inside a real 320px iframe, walked element by element, reporting for each box whether its content
-  is wider than the box and whether that box **scrolls** (designed) or **clips** (content gone).
-  Chrome will not give a real 320px viewport — `--window-size=320` reports 489px on Windows — so the
-  iframe is not a convenience, it is the only way the numbers mean anything.
-
-- **Defect 1: the nav has been hiding sections since long before 320px.** `.topnav` is
-  `flex: 1 1 auto; min-width: 0; overflow-x: auto`, so wherever the bar is tight it shrinks to a
-  sliver and scrolls rather than wrapping. Measured, with eight sections: clean at 1024 and at 900,
-  **79px hidden at 768** — Live mode simply gone — and **438px hidden at 320**, six of eight gone.
-  A horizontal scroller with no visible scrollbar gives no sign the rest exist. So this was never a
-  320px curiosity: every tablet and every phone has been losing Admin sections, and the gap note
-  filed it under a width nobody uses.
-
-- **`.topbar`'s own comment had promised the fix since PHASE 25, and the CSS never did it.** "At a
-  narrow width the nav takes its own line and the brand keeps its position." It never took its own
-  line, because `min-width: 0` lets a flex item shrink below its content instead of wrapping.
-  `flex: 1 1 100%` is what makes that sentence true. Below 900px the nav now takes its own row and
-  **wraps** — PHASE 32's own recorded decision on the Affiliate tab rail, reused: "a second line is
-  legible and a hidden tab is a missing tab."
-
-- **It wraps and `.tabs` still scrolls, and the difference is the mechanism rather than a
-  preference.** `.navlink::after` is a per-link underline and follows its own link onto row two.
-  `.tabs` uses `.tabline` — ONE absolutely-positioned indicator — which a second row would strand,
-  and that is exactly the reason PHASE 25 already recorded for scrolling there. Two rules that look
-  contradictory are the same rule applied to two different mechanisms.
-
-- **No `order`, deliberately.** Putting the nav visually after the environment cluster would have
-  kept the brand and the cluster on one line and made the tab path disagree with the reading path
-  (§28.5, §33.11.4). Three rows in DOM order is the honest layout.
-
-- **Defect 2: a `.wrap` inside the Admin view was clipped away entirely.** `.wrap` is
-  `width: min(90vw, 1600px)` — a VIEWPORT-relative width, correct for a top-level public section and
-  wrong for anything nested. `.views` is already `--wrap` wide and `.view` has already spent a
-  `--gutter` on each side, so any Admin surface reaching for the product's own layout components
-  computes a child wider than the box containing it. `.views` is `overflow-x: clip`, so the excess
-  does not scroll — it is gone. Measured on `/admin/live-mode`: **48px clipped**, taking the right
-  edge of the state panel's values with it.
-
-- **Fixed at the primitive rather than at the call site, because the trap is in the primitive.**
-  `LiveModePage` is the only in-shell user today; the next surface to use `Section` inherits the
-  same clip, and a design system whose parts do not compose is the thing being fixed. `.view .wrap`
-  is full-width and `.view .section` does not re-apply a gutter the view already has — scoped to the
-  Admin view, which is PHASE 25's convention 2 verbatim. Only the inline axis is touched;
-  `.section`'s block padding is vertical rhythm, not overflow.
-
-- **Two more clips the same pass found, both inside workspaces rather than the shell.** The §22.4
-  Day 14 receipt prints an evidence URL as plain text, and a URL is one unbreakable token: 52px past
-  its list item at 320. PHASE 36 had already made this decision twice — `.mny-facts dd` and
-  `.mny-head__title` both carry `overflow-wrap: anywhere`, the second noting that "a campaign id
-  wraps badly at 320" — and the evidence list did not get it. Applied to every `li` in the console,
-  because a reference, an id, a provider object and a URL all appear in those lists.
-  And the Create Founder footer is a flex row that never wrapped: a `.btn` is `overflow: hidden`
-  because it hosts the fill-sweep, so when the row squeezed it, **`Create prospect` lost the
-  right-hand 5px of its own label** rather than wrapping.
-
-- **That footer fix has no media query, and the first attempt is why.** It was written as
-  `max-width: 600px`, and the label was still clipped at 768 — a guessed breakpoint, wrong in the
-  usual direction. `flex-wrap: wrap` does nothing at a width where the row fits and everything at a
-  width where it does not, so there is no number to get wrong. Verified clean at nine widths from
-  1440 down to 320.
-
-- **The result is measured, not asserted.** Fourteen Admin routes at 320px: every one clean. Three
-  routes at 1440 / 1280 / 1024 / 900 / 768 / 600 / 480 / 375 / 320: every one clean. Desktop is
-  visually unchanged — the nav is still one line at 1280 — and the frontend project passes whole:
-  **30 files, 1308 tests**, including the three `proovd.css` scans, the §33.11 sweep over every
-  principal flow, and §33.11.3's scan of a freshly built bundle.
-
-- **One probe finding was a false positive and is worth keeping written down.** `span.sr-only`
-  reports as a clipping box on every route, because it *is* one — a 1px box whose content overflows
-  is the visually-hidden mechanism, not a defect. The probe skips boxes narrower than 2px. A scan
-  that flagged it would have had to be silenced, and a silenced check is worse than none.
-
-- **What this does not fix.** The Affiliate record shell's own 320px reflow is a separate item and
-  stays recorded — the shell half is now clean, so anything still overflowing inside that record is
-  its own defect rather than masked by the shell's. §33.11's manual gate is untouched: real focus
-  visibility, 44px tap targets, colour contrast, and an actual screen-reader pass still need a
-  person, and `.btn--primary`'s 1.44:1 remains the documented, scoped tech-stack §3.6 exception it
-  has always been. **(That pair is 1.46:1 as of 2026-08-19 — the owner ruling below moved the text
-  from `#E9FFE1` to `#FAFAFA`. Still the same exception, still scoped the same way.)**
-
-### The owner ruling — Founder Dashboard Session A of seven (DNA §1/§2/§10.1, §33.11, 2026-08-19)
-
-`docs/phases/founder-dashboard.md` is the Founder's home after the flow — four chapters, settings
-and a Backers page, built from `docs/design-refrence/Proovd_Founder_Dashboard_v5.html`. **It is
-seven sessions and only A has landed: the owner ruling. It writes no dashboard code**, and B–G are
-the shell, the four chapters, the Backers page, and §5.2's settings panel.
-
-The reference's application header carries an owner ruling, quoted here as it is written:
-
-> OWNER RULING (supersedes DNA 2 / 1 / 10.1): radius is 2px on both postures, brand-green fill
-> takes #FAFAFA text, and the inset highlight ships on brand-filled primaries. Those three come
-> from the shipped Founder Flow. Every other DNA rule stands.
-
-It is **product direction**, taken as such, and it is the only change in this product that has
-moved a design token — nothing had touched `:root` since the file was written. Two `--radius`
-declarations and thirteen colour declarations changed value, and one `box-shadow` was added.
-Nothing else in the session is code.
-
-- **Three premises in the chain were not accurate, and each is recorded rather than quietly fixed.**
-  The pattern matters more than any one of them: a ruling is transcribed into a brief, the brief
-  derives an edit list mechanically, and the derivation drops what the ruling actually said.
-  - **"Those three come from the shipped Founder Flow" is not true of the code**, which the brief
-    already says: `--radius` was `1px` and `radius: 2px` appeared zero times in the whole
-    stylesheet. What the brief did not have is *why* somebody would believe it — `PHASE 34`'s own
-    header records the flow's REFERENCE asking for "2px everywhere. Never rounded." and the flow
-    declining it because "one of them is already the system." So the ruling promotes the Founder
-    Flow reference's own number to the token, which is a much better description of it than "an
-    alignment to something that is not there". That paragraph is now marked resolved.
-  - **"It is a slot change, not a hunt through selectors… three edits reach the whole product"** is
-    not accurate, and the brief's table is a grep rather than a derivation. It names `--btn1-text`
-    in `:root, .mode-none` and in `.mode-light`, and misses **four hover slots that are genuine
-    brand fills** — `--btn2-htext` in `.mode-none` and `.mode-light`, `--btn1-htext` in `.mode-dark`
-    and `.mode-light` — plus `.btn.is-done .btn__label` and **six hardcoded `PHASE 33` rules**.
-    Applying only the two named would have left the ruling's own hard rule untrue in eleven places
-    the moment it was written down, which is the failure the brief warns about one level up ("a rule
-    that is no longer true is worse than no rule").
-  - **The brief's table halves the phone radius to `1px`**, against the ruling's "2px on **both
-    postures**" — a phrase that is redundant under any other reading — and against the reference,
-    which declares `--br:2px` inside its own `@media (max-width:600px)` block beside a `--bw` that
-    does halve. The ruling and the reference win: **2px in both blocks**, and the border widths
-    still halve while the radius deliberately does not.
-- **Two of the brief's targets are not brand fills, and the distinction decided what moved.**
-  `.mode-light`'s primary is a **dark-green** fill and `.mode-dark`'s is a **white** one. The ruling
-  reaches neither. `.mode-light`'s moved anyway on the brief's own explicit product direction, and
-  is not a regression in either direction (`#FAFAFA` on `#013F17` is 11.7:1 against the `#E9FFE1` it
-  replaces at 11.5:1). `.mode-dark`'s `--btn1-text: var(--dark)` was **kept** — the brief says keep
-  it, and the better reason is that it is not a brand fill at all, so the comment on it now records
-  that it was considered.
-- **The browser pass found a third pairing nobody had listed, and it was kept for the same reason.**
-  `.ff-splash` puts `--dark` on brand — 8.0:1, plainly deliberate. Blanket-applying the ruling would
-  have taken a genuinely readable pairing down to 1.46:1. The ruling replaces `#E9FFE1`; it is not a
-  mandate to destroy the two deliberate high-contrast pairings on brand.
-- **The inset highlight sits on the tier, not in a fourth per-mode slot.** It reads as a top-edge
-  gloss on the brand and dark-green fills and is invisible on `.mode-dark`'s white one, so a slot
-  would have bought four declarations and a hover complication for a clause the ruling states in six
-  words. An inset shadow paints above the background and below child content, so `.btn__fill` covers
-  it during the §6.5 progress morph — which is what should happen.
-- **Three records that were no longer true were edited, not left standing.** `proovd.css:158`'s hard
-  rule; `PHASE 33`'s third convention, struck in place with its reasoning kept because the
-  observation that produced it is still true (`#FAFAFA` on brand really is imperceptible against
-  `#E9FFE1` — 1.46:1 against 1.44:1 — and the ruling makes it the product's answer anyway); and
-  campaign-page-v2's own line in this file. Tech-stack §3.6 is re-recorded with the new value.
-- **§3.6 was also narrower than the product, and now says so.** It ended "the exception covers the
-  one button pair, nothing else", and that had been untrue since 2026-08-18: campaign-page-v2
-  shipped five non-button brand fills carrying text at the same ratio — the avatar initial, the
-  illustrated demo control, the active demo moment, the check benefit card, and the selected reward
-  badge. Same exception, unrecorded. The exception is **brand fill**, wherever it appears.
-
-**The verification was measured, not eyeballed, and that is what makes the claims here checkable.**
-120 page loads — every §33.11 principal flow plus the public site and both samples — at 1280 and at
-a **true** 320 through `Emulation.setDeviceMetricsOverride` rather than `--window-size`, which is the
-trap `PHASE 38` records. Zero unmatched fixtures, so every surface rendered its real content rather
-than an error state (§33.11.1's own rule, applied to a browser).
-
-- **The whole run was done three times: once on the pre-change stylesheet, twice on the new one.** A
-  picture cannot tell "the change did this" from "this was already so", and this change had the
-  largest blast radius in the product.
-- **`--radius` reads `1px`/`0.5px` before and `2px` at both widths after. Brand-fill text reads
-  `rgb(233,255,225)` before and `rgb(250,250,250)` after, across 192 brand-filled elements, with the
-  two deliberate `rgb(1,63,23)` pairings surviving both runs.** All 166 sampled `.btn--primary`s
-  carry the inset. Measured at runtime, so a brand fill missed in the stylesheet would have surfaced
-  here rather than in a later session.
-- **The change is layout-neutral, and that is proved rather than argued.** `var(--radius)` appears in
-  `border-radius` and nowhere else; colour and inset shadows never affect layout. The empirical half:
-  nine routes' overflow numbers differed between the pre- and post-change runs, and **eleven differed
-  between two runs of the *identical* stylesheet** — the wobble is the probe sampling mid-animation
-  on the flow's GSAP entry transitions, not the token. More variance from no change than from the
-  change is the cleanest form that proof takes.
-- **No new low-contrast pair appeared anywhere outside the brand-fill exception**, compared as a set
-  against the baseline rather than spot-checked.
-
-**Two pre-existing defects the pass surfaced, deterministic across all three runs, and deliberately
-NOT fixed here.** Session A is a token change; fixing an unrelated layout bug in `PHASE 34` — whose
-clearance media queries Session C already got wrong once — is not "one token change, one rule edit",
-and the 2026-08-17 Affiliate-shell entry is the precedent for recording rather than absorbing one.
-
-- **`.ff__badge` overflows the right edge at 320** on eleven Founder Flow pages (+15 to +28px). It is
-  `position: fixed`, so it escapes every stacking fix around it — and it is the same control Session
-  C already caught at 1280×520, where "its stage clearance was inside the mobile media query while
-  the badge is fixed at every width." Same element, same class of bug, other axis. **Session B owns
-  the flow's landing and should take it.**
-- **`/safety` reports a 1401px scroll width at 1280.** Nothing is past the viewport once the page
-  settles, so it is an entry animation leaving scrollable overflow behind rather than a static
-  layout defect. Unchanged by this session and unrelated to it.
-
-**Where the pass does NOT reach, stated rather than implied.** It walks `PRINCIPAL_FLOWS`, and that
-register names six Admin ADDRESSES across four sections — Today, Founders, Money and Live mode.
-**Campaigns, Backers, Creators and Support were not rendered**, because §33.11 does not register
-them and no QA fixture answers their reads. Writing four fixture sets would be adding flows to an
-acceptance register, which is not a token session's work. What carries the claim for those four is
-that the change is at the SLOT level and was measured at runtime across 192 brand-filled elements
-and 166 primaries — they read the same `--btn1-*` slots as the four that were rendered. If a later
-session wants them covered visually, the fixtures are the thing to build, and they belong to
-§33.11 rather than here.
-
-**What Session A deliberately did not do:** write any dashboard code; touch `.mode-dark`'s
-`--btn1-text` or `--btn2-htext`, or any other non-brand fill; add a `--btn1-inset` slot; change a
-`border-radius` that was not reading the token (fourteen are `50%`, `99px`, `12px`, `14px`, `4px` or
-`0`, all deliberate); extend `PRINCIPAL_FLOWS`; or fix either pre-existing defect above.
-
-**`npm test` is 127 files and 3,470 tests, green in one run** — backend 1,697, shared 465, frontend
-1,308 — including `a11y.test.tsx`'s stylesheet scans, the §33.11 sweep over every principal flow,
-and §33.11.3's scan of a freshly built bundle. **Export `TEST_DATABASE_URL` first.** It lives in
-`.env` and `.env` is not loaded into the shell, so without it `app-harness.ts` falls back to
-Testcontainers, finds no Docker, and the run reports ~61 failed FILES and 0 failed TESTS — which is
-the identical summary line to the intermittent esbuild `tsconfig.base.json` flake this file already
-documents, with a different fix. Look for `PostgreSqlContainer.start` in the stack before batching
-anything.
-
-### …and the shell, and the address — Session B of seven (§20, §26, §27.1, §27.8, §33.11, DNA §5.12, 2026-08-19)
-
-Session B is the chrome: the Founder's first authenticated shell, four chapters at one address, and
-the route `/support` never had. **It writes no chapter content** — C–F own that, and G owns §5.2's
-settings panel.
-
-`shared/src/founder-dashboard/index.ts` owns the chapter register; `backend/src/founder-dashboard/
-service.ts` the shell's own read with one route on `founder-home.ts`; `frontend/src/surfaces/
-founder/FounderDashboard.tsx` the shell; `frontend/src/features/public/SupportPage.tsx` the support
-page; `PHASE 39` the styles; `founder-dashboard.test.tsx` (17) and two new `live-operations`
-tests are the artifact. **`npm test` is 128 files and 3,498 tests, green in one run** (was 127 and
-3,470). No migration — nothing about the shell is a new fact about a campaign.
-
-- **`/support` was a live bug, and it was the largest thing in this session.** `support` was
-  declared INSIDE the `admin` route group, so the only address it ever had was `/admin/support`.
-  Meanwhile `/support` is the `getHelp` target in every Founder Flow step, in the global
-  `ErrorBoundary`, in §20's Act ranks, and in the 404 body `founder-home.ts` returns — twelve-plus
-  call sites. §27.1's sixth question, "how do I get help without losing context", was answered
-  product-wide with a link to nothing.
-- **It is public, and that is forced rather than chosen.** The flow's stage-1 and stage-2 pages are
-  behind a DRAFT TOKEN rather than a session (§10's claim is what creates the account), and
-  `ErrorBoundary` wraps routes nobody is signed in for. A `/support` behind `RequireRole` would send
-  exactly the people whose page just broke to a sign-in form.
-- **There is no intake form on it, and the absence is asserted.** §26.7's case machinery — the
-  `PVD-…` reference, the owner, §27.8's business-day deadline stored beside its calendar version —
-  is reached today by an Admin and by a Backer holding a magic link. There is **no Founder or
-  Creator intake route on the server**. Rendering a form over an endpoint that does not exist would
-  be the §1.4 failure this page was written to fix, one layer down; building that endpoint is
-  §26.7's work. What ships is the commitment that IS published: `SERVICE_SLA_BLOCK`, the same
-  constant the footer renders, so the promise on the page and the promise in the footer are
-  literally the same string.
-- **It is not a fifteenth `PUBLIC_ROUTES` row.** That list is §18's inventory of the public site,
-  its length is fixed at fourteen, and the suite sweeps every entry as a marketing page. `/support`
-  has no §18 content requirement — it is its own `SUPPORT_ROUTE` entry, in `LINKABLE_ROUTE_PATHS` so
-  §33.11.6's broken-link scan accepts links to it, and in neither the header nav nor
-  `REQUIRED_FOOTER_LINKS`. It is reached from the `getHelp` control on the panel that needed it,
-  which is what "without losing context" means.
-- **`support_page` is a sixteenth principal flow with `keyboardPathRequired: true`**, because §28.5
-  names "support" among its own five by name. It is also the first entry in the sweep's
-  `READS_NOTHING` set since `token_unavailable` — that set was two literals written twice, in the
-  failure filter and the loading filter, and is now one named constant. A static page has no failure
-  state and no loading state, so asserting §27.1's six questions against one would be asserting them
-  against the page's ordinary content.
-
-**The shell, and the two things about it that are decisions rather than markup.**
-
-- **It is neither of the two shells that already exist.** Not `AdminFrame` — §26 licenses dashboard
-  density in Admin and NOWHERE else, and shared chrome is exactly how that density leaks into a
-  Founder surface; the rail here is four words, not eight sections. Not `PublicLayout` — a signed-in
-  Founder reading their own campaign does not need a marketing nav, and the §31.4 footer sitemap is
-  wayfinding for somebody who is not signed in. It is the product's **first non-Admin authenticated
-  chrome**, and the Creator dashboard is the obvious next tenant.
-- **The address does not move, and the chapter is a search parameter under it.**
-  `/campaigns/:campaignId/home` is what `LiveStep`'s "Go to your campaign home" links to and what
-  §27's emails point at, so all of it keeps working; `?chapter=` beneath it is the position (DNA
-  §5.12), the reasoning `routes.tsx` already records for the draft flow and the Admin record tabs.
-  A fresh router with the address as its only entry IS a reload, and that is how the suite proves
-  the position survives one.
-- **Phase 17a's §20 surface is not replaced.** The Live chapter renders `CampaignHome` — Glance, the
-  ranked Act and Explore, swept by §33.11 since Phase 23a. Rendering a placeholder over a working
-  surface would be a regression dressed as progress, so the suite asserts the Act's own label is on
-  the page. Session D rebuilds that content to the reference.
-- **The three unbuilt chapters name the surface that owns their work today**, with real routes — the
-  arrangement the Admin rebuilds established for their un-rebuilt sections. Not an apology and not
-  an empty frame.
-- **The shell renders no `h1`; whichever chapter is showing supplies it.** §33.11.2 requires exactly
-  one, `CampaignHome` has had its own since Phase 23a, and the browser pass confirms every one of
-  116 route-widths renders exactly one.
-
-**B4 is where the reference and production actually diverge, and it is a column rather than a
-parameter.** The supplied reference drives its whole state from `?phase=`, `?type=`, `?effort=`,
-`?upfront=` and `?day=`. Every one is a column here, read on the server.
-
-- **`campaigns.status` decides which chapter a campaign is IN.** `CAMPAIGN_STATUS_CHAPTER` is total
-  over §23.1's 27 values by `satisfies`, on the `CAMPAIGN_STATUS_LABELS` precedent: a 28th state
-  fails the BUILD rather than quietly falling into chapter one.
-- **`campaign_live_at` decides whether the money chapters may open at all, and it is the whole
-  reason the shell reads a column rather than counting statuses.** §31.6's pre-live cancellation and
-  §14.6's no-Creator failure both END a campaign that never opened, so both land in Wrap — and
-  without this, "every chapter up to the current one is open" would hand that Founder a Live chapter
-  and a Get-paid chapter for a campaign with no Backers and no charge. `campaign_close_at` cannot
-  stand in: §17 stamps that at LAUNCH, as a schedule.
-- **A locked chapter asked for by URL falls back rather than refusing.** A stale bookmark is not an
-  attack. `founderChapterOrDefault` sends the request to the campaign's real chapter, and the
-  browser pass caught this working by accident — the `?chapter=payouts` screenshot of a live
-  campaign renders Live.
-- **`aria-disabled`, never `disabled`, on a locked chapter**, with the reason on the accessible name
-  — so the announcement is "Get paid, Opens when the campaign closes…" rather than a mystery tab a
-  keyboard user cannot even reach (§28.5, the Support workspace's own rule).
-- **The shell's read is its OWN read, and that is the trap this session had to avoid.** `readGlance`
-  issues a `campaign_home_deliveries` receipt carrying the count it rendered (§33.6.6), and the
-  shell re-reads on every chapter change — a shell that minted a receipt per chapter switch would
-  advance last-seen for deltas the Founder never saw. `GET …/dashboard` touches no delivery record
-  and writes nothing, and the backend test reads it four times and asserts the receipt count did not
-  move.
-
-**`PHASE 39`, not the brief's `PHASE 40`, and the brief said to check.** The highest section in
-`proovd.css` was 38. The Creator flow's brief had reserved 39, but its Session A built no surface
-and wrote no CSS, so 39 was never taken — a contiguous number every session derives the same way
-beats a reserved one only one document knows about. `.fd-` was checked against `.pc-` (33), `.ff-`
-(34), `.cr-` (26/32), `.cf-` (31), `.mny-` (36) and `.tdy-` (37). **The rail WRAPS rather than
-scrolling**, PHASE 38's own finding applied before it could become a defect: a horizontal scroller
-with no visible scrollbar gives no sign the rest exist, and all four chapters must be reachable at
-320.
-
-**The browser pass found one defect and confirmed two pre-existing ones.** 116 route-widths at 1280
-and a true 320, zero unmatched fixtures.
-
-- **`Get help` rendered beside the second bullet of a list.** The interim chapter put a block `<ul>`
-  in `StatePanel`'s `action` slot, which the panel lays out in a row with `getHelp`. It is one
-  control now — the chapter's primary surface, DNA §5.6 — with any others below the panel. jsdom has
-  no layout, so nothing but a screenshot could have caught it. Ninth rebuild in a row.
-- **All four chapters and `/support` measure 0px document overflow at both widths**, and the rail
-  and band both wrap cleanly at 320.
-- **The `.ff__badge` overflow Session A recorded is unchanged**, on the same eleven Founder Flow
-  pages. It is `position: fixed` and belongs to `PHASE 34`; this session touched no flow page.
-- **A new pre-existing finding, recorded and NOT fixed: `.mode-light`'s body slot is 3.33:1.**
-  `--moss` (#669370) on `--mint` (#E9FFE1) is below AA's 4.5:1 for body text, and it is the slot
-  every light-green section in the product uses — About, Safety, the campaign page, and now this
-  support page. Changing it is a product-wide design decision with its own six-surface screenshot
-  pass, not a chrome session's. tech-stack §3.6's exception covers brand fill and does not reach it.
-
-**What Session B deliberately did not do:** write any chapter content; replace `CampaignHome`; add a
-migration; build a Founder support-case intake (§26.7 owns that, and there is no server route);
-put `/support` in the header nav or the §18 fourteen; or touch §15's review, §16's readiness, §17's
-launch, or §14's Creator decisions — the dashboard waits on all four and renders their state.
-
-### …and Chapter 1, Choose — Session C of seven (§14.2, §14.3, §14.5, §11, §16, §30, 2026-08-19)
-
-Session C is the chapter a Founder lives in between paying the listing fee and going live:
-§14.5's roster, §14.2's three responses, §14.3's Creator-specific bonus, the two build fields
-that survive the reference's onboarding, and **deviation 1 — the Founder→Creator meeting
-request**, which is a recorded departure from §1 rule 6 and is stated as one below.
-
-`shared/src/founder-dashboard/choose.ts` owns the register; `backend/src/db/schema/meetings.ts`
-+ migration `0056` the record; `backend/src/affiliates/{meeting-requests,meeting-notifications,
-meeting-logic}.ts` the service, the one message, and the drift-tested restatement;
-`frontend/src/surfaces/founder/chapters/ChooseChapter.tsx` the surface; `PHASE 39`'s Session C
-block the styles; `founder-dashboard-c.test.ts` (23) and eleven more in
-`founder-dashboard.test.tsx` are the artifact. **`npm test` is 129 files and 3,523 tests, green
-in one run** (was 128 and 3,498).
-
-- **The chapter ANSWERS a roster; it does not assemble one, and that is the whole design.**
-  §14.5 is explicit — "Proovd owns recruitment follow-up. The Founder cannot browse or contact a
-  general pool" — §8 repeats it, §30 defers "Founder browsing/outreach to unmatched Affiliates",
-  and `rosterMembership` has two writers and both are Admin. The reference's `ready` modal draws
-  **`Send to affiliates`**, and its own copy says "Meet them one at a time, lock the people you
-  trust, then Proovd sends the campaign to your final roster." So the left column is a READER —
-  it decides which card is open and nothing about who is on the roster — and the suite drives
-  seven plausible addresses (`/roster/send`, `/roster/order`, `/roster/:id/remove`, a DELETE,
-  `/roster/invite`, `/founder/creators`, `/founder/creators/search`) and asserts 404 on all seven.
-- **The revision control is bounded by the SERVER's own numbers, and the reference's is bounded
-  1–90.** `validateProposalAgainstCell` refuses a bid at or below the applicable base by name and
-  refuses one past the ceiling, so a free stepper produces refusals a Founder cannot act on —
-  they lower the number to be reasonable and are told the standard terms already give more. The
-  roster payload gained a `terms` block (base, ceiling, `bidAllowed`, `fixedPaymentAllowed`,
-  high-effort) resolved by `resolveCell` from the §6 settings, and `revisionRange` turns it into
-  `[base + 1, ceiling]`. Nothing in the browser computes a percentage — a second copy of §14.3's
-  matrix would be a second answer to what the base is.
-- **Declining answers the VERSION, not the person.** The reference's control says `Reject match`
-  and its handler sets `status = 'rejected'`, which reads as a removal the Founder cannot make.
-  §14.2 keeps all three outcomes open after a Founder decline: the association stays
-  `proposal_pending`, and the Creator may still accept standard terms or counter. The suite
-  declines a version and asserts the association's status and `rosterMembership` are unchanged
-  and the roster still has one row.
-- **The bonus is offered AFTER acceptance, and the ordering is load-bearing.**
-  `offerCreatorBonus` measures the ceiling against the LOCKED agreement where one exists and
-  against the campaign's standard base where none does — so the reference's arrangement, where
-  `Accept` opens the bonus modal, checks a 20% bonus against 30% (passes) that will breach the
-  ceiling the moment 35% locks. `BONUS_AFTER_ACCEPTANCE` renders where the control would be, and
-  the control appears only once `lockedTerms` exists.
-- **§14.3 names two trigger units and no clock.** The reference's bonus modal asks "When should
-  it count? — 3 days / 1 week / By campaign end", which is a third commercial rule with no column
-  behind it: `creator_bonuses` stores trigger unit, threshold, additional percentage, maximum
-  combined percentage, proposal version and earned result, and nothing that could hold a period.
-  The suite asserts the absence in `information_schema` and the surface renders the refusal where
-  the chips were. Its "Reward performance **without changing the agreed base cut**" is refused
-  too — §14.3 stores a maximum COMBINED percentage, and only a fixed amount sits outside it.
-- **`CHOOSE_ABSENCES` is `OPERATIONS_ABSENCES` applied to a Founder chapter.** Seven controls the
-  reference draws that the Spec forbids, each carrying the sentence the surface renders in its
-  place; a test requires every reason to be over 60 characters, because a one-word reason is how
-  a register stops being an argument. Re-adding a control means deleting the sentence that
-  refuses it, which is a visible edit.
-
-**Deviation 1, recorded as a deviation: the Founder→Creator meeting request.** Built by explicit
-product direction. It sits beside three things §30 defers **verbatim** — Founder outreach to
-unmatched Affiliates, a Founder–Creator meeting scheduler with "the human Founder interview
-scheduler is required", and direct Founder–Affiliate messaging — and beside §11's "The Founder
-cannot contact the Affiliate directly." The Admin Founders rebuild refused a meeting record on
-2026-08-17 for exactly this reason. What keeps it narrow is what the table cannot hold:
-
-- **It is not a scheduler.** No `scheduled_for`, `starts_at`, `ends_at`, `duration`, `timezone`,
-  `platform`, `meeting_url`, `calendar_id` or `slot` column — the exact column set is asserted,
-  and the route is driven with `when`, `slot`, `durationMinutes` and `platform` in the body and
-  the stored row is scanned for all four. The reference draws three time chips and
-  `Send meeting invite`; §12's Cal.com booking is the one thing in this product that books time
-  (tech-stack §12), and if they say yes a person arranges it.
-- **It is not a thread.** ONE `message`, written once. A second ask while the first is unanswered
-  is refused by the service and by a partial unique index; the message itself is refused by a
-  0056 trigger even from a hand-written UPDATE; `message` sits outside the column-scoped UPDATE
-  grant as well. There is no messages table beside it, asserted by name.
-- **It decides nothing.** The suite compares the whole association row before and after an answer
-  and requires it byte-identical — §14.2's three responses stay the only things that move a
-  number, and agreeing to talk is agreeing to talk.
-- **Its shape is `work_again_requests`', rescoped.** §22.9 is the one mediated Founder→Creator ask
-  the product already had, and every column, CHECK, index and trigger is that table's. Copying it
-  rather than inventing a shape is what makes "is this a message or a scheduler" answerable by
-  comparison rather than by argument.
-- **ONE §27 key, and the missing second one is a decision.** `affiliate_meeting_request`, deduped
-  on the request ROW. There is deliberately no `founder_meeting_response`: the Founder reads the
-  answer on the roster card they are already looking at, and §22.9's three keys exist because
-  that ask fires after a campaign has ENDED, when there is no roster anybody is watching. The
-  suite asserts exactly one delivery and that no other `%meeting%` key ever sends.
-- **The response column has a writer, and that is why the Creator's route is in this session.**
-  A record with a `response_note` no route can fill is the §1.4 failure — a promise of an answer
-  nobody can give — so `GET /api/creator/meeting-requests` and
-  `POST /api/creator/meeting-requests/:id/respond` land with the ask. Somebody else's request
-  answers `not_found`, byte-identical to a nonexistent one.
-- **Not a licence for its neighbours.** A later phase asked to add a reply, a thread, a second
-  message, a slot picker, or a Creator search is asking for the direct messaging and the pool
-  browsing §30 defers, and this is not the licence for either.
-
-**Six more places the reference and the Spec disagree that the brief did not name.**
-
-- **`baseCut()` returns 15% for a Product campaign with an accepted fixed payment.** §14.3's own
-  matrix says **20%**, and both numbers are §6 settings (`affiliate_base_percent_standard`,
-  `affiliate_base_percent_with_fixed`) rather than constants. The reference hardcodes both and
-  gets one wrong; Phase 06's rule is that a hardcoded number is a bug even when it is right.
-- **"Affiliates can bid higher or lower."** §14.2 permits a bid ABOVE the applicable base and only
-  on a high-effort campaign. There is no downward bid anywhere in the product, and
-  `NO_DOWNWARD_BID` says so on the screen that would otherwise imply one.
-- **"If the campaign doesn't clear, you get a full refund minus the $5 listing fee."** Wrong
-  twice: §14.6 refunds **the entire listing Checkout total**, and no US$5 fee exists in §6 (the
-  base is US$35 with a US$25 floor). `LISTING_REFUND_PROMISE` — Appendix A.5's own sentence — is
-  what renders, from the server.
-- **"Tell Proovd why so matching gets smarter."** §1.4: there is no matching model that learns.
-  The decline reason is stored (§14.2) and read by a person.
-- **`Send to affiliates` fires a 5.2-second `setTimeout` that navigates to `live`.** Disagreement
-  14, confirmed present as a real timer, on top of disagreement 8's control.
-- **Three audience metrics, a channel link, and "Last three pieces".**
-  `listFounderVisibleRoster` is frozen at seven columns: one audience metric (text, because the
-  unit differs per subtype), no channel URL, and no post record before §17's submissions exist.
-  Two absences carry the reasons, and the suite asserts the card's exact key set.
-
-**`/roster` and `/creator-readiness` are retired to redirects, and the readiness content moved
-rather than being dropped.** Two Founder surfaces over one roster would be two places to answer
-one proposal — the reasoning that retired `/draft/:token/vetting` in the flow's Session C and
-`/workspace` in its Session E. `RosterView.tsx` is deleted (dead CSS and dead code ship in every
-browser); Phase 13's `CreatorReadiness` is rendered as a SECTION of the chapter, once somebody's
-terms are locked — a fact on the roster rather than an invented phase rule, since readiness is
-assessed for accepted Creators and before there are any there is nobody to assess. Its only edit
-is an `embedded` prop that drops its heading a level (§33.11.2 wants exactly one `h1`). Both
-addresses survive their components because §27.3/§27.4 emails and Appendix C's §34 walk steps
-point at them.
-
-**The panels are inline rather than modal, and the reference's are modal.** Every form here can
-be refused by the server — a revision at or below base, a bonus that breaches the ceiling, a
-second meeting ask — and `Modal` closes on its own primary action, which would put the refusal on
-a card behind a panel that has just vanished. §1.8 gives DNA control of presentation and §5.14's
-Act stage is exactly this: the decision opens in place, beside the field that caused it.
-
-**The browser pass found four defects and nothing else could — the eleventh rebuild in a row.**
-
-- **`.wrap` is `width: min(90vw, 1600px)`, and that is wrong twice here.** The shell's own wrap
-  ran 13px past a 320 viewport, and the SECOND one — Phase 13's readiness brings its own
-  Measure/Section pair when embedded — ran 77px past its parent at 1280 and scrolled the document
-  sideways. PHASE 38 found and fixed exactly this inside the Admin view; `.fd .wrap` is that fix
-  for the Founder shell, so chapters D–G inherit it.
-- **`min-width: auto` on a grid item is why a single-column grid can be wider than its
-  container.** An implicit `auto` track is sized to the widest item's MIN-content, and a text
-  input carries an intrinsic one that ignores `width: 100%` — so at 320 the two URL fields set a
-  309px floor and every sibling stretched to it, while `.fd-choose` itself measured a correct 272.
-  `minmax(0, 1fr)` on every grid the chapter declares, rather than on the one that happened to
-  hold an input.
-- **A handle, a URL and a UTC instant are each one unbreakable token**, and at 320 each was wider
-  than its column (37px and 13px over). PHASE 36 made the same call twice on the Money console.
-- **`--moss` on white is 3.37:1, under AA, and these sentences carry the rules.** Founder Flow
-  Session E's own finding — a sentence that states a rule takes `--dark`, a caption stays
-  `--moss` — applied to `.fd-note` and `.fd-absence`, which are what say why a control does not
-  exist. The status captions beside them keep `--moss`: that token's own ratio is the
-  product-wide gap Session B recorded, and closing it is a design decision with its own pass.
-- **One duplication the suite caught rather than the browser:** the scheduler refusal rendered
-  twice on the meeting panel, because the `meeting_slots` absence's sentence IS
-  `MEETING_REQUEST_IS_NOT_A_SCHEDULER`. The footer copy went.
-
-**What Session C deliberately did not build:** any content for Live, Get paid or Wrap; a second
-write path for a proposal, a bonus, or a roster change; a Founder route that could create,
-remove, order or send a roster; a slot picker, a calendar, or any second scheduler; a second
-message on the meeting record; a `founder_meeting_response` notification key; and any change to
-§15's review, §16's readiness rules, §17's launch, or §14's Creator-side decisions — the chapter
-waits on all four and renders their state.
-
-### …and Chapter 2, Live — Session D of seven (§20, §18, §30, §11, §17, 2026-08-19)
-
-Session D is the chapter a Founder lives in while the campaign runs: §20's Glance, the one ranked
-Act, Explore's eleven sections, the **first UI the three live-editing tiers have ever had**, §18's
-updates, and **deviation 2 — the post acknowledgement**, which is a recorded departure from §1
-rule 6 and is stated as one below.
-
-`shared/src/founder-dashboard/live.ts` owns the register; `backend/src/db/schema/posts.ts` +
-migration `0057` the record; `backend/src/live/{posts,post-notifications,post-logic}.ts` the read,
-the one message, and the drift-tested restatement; `frontend/src/surfaces/founder/chapters/
-LiveChapter.tsx` the surface; `PHASE 39`'s Session D block the styles; `founder-dashboard-d.test.ts`
-(17) and thirteen more in `founder-dashboard.test.tsx` (28 → 41) are the artifact. **`npm test` is
-130 files and 3,542 tests, green in one run** (was 129 and 3,523 — +30 new, −11 as the §33.11 sweep
-lost a retired route).
-
-- **The largest existing asset finally has a caller.** §20's three-tier live-editing API —
-  `applyLiveEdit`, the register in `shared/src/live/editing.ts`, and
-  `POST /api/founder/campaigns/:id/live-edit` — has been built, tested and mounted since Phase 17b
-  with **zero frontend callers**; a repo-wide grep returned one comment. Fifty-three fields across
-  three columns, and no Founder could reach any of them. This chapter is that UI, and it is ONE
-  picker over the register the route serves — not a form per field, and not a route per tier.
-- **The Founder never classifies their own edit, and the request body is what proves it.** §15
-  makes materiality an Admin judgement recorded with its reason and §20's columns are a property of
-  the FIELD. So the surface sends `{surface, field, value}` and renders whatever comes back;
-  there is no `tier` in the body, no control that could set one, and the suite posts
-  `tier: 'direct_versioned'` on a `requires_review` field and watches it route to review anyway.
-  A column-three field renders its own reason where the control would be and **opens nothing** —
-  asserted by counting `campaign_change_requests` before and after.
-- **One render, one receipt, and the refresh route finally has a caller too.** §33.6.6: `GET .../home`
-  issues a `campaign_home_deliveries` row carrying the count it rendered. The chapter reads `home`
-  exactly once, on mount, and every later refresh — after an update, an edit, an acknowledgement —
-  goes to `GET .../home/explore`, which Phase 17a built for this and which nothing had called. The
-  suite drives one `home` read and five `explore` reads and counts one receipt; a source scan
-  asserts exactly one `fetchCampaignHome(` call site in the file. A chapter that re-read `home`
-  after each click would reset the Founder's "+N since you left" to zero mid-session.
-- **A ranking is FOUR mechanisms, and the reference has all four.** An `h1` reading
-  "Farah Nassar is leading.", `#1`–`#6` badges, a three-place podium with a `Top` tag, and the list
-  SORTED by backers. §30 defers public leaderboards and the Creator close view has shipped with no
-  rank on that basis since Phase 18b. Removing the crown while keeping the sort is still a ranking —
-  the order IS the claim — so `explore.ts` now states its order (`ORDER BY public_handle`,
-  transparently not a metric) and the suite seeds `@zeta…` before `@alpha…` and asserts the read
-  returns them the other way round. No ORDER BY at all was not the answer either: Postgres would
-  then pick one, and an arbitrary order that happens to look sorted is worse than a stated one.
-- **`creator_results` was already clean, which is worth knowing.** It carries handle, subtype,
-  status, activation, pause and first-post status — no backer count, no revenue, no conversion. The
-  reference's `92 backers · $6,440` per Creator is not in the §20 read at all, and this session did
-  not add it: the done-when is an absence, and a per-Creator metric column is the shape a ranking
-  needs even unsorted.
-
-**Five more places the reference and the Spec disagree that the brief's fourteen did not name.**
-
-- **`$12,840 Money made` as the hero, on a running campaign.** §20 names Glance's one large number
-  and it is the **active pre-order count**; §20 also requires the permanent clarification that these
-  people "have not yet been charged", and the reference's hub carries no such line anywhere. During
-  a live campaign the figure is not merely mis-ranked, it is **false** — capture is §21's close
-  batch and nothing has moved — which makes it the saved-card/charge confusion §30 forbids, in the
-  one place §20 legislates against it directly. The totals live in Explore, where the read already
-  carries `charged: false`, beside `RESERVED_IS_NOT_RAISED`.
-- **`4.7/5 Checkout sentiment` as a headline tile.** There is no such record. §19's survey is two
-  optional questions and the answers are consent-gated; a score computed from checkout comments is
-  an invented metric (§1 rule 6, §1.4). `Gross raised` and `128% Threshold progress` go with it.
-- **`I have an issue` — a free-text box on a Creator's post.** §20 gives post correction to Admin
-  ("Admin can request post correction") and §17's verification is Admin's. There is no Founder route
-  that flags a post and no record for one, and building a Founder support-case intake is out of
-  scope (Session B recorded that the server has none). The refusal points at `/support`, which
-  Session B made real.
-- **`Copy campaign link` copying `https://proovd.com/c/teeb`.** `/c/:code` is §18's **per-Creator**
-  tracking-link ingest. Handing a Founder that shape means their own shares attribute to a Creator
-  and reduce their own share. The control copies `/campaign/:campaignId`, and the absence says why.
-- **`Backer sources — Instagram · TikTok · Organic`.** The platform is not recorded. §18's ledger
-  records which tracking LINK a click came through and whether it was direct, organic or house —
-  the same call the Admin Founders rebuild made on 2026-08-17, for the same reason.
-
-**And one thing the walk cleared rather than found: nothing in this chapter advances on a timer.**
-Disagreement 14 has caught a real navigating timer in two supplied references (Founder Flow's
-`send-affiliates`, campaign-page-v2's). This one has a single `setTimeout` in 455KB and it is a
-font-loading race; the story recap is stepped by three buttons (`story-recap-next` / `-done` /
-`-skip`) and the browser walk confirmed it waits indefinitely. Recorded because "we checked and it
-was clean" is a different fact from "we did not check".
-
-**Deviation 2, recorded as a deviation: the Founder's acknowledgement of a Creator's post.** Built
-by explicit product direction. The reference's control toasts *"Liked — creator will see it"*, and
-that last clause is what makes it a deviation rather than a bookmark: it is a MESSAGE, and §30
-defers "Direct Founder–Affiliate messaging" while §11 says "The Founder cannot contact the Affiliate
-directly." It takes §22.9's treatment — recorded, routed through Proovd — and is narrowed by what
-the table cannot hold:
-
-- **It carries no free text.** No `note`, `body`, `comment`, `text`, `message` or `reason` column —
-  the suite asserts the **exact** seven-column set, so a column added without a decision fails
-  rather than quietly widening what the record may hold. The route ignores its body entirely: the
-  suite posts `{note, message, reaction}` and scans the stored row for all three. A note box here
-  is the direct messaging §30 defers wearing a smaller control.
-- **It is one-way, at the database.** Neither UPDATE nor DELETE is granted, and there is no
-  `withdrawAcknowledgement` to call. The reference toggles (`Liked ✓` → "Like removed."), and a
-  toggle is wrong once a message has gone out: un-acknowledging would leave the record saying one
-  thing and an inbox saying another, and §27.2's dedup means the re-acknowledgement sends nothing —
-  so the second half of the toggle is a control that quietly does less than it offers. Asserted as
-  the application role, not the migrator: `h.db` owns every table and is not subject to a REVOKE,
-  so a grant assertion made through it passes for the wrong reason.
-- **It decides nothing.** No amount, no percentage, no verification field. §17's outcomes are
-  Admin's and nothing here touches one.
-- **It refuses a post Proovd has queried.** A `correction_needed` or `rejected` post is one Proovd
-  has found a problem with; acknowledging it would tell the Creator their Founder liked work Proovd
-  has just asked them to change — two messages about one post saying opposite things. This narrows
-  the deviation rather than adding a condition to existing machinery, and the surface renders the
-  reason where the control would be.
-- **ONE §27 key, deduped on the POST.** `affiliate_post_acknowledged`, through the full five-part
-  chain. Not on the acknowledgement row: the record is one-way and insert-only, so there is no
-  second deliberate act for a second message to belong to — unlike §22.9's work-again ask, where a
-  Founder may legitimately ask again on a later campaign. There is deliberately no
-  `founder_post_acknowledged` response key: the Founder is looking at the post when they send it.
-  The suite asserts exactly one registry key matches `/acknowledg/i`.
-- **The post read is §11's projection and adds no column.** Public handle, the public post URL, the
-  channel, the §17 outcome — and never the seven-check checklist, the correction detail, the §25.6
-  enforcement reason, or the person behind the handle. The suite asserts the exact key set.
-- **Not a licence for its neighbours.** A later phase asked to add a note, a reply, a reaction
-  vocabulary, or any Founder→Creator message is asking for the direct messaging §30 defers.
-
-**`/updates` is retired to a redirect, and both surfaces it replaced are deleted.** Two Founder
-surfaces over one live campaign would be two places to post the same update — the reasoning that
-retired `/roster` into Chapter 1, `/vetting` in the flow's Session C and `/workspace` in its
-Session E. `CampaignUpdates.tsx` and `CampaignHome.tsx` are gone (dead CSS and dead code ship in
-every browser); the address survives its component because §27's campaign emails point at it. The
-§33.11 `founder_live` flow follows the content rather than the redirect.
-
-**The browser pass found two defects and nothing else could — the twelfth rebuild in a row.**
-
-- **A `Copylink` given a raw URL clipped its own copy button by 8px at 320.** `.copylink__url` has
-  `min-width: 0` and ellipsises; the BUTTON is a flex item too, and `.btn` is `overflow: hidden`
-  because it hosts the fill sweep — so the row squeezed the control until it lost the right-hand
-  8px of its own label. Founder Flow Sessions D and E, the Money console and Session C have each
-  recorded a version of that trap. Fixed at the primitive (`.copylink > .btn { flex: 0 0 auto }`)
-  so every Copylink in the product inherits it, and at the call site: every other use in the
-  product already passes a short `display` label and this one did not. The three shipped Copylink
-  routes were re-measured and are unchanged.
-- **…and the short label then ellipsised to `Your camp…`, which names nothing.** `.copylink` wraps
-  below 600px now — PHASE 38's own call on the Admin nav: a second line is legible, and a truncated
-  label is a missing one.
-- **Final measurement: 0 document overflow at 1280 and at a true 320, on both Chapter 2 addresses
-  and on the two shipped Copylink routes, with one `h1` on each.**
-- **One product-wide contrast gap was measured and deliberately NOT fixed.** `--mode-link` is
-  `var(--brand)` in `:root, .mode-none` — marked `UNSPECIFIED` at `proovd.css:163` since Phase 02 —
-  so every anchor on a light surface renders at **1.46:1**. It joins `--moss` at 3.33:1 (Session B)
-  and `--grey` at 2.18:1 on `.kicker`/`dt`/`.field-hint` as a palette decision with its own
-  product-wide screenshot pass. The baseline confirms it: Chapter 1 reports 33 low-contrast findings
-  of exactly these kinds and Chapter 2 reports 12, none of them new.
-
-**Two test bugs worth recording, because both are shapes that recur.** The `\brank\b` scan matched
-`@zeta-rank` — my own seed label, and the third time a suite has caught its own fixture (Session C's
-`@creator-norank`); the label was renamed rather than the scan loosened. And one frontend assertion
-waited on `@solderandsawdust`, which the **Act panel** renders from the earlier `home` read — so the
-wait resolved before the posts arrived and the assertion raced them. It passed alone and failed
-under the full suite's load, which is exactly what that shape looks like; it now waits on a control
-only the posts panel renders.
-
-**What Session D deliberately did not build:** any content for Get paid or Wrap; a second live-edit
-write path, a second update path, or a second scheduler; a Founder support-case intake (§26.7 owns
-that queue and the server has no Founder route); a per-Creator performance metric in
-`creator_results`; a note, reply or reaction on the acknowledgement; an undo for it; a
-`founder_post_acknowledged` key; and any change to §15's review, §17's verification, §18's audience
-rules, or §21's close — the chapter renders their state and touches none of them.
-
-### …and Chapter 3, Get paid — Session E of seven (§21, §22.3, §22.4, §22.5, §33.8.13, 2026-08-19)
-
-Session E is everything between the campaign closing and the money being out: §21's retry window,
-§22.3's W-9 and payment schedule through the ONE `readFounderPaymentStatus` resolver, §22.4's Day 14
-Progress Check with its durable receipt, and §22.5's four obligations. **It adds no migration, no
-commercial rule, and no write route** — every control drives a service Phases 18b, 19b and 21a
-shipped and §33 drives.
-
-`shared/src/founder-dashboard/paid.ts` owns the register; `backend/src/close/results.ts` gained the
-one payload this session added; `frontend/src/surfaces/founder/chapters/PaidChapter.tsx` is the
-surface; `PHASE 39`'s Session E block the styles; `founder-dashboard-e.test.ts` (21) and eight more
-in `founder-dashboard.test.tsx` (50 → 51, one consciously moved) are the artifact. **`npm test` is
-131 files and 3,562 tests, green in one run** (was 130 and 3,542 — +29 new, −9 as the §33.11 sweep
-traded two retired routes for one).
-
-- **The chapter is a RENDERER, and the suite scans for it.** §33.8.13 is one source and many
-  renderers, and this is a renderer: no `+`, no `-`, no `*` applied to an amount, no `Math.round`,
-  no `reduce`, and exactly ONE `BigInt(` — the `usd` formatter. The reference does the opposite in
-  the open: `net = gross − aff − proovd`, then `Math.round(net*.4)` and `Math.round(net*.6)`. Three
-  things are wrong with that beyond it being a mock — §22.3's eligible share subtracts **five**
-  terms and the reference has three (the §24.8 cause-based adjustments and the §24.5 allocated
-  Stripe fees are simply gone); the remaining payment is **the exact remainder** (§33.8.11: first +
-  remaining = the share, to the cent), never an independent 60% floor beside a rounded 40% one; and
-  a browser that computes the split is a second answer to what somebody is owed.
-- **The Founder payload and the Admin queue deep-compare equal, driven rather than asserted.** Both
-  routes call `readFounderPaymentStatus(db, { campaignId })`; the suite signs in as both and
-  compares `founderRes.body.payments` to `adminRes.body.status` as whole objects.
-- **§22.3 has no Founder request, and that is the largest refusal here.** The reference's spine is
-  `Request payment` → `In review` → `Paid ✓`, with `Request 40%`, `Request the rest` and `With
-  Proovd rep` beside it. §22.3 creates each payment on its own §6 day through the
-  `founder-payment-schedule` sweep and releases it on Proovd's recorded decision; the ONE ask a
-  Founder makes is the early remaining release, Product-only, behind a §6 setting that ships
-  disabled, gated on four recorded proofs. A request button would tell a Founder their money is
-  waiting on them when it is not (§1.4) — and on an Idea single payment there is nothing for it to
-  request at all. `NO_PAYMENT_REQUEST` renders where the three buttons were, and the suite walks
-  every control on the rendered chapter.
-- **The W-9 is a secure action, not a file input.** The reference draws
-  `<input type="file" accept=".pdf,.png,.jpg,.jpeg">` with a "W-9 uploaded." toast. §11 and §13 make
-  Proovd the holder of a status and an identifier and never of the documents; no Proovd column can
-  take a taxpayer identification number (the 0015 CHECK, reapplied on 0031); receipt is an Admin's
-  recorded fact rather than a Founder self-assertion (§12's rule); and R2 is unconfigured besides
-  (Track A4). The chapter has **no file input anywhere** — asserted in the DOM and by a source scan
-  for `type="file"` and `accept=` — which also disposes of the reference's `Upload proof of
-  delivery`.
-- **The one payload this session added is a READ of three stored columns.** §21's window was
-  nowhere on the Founder's own record: `prepareResults` refuses while it is open and names the
-  deadline in ITS refusal, which only an Admin ever sees, so a Founder waiting on results was told
-  reconciliation was happening with no instant attached — §27.1's "when's the next update"
-  unanswered on the one screen where the answer is stored and immutable. `retryWindow` carries the
-  §6 hours in force at batch start, the once-anchored `first_failure_at`, and the CHECK-pinned
-  deadline. The suite stores **72** hours rather than 48 and asserts the payload moves, because a
-  read that only ever sees the default is indistinguishable from a constant.
-- **`open` follows the campaign's lifecycle, not this process's clock.** `endRetryWindow` is what
-  moves a campaign out, and it resolves any in-flight attempt under its own key first — so a window
-  whose deadline has passed but whose sweep has not run is still open. Deciding it from `Date.now()`
-  would tell a Founder their outcomes were final while a charge was still being resolved. And
-  `not_opened` stays its own state beside `closed` (§16a): "no card ever failed" and "the window ran
-  and ended" are different facts.
-- **The §22.4 clarification finally has somewhere to answer, and that is a live defect closed.**
-  `POST …/day-14/clarification` shipped with Phase 21a, is mounted, and is driven by that phase's
-  own suite — and had **no client and no control anywhere**. The old surface rendered the question,
-  told the Founder that not answering inside five business days is one of the recorded reasons a
-  review fails, and offered nothing to answer with, on a review whose failure blocks a payment.
-- **`outcome !== 'pending'` rendered an unopened review as one that DID NOT PASS.** The vocabulary
-  is `pending | pass | fail | not_opened` and `readDay14Checklist` defaults an absent review to
-  `not_opened`, so the old branch printed "Recorded outcome: did not pass" for a review nobody had
-  opened — the worst possible direction for a state that blocks money (§1.4). It decides on the two
-  recorded outcomes now, and the QA fixture's `outcome: 'open'` — a value not in the vocabulary at
-  all — was corrected to `pending`.
-- **§3.2's `held` is refused twice.** The reference says "before it leaves the held balance" and
-  "the held money is returned to backers". Under §24.1 the captured funds settled to the Founder's
-  own account at capture and §22.3's release is Proovd's recorded decision; §22.3's vocabulary is
-  `eligible` / `blocked` with the requirement named / `released`, and has no `held` at all. The
-  suite scans the chapter for `escrow`, `custody`, `held balance`, `held money`, `pledge`,
-  `upfront`, `all-or-nothing`, and `affiliate`.
-- **The ghost ban is a record with four triggers, not a threat attached to a step.** The reference
-  says "Ghosting this request bans the account" on the 14-day update and again on delivery proof.
-  §22.7's `ghostBanTriggersMet` returns the met triggers and `recordGhostBan` refuses any trigger
-  not among them; a Day-14 failure blocks the *unreleased* remaining payment, and recovering
-  anything already released is an Admin-recorded §24.8 case rather than an automatic reversal.
-- **Day 14 is anchored on close, not on the payout.** §22.4's review is `campaign_close_at + 14
-  days` and applies to every campaign including Idea ones, whose §6 payment day is 3. The
-  reference's "Fourteen days after payout" would put it after the first Product payment and eleven
-  days late on an Idea campaign.
-- **The chapter register's own line was corrected.** Session B took the reference's
-  `Card retries, W-9, payout requests and delivery proof` verbatim; two thirds of it names controls
-  that must not exist, in the one sentence saying what the chapter is for. It now reads
-  `Card retries, your W-9, when each payment lands, and what you owe your backers`, and a test
-  refuses `request` and `proof` in it.
-- **`/results` and `/fulfillment` are retired to redirects and both components are deleted.** Two
-  Founder surfaces over one campaign's money would be two places to read an amount, which is what
-  §33.8.13 exists to prevent — the reasoning that retired `/roster` into Chapter 1 and `/updates`
-  into Chapter 2. Both addresses survive their components because §27's close, results and Day-14
-  messages point at them and Appendix C's §34 walk steps name them; the §33.11 sweep follows the
-  content into a new `founder_paid` flow with `keyboardPathRequired: true` (§28.5 names payment and
-  recovery surfaces among its five).
-
-**The §33.11 fixture was sweeping the wrong chapter, and that is the finding worth carrying.** The
-QA dashboard fixture said `status: 'live'`, and `founderChapterUnlocked` opens only the chapters a
-campaign has REACHED — so the new `founder_paid` address fell back to Chapter 2 and the sweep
-reported Get paid as swept while rendering Live. Nothing errored, nothing 404ed, and axe and the
-keyboard walk ran happily against the wrong page: §33.11.1's own trap ("a surface showing something
-else is not the flow") in its quietest possible form, *inside the harness*. The fixture is
-`closed_reconciling` now — past chapters stay open, so Choose and Live still render at their own
-addresses — and a new test walks `PRINCIPAL_FLOWS` for every `?chapter=` it addresses and asserts
-each is unlocked on the fixture campaign, which is what Session F will trip on the day it addresses
-`?chapter=after`.
-
-**One production defect that only a real interaction could find.** The clarification answer's
-`onChange` read `event.currentTarget.value` **inside** a functional `setState` updater. React runs
-the updater later, during the reducer, by which point the synthetic event has been recycled and
-`currentTarget` is null — so the first keystroke threw into the ErrorBoundary and replaced the page
-with "This screen could not be displayed". It is on the one control in this chapter that answers a
-review which blocks a payment. jsdom found it because the test types into the box rather than
-asserting the box exists; a rendering test would have passed.
-
-**The browser pass found two defects and nothing else could — the thirteenth rebuild in a row.**
-
-- **`--fs-num` has a 2.5rem floor, and this is the first hero in the product that is money.**
-  `.stat__value` is the done-moment slot sized for a COUNT — Chapter 2's Glance puts `44` in it —
-  and `US$4,180.80` is eleven glyphs of one unbreakable token. At 40px it ran **91px** past its card
-  at 320 and pushed the measure, the section and the document sideways: one defect reported as ten,
-  with `doc=331/320`. The floor is lowered where the hero is a currency and only there, so every
-  counting Stat is untouched. Not `overflow-wrap` — breaking an amount across two lines is worse
-  than shrinking it.
-- **The brand-ringed block was shouting the absence of a task.** `.fd-paid__action` is the §22.3
-  secure-action slot, and `w9.action` is `No action needed` once the W-9 is verified — so the
-  loudest treatment on the panel was carrying "there is nothing to do", and on the schedule a
-  `secureAction` that describes what happens *without* the Founder sat in the same block above a
-  quiet "No action needed" saying the opposite. The emphasis follows whether there is actually
-  something to do now. axe cannot see either: both are correctly named text.
-- **`.stat__sub` is `--grey`, which is 2.27:1 on white**, and it carries the label of the largest
-  money figure a Founder will read — Founder Flow Session E's rule, that a line saying what a number
-  MEANS is not a caption. Scoped, for the reason Session C recorded.
-- **Final measurement: 0 document overflow at 1280 and at a true 320, on all three addresses, with
-  one `h1` each** — and `/results` and `/fulfillment` measure identically to the chapter, which is
-  the redirect proving itself.
-- **Every one of the 32 contrast findings is inherited, compared as a set against Chapters 1 and
-  2.** Seven token pairings, all pre-existing: `--grey` at 2.18 on `.kicker`, `--moss` at 3.37 on
-  `dt` and the meta lines, `--brand` at 1.52 in the `.stat__value` brand slot Chapter 2's Glance
-  already uses, `Tag`'s mint-on-moss and mint-on-sage at 2.66 and 1.82, one 1.0 artifact of the
-  probe sampling a `.btn` mid-sweep, and `--white` on `--brand` at 1.46 — the documented, scoped
-  tech-stack §3.6 exception the owner ruling re-recorded in Session A. Nothing new.
-- **A pre-existing Chapter 1 finding, attributed rather than absorbed.** Two `input.input` boxes
-  overflow their own box by 89px and 117px at 320. It was suspected to be a side effect of the
-  fixture change, so the pass was re-run with the previous `live` fixture and it reproduces exactly
-  — it is Session C's, the document does not scroll (`320/320`), and a text input scrolling
-  internally is much milder than the numbers look. Recorded, not fixed: it is a `PHASE 39`
-  Chapter-1 change with its own pass.
-
-**And one thing the walk cleared rather than found.** Disagreement 14 has caught a real navigating
-timer in two supplied references. This one has seven `setTimeout` sites in 460KB: a 1.9s toast
-dismissal, a font race, a `URL.revokeObjectURL`, three inside GSAP, and **one real 5.2-second
-auto-advance** — which belongs to `send-affiliates`, the control Session C already refused under
-disagreement 8, so the timer went with it. Nothing in Chapter 3 advances on a clock. Recorded
-because "we checked and it was clean" is a different fact from "we did not check".
-
-**What Session E deliberately did not build:** any content for Wrap; a migration; a second refund,
-Transfer, release, or payment path; a Founder support-case intake (§26.7 owns that queue and the
-server has no Founder route); a file upload for the W-9 or for Day-14 evidence; a payment-request
-route or column; and any change to §21's close batch, §22.1's earnings, §22.3's release rules, or
-§22.7's ban — the chapter renders their state and touches none of them.
-
-### …and Chapter 4, Wrap, and the Backers page — Session F of seven (§19, §20, §22.8–§22.11, §25.7, §31.8, 2026-08-20)
-
-Session F is everything after the money is out: §22.8's recorded completion, §22.9's ask, §22.10's
-two gates, §22.11's resolution — and the three things §19, §20 and §22.10 require that no Founder
-route has ever served. **It adds one record (0058), one migration, four routes, and closes three
-compliance gaps.**
-
-`shared/src/founder-dashboard/wrap.ts` owns the register; `backend/src/founder-dashboard/{wrap,logic}.ts`
-the reads, the writes and the drift-tested restatement; migration `0058` the Backer data request;
-`frontend/src/surfaces/founder/chapters/WrapChapter.tsx` and `BackersPage.tsx` the surfaces; `PHASE 41`
-the styles; `founder-dashboard-f.test.ts` (17) and the dashboard suite's Session F half (13 of its 61)
-are the artifact. **The Founder dashboard's four chapters are complete; Session G's settings panel
-remains.**
-
-- **Three compliance gaps close here, and none of them is new capability.** §19 calls the operational
-  share MANDATORY and disclosed before consent; `founder_operational_shares` has been written by five
-  services since Phase 15a and read by **no Founder route**. §20's Explore section 10 requires a
-  Founder export and the payload has shipped `available: []` since Phase 17a, honestly declaring its
-  own absence. And §22.10's two-gate panel has existed as `NextCampaign.tsx` since Phase 21b, **routed
-  nowhere** — it is imported whole rather than rewritten, so §33.10.9's trap (summarising two gates
-  into one green tick) stays refused by the component that was built to refuse it.
-- **The export has TWO parameters, and that is the guarantee rather than a comment.**
-  `exportBackerRows(db, campaignId)` — no column list, no purpose, no request id, no "include survey"
-  flag. So there is nothing an approved §25.7 request could arrive AS, and approving one cannot change
-  what a file carries. 16a's rule applied to the Founder side: a limit the requester can widen is not
-  a limit. The suite asserts `.length === 2`.
-- **The survey answer is refused for a FILE, and the reason was already written down.** §25.7 permits
-  identifiable survey fields under §19 step 7's specific consent, and the Admin ledger register has
-  recorded since Phase 16a that *"an export cannot carry that condition with it"*. A CSV opened in a
-  spreadsheet six months from now carries no consent state. So the column is withheld with that exact
-  reason, and the surface that CAN carry the condition — §20's Explore `survey_answers`, consent-gated
-  at the query — is where the answers stay. The suite seeds a consented answer and asserts it is still
-  not in the file: the consent existing is what makes the assertion mean something.
-- **The reference ranks Creators four ways at once and none of them ships.** A numbered badge, a
-  first-place tile, a "Who you'd work with again" heading, and a sort by backer count. §30 defers
-  public leaderboards and the Creator close view has shipped with no rank on that basis since Phase
-  18b — and removing the crown while keeping the sort is still a ranking, because **the order IS the
-  claim**. `readFounderWrap` sorts by handle and the surface renders what it is given; the suite reads
-  the rendered handles and compares the sequence, rather than hunting for the word `leaderboard` —
-  which appears on the page, inside the sentence refusing one.
-- **Sorting is in the wrap read, not the projection, and that is deliberate.**
-  `listFounderVisibleRoster` returns newest-recruited first, which is right for Chapter 1 (a Founder
-  answering proposals wants the newest) and wrong for a recap. §20's `creator_results` already took
-  the same decision for the same reason (`ORDER BY public_handle`, Session D). A handle that is not
-  set sorts LAST: an unnamed row at the top of a list reads as a placement.
-- **§22.9's ask follows §22.8's recorded status, never a revenue figure.** The reference offers
-  work-again to the top three by backers, which would make a §22.8 decision out of a sales number —
-  and §22.8's five criteria contain no sales term at all (§33.10.6, asserted since Phase 21b). The
-  control appears on `successfully_completed` and nowhere else, and `requestWorkAgain` re-decides it
-  server-side (§1.1).
-- **§22.11's item keys stay on the server.** `readResolution` knows which of §21's nine reconciliation
-  items is outstanding — `batch_completeness`, `provisional_vs_earned`, `founder_share_w9`. Those are
-  Admin vocabulary and §3.1's whole risk is an internal name reaching a customer, so the Founder reads
-  whether the money is closed out and who owns the next step (§27.1). That is not a summary standing
-  in for detail: which item an Admin still has to verify is not something a Founder can act on. Both
-  suites scan the payload and the rendered chapter for every key.
-- **A withdrawn share renders as what it is, and the failure mode is why.** `do_not_fulfill` rows are
-  returned rather than filtered — a Founder needs to see that a pre-order was shared and then
-  withdrawn — and the pinned sentence replaces the enum value in the payload, on the surface, and in
-  the CSV. A row presented as deliverable when the money never moved is a Founder shipping to somebody
-  who was never charged, and neither side finds out until it arrives.
-- **§31.8's step is one rule with two callers.** The Backers page needs the progression for a whole
-  campaign at once and a per-row `backerProgression` call would be an N+1; a batched copy of the rule
-  would be a second answer to "where is this pre-order", and the one nobody updated is the one a
-  Founder acts on. `backerProgressionStep` is the pure kernel extracted from `backerProgression`, and
-  the Backer's own page and the Founder's list read it.
-- **§25.7's two refused purposes are refused by the DATABASE.** The reference offers marketing
-  follow-up, adding backers to a community, and customer support; §25.7 permits the third, and
-  fulfillment. The other two are a CHECK on 0058, so a marketing request has no representable row
-  whatever a route is later persuaded to accept — the suite hand-writes the INSERT and watches it
-  throw. Both are named on the form with their own reason where the option would have been, so a later
-  session that wants one back has to delete the sentence refusing it. `community` is the one that would
-  actually happen: a Founder with a Discord and a list of emails will simply add them.
-- **An approved request grants nothing, and there is nowhere for it to.** No `granted_columns`,
-  `scope`, `access_level` or `expires_at` on 0058 — the exact column set is asserted — and no parameter
-  on the exporter. What an Admin does about an approval is §26.7's support case: a person, with the
-  record in front of them, which is §1.3's manual-but-recorded path rather than a column that quietly
-  widens a file. **§31.8's newsletter promise is re-asserted** because Session F added a table a later
-  reader might reach for: `backer_satisfaction_responses` still has no consent column of any spelling.
-- **`admin-backers.ts` gained its first write, and its header was corrected rather than left lying.**
-  It has recorded since 2026-08-19 that no verb is mounted and that the suite drives all four at the
-  path. That is still true of the DIRECTORY and the test is untouched; what is new is the §25.7
-  decision at `/data-requests/:requestId`, which is about what a FOUNDER may be handed rather than
-  about a Backer. It takes the freshness gate — approving one is Proovd undertaking to hand a person
-  identifiable Backer detail, which is exactly the sensitive property §33.12.5 asks about — so
-  §33.12.5's partition needs no register entry for it.
-- **The interim-chapter renderer is deleted, and `ChapterBody` is an exhaustive switch.** Every chapter
-  is built, so the panel naming "the surface that owns this work today" describes nothing. Leaving it
-  would be a state the product cannot reach, rendered by code the type checker can no longer prove is
-  dead — the chapter id is a closed union and the four cases exhaust it, so a fifth chapter without a
-  component fails the BUILD. **One Session B assertion was consciously retired** (Session E had already
-  moved it once, from Get paid onto Wrap); what replaces it asserts the fact that made it dead.
-- **The §33.11 fixture moved for the second time, and the guard Session E added is what caught it.**
-  `founderChapterUnlocked` opens the chapters a campaign has REACHED, so `closed_reconciling` would
-  have sent `founder_wrap` back to Chapter 3 — the sweep reporting a chapter as swept while rendering
-  a different one, nothing erroring and axe running happily against the wrong page. The fixture is
-  `closed_resolved`; past chapters stay open, so all four render at their own addresses.
-- **The Backers page is a PAGE, not a chapter, and that is the reference's own architecture.** *"A
-  chapter's home is a HUB… everything that manages detail — the backers, the numbers behind the
-  numbers — is its own PAGE, reached by a link and left by a back control."* It is linked from Chapter
-  2 (a live campaign has people to support) and Chapter 4 (a finished one has rewards to deliver), so
-  it belongs to neither and sits at `/campaigns/:campaignId/backers`.
-- **The §3 scan caught this session's own copy twice, and the copy changed rather than the scan.** The
-  wrap register's threshold refusal quoted the word §3.2 bans for an Idea threshold, and the export
-  refusal quoted the word §3.2 replaces with `Pre-order` — both in RENDERED sentences. The scan reads
-  what a person sees and cannot tell a promise-not-to-use from a use; neither can a reader. That is the
-  opposite of `notifications/`'s source scan, which strips comments first because an explanation is not
-  a usage, and it is Session A's `placeholder_policy` finding in a different file.
-- **The browser pass found the money hero for the FOURTH time, and lowering the clamp was not enough.**
-  `--fs-num` has a 2.5rem floor because `.stat__value` is sized for a COUNT; `US$5,715.60` is eleven
-  glyphs of one unbreakable token and ran 108px past its card at 1280, pushing the row, the measure and
-  the document with it — one defect reported as four. Session E lowered the floor on its own chapter;
-  here the row was two auto-fit columns, so the amount had half the measure and was **still 11px over**
-  after the clamp came down, and a wider figure would put it back however far it went. The row is ONE
-  column at every width now: the count and the amount are two facts about the same campaign and read
-  perfectly well stacked, and sizing an unbreakable token to fit half a measure is how this keeps
-  coming back. Not `overflow-wrap` either — breaking an amount across two lines is worse than shrinking
-  it.
-- **Five lines were re-toned, and the rule is which ones were not.** `--moss` is 3.37:1 and `--grey`
-  ~2.2:1 on white; both are product-wide gaps with their own pass. So anything that CHANGES WHAT
-  SOMEBODY DOES took `--dark` — the do-not-fulfill note (a rule about money), the `To deliver` sub
-  (what the number a Founder packs against counts), the reward title and the pre-order reference (what
-  they ship and what they read out to support), §25.7's basis under each permitted purpose, and a
-  §22.8 disqualification reason. `.fd-wrap__niche` stayed `--moss`: a Creator's niche genuinely is a
-  caption, and re-toning every quiet line leaves a surface with no quiet lines at all.
-- **Final measurement: 0 document overflow at 1280 and at a true 320 on both addresses, one `h1`
-  each.** Every remaining contrast finding is an inherited token pairing also present on Chapters 2 and
-  3 — `--grey` at 2.18 on the StatePanel keys and the kicker, `--mode-link` at 1.46, `--brand` at 2.55
-  in the Stat brand slot, `Tag`'s mint-on-moss at 3.32, `--moss` at 3.37 on the one caption, the 1.0
-  artifact of the probe sampling a `.btn` mid-sweep, and `--white` on `--brand` at 1.46, which is the
-  documented tech-stack §3.6 exception Session A re-recorded. Nothing new.
-- **And one thing the walk cleared rather than found.** Disagreement 14 has caught a real navigating
-  timer in two supplied references. This one has seven `setTimeout` sites in 460KB and the only
-  navigating one belongs to `send-affiliates`, which Session C already refused. Nothing in Chapter 4 or
-  the Backers page advances on a clock, and `WRAP_ABSENCES` records the wrap-up sequence's own refusal.
-
-**What Session F deliberately did not build:** §5.2's settings panel (Session G's, and
-`/settings/notifications` redirects there); a second export, a second refund path, or a second scheduler;
-an access column, an approval flag, or any parameter an approved §25.7 request could arrive as; a
-marketing or community purpose of any spelling; a Founder support-case intake (§26.7 owns that queue and
-the server has no Founder route); and any change to §22.8's criteria, §22.9's eligibility, §22.10's
-cooldown kernel, or §22.11's resolution rules — the chapter renders their state and touches none of them.
-
-### …and the settings panel — Session G of seven, the dashboard is complete (§5.2, §5.5, §13, §22.3, §25.6, §25.8, §27.7, 2026-08-20)
-
-Session G is §5.2's settings panel, whole, at an account-level address. **The Founder Dashboard is
-complete: four chapters, the Backers page, and the settings.** It adds **no migration, no table, and
-no commercial rule** — one correction path, one read that composes existing resolvers, and three
-routes onto records that already existed.
-
-`shared/src/founder-dashboard/settings.ts` owns the register; `backend/src/founder-dashboard/{settings,settings-logic}.ts`
-the read, the writes, and the restatement; `backend/src/routes/founder-settings.ts` the four routes;
-`frontend/src/surfaces/founder/SettingsPage.tsx` the surface; `PHASE 42` the styles.
-`/settings/notifications` redirects here.
-
-- **§5.2 names eleven items and exactly ONE existed as a Founder-facing control.** The notification
-  preference, at `/settings/notifications`, whose own header has said since Phase 22c that *"when a
-  later phase has a second account-level setting, it joins this page."* Name, email, phone, profile
-  photo, password, business/entity data, connected-account status, KYC status, W-9 status and the
-  delete-account request had no Founder route at all — the payout and W-9 blocks had **resolvers**
-  and no page, and the deletion record had a table and an **Admin-only** writer.
-- **"Every §5.2 item is present or renders why it is not" is only checkable if the eleven are a
-  list.** So `FOUNDER_SETTINGS_ITEMS` is §5.2's own list in §5.2's own order, each entry either built
-  or carrying a sentence the surface renders where the control would be. A twelfth entry is a §1
-  rule 6 conversation rather than a nice idea somebody had; a missing one fails the register walk.
-  Only **one** carries a reason: the profile photo, because R2 is unconfigured (Track A4) and an
-  upload control that cannot finish is the §1.4 failure.
-- **The corrections record was NOT copied, and that is the session's main finding.** The brief says
-  "the corrections record, copied from `affiliate_profile_corrections`". Creator Flow Session A built
-  that table because `affiliate_signup_profiles` has **no history table at all** — no provenance
-  columns on `date_of_birth`, `country`, `state_region` or the five confirmations, and nothing
-  trigger-written beside them; the record had to be created before a reason could be stored. The
-  Founder record is not in that position: `record_claim_profile_edits` has written `draft_field_edits`
-  by trigger since Phase 07 (prior value, new value, supplier, editor, instant, insert-only, swept by
-  §25.8), and `audit_events` carries the reason — which is exactly the pair Admin's own
-  `updateFounderField` has written since 2026-08-16. So Session G copies the **discipline** and not
-  the table: a required reason, the prior value read `FOR UPDATE` inside the transaction that changes
-  it (§33.12.4), an audit row in the same transaction, and registered field ids rather than free-text
-  column names. A third store for prior/new/reason would be §26.8's *"a second event store that
-  drifts from the first"*, and it would put the Founder's own corrections somewhere
-  `founders/history.ts` does not look — the one place a support person goes.
-- **The Founder and the Admin edit the SAME row, and that had to be checked rather than assumed.**
-  `founder_claim_profiles` is unique per campaign, so a Founder who has run two campaigns has two
-  rows and an account-level page must pick one. `loadFounderAccount` picks the most recently created,
-  which is what `loadFounderContext` has done for the Admin workspace since 2026-08-16. If the two
-  disagreed, an Admin correcting a phone number and the Founder correcting their own would each see
-  the other's edit as having done nothing.
-- **`founder.self_corrected` is its own §25.6 action, beside `founder.field_updated`.** The actor
-  string distinguishes them too, but the action name is what a history surface reads to choose the
-  label a support person quotes, and "Proovd corrected this" and "they corrected it themselves" are
-  two different facts about one column.
-- **The §28.1 review `auth.ts` demands, done, with its conclusion recorded.**
-  `POST /api/auth/change-password` is a Better Auth core endpoint, already mounted because
-  `emailAndPassword.enabled` is true. Four checks: it is **not an enumeration oracle** (it requires a
-  live session, so the caller already holds the account, and a wrong current password reveals only
-  that they do not know their own); it is **rate-limited** by §28.1's per-address `/api/auth` limit;
-  it is behind the **cross-origin write guard**; and it is **not `update-user`**, which stays
-  unsurfaced with `delete-user` and `change-email` still disabled. Proovd's route **wraps** it rather
-  than the browser calling it directly, for two things the library cannot do on its own behalf:
-  `revokeOtherSessions` is forced true here rather than being a field a client may omit — somebody
-  changing a password because they think it is compromised must not be left with the other sessions
-  live, and with the second factor gone `requireFreshSession` is the only other thing standing
-  between a stolen session and a money-moving action — and the §25.6 row is written in the same act.
-- **`update-user` is the dangerous one and the reason is worth stating.** It writes `user.name` and
-  `user.phone`, which **no Proovd surface renders** — the claim profile is what every surface reads
-  — so surfacing it would let somebody edit a record that decides nothing while believing they had
-  corrected the one that does.
-- **The delete-account request writes 0040's record through 0040's own service.**
-  `requestFounderDeletion` calls `recordDeletionRequest` — the SAME one the Admin workspace calls when
-  somebody transcribes the ask off a call — with `received_via` set to `FOUNDER_DELETION_RECEIVED_VIA`.
-  That column exists for exactly this distinction. There is no approval state to set and no purge
-  column to write because 0040 has neither, and `FOUNDER_DELETION_IS_RECORDED_NOT_EXECUTED` rides the
-  control rather than sitting under it: somebody who reads "close my account" and nothing else will
-  believe their records are gone, and the next tax document they receive is the correction (§1.4).
-- **Two blocks are somebody else's read, rendered by somebody else's component.** `PayoutOnboarding`
-  renders §13's four states from `GET /api/founder/payouts`; `NotificationSettings` renders §27.7's
-  preference and history from Phase 22c's two routes. Neither is re-fetched or re-composed, because
-  a second answer to "is this payout account complete" is exactly the drift one resolver exists to
-  prevent — and the W-9 block renders `readFounderPaymentStatus`'s own `line` and `action` rather
-  than a §22.3 sentence of its own (§33.8.13, third surface).
-- **`NotificationSettings` gained an `embedded` prop**, the `CreatorReadiness` arrangement for its
-  reason: §33.11.2 wants exactly one `h1`, and this component's own is correct when the page IS
-  notifications and one level too high when it is a section of eleven. The loading state, the failure
-  state and its six §27.1 answers, and both controls are identical — which is the argument for a prop
-  rather than a second component.
-- **Seven refusals, each rendered where its control would be.** `SETTINGS_ABSENCES` is the
-  `OPERATIONS_ABSENCES` arrangement applied to a settings page, which is where options accumulate and
-  every one of them would be a rule nobody agreed to. The three worth naming: **per-topic toggles**
-  (§27.2's first rule — a switch that turned off a charge notice would be the one setting nobody
-  should be able to find); **editable representations** (§10's three are statements, each its own
-  unchecked control at the claim, and a representation somebody can quietly toggle is not one); and
-  **changing the sign-in address**, which is kept apart from changing the contact address because
-  getting it wrong locks somebody out rather than misdirecting a message.
-- **Four fields are correctable and five claim-time answers deliberately are not**, each with its
-  reason on the register: `date_of_birth` (§10 collects it as part of the age representation, and the
-  product derives no age from it), the three representations, and `country`/`state_region` — which is
-  what §24.3's tax handling and §11's US-only rule read. `legal_name` and `email` are §5.2 names and
-  therefore not refused, but neither is a box that saves on blur: both take the correction path with
-  the consequence stated BEFORE the change rather than discovered after it.
-- **Inline editing, not modal — the Session C decision, and it binds harder here.** Every form can be
-  refused by the server (an unregistered field, a missing reason, a wrong current password), and
-  `Modal` closes on its own primary action, which would put the refusal behind a panel that has just
-  vanished. Two of these refusals are about a credential.
-- **The var scan caught `--fs-caption`, which does not exist.** Session C added that scan after a
-  silently-invalid stylesheet had shipped twice; this is the second time it has caught a token
-  invented in good faith. The six that exist are body, button, h2, hero, number and step, and the
-  label now uses `.kicker`'s own uppercase-plus-tracking treatment instead.
-- **§33.11 passes with `founder_settings` as a sixteenth principal flow**, `keyboardPathRequired`
-  because §28.5 names account and privacy surfaces among its five and this page changes a password,
-  moves the address every transactional message goes to, and files an account-closure request. 562
-  tests: it renders real content with no fixture fallback, passes axe, and its keyboard path is
-  complete with nothing trapped.
-- **§33.12.5's partition is untouched, and that is by construction.** It is over `/api/admin` writes;
-  nothing here is mounted under that prefix and no Admin route was added. None of the four routes
-  takes the freshness gate either, stated rather than assumed: correcting your own phone number moves
-  nothing, the closure ask records a request a person reads, and the password change carries a
-  stronger proof of identity than a recent sign-in — the current password itself.
-
-**What Session G deliberately did not build:** a migration or a `founder_profile_corrections` table;
-a second reset path (§5.5's public ask at `/reset-password` stays exactly where it is, because
-somebody who cannot sign in cannot reach a settings page); a profile-photo upload; a W-9 file field;
-an approval state or purge column on the deletion record; a per-topic notification switch; any
-control over `date_of_birth`, the three §10 representations, `country`, or `state_region`; and any
-surface for `POST /api/auth/update-user`, which stays unsurfaced with `delete-user` and
-`change-email` still disabled.
-
-**Testing was deliberately partial, at the user's request, and the gap is stated rather than
-implied.** `npm run typecheck` is clean across all three workspaces; `a11y.test.tsx`'s three
-stylesheet scans pass (50); `qa.test.tsx`'s §33.11 sweep passes (562) with the new flow registered
-and fixtured. **Not run this session:** the full `npm test`, the backend integration suites, and the
-1280/320 browser pass — which every rebuild since 2026-08-10 has used to find at least one defect
-jsdom and axe cannot see. A settings page with a money block, a credential form, and six
-unbreakable-token values is exactly the shape that pass keeps catching, so it is an open item rather
-than a skipped one. **There is no `founder-dashboard-g.test.ts` and no Session G half of the surface
-suite; both are outstanding.**
-
-### The last look at the problem was inserted between the code and Positioning (§9, §33.11, 2026-08-20)
-
-> **Superseded in one detail on 2026-08-20**: the solution's own last look was
-> built the same day and now sits between this screen and Positioning, so the
-> order is `code → confirm-problem → confirm-solution → positioning`. Everything
-> below is otherwise unchanged and still true of the problem screen; the two
-> sentences naming its forward target are marked where they occur. See the
-> section after this one.
-
-One screen, built from scratch to the supplied reference's `probConfirm` (`Proovd Founder Flow v2.dc.html`,
-`[data-pconfirm]` / `kindWide`) and inserted into the Founder flow at the position the reference gives
-it: `code → confirm-problem → positioning`. **By explicit product direction, and it is the half of
-Session C's refusal that comes back.**
-
-`shared/src/vetting/flow.ts` gained the register entry; `shared/src/qa/index.ts` the route;
-`frontend/src/surfaces/founder-flow/ConfirmProblem.tsx` is the screen; `frontend/src/components/anim.ts`
-gained `stageToggleHead`; `frontend/src/routes.tsx` the route; `PHASE 54` in proovd.css the styles.
-**No migration, no service, no new record** — it reads and writes `campaign_vetting.problem_text`
-through the same `fetchVetting`/`saveVetting` the `problem` screen uses.
-
-- **It is a departure from Session C, and only the problem half of it.** Session C built nothing for
-  the reference's screens 7–8 because §9 has one `problem_text` and one `solution_text`, and a record
-  collected on two screens is a record whose two copies eventually disagree. What makes this narrow is
-  that the two screens are **one record**: this page edits `problem_text` through the same route, so
-  there is no second copy to drift — which is also exactly what the reference does (`pcText` reads
-  `st.probText`, the state `[data-problem]` writes). **The SOLUTION half is still not built**, for the
-  reason Session C recorded, and the register's header says so.
-- **This is not `ConfirmAnswer`, and the two prefixes exist because they are two screens.**
-  `.ff-prob` is `[data-problem]` — a 1304px column, a sticker in the headline, a scroll rail, a `Next`
-  CTA, and `fitStages`' `s *= 1.38`. `.ff-pc` is `[data-pconfirm]` — a 1760px column pushed 70px down,
-  no sticker, no rail, no boost, and a green `Still my problem` bar. Merging them would be one
-  component with a variant flag over two different compositions.
-- **The CTA is REMOVED in the editor rather than collapsed, and that is the composition.** The
-  reference's `sc-if value="{{ pcView }}"` wraps both the green button and the pencil, so entering the
-  editor unmounts the button and the panel grows 470 → 640px into the space it leaves. The two states
-  are 1260px and 1270px tall on the stage, which is why the screen does not jump; a
-  collapsed-to-zero button would leave a 0px control in the tab order AND animate a height the
-  reference does not. The `Save` label `pcCta` computes for the editing state is therefore unreachable
-  THERE too, and is not implemented here.
-- **`stageToggleHead` is `pcToggle`, tween for tween**, and it is a second helper rather than a
-  parameter on `problemToggle` because the two pages mark their parts with different attributes —
-  `data-prob-part` and `data-stage-anim`. That is the same mechanism every screen of this flow uses to
-  keep `FlowPage`'s `relayIn` off its page, and it is why neither helper can reach into the other's.
-- **Back goes to the code, not to the email.** The reference's own `back()` from `vetting` vStep 0
-  goes to the email-ENTER stage, skipping its code screen. Here the linear convention wins: `code` is
-  a real page in this product's register, `positioning` already had exactly this Back target before
-  the insert, and the help drawer lists everything behind. `positioning`'s Back moved onto this page
-  and its accessible name moved with it.
-- **The browser pass is the whole verification, and it is a measured 1:1.** The reference was served
-  with `startScreen` defaulted to `Vetting` and both were driven through headless Chrome at a TRUE
-  viewport (`Emulation.setDeviceMetricsOverride` — `--window-size` lies on Windows, which PHASE 38
-  already records). Every box matches on every number, at 1280 and at 320, offset only by the 7.5px
-  the reference's own canvas harness reserves for a scrollbar (`documentElement.scrollWidth` is 1265
-  there and 1280 here):
-
-  | | reference | this |
-  |---|---|---|
-  | stage | 998.4×616.8 @141.6 | 998.4×616.8 @141.6 |
-  | head | 704×84.5 @224, 80px/700/105.6/-2.4 | identical |
-  | panel | 704×241.2 @345.2 | identical |
-  | field, read | 684×188 @355.2, 55px/500/82.5/-0.66 | identical |
-  | field, edit | 684×256 @353.2 | identical |
-  | cta | 704×64 @586.4, 66px/900/-1.32 | identical |
-  | edit | 132.4×53.6 @678.4 → 146.1×53.6 @680.4 | identical |
-  | back | 74.2×30 @831.6 | identical |
-
-  Zero document overflow and exactly one `h1` at both widths. At 320 the whole composition scales to
-  a 249.6×154.2 stage in both — nothing reflows, which is the reference's own model.
-- **All three transitions were driven, not inferred.** A real six-digit code typed into `/code`
-  lands on `/confirm-problem` (the token row's `claimed_at` is the receipt); `Still my problem`
-  lands on `/positioning` with its real content rendered (**as of 2026-08-20 it lands on
-  `/confirm-solution`, which lands on Positioning**); and Positioning's Back lands back here with
-  the geometry unchanged, which also exercises the backward relay.
-- **The keyboard path is complete and every control is named**: Back (naming its destination), Help,
-  the field, `Still my problem`, `edit`. In the editor the CTA is absent from the DOM and therefore
-  from the tab order, the field is `readOnly=false`, focus is on it with the caret at the end
-  (111/111 on a 111-character answer — the reference's `setSelectionRange(n, n)`), and the label is
-  `Confirm`. One live region, one `h1`.
-- **One thing the reference has no need of, and one it refuses.** It holds a record in memory, so the
-  loading state is ours; and a save that FAILS says so, below the column and absolutely positioned so
-  it can never move the composition. It gives the field no focus ring at all — a keyboard user
-  tabbing onto a read-state field would have nothing — so one is drawn INSIDE the sheet
-  (`outline-offset: -6px`), because an outset ring would be laid over the dark card and read as a
-  second border on it.
-- **`Confirm` and `edit` are the reference's own labels and ship as they are.** `Confirm` is in
-  §33.11.4's `OBJECTLESS_CTA_LABELS`, so this is the same knowing exception `ConfirmAnswer` already
-  records — the copy is the specification on these pages. `Still my problem` is not objectless.
-
-**Testing was deliberately partial, at the user's request, and the gap is stated rather than
-implied.** `npm run typecheck` is clean for `shared` and `backend`; `frontend` reports four errors and
-all four are pre-existing in `founder-flow.test.tsx`, left by the same day's removal of the `claim`
-and `match` screens (`FLOW_AGE_IS_YOUR_STATEMENT`, `PUBLISHED_POLICIES`, `FLOW_CLAIM_USES_THE_LINK`,
-`stubSignal` — none from this screen). The stylesheet's comment balance and its `var()` definitions
-were both checked. **Not run:** `npm test`, the §33.11 sweep, and axe. **There is no test file for
-this screen and no `founder-flow.test.tsx` half for it; both are outstanding.**
-### …and the last look at the solution, between it and Positioning (§9, §33.11, 2026-08-20)
-
-One screen, built from scratch to the same reference component at `vStep` 1
-(`Proovd Founder Flow v2.dc.html`, `[data-pconfirm]` / `kindWide`) and inserted where the
-reference puts it: `confirm-problem → confirm-solution → positioning`. **By explicit product
-direction.**
-
-`shared/src/vetting/flow.ts` gained the register entry; `shared/src/qa/index.ts` the route;
-`frontend/src/surfaces/founder-flow/ConfirmSolution.tsx` is the screen; `frontend/src/routes.tsx`
-the route. **No migration, no service, no new record, and no new CSS** — it reads and writes
-`campaign_vetting.solution_text` through the same `fetchVetting`/`saveVetting` the problem screen
-uses, and renders into `PHASE 54`'s existing `.ff-pc` block.
-
-- **One component there, two pages here, and every difference is a ternary the reference already
-  writes.** `isProbConfirm` is `n==='vetting' && !vReviewing && vStep<2`, so both answers are
-  `probConfirm`; `pcHead`, `pcText`, `pcCta` and `setProbText` each branch on `vStep===1`. A page in
-  this product is an ADDRESS, so the pair is two register entries — which is also what lets the help
-  drawer name and mark them separately, and what puts the flow's forward and back targets in the
-  router rather than behind a prop. The stylesheet is deliberately NOT duplicated: a second copy of
-  those rules is how the two would come to differ by a pixel.
-- **The reference's own walk confirmed the position before anything was built.** A copy pinned to
-  `vStep:0`, driven in Chrome: one click on `Still my problem` gives the solution headline and
-  `Still my solution`; a second gives `[data-compet]` with the `h1` `Lets talk about your
-  competitors...`, which is Positioning. The insert is the reference's own sequence, not an
-  interpretation of it.
-- **The product name is the real one.** The reference hardcodes `Teeb`; the sentence structure is
-  kept and the value comes from `fetchDraftLanding`, the read the invite page and the reach orbit
-  already use. A draft with no product name renders `your solution` rather than an empty
-  possessive — this headline is the one string on the screen that cannot degrade to a blank.
-- **Measured 1:1 against the reference at 1280×800 and at a TRUE 320 viewport**, both states. Every
-  field compared — x, y, w, h, font, size, weight, line-height, letter-spacing, align, colour,
-  background, radius, padding, margin, box-shadow — and the ONLY difference anywhere is a uniform
-  **7.5px** on `x`, which is the reference's own canvas harness reserving a scrollbar
-  (`documentElement.scrollWidth` 1265 against clientWidth 1280). Stage 998.4×616.8 @141.6; head
-  704×42.2 @195.1, 80px/700/105.6/-2.4; panel 704×241.2 @274.1; field 684×188 @284.1,
-  55px/500/82.5/-0.66; cta 704×64 @515.3, 66px/900/-1.32; edit 132.4×53.6 @607.3; back 74.2×30
-  @731.6. At 320 the whole composition scales to a 249.6×154.2 stage in both, with zero document
-  overflow and one `h1`.
-- **The edit state matches on every field too, including focus and caret.** The CTA is absent from
-  the DOM in both — not collapsed — the panel grows 470 → 640px into the space it leaves, the label
-  is `Confirm`, and the field holds focus with the caret at 121/121 on a 121-character answer.
-- **The entry relay was sampled frame by frame rather than assumed.** Both run the same curve from
-  `x: 150` to 0 with opacity ramping and the same head → panel → cta → edit stagger, ending in
-  `clearProps` (transform back to `none`). It is `stageRelayIn`, the helper the problem screen
-  already uses, with the reference's own order passed in rather than read from the DOM.
-- **All three transitions were driven, not inferred.** `Still my problem` on the problem screen lands
-  on `/confirm-solution` with the solution headline, CTA and answer rendered; `Still my solution`
-  lands on `/positioning` with `Lets talk about your competitors...`; and Back lands on
-  `/confirm-problem` with `Still my problem`. Which is `back()`'s own `vStep>0` branch.
-- **The edit actually writes the record, checked at the database.** Typed in the browser, `Confirm`
-  pressed, autosave reported `saved`, the screen returned to read state at 470px — and
-  `campaign_vetting.solution_text` held the new text with `solution_supplier` still `founder`.
-- **The keyboard path is complete and every control is named**: Back (naming its destination), Help,
-  the field, `Still my solution`, `edit`. One `h1`, no heading-level jump, and the help drawer lists
-  this page marked `This page` above the eight before it marked `Done` — the register's three
-  readers agreeing without a second list.
-- **`Confirm` and `edit` are the reference's own labels and ship as they are.** `Confirm` is in
-  §33.11.4's `OBJECTLESS_CTA_LABELS`, so this is the same knowing exception `ConfirmProblem` and
-  `ConfirmAnswer` already record. `Still my solution` is not objectless and needs none.
-- **The §33.11 sweep needed no new fixture.** `fixtures.ts` already stubs both
-  `/api/draft/:token/vetting` and `/api/draft/:token`, and both carry real content, so the new route
-  renders its real headline and answer rather than an error state.
-- **One correct behaviour was hit while testing and is worth knowing about.** §28.1's token verify
-  limiter is 20 attempts per 15 minutes per address, and each load of this screen spends two — so a
-  run of browser probes exhausts it and every later load renders `LinkUnavailable`, which is the
-  frozen non-enumerating rejection working exactly as designed. It is not a bug and nothing was
-  changed for it; the in-memory limiter resets when the backend reloads.
-
-**What this deliberately did not do:** touch `completeClaim`, the §9 type lock, the retention sweep,
-the token model, `ConfirmAnswer`, or `PositioningStep` beyond its one back target; add a `Save`
-control (the reference's `pcCta` computes that label for a state whose button is not rendered);
-collect the solution on a third screen; or duplicate `PHASE 54`.
-
-### Last look was rebuilt 1:1 from the reference (§12, §9, §14.3, §33.11, 2026-08-20)
-
-Screen 15 — `/campaigns/:campaignId/setup/review` — rebuilt from scratch to the supplied
-reference's `[data-lastlook]` (`Proovd Founder Flow v2.dc.html`, `kindWide`), by explicit
-product direction, on the terms every other 1:1 screen of this flow ships under: the
-reference outranks the design system HERE, and nowhere else. The Session D surface it
-replaces was a token-scale card list; `.ff-look` and `.ff-card` are deleted with their
-component, and `.ff-ll` / `PHASE 63` is the reference's own stylesheet.
-
-`lastLookIntro` in `components/anim.ts` is the entrance; `LastLook.tsx` the screen;
-`PHASE 63` the styles. **No route, no register, no service and no migration** — the data
-is the same `useSetupWorkspace` read Session D used.
-
-- **The stage model is the reference's, including the branch that names this screen.**
-  `s = min(innerWidth/2496, innerHeight/1542) * .78 * .9`, and the `.9` is `fitStages`'
-  own `if (!hero && c === 'vetting' && vReviewing)` with its own reason: *"Last look
-  carries the whole answer grid, so it sits a notch under the other pages."* Measured
-  against the reference in a real browser at 1320×900 — its matrix reads `0.3713`, ours
-  `0.37125`. Nothing reflows; the stage scales, so the composition is identical at every
-  viewport and `isClaimPhone()` is `false` there, so there is no phone posture to build.
-- **The column measures itself, and that is reproduced as the mechanism rather than as
-  the number.** `width: fit-content` over a hidden, zero-height, `aria-hidden`, `nowrap`
-  span at 112px/700 reading *"We want to see your product..."* — in the reference the
-  column and that span are both 1521.34px and the grid inside is 100% of it. With the
-  product's **variable** Satoshi the same span measures 1491.06px, a 2% difference that
-  is the font cut and not the layout. A hardcoded 1521.34 would be right for one cut and
-  quietly wrong for the next.
-- **The entrance is the flow's one headline-first page, and it was sampled frame by
-  frame.** `verifyIntro`'s `headFirst = !back && root.matches('[data-lastlook]')`: the
-  title splits and reveals word by word, and the six things under it relay in 90ms after
-  the word timeline is 55% done — *"let the page start moving before the last word
-  lands"*. Against the reference at 1320×900, aligned on the frame the split clone
-  appears: relay start Δ302 vs Δ307ms, clone dropped Δ402 vs Δ406, and the per-element
-  stagger Δ0/100/183/266/349/433 vs Δ0/99/182/266/348/432. `revealHead` gained the
-  reference's own fourth parameter (`nearlyDone`) for it; every existing caller passes
-  none and is unchanged. On BACK there is no reveal — `headFirst` is `!back` — and the
-  title relays from the end with everything else.
-- **Three of the eight cards are not buttons, and that is §1.4 rather than a style.**
-  The reference makes all eight clickable because in the prototype all eight have
-  somewhere to go. §9's three answers are locked at submission and their route is behind
-  the draft token §10's claim invalidated, so there is no address to send anybody to —
-  they render the same box with no hover scale, no cursor, `SUBMITTED` rather than
-  `ADDED`, and the reason on an `sr-only` line. `FOUNDER_ANSWER_SEQUENCE`'s
-  `editableAfterClaim` decides it, not an index.
-- **The money is the server's and the reference's `$` goes with its variable.**
-  `FEE_BASE=35 / FEE_PER=2 / FEE_FLOOR=25` are three §6 settings; `${{ feeNow }}` becomes
-  `formatUsd(subtotalCents)`, which is what screen 20 already does for the same template.
-  `$US$33.00` is not a price. No arithmetic on a fee exists under `frontend/src/surfaces/`.
-- **One tile's label is longer than the reference's, deliberately.** Its sixth card reads
-  `Interview`; `OPTIONAL_ITEMS` calls the item `Founder interview`, which wraps to two
-  lines at 44px in a 340px tile. Not forked to match the picture — `founderAnswerLabel`'s
-  own header records why, and §3.1's risk model is two customer-facing names for one
-  thing. The card absorbs it (96.8 + 16 + 35 of 184px used).
-- **§12's high-effort note rides the CHROME band, not the stage.** The reference draws
-  nothing for it and the column is a fixed vertical rhythm, so one more line moves
-  everything. It is one line at the furniture scale beside the return contract — screen
-  1's own legal-line treatment — and it is now a COUNT of three named criteria rather
-  than a verdict with a disclaimer under it, which is §12's "neutrally, not as a quality
-  judgment" in one sentence instead of four.
-- **A pre-existing stylesheet defect was found by this rebuild and fixed — and found
-  independently by the Story session on the same day.** An `@media (prefers-reduced-motion:
-  reduce)` opened in PHASE 46 and was never closed, so **every rule after it — the whole of
-  PHASE 61, the Founder flow's password page — applied only to people who had turned motion
-  off.** The file is still valid CSS, which is why nothing caught it: `a11y.test.tsx`'s two
-  scans check comment balance and `var()` definitions, and neither counts braces. Found here
-  by rendering the new block and getting browser defaults; found there by reading
-  `document.styleSheets` and seeing the CSSOM stop at 2698 rules. Both sessions wrote the
-  same `}`; the Story session's comment is the one that survives the merge, because it names
-  the phase that opened it.
-- **The merge of the two sessions was committed WITH conflict markers, and that is what a
-  Founder saw.** `e9e71bf` carried ten unresolved `<<<<<<< / ======= / >>>>>>>` regions in
-  `proovd.css` — nowhere else in the repo — which cut `.ff-story {` off mid-rule and left six
-  unclosed braces. Everything after line 16956 was swallowed, so **neither** rebuilt screen
-  had any of its own CSS: the reference's `<img>` wordmark rendered at intrinsic size, the
-  in-layer HELP fell into the flow beside `FlowPage`'s, and the stage never scaled. Recovered
-  by splitting the file into its two sides, checking each is brace-balanced on its own, and
-  concatenating them — Story first, since it was pushed first, and Last look renumbered to
-  **PHASE 63** because both sessions had independently taken 62. A brace-balance scan belongs
-  in `a11y.test.tsx` beside the other two; it would have caught this and both `@media` bugs.
-- **Measured clean at 1440, 1320, 1280 and a true 320:** zero document overflow, nothing
-  past the viewport, exactly one `h1`. The keyboard path is complete and every control
-  names itself — Back names its destination, five cards are named by title and tag, `All
-  good` is not in §33.11.4's `OBJECTLESS_CTA_LABELS`. Hover is the reference's own
-  `scale(1.06)` and `#3BDC8C`. With `prefers-reduced-motion` the page renders whole and
-  no split clone is created.
-- **Three `founder-flow.test.tsx` tests fail on this machine and did so BEFORE this
-  change** — verified by stashing and re-running: identical 3 failed / 4 passed. They are
-  react-router navigations dying on `TypeError: RequestInit: Expected signal
-  ("AbortSignal {}") to be an instance of AbortSignal` under Node 25, not this rebuild.
-  Five assertions in that file were updated to describe the rebuilt surface rather than
-  the retired one.
-- **Thirteen axe colour-contrast findings, and every one is the reference's own pair.**
-  `#41ED98` on `#FAFAFA` for Back and HELP (1.45) is byte-identical to `.ff-pc__back` /
-  `.ff-pc__help`, which PHASE 54 already ships on the two screens before this one;
-  `#FAFAFA` on `#41ED98` for the CTA (1.45) is the brand-fill pair the owner ruling
-  re-recorded as tech-stack §3.6's documented, scoped exception; `#7FD9A4` on the fee
-  label (1.62), `#A2AFA8` on the hint (2.17) and `#41ED98` / `#7FA98D` on the card tags
-  (1.41 / 2.52) are `lastLookCards`' own `tagFg` and the reference's own copy colours.
-  Nothing was re-toned: doing it here would make one screen disagree with both the
-  reference and the rest of the flow, and it is a flow-wide decision with its own
-  screenshot pass — which is how PHASE 36, 45 and 46 each recorded the same finding.
-- **The §33.11 sweep could not be run on this machine and that is not this change.**
-  `qa.test.tsx` fails all 719 in its own `beforeEach` with `TypeError:
-  localStorage.clear is not a function` — a jsdom/Node 25 interop failure, before any
-  surface renders. The equivalent was done in a real browser instead: axe over the
-  rendered page at 1320 and a true 320, zero document overflow at four widths, one `h1`,
-  the complete keyboard path with every control named, the failure state answering
-  §27.1's six questions, and `prefers-reduced-motion` rendering the page whole.
-
-### Screen 10, the visuals, was rebuilt to the reference (§12, §28.4, §28.5, §33.11, 2026-08-20)
-
-`/campaigns/:campaignId/setup/visuals` was rebuilt from scratch against the supplied reference
-(`Proovd Founder Flow v2.dc.html`, `[data-visuals]` / `kindWide`) and its screenshot. What stood
-there was Session D's `AnswerPage` layout — a trail line, the optional tag, the §12 question as the
-heading, a stacked file list, a dashed `UploadZone`, the helper accordion and a nav row. None of it
-is left. `VisualsStep.tsx` is the surface, `PHASE 64` the styles. **No route, table, register entry
-or migration changed**; every control drives the Phase 09a upload path unchanged.
-
-- **The composition is measured, not approximated.** Driven in headless Chrome against the reference
-  at 1860×922 and 1280×800, box by box — x, y, w, h, offsetW/H, font, weight, line-height,
-  letter-spacing, colour, background, radius, border, padding, margin, gap, display, alignment and
-  shadow. Every one matches: stage scale 0.4664 and 0.4, column 1491px, panel `860px 551.062px`,
-  drop zone 500px, input 544×112 beside a 290×112 `Add`, CTA 1491×165. The remaining reported
-  differences are the reference's zone being a `<button>` (its UA font-size, `buttontext` and
-  `buttonface` under a gradient stack that paints over all three) and the DC harness reserving a
-  15px scrollbar, which shifts its right-anchored chrome by exactly that.
-- **The relay is the reference's, frame for frame.** `verifyIntro`'s `runRelay` over
-  `pill, head, panel, cta` — 620ms `power3.out` from `x:150`, 85ms stagger. Sampled every animation
-  frame on both sides: ref starts 0/74/158/241ms and settles 524/607/691/774; app starts
-  2/78/162/245 and settles 529/612/695/778. Hover, the `data-press` 0.94 and the focus rings were
-  driven with real pointer events.
-- **Three fixes came out of the measurement and none was visible in a screenshot.** The zone's two
-  lines had `line-height` 1.2 and 1.34 where the reference sets none, which made the label 6px short
-  and lifted the arrow 3px on the stage; the zone carried a 60px inline padding where the reference
-  has the UA button's `1px 6px`; and the stage transform is written through `toFixed(4)` now, which
-  is the reference's own rounding rather than a number that agrees to five decimal places.
-- **The link row is drawn and it is not wired, and the row says so before anybody types.** The
-  reference's `addLink` appends the URL to the same `files` list an upload lands in.
-  `campaign_assets.storage_key` is NOT NULL, so a visual is an object we fetched and read, and §12's
-  evidence rule for this item is exactly that. A URL would have to be fetched from wherever a
-  Founder pointed, on a schedule nobody defined, and could change after approval into something they
-  never approved — a §12 evidence decision and a migration, not a surface rebuild.
-  `VISUALS_LINK_ABSENT` sits in the 130px gap the composition already leaves above the CTA, so not
-  one reference box moves for it, and the field keeps what was typed.
-- **Two §12 facts live inside the reference's own file row.** Its row is a label and an `x`; §12
-  needs the object's state (and the reason when it did not count) and §28.4 forbids folding the
-  Founder's approval into the upload. Both are a second line INSIDE the `#DEF6FF` block, so the list
-  keeps its width, its 34px gap and its position, and the CTA does not move.
-- **Enter presses Add rather than leaving the page.** The reference binds Enter GLOBALLY
-  (`enterAdvance`) and excludes only a `TEXTAREA`, so pressing it in the link field navigates to the
-  next screen — somebody who typed an address and expected to add it ends up on Branding. Every
-  other rebuilt screen in this flow binds Enter to its own field's control (`EmailStep` sends,
-  `BrandingStep` adds a swatch) and nothing binds it to navigation.
-- **The zone is a `label` over a real file input**, so the keyboard path is the browser's own picker
-  (§28.5) and the box is identical. Both unavailable states — Track A4 uploads and §12's post-payment
-  lock — render their reason INSIDE the reference's 500px box rather than as a disabled control.
-- **`Next` is the reference's word and it is in §33.11.4's `OBJECTLESS_CTA_LABELS`** — the same
-  knowing exception `Socials`, `ConfirmProblem` and `ConfirmAnswer` already carry, where the
-  reference's copy is the specification. What costs the composition nothing is the accessible name,
-  which adds the destination and contains the visible word (WCAG 2.5.3).
-- **There is still no Back on a plain arrival**, and `AnswerPage`'s header records why: everything
-  behind this page is on the draft token §10's claim invalidated, and sending Back to Last look —
-  five pages forward — closed a ring. An edit opened from Last look still returns there, and there
-  the control is drawn exactly as the reference draws it.
-- **The pill's number is the §6 setting.** The reference hardcodes `FEE_PER=2`; this renders
-  `fee.itemDiscountCents` in the reference's own `$2 discount` shape, and `optional: discount` when
-  there is no calculation to read. No fee arithmetic exists in the file.
-
-**A pre-existing defect was found and fixed, and it was not this screen's.** PHASE 46's last
-`@media (prefers-reduced-motion: reduce)` block was never closed. An unterminated at-rule does not
-fail — the parser swallows everything after it into the block — so **PHASE 61 in full was in the
-served stylesheet and in no stylesheet the browser had, and the password page had been rendering
-unstyled since it shipped**. `a11y.test.tsx`'s two stylesheet scans cannot see it: the comments were
-balanced and every token was defined. A third scan is added there for brace balance, on the
-comments-stripped copy.
-
-**Three assertions in `founder-flow.test.tsx` were consciously changed**, each with a dated comment:
-the Track A4 absence now reads the reference's box copy, `offers copy, never generate` moved to
-`branding` (whose helper block still exists — this page's does not), and the sequence walk clicks
-`Next` by its accessible name. **They were not run**: this session's instruction was no test suites.
-`npm run typecheck` is clean across all three workspaces.
-
-### The merge dropped the Visuals and Color styles, and this is the recovery (2026-08-21)
-
-`2f44efa` — `Merge branch 'main'` — resolved a conflict in `proovd.css` and in this file by taking
-one side whole. Both sides had independently taken **PHASE 62 and PHASE 63**: the kept side used
-them for **Your story** and **Last look**, the dropped side for **the visuals** (screen 10) and
-**more about your brand** (screen 11). So `9397d2a`'s two sections — 67 `.ff-vis` rules and 74
-`.ff-col` rules, 1,171 lines — left the stylesheet entirely, and both screens have been rendering
-with **no CSS of their own** ever since. The Visuals section of this file went with them.
-
-- **Nothing was broken; two things were simply absent, which is why every scan passed.** The file
-  was brace-balanced, comment-balanced, and defined every token it used — `a11y.test.tsx`'s four
-  scans all passed on a stylesheet missing two whole screens. That is the difference between this
-  and the two `@media` bugs the same file has already shipped: a scan can see a rule that is
-  swallowed, and cannot see a rule that was never there. **A deletion is invisible to a validator.**
-  What found it was asking the file whether `.ff-vis` existed at all, which returned zero.
-- **Recovered byte-for-byte from `9397d2a`, not rewritten.** The sections were verified balanced in
-  isolation before being appended, and the only edit is the two header lines: **the visuals is now
-  `PHASE 64` and the brand colours `PHASE 65`**, the next free numbers. That is the same renumber
-  `e9e71bf` recorded when Story and Last look collided on 62 — and it is the second time this
-  collision has happened, because a phase number is derived from the file at the moment somebody
-  writes it and two sessions in parallel derive the same one. **Run
-  `grep -oE "PHASE [0-9]+" frontend/public/proovd.css | sort -u -V | tail -1` and take the next.**
-- **`.ff-look` and `.ff-card` are correctly gone and were not restored.** They are Session D's old
-  Last look card list, deleted with their component when `.ff-ll` replaced it. A selector-family
-  diff of the two files reported five families missing and two of them were supposed to be —
-  restoring all five would have put a deleted surface's stylesheet back.
-- **Verified after the repair:** the four `proovd.css` scans pass; all 73 classes the two components
-  render resolve to a rule; the 131 recovered rules sit at top level except the one inside
-  `@media (hover: none)`, which is `ColorStep.tsx`'s own touch-device swatch rule; and both screens
-  suppress `FlowPage`'s `.ff__top`/`.ff__badge` as the other four full-bleed screens do, so neither
-  draws a second header.
-- **The Color screen has never had a section in this file.** It was built in `9397d2a` alongside the
-  visuals and documented nowhere, and inventing a record of a browser pass nobody ran would be worse
-  than the gap. `ColorStep.tsx`'s own header carries the reasoning.
-
-### The FAQs were rebuilt 1:1 from the reference — and the merge had eaten the stylesheet (§14.4, §12, §9, §33.11, 2026-08-21)
-
-Screen 23 — `/campaigns/:campaignId/setup/faqs` — rebuilt from scratch against the
-supplied reference's `[data-faq]` (`Proovd Founder Flow v2.dc.html`, `kindWide`) and
-its screenshot, by explicit product direction, on the terms every other 1:1 screen of
-this flow ships under: the reference outranks the design system HERE, and nowhere
-else. Session F's surface — a token-scale form beside a stacked card list inside
-`BuildStepPage` — is gone with its 22 rules; `PHASE 67` is the reference's own
-composition.
-
-`stageFlourishIn` in `components/anim.ts` is the new helper, `FaqsStep.tsx` the
-screen, `PHASE 67` the styles. **No route, register entry, table or migration** — the
-data is the same `useBuildFlow` read, and every write drives `saveFaq`/`removeFaq`,
-which shipped with campaign-page-v2 on 2026-08-18.
-
-- **The stylesheet was committed with twelve unresolved conflict regions, and that
-  had to be repaired before anything could be added to it.** `bbeefbf` carried
-  `<<<<<<< HEAD` / `=======` / `>>>>>>>` at top level in `proovd.css` — both sides
-  had independently taken **PHASE 64** (HEAD for screen 10's visuals, the incoming
-  side for screen 21's brand voice), and git matched their shared declaration bodies
-  as context and interleaved them into twelve hunks. Repaired exactly the way
-  `e9e71bf`'s identical failure was: split into the two sides, check each is
-  brace-balanced alone, concatenate, renumber the collision (the voice tail is
-  **PHASE 66** now). **This is the second time two sessions have derived the same
-  phase number.** Run
-  `grep -oE "PHASE [0-9]+" frontend/public/proovd.css | sort -u -V | tail -1`.
-- **`a11y.test.tsx`'s scans could not see it, and the reason is worth knowing.** The
-  file was brace-balanced, comment-balanced and defined every token it used — the
-  markers sit at top level where a parser drops them along with whatever rule they
-  cut in half, and all three existing scans passed on a stylesheet with two whole
-  screens' rules interleaved. **A deletion is invisible to a validator**; what found
-  it was asking the file whether `.ff-vc` and `.ff-vis` both existed.
-- **The reference renders in ARIAL on any machine, and the screenshot does not.** Its
-  `@font-face` points at `./fonts/Satoshi-400.woff2` and the bundle ships **no
-  `fonts/` directory at all**, so all four faces report `status: error` and it falls
-  back to `sans-serif`. That is not cosmetic: in Arial its preview headline wraps to
-  two lines and its guide control measures 438px; in Satoshi both are one line and
-  391px. The screenshot shows ONE line, so the screenshot is the ground truth and the
-  app is right. The comparison was made like-for-like by copying the product's own
-  variable Satoshi into a scratchpad copy of the reference — never into the bundle,
-  which is untouched.
-- **Measured 1:1 at 1600x793, box by box.** Every one of the 21 boxes ON THE STAGE is
-  identical — x, y, w, h, offsetW/H, font, size, weight, line-height, letter-spacing,
-  colour, background, radius, border, padding, margin, display, alignment, gap,
-  grid-template-columns, shadow. The four chrome boxes differ only in absolute `x`,
-  because the DC harness reserves a 15px scrollbar (`documentElement.scrollWidth` is
-  1585 against clientWidth 1600); `back` and `logo` are at x=46 in BOTH and `help`
-  sits 46px from the right edge in BOTH.
-- **`align-items: center` on the grid is load-bearing rather than incidental.** The
-  right column is a fixed 1333px rhythm; the left one changes height with the preview
-  (measured 1151 → 1143 → 1174 as a card fills and the delete control appears), so
-  the two share a centre line and never a top edge.
-- **The preview title carries no `display`, and that was a real correction.** A block
-  span reports the 96.8px line box and an inline one the font's own 110px content
-  area — same glyphs, same baseline, same 824px wrap width, different measurement.
-  `1:1` means the declaration the reference has rather than one that renders the same
-  today.
-- **Five states driven through real DOM events, 62 field comparisons, zero
-  differences.** Initial, typed, after-add, after-prev, after-delete — labels,
-  preview text, values, both arrow colours, all three heights, the delete button's
-  box and text, and the button set. `faqAdd` appends a blank and moves the cursor;
-  `faqDelete` drops the current one and steps back; the renumbering matches.
-- **The entrance is `verifyIntro`'s `runRelay` PLUS its flourish branch, and this is
-  the flow's first screen with both.** Relay order is `panel, art, cta` — out of that
-  function's fixed thirteen-name list, and the opposite of document order, which is
-  exactly why `stageRelayIn` takes the order rather than reading the DOM. Sampled
-  frame by frame against the reference: at opacity 0.75 the stagger is ref
-  +85.9/+171.3/+253.6ms against app +86.5/+171.0/+249.5ms. The tween reads
-  `dur 0.79` (0.62 + 2 x 0.085), `power3.out`, `x: 150 → 0`; the flourish
-  `dur 0.8, delay 0.24, back.out(1.4)`, peaking at 1.0066 against the reference's
-  1.0062 (`back.out(1.3)` — §6.1's `snap` is the nearest token, and a fourth
-  hand-written cubic beside three tokens is the drift this file exists to avoid).
-- **Two tweens per element appear in dev and it is not this screen's.** React 19
-  StrictMode double-invokes effects; `VoiceStep` reports the same 2. Production has
-  no StrictMode.
-- **The reference's record is an array with a cursor; ours is rows, and the
-  difference is a server rule rather than a design decision.** `upsertFaq` refuses a
-  blank — "An FAQ needs both a question and an answer" — so a blank card cannot be
-  persisted and must not be, or a Founder's public page grows a heading with nothing
-  under it. The cursor list is local and seeded from the rows; a card writes once
-  BOTH halves are non-blank; `Add FAQ` is purely local until the new card has
-  something in it; every cursor move flushes first, because `useAutosave` coalesces
-  by replacing and a debounce still in flight would send the new card's text under
-  the old card's id.
-- **It gets its own `useAutosave`, not `build.autosave`.** That one is `saveBuild`
-  over `Partial<BuildFields>`, which has no field for an FAQ; routing one through it
-  would mean a fake key or a lie in the type. Same hook, so §9's three phrases, the
-  retry rule and the `beforeunload` warning are the ones every other Founder surface
-  uses — and a 422 reads `Not saved — …` rather than `retrying`, because a refusal is
-  a decision (`isRetryable` draws that line once, for everybody).
-- **Two things the reference draws are refused.** `Our guide on FAQ's` is a `<button>`
-  there with no `onClick` at all — a control that does nothing — so it opens the HELP
-  drawer the §12 guidance lives in (the `VoiceStep` arrangement; there is no PDF,
-  because §12's object storage is Track A4). And the document-level Enter handler:
-  `enterAdvance`'s early return catches only a `TEXTAREA`, so pressing Enter in the
-  FAQ TITLE leaves the page and somebody who typed a question and expected to add it
-  is on the rewards screen instead. Enter moves to the answer, which is the field's
-  own next step — `EmailStep`, `BrandingStep` and `VisualsStep` each bind Enter the
-  same way.
-- **The screenshot pass found a defect nothing else could — the fourteenth rebuild in
-  a row.** The reference carries `@media (max-width:600px){[data-back]{bottom:92px
-  !important;padding:8px 14px !important;}}` in its own `<style>` block rather than
-  beside the control it moves, and at 320 the app's BACK sat **72px** below the
-  reference's and measured 4px narrower. Eight other screens in this flow already
-  carry that rule; this one did not. Fixed, and re-measured identical (x20 y518
-  w77.5 h30 in both).
-- **Final measurement: 0 document overflow at 1600x793 and at a TRUE 320** (through
-  `Emulation.setDeviceMetricsOverride` — `--window-size` lies on Windows, which
-  PHASE 38 records), exactly one `h1`, both fields labelled, and a complete
-  ten-stop keyboard path where every control is named, every one has a visible focus
-  ring, Shift+Tab reverses, the arrow glyphs are `aria-hidden` behind real names, and
-  the delete's `X` is hidden.
-- **Three axe colour-contrast findings and every one is inherited.** `#41ED98` on
-  `#FAFAFA` at 1.45 for BACK and HELP is byte-identical to `.ff-vc__back`/`.ff-pc__back`,
-  which PHASE 54 and 66 already ship; `#FAFAFA` on `#41ED98` at 1.45 for the CTA is
-  the brand-fill pair the owner ruling re-recorded as tech-stack §3.6's documented,
-  scoped exception. Nothing was re-toned: doing it here would make one screen
-  disagree with both the reference and the rest of the flow.
-- **The four states the reference has none of all answer.** The read failing renders
-  a `StatePanel` with §27.1's questions and a support route; a campaign past
-  `affiliate_response_and_build`/`changes_required` renders the screen with the lock
-  sentence and all three write controls disabled; a refused save carries the server's
-  own `whatHappened` and turns legible; `prefers-reduced-motion` renders the page
-  whole with nothing staged. All four are absolutely positioned in the chrome, so
-  none can move a reference box.
-- **One assertion in `founder-flow.test.tsx` was consciously updated**, with a dated
-  comment: it named the retired surface's heading, field and `.ff-faq__preview`. What
-  it was protecting — the preview renders what is typed — is what it still asserts,
-  plus the reference's placeholder before anything is typed. **The suite was not
-  run**, per this session's instruction; `npm run typecheck` is clean across all
-  three workspaces.
-- **What is NOT done:** re-writing `sortOrder` on the surviving rows after a delete
-  (persisted rows keep the value they were written with; the public page orders by it
-  and ties break on insertion, and a burst of writes for a cosmetic ordering is worse
-  than the drift), and any test run.
-
-### The listing fee was rebuilt 1:1 from the reference (§13, §24.6, §31.6, §30, Appendix A.5, 2026-08-21)
-
-Screen 20 — `/campaigns/:campaignId/setup/fee` — rebuilt from scratch against the supplied
-reference's `[data-paynow]` (`Proovd Founder Flow v2.dc.html`, `kindWide`) and its screenshot, by
-explicit product direction, on the terms every other 1:1 screen of this flow ships under: the
-reference outranks the design system HERE, and nowhere else. Session E's `.ff-money` surface — a
-token-scale title, a `clamp()` hero, a `dl` of fee lines, a billing panel, a two-button nav row and
-a second screen for the quote — is gone with its markup and its five FeeStep-only CSS rules.
-
-`stageBigHeadIn` and `paySheetIn` in `components/anim.ts` are the two entrances; `FeeStep.tsx` the
-screen; `PHASE 68` the styles; `shared/src/vetting/money.ts` the reference's own copy; and
-`workspace/listing-fee.ts` + `projection.ts` the one derived field. **No migration** — the fee is
-computed from four §6 settings that already exist.
-
-- **The composition is measured, not approximated.** Driven in headless Chrome against the
-  reference at 1320x900, box by box — x, y, w, h, offsetW/H, font, size, weight, line-height,
-  letter-spacing, colour, background, radius, border, padding, margin, display, alignment, shadow,
-  transform. Stage `scale(0.4125)` (= `min(1320/2496, 900/1542) × 0.78`, `pageScale` alone — no
-  branch of `fitStages` names `fee`), a 2220px column, h1 118/900/lh-1/-.035em at y 214.67, the
-  amount 290/900/lh-.9 at y 325.22, the saving 56/900 at y 478.26, a 1130×130 outlined control at
-  554.98, a 1130×150 CTA at 623.46. **Every declared box and every style field is identical**; the
-  only differences anywhere are the two amounts' own digits and the DC runtime's `.sc-interp`
-  wrapper spans, which are its artifact rather than its design. The chrome matches too — BACK is
-  identical on every field, and the top bar differs by exactly the 15px `scrollbar-gutter` the
-  reference reserves (HELP sits 39.59px from the right edge in both).
-- **At 320 the reference does the same thing, and that was checked rather than assumed.** Both
-  report `scale(0.1)` and a 249.6×154.2 stage at the same y. `isClaimPhone()` returns `false` there
-  — "one composition everywhere: the phone posture stays off" — so its `kindPhone` branch is dead
-  code and this is what every viewport gets.
-- **The entrance is this flow's one title-FIRST page**, and `verifyIntro` names it by selector:
-  `const bigFirst = !back && !growFirst && root.matches('[data-paynow]')`. The headline opens at
-  `scale(2.2567)` in the middle of the VIEWPORT and travels into place over 1.15s `power2.inOut`,
-  then the four things under it relay in behind it. Sampled frame by frame against the reference:
-  aligned on the tween's own start, every (scale, y) pair matches to four decimals — 2.2132/493.9,
-  2.1656/474.5, 2.0919/444.5, 1.4514/183.8 — the head lands at the same frame, the relay starts
-  +66ms after it in both, and the internal stagger reads fee 0.914 / sub 0.787 / hint 0.556 / cta
-  0.174 there against 0.913 / 0.785 / 0.553 / 0.169 here. On BACK it is the ordinary relay with the
-  head IN the order and the stagger from the END, which is what `!back` makes it there; driven
-  through the voice page's own Back control and sampled.
-- **1.15s exceeds §6.1's `grand` ceiling and is kept**, on the licence `problemIntro` records and
-  `reachIntro`'s `refDur(1)` already takes: it is the one-shot landing of a page title, once per
-  arrival, and rounding it to 0.90 finishes the travel before the eye has followed it.
-- **Every amount is the server's, in the reference's own shape.** The prototype hardcodes
-  `FEE_BASE=35`, `FEE_FLOOR=25`, `FEE_PER=2` and builds three of its five strings from them; all
-  four are §6 settings. The reference's markup is a literal `$` plus `{{ feeNow }}`, so the `$` is
-  copy and the value is `formatUsd`'s — which always renders cents, because a second money format
-  in the product is worse than a hero that reads `$35.00` where the mock reads `$35`.
-- **`Discount $N by completing tasks` is the one line that could not be computed here, and it is
-  the reason for the only backend change.** The reference writes `fee() − FEE_FLOOR`, which equals
-  the remaining discount only while `base − cap` and the floor coincide — they do on the seeded §6
-  numbers and need not after an Admin edits one of the four. `lowestReachableSubtotal` and
-  `remainingDiscount` sit beside §12's own arithmetic in `workspace/listing-fee.ts`, and
-  `remainingDiscountCents` rides the fee payload; `payCanLower` is that number above zero. At the
-  floor the control is ABSENT rather than disabled, which is what `<sc-if>` does there.
-- **`You saved $0 by doing bonus tasks` is DELIBERATELY REINSTATED.** Session E refused that line at
-  zero and rendered `LISTING_FEE_STILL_LOWERABLE` in its place; the 1:1 rebuild reverses it by
-  product direction, because the supplied screenshot shows it and the reference's copy is the
-  specification on these pages. It is true at every value. The retired constant is deleted (an
-  exported string nothing renders ships in every browser), the reversal is recorded on
-  `payoutSavedLine`, and **the two matching `FOUNDER_FLOW_ABSENCES` entries were removed** — that
-  register's own rule: an entry saying an element is absent while a page renders it is worse than no
-  register.
-- **What §13 requires and the composition has no room for is a SHEET, in the reference's own card
-  vocabulary.** `payAndStart` advances a step there; here it opens a charge, and §13 wants a billing
-  address, a real Stripe Tax total, the itemisation, the descriptor and Appendix A.5 verbatim first.
-  Rather than invent a treatment, the sheet is `[data-pay-modal]` from the adjacent `[data-paypick]`
-  screen — 720px, a 3px brand border, a 2px radius, over `rgba(1,63,23,.35)` — entering with its own
-  `payModalIn` tween (`y:18, opacity:0, scale:.97, .34s power3.out`), sampled and confirmed. Nothing
-  this page proved before has moved or been dropped; most of it is one click further in.
-- **Enter still does not advance, and that refusal is unchanged.** `enterAdvance` → `next()` is
-  global there and `ctaState` for `fee` is `{show:true,label:'Pay $35'}` — fine where the one
-  control is a one-line input, and dangerous on a screen with a ZIP field (§30). There is no key
-  handler and no `<form>`, so the browser's own submit-on-Enter has nothing to submit either; driven
-  with a real keystroke and asserted against both the route and the checkout call.
-- **Four defects only measurement could find — and two of them are the same React 19 trap.**
-  StrictMode double-invokes an effect in development, and both entrances read the DOM: the head's
-  second invocation measured it MID-FLIGHT (1082px instead of 479px), so `s` clamped to its 1.3
-  floor and `dx`/`dy` came out zero — a landing that did not travel; and `g.from` takes the current
-  state as its DESTINATION, so the sheet's second call animated y18→y18 and then snapped. Both fixed
-  by clearing the transform before measuring, which makes the numbers the same however many times
-  the effect runs. Third: `paySheetIn` used `autoAlpha`, which sets `visibility: hidden` for the
-  first frame, and **an element that is `visibility: hidden` cannot take focus** — the sheet opened
-  with focus still on `<body>`, outside a dialog claiming `aria-modal`. The reference writes
-  `opacity`, which is both 1:1 and correct. Fourth: the consent ran the card past its own fold and
-  put `Agree and Pay` off-screen, so the sheet became three regions with only the middle scrolling.
-- **A fifth the keyboard walk found: the scrim blocked a POINTER and nothing else.** Tab ran
-  straight through `Pay & Start` behind an `aria-modal` sheet — two competing actions in a payment
-  state, and a claim to a screen reader that was not true. The background is `inert` while the sheet
-  is open, which needs no focus trap and makes the two agree.
-- **The states the reference does not draw.** A failure, §13's two refusals and an uncalculated fee
-  replace the stage with a `StatePanel` — a payment screen showing a hero over a control that will
-  refuse is worse than no hero — and each gained an `h1`, because `StatePanel`'s head is a `<p>` by
-  design and §33.11.2 wants exactly one per surface. It was first drawn at 34px UNDER a 40px panel
-  head, which is the caption-over-the-state inversion Founder Flow Sessions E and F each recorded;
-  it is above it now. `ring` moved to the one of the three a Founder can act on: a restricted
-  account and an unconfigured tax service are Proovd's and both say `No action needed`. The paid
-  state keeps the reference's five slots — headline, amount, line, one quiet control, one loud one —
-  with §24.6's record and §31.6's decision behind `See what you paid` and the §31.6 deadline itself
-  in the chrome, absolutely positioned so it can never move a reference box.
-- **Final measurement: 0 document overflow at 1440, 1320, 1280 and a true 320 on every state,
-  exactly one `h1` on each, and a complete keyboard path where every control is named and every one
-  has a visible focus ring.** Escape closes the sheet and returns focus to the control that opened
-  it. All four hover states are byte-identical to the reference, driven with real pointer events:
-  `scale(1.02)` on the discount control, `#3BDC8C` on the CTA, `#013F17` on BACK, `#E9FFE1` on HELP.
-  With `prefers-reduced-motion` the page renders whole and nothing is staged.
-- **Four contrast findings on the page and all four are the reference's own pairs** — `#41ED98` on
-  `#FAFAFA` at 1.46 for BACK, HELP and the saved line (what `.ff-vc__back`/`.ff-pc__back` already
-  ship on the two screens before this one), and `#FAFAFA` on `#41ED98` at 1.46 for the CTA, which is
-  tech-stack §3.6's documented, scoped brand-fill exception the owner ruling re-recorded. The
-  discount control's `#4E8C67` measures 3.82 at 52px and passes. **What did NOT pass was mine**: the
-  sheet's 14.5px saving lines and 13px controls at 3.82 under a 4.5 requirement, in a block the
-  reference does not draw. Darkened to `#3F7856` (5.07, measured) and scoped to those lines; the
-  reference's own `#4E8C67` stays on the control it belongs to. The sheet's `#7FD9A4` eyebrow at
-  1.63 is that card's own pairing and duplicates a subject the `h2` under it states in ink.
-
-**What this deliberately did not do:** a second refund, checkout or cancellation path; any change to
-`beginListingCheckout`, `applyListingPayment`, the §12 lock or the §31.6 window; a card field of any
-kind (§34 gates live mode on samples mounting none, and Stripe Checkout is where a card is entered);
-an Enter binding; a `US$` prefix on the hero, or a rule that drops the cents when they are zero.
-`.ff-money`, `__title`, `__lede`, `__sub`, `__foot` and `__panel` are still `CreatorPaymentStep`'s
-and `BuildStepPage`'s and are untouched.
-
-**Testing was deliberately partial, at the user's instruction (no test suites).**
-`npm run typecheck` is clean across all three workspaces, and `proovd.css` passes the four scans
-this file has learned to run — 941 balanced comments, 2617/2617 braces, no undefined `var()`, no
-conflict markers. **Not run:** `npm test`, the §33.11 sweep, and axe. The assertions in
-`listing-payment.test.tsx` (13) and `founder-flow.test.tsx`'s fee block were updated to the rebuilt
-surface with dated comments — every fact they prove is preserved, including Appendix A.5 compared
-byte-for-byte against the Spec — but **they have not been executed**, and that is an open item
-rather than a skipped one.
+- Stripe runs in **test mode**. Live mode is gated by §34. Never render test cards or test controls
+  in production UI.
+- The Stripe model is **direct charges on the Founder connected account**. The backup
+  separate-charges path is not built; `STRIPE_TEST_BACKUP_MODE_ENABLED=false`. Never run both for
+  one transaction.
+- A Transfer creation failure is a **synchronous API error** and a retry-job case. There is no
+  `transfer.failed` webhook to wait for (§32.3).
+- **Before changing an area whose behaviour looks wrong**, check *Recorded deviations* above, then
+  search `docs/build-log-archive.md` for the surface name, section number, or date. Several
+  controls are absent on purpose and carry their reason where the control would be.
+- If the phase you were given is too large for one session, **stop and say so.** A truncated session
+  produces code that looks finished and isn't.
