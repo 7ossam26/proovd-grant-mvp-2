@@ -31,6 +31,39 @@ const ASSETS = {
   ).href,
 };
 
+let artworkPreload: Promise<void> | null = null;
+
+/**
+ * The reference's artwork is already in the document before `verifyIntro`
+ * starts. In the routed app these three PNGs total about 13.8 MB, so fetch and
+ * decode them on the preceding Details screen; otherwise identical tweens can
+ * appear late as transparent image boxes finish decoding mid-timeline.
+ */
+export function preloadMatchArtwork(): Promise<void> {
+  if (artworkPreload) return artworkPreload;
+  if (typeof Image === 'undefined') return Promise.resolve();
+
+  artworkPreload = Promise.all(
+    [ASSETS.lockup, ASSETS.cupidLeft, ASSETS.cupidRight].map(
+      (src) =>
+        new Promise<void>((resolve) => {
+          const image = new Image();
+          image.onload = () => {
+            if (typeof image.decode !== 'function') {
+              resolve();
+              return;
+            }
+            void image.decode().catch(() => undefined).then(() => resolve());
+          };
+          image.onerror = () => resolve();
+          image.src = src;
+        }),
+    ),
+  ).then(() => undefined);
+
+  return artworkPreload;
+}
+
 const FIT_W = 2496;
 const FIT_H = 1542;
 const PAGE_SCALE = 0.78;
@@ -296,12 +329,14 @@ export function MatchStep() {
           className="ff-match__cupid ff-match__cupid--left"
           data-match-cupid="l"
           src={ASSETS.cupidLeft}
+          fetchPriority="high"
           alt=""
         />
         <img
           className="ff-match__cupid ff-match__cupid--right"
           data-match-cupid="r"
           src={ASSETS.cupidRight}
+          fetchPriority="high"
           alt=""
         />
 
@@ -311,6 +346,7 @@ export function MatchStep() {
               className="ff-match__mark"
               data-match-grow="1"
               src={ASSETS.lockup}
+              fetchPriority="high"
               alt="It's a match!"
             />
 

@@ -96,6 +96,7 @@ import {
   stageRelayIn,
 } from '../../components/anim.js';
 import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
+import { preloadMatchArtwork } from './MatchStep.js';
 import {
   fetchFounderDetails,
   saveFounderDetails,
@@ -249,6 +250,10 @@ export function DetailsStep() {
   const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
+    // The next screen's three large reference PNGs must be decoded before its
+    // exact GSAP timeline begins; see `preloadMatchArtwork`.
+    void preloadMatchArtwork();
+
     let cancelled = false;
     fetchFounderDetails(campaignId)
       .then(({ details: next }) => {
