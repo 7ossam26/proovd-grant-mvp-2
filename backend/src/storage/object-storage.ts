@@ -22,9 +22,12 @@
  * ── Scoped and short-lived, and both are signed ─────────────────────────────
  * Phase 09's trap: "Presigned uploads must be scoped and short-lived. Don't
  * issue a URL that grants broader bucket access than the one object." The
- * signature covers the method, the exact object key, `content-type`, and
- * `content-length` — so a URL issued for a 400 KB JPEG at one key cannot be
- * replayed to PUT a 40 MB executable at another. Expiry is minutes, not hours.
+ * signature covers the method, the exact object key and `content-type`.
+ * `content-length` is deliberately not a signed header: browsers forbid
+ * JavaScript from setting it and Chromium silently removes it from Fetch
+ * requests. R2 still receives the browser-generated length, while step 3 reads
+ * the object back and enforces its byte size and checksum. Expiry is minutes,
+ * not hours.
  *
  * ── No SDK ──────────────────────────────────────────────────────────────────
  * SigV4 query-string presigning is a specified, stable algorithm and about
@@ -56,7 +59,7 @@ export interface StoredObject {
 export interface PresignInput {
   key: string;
   contentType: string;
-  /** Exact byte length. Signed, so the browser cannot send a different one. */
+  /** Expected byte length. Step 3 confirms it from the stored object. */
   contentLength: number;
   expiresInSeconds?: number;
 }
@@ -225,12 +228,12 @@ export function createR2Storage(config: R2Config): ObjectStorage {
 
     async presignUpload(input) {
       const expiresInSeconds = input.expiresInSeconds ?? DEFAULT_EXPIRY_SECONDS;
-      // Both are signed. The URL is therefore usable for exactly this object,
-      // of exactly this type, at exactly this size — the trap's "don't issue a
-      // URL that grants broader bucket access than the one object".
+      // Content-Type is safe for browser JavaScript to set. Content-Length is
+      // not: Fetch treats it as a forbidden request header, so signing it makes
+      // an otherwise valid URL fail in real browsers. The stored byte length
+      // and checksum are enforced when the server reads the object back.
       const requiredHeaders = {
         'content-type': input.contentType,
-        'content-length': String(input.contentLength),
       };
       const { url, expiresAt } = sign('PUT', input.key, expiresInSeconds, {
         host,
@@ -287,7 +290,6 @@ export function createMemoryStorage(bucket = 'test-bucket'): ObjectStorage & {
         url: `memory://${bucket}/${input.key}`,
         requiredHeaders: {
           'content-type': input.contentType,
-          'content-length': String(input.contentLength),
         },
         expiresAt: new Date(Date.now() + (input.expiresInSeconds ?? DEFAULT_EXPIRY_SECONDS) * 1000),
         key: input.key,

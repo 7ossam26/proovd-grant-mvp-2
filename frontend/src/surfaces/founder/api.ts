@@ -324,9 +324,9 @@ export const requestUpload = (
   call(`${base(campaignId)}/uploads`, { method: 'POST', body: JSON.stringify(input) });
 
 /**
- * PUTs the file to R2. The headers are part of the signature, so they are sent
- * exactly as issued — changing either would invalidate the URL, which is the
- * point of signing them.
+ * PUTs the file to R2. The safe, signed headers are sent exactly as issued.
+ * Content-Length is left to the browser because Fetch forbids JavaScript from
+ * setting it; the server verifies the stored byte length and checksum next.
  */
 export async function putToStorage(
   upload: PresignedUpload,

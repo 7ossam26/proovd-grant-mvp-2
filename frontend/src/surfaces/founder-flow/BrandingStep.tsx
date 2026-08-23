@@ -138,7 +138,19 @@ function BrandLogoScreen({
           checksumSha256: await fileChecksum(file),
           filename: file.name,
         });
-        await putToStorage(presigned, file);
+        try {
+          await putToStorage(presigned, file);
+        } catch (error) {
+          // Do not leave the presigned row stuck as "Still uploading" when the
+          // browser never managed to put the bytes into object storage.
+          try {
+            await refresh(removeAsset(campaignId, presigned.assetId));
+          } catch {
+            // Preserve the upload error; the row still has its Remove control
+            // if cleanup itself was unavailable.
+          }
+          throw error;
+        }
         await refresh(verifyUpload(campaignId, presigned.assetId));
         setSaid(`${file.name} added.`);
         window.setTimeout(() => fileRowIn(root.current), 30);

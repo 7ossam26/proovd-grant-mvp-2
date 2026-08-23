@@ -269,7 +269,20 @@ function VisualsScreen({
           checksumSha256: await fileChecksum(file),
           filename: file.name,
         });
-        await putToStorage(presigned, file);
+        try {
+          await putToStorage(presigned, file);
+        } catch (error) {
+          // Presigning creates the pending row first. If the browser cannot PUT
+          // the bytes, remove that row immediately so the page does not leave a
+          // permanent "Still uploading" item or block a retry as a duplicate.
+          try {
+            await refresh(removeAsset(campaignId, presigned.assetId));
+          } catch {
+            // Keep the upload failure as the useful error. A cleanup failure is
+            // safe to resolve with the row's existing Remove control.
+          }
+          throw error;
+        }
         await refresh(verifyUpload(campaignId, presigned.assetId));
         setSaid(`${file.name} added. We are checking we can open it.`);
       } catch (error) {
