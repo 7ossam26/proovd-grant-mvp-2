@@ -84,6 +84,7 @@ import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
 import { InReviewRoute } from './surfaces/founder-flow/InReviewReferenceStep.js';
+import { LiveRoute } from './surfaces/founder-flow/LiveReferenceStep.js';
 import { FounderPasswordStep } from './surfaces/founder-flow/FounderPasswordStep.js';
 
 /**
@@ -145,12 +146,6 @@ function FounderDraftRoute({ children }: { children: ReactNode }) {
 function WorkspaceRedirect() {
   const { campaignId = '' } = useParams();
   return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
-}
-
-/** The supplied dashboard now owns the retired setup tail. */
-function FounderSetupTailRedirect() {
-  const { campaignId = '' } = useParams();
-  return <Navigate to={founderDashboardPath(campaignId)} replace />;
 }
 
 /** The reference-only application-review timer never represented stored state. */
@@ -881,9 +876,10 @@ const rootChildren: RouteObject[] = [
     element: <InReviewRoute />,
   },
   {
-    // Retired because campaign state now lives in the supplied dashboard.
+    // The pitch walkthrough celebrates before account setup. Genuine visits
+    // still redirect to the supplied dashboard inside LiveRoute.
     path: 'campaigns/:campaignId/setup/live',
-    element: <FounderSetupTailRedirect />,
+    element: <LiveRoute />,
   },
   {
     // The claim session proves ownership; this replaces its server-generated

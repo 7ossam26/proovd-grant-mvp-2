@@ -113,9 +113,9 @@ function ReviewBody() {
       <button
         type="button"
         className="ff-review-ref__continue"
-        onClick={() => swapToPage('password')}
+        onClick={() => swapToPage('live')}
       >
-        Secure account and continue
+        Continue to launch
       </button>
     </section>
   );
