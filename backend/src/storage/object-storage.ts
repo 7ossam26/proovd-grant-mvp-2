@@ -37,6 +37,8 @@
  */
 
 import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
 export interface PresignedUpload {
   /** The URL the browser PUTs to. Carries the signature in the query string. */
@@ -328,7 +330,7 @@ export function createMemoryStorage(bucket = 'test-bucket'): ObjectStorage & {
 export const DEVELOPMENT_UPLOAD_PATH = '/api/development-storage/:token';
 
 /**
- * Same-origin, in-memory storage for walking the real browser flow locally.
+ * Same-origin storage for walking the real browser flow locally.
  *
  * A random, one-use capability stands in for R2's signed query string. The
  * upload still uses the production three-step sequence (presign, browser PUT,
@@ -340,6 +342,8 @@ export function createDevelopmentStorage(input: {
   appBaseUrl: string;
   bucket?: string;
   maxBytes: number;
+  /** Optional persistent directory. Docker Compose mounts this as a named volume. */
+  directory?: string;
 }): ObjectStorage {
   const bucket = input.bucket ?? 'local-development';
   const objects = new Map<string, { contentType: string; body: Buffer }>();
@@ -347,6 +351,13 @@ export function createDevelopmentStorage(input: {
     string,
     { key: string; contentType: string; contentLength: number; expiresAt: Date }
   >();
+  const objectPaths = (key: string) => {
+    const digest = createHash('sha256').update(key).digest('hex');
+    return {
+      body: input.directory ? path.join(input.directory, `${digest}.bin`) : null,
+      metadata: input.directory ? path.join(input.directory, `${digest}.json`) : null,
+    };
+  };
 
   return {
     configured: true,
@@ -367,7 +378,18 @@ export function createDevelopmentStorage(input: {
         if (body.byteLength !== grant.contentLength || body.byteLength > input.maxBytes) {
           return 'invalid';
         }
-        objects.set(grant.key, { contentType: grant.contentType, body: Buffer.from(body) });
+        const storedBody = Buffer.from(body);
+        objects.set(grant.key, { contentType: grant.contentType, body: storedBody });
+        if (input.directory) {
+          const files = objectPaths(grant.key);
+          await mkdir(input.directory, { recursive: true });
+          await writeFile(files.body!, storedBody);
+          await writeFile(
+            files.metadata!,
+            JSON.stringify({ key: grant.key, contentType: grant.contentType }),
+            'utf8',
+          );
+        }
         return 'stored';
       },
     },
@@ -392,13 +414,31 @@ export function createDevelopmentStorage(input: {
     },
     async getObject(key) {
       const found = objects.get(key);
-      if (!found) throw new ObjectNotStored(key);
-      return {
-        key,
-        contentType: found.contentType,
-        byteSize: found.body.byteLength,
-        body: Buffer.from(found.body),
-      };
+      if (found) {
+        return {
+          key,
+          contentType: found.contentType,
+          byteSize: found.body.byteLength,
+          body: Buffer.from(found.body),
+        };
+      }
+      if (!input.directory) throw new ObjectNotStored(key);
+      const files = objectPaths(key);
+      try {
+        const [body, rawMetadata] = await Promise.all([
+          readFile(files.body!),
+          readFile(files.metadata!, 'utf8'),
+        ]);
+        const metadata = JSON.parse(rawMetadata) as { key?: unknown; contentType?: unknown };
+        if (metadata.key !== key || typeof metadata.contentType !== 'string') {
+          throw new Error(`invalid development storage metadata for ${key}`);
+        }
+        objects.set(key, { contentType: metadata.contentType, body });
+        return { key, contentType: metadata.contentType, byteSize: body.byteLength, body };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new ObjectNotStored(key);
+        throw error;
+      }
     },
   };
 }

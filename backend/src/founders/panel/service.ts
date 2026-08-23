@@ -201,6 +201,17 @@ export interface FounderPanelView {
     content: string | null;
     logo: string | null;
     colors: string | null;
+    assets: Array<{
+      id: string;
+      filename: string;
+      contentType: string;
+    }>;
+    interview: {
+      status: string;
+      scheduledAt: string | null;
+      timezone: string | null;
+      provider: string | null;
+    } | null;
     source: string;
     reason: string | null;
   }> | null;
@@ -510,6 +521,17 @@ export async function readFounderPanel(
     optionalWorkspace?.fee?.discountLines.map((line) => [line.item, line.discountCents]) ?? [],
   );
   const visibleAssets = optionalWorkspace?.assets.filter((asset) => !asset.removed) ?? [];
+  const downloadableAssets = visibleAssets
+    .filter(
+      (asset) =>
+        asset.state === 'stored' && (asset.purpose === 'visual' || asset.purpose === 'logo'),
+    )
+    .map((asset) => ({
+      id: asset.id,
+      filename: asset.filename ?? `${asset.purpose}-upload`,
+      contentType: asset.contentType,
+      purpose: asset.purpose,
+    }));
   const visibleLinks = optionalWorkspace?.visualLinks.filter((link) => !link.removed) ?? [];
   const visibleSocials = optionalWorkspace?.socials.filter((social) => !social.removed) ?? [];
   const itemByKey = new Map(
@@ -533,6 +555,7 @@ export async function readFounderPanel(
           .filter((asset) => asset.purpose === 'logo')
           .map((asset) => asset.filename)
           .filter((name): name is string => Boolean(name));
+        const booking = optionalWorkspace.interview.booking;
 
         const content =
           key === 'visuals'
@@ -540,7 +563,7 @@ export async function readFounderPanel(
             : key === 'branding'
               ? optionalWorkspace.workspace.brand.colors
               : key === 'interview'
-                ? optionalWorkspace.interview.booking?.status ?? null
+                ? booking?.scheduledAt?.toISOString() ?? null
                 : key === 'story'
                   ? optionalWorkspace.workspace.story.text
                   : visibleSocials.map((social) => social.url).join(' · ') || null;
@@ -552,6 +575,25 @@ export async function readFounderPanel(
           content,
           logo: key === 'branding' ? logos.join(' · ') || null : null,
           colors: key === 'branding' ? optionalWorkspace.workspace.brand.colors : null,
+          assets:
+            key === 'visuals'
+              ? downloadableAssets
+                  .filter((asset) => asset.purpose === 'visual')
+                  .map(({ purpose: _purpose, ...asset }) => asset)
+              : key === 'branding'
+                ? downloadableAssets
+                    .filter((asset) => asset.purpose === 'logo')
+                    .map(({ purpose: _purpose, ...asset }) => asset)
+                : [],
+          interview:
+            key === 'interview' && booking
+              ? {
+                  status: booking.status,
+                  scheduledAt: booking.scheduledAt?.toISOString() ?? null,
+                  timezone: booking.founderTimezone,
+                  provider: booking.meetingProvider,
+                }
+              : null,
           source:
             key === 'visuals' || key === 'branding'
               ? 'Founder upload and approval'

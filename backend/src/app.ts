@@ -529,6 +529,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     createAdminFounderPanelRouter({
       db,
       auth,
+      storage: config.objectStorage ?? unconfiguredStorage,
       notifier,
       notificationContext: launchContext,
       ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),

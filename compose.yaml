@@ -35,8 +35,11 @@ services:
       TRUST_PROXY_HOPS: 0
       DRAFT_VERIFY_LIMIT: 1000
       INVITATION_LINKS_REUSABLE: "true"
+      DEVELOPMENT_STORAGE_DIR: /app/.development-storage
     ports:
       - "127.0.0.1:3000:3000"
+    volumes:
+      - proovd_development_uploads:/app/.development-storage
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,3 +53,4 @@ services:
 
 volumes:
   proovd_postgres_data:
+  proovd_development_uploads:

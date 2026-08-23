@@ -117,6 +117,9 @@ async function main() {
       ? createDevelopmentStorage({
           appBaseUrl: env.APP_BASE_URL,
           maxBytes: MAX_UPLOAD_BYTES,
+          ...(env.DEVELOPMENT_STORAGE_DIR
+            ? { directory: env.DEVELOPMENT_STORAGE_DIR }
+            : {}),
         })
       : unconfiguredStorage;
 

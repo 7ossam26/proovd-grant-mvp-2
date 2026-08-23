@@ -65,14 +65,6 @@
  * per render: `new Date()` inside the map would let a chip's instant move
  * between the render that displayed it and the click that books it.
  *
- * ── The visible selection is the saved commitment ──────────────────────────
- * The Founder can save a platform and time even before operator scheduling
- * configuration exists. Provider confirmation can add joining details later;
- * the selected record already earns the item and remains visible below the CTA.
- * It is absolutely
- * positioned under the column, in the room the composition already leaves, so
- * not one reference box moves for it.
- *
  * ── The bell carries a count of reading, never a count of messages ─────────
  * The reference's is `mailCount: 2 + Math.max(0, vStep - 3)` — four at `vStep`
  * 5, which is what the screenshot shows. There is no inbox in this product and
@@ -100,7 +92,6 @@ import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { stageRelayIn } from '../../components/anim.js';
 import {
   bookInterview,
-  cancelInterview,
   FounderRequestError,
   type WorkspaceState,
 } from '../founder/api.js';
@@ -142,22 +133,13 @@ const RELAY = ['pill', 'head', 'panel', 'cta'] as const;
  * The reference wins on the label, because the brief for this screen is a
  * reproduction and the tile word is part of the composition. Both names are the
  * same product written long and short, so nothing is misleading and neither is
- * an internal name (§3.1) — the register keeps owning what §27.3's four
- * interview emails and the Admin workspace say. This screen uses ONE name per
- * provider throughout: the tile and the booking record below the CTA both read
- * from here, so the page can never say `Teams` in one place and
- * `Microsoft Teams` in another.
+ * an internal name (§3.1).
  */
 const PLATFORMS = [
   { id: 'google_meet', icon: 'meet', label: 'Google Meet' },
   { id: 'zoom', icon: 'zoom', label: 'Zoom' },
   { id: 'microsoft_teams', icon: 'teams', label: 'Teams' },
 ] as const satisfies readonly { id: MeetingProvider; icon: string; label: string }[];
-
-/** The name this screen shows for a stored provider value. */
-function platformLabel(id: string | null): string | null {
-  return PLATFORMS.find((p) => p.id === id)?.label ?? null;
-}
 
 /**
  * `this.SLOTS`, verbatim, plus the weekday and time each one names.
@@ -214,30 +196,6 @@ function resolveSlots(now: Date): { label: string; at: Date }[] {
     return { label: slot.label, at };
   });
 }
-
-/** §12's five booking states, in the words a Founder needs (§3.1). */
-const BOOKING_STATE: Record<string, { tag: string; line: string }> = {
-  selected: {
-    tag: 'Saved',
-    line: 'Your platform and time are saved. This counts towards your listing fee.',
-  },
-  confirmed: {
-    tag: 'Confirmed',
-    line: 'This is booked. It counts towards your listing fee.',
-  },
-  rescheduled: {
-    tag: 'Moved',
-    line: 'This booking was moved. It counts once the new time is confirmed.',
-  },
-  canceled: {
-    tag: 'Canceled',
-    line: 'This booking was canceled, so it does not count towards your listing fee. Pick another time.',
-  },
-  abandoned: {
-    tag: 'Never confirmed',
-    line: 'This time came and went without being confirmed, so it does not count. Pick another.',
-  },
-};
 
 /** Whether a booking still occupies the slot — `recordBooking` refuses a second. */
 const LIVE = new Set(['selected', 'confirmed']);
@@ -324,6 +282,7 @@ function InterviewScreen({
   });
 
   const [busy, setBusy] = useState(false);
+  const savingBooking = useRef<Promise<boolean> | null>(null);
   const [said, setSaid] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -378,45 +337,58 @@ function InterviewScreen({
    * — nothing chosen, nothing bookable, a booking already live — advances, as
    * there. §12 makes the answer optional and skipping it costs nothing else.
    */
+  const saveBooking = useCallback(
+    (
+      selectedPlatform: MeetingProvider,
+      chosen: { label: string; at: Date },
+    ): Promise<boolean> => {
+      if (!bookable) return Promise.resolve(false);
+      if (savingBooking.current) return savingBooking.current;
+
+      setBusy(true);
+      setFailure(null);
+      const work = refresh(
+        bookInterview(campaignId, {
+          meetingProvider: selectedPlatform,
+          scheduledAt: chosen.at.toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        }),
+      )
+        .then(() => true)
+        .catch((error: unknown) => {
+          /* The server's refusals are §27.1-shaped and name the booking state
+             that stopped it. The bare `title` is a heading; what a Founder can
+             act on is the pair under it. Falling back to a sentence of our own
+             rather than `error.message`, which is that same title. */
+          const detail =
+            error instanceof FounderRequestError
+              ? [error.detail.whatHappened, error.detail.next].filter(Boolean).join(' ')
+              : '';
+          setFailure(
+            detail ||
+              'We could not record that time. Nothing has been booked and nothing else on this page has changed.',
+          );
+          return false;
+        })
+        .finally(() => {
+          savingBooking.current = null;
+          setBusy(false);
+        });
+      savingBooking.current = work;
+      return work;
+    },
+    [bookable, campaignId, refresh],
+  );
+
   const next = useCallback(async () => {
     const go = () => leave(founderFlowPath(fromReview ? 'last-look' : 'story', campaignId), 1);
-
     const chosen = slots.find((s) => s.label === slotLabel);
     if (!bookable || !platform || !chosen) {
       go();
       return;
     }
-
-    setBusy(true);
-    setFailure(null);
-    try {
-      await refresh(
-        bookInterview(campaignId, {
-          meetingProvider: platform,
-          scheduledAt: chosen.at.toISOString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-        }),
-      );
-      go();
-    } catch (error) {
-      /* The server's refusals are §27.1-shaped and say which of the two
-         absences stopped it — `recordBooking` names the missing §6 settings in
-         `next`, and `already_live` names the booking in the way. The bare
-         `title` is a heading; what a Founder can act on is the pair under it.
-         Falling back to a sentence of our own rather than to `error.message`,
-         which is that same title. */
-      const detail =
-        error instanceof FounderRequestError
-          ? [error.detail.whatHappened, error.detail.next].filter(Boolean).join(' ')
-          : '';
-      setFailure(
-        detail ||
-          'We could not record that time. Nothing has been booked and nothing else on this page has changed.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  }, [bookable, platform, slotLabel, slots, campaignId, refresh, leave, fromReview]);
+    if (await saveBooking(platform, chosen)) go();
+  }, [bookable, platform, slotLabel, slots, campaignId, leave, fromReview, saveBooking]);
 
   // Announce a refusal once it renders, so it is not only a visible sentence.
   useEffect(() => {
@@ -424,8 +396,6 @@ function InterviewScreen({
   }, [failure]);
 
   const readingCount = founderFlowIndex('interview') + 1;
-  const described = booking ? BOOKING_STATE[booking.status] : undefined;
-
   return (
     <div className="ff-int" ref={root}>
       {/* The reference's own control, bottom-left. `back()` at `vStep` 5 goes to
@@ -531,7 +501,13 @@ function InterviewScreen({
                     className={on ? 'ff-int__tile is-on' : 'ff-int__tile'}
                     aria-pressed={on}
                     aria-disabled={blockedBecause ? true : undefined}
-                    onClick={() => pick(() => setPlatform(entry.id))}
+                    onClick={() =>
+                      pick(() => {
+                        setPlatform(entry.id);
+                        const chosen = slots.find((slot) => slot.label === slotLabel);
+                        if (chosen) void saveBooking(entry.id, chosen);
+                      })
+                    }
                   >
                     <span className="ff-int__icon" aria-hidden="true">
                       <PlatformIcon kind={entry.icon} />
@@ -564,7 +540,12 @@ function InterviewScreen({
                       hour: 'numeric',
                       minute: '2-digit',
                     })}
-                    onClick={() => pick(() => setSlotLabel(slot.label))}
+                    onClick={() =>
+                      pick(() => {
+                        setSlotLabel(slot.label);
+                        if (platform) void saveBooking(platform, slot);
+                      })
+                    }
                   >
                     {slot.label}
                   </button>
@@ -591,52 +572,6 @@ function InterviewScreen({
               lock. */}
           <div className="ff-int__state">
             {failure ? <p className="ff-int__failline">{failure}</p> : null}
-
-            {booking && described ? (
-              <p className="ff-int__record">
-                <span
-                  className={
-                    booking.status === 'confirmed'
-                      ? 'ff-int__tag ff-int__tag--on'
-                      : 'ff-int__tag'
-                  }
-                >
-                  {described.tag}
-                </span>
-                <span className="ff-int__recordline">
-                  {booking.scheduledAt
-                    ? new Date(booking.scheduledAt).toLocaleString(undefined, {
-                        weekday: 'long',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        timeZoneName: 'short',
-                      })
-                    : 'No time set yet'}
-                  {platformLabel(booking.provider) ? ` · ${platformLabel(booking.provider)}` : ''}
-                  {' — '}
-                  {described.line}
-                </span>
-                {live && !locked ? (
-                  <button
-                    type="button"
-                    className="ff-int__mini"
-                    onClick={() =>
-                      void refresh(
-                        cancelInterview(
-                          campaignId,
-                          booking.id,
-                          'Canceled by the Founder from the setup flow',
-                        ),
-                      )
-                    }
-                  >
-                    Cancel this interview
-                  </button>
-                ) : null}
-              </p>
-            ) : null}
 
             {blockedBecause && !live ? (
               <p className="ff-int__note">{blockedBecause}</p>

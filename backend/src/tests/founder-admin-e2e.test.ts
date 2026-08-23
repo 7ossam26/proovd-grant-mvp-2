@@ -5,15 +5,18 @@ import { eq } from 'drizzle-orm';
 
 import { campaigns } from '../db/schema/domain.js';
 import { founderProspects } from '../db/schema/invitations.js';
+import { campaignAssets } from '../db/schema/workspace.js';
 import { seedAdminReauthWindow } from '../settings/service.js';
+import { createMemoryStorage } from '../storage/object-storage.js';
 import { startHarness, type Harness } from './app-harness.js';
 import { cookiesOf, createAdmin, type AdminSession } from './admin-session.js';
 
 let h: Harness;
 let admin: AdminSession;
+const storage = createMemoryStorage('founder-admin-assets');
 
 beforeAll(async () => {
-  h = await startHarness({}, 'founder-admin-e2e');
+  h = await startHarness({ objectStorage: storage }, 'founder-admin-e2e');
   admin = await createAdmin(h, 'founder-admin-e2e');
   await seedAdminReauthWindow(h.db, 3600);
 }, 180_000);
@@ -162,6 +165,47 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
       fee: { completedItems: 1, discountCents: '200', subtotalCents: '3300' },
     });
 
+    const scheduledAt = '2030-03-12T15:30:00.000Z';
+    const booked = await request(h.app)
+      .post(`/api/founder/campaigns/${founder.campaignId}/interview`)
+      .set('cookie', founder.founderCookie)
+      .send({
+        meetingProvider: 'google_meet',
+        scheduledAt,
+        timezone: 'Africa/Cairo',
+      })
+      .expect(200);
+    expect(booked.body.workspace).toMatchObject({
+      interview: {
+        booking: {
+          status: 'selected',
+          scheduledAt,
+          timezone: 'Africa/Cairo',
+          provider: 'google_meet',
+        },
+      },
+      fee: { completedItems: 2, discountCents: '400', subtotalCents: '3100' },
+    });
+
+    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const storageKey = `campaigns/${founder.campaignId}/logo.png`;
+    storage.put(storageKey, 'image/png', image);
+    const [logo] = await h.db
+      .insert(campaignAssets)
+      .values({
+        campaignId: founder.campaignId,
+        purpose: 'logo',
+        storageKey,
+        storageBucket: storage.bucket,
+        originalFilename: 'founder-logo.png',
+        contentType: 'image/png',
+        byteSize: BigInt(image.byteLength),
+        state: 'stored',
+        verifiedAt: new Date(),
+        createdBy: 'founder-e2e',
+      })
+      .returning();
+
     const workspace = await request(h.app)
       .get(`/api/admin/founders/${founder.prospectId}`)
       .set('cookie', admin.cookie)
@@ -200,13 +244,42 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
         content: 'We built this after watching independent teams lose hours to the same problem.',
       }),
     );
+    expect(panel.body.optionalItems).toContainEqual(
+      expect.objectContaining({
+        key: 'interview',
+        complete: true,
+        savingCents: '200',
+        content: scheduledAt,
+        interview: expect.objectContaining({ scheduledAt, timezone: 'Africa/Cairo' }),
+      }),
+    );
+    expect(panel.body.optionalItems).toContainEqual(
+      expect.objectContaining({
+        key: 'branding',
+        assets: [
+          expect.objectContaining({
+            id: logo!.id,
+            filename: 'founder-logo.png',
+            contentType: 'image/png',
+          }),
+        ],
+      }),
+    );
     expect(panel.body.listingFee).toMatchObject({
       status: 'Calculated',
       baseCents: '3500',
-      savedCents: '200',
-      subtotalCents: '3300',
+      savedCents: '400',
+      subtotalCents: '3100',
     });
     expect(panel.body.listingFee.lines).toHaveLength(5);
+
+    const downloaded = await request(h.app)
+      .get(`/api/admin/founder-panel/${founder.prospectId}/assets/${logo!.id}/download`)
+      .set('cookie', admin.cookie)
+      .expect(200)
+      .expect('content-type', 'image/png');
+    expect(downloaded.headers['content-disposition']).toContain('founder-logo.png');
+    expect(Buffer.from(downloaded.body)).toEqual(image);
 
     const resetsBefore = h.resetLinks.length;
     await request(h.app)

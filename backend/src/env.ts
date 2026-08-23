@@ -5,6 +5,7 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   APP_BASE_URL: z.string().url('APP_BASE_URL must be a valid URL'),
+  DEVELOPMENT_STORAGE_DIR: z.string().min(1).optional(),
 
   /**
    * tech-stack §10: proovd.co (the landing repository) is the marketing home,

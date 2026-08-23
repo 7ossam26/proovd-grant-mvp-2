@@ -43,8 +43,12 @@
 
 import express from 'express';
 import { Router, type Request, type RequestHandler, type Response } from 'express';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import { campaignDrafts } from '../db/schema/invitations.js';
+import { campaignAssets } from '../db/schema/workspace.js';
 import type { Auth } from '../auth/auth.js';
+import { ObjectNotStored, type ObjectStorage } from '../storage/object-storage.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { notifyApplicationReviewOutcome } from '../campaign/application-review-notifications.js';
@@ -92,6 +96,7 @@ export const ADMIN_PANEL_CAMPAIGNS_PATH = '/api/admin/campaigns';
 export interface AdminFounderPanelDeps {
   db: Database;
   auth: Auth;
+  storage: ObjectStorage;
   notifier?: Notifier | undefined;
   notificationContext?: LaunchNotificationContext | undefined;
   internalRecipient?: string | undefined;
@@ -177,7 +182,7 @@ function optionalString(
 }
 
 export function createAdminFounderPanelRouter(deps: AdminFounderPanelDeps): Router {
-  const { db, auth } = deps;
+  const { db, auth, storage } = deps;
   const router = Router();
   const admin = requireAdmin(auth);
   const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
@@ -219,6 +224,65 @@ export function createAdminFounderPanelRouter(deps: AdminFounderPanelDeps): Rout
   });
 
   /* ══ 1. The panel supplement ═══════════════════════════════════════════ */
+
+  router.get(
+    `${ADMIN_FOUNDER_PANEL_PATH}/:prospectId/assets/:assetId/download`,
+    admin,
+    async (req, res) => {
+      const [asset] = await db
+        .select({
+          id: campaignAssets.id,
+          storageKey: campaignAssets.storageKey,
+          filename: campaignAssets.originalFilename,
+          contentType: campaignAssets.contentType,
+          purpose: campaignAssets.purpose,
+        })
+        .from(campaignAssets)
+        .innerJoin(campaignDrafts, eq(campaignDrafts.campaignId, campaignAssets.campaignId))
+        .where(
+          and(
+            eq(campaignDrafts.prospectId, String(req.params['prospectId'] ?? '')),
+            eq(campaignAssets.id, String(req.params['assetId'] ?? '')),
+            eq(campaignAssets.state, 'stored'),
+            isNull(campaignAssets.removedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!asset || (asset.purpose !== 'logo' && asset.purpose !== 'visual')) {
+        notFound(res, 'There is no downloadable Founder image at that address.');
+        return;
+      }
+
+      try {
+        const object = await storage.getObject(asset.storageKey);
+        const filename =
+          (asset.filename ?? `${asset.purpose}-upload`)
+            .split(/[\\/]/)
+            .at(-1)
+            ?.replace(/[\r\n"]/g, '_') || `${asset.purpose}-upload`;
+        const asciiFilename = filename.replace(/[^\x20-\x7e]/g, '_');
+        res.setHeader('Content-Type', object.contentType || asset.contentType);
+        res.setHeader('Content-Length', String(object.byteSize));
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        );
+        res.send(object.body);
+      } catch (error) {
+        if (error instanceof ObjectNotStored) {
+          notFound(res, 'The upload record exists, but the stored file is missing.');
+          return;
+        }
+        res.status(503).json({
+          error: 'storage_unavailable',
+          title: 'That image could not be downloaded',
+          whatHappened: 'The stored file could not be read.',
+          next: 'Try the download again. The Founder record has not changed.',
+        });
+      }
+    },
+  );
 
   router.get(`${ADMIN_FOUNDER_PANEL_PATH}/:prospectId`, admin, async (req, res) => {
     const view = await readFounderPanel(db, String(req.params['prospectId'] ?? ''));

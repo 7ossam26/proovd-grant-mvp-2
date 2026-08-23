@@ -523,13 +523,8 @@ export const cancelListing = (
  * Records a chosen slot — `POST .../interview`, Phase 09a.
  *
  * The route has existed since Phase 09a, is driven by the backend suite, and
- * until this screen was rebuilt to the reference it had NO frontend caller at
- * all: `recordBooking` was reachable only from Admin. It is the SELECTION half
- * of the two-step model §12 describes — it always writes `selected`, never
- * `confirmed`, because §12 is explicit that a slot somebody picked and nobody
- * confirmed does not complete the item. Confirmation still arrives from the
- * Cal.com webhook or from an Admin reconciling a missed delivery (tech-stack
- * §12), and nothing on this path can produce it.
+ * It always writes `selected`; that saved selection completes the optional
+ * item, while provider confirmation can still enrich the booking later.
  *
  * `timezone` is the browser's own IANA zone, because the record stores the
  * Founder's zone beside the instant and `scheduledAt` alone cannot carry it.

@@ -15809,46 +15809,9 @@ html.no-motion .ff-story__say { transition: none; }
 }
 .ff-int__state p { margin: 0; max-width: none; }
 
-.ff-int__record {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-.ff-int__recordline { flex: 1 1 20ch; min-width: 0; }
-.ff-int__tag {
-  flex: none;
-  padding: 8px 20px;
-  border: 3px solid #013F17;
-  border-radius: 2px;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.02em;
-}
-.ff-int__tag--on { border-color: #41ED98; color: #013F17; background: rgba(65, 237, 152, 0.14); }
-
 .ff-int__failline { color: #013F17; font-weight: 700; }
 
 .ff-int__note { max-width: none; }
-
-.ff-int__mini {
-  flex: none;
-  padding: 10px 24px;
-  border: 3px solid #41ED98;
-  border-radius: 2px;
-  background: transparent;
-  color: #013F17;
-  font-family: 'Satoshi', sans-serif;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  outline: none;
-}
-.ff-int__mini:hover { background: #E9FFE1; }
-.ff-int__mini:focus-visible { outline: 4px solid #013F17; outline-offset: 4px; }
 
 /* §12's own mechanism, behind one gesture (DNA §5.12) so the composition above
    it is untouched until somebody asks for it. */

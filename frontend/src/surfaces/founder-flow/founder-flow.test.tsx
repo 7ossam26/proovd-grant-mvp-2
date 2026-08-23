@@ -1730,6 +1730,56 @@ describe('the five §12 answers (10–14)', () => {
     expect(document.querySelector('.ff-int__embed')).toBeNull();
   });
 
+  it('saves the interview as soon as both a provider and time are selected', async () => {
+    const user = userEvent.setup();
+    stubStage3();
+    handlers.push((url, init) => {
+      if (!url.endsWith('/interview') || init?.method !== 'POST') return undefined;
+      return { status: 200, body: { workspace: workspaceState() } };
+    });
+    renderAt(at('interview'));
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.click(screen.getByRole('button', { name: 'Google Meet' }));
+    await user.click(
+      within(screen.getByRole('group', { name: 'Pick a time' })).getAllByRole('button')[0]!,
+    );
+
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.method === 'POST' &&
+            request.url.endsWith('/interview') &&
+            request.body?.['meetingProvider'] === 'google_meet' &&
+            typeof request.body?.['scheduledAt'] === 'string',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('does not render a saved-interview banner or cancel control', async () => {
+    stubStage3({
+      interview: {
+        ...(workspaceState()['interview'] as object),
+        booking: {
+          id: 'booking-1',
+          status: 'selected',
+          scheduledAt: '2030-03-12T15:30:00.000Z',
+          timezone: 'Africa/Cairo',
+          provider: 'zoom',
+          link: null,
+          interviewer: null,
+        },
+      },
+    });
+    renderAt(at('interview'));
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.queryByText(/your platform and time are saved/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /cancel this interview/i })).toBeNull();
+  });
+
   it('offers factual help, never generated brand work (§12, §30)', async () => {
     // DELIBERATELY MOVED (2026-08-20): it ran on `visuals`, whose rebuild to the
     // supplied reference leaves no helper block — the reference's composition is

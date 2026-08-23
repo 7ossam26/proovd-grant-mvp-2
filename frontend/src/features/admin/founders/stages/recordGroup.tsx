@@ -40,7 +40,12 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { formatCents, prefillAffiliateTypeLabel } from '@proovd/shared';
+import {
+  MEETING_PROVIDER_LABELS,
+  formatCents,
+  prefillAffiliateTypeLabel,
+  type MeetingProvider,
+} from '@proovd/shared';
 import { AdminRequestError, type FounderWorkspaceDetail } from '../api.js';
 import { absoluteTime } from '../format.js';
 
@@ -194,7 +199,11 @@ export function RecordGroup({ title, rows }: RecordGroupProps) {
  * what the panel was authorised to render.
  */
 export function downloadFile(filename: string, content: string, mime = 'text/plain'): void {
-  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  downloadBlob(filename, new Blob([content], { type: mime }));
+}
+
+export function downloadBlob(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
@@ -276,6 +285,13 @@ export interface PanelOptionalItem {
   /** Branding is displayed as two rows and is ONE record. Both read from here. */
   logo?: string | null;
   colors?: string | null;
+  assets?: Array<{ id: string; filename: string; contentType: string }> | null;
+  interview?: {
+    status?: string | null;
+    scheduledAt?: string | null;
+    timezone?: string | null;
+    provider?: string | null;
+  } | null;
   source?: string | null;
   /** Why it does not qualify, when it does not. */
   reason?: string | null;
@@ -1129,6 +1145,21 @@ export function optionalItemRows(p: FounderPanel): SharedRow[] {
   const story = item('story');
   const socials = item('socials');
 
+  const interviewProvider = interview?.interview?.provider;
+  const interviewProviderLabel =
+    interviewProvider && interviewProvider in MEETING_PROVIDER_LABELS
+      ? MEETING_PROVIDER_LABELS[interviewProvider as MeetingProvider]
+      : interviewProvider;
+  const interviewValue = interview?.interview
+    ? [
+        interviewProviderLabel,
+        absoluteTime(interview.interview.scheduledAt),
+        interview.interview.timezone,
+      ]
+        .filter((value): value is string => Boolean(value) && value !== '—')
+        .join(' · ') || interview?.content || null
+    : interview?.content ?? null;
+
   return [
     {
       key: 'optional.visuals',
@@ -1159,10 +1190,10 @@ export function optionalItemRows(p: FounderPanel): SharedRow[] {
     {
       key: 'optional.interview',
       label: 'Founder interview',
-      value: interview?.content ?? null,
+      value: interviewValue,
       absence: 'No confirmed booking',
       source: 'Founder selected',
-      ...qualifier('interview', 'Complete', interview?.content ?? null),
+      ...qualifier('interview', 'Complete', interviewValue),
     },
     {
       key: 'optional.story',

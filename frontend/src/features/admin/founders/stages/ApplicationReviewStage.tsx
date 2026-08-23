@@ -61,6 +61,7 @@ import {
   action,
   asRequestError,
   campaignAnswerRows,
+  downloadBlob,
   downloadFile,
   downloadNameFor,
   firstName,
@@ -264,6 +265,63 @@ export function ApplicationReviewStage({ detail, panel, onSaved }: StageProps) {
   const downloadAction = (row: SharedRow): RowAction =>
     action('Download', () => downloadFile(downloadNameFor(row.label), row.value ?? ''));
 
+  const assetDownloadAction = (
+    assets: Array<{ id: string; filename: string; contentType: string }>,
+  ): RowAction =>
+    action('Download', () => {
+      void (async () => {
+        setError(null);
+        setDone(null);
+        for (const asset of assets) {
+          const response = await fetch(
+            `/api/admin/founder-panel/${encodeURIComponent(header.prospectId)}` +
+              `/assets/${encodeURIComponent(asset.id)}/download`,
+          );
+          if (!response.ok) {
+            let detail: Record<string, unknown> = {};
+            try {
+              detail = (await response.json()) as Record<string, unknown>;
+            } catch {
+              // The fallback below still states exactly what is and is not known.
+            }
+            setError(
+              new AdminRequestError({
+                error:
+                  typeof detail['error'] === 'string'
+                    ? detail['error']
+                    : 'asset_download_failed',
+                title:
+                  typeof detail['title'] === 'string'
+                    ? detail['title']
+                    : 'That file could not be downloaded',
+                whatHappened:
+                  typeof detail['whatHappened'] === 'string'
+                    ? detail['whatHappened']
+                    : `The server answered ${response.status} without a downloadable file.`,
+                next:
+                  typeof detail['next'] === 'string'
+                    ? detail['next']
+                    : 'Reload the panel and try again.',
+                status: response.status,
+              }),
+            );
+            return;
+          }
+          downloadBlob(asset.filename, await response.blob());
+        }
+      })().catch(() => {
+        setError(
+          new AdminRequestError({
+            error: 'asset_download_failed',
+            title: 'That file could not be downloaded',
+            whatHappened: 'The download request did not complete.',
+            next: 'Check the local server and try again.',
+            status: 0,
+          }),
+        );
+      });
+    });
+
   const isProse = (key: string) =>
     key === 'problem' || key === 'solution' || key === 'competition';
 
@@ -284,9 +342,18 @@ export function ApplicationReviewStage({ detail, panel, onSaved }: StageProps) {
   const optionalRows = optionalItemRows(p);
   const group3 = optionalRows.map((row) => {
     const base = [editAction(row), requestAction(row)];
-    if (row.key === 'optional.visuals') return withActions(row, [...base, downloadAction(row)]);
-    if (row.key === 'optional.story')
-      return withActions(row, [...base, viewAction(row), downloadAction(row)]);
+    const itemKey =
+      row.key === 'optional.visuals'
+        ? 'visuals'
+        : row.key === 'optional.branding.logos'
+          ? 'branding'
+          : null;
+    const assets = itemKey
+      ? p.optionalItems?.find((item) => item.key === itemKey)?.assets
+      : null;
+    if (assets?.length) {
+      return withActions(row, [...base, assetDownloadAction(assets)]);
+    }
     return withActions(row, base);
   });
 
