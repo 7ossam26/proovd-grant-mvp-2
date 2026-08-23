@@ -21,13 +21,13 @@ const PAYMENT_MODELS = [
   {
     stance: 'not_open' as const,
     title: 'No optional fixed Creator payment',
-    art: '/assets/pie-cursor.png',
+    art: '/assets/pie-cursor.webp',
     body: 'Creators are paid only through their agreed share of captured pre-orders.',
   },
   {
     stance: 'open' as const,
     title: 'Open to an optional fixed Creator payment',
-    art: '/assets/cash-hand.png',
+    art: '/assets/cash-hand.webp',
     body: 'A Creator may propose a fixed payment alongside a lower agreed percentage. Nothing is agreed on this screen.',
   },
 ] as const;
@@ -261,7 +261,7 @@ function PaymentExplainer({ campaignId }: { campaignId: string }) {
       <ReferenceChrome backLabel="Back to Creator match" />
       <div className="ff-paypick__stage" data-page-stage="1" ref={stage}>
         <div className="ff-paypick__explainer-column">
-          <img className="ff-paypick__explainer-art" data-anim="art" src="/assets/pie-cursor.png" alt="" />
+          <img className="ff-paypick__explainer-art" data-anim="art" src="/assets/pie-cursor.webp" alt="" />
           <h1 className="ff-paypick__explainer-title" data-anim="head">Creators earn an agreed share<br />of captured pre-orders</h1>
           {error ? <p className="ff-paypick__error" role="alert">{error}</p> : null}
           <button type="button" className="ff-paypick__explainer-cta" data-anim="cta" disabled={busy} onClick={() => void continueToReviewOrFee()}>{busy ? 'Continuing…' : 'I understand'}</button>

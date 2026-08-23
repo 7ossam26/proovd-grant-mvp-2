@@ -18,29 +18,17 @@ import { flowDirection, resetFlowDirection, startFlowTransition } from './FlowPa
 import { fetchFounderDetails, type FounderDetails } from '../founder/api.js';
 
 const ASSETS = {
-  lockup: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/match-lockup.png',
-    import.meta.url,
-  ).href,
-  cupidLeft: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-left.png',
-    import.meta.url,
-  ).href,
-  cupidRight: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-right.png',
-    import.meta.url,
-  ).href,
-  logo: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg',
-    import.meta.url,
-  ).href,
+  lockup: '/assets/match-lockup.webp',
+  cupidLeft: '/assets/cupid-left.webp',
+  cupidRight: '/assets/cupid-right.webp',
+  logo: '/assets/proovd-logo.svg',
 };
 
 let artworkPreload: Promise<void> | null = null;
 
 /**
  * The reference's artwork is already in the document before `verifyIntro`
- * starts. In the routed app these three PNGs total about 13.8 MB, so fetch and
+ * starts. In the routed app these three images are fetched and
  * decode them on the preceding Details screen; otherwise identical tweens can
  * appear late as transparent image boxes finish decoding mid-timeline.
  */

@@ -72,10 +72,7 @@ const PAYOUT_ASSETS = {
     '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-ssn.svg',
     import.meta.url,
   ).href,
-  piggy: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/piggy.png',
-    import.meta.url,
-  ).href,
+  piggy: '/assets/piggy.webp',
 };
 
 interface PayoutGsap {

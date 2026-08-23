@@ -3755,7 +3755,8 @@ label.btn{ cursor:pointer; }
    progress row; the dossier became one column of copy with the creator's work
    stepping beside it, one piece at a time under a fade at both edges.
    ========================================================================= */
-.ch-hub{display:flex;flex-direction:column;gap:var(--group-gap);width:100%}
+.ch-hub{display:flex;flex-direction:column;gap:var(--group-gap);width:100%;
+  --dossier-media:clamp(6rem,min(11vw,13svh),9rem)}
 .ch-head{display:flex;align-items:center;justify-content:space-between;gap:var(--group-gap-x)}
 .ch-prog{display:flex;align-items:center;gap:.75rem}
 .ch-dots{display:flex;gap:.35rem}
@@ -3768,7 +3769,9 @@ label.btn{ cursor:pointer; }
 .ch-copy{display:flex;flex-direction:column;gap:clamp(2.8rem,6.6svh,4.8rem);min-width:0}
 .ch-id{display:flex;align-items:center;gap:var(--group-gap-x);flex-wrap:wrap}
 .ch-idmain{display:flex;flex-direction:column;gap:.2rem;min-width:0}
-.ch-desc{font-size:var(--body);font-weight:500;line-height:1.5;color:var(--forest);max-width:min(46ch,100%)}
+.ch-idmain .h2{font-size:clamp(2rem,min(3.6vw,4.8svh),3rem)}
+.ch-idmain .b-handle{font-size:clamp(1rem,.35vw + .9rem,1.2rem)}
+.ch-desc{font-size:clamp(1.1rem,.35vw + 1rem,1.3rem);font-weight:500;line-height:1.5;color:var(--forest);max-width:min(58ch,100%)}
 /* the three numbers are the case for the creator, so they are read as figures
    rather than a sentence */
 .ch-facts{display:flex;gap:clamp(1.5rem,4vw,3rem);flex-wrap:wrap}
@@ -3827,20 +3830,22 @@ label.btn{ cursor:pointer; }
 .ch-call:hover{border-color:var(--brand);color:var(--brand)}
 
 /* the three figures carry the case; the terms line reports it */
-.ch-facts strong{font-size:calc(var(--h3) * 1.28)}
+.ch-facts strong{font-size:calc(var(--h3) * 1.48)}
 .ch-copy .b-terms{font-size:var(--small)}
 .ch-copy .b-offerpct{font-size:var(--h3)}
 
-/* the work strip takes more of the row */
-.ch-body{grid-template-columns:minmax(0,1fr) 34rem}
-.ch-tile{flex:0 0 18rem}
-.ch-track{padding:0 8rem}
+/* Both halves use the available row: the dossier reads larger and the work
+   strip no longer sits as a small fixed island at the far edge. */
+.ch-body{grid-template-columns:minmax(0,1fr) 42rem;gap:clamp(2rem,3vw,4rem)}
+.ch-copy{max-width:48rem}
+.ch-tile{flex:0 0 22rem}
+.ch-track{padding:0 10rem}
 
 /* Centring is arithmetic, not a guess: half the difference between the window
    and a tile on each side, and a stride of exactly one tile plus one gap. The
    fades ramp gently instead of whiting the neighbours out, and the controls
    are big enough to hit. */
-.ch-track{padding:0 calc((34rem - 18rem) / 2)}
+.ch-track{padding:0 calc((42rem - 22rem) / 2)}
 .ch-fade{width:38%}
 .ch-fade.l{background:linear-gradient(270deg,rgba(250,250,250,0) 0%,rgba(250,250,250,.35) 52%,rgba(250,250,250,.92) 100%)}
 .ch-fade.r{background:linear-gradient(90deg,rgba(250,250,250,0) 0%,rgba(250,250,250,.35) 52%,rgba(250,250,250,.92) 100%)}
@@ -3849,7 +3854,7 @@ label.btn{ cursor:pointer; }
 
 @media (max-width:900px){
   .ch-body{grid-template-columns:1fr}
-  .ch-work{width:min(34rem,100%);max-width:none}
+  .ch-work{width:min(42rem,100%);max-width:none}
 }
 
 /* the foot sits clear of the decision above it */

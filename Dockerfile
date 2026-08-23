@@ -11,20 +11,12 @@ RUN npm ci --workspace=@proovd/frontend --workspace=@proovd/shared
 COPY shared/ ./shared/
 COPY frontend/ ./frontend/
 
-# MatchStep imports these reference assets through `new URL(..., import.meta.url)`.
-# Keep the files at the same repository-relative path so Vite fingerprints and
-# bundles them instead of leaving production-only `/docs/...` URLs that 404.
-COPY docs/design-refrence/Proovd-Founder-Flow-v2/assets/match-lockup.png \
-     docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-left.png \
-     docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-right.png \
-     docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg \
-     docs/design-refrence/Proovd-Founder-Flow-v2/assets/reward-gift.png \
-     docs/design-refrence/Proovd-Founder-Flow-v2/assets/review-lens.png \
-     docs/design-refrence/Proovd-Founder-Flow-v2/assets/stripe.svg \
+# The remaining SVGs are imported through `new URL(..., import.meta.url)`.
+# Runtime picture assets live canonically in `frontend/public/assets`.
+COPY docs/design-refrence/Proovd-Founder-Flow-v2/assets/stripe.svg \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-id.svg \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-bank.svg \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-ssn.svg \
-     docs/design-refrence/Proovd-Founder-Flow-v2/assets/piggy.png \
      ./docs/design-refrence/Proovd-Founder-Flow-v2/assets/
 
 # Every workspace tsconfig extends this. Without it tsc reports TS5083 and then

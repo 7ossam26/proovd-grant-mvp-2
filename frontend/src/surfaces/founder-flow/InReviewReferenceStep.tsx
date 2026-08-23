@@ -15,14 +15,8 @@ import { InReviewStep } from './InReviewStep.js';
 import { PITCH_DEMO } from './referenceWalkthrough.js';
 
 const REVIEW_ASSETS = {
-  logo: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg',
-    import.meta.url,
-  ).href,
-  lens: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/review-lens.png',
-    import.meta.url,
-  ).href,
+  logo: '/assets/proovd-logo.svg',
+  lens: '/assets/review-lens.webp',
 };
 
 /** Keep the pitch simulation separate from the truthful production state. */

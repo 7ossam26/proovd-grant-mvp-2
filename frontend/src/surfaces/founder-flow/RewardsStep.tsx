@@ -444,14 +444,8 @@ function RewardsBody({
 }
 
 const REWARD_ASSETS = {
-  logo: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg',
-    import.meta.url,
-  ).href,
-  gift: new URL(
-    '../../../../docs/design-refrence/Proovd-Founder-Flow-v2/assets/reward-gift.png',
-    import.meta.url,
-  ).href,
+  logo: '/assets/proovd-logo.svg',
+  gift: '/assets/reward-gift.webp',
 };
 
 function RewardLine({ children, className }: { children: ReactNode; className: string }) {

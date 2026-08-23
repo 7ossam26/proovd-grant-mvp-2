@@ -260,7 +260,7 @@ function ApplicationReviewScreen({
         <div className="ff-application-review__lockup">
           <img
             data-review-anim="grow"
-            src="/assets/review-loupe.png"
+            src="/assets/review-loupe.webp"
             alt=""
             className="ff-application-review__art"
           />
