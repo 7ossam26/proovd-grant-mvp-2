@@ -753,6 +753,34 @@ export const recordOpenness = (
     body: JSON.stringify({ stance }),
   });
 
+export interface FounderApplicationReviewState {
+  required: boolean;
+  mayContinue: boolean;
+  review: {
+    round: number;
+    outcome: string;
+    submittedAt: string;
+    decidedAt: string | null;
+    customerExplanation: string | null;
+    changeRequests: Array<{
+      fieldKey: string;
+      reason: string;
+      requestedAt: string;
+      resolvedAt: string | null;
+    }>;
+  } | null;
+}
+
+export const fetchApplicationReview = (
+  campaignId: string,
+): Promise<{ applicationReview: FounderApplicationReviewState }> =>
+  call(`${base(campaignId)}/application-review`);
+
+export const submitApplicationReview = (
+  campaignId: string,
+): Promise<{ applicationReview: FounderApplicationReviewState }> =>
+  call(`${base(campaignId)}/application-review/submit`, { method: 'POST', body: '{}' });
+
 export const fetchBuild = (campaignId: string): Promise<BuildState> =>
   call(`${base(campaignId)}/build`);
 

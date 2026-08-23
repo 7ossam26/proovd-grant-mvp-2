@@ -42,6 +42,7 @@ import {
   notifyListingRefund,
   type ListingNotificationContext,
 } from '../payments/listing-notifications.js';
+import { applicationReviewBlocksListing } from '../campaign/application-review-gate.js';
 
 export const FOUNDER_LISTING_PATH = '/api/founder/campaigns';
 
@@ -134,6 +135,16 @@ export function createFounderListingRouter(deps: FounderListingDeps): Router {
       return;
     }
 
+    if (await applicationReviewBlocksListing(db, campaignId)) {
+      res.status(409).json({
+        error: 'application_review_required',
+        title: 'Application Review approval is required',
+        whatHappened: 'This campaign must be approved before the listing fee can open.',
+        next: 'Return to Application Review to see its current status.',
+      });
+      return;
+    }
+
     const onboarding = await readOnboardingState(
       {
         db,
@@ -167,6 +178,16 @@ export function createFounderListingRouter(deps: FounderListingDeps): Router {
     async (req, res) => {
       const campaignId = await resolve(req, res);
       if (!campaignId) return;
+
+      if (await applicationReviewBlocksListing(db, campaignId)) {
+        res.status(409).json({
+          error: 'application_review_required',
+          title: 'Application Review approval is required',
+          whatHappened: 'This campaign must be approved before listing-fee checkout can open.',
+          next: 'Return to Application Review to see its current status.',
+        });
+        return;
+      }
 
       const body = req.body as Record<string, unknown>;
       const rawAddress = (body['address'] as Record<string, unknown> | undefined) ?? {};

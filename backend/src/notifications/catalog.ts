@@ -1272,6 +1272,87 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       supportEmail: SUPPORT,
     }),
 
+  founder_application_review_received: () =>
+    renderPlainNotice({
+      subject: `We received your application — ${CAMPAIGN}`,
+      headline: 'Your application is with Proovd.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Application round', value: '1' },
+        { label: 'Who owns the next step', value: 'Proovd' },
+      ],
+      action: { label: 'View Application Review', url: `${APP}/campaigns/c1/setup/application-review` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_application_information_needed: () =>
+    renderPlainNotice({
+      subject: `We need more information about ${CAMPAIGN}`,
+      headline: 'We need more information before we can finish the review.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'What we need', value: 'Please clarify the launch timeline.' },
+        { label: 'Who owns the next step', value: 'You' },
+      ],
+      action: { label: 'Open Application Review', url: `${APP}/campaigns/c1/setup/application-review` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_application_changes_requested: () =>
+    renderPlainNotice({
+      subject: `Changes requested for ${CAMPAIGN}`,
+      headline: 'Please update your application and resubmit it.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Field', value: 'Product story' },
+        { label: 'Requested change', value: 'Add the evidence behind the claim.' },
+      ],
+      action: { label: 'Update your application', url: `${APP}/campaigns/c1/setup/application-review` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_application_approved: () =>
+    renderPlainNotice({
+      subject: `Your application is approved — ${CAMPAIGN}`,
+      headline: 'Your application is approved.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'What happens next', value: 'Continue to the listing-fee step.' },
+      ],
+      action: { label: 'Continue setup', url: `${APP}/campaigns/c1/setup/creator-payment` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  founder_application_rejected: () =>
+    renderPlainNotice({
+      subject: `Application Review decision — ${CAMPAIGN}`,
+      headline: 'We cannot approve this application.',
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Decision explanation', value: 'The application does not meet the current program requirements.' },
+      ],
+      action: { label: 'View the decision', url: `${APP}/campaigns/c1/setup/application-review` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
+  internal_founder_application_submitted: () =>
+    renderInternalNotice({
+      subject: `Founder application submitted — ${CAMPAIGN} (round 1)`,
+      headline: `A Founder application is waiting — ${CAMPAIGN}`,
+      facts: [
+        { label: 'Campaign', value: CAMPAIGN },
+        { label: 'Application round', value: '1' },
+      ],
+      action: { label: 'Open the Founder record', url: `${APP}/admin/founders/p1` },
+      reference: REF,
+      supportEmail: SUPPORT,
+    }),
+
   /*
    * §27.7's three digests. The samples carry real activity because an empty
    * digest is never sent (`DIGEST_PROHIBITIONS.no_empty_send`) — rendering one

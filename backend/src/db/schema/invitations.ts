@@ -88,6 +88,13 @@ export const founderProspects = pgTable(
       .notNull()
       .default(sql`mint_founder_record_reference()`),
 
+    /**
+     * Browser-generated key for the one-click Admin create-and-invite act.
+     * A lost HTTP response may be retried with the same key without creating a
+     * second person. Null keeps the older create-only route backwards compatible.
+     */
+    creationRequestKey: text('creation_request_key'),
+
     /* ── Recipient identity (§7). All nullable: all anonymisable. ──────────*/
     legalName: text('legal_name'),
     preferredName: text('preferred_name'),
@@ -171,6 +178,9 @@ export const founderProspects = pgTable(
   },
   (t) => ({
     emailIdx: index('founder_prospects_email_idx').on(t.email),
+    creationRequestIdx: uniqueIndex('founder_prospects_creation_request_key_idx')
+      .on(t.creationRequestKey)
+      .where(sql`${t.creationRequestKey} is not null`),
     claimedIdx: index('founder_prospects_claimed_idx').on(t.claimedUserId),
   }),
 );

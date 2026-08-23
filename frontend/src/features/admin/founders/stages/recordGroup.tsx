@@ -289,6 +289,32 @@ export interface PanelFeeLine {
 }
 
 export interface FounderPanel {
+  notes?: Array<{
+    id: string;
+    body: string;
+    author: string;
+    createdAt: string;
+  }> | null;
+
+  warnings?: Array<{
+    id: string;
+    reason: string;
+    warnedBy: string;
+    createdAt: string;
+  }> | null;
+
+  workflow?: {
+    stage?: string | null;
+    stageReached?: string | null;
+    exitStatus?: string | null;
+  } | null;
+
+  applicationReviewRequirement?: {
+    required?: boolean | null;
+    locked?: boolean | null;
+    lockedReason?: string | null;
+  } | null;
+
   draft?: {
     status?: string | null;
     updatedAt?: string | null;

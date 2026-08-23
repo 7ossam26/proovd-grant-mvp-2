@@ -64,6 +64,25 @@ export const founderInternalNotes = pgTable(
 
 export type FounderInternalNote = typeof founderInternalNotes.$inferSelect;
 
+/** Append-only Admin warnings on the Founder account. */
+export const founderAccountWarnings = pgTable(
+  'founder_account_warnings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    prospectId: uuid('prospect_id')
+      .notNull()
+      .references(() => founderProspects.id, { onDelete: 'cascade' }),
+    reason: text('reason').notNull(),
+    warnedBy: text('warned_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    prospectIdx: index('founder_account_warnings_prospect_idx').on(t.prospectId, t.createdAt),
+  }),
+);
+
+export type FounderAccountWarning = typeof founderAccountWarnings.$inferSelect;
+
 /* ── Admin offer (Matching) ────────────────────────────────────────────────── */
 
 export const associationAdminOffers = pgTable(

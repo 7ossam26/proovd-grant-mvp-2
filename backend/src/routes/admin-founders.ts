@@ -67,7 +67,7 @@ import type { Notifier } from '../notifications/send.js';
 import { requireAdmin, requireFreshSession } from '../auth/guards.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import { campaigns } from '../db/schema/domain.js';
-import { founderProspects } from '../db/schema/invitations.js';
+import { campaignDrafts, founderProspects } from '../db/schema/invitations.js';
 import {
   updateProspect,
   composeInvitation,
@@ -109,6 +109,8 @@ import {
   recordDeletionRequest,
   recordDeletionReview,
   recordInvitationSender,
+  revokeFounderSessions,
+  sendFounderPasswordRecovery,
   setInvitationOverride,
   setNextCampaignReadiness,
   updateFounderField,
@@ -417,6 +419,201 @@ export function createAdminFoundersRouter({
 
     res.status(201).json(created);
   });
+
+  /**
+   * The directory's one-click create-and-send act.
+   *
+   * The request key is database-unique. If the browser loses the response and
+   * retries, this route resumes the same draft; if delivery was already
+   * confirmed it returns that send without rotating the link or emailing twice.
+   */
+  router.post(
+    `${ADMIN_FOUNDERS_PATH}/create-and-invite`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const required = [
+        ['requestKey', 'Request key'],
+        ['legalName', 'Founder name'],
+        ['email', 'Email'],
+        ['businessName', 'Business'],
+        ['invitationSource', 'Invitation source'],
+        ['internalOwner', 'Internal owner'],
+        ['whatWeUnderstood', 'What Proovd understood'],
+        ['whyInvited', 'Why the Founder was invited'],
+        ['expectedSetupTime', 'Expected setup time'],
+        ['campaignType', 'Campaign path'],
+      ] as const;
+      const missing = required
+        .filter(([key]) => typeof body[key] !== 'string' || !(body[key] as string).trim())
+        .map(([, label]) => label);
+      if (missing.length > 0) {
+        badRequest(
+          res,
+          `The invitation is incomplete. Still blank: ${missing.join(', ')}.`,
+          'Complete every field and try again. No invitation was sent.',
+        );
+        return;
+      }
+
+      const requestKey = (body['requestKey'] as string).trim();
+      const email = (body['email'] as string).trim().toLowerCase();
+      const campaignType = (body['campaignType'] as string).trim();
+      if (!/^[A-Za-z0-9_-]{16,128}$/.test(requestKey)) {
+        badRequest(res, 'The request key is not valid.', 'Reload the form and try again.');
+        return;
+      }
+      if (!/^\S+@\S+\.\S+$/.test(email)) {
+        badRequest(res, 'The Founder email is not valid.', 'Correct the address and try again.');
+        return;
+      }
+      if (campaignType !== 'pre_build' && campaignType !== 'pre_launch') {
+        badRequest(
+          res,
+          'That is not one of the two campaign paths.',
+          'Choose Idea Campaign or Product Campaign and try again.',
+        );
+        return;
+      }
+      if (!req.authUser?.name?.trim() || !req.authUser.email?.trim()) {
+        refused(
+          res,
+          'That invitation was not sent',
+          'The sending Admin account must have a name and email address before it can be named in the invitation.',
+        );
+        return;
+      }
+
+      const findCreated = async () => {
+        const [row] = await db
+          .select({
+            prospectId: founderProspects.id,
+            campaignId: campaignDrafts.campaignId,
+            draftId: campaignDrafts.id,
+          })
+          .from(founderProspects)
+          .innerJoin(campaignDrafts, eq(campaignDrafts.prospectId, founderProspects.id))
+          .where(eq(founderProspects.creationRequestKey, requestKey))
+          .limit(1);
+        return row ?? null;
+      };
+
+      let created = await findCreated();
+      if (!created) {
+        try {
+          created = await addFounder(
+            mutations,
+            {
+              creationRequestKey: requestKey,
+              legalName: body['legalName'] as string,
+              email,
+              phone: str(body, 'phone'),
+              productName: body['businessName'] as string,
+              invitationSource: body['invitationSource'] as string,
+              internalOwner: body['internalOwner'] as string,
+            },
+            whoOf(req),
+          );
+        } catch (error) {
+          // A simultaneous retry may win the unique request-key insert. Read
+          // the winner; any other database failure remains a real failure.
+          created = await findCreated();
+          if (!created) throw error;
+        }
+      }
+
+      const current = await readDraft(db, created.draftId);
+      const confirmed = current?.hasLiveToken
+        ? current.sends.find((send) => send.notificationId !== null)
+        : null;
+      if (confirmed) {
+        res.status(200).json({
+          ...created,
+          sendId: confirmed.id,
+          tokenVersion: confirmed.tokenVersion,
+          resent: false,
+          alreadySent: true,
+        });
+        return;
+      }
+
+      for (const [key, value] of [
+        ['bizLegal', body['businessName'] as string],
+        ['state', str(body, 'location')],
+      ] as const) {
+        if (!value) continue;
+        const updated = await updateFounderField(
+          mutations,
+          { prospectId: created.prospectId, key, value },
+          whoOf(req),
+        );
+        if (!updated.ok) {
+          refused(res, 'That Founder was created but the invitation was not sent', updated.message);
+          return;
+        }
+      }
+
+      const path = await setCampaignPath(db, created.draftId, {
+        type: campaignType,
+        actor: actorOf(req),
+      });
+      if (!path.ok) {
+        refused(res, 'That Founder was created but the invitation was not sent', path.message);
+        return;
+      }
+
+      const composed = await composeInvitation(db, created.draftId, {
+        whatWeUnderstood: body['whatWeUnderstood'] as string,
+        whyInvited: body['whyInvited'] as string,
+        expectedSetupTime: body['expectedSetupTime'] as string,
+        actor: actorOf(req),
+      });
+      if (!composed.ok) {
+        refused(res, 'That Founder was created but the invitation was not sent', composed.message);
+        return;
+      }
+
+      const sender = await recordInvitationSender(
+        mutations,
+        {
+          draftId: created.draftId,
+          senderName: req.authUser.name,
+          senderEmail: req.authUser.email,
+        },
+        whoOf(req),
+      );
+      if (!sender.ok) {
+        refused(res, 'That Founder was created but the invitation was not sent', sender.message);
+        return;
+      }
+
+      const sent = await sendInvitation(
+        { db, tokens, notifier },
+        { draftId: created.draftId, actor: actorOf(req), context },
+      );
+      if (!sent.ok) {
+        res.status(422).json({
+          error: 'send_rejected',
+          title: 'That Founder was created but the invitation was not sent',
+          whatHappened: sent.message,
+          next: 'Fix the named issue and submit the same form again; the request resumes this Founder.',
+          ...(sent.unresolved ? { unresolved: sent.unresolved } : {}),
+          prospectId: created.prospectId,
+        });
+        return;
+      }
+
+      res.status(201).json({
+        ...created,
+        sendId: sent.sendId,
+        tokenVersion: sent.tokenVersion,
+        resent: sent.resent,
+        alreadySent: false,
+      });
+    },
+  );
 
   /* ── One subject, resolved: the person, else the invitation ────────────── */
 
@@ -805,6 +1002,43 @@ export function createAdminFoundersRouter({
     json,
     async (req, res) => {
       await deliverInvitation(req, res, 'again');
+    },
+  );
+
+  router.post(
+    `${ADMIN_FOUNDERS_PATH}/:prospectId/password-recovery`,
+    admin,
+    fresh,
+    async (req, res) => {
+      const result = await sendFounderPasswordRecovery(
+        { ...mutations, auth },
+        { prospectId: req.params['prospectId'] as string, who: whoOf(req) },
+      );
+      if (!result.ok) {
+        refused(res, 'That recovery link could not be sent', result.message);
+        return;
+      }
+      res.json({ sent: true });
+    },
+  );
+
+  router.post(
+    `${ADMIN_FOUNDERS_PATH}/:prospectId/sessions/revoke`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = req.body as Record<string, unknown>;
+      const result = await revokeFounderSessions(mutations, {
+        prospectId: req.params['prospectId'] as string,
+        reason: str(body, 'reason') ?? '',
+        who: whoOf(req),
+      });
+      if (!result.ok) {
+        refused(res, 'Those sessions were not revoked', result.message);
+        return;
+      }
+      res.json({ revoked: result.revoked });
     },
   );
 

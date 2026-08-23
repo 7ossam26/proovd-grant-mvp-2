@@ -31,7 +31,7 @@ import {
 } from './surfaces/notifications/NotificationSettings.js';
 import { StripeReturn } from './surfaces/payouts/StripeReturn.js';
 import { WelcomeStep } from './surfaces/creator-flow/WelcomeStep.js';
-import { PasswordStep } from './surfaces/creator-flow/PasswordStep.js';
+import { PasswordStep as CreatorPasswordStep } from './surfaces/creator-flow/PasswordStep.js';
 import { ProfileStep } from './surfaces/creator-flow/ProfileStep.js';
 import { ChannelStep } from './surfaces/creator-flow/ChannelStep.js';
 import { VoiceStep as CreatorVoiceStep } from './surfaces/creator-flow/VoiceStep.js';
@@ -79,10 +79,12 @@ import { PayoutsStep } from './surfaces/founder-flow/PayoutsStep.js';
 import { FeeStep } from './surfaces/founder-flow/FeeStep.js';
 import { VoiceStep } from './surfaces/founder-flow/VoiceStep.js';
 import { CreatorPaymentStep } from './surfaces/founder-flow/CreatorPaymentStep.js';
+import { ApplicationReviewStep } from './surfaces/founder-flow/ApplicationReviewStep.js';
 import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
 import { InReviewStep } from './surfaces/founder-flow/InReviewStep.js';
+import { FounderPasswordStep } from './surfaces/founder-flow/FounderPasswordStep.js';
 
 /**
  * `/draft/:token/vetting` — retired by Founder Flow v2 Session C.
@@ -140,10 +142,6 @@ function FounderSetupTailRedirect() {
 }
 
 /** The reference-only application-review timer never represented stored state. */
-function ApplicationReviewRedirect() {
-  const { campaignId = '' } = useParams();
-  return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
-}
 
 /**
  * The retired roster and Creator-readiness addresses (Founder Dashboard Session
@@ -551,7 +549,7 @@ const rootChildren: RouteObject[] = [
   },
   {
     path: 'creator-invitation/:token/password',
-    element: <PasswordStep />,
+    element: <CreatorPasswordStep />,
   },
   {
     path: 'creator-invitation/:token/you',
@@ -835,7 +833,7 @@ const rootChildren: RouteObject[] = [
   },
   {
     path: 'campaigns/:campaignId/setup/application-review',
-    element: <ApplicationReviewRedirect />,
+    element: <ApplicationReviewStep />,
   },
   {
     path: 'campaigns/:campaignId/setup/fee',
@@ -876,10 +874,10 @@ const rootChildren: RouteObject[] = [
     element: <FounderSetupTailRedirect />,
   },
   {
-    // Retired because the supplied dashboard begins with the same password
-    // setup. Existing bookmarks hand directly to that intro.
+    // The claim session proves ownership; this replaces its server-generated
+    // temporary credential before the Founder enters the dashboard.
     path: 'campaigns/:campaignId/setup/password',
-    element: <FounderSetupTailRedirect />,
+    element: <FounderPasswordStep />,
   },
   {
     /*

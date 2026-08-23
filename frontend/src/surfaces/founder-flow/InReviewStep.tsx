@@ -31,7 +31,7 @@ import { useParams } from 'react-router';
 import {
   NOTHING_HERE_IS_A_TIMER,
   ROSTER_CHIPS_ARE_RECORDED,
-  founderDashboardPath,
+  founderFlowPath,
 } from '@proovd/shared';
 import { Button, StatePanel, Tag, NO_ACTION } from '../../components/index.js';
 import { SurfaceLoading } from '../../features/public/states.js';
@@ -159,8 +159,8 @@ function Body({
           Your campaign is live
         </h1>
         <div className="ff-nav" data-anim="cta">
-          <Button tier="primary" onClick={() => leave(founderDashboardPath(campaignId), 1)}>
-            See your campaign
+          <Button tier="primary" onClick={() => leave(founderFlowPath('password', campaignId), 1)}>
+            Secure your account
           </Button>
         </div>
       </div>
@@ -184,16 +184,19 @@ function Body({
           owner={stage?.owner ?? 'Proovd'}
           nextUpdate="We email you when it changes"
           action={
-            status === 'changes_required' || status === 'affiliate_response_and_build' ? (
-              <Button
-                tier="primary"
-                onClick={() => leave(`/campaigns/${encodeURIComponent(campaignId)}/build`)}
-              >
-                Open your campaign page
+            <div className="ff-nav">
+              {status === 'changes_required' || status === 'affiliate_response_and_build' ? (
+                <Button
+                  tier="secondary"
+                  onClick={() => leave(`/campaigns/${encodeURIComponent(campaignId)}/build`)}
+                >
+                  Open your campaign page
+                </Button>
+              ) : null}
+              <Button tier="primary" onClick={() => leave(founderFlowPath('password', campaignId), 1)}>
+                Secure account and continue
               </Button>
-            ) : (
-              NO_ACTION
-            )
+            </div>
           }
           reference={campaignId}
           getHelp={{ href: '/support' }}

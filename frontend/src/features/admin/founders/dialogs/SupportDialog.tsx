@@ -1,51 +1,56 @@
-/**
- * Support cases on this record — Spec §31.
- *
- * The lead is the reference's own and states the rule that matters: a case does
- * not belong to a campaign stage, so it stays visible from every one of them. A
- * case that disappeared when a campaign moved on is a person who stopped
- * getting answers.
- *
- * ── "Open" is decided once ──────────────────────────────────────────────────
- * `openCaseCount` is the single derivation of what counts as open, and both the
- * record bar's `Support (n)` and this sheet's heading render it. Two counts
- * computed in two places is two numbers that eventually disagree in front of
- * somebody on a support call.
- *
- * ── Opening a case from here is not built ───────────────────────────────────
- * `POST /api/admin/support/cases` exists, but it requires a topic and an owner
- * from §31's enumerations and the account id of whoever asked. This sheet is
- * handed none of the three, and choosing them on a person's behalf would file a
- * case whose topic and owner nobody decided (§1 rule 6). The reason stands where
- * the action would be, and it names the surface that does own the act.
- */
-
+import { useState, type FormEvent } from 'react';
+import {
+  SUPPORT_OWNERS,
+  SUPPORT_OWNER_LABELS,
+  SUPPORT_TOPICS,
+  SUPPORT_TOPIC_LABELS,
+} from '@proovd/shared';
 import type { FounderOperationsView } from '../api.js';
 import { Overlay } from './Overlay.js';
 
 type SupportCase = FounderOperationsView['supportCases'][number];
 
-/** Everything the server did not label `Resolved`. One derivation, two readers. */
 export function openCaseCount(cases: readonly SupportCase[] | undefined): number {
   return (cases ?? []).filter((supportCase) => supportCase.status !== 'Resolved').length;
 }
 
 interface Props {
   cases: readonly SupportCase[];
+  canCreate: boolean;
+  onCreate: (input: { topic: string; owner: string; message: string }) => Promise<void>;
   onOpenDetail: (title: string, body: string) => void;
   onClose: () => void;
 }
 
-export function SupportDialog({ cases, onOpenDetail, onClose }: Props) {
+export function SupportDialog({ cases, canCreate, onCreate, onOpenDetail, onClose }: Props) {
+  const [topic, setTopic] = useState<string>('account_access');
+  const [owner, setOwner] = useState<string>('proovd_support');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const open = openCaseCount(cases);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!message.trim() || busy || !canCreate) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onCreate({ topic, owner, message: message.trim() });
+      setMessage('');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The case could not be opened.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Overlay label="Support" onClose={onClose}>
       <p className="dialog-kicker">Support</p>
-      <h2>
-        {open} open case{open === 1 ? '' : 's'}
-      </h2>
+      <h2>{open} open case{open === 1 ? '' : 's'}</h2>
       <p className="dialog-lead">Cases remain visible regardless of the campaign stage.</p>
+
       <div className="support-list">
         {cases.map((supportCase) => (
           <button
@@ -64,19 +69,49 @@ export function SupportDialog({ cases, onOpenDetail, onClose }: Props) {
           >
             <span>{supportCase.reference}</span>
             <strong>{supportCase.subject ?? 'No subject recorded'}</strong>
-            <small>
-              {supportCase.status} · {supportCase.owner}
-            </small>
+            <small>{supportCase.status} · {supportCase.owner}</small>
           </button>
         ))}
         {cases.length === 0 ? <p className="empty">No cases on this record.</p> : null}
       </div>
-      <div className="dialog-actions">
-        <small>
-          Opening a case needs a topic and an owner, which this sheet does not ask for. Open it in
-          the Support section, where the newest eight cases here also live in full.
-        </small>
-      </div>
+
+      <form className="support-case-form" onSubmit={submit}>
+        <h3>Open a case</h3>
+        <label>
+          <span>Topic</span>
+          <select value={topic} onChange={(event) => setTopic(event.currentTarget.value)}>
+            {SUPPORT_TOPICS.map((key) => (
+              <option key={key} value={key}>{SUPPORT_TOPIC_LABELS[key]}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Owner</span>
+          <select value={owner} onChange={(event) => setOwner(event.currentTarget.value)}>
+            {SUPPORT_OWNERS.map((key) => (
+              <option key={key} value={key}>{SUPPORT_OWNER_LABELS[key]}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>What happened</span>
+          <textarea
+            value={message}
+            onChange={(event) => setMessage(event.currentTarget.value)}
+            required
+          />
+        </label>
+        {!canCreate ? (
+          <small>This Founder must claim the invitation before an account support case can be opened.</small>
+        ) : null}
+        {error ? <small role="alert">{error}</small> : null}
+        <div className="dialog-actions">
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button className="primary" type="submit" disabled={!canCreate || busy || !message.trim()}>
+            {busy ? 'Opening…' : 'Open case'}
+          </button>
+        </div>
+      </form>
     </Overlay>
   );
 }

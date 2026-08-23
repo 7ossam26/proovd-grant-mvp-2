@@ -150,6 +150,22 @@ export function ApplicationReviewStage({ detail, panel, onSaved }: StageProps) {
      submitted application, is always. The server decides; this only asks. */
   const reasonRequired = overview.accountCreatedAt !== null;
 
+  if (p.applicationReviewRequirement?.required === false) {
+    return (
+      <StageFrame
+        stage="Application review"
+        heading="Application Review skipped"
+        lead="This campaign is configured to continue without an early Application Review decision."
+      >
+        <StateStrip
+          status="Skipped"
+          lastChange="The per-campaign requirement is off"
+          next="The Founder continues to the listing-fee step"
+        />
+      </StageFrame>
+    );
+  }
+
   async function run(work: () => Promise<unknown>, closed: string, closeDialog = true) {
     setBusy(true);
     setError(null);

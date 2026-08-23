@@ -31,11 +31,9 @@ import {
 } from '@proovd/shared';
 import {
   AdminRequestError,
-  createFounder,
+  createAndInviteFounder,
   listFounders,
-  setCampaignPath,
-  updateFounderField,
-  type CreateFounderInput,
+  type CreateAndInviteFounderInput,
   type FounderListRow,
 } from './api.js';
 import { CreateFounderDialog, type CreateFounderValues } from './CreateFounderDialog.js';
@@ -116,52 +114,25 @@ export function Directory({ onOpenFounder }: Props) {
   const corpus = useMemo(() => buildSearchCorpus(rows ?? [], null), [rows]);
 
   async function create(values: CreateFounderValues) {
-    const input: CreateFounderInput = {
+    const input: CreateAndInviteFounderInput = {
+      requestKey: values.requestKey,
       legalName: values.name,
       email: values.email,
+      businessName: values.company,
+      invitationSource: values.invitationSource,
+      internalOwner: values.owner,
+      campaignType: values.campaign === 'Product Campaign' ? 'pre_launch' : 'pre_build',
+      whatWeUnderstood: values.whatWeUnderstood,
+      whyInvited: values.whyInvited,
+      expectedSetupTime: values.expectedSetupTime,
       ...(values.phone ? { phone: values.phone } : {}),
-      ...(values.owner ? { internalOwner: values.owner } : {}),
+      ...(values.location ? { location: values.location } : {}),
     };
-
-    // Throws on refusal, and the dialog renders the server's own words. The
-    // record does not exist if this fails, so nothing below runs.
-    const created = await createFounder(input);
-
-    // Three separate subjects, three routes: the profile's business name and
-    // location go through the §25.6 field route (which records actor, prior
-    // value, new value and time for each), and the expected campaign path
-    // belongs to the DRAFT, which §9 keeps changeable until vetting is
-    // submitted. A partial failure here leaves a real record behind, so it is
-    // reported rather than swallowed.
-    const unsaved: string[] = [];
-    try {
-      await updateFounderField(created.prospectId, 'bizLegal', values.company);
-    } catch {
-      unsaved.push('the business');
-    }
-    if (values.location) {
-      try {
-        await updateFounderField(created.prospectId, 'state', values.location);
-      } catch {
-        unsaved.push('the location');
-      }
-    }
-    try {
-      await setCampaignPath(
-        created.draftId,
-        values.campaign === 'Product Campaign' ? 'pre_launch' : 'pre_build',
-      );
-    } catch {
-      unsaved.push('the expected campaign path');
-    }
+    const created = await createAndInviteFounder(input);
 
     setOverlay(null);
     load();
-    toast.show(
-      unsaved.length
-        ? `Founder created. ${unsaved.join(' and ')} could not be saved — open the record and set it there.`
-        : 'Founder and first campaign created',
-    );
+    toast.show('Founder created and invitation sent');
     onOpenFounder(created.prospectId);
   }
 

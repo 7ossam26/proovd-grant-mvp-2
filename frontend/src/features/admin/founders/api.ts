@@ -101,6 +101,36 @@ export interface CreatedFounder {
 export const createFounder = (input: CreateFounderInput): Promise<CreatedFounder> =>
   call('/api/admin/founders', { method: 'POST', body: JSON.stringify(input) });
 
+export interface CreateAndInviteFounderInput {
+  requestKey: string;
+  legalName: string;
+  email: string;
+  businessName: string;
+  phone?: string;
+  location?: string;
+  campaignType: 'pre_build' | 'pre_launch';
+  invitationSource: string;
+  internalOwner: string;
+  whatWeUnderstood: string;
+  whyInvited: string;
+  expectedSetupTime: string;
+}
+
+export interface CreatedAndInvitedFounder extends CreatedFounder {
+  sendId: string;
+  tokenVersion: number;
+  resent: boolean;
+  alreadySent: boolean;
+}
+
+export const createAndInviteFounder = (
+  input: CreateAndInviteFounderInput,
+): Promise<CreatedAndInvitedFounder> =>
+  call('/api/admin/founders/create-and-invite', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+
 /* ── Workspace detail (§26.1, §26.2) ──────────────────────────────────────── */
 
 export interface OverrideField {
@@ -429,6 +459,16 @@ export const sendInvitation = (draftId: string): Promise<SendResult> =>
     body: JSON.stringify({}),
   });
 
+/**
+ * First-send path addressed by the Founder prospect. The server derives and
+ * records the authenticated Admin as sender before delivering the message.
+ */
+export const sendFounderInvitation = (prospectId: string): Promise<SendResult> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/invitation/send`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
 export const revokeInvitation = (draftId: string, reason: string): Promise<unknown> =>
   call(`/api/admin/founders/${encodeURIComponent(draftId)}/revoke`, {
     method: 'POST',
@@ -562,3 +602,112 @@ export const recordAccessDecision = (
  */
 export const fetchFounderPanel = (prospectId: string): Promise<unknown> =>
   call(`/api/admin/founder-panel/${encodeURIComponent(prospectId)}`);
+
+export interface FounderInternalNote {
+  id: string;
+  body: string;
+  author: string;
+  createdAt: string;
+}
+
+export const addFounderNote = (
+  prospectId: string,
+  body: string,
+): Promise<{ note: FounderInternalNote }> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  });
+
+export interface FounderAccountWarning {
+  id: string;
+  reason: string;
+  warnedBy: string;
+  createdAt: string;
+}
+
+export const addFounderWarning = (
+  prospectId: string,
+  reason: string,
+): Promise<{ warning: FounderAccountWarning }> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/warnings`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+export interface OpenFounderSupportCaseInput {
+  prospectId: string;
+  requesterEmail: string;
+  campaignId?: string;
+  topic: string;
+  owner: string;
+  message: string;
+}
+
+export const openFounderSupportCase = (
+  input: OpenFounderSupportCaseInput,
+): Promise<{ caseId: string; reference: string }> =>
+  call('/api/admin/support/cases', {
+    method: 'POST',
+    body: JSON.stringify({
+      requesterKind: 'founder',
+      requesterProspectId: input.prospectId,
+      requesterEmail: input.requesterEmail,
+      ...(input.campaignId ? { campaignId: input.campaignId } : {}),
+      topic: input.topic,
+      owner: input.owner,
+      message: input.message,
+    }),
+  });
+
+export const sendFounderPasswordRecovery = (
+  prospectId: string,
+): Promise<{ sent: true }> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/password-recovery`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const revokeFounderSessions = (
+  prospectId: string,
+  reason: string,
+): Promise<{ revoked: number }> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/sessions/revoke`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+export const stopFounderCampaign = (
+  campaignId: string,
+  customerExplanation: string,
+): Promise<unknown> =>
+  call(`/api/admin/campaigns/${encodeURIComponent(campaignId)}/enforcement`, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'suspend',
+      reasonCategory: 'other_reviewed',
+      reasonDetail: customerExplanation,
+      customerExplanation,
+    }),
+  });
+
+/**
+ * Changes whether Application Review is an early blocking gate for one
+ * campaign. The server records the reason and refuses changes once review or
+ * payment progression has started.
+ */
+export const setApplicationReviewRequirement = (
+  campaignId: string,
+  required: boolean,
+  internalReason: string,
+): Promise<{
+  requirement: { required: boolean; locked: boolean; lockedReason: string | null };
+  changed: boolean;
+}> =>
+  call(
+    `/api/admin/campaigns/${encodeURIComponent(campaignId)}/application-review-requirement`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ required, internalReason }),
+    },
+  );

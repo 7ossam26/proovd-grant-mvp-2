@@ -555,7 +555,15 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // is a supplement to that read, not a replacement for it, and its two
   // `/api/admin/founders/...` writes are distinct path segments that the
   // workspace router does not claim.
-  app.use(createAdminFounderPanelRouter({ db, auth }));
+  app.use(
+    createAdminFounderPanelRouter({
+      db,
+      auth,
+      notifier,
+      notificationContext: launchContext,
+      ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
+    }),
+  );
   // Phase 08a (§8, §5.3, §25.4, §33.2.1). Campaign-specific Creator
   // recruitment and the private invitation. Behind the same guards: §33.2.1's
   // "no public signup" is partly the fact that every route that can create an

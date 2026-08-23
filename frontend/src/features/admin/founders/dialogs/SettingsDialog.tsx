@@ -7,19 +7,10 @@
  * destructive control with a route behind it (§26.7's access decision) is
  * refused by the SERVER without a reason, not merely by the dialog.
  *
- * ── Eleven of the fourteen rows have no route, and each says which ──────────
- * A settings index is exactly where a control that silently does nothing is
- * least visible, so none of them is a disabled button. Each renders its title
- * and its description exactly as the reference does, and where the action would
- * be there is one sentence naming what is missing. That is the codebase's
- * standing rule (prefer absent, with the reason rendered where the control
- * would be) and the honest reading of §1.4 — a disabled control invites
- * somebody to work out how to enable it.
- *
- * The three that are real:
- *   · Restrict / Restore    → POST …/access, freshness-gated, reason required
- *   · Change campaign owner → PUT …/:draftId/prospect { internalOwner }
- *   · the four Communication rows → they open the sheets beside them
+ * Every action shown as a button has a real route or a local export behind it.
+ * Two rows remain explanatory by product rule: bulk account deletion is
+ * prohibited by retention obligations, and arbitrary campaign archival is not
+ * a lifecycle transition. Neither is rendered as an enable-able control.
  *
  * ── Two reference strings are not reproduced, and both are mock data ────────
  * The reference's owner control reads `Change to Omar` because its roster is
@@ -66,16 +57,38 @@ export type SettingsTool = 'message' | 'support' | 'notes' | 'history';
 
 interface Props {
   detail: FounderWorkspaceDetail;
+  applicationReviewRequirement: {
+    required: boolean;
+    locked: boolean;
+    lockedReason: string | null;
+  } | null;
   onTool: (tool: SettingsTool) => void;
   onAccessDecision: (action: 'suspend' | 'restore') => void;
+  onApplicationReviewRequirement: (required: boolean) => void;
+  onPasswordRecovery: () => void;
+  onRevokeSessions: () => void;
+  warningCount: number;
+  onAddWarning: () => void;
+  onExportAccount: () => void;
+  onExportCampaign: () => void;
+  onStopCampaign: () => void;
   onChangeOwner: () => void;
   onClose: () => void;
 }
 
 export function SettingsDialog({
   detail,
+  applicationReviewRequirement,
   onTool,
   onAccessDecision,
+  onApplicationReviewRequirement,
+  onPasswordRecovery,
+  onRevokeSessions,
+  warningCount,
+  onAddWarning,
+  onExportAccount,
+  onExportCampaign,
+  onStopCampaign,
   onChangeOwner,
   onClose,
 }: Props) {
@@ -102,12 +115,24 @@ export function SettingsDialog({
           <SettingRow
             title="Send password reset"
             description="Send a secure reset email without viewing or changing the password."
-            action={<NotBuilt>No password-reset route exists yet.</NotBuilt>}
+            action={
+              header.account === 'Not created yet' ? (
+                <NotBuilt>No account exists yet; resend the invitation instead.</NotBuilt>
+              ) : (
+                <button type="button" onClick={onPasswordRecovery}>Send reset</button>
+              )
+            }
           />
           <SettingRow
             title="Revoke active sessions"
             description="Sign the Founder out on every device while keeping the account active."
-            action={<NotBuilt>No session-revocation route exists yet.</NotBuilt>}
+            action={
+              header.account === 'Not created yet' ? (
+                <NotBuilt>No account exists yet, so there are no sessions.</NotBuilt>
+              ) : (
+                <button type="button" onClick={onRevokeSessions}>Revoke</button>
+              )
+            }
           />
           <SettingRow
             title={suspended ? 'Restore account' : 'Restrict account'}
@@ -132,19 +157,23 @@ export function SettingsDialog({
           <SettingRow
             title="Add account warning"
             description="Increase the persistent warning count and mark the account for attention."
-            action={<NotBuilt>The record keeps no warning count.</NotBuilt>}
+            action={
+              <button type="button" onClick={onAddWarning}>
+                Add warning ({warningCount})
+              </button>
+            }
           />
           <SettingRow
             title="Export account record"
             description="Download profile, eligibility, account status and warning data."
-            action={<NotBuilt>No account-record export route exists yet.</NotBuilt>}
+            action={<button type="button" onClick={onExportAccount}>Export JSON</button>}
           />
           <SettingRow
             danger
-            title="Delete Founder account"
-            description="Hide the Founder from the directory, ban access, stop and archive every campaign."
+            title="Account deletion"
+            description="Account-closure requests are recorded and reviewed; retained campaign, payment, tax, support and audit records are never bulk-deleted."
             action={
-              <NotBuilt>This is four recorded acts and no route performs them together.</NotBuilt>
+              <NotBuilt>Bulk deletion is prohibited by the retention policy.</NotBuilt>
             }
           />
         </section>
@@ -156,9 +185,41 @@ export function SettingsDialog({
           </header>
 
           <SettingRow
+            title="Require Application Review"
+            description="When on, the Founder must receive approval before the listing-fee step. When off, the flow skips Application Review."
+            action={
+              applicationReviewRequirement ? (
+                applicationReviewRequirement.locked ? (
+                  <NotBuilt>
+                    {applicationReviewRequirement.lockedReason ??
+                      'This setting is locked because the campaign has progressed.'}
+                  </NotBuilt>
+                ) : (
+                  <button
+                    type="button"
+                    aria-pressed={applicationReviewRequirement.required}
+                    onClick={() =>
+                      onApplicationReviewRequirement(!applicationReviewRequirement.required)
+                    }
+                  >
+                    {applicationReviewRequirement.required ? 'Turn off' : 'Turn on'}
+                  </button>
+                )
+              ) : (
+                <NotBuilt>No current campaign is available.</NotBuilt>
+              )
+            }
+          />
+          <SettingRow
             title="Stop campaign"
             description="Stop all campaign actions immediately without deleting the record."
-            action={<NotBuilt>No campaign-stop route exists yet.</NotBuilt>}
+            action={
+              campaigns.current ? (
+                <button type="button" onClick={onStopCampaign}>Stop</button>
+              ) : (
+                <NotBuilt>No current campaign is available.</NotBuilt>
+              )
+            }
           />
           <SettingRow
             title="Change campaign owner"
@@ -170,14 +231,20 @@ export function SettingsDialog({
             }
           />
           <SettingRow
-            title="Archive campaign"
-            description="Move the campaign to Complete while preserving financial, content and communication records."
-            action={<NotBuilt>Archiving without restarting the campaign is not built.</NotBuilt>}
+            title="Campaign archival"
+            description="Campaigns reach Complete through their lifecycle. Archival is reserved for correcting a locked campaign type and always creates a clean replacement."
+            action={<NotBuilt>Arbitrary archival is not a valid campaign lifecycle action.</NotBuilt>}
           />
           <SettingRow
             title="Export complete campaign"
             description="Download invite, onboarding, payments, Creators, campaign page, Backers and fulfillment data."
-            action={<NotBuilt>No campaign export route exists yet.</NotBuilt>}
+            action={
+              campaigns.current ? (
+                <button type="button" onClick={onExportCampaign}>Export JSON</button>
+              ) : (
+                <NotBuilt>No current campaign is available.</NotBuilt>
+              )
+            }
           />
         </section>
 

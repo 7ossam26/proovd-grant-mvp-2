@@ -97,6 +97,7 @@ export interface InvitationContext {
  * reasoning §5.3's verification evidence already records for the same shape.
  */
 export interface CreateProspectInput {
+  creationRequestKey?: string | null;
   legalName: string;
   preferredName?: string | null;
   email: string;
@@ -141,6 +142,7 @@ export async function createProspect(
     const [prospect] = await tx
       .insert(founderProspects)
       .values({
+        creationRequestKey: input.creationRequestKey?.trim() || null,
         legalName: input.legalName.trim(),
         preferredName: input.preferredName?.trim() || null,
         email: input.email.trim().toLowerCase(),

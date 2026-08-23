@@ -23,10 +23,11 @@ import { Overlay } from './Overlay.js';
 
 interface Props {
   founderName: string;
+  onOpenSupport?: () => void;
   onClose: () => void;
 }
 
-export function MessageDialog({ founderName, onClose }: Props) {
+export function MessageDialog({ founderName, onOpenSupport, onClose }: Props) {
   const firstName = founderName.split(' ')[0] ?? founderName;
 
   return (
@@ -44,7 +45,12 @@ export function MessageDialog({ founderName, onClose }: Props) {
         <button type="button" onClick={onClose}>
           Cancel
         </button>
-        <small id="message-inert">Sending is not built. Open a support case instead.</small>
+        {onOpenSupport ? (
+          <button type="button" onClick={onOpenSupport}>
+            Open support case
+          </button>
+        ) : null}
+        <small id="message-inert">Direct messaging is not part of the current product.</small>
       </div>
     </Overlay>
   );

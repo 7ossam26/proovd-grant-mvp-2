@@ -469,7 +469,10 @@ export async function completeClaim(
   tokens: TokenService,
   input: CompleteClaimInput,
 ): Promise<CompleteClaimResult> {
-  const profile = await readClaimProfile(db, input.draftId);
+  // Submission can be reached without opening the profile screens first (for
+  // example after a resumed or older invitation journey). Account creation must
+  // not depend on a prior GET having performed this lazy initialization.
+  const profile = await ensureClaimProfile(db, input.draftId, input.actor);
   if (!profile) {
     return {
       ok: false,
@@ -707,7 +710,11 @@ export async function completeClaim(
 
       const moved = await tx
         .update(campaigns)
-        .set({ status: 'account_claimed' })
+        // Account creation is the durable handoff from the token-addressed
+        // invitation into the authenticated onboarding workflow. Keeping the
+        // workflow marker at `invite` makes the Admin panel show the wrong
+        // stage and prevents the optional Application Review gate from opening.
+        .set({ status: 'account_claimed', workflowStageReached: 'onboarding' })
         .where(
           and(eq(campaigns.id, profile.campaignId), eq(campaigns.status, 'vetting_submitted')),
         )
@@ -786,6 +793,7 @@ export async function completeClaim(
         priorValue: { status: 'vetting_submitted', claimed: false },
         newValue: {
           status: 'account_claimed',
+          workflowStageReached: 'onboarding',
           founderUserId: userId,
           draftId: input.draftId,
           emailOwnership: profile.emailOwnership,
@@ -900,7 +908,7 @@ export async function claimAndSignIn(
   | { ok: true; campaignId: string; userId: string; setCookie: string[] }
   | { ok: false; code: ClaimRefusal; message: string; next: string; missing?: string[] }
 > {
-  const profile = await readClaimProfile(db, input.draftId);
+  const profile = await ensureClaimProfile(db, input.draftId, input.actor);
   const email = profile?.fields.email.value?.toLowerCase();
   if (!email) {
     return {

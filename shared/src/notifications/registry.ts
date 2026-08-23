@@ -155,6 +155,31 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.3',
     description: 'Campaign approval',
   },
+  founder_application_review_received: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description: 'Application Review submission receipt',
+  },
+  founder_application_information_needed: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description: 'Application Review needs more information',
+  },
+  founder_application_changes_requested: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description: 'Application Review changes requested',
+  },
+  founder_application_approved: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description: 'Application Review approval',
+  },
+  founder_application_rejected: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description: 'Application Review rejection',
+  },
   founder_fixed_payment_funding_request: {
     audience: 'founder',
     specRef: '§27.3',
@@ -666,6 +691,11 @@ export const NOTIFICATION_EVENTS = {
     audience: 'internal',
     specRef: '§27.6',
     description: 'Campaign submitted',
+  },
+  internal_founder_application_submitted: {
+    audience: 'internal',
+    specRef: '§27.6',
+    description: 'Founder application submitted for review',
   },
   internal_proposal_awaiting_response: {
     audience: 'internal',

@@ -236,38 +236,11 @@ async function signedUpCreator(campaignId: string): Promise<{
   return { associationId: created.body.associationId, email, userId: claimed.body.userId, cookie };
 }
 
-/** Founder claims their account, which is what fires the handoff. */
-async function claimFounder(raw: string): Promise<void> {
-  await request(h.app)
-    .patch(`/api/draft/${raw}/claim`)
-    .send({
-      legalName: 'Rowan Vale',
-      email: `rowan-${randomUUID()}@example.com`,
-      dateOfBirth: '1988-02-02',
-      country: 'US',
-      stateRegion: 'WA',
-      soleProprietor: true,
-      representationUsPerson: true,
-      representationAge18Plus: true,
-      representationSanctions: true,
-    })
-    .expect(200);
-
-  await request(h.app)
-    .post(`/api/draft/${raw}/claim`)
-    .send({
-      password: 'a-perfectly-good-password',
-      acceptedPolicySlugs: [...FOUNDER_CLAIM_POLICY_SLUGS],
-    })
-    .expect(201);
-}
-
-/** The full journey up to and including the Founder claim. */
+/** The full journey through vetting submission, which now creates the account. */
 async function journey(): Promise<Journey> {
   const founder = await invitedFounder();
   const creator = await signedUpCreator(founder.campaignId);
   await submitVetting(founder.raw, founder.campaignId, founder.draftId);
-  await claimFounder(founder.raw);
 
   return {
     campaignId: founder.campaignId,
@@ -387,7 +360,6 @@ describe('§33.1.9 — founder_signup_complete reveals the preparing campaign on
     const founder = await invitedFounder();
     await submitVetting(founder.raw, founder.campaignId, founder.draftId);
     const before = h.sentEmails.messages.length;
-    await claimFounder(founder.raw);
 
     const handoffs = h.sentEmails.messages
       .slice(before)
@@ -436,7 +408,6 @@ describe('§33.1.9 — founder_signup_complete reveals the preparing campaign on
       .expect(201);
 
     await submitVetting(founder.raw, founder.campaignId, founder.draftId);
-    await claimFounder(founder.raw);
 
     const [association] = await h.db
       .select()

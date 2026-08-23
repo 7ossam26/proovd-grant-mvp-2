@@ -304,8 +304,8 @@ describe('the Founder onboarding flow', () => {
     // Twenty-six were planned; the current routed sequence has twenty-seven
     // distinct pages after splitting the confirm and branding beats, restoring
     // Match, and keeping the later build, payout, and review screens explicit.
-    // The retired standalone password and live-status pages remain absent.
-    expect(FOUNDER_FLOW_PAGES).toHaveLength(27);
+    // The durable password step is explicit; only live-status remains retired.
+    expect(FOUNDER_FLOW_PAGES).toHaveLength(29);
   });
 
   it('addresses a page by the parameter its own auth regime has', () => {

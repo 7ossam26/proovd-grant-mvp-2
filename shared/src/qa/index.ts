@@ -179,6 +179,7 @@ export const PRINCIPAL_FLOWS = [
     // and §28.5 grades a payment path on its own terms.
     routes: [
       '/campaigns/:campaignId/setup/creator-payment',
+      '/campaigns/:campaignId/setup/application-review',
       '/campaigns/:campaignId/setup/fee',
     ],
     keyboardPathRequired: true,
@@ -200,6 +201,7 @@ export const PRINCIPAL_FLOWS = [
       '/campaigns/:campaignId/setup/rewards',
       '/campaigns/:campaignId/setup/payouts',
       '/campaigns/:campaignId/setup/in-review',
+      '/campaigns/:campaignId/setup/password',
     ],
     keyboardPathRequired: true,
   },

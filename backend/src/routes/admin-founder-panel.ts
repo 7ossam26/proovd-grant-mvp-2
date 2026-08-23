@@ -45,9 +45,13 @@ import express from 'express';
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
+import type { Notifier } from '../notifications/send.js';
+import type { LaunchNotificationContext } from '../launch/notifications.js';
+import { notifyApplicationReviewOutcome } from '../campaign/application-review-notifications.js';
 import { requireAdmin, requireFreshSession } from '../auth/guards.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import {
+  addAccountWarning,
   addInternalNote,
   decideApplicationReview,
   editSetupField,
@@ -57,6 +61,7 @@ import {
   recordAdminOffer,
   recordFinalCampaignSend,
   requestApplicationChange,
+  setApplicationReviewRequirement,
   updateInvitePrefills,
   withdrawAdminOffer,
   type PanelActor,
@@ -87,6 +92,9 @@ export const ADMIN_PANEL_CAMPAIGNS_PATH = '/api/admin/campaigns';
 export interface AdminFounderPanelDeps {
   db: Database;
   auth: Auth;
+  notifier?: Notifier | undefined;
+  notificationContext?: LaunchNotificationContext | undefined;
+  internalRecipient?: string | undefined;
 }
 
 /**
@@ -168,7 +176,8 @@ function optionalString(
   return typeof value === 'string' ? value : 'invalid';
 }
 
-export function createAdminFounderPanelRouter({ db, auth }: AdminFounderPanelDeps): Router {
+export function createAdminFounderPanelRouter(deps: AdminFounderPanelDeps): Router {
+  const { db, auth } = deps;
   const router = Router();
   const admin = requireAdmin(auth);
   const fresh = requireFreshSession(auth, () => readAdminReauthWindowSeconds(db));
@@ -247,6 +256,26 @@ export function createAdminFounderPanelRouter({ db, auth }: AdminFounderPanelDep
     },
   );
 
+  /** A warning is an enforcement signal, so it always requires fresh auth. */
+  router.post(
+    `${ADMIN_PANEL_FOUNDERS_PATH}/:prospectId/warnings`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = bodyOf(req);
+      const result = await addAccountWarning(db, whoOf(req), {
+        prospectId: String(req.params['prospectId'] ?? ''),
+        reason: str(body, 'reason'),
+      });
+      if (!result.ok) {
+        sendRefusal(res, result);
+        return;
+      }
+      res.status(201).json({ warning: result.warning });
+    },
+  );
+
   /* ══ 3. Invite prefills ════════════════════════════════════════════════ */
 
   /**
@@ -317,6 +346,36 @@ export function createAdminFounderPanelRouter({ db, auth }: AdminFounderPanelDep
 
   /* ══ 4–6. Application review ═══════════════════════════════════════════ */
 
+  router.put(
+    `${ADMIN_PANEL_CAMPAIGNS_PATH}/:campaignId/application-review-requirement`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = bodyOf(req);
+      const required = body['required'];
+      if (typeof required !== 'boolean') {
+        sendRefusal(res, {
+          ok: false,
+          code: 'invalid_required',
+          message: 'Application Review must be explicitly turned on or off.',
+          next: 'Choose one state and try again. Nothing has changed.',
+        });
+        return;
+      }
+      const result = await setApplicationReviewRequirement(db, whoOf(req), {
+        campaignId: String(req.params['campaignId'] ?? ''),
+        required,
+        internalReason: str(body, 'internalReason'),
+      });
+      if (!result.ok) {
+        sendRefusal(res, result);
+        return;
+      }
+      res.json({ requirement: result.requirement, changed: result.changed });
+    },
+  );
+
   /**
    * Opens a round, or returns the one already open.
    *
@@ -364,6 +423,18 @@ export function createAdminFounderPanelRouter({ db, auth }: AdminFounderPanelDep
         sendRefusal(res, result);
         return;
       }
+      await notifyApplicationReviewOutcome(
+        {
+          db,
+          ...(deps.notifier ? { notifier: deps.notifier } : {}),
+          ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+          ...(deps.internalRecipient ? { internalRecipient: deps.internalRecipient } : {}),
+        },
+        {
+          campaignId: String(req.params['campaignId'] ?? ''),
+          review: result.review,
+        },
+      );
       res.json({ review: result.review });
     },
   );
@@ -388,6 +459,18 @@ export function createAdminFounderPanelRouter({ db, auth }: AdminFounderPanelDep
         sendRefusal(res, result);
         return;
       }
+      await notifyApplicationReviewOutcome(
+        {
+          db,
+          ...(deps.notifier ? { notifier: deps.notifier } : {}),
+          ...(deps.notificationContext ? { context: deps.notificationContext } : {}),
+          ...(deps.internalRecipient ? { internalRecipient: deps.internalRecipient } : {}),
+        },
+        {
+          campaignId: String(req.params['campaignId'] ?? ''),
+          review: result.review,
+        },
+      );
       res.status(201).json({ review: result.review, requestId: result.requestId });
     },
   );

@@ -5,6 +5,7 @@ import { SurfaceLoading } from '../../features/public/states.js';
 import {
   fetchOpenness,
   recordOpenness,
+  submitApplicationReview,
   FounderRequestError,
   type OpennessState,
 } from '../founder/api.js';
@@ -80,7 +81,7 @@ export function CreatorPaymentStep() {
       {openness.applicable ? (
         <PaymentPicker openness={openness} campaignId={campaignId} onRecorded={setOpenness} />
       ) : (
-        <PaymentExplainer />
+        <PaymentExplainer campaignId={campaignId} />
       )}
     </FlowPage>
   );
@@ -119,6 +120,26 @@ function PaymentPicker({ openness, campaignId, onRecorded }: {
   const [error, setError] = useState<string | null>(null);
   const model = PAYMENT_MODELS[index];
 
+  const continueToReviewOrFee = useCallback(async () => {
+    const result = await submitApplicationReview(campaignId);
+    swapToPage(result.applicationReview.required ? 'application-review' : 'fee', 1);
+  }, [campaignId, swapToPage]);
+
+  const finishModal = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await continueToReviewOrFee();
+    } catch (cause: unknown) {
+      setBusy(false);
+      setError(
+        cause instanceof FounderRequestError
+          ? (cause.detail.whatHappened ?? cause.detail.title)
+          : 'We could not continue. Nothing has changed.',
+      );
+    }
+  }, [continueToReviewOrFee]);
+
   useLayoutEffect(() => {
     const el = stage.current;
     if (!el) return;
@@ -138,7 +159,7 @@ function PaymentPicker({ openness, campaignId, onRecorded }: {
         setModal(true);
         setBusy(false);
       } else {
-        swapToPage('fee', 1);
+        await continueToReviewOrFee();
       }
     } catch (cause: unknown) {
       setBusy(false);
@@ -148,7 +169,7 @@ function PaymentPicker({ openness, campaignId, onRecorded }: {
           : 'We could not record that. Nothing has changed.',
       );
     }
-  }, [campaignId, model.stance, onRecorded, swapToPage]);
+  }, [campaignId, continueToReviewOrFee, model.stance, onRecorded]);
 
   const move = (delta: number) => setIndex((current) => (current + delta + PAYMENT_MODELS.length) % PAYMENT_MODELS.length);
 
@@ -160,7 +181,8 @@ function PaymentPicker({ openness, campaignId, onRecorded }: {
           <div className="ff-paypick__modal" role="dialog" aria-modal="true" aria-labelledby="fixed-payment-title" data-pay-modal="1">
             <span id="fixed-payment-title" className="ff-paypick__modal-tag">Optional fixed Creator payment</span>
             <p>A Proovd representative will help both sides record a proposal. Nothing is agreed until the Creator and Founder accept the same version.</p>
-            <button type="button" onClick={() => swapToPage('fee', 1)}>Got it</button>
+            {error ? <p className="ff-paypick__error" role="alert">{error}</p> : null}
+            <button type="button" disabled={busy} onClick={() => void finishModal()}>{busy ? 'Continuing…' : 'Got it'}</button>
           </div>
         </div>
       ) : null}
@@ -192,9 +214,27 @@ function ArrowButton({ direction, onClick }: { direction: 'left' | 'right'; onCl
   );
 }
 
-function PaymentExplainer() {
+function PaymentExplainer({ campaignId }: { campaignId: string }) {
   const { swapToPage } = useFlowNav();
   const stage = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const continueToReviewOrFee = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await submitApplicationReview(campaignId);
+      swapToPage(result.applicationReview.required ? 'application-review' : 'fee', 1);
+    } catch (cause: unknown) {
+      setBusy(false);
+      setError(
+        cause instanceof FounderRequestError
+          ? (cause.detail.whatHappened ?? cause.detail.title)
+          : 'We could not continue. Nothing has changed.',
+      );
+    }
+  }, [campaignId, swapToPage]);
 
   useLayoutEffect(() => {
     const el = stage.current;
@@ -212,7 +252,8 @@ function PaymentExplainer() {
         <div className="ff-paypick__explainer-column">
           <img className="ff-paypick__explainer-art" data-anim="art" src="/assets/pie-cursor.png" alt="" />
           <h1 className="ff-paypick__explainer-title" data-anim="head">Creators earn an agreed share<br />of captured pre-orders</h1>
-          <button type="button" className="ff-paypick__explainer-cta" data-anim="cta" onClick={() => swapToPage('fee', 1)}>I understand</button>
+          {error ? <p className="ff-paypick__error" role="alert">{error}</p> : null}
+          <button type="button" className="ff-paypick__explainer-cta" data-anim="cta" disabled={busy} onClick={() => void continueToReviewOrFee()}>{busy ? 'Continuing…' : 'I understand'}</button>
         </div>
       </div>
     </section>

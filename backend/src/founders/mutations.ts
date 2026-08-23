@@ -47,9 +47,11 @@
 import { eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import type { AuditWriter } from '../auth/audit.js';
+import type { Auth } from '../auth/auth.js';
 
 import { auditEvents } from '../db/schema/integrity.js';
 import { campaignDrafts, founderProspects } from '../db/schema/invitations.js';
+import { session } from '../db/schema/auth.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
 import {
   founderAccessActions,
@@ -135,6 +137,7 @@ function trimmedOrNull(value: string | null | undefined): string | null {
 /* ── §7's first act: writing somebody down ─────────────────────────────────── */
 
 export interface AddFounderInput {
+  creationRequestKey?: string | null;
   legalName: string;
   email: string;
   preferredName?: string | null;
@@ -173,6 +176,7 @@ export async function addFounder(
   who: ActorContext,
 ): Promise<CreatedProspect> {
   const created = await createProspect(deps.db, {
+    creationRequestKey: input.creationRequestKey ?? null,
     legalName: input.legalName,
     preferredName: input.preferredName ?? null,
     email: input.email,
@@ -732,6 +736,70 @@ export async function recordInvitationSender(
   });
 
   return { ok: true, senderName: next.senderName, senderEmail: next.senderEmail, recorded: true };
+}
+
+/** Sends the one Better Auth password-recovery email for a claimed Founder. */
+export async function sendFounderPasswordRecovery(
+  deps: FounderMutationDeps & { auth: Auth },
+  input: { prospectId: string; who: ActorContext },
+): Promise<{ ok: true; sent: true } | MutationFailure> {
+  const ctx = await loadFounderContext(deps.db, input.prospectId);
+  if (!ctx) return notFound('There is no Founder at that address.');
+  if (!ctx.accountUserId || !ctx.identity.email) {
+    return invalid(
+      'Nobody has claimed this account yet, so there is no password to reset. The invitation link is how they get in.',
+    );
+  }
+
+  await deps.auth.api.requestPasswordReset({
+    body: { email: ctx.identity.email, redirectTo: '/reset-password' },
+  });
+  await deps.db.insert(auditEvents).values({
+    actor: input.who.actor,
+    mfaContext: input.who.mfaContext ?? null,
+    reauthContext: input.who.reauthContext ?? null,
+    targetType: 'founder_prospect',
+    targetId: input.prospectId,
+    action: 'founder.password_recovery_sent',
+    internalReason:
+      'Admin-initiated password recovery. The raw link is delivered only by the authentication notification path.',
+    newValue: { requested: true },
+  });
+  return { ok: true, sent: true };
+}
+
+/** Revokes every active session for one claimed Founder and records the reason. */
+export async function revokeFounderSessions(
+  deps: FounderMutationDeps,
+  input: { prospectId: string; reason: string; who: ActorContext },
+): Promise<{ ok: true; revoked: number } | MutationFailure> {
+  const reason = trimmedOrNull(input.reason);
+  if (!reason) return invalid('A reason is required before active sessions can be revoked.');
+  const ctx = await loadFounderContext(deps.db, input.prospectId);
+  if (!ctx) return notFound('There is no Founder at that address.');
+  if (!ctx.accountUserId) {
+    return invalid('Nobody has claimed this account yet, so it has no sessions to revoke.');
+  }
+
+  const revoked = await deps.db.transaction(async (tx) => {
+    const rows = await tx
+      .delete(session)
+      .where(eq(session.userId, ctx.accountUserId!))
+      .returning({ id: session.id });
+    await tx.insert(auditEvents).values({
+      actor: input.who.actor,
+      mfaContext: input.who.mfaContext ?? null,
+      reauthContext: input.who.reauthContext ?? null,
+      targetType: 'founder_prospect',
+      targetId: input.prospectId,
+      action: 'founder.sessions_revoked',
+      internalReason: reason,
+      priorValue: { activeSessions: rows.length },
+      newValue: { activeSessions: 0 },
+    });
+    return rows.length;
+  });
+  return { ok: true, revoked };
 }
 
 /* ── Person-level access (§26.7, §25.6) ────────────────────────────────────── */

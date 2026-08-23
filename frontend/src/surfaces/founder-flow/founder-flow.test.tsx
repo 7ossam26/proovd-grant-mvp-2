@@ -2263,13 +2263,38 @@ function stubOpenness(overrides: Record<string, unknown> = {}) {
   return openness;
 }
 
-function stubStage5(build: Record<string, unknown> = {}, openness: Record<string, unknown> = {}) {
+function stubStage5(
+  build: Record<string, unknown> = {},
+  openness: Record<string, unknown> = {},
+  applicationReviewRequired = false,
+) {
   handlers.push((url) =>
     url.startsWith('/api/account/me')
       ? { status: 200, body: { account: { role: 'founder', email: 'rowan@example.com', name: 'Rowan' } } }
       : undefined,
   );
   stubOpenness(openness);
+  handlers.push((url, init) => {
+    if (!/\/application-review(?:\/submit)?$/.test(url)) return undefined;
+    const review = applicationReviewRequired
+      ? {
+          required: true,
+          mayContinue: false,
+          review: {
+            round: 1,
+            outcome: 'waiting',
+            submittedAt: '2026-08-23T09:00:00.000Z',
+            decidedAt: null,
+            customerExplanation: null,
+            changeRequests: [],
+          },
+        }
+      : { required: false, mayContinue: true, review: null };
+    if (init?.method === 'POST' || !init?.method) {
+      return { status: 200, body: { applicationReview: review } };
+    }
+    return undefined;
+  });
   stubBuild(build);
   handlers.push((url) =>
     /\/roster$/.test(url)
@@ -2280,9 +2305,16 @@ function stubStage5(build: Record<string, unknown> = {}, openness: Record<string
               responseDeadlineAt: null,
               fullRefundOutcome: 'x',
               pendingProposalNote: 'y',
+              terms: {
+                basePercent: 30,
+                ceilingPercent: 50,
+                bidAllowed: true,
+                fixedPaymentAllowed: true,
+                highEffort: false,
+              },
               creators: [
-                { associationId: 'a1', handle: '@nolan', channelType: null, audienceMetric: null, niche: null, bio: null, statusLabel: 'Accepted', openProposal: null },
-                { associationId: 'a2', handle: '@wren', channelType: null, audienceMetric: null, niche: null, bio: null, statusLabel: 'Reviewing', openProposal: null },
+                { associationId: 'a1', handle: '@nolan', channelType: null, audienceMetric: null, niche: null, bio: null, statusLabel: 'Accepted', openProposal: null, lockedTerms: { totalPercent: 30, fixedPaymentCents: null }, meetingRequest: null },
+                { associationId: 'a2', handle: '@wren', channelType: null, audienceMetric: null, niche: null, bio: null, statusLabel: 'Reviewing', openProposal: null, lockedTerms: null, meetingRequest: null },
               ],
             },
           },
@@ -2321,6 +2353,18 @@ describe('how Creators are paid (18)', () => {
     const sent = requests.find((r) => r.url.includes('fixed-payment-openness') && r.method === 'PUT');
     expect(sent!.body).toEqual({ stance: 'not_open' });
     await screen.findByRole('heading', { name: /please pay/i });
+  });
+
+  it('holds a campaign at Application Review when the Admin requirement is on', async () => {
+    stubStage5({}, {}, true);
+    renderAt(at('creator-payment'));
+    await screen.findByRole('heading', { name: 'No optional fixed Creator payment' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Select' }));
+
+    expect(await screen.findByRole('heading', { name: 'Application Review' })).toBeInTheDocument();
+    expect(screen.getByText(/with our review team/i)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /please pay/i })).not.toBeInTheDocument();
   });
 
   it('gives an Idea campaign the reference explainer and continuation instead of the picker', async () => {
@@ -2520,11 +2564,107 @@ describe('the two waiting states (19, 26)', () => {
 });
 
 describe('the founder dashboard handoff', () => {
-  it.each(['live', 'password'])('redirects the retired %s URL to the dashboard intro', async (tail) => {
-    stubStage5({ campaignStatus: 'live' });
-    renderAt(`/campaigns/${CAMPAIGN}/setup/${tail}`);
+  it('sets a durable password before opening the authenticated campaign dashboard', async () => {
+    stubStage5({ campaignStatus: 'pending_review' });
+    handlers.push((url, init) =>
+      /\/api\/founder\/settings\/initial-password$/.test(url) && init?.method === 'POST'
+        ? { status: 200, body: { ok: true } }
+        : undefined,
+    );
+    handlers.push((url) =>
+      /\/api\/founder\/campaigns\/[^/]+\/dashboard$/.test(url)
+        ? {
+            status: 200,
+            body: {
+              dashboard: {
+                campaignId: CAMPAIGN,
+                status: 'pending_review',
+                type: 'pre_launch',
+                campaignLiveAt: null,
+                campaignCloseAt: null,
+                listingPaidAt: '2026-08-23T09:00:00.000Z',
+                highEffort: false,
+                title: 'Benchlight',
+              },
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('in-review'));
 
-    const frame = await screen.findByTitle<HTMLIFrameElement>('Founder dashboard');
-    expect(new URL(frame.src).pathname).toBe('/founder-dashboard-final.html');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Secure account and continue' }),
+    );
+
+    await screen.findByRole('heading', { name: 'Secure your Founder account' });
+    await userEvent.type(screen.getByLabelText('New password'), 'StrongPassword1!');
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPassword1!');
+    await userEvent.click(screen.getByRole('button', { name: 'Set password and open dashboard' }));
+
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url.endsWith('/api/founder/settings/initial-password') &&
+            request.method === 'POST' &&
+            request.body?.['campaignId'] === CAMPAIGN,
+        ),
+      ).toBe(true),
+    );
+
+    expect(await screen.findByRole('navigation', { name: 'Campaign chapters' })).toBeInTheDocument();
+    expect(
+      requests.some((request) => request.url.endsWith(`/campaigns/${CAMPAIGN}/dashboard`)),
+    ).toBe(true);
+  });
+
+  it('keeps the retired live URL redirecting to the dashboard intro', async () => {
+    stubStage5({ campaignStatus: 'live' });
+    handlers.push((url) =>
+      /\/api\/founder\/campaigns\/[^/]+\/dashboard$/.test(url)
+        ? {
+            status: 200,
+            body: {
+              dashboard: {
+                campaignId: CAMPAIGN,
+                status: 'live',
+                type: 'pre_launch',
+                campaignLiveAt: '2026-08-23T09:00:00.000Z',
+                campaignCloseAt: '2026-09-06T09:00:00.000Z',
+                listingPaidAt: '2026-08-22T09:00:00.000Z',
+                highEffort: false,
+                title: 'Benchlight',
+              },
+            },
+          }
+        : undefined,
+    );
+    renderAt(`/campaigns/${CAMPAIGN}/setup/live`);
+
+    expect(await screen.findByRole('navigation', { name: 'Campaign chapters' })).toBeInTheDocument();
+  });
+
+  it('keeps a failed password write on the credential screen', async () => {
+    stubStage5({ campaignStatus: 'pending_review' });
+    handlers.push((url, init) =>
+      /\/api\/founder\/settings\/initial-password$/.test(url) && init?.method === 'POST'
+        ? {
+            status: 422,
+            body: {
+              error: 'password_rejected',
+              title: 'That password was not set',
+              whatHappened: 'Choose a different password.',
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('password'));
+
+    await userEvent.type(await screen.findByLabelText('New password'), 'StrongPassword1!');
+    await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPassword1!');
+    await userEvent.click(screen.getByRole('button', { name: 'Set password and open dashboard' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a different password.');
+    expect(screen.queryByRole('main', { name: 'Founder dashboard' })).not.toBeInTheDocument();
   });
 });

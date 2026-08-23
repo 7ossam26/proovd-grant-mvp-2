@@ -578,6 +578,16 @@ export const FOUNDER_SUBMISSION_RECEIPT = 'founder_submission_receipt' as const;
 export const FOUNDER_CHANGES_REQUIRED = 'founder_changes_required' as const;
 export const FOUNDER_CAMPAIGN_APPROVED = 'founder_campaign_approved' as const;
 export const INTERNAL_CAMPAIGN_SUBMITTED = 'internal_campaign_submitted' as const;
+export const FOUNDER_APPLICATION_REVIEW_RECEIVED =
+  'founder_application_review_received' as const;
+export const FOUNDER_APPLICATION_INFORMATION_NEEDED =
+  'founder_application_information_needed' as const;
+export const FOUNDER_APPLICATION_CHANGES_REQUESTED =
+  'founder_application_changes_requested' as const;
+export const FOUNDER_APPLICATION_APPROVED = 'founder_application_approved' as const;
+export const FOUNDER_APPLICATION_REJECTED = 'founder_application_rejected' as const;
+export const INTERNAL_FOUNDER_APPLICATION_SUBMITTED =
+  'internal_founder_application_submitted' as const;
 
 export const FOUNDER_ACTIVITY_DIGEST = 'founder_activity_digest' as const;
 export const AFFILIATE_ACTIVITY_DIGEST = 'affiliate_activity_digest' as const;
@@ -695,6 +705,12 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   FOUNDER_CHANGES_REQUIRED,
   FOUNDER_CAMPAIGN_APPROVED,
   INTERNAL_CAMPAIGN_SUBMITTED,
+  FOUNDER_APPLICATION_REVIEW_RECEIVED,
+  FOUNDER_APPLICATION_INFORMATION_NEEDED,
+  FOUNDER_APPLICATION_CHANGES_REQUESTED,
+  FOUNDER_APPLICATION_APPROVED,
+  FOUNDER_APPLICATION_REJECTED,
+  INTERNAL_FOUNDER_APPLICATION_SUBMITTED,
   INTERNAL_INVITATION_CLAIMED,
   FOUNDER_PASSWORD_RESET,
   FOUNDER_EMAIL_CODE,

@@ -55,6 +55,7 @@ import {
   campaignAdminFieldEdits,
   campaignApplicationChangeRequests,
   campaignApplicationReviews,
+  founderAccountWarnings,
   founderInternalNotes,
 } from '../../db/schema/admin-founder-panel.js';
 import { recomputeBuildStatus } from '../../campaign/service.js';
@@ -72,6 +73,7 @@ import {
   FOUNDER_WORKFLOW_STAGE_IDS,
   PREFILL_AFFILIATE_TYPE_IDS,
   workflowStageAvailable,
+  workflowStageIndex,
   type ApplicationReviewOutcome,
   type FounderWorkflowStageId,
 } from './workflow.js';
@@ -163,11 +165,17 @@ export interface FounderPanelView {
     stages: WorkflowStageView[];
   };
   applicationReview: ApplicationReviewView | null;
+  applicationReviewRequirement: {
+    required: boolean;
+    locked: boolean;
+    lockedReason: string | null;
+  } | null;
   /** Every round, newest first, so `Application version` reads `rounds.length`. */
   applicationRounds: number;
   offers: AdminOfferView[];
   finalCampaignSends: FinalCampaignSendView[];
   notes: InternalNoteView[];
+  warnings: AccountWarningView[];
   invitePrefills: InvitePrefillView | null;
   identity: {
     username: string | null;
@@ -314,12 +322,15 @@ export async function readFounderPanel(
   // sits there when vetting is submitted and a round is open. That derivation
   // needs the review row, which is why it lives here and not in the register.
   const derivedStage = stageForStatus(status);
+  const preFeeStatus = status === 'vetting_submitted' || status === 'account_claimed';
   const stage: FounderWorkflowStageId | null =
-    latestReview &&
-    !applicationReviewDecided(latestReview.outcome) &&
-    status === 'vetting_submitted'
-      ? 'review'
-      : derivedStage;
+    campaign?.applicationReviewRequired && latestReview && preFeeStatus
+      ? latestReview.outcome === 'approved'
+        ? 'fee'
+        : 'review'
+      : !campaign?.applicationReviewRequired && stageReached === 'fee' && preFeeStatus
+        ? 'fee'
+        : derivedStage;
 
   const exitStatus =
     status && FOUNDER_WORKFLOW_EXIT_STATUSES.includes(status) ? status : null;
@@ -365,6 +376,22 @@ export async function readFounderPanel(
       }
     : null;
 
+  const requirementLocked =
+    reviewRows.length > 0 ||
+    workflowStageIndex(stageReached) > workflowStageIndex('onboarding') ||
+    (status !== null && !['invited_draft', 'vetting_submitted', 'account_claimed'].includes(status));
+  const applicationReviewRequirement = campaign
+    ? {
+        required: campaign.applicationReviewRequired,
+        locked: requirementLocked,
+        lockedReason: requirementLocked
+          ? reviewRows.length > 0
+            ? 'Application Review has already started, so its requirement cannot be changed.'
+            : 'This campaign has already entered payment or a later stage, so Application Review cannot be inserted or removed.'
+          : null,
+      }
+    : null;
+
   /* ── Offers and final-campaign sends ───────────────────────────────────── */
 
   const offerRows = campaignId
@@ -390,6 +417,11 @@ export async function readFounderPanel(
     .from(founderInternalNotes)
     .where(eq(founderInternalNotes.prospectId, prospectId))
     .orderBy(desc(founderInternalNotes.createdAt));
+  const warningRows = await db
+    .select()
+    .from(founderAccountWarnings)
+    .where(eq(founderAccountWarnings.prospectId, prospectId))
+    .orderBy(desc(founderAccountWarnings.createdAt));
 
   const draft = ctx.currentDraft;
   const invitePrefills: InvitePrefillView | null = draft
@@ -453,6 +485,7 @@ export async function readFounderPanel(
       stages,
     },
     applicationReview,
+    applicationReviewRequirement,
     applicationRounds: reviewRows.length,
     offers: offerRows.map(toOfferView),
     finalCampaignSends: sendRows.map((row) => ({
@@ -467,6 +500,12 @@ export async function readFounderPanel(
       id: row.id,
       body: row.body,
       author: row.author,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    warnings: warningRows.map((row) => ({
+      id: row.id,
+      reason: row.reason,
+      warnedBy: row.warnedBy,
       createdAt: row.createdAt.toISOString(),
     })),
     invitePrefills,
@@ -585,6 +624,7 @@ export async function addInternalNote(
       .insert(founderInternalNotes)
       .values({ prospectId: input.prospectId, body: body.slice(0, 20000), author: who.actor })
       .returning();
+
     await insertAuditEvent(tx, who, {
       action: 'founder.internal_note_added',
       targetType: 'founder_prospect',
@@ -610,6 +650,70 @@ export async function addInternalNote(
 }
 
 /* ══ 3. Invite prefills ════════════════════════════════════════════════════ */
+
+/**
+ * Adds one durable warning to the Founder account.
+ *
+ * Warnings are append-only: an Admin cannot quietly lower the count or rewrite
+ * the reason later. The route is freshness-gated because this is an account
+ * enforcement signal, even though it does not by itself suspend access.
+ */
+export async function addAccountWarning(
+  db: Database,
+  who: PanelActor,
+  input: { prospectId: string; reason: string },
+): Promise<{ ok: true; warning: AccountWarningView } | PanelRefusal> {
+  const reason = input.reason.trim();
+  if (!reason) {
+    return refuse(
+      'empty_reason',
+      'An account warning needs a recorded reason.',
+      'Nothing was saved. Add the evidence or behaviour that caused this warning.',
+    );
+  }
+  if (!looksLikeId(input.prospectId)) {
+    return refuse('not_found', 'There is no Founder at that address.', 'Go back to the Founders list.');
+  }
+
+  const [exists] = await db
+    .select({ id: founderProspects.id })
+    .from(founderProspects)
+    .where(eq(founderProspects.id, input.prospectId))
+    .limit(1);
+  if (!exists) {
+    return refuse('not_found', 'There is no Founder at that address.', 'Go back to the Founders list.');
+  }
+
+  const row = await db.transaction(async (tx) => {
+    const [inserted] = await tx
+      .insert(founderAccountWarnings)
+      .values({
+        prospectId: input.prospectId,
+        reason: reason.slice(0, 20000),
+        warnedBy: who.actor,
+      })
+      .returning();
+
+    await insertAuditEvent(tx, who, {
+      action: 'founder.account_warning_added',
+      targetType: 'founder_prospect',
+      targetId: input.prospectId,
+      internalReason: reason.slice(0, 20000),
+      newValue: { warningId: inserted!.id },
+    });
+    return inserted!;
+  });
+
+  return {
+    ok: true,
+    warning: {
+      id: row.id,
+      reason: row.reason,
+      warnedBy: row.warnedBy,
+      createdAt: row.createdAt.toISOString(),
+    },
+  };
+}
 
 export interface PrefillPatch {
   viewsCount?: number | null;
@@ -805,6 +909,109 @@ async function lockCampaign(
   return row ?? null;
 }
 
+export interface AccountWarningView {
+  id: string;
+  reason: string;
+  warnedBy: string;
+  createdAt: string;
+}
+
+/**
+ * Turns the early Application Review gate on or off for one campaign.
+ *
+ * The switch is intentionally mutable only before a review exists and before
+ * payment preparation begins. Changing it later would either strand a Founder
+ * behind a review they already passed or let them bypass a decision already in
+ * progress. The row is locked and the prior value is audited in the same
+ * transaction as the write.
+ */
+export async function setApplicationReviewRequirement(
+  db: Database,
+  who: PanelActor,
+  input: { campaignId: string; required: boolean; internalReason: string },
+): Promise<
+  | {
+      ok: true;
+      requirement: { required: boolean; locked: false; lockedReason: null };
+      changed: boolean;
+    }
+  | PanelRefusal
+> {
+  if (!looksLikeId(input.campaignId)) {
+    return refuse('not_found', 'There is no campaign at that address.', 'Go back to the Founder record.');
+  }
+  const internalReason = input.internalReason.trim();
+  if (!internalReason) {
+    return refuse(
+      'reason_required',
+      'A reason is required to change whether Application Review blocks this campaign.',
+      'Add the reason and try again. Nothing has changed.',
+    );
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const campaign = await lockCampaign(tx, input.campaignId);
+    if (!campaign) return 'not_found' as const;
+
+    const [review] = await tx
+      .select({ id: campaignApplicationReviews.id })
+      .from(campaignApplicationReviews)
+      .where(eq(campaignApplicationReviews.campaignId, input.campaignId))
+      .limit(1);
+    if (review) return 'review_started' as const;
+    if (
+      !['invited_draft', 'vetting_submitted', 'account_claimed'].includes(campaign.status) ||
+      workflowStageIndex(
+        isFounderWorkflowStage(campaign.workflowStageReached)
+          ? campaign.workflowStageReached
+          : 'invite',
+      ) > workflowStageIndex('onboarding')
+    ) {
+      return 'progressed' as const;
+    }
+    if (campaign.applicationReviewRequired === input.required) {
+      return { changed: false as const };
+    }
+
+    await tx
+      .update(campaigns)
+      .set({ applicationReviewRequired: input.required })
+      .where(eq(campaigns.id, input.campaignId));
+    await insertAuditEvent(tx, who, {
+      action: 'campaign.application_review_requirement_changed',
+      targetType: 'campaign',
+      targetId: input.campaignId,
+      internalReason,
+      priorValue: { applicationReviewRequired: campaign.applicationReviewRequired },
+      newValue: { applicationReviewRequired: input.required },
+    });
+    return { changed: true as const };
+  });
+
+  if (result === 'not_found') {
+    return refuse('not_found', 'There is no campaign at that address.', 'Go back to the Founder record.');
+  }
+  if (result === 'review_started') {
+    return refuse(
+      'review_started',
+      'Application Review has already started, so its requirement is locked.',
+      'Finish the current review. Nothing has changed.',
+    );
+  }
+  if (result === 'progressed') {
+    return refuse(
+      'campaign_progressed',
+      'This campaign has already entered payment or a later stage.',
+      'Application Review cannot be inserted or removed now. Nothing has changed.',
+    );
+  }
+  return {
+    ok: true,
+    requirement: { required: input.required, locked: false, lockedReason: null },
+    changed: result.changed,
+  };
+}
+
 /**
  * Opens a round, or returns the one already open.
  *
@@ -954,6 +1161,13 @@ export async function decideApplicationReview(
       newValue: { round: open.round, outcome },
     });
 
+    if (outcome === 'approved') {
+      await tx
+        .update(campaigns)
+        .set({ workflowStageReached: 'fee' })
+        .where(eq(campaigns.id, input.campaignId));
+    }
+
     return updated!;
   });
 
@@ -1057,6 +1271,17 @@ export async function requestApplicationChange(
       })
       .returning();
 
+    const [updatedReview] = await tx
+      .update(campaignApplicationReviews)
+      .set({
+        outcome: 'changes_requested',
+        reviewer: who.actor,
+        decidedAt: new Date(),
+        customerExplanation: reason.slice(0, 20000),
+      })
+      .where(eq(campaignApplicationReviews.id, open.id))
+      .returning();
+
     await insertAuditEvent(tx, who, {
       action: 'campaign.application_change_requested',
       targetType: 'campaign',
@@ -1066,7 +1291,7 @@ export async function requestApplicationChange(
       newValue: { round: open.round, fieldKey: field.key, requestId: inserted!.id },
     });
 
-    return { review: open, requestId: inserted!.id };
+    return { review: updatedReview!, requestId: inserted!.id };
   });
 
   if (result === 'not_found') {

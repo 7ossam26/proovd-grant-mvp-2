@@ -45,6 +45,11 @@ import type { AuditWriter } from '../auth/audit.js';
 import { requireRole } from '../auth/guards.js';
 import { readOpenness, recordOpenness } from '../campaign/openness.js';
 import {
+  readFounderApplicationReview,
+  submitFounderApplicationReview,
+} from '../campaign/application-review-gate.js';
+import { notifyApplicationReviewSubmitted } from '../campaign/application-review-notifications.js';
+import {
   readFounderDetails,
   saveFounderDetails,
   type FounderDetailsPatch,
@@ -296,6 +301,49 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
         return;
       }
       res.json({ openness: result.view });
+    },
+  );
+
+  /* ── Optional blocking Application Review ─────────────────────────────── */
+
+  router.get(
+    `${FOUNDER_PATH}/campaigns/:campaignId/application-review`,
+    founder,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+      const review = await readFounderApplicationReview(db, campaignId);
+      if (!review) return notFound(res);
+      res.json({ applicationReview: review });
+    },
+  );
+
+  router.post(
+    `${FOUNDER_PATH}/campaigns/:campaignId/application-review/submit`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+      const submission = await submitFounderApplicationReview(db, audit, {
+        campaignId,
+        founderUserId: req.authUser?.id ?? '',
+      });
+      if (!submission.state) return notFound(res);
+      if (submission.submitted && submission.state.review && config.appBaseUrl) {
+        await notifyApplicationReviewSubmitted(
+          {
+            db,
+            notifier,
+            context: { ...context, appBaseUrl: config.appBaseUrl },
+            ...(config.internalRecipient
+              ? { internalRecipient: config.internalRecipient }
+              : {}),
+          },
+          { campaignId, review: submission.state.review },
+        );
+      }
+      res.json({ applicationReview: submission.state });
     },
   );
 

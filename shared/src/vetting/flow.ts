@@ -311,12 +311,20 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 3,
   },
   {
-    /* Creator-pay openness leads directly to the real listing-fee step. */
+    /* Creator-pay openness branches through the per-campaign review gate. */
     id: 'creator-payment',
     path: '/campaigns/:campaignId/setup/creator-payment',
     param: 'campaignId',
     title: 'How Creators are paid',
     help: 'Creators take a share of the preorders, so there is nothing to pay upfront.',
+    stage: 4,
+  },
+  {
+    id: 'application-review',
+    path: '/campaigns/:campaignId/setup/application-review',
+    param: 'campaignId',
+    title: 'Application Review',
+    help: 'When this campaign requires an early review, this page shows the saved decision and keeps the listing fee locked until approval. Campaigns without the requirement skip it.',
     stage: 4,
   },
   {
@@ -384,6 +392,14 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     param: 'campaignId',
     title: 'Your campaign in review',
     help: 'Where your campaign stands between being submitted and going live: our review, your Creators’ decisions, and the coordinated launch.',
+    stage: 5,
+  },
+  {
+    id: 'password',
+    path: '/campaigns/:campaignId/setup/password',
+    param: 'campaignId',
+    title: 'Secure your account',
+    help: 'Choose the password you will use when you return, replacing the temporary credential created when you claimed the invitation.',
     stage: 5,
   },
 ];

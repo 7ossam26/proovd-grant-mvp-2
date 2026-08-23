@@ -40,10 +40,17 @@ import {
 } from '@proovd/shared';
 import {
   AdminRequestError,
+  addFounderNote,
+  addFounderWarning,
   fetchFounder,
   fetchFounderPanel,
   listFounders,
+  openFounderSupportCase,
   recordAccessDecision,
+  revokeFounderSessions,
+  sendFounderPasswordRecovery,
+  stopFounderCampaign,
+  setApplicationReviewRequirement,
   updateProspect,
   type FounderListRow,
   type FounderWorkspaceDetail,
@@ -61,6 +68,7 @@ import { buildSearchCorpus, SearchDialog, type SearchItem } from './dialogs/Sear
 import { SettingsDialog, type SettingsTool } from './dialogs/SettingsDialog.js';
 import { openCaseCount, SupportDialog } from './dialogs/SupportDialog.js';
 import { Toast, useToast } from './dialogs/Toast.js';
+import { readPanel } from './stages/recordGroup.js';
 
 /* ── The stage screens, resolved by convention rather than by a second list ── */
 
@@ -265,9 +273,24 @@ export function Workspace({ prospectId, onBack }: Props) {
 
   const { header, overview, campaigns } = detail;
   const campaign = campaigns.current;
+  const applicationReviewRequirement = readPanel(panel)?.applicationReviewRequirement;
+  const internalNotes = readPanel(panel).notes ?? [];
+  const accountWarnings = readPanel(panel).warnings ?? [];
+  const reviewRequirement = campaign
+    ? {
+        required: applicationReviewRequirement?.required === true,
+        locked: applicationReviewRequirement?.locked === true,
+        lockedReason: applicationReviewRequirement?.lockedReason ?? null,
+      }
+    : null;
 
-  const stageNow = stageForStatus(campaign?.rawStatus);
-  const recorded = campaign?.workflowStageReached;
+  const panelWorkflow = readPanel(panel)?.workflow;
+  const panelStage = panelWorkflow?.stage;
+  const stageNow =
+    panelStage && isFounderWorkflowStage(panelStage)
+      ? panelStage
+      : stageForStatus(campaign?.rawStatus);
+  const recorded = panelWorkflow?.stageReached ?? campaign?.workflowStageReached;
   const recordedStage = recorded && isFounderWorkflowStage(recorded) ? recorded : null;
   // The high-water mark, and never lower than where the record actually is:
   // until the route composes the ratchet column, the current stage IS the
@@ -352,6 +375,78 @@ export function Workspace({ prospectId, onBack }: Props) {
         await updateProspect(draftId, { internalOwner: value.trim() || null });
         load();
         toast.show(value.trim() ? `Owner changed to ${value.trim()}` : 'Owner cleared');
+      },
+    });
+  }
+
+  function askApplicationReviewRequirement(required: boolean) {
+    if (!campaign) return;
+    setOverlay({
+      kind: 'decision',
+      title: required ? 'Require Application Review' : 'Skip Application Review',
+      prompt: required
+        ? 'Record why this Founder must receive Application Review approval before listing-fee payment.'
+        : 'Record why this Founder may skip Application Review and continue directly to listing-fee payment.',
+      confirmLabel: required ? 'Turn on review' : 'Turn off review',
+      run: async (reason: string) => {
+        await setApplicationReviewRequirement(campaign.campaignId, required, reason);
+        load();
+        toast.show(required ? 'Application Review is now required' : 'Application Review will be skipped');
+      },
+    });
+  }
+
+  function exportJson(filename: string, value: unknown) {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }),
+    );
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function askSessionRevocation() {
+    setOverlay({
+      kind: 'decision',
+      title: 'Revoke active sessions',
+      prompt: 'Record why every active Founder session must be revoked. The Founder will need to sign in again on every device.',
+      confirmLabel: 'Revoke sessions',
+      run: async (reason: string) => {
+        const result = await revokeFounderSessions(prospectId, reason);
+        load();
+        toast.show(`${result.revoked} active session${result.revoked === 1 ? '' : 's'} revoked`);
+      },
+    });
+  }
+
+  function askCampaignStop() {
+    if (!campaign) return;
+    setOverlay({
+      kind: 'decision',
+      title: 'Stop campaign',
+      prompt: 'Write the customer-facing explanation for stopping this campaign. This immediately suspends campaign actions, preserves the record, and notifies affected roles.',
+      confirmLabel: 'Stop campaign',
+      run: async (reason: string) => {
+        await stopFounderCampaign(campaign.campaignId, reason);
+        load();
+        toast.show('Campaign stopped');
+      },
+    });
+  }
+
+  function askAccountWarning() {
+    setOverlay({
+      kind: 'decision',
+      title: 'Add account warning',
+      prompt: 'Record the evidence or behaviour that caused this persistent account warning. Warnings are append-only and remain in the audit record.',
+      confirmLabel: 'Add warning',
+      run: async (reason: string) => {
+        await addFounderWarning(prospectId, reason);
+        const updated = await fetchFounderPanel(prospectId);
+        setPanel(updated);
+        toast.show('Account warning added');
       },
     });
   }
@@ -492,19 +587,45 @@ export function Workspace({ prospectId, onBack }: Props) {
       ) : null}
 
       {overlay?.kind === 'message' ? (
-        <MessageDialog founderName={header.legalName} onClose={closeOverlay} />
+        <MessageDialog
+          founderName={header.legalName}
+          onOpenSupport={() => setOverlay({ kind: 'support' })}
+          onClose={closeOverlay}
+        />
       ) : null}
 
       {overlay?.kind === 'support' ? (
         <SupportDialog
           cases={supportCases}
+          canCreate={header.account !== 'Not created yet'}
+          onCreate={async (input) => {
+            const opened = await openFounderSupportCase({
+              prospectId,
+              requesterEmail: header.email,
+              ...(campaign ? { campaignId: campaign.campaignId } : {}),
+              ...input,
+            });
+            const updated = await fetchFounder(prospectId);
+            setDetail(updated);
+            toast.show(`Support case ${opened.reference} opened`);
+          }}
           onOpenDetail={(title, body) => setOverlay({ kind: 'detail', title, body })}
           onClose={closeOverlay}
         />
       ) : null}
 
       {overlay?.kind === 'notes' ? (
-        <NotesDialog founderName={header.legalName} onClose={closeOverlay} />
+        <NotesDialog
+          founderName={header.legalName}
+          notes={internalNotes}
+          onAdd={async (body) => {
+            await addFounderNote(prospectId, body);
+            const updated = await fetchFounderPanel(prospectId);
+            setPanel(updated);
+            toast.show('Internal note added');
+          }}
+          onClose={closeOverlay}
+        />
       ) : null}
 
       {overlay?.kind === 'history' ? (
@@ -518,8 +639,41 @@ export function Workspace({ prospectId, onBack }: Props) {
       {overlay?.kind === 'settings' ? (
         <SettingsDialog
           detail={detail}
+          applicationReviewRequirement={reviewRequirement}
           onTool={(tool: SettingsTool) => setOverlay({ kind: tool })}
           onAccessDecision={askAccessDecision}
+          onApplicationReviewRequirement={askApplicationReviewRequirement}
+          onPasswordRecovery={() => {
+            void run(async () => {
+              await sendFounderPasswordRecovery(prospectId);
+              toast.show('Password reset email requested');
+            });
+          }}
+          onRevokeSessions={askSessionRevocation}
+          warningCount={accountWarnings.length}
+          onAddWarning={askAccountWarning}
+          onExportAccount={() => {
+            exportJson(`founder-${header.recordReference}.json`, {
+              exportedAt: new Date().toISOString(),
+              header: detail.header,
+              overview: detail.overview,
+              operations: detail.operations,
+              history: detail.history,
+              notes: internalNotes,
+            });
+            toast.show('Founder account export downloaded');
+          }}
+          onExportCampaign={() => {
+            if (!campaign) return;
+            exportJson(`campaign-${campaign.campaignId}.json`, {
+              exportedAt: new Date().toISOString(),
+              campaign,
+              panel,
+              workspace: detail,
+            });
+            toast.show('Complete campaign export downloaded');
+          }}
+          onStopCampaign={askCampaignStop}
           onChangeOwner={askOwnerChange}
           onClose={closeOverlay}
         />

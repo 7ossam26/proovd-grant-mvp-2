@@ -186,6 +186,16 @@ export const campaigns = pgTable(
     status: campaignStatus('status').notNull().default('invited_draft'),
 
     /**
+     * Per-campaign gate for the early Founder Application Review.
+     *
+     * False preserves the historic flow (Creator payment -> listing fee). When
+     * true, the server requires a decided, approved application-review round
+     * before listing preparation may begin. This lives on the campaign rather
+     * than in browser state so a copied URL cannot bypass the Admin's choice.
+     */
+    applicationReviewRequired: boolean('application_review_required').notNull().default(false),
+
+    /**
      * The furthest workflow stage this campaign has ever reached — the Admin
      * panel's stage menu unlocks on this and nothing else (migration 0059).
      *

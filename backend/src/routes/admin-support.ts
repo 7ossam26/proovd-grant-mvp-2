@@ -70,6 +70,7 @@ import { BACKER_SUPPORT_FOUNDER_RESPONSE } from '../notifications/events.js';
 import { renderPlainNotice } from '../notifications/templates/plain.js';
 import { eq } from 'drizzle-orm';
 import { supportCases } from '../db/schema/support.js';
+import { founderProspects } from '../db/schema/invitations.js';
 import {
   SUPPORT_TOPICS,
   SUPPORT_OWNERS,
@@ -200,13 +201,29 @@ export function createAdminSupportRouter({
       return;
     }
 
+    let requesterUserId = str('requesterUserId');
+    const requesterProspectId = str('requesterProspectId');
+    if (
+      requesterKind === 'founder' &&
+      !requesterUserId &&
+      requesterProspectId &&
+      /^[0-9a-fA-F-]{36}$/.test(requesterProspectId)
+    ) {
+      const [prospect] = await db
+        .select({ claimedUserId: founderProspects.claimedUserId })
+        .from(founderProspects)
+        .where(eq(founderProspects.id, requesterProspectId))
+        .limit(1);
+      requesterUserId = prospect?.claimedUserId ?? undefined;
+    }
+
     const result = await openSupportCase(db, {
       topic,
       owner,
       requesterKind,
       requesterEmail: str('requesterEmail') ?? '',
       backerIdentityId: str('backerIdentityId'),
-      requesterUserId: str('requesterUserId'),
+      requesterUserId,
       campaignId: str('campaignId'),
       reservationId: str('reservationId'),
       associationId: str('associationId'),
