@@ -14,14 +14,14 @@ export const CAMPAIGN_BUILD_STATUSES = ['not_started', 'in_progress', 'complete'
 export type CampaignBuildStatus = (typeof CAMPAIGN_BUILD_STATUSES)[number];
 
 /**
- * §23.2: `review_ready` is DERIVED, never stored as a source of truth — true
- * only for `launch_ready + complete`. This function is the one definition.
+ * `review_ready` is derived from Campaign Setup and never stored. Creator
+ * matching is a separate stage and cannot block submission for review.
  */
 export function deriveReviewReady(
-  rosterStatus: AffiliateRosterStatus,
+  _rosterStatus: AffiliateRosterStatus,
   buildStatus: CampaignBuildStatus,
 ): boolean {
-  return rosterStatus === 'launch_ready' && buildStatus === 'complete';
+  return buildStatus === 'complete';
 }
 
 /**

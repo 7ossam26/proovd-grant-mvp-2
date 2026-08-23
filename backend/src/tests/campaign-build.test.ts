@@ -394,16 +394,15 @@ describe('drift — the §14.4/§15 logic matches shared', () => {
     expect(deriveReviewReady('launch_ready', 'complete')).toBe(
       sharedDeriveReview('launch_ready', 'complete'),
     );
-    expect(deriveReviewReady('failed', 'complete')).toBe(false);
+    expect(deriveReviewReady('failed', 'complete')).toBe(true);
   });
 });
 
-/* ═══ §33.3.10 — review_ready is false until both tracks complete ══════════ */
+/* ═══ Campaign review follows the build; Matching is non-blocking ══════════ */
 
-describe('§33.3.10 — review_ready needs both tracks', () => {
-  it('is false while the build is incomplete or the roster is not launch-ready, true only when both are done', async () => {
+describe('campaign review readiness', () => {
+  it('allows a complete build to submit while the Creator roster is still forming', async () => {
     const j = await paidJourney('rr');
-    const c = j.creators[0]!;
 
     // Neither track complete.
     let readiness = await reviewReadiness(j);
@@ -411,31 +410,13 @@ describe('§33.3.10 — review_ready needs both tracks', () => {
     expect(readiness.rosterStatus).not.toBe('launch_ready');
     expect(readiness.reviewReady).toBe(false);
 
-    // Build complete, roster still forming → still not ready (§33.3.10).
+    // Build complete, roster still forming: matching does not block review.
     await fillBuild(j);
     readiness = await reviewReadiness(j);
     expect(readiness.buildStatus).toBe('complete');
     expect(readiness.rosterStatus).not.toBe('launch_ready');
-    expect(readiness.reviewReady).toBe(false);
-
-    // The Founder cannot submit yet.
-    const early = await request(h.app)
-      .post(`/api/founder/campaigns/${j.campaignId}/submit`)
-      .set('cookie', j.founder.cookie)
-      .expect(409);
-    expect(early.body.error).toBe('not_ready');
-
-    // Roster launch-ready, build complete → review_ready.
-    await acceptAll(j);
-    await finalizeRoster(j, [
-      { associationId: c.associationId, rosterDecision: 'included', launchRequired: true, readinessConfirmed: true },
-    ]);
-    readiness = await reviewReadiness(j);
-    expect(readiness.rosterStatus).toBe('launch_ready');
-    expect(readiness.buildStatus).toBe('complete');
     expect(readiness.reviewReady).toBe(true);
 
-    // Now submission is allowed, and the campaign enters pending_review.
     await request(h.app)
       .post(`/api/founder/campaigns/${j.campaignId}/submit`)
       .set('cookie', j.founder.cookie)
@@ -680,8 +661,8 @@ describe('§33.4.2 — materiality and reacceptance', () => {
     expect(list.body.reacceptances[0].changedFields).toEqual(['rewards_or_prices']);
     const taskId = list.body.reacceptances[0].id;
 
-    // Review readiness is false until the affected Creator reaccepts.
-    expect((await reviewReadiness(j)).reviewReady).toBe(false);
+    // Creator reacceptance is tracked independently from campaign review.
+    expect((await reviewReadiness(j)).reviewReady).toBe(true);
 
     // Someone else cannot answer this Creator's reacceptance.
     const otherCreator = (await paidJourney('mat-other')).creators[0]!;

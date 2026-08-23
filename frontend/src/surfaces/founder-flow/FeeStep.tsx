@@ -133,6 +133,7 @@ import { SurfaceLoading } from '../../features/public/states.js';
 import {
   fetchListing,
   openListingCheckout,
+  recordSimulatedListingPayment,
   cancelListing,
   FounderRequestError,
   type CheckoutQuote,
@@ -396,6 +397,20 @@ function FeeScreen({
     }
   }, [campaignId, postalCode, region, newsletterOptIn]);
 
+  const recordDemoPayment = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await recordSimulatedListingPayment(campaignId);
+      startReferenceWalkthrough(campaignId);
+      leaveToPage('voice');
+    } catch (e: unknown) {
+      if (e instanceof FounderRequestError) setError(e.detail);
+    } finally {
+      setBusy(false);
+    }
+  }, [campaignId, leaveToPage]);
+
   const cancel = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -617,12 +632,12 @@ function FeeScreen({
                   ? 'Pay & Start — continue the pitch demo without payment'
                   : 'Pay & Start — your billing address and total'
             }
+            disabled={busy}
             onClick={() => {
               if (paid) {
                 leaveToPage('voice');
               } else if (PITCH_DEMO) {
-                startReferenceWalkthrough(campaignId);
-                leaveToPage('voice');
+                void recordDemoPayment();
               } else {
                 startPaying();
               }
@@ -640,8 +655,8 @@ function FeeScreen({
           {LISTING_FEE_CHECKOUT_CANCELED}
         </p>
       ) : PITCH_DEMO && !paid ? (
-        <p className="ff-fee__note" role="status">
-          Demo mode — no card details or real payment will be collected.
+        <p className="ff-fee__note" role={error ? 'alert' : 'status'}>
+          {error?.whatHappened ?? 'Demo mode — no card details or real payment will be collected.'}
         </p>
       ) : null}
       {paid && !canceled ? (

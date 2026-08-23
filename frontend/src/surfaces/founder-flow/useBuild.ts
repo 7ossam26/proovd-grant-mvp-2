@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchBuild,
+  recordSimulatedListingPayment,
   saveBuild,
   FounderRequestError,
   type BuildFields,
@@ -43,7 +44,11 @@ export function useBuildFlow(campaignId: string): BuildFlowState {
 
   useEffect(() => {
     let cancelled = false;
-    fetchBuild(campaignId)
+    const reconcileOldWalkthroughClick = isReferenceWalkthrough(campaignId)
+      ? recordSimulatedListingPayment(campaignId)
+      : Promise.resolve();
+    reconcileOldWalkthroughClick
+      .then(() => fetchBuild(campaignId))
       .then((build) => {
         if (!cancelled) setState(build);
       })
@@ -63,10 +68,6 @@ export function useBuildFlow(campaignId: string): BuildFlowState {
   const autosave = useAutosave<Partial<BuildFields>>(
     useCallback(
       async (patch: Partial<BuildFields>) => {
-        // The local reference walkthrough must remain non-financial and
-        // non-lifecycle-mutating. Keep its edits local while still letting the
-        // complete reference sequence be exercised.
-        if (isReferenceWalkthrough(campaignId)) return;
         const result = await saveBuild(campaignId, patch);
         // Only what the server DERIVES. `build` is deliberately not written
         // back over the caller's own text state (§9).

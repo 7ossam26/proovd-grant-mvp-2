@@ -3,9 +3,8 @@
  * §33.4.1.
  *
  * ── `review_ready` is derived, and the submit gate reads it ─────────────────
- * §23.2/§33.3.10: `review_ready` is true only for `launch_ready + complete`,
- * and it is never stored. `submitForReview` computes it from the two live
- * columns and refuses when it is false — the Founder can submit only then.
+ * `review_ready` follows the Campaign Setup build and is never stored.
+ * Matching remains visible as its own stage, but it does not block submission.
  *
  * ── Changes preserve all valid work ─────────────────────────────────────────
  * §15: "Changes required: set `changes_required`, preserve all valid work,
@@ -63,8 +62,7 @@ export async function readReviewReadiness(
   return {
     rosterStatus: roster.rosterStatus,
     buildStatus: build.buildStatus,
-    // `deriveReviewReady` is the one definition (§23.2) and returns false for a
-    // `failed` roster, since failed is not launch_ready.
+    // Matching is reported independently but does not gate campaign review.
     reviewReady: deriveReviewReady(roster.rosterStatus, build.buildStatus),
   };
 }
@@ -91,7 +89,7 @@ export async function submitForReview(
       ok: false,
       code: 'not_ready',
       message: 'This campaign is not ready to submit yet.',
-      next: 'Both tracks have to finish: your build must be complete and your Creator roster launch-ready.',
+      next: 'Finish the required Campaign Setup fields before submitting for review.',
       readiness,
     };
   }

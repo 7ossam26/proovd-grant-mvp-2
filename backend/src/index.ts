@@ -191,6 +191,7 @@ async function main() {
     objectStorage,
     interviewScheduler,
     stripeGateway,
+    simulatedListingPayments: env.SIMULATED_LISTING_PAYMENTS,
     ...(env.STRIPE_CONNECT_RETURN_URL && env.STRIPE_CONNECT_REFRESH_URL
       ? {
           stripeConnectUrls: {

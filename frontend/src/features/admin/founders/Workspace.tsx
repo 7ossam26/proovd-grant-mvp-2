@@ -317,7 +317,7 @@ export function Workspace({ prospectId, onBack }: Props) {
   const Screen = screenFor(shown) ?? STAGE_PLACEHOLDER;
 
   /**
-   * A stage's own navigation — `Open Matching`, `Open Campaign Setup`.
+   * A stage's own navigation — for example, `Open Ready to launch`.
    *
    * It goes through the same ratchet the menu does, so a stage screen cannot
    * open somewhere the menu would have locked. A refused move says which stage

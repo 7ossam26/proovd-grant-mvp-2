@@ -29,6 +29,7 @@ import type { StripeGateway, TaxAddress } from '../payments/stripe-client.js';
 import type { Notifier } from '../notifications/send.js';
 import { findFounderCampaign } from '../workspace/service.js';
 import {
+  applySimulatedListingPayment,
   beginListingCheckout,
   findListingPayment,
 } from '../payments/listing-checkout.js';
@@ -54,6 +55,7 @@ export interface FounderListingDeps {
   notifier: Notifier;
   context: ListingNotificationContext;
   connectUrls?: { returnUrl: string; refreshUrl: string } | undefined;
+  simulatedPaymentsEnabled?: boolean;
 }
 
 function notFound(res: express.Response): void {
@@ -69,7 +71,16 @@ function notFound(res: express.Response): void {
 const cents = (value: bigint): string => value.toString();
 
 export function createFounderListingRouter(deps: FounderListingDeps): Router {
-  const { db, auth, gateway, audit, notifier, context, connectUrls } = deps;
+  const {
+    db,
+    auth,
+    gateway,
+    audit,
+    notifier,
+    context,
+    connectUrls,
+    simulatedPaymentsEnabled = false,
+  } = deps;
   const router = Router();
   const founder = requireRole(auth, 'founder');
   const json: RequestHandler = express.json({ limit: '64kb' });
@@ -272,6 +283,81 @@ export function createFounderListingRouter(deps: FounderListingDeps): Router {
           descriptor: 'PROOVD LISTING',
         },
       });
+    },
+  );
+
+  /* ── Simulated payment for the no-provider pitch flow ───────────────────── */
+
+  router.post(
+    `${FOUNDER_LISTING_PATH}/:campaignId/listing/simulated-payment`,
+    founder,
+    async (req, res) => {
+      // Never expose the fake-pay write in a live money mode or a deployment
+      // that did not explicitly enable it.
+      if (!simulatedPaymentsEnabled || gateway.mode !== 'test') {
+        notFound(res);
+        return;
+      }
+
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      if (await applicationReviewBlocksListing(db, campaignId)) {
+        res.status(409).json({
+          error: 'application_review_required',
+          title: 'Application Review approval is required',
+          whatHappened: 'This campaign must be approved before the listing fee can be recorded.',
+          next: 'Return to Application Review to see its current status.',
+        });
+        return;
+      }
+
+      const existing = await findListingPayment(db, campaignId);
+      if (existing) {
+        res.json({ paid: true, paidAt: existing.paidAt.toISOString() });
+        return;
+      }
+
+      const outcome = await applySimulatedListingPayment(
+        db,
+        { gateway, audit },
+        {
+          campaignId,
+          actor: `user:${req.authUser?.id ?? ''}`,
+        },
+      );
+
+      if (outcome.status === 'no_calculation') {
+        res.status(422).json({
+          error: 'no_calculation',
+          title: 'The listing fee is not ready',
+          whatHappened: 'This campaign does not have a saved listing-fee calculation yet.',
+          next: 'Open the campaign workspace, then try Pay again.',
+        });
+        return;
+      }
+      if (outcome.status === 'unreconciled') {
+        res.status(409).json({
+          error: 'payment_not_recorded',
+          title: 'The payment state could not be recorded',
+          whatHappened: outcome.reason,
+          next: 'Try again. If this continues, contact support.',
+        });
+        return;
+      }
+
+      const payment = await findListingPayment(db, campaignId);
+      if (!payment) {
+        res.status(409).json({
+          error: 'payment_not_recorded',
+          title: 'The payment state could not be recorded',
+          whatHappened: 'The campaign did not produce a saved payment record.',
+          next: 'Try again. If this continues, contact support.',
+        });
+        return;
+      }
+
+      res.json({ paid: true, paidAt: payment.paidAt.toISOString() });
     },
   );
 

@@ -1,10 +1,9 @@
 /**
  * Continuity for the Founder Flow reference walkthrough.
  *
- * The listing-fee pitch bypass deliberately does not fake a Stripe payment or
- * advance the campaign lifecycle in the database. Without this marker, Brand
- * Voice reads the still-pre-payment status and correctly redirects to Campaign
- * Review, accidentally skipping the reference build pages in the demo.
+ * The listing-fee pitch path records its simulated payment on the server. This
+ * marker only preserves continuity between the authored reference build pages;
+ * it is not the payment fact and cannot unlock the Admin workflow by itself.
  *
  * Development keeps the historical default-on behaviour. A production pitch
  * build must opt in explicitly with `VITE_PITCH_DEMO=true`; test builds always
@@ -44,9 +43,9 @@ export function isReferenceWalkthrough(campaignId: string): boolean {
 }
 
 /**
- * The pitch walkthrough deliberately writes no campaign rows, but its authored
- * build cards still have to survive moving between its pages. Keep that copy
- * session-scoped and campaign-scoped beside the walkthrough marker.
+ * The pitch walkthrough's draft-only cards still have to survive moving
+ * between its pages. Keep that copy session-scoped and campaign-scoped beside
+ * the walkthrough marker.
  */
 export function readReferenceDraft(campaignId: string, area: 'faqs' | 'rewards'): unknown {
   const stored = window.sessionStorage.getItem(draftKey(campaignId, area));

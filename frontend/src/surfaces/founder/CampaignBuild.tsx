@@ -7,7 +7,7 @@
  * read-only — there is no control to change it here.
  *
  * ── Review readiness is the server's answer, rendered ───────────────────────
- * `review_ready` is derived from both tracks (§23.2, §33.3.10); the surface
+ * `review_ready` is derived from the campaign build; the surface
  * shows what still blocks it and enables Submit only when the server says
  * ready. Nothing here computes readiness — the same rule the workspace follows
  * for the fee.

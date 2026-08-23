@@ -1,5 +1,5 @@
 /**
- * Stage 5 — Matching. Spec §14.2, §14.3, §25.6, §26.2.
+ * Stage 6 — Matching. Spec §14.2, §14.3, §25.6, §26.2.
  *
  * The reference's own arrangement: four summary tiles, the add-an-offer form,
  * the Founder-dashboard offer list, the policy note, and the action bar.
@@ -501,7 +501,7 @@ export function MatchingStage({ detail, panel, onSaved, onOpenStage }: StageProp
             <div>
               <small>
                 {refusalLine(error) ??
-                  'Campaign Setup can open once at least one affiliate offer is visible in the Founder dashboard'}
+                  'Affiliate matching does not block campaign review or Ready to launch'}
               </small>
             </div>
             <div className="action-buttons">
@@ -529,14 +529,13 @@ export function MatchingStage({ detail, panel, onSaved, onOpenStage }: StageProp
               <button
                 className="primary"
                 type="button"
-                disabled={offers.length === 0}
                 onClick={() =>
                   onOpenStage
-                    ? onOpenStage('setup')
+                    ? onOpenStage('launch')
                     : say('The record shell did not hand this stage a way to move between stages.')
                 }
               >
-                Open Campaign Setup
+                Open Ready to launch
               </button>
             </div>
           </div>

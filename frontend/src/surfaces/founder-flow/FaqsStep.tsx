@@ -283,18 +283,6 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
    */
   const persist = useCallback(
     async (patch: FaqPatch) => {
-      if (isReferenceWalkthrough(campaignId)) {
-        setCards((list) => {
-          const next = list.map((card, i) =>
-            i === patch.at
-              ? { ...card, id: card.id ?? `walkthrough-faq-${String(i)}` }
-              : card,
-          );
-          writeReferenceDraft(campaignId, 'faqs', next);
-          return next;
-        });
-        return;
-      }
       const { faq } = await saveFaq(campaignId, patch.faq);
       setCards((list) => list.map((card, i) => (i === patch.at ? { ...card, id: faq.id } : card)));
     },
@@ -323,7 +311,7 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
       autosave.queue({
         at,
         faq: {
-          ...(next.id ? { faqId: next.id } : {}),
+          ...(next.id && !next.id.startsWith('walkthrough-faq-') ? { faqId: next.id } : {}),
           question,
           answer,
           sortOrder: at,
@@ -391,7 +379,7 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
       return next;
     });
     setIndex((i) => Math.max(0, i - 1));
-    if (going?.id && !walkthrough) {
+    if (going?.id && !going.id.startsWith('walkthrough-faq-')) {
       try {
         await removeFaq(campaignId, going.id);
       } catch {

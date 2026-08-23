@@ -86,6 +86,17 @@ const schema = z.object({
     .default('true')
     .transform((v) => v === 'true'),
 
+  /**
+   * Temporary no-provider listing-fee path used by the Founder pitch flow.
+   * It records the same campaign/payment transition as a successful listing
+   * fee, but never creates a Checkout session or calls Stripe. Default-off so
+   * an operator must explicitly choose the simulated payment behaviour.
+   */
+  SIMULATED_LISTING_PAYMENTS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+
   // ── Auth (§5, §28.1, §28.2) ──────────────────────────────────────────────
   // Signs Better Auth sessions and reset links. Same length floor as
   // CRON_SECRET: a short one is a forgeable session.

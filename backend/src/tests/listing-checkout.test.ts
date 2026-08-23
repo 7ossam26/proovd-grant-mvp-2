@@ -35,7 +35,7 @@ import { founderProspects, campaignDrafts } from '../db/schema/invitations.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
 import { affiliateProspects } from '../db/schema/affiliates.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
-import { stripeConnectedAccounts } from '../db/schema/payments.js';
+import { providerObjects, stripeConnectedAccounts } from '../db/schema/payments.js';
 import {
   listingFeePayments,
   listingFeeRefunds,
@@ -43,6 +43,7 @@ import {
 } from '../db/schema/listing.js';
 import { listingFeeCalculations, campaignOptionalItems } from '../db/schema/workspace.js';
 import { idempotencyKeys, notificationDeliveries, providerEvents } from '../db/schema/integrity.js';
+import { campaignApplicationReviews } from '../db/schema/admin-founder-panel.js';
 import { beginListingCheckout } from '../payments/listing-checkout.js';
 import { sweepListingDeadlines } from '../payments/listing-clocks.js';
 import { formatUsdCents } from '../payments/listing-notifications.js';
@@ -75,6 +76,7 @@ beforeAll(async () => {
   h = await startHarness(
     {
       stripeGateway: gateway,
+      simulatedListingPayments: true,
       stripeConnectUrls: {
         returnUrl: 'https://app.example.com/stripe/return',
         refreshUrl: 'https://app.example.com/stripe/refresh',
@@ -330,6 +332,73 @@ async function completeSession(
 }
 
 const emailsTo = (address: string) => h.sentEmails.messages.filter((m) => m.to === address);
+
+describe('the no-provider fake Pay action', () => {
+  it('records payment and advances the Admin workflow without calling Stripe', async () => {
+    const j = await journey('simulated');
+    await h.db.insert(campaignApplicationReviews).values({
+      campaignId: j.campaignId,
+      round: 1,
+      outcome: 'approved',
+      reviewer: 'admin:test',
+      decidedAt: new Date(),
+      internalReason: 'Approved for the simulated-payment integration test.',
+      customerExplanation: 'Your application is approved.',
+    });
+    const sessionsBefore = gateway.sessions.length;
+
+    const first = await request(h.app)
+      .post(`/api/founder/campaigns/${j.campaignId}/listing/simulated-payment`)
+      .set('cookie', j.founder.cookie)
+      .expect(200);
+
+    expect(first.body.paid).toBe(true);
+    expect(gateway.sessions).toHaveLength(sessionsBefore);
+
+    const [campaign] = await h.db
+      .select({
+        status: campaigns.status,
+        listingPaidAt: campaigns.listingPaidAt,
+        workflowStageReached: campaigns.workflowStageReached,
+      })
+      .from(campaigns)
+      .where(eq(campaigns.id, j.campaignId));
+    expect(campaign?.status).toBe('affiliate_response_and_build');
+    expect(campaign?.listingPaidAt).toBeInstanceOf(Date);
+    expect(campaign?.workflowStageReached).toBe('setup');
+
+    const payment = await h.db
+      .select()
+      .from(listingFeePayments)
+      .where(eq(listingFeePayments.campaignId, j.campaignId));
+    expect(payment).toHaveLength(1);
+    expect(payment[0]?.taxCents).toBe(0n);
+    expect(payment[0]?.totalCents).toBe(payment[0]?.subtotalCents);
+
+    const providerRows = await h.db
+      .select({ id: providerObjects.id })
+      .from(providerObjects)
+      .where(eq(providerObjects.campaignId, j.campaignId));
+    expect(providerRows).toHaveLength(0);
+
+    const association = await h.db
+      .select({ status: campaignAffiliateAssociations.status })
+      .from(campaignAffiliateAssociations)
+      .where(eq(campaignAffiliateAssociations.id, j.associationId));
+    expect(association[0]?.status).toBe('formal_decision_open');
+
+    await request(h.app)
+      .post(`/api/founder/campaigns/${j.campaignId}/listing/simulated-payment`)
+      .set('cookie', j.founder.cookie)
+      .expect(200);
+    const paymentsAfterRetry = await h.db
+      .select({ id: listingFeePayments.id })
+      .from(listingFeePayments)
+      .where(eq(listingFeePayments.campaignId, j.campaignId));
+    expect(paymentsAfterRetry).toHaveLength(1);
+    expect(gateway.sessions).toHaveLength(sessionsBefore);
+  });
+});
 
 /* ═══════════════════════════════════════════════════════════════════════════
    §33.3.5 — Checkout/receipt list base, each discount, tax, total, descriptor,

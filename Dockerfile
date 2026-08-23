@@ -32,10 +32,9 @@ COPY docs/design-refrence/Proovd-Founder-Flow-v2/assets/match-lockup.png \
 # surfaces as ~120 bogus errors about BigInt literals and downlevelIteration.
 COPY tsconfig.base.json ./
 
-# Temporary pitch build: the frontend-only walkthrough simulates the Stripe
-# handoffs without collecting card details, moving money, or writing a paid
-# campaign state. Set this build argument to false when Stripe test mode is
-# ready for end-to-end use.
+# Temporary pitch build: the walkthrough collects no card details and calls no
+# payment provider. Its Pay action records a simulated paid campaign state so
+# the Founder flow and Admin workflow read the same persisted fact.
 ARG VITE_PITCH_DEMO=true
 ENV VITE_PITCH_DEMO=$VITE_PITCH_DEMO
 
@@ -60,6 +59,7 @@ RUN npm run build --workspace=@proovd/backend
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+ENV SIMULATED_LISTING_PAYMENTS=true
 
 COPY package.json package-lock.json ./
 COPY shared/package.json ./shared/

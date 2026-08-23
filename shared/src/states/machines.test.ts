@@ -205,11 +205,11 @@ describe('parallel fields stay separate (§23.2, §23.3)', () => {
     }
   });
 
-  it('review_ready is derived: true only for launch_ready + complete (§23.2)', () => {
+  it('review_ready follows the build and is not blocked by matching', () => {
     for (const roster of AFFILIATE_ROSTER_STATUSES) {
       for (const build of CAMPAIGN_BUILD_STATUSES) {
         expect(deriveReviewReady(roster, build)).toBe(
-          roster === 'launch_ready' && build === 'complete',
+          build === 'complete',
         );
       }
     }

@@ -159,6 +159,11 @@ export interface AppConfig {
    */
   stripeGateway?: StripeGateway;
   /**
+   * Enables the Founder flow's explicit fake-pay endpoint. The endpoint writes
+   * the paid lifecycle fact without contacting a payment provider.
+   */
+  simulatedListingPayments?: boolean;
+  /**
    * §32.2's Connect return/refresh URLs. Absent means hosted onboarding cannot
    * be offered, and the surfaces say so rather than issuing a link Stripe would
    * bounce (§1.4).
@@ -873,6 +878,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         audit: (event) => audit({ ...event, targetId: event.targetId }),
         notifier,
         context: listingContext,
+        simulatedPaymentsEnabled: config.simulatedListingPayments === true,
         ...(config.stripeConnectUrls ? { connectUrls: config.stripeConnectUrls } : {}),
       }),
     );

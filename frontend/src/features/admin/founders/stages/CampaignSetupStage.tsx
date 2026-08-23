@@ -1,5 +1,5 @@
 /**
- * Stage 6 — Campaign setup. Spec §15, §25.6, §26.2.
+ * Stage 5 — Campaign setup. Spec §15, §25.6, §26.2.
  *
  * The reference's own five record groups over 23 rows: brand voice, the order
  * goal and the system limits, the Founder's FAQs, the Founder's rewards, and

@@ -205,23 +205,13 @@ function RewardsBody({
         setError('Add a title, description, delivery date, and valid price before leaving this reward.');
         return false;
       }
-      if (walkthrough) {
-        setCards((current) => {
-          const next = current.map((entry, entryIndex) =>
-            entryIndex === rewardIndex
-              ? { ...entry, id: entry.id ?? `walkthrough-reward-${String(entryIndex)}` }
-              : entry,
-          );
-          writeReferenceDraft(campaignId, 'rewards', next);
-          return next;
-        });
-        return true;
-      }
       setError(null);
       setSaving(true);
       try {
         const result = await saveRewardPackage(campaignId, {
-          ...(reward.id ? { packageId: reward.id } : {}),
+          ...(reward.id && !reward.id.startsWith('walkthrough-reward-')
+            ? { packageId: reward.id }
+            : {}),
           sku: reward.title
             .trim()
             .toLowerCase()
@@ -281,7 +271,9 @@ function RewardsBody({
     if (cards.length <= 1) return;
     setError(null);
     try {
-      if (card.id) await removeRewardPackage(campaignId, card.id);
+      if (card.id && !card.id.startsWith('walkthrough-reward-')) {
+        await removeRewardPackage(campaignId, card.id);
+      }
       setCards((current) => {
         const next = current.filter((_, rewardIndex) => rewardIndex !== index);
         if (walkthrough) writeReferenceDraft(campaignId, 'rewards', next);
@@ -289,7 +281,7 @@ function RewardsBody({
       });
       setIndex(Math.max(0, index - 1));
       setFocus(null);
-      if (card.id) await refresh();
+      if (card.id && !card.id.startsWith('walkthrough-reward-')) await refresh();
     } catch {
       setError('We could not delete that reward. Nothing has changed.');
     }

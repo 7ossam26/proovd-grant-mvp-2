@@ -509,6 +509,13 @@ export const openListingCheckout = (
     body: JSON.stringify(input),
   });
 
+export const recordSimulatedListingPayment = (
+  campaignId: string,
+): Promise<{ paid: true; paidAt: string }> =>
+  call(`${base(campaignId)}/listing/simulated-payment`, {
+    method: 'POST',
+  });
+
 export const cancelListing = (
   campaignId: string,
   reason: string,

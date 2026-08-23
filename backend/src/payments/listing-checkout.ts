@@ -413,6 +413,8 @@ export interface ApplyPaymentInput {
   paidAt: Date;
   providerEventId: string | null;
   actor: string;
+  /** A fake-pay click records domain state without creating provider objects. */
+  source?: 'provider' | 'simulated';
 }
 
 /**
@@ -431,6 +433,7 @@ export async function applyListingPayment(
   input: ApplyPaymentInput,
 ): Promise<ApplyPaymentOutcome> {
   const { gateway, audit } = deps;
+  const simulated = input.source === 'simulated';
 
   try {
     return await db.transaction(async (tx) => {
@@ -631,36 +634,39 @@ export async function applyListingPayment(
           and(eq(campaigns.id, input.campaignId), eq(campaigns.campaignBuildStatus, 'not_started')),
         );
 
-      /* The §32.4 ledger's view of the same fact. */
-      await recordProviderObject(tx, {
-        mode: gateway.mode,
-        objectType: 'checkout_session',
-        providerObjectId: input.checkoutSessionId,
-        accountContext: 'platform',
-        campaignId: input.campaignId,
-        amountCents: input.amountTotalCents,
-        amountTaxCents: input.taxCents,
-        status: 'complete',
-      });
-      if (input.paymentIntentId) {
+      /* A provider-backed payment gets the §32.4 provider ledger entries. A
+         simulated click deliberately has no provider object to invent. */
+      if (!simulated) {
         await recordProviderObject(tx, {
           mode: gateway.mode,
-          objectType: 'payment_intent',
-          providerObjectId: input.paymentIntentId,
+          objectType: 'checkout_session',
+          providerObjectId: input.checkoutSessionId,
           accountContext: 'platform',
           campaignId: input.campaignId,
           amountCents: input.amountTotalCents,
           amountTaxCents: input.taxCents,
-          status: 'succeeded',
+          status: 'complete',
         });
+        if (input.paymentIntentId) {
+          await recordProviderObject(tx, {
+            mode: gateway.mode,
+            objectType: 'payment_intent',
+            providerObjectId: input.paymentIntentId,
+            accountContext: 'platform',
+            campaignId: input.campaignId,
+            amountCents: input.amountTotalCents,
+            amountTaxCents: input.taxCents,
+            status: 'succeeded',
+          });
+        }
       }
 
       await audit({
-        action: 'listing.payment_applied',
+        action: simulated ? 'listing.simulated_payment_applied' : 'listing.payment_applied',
         targetType: 'campaign',
         targetId: input.campaignId,
         internalReason:
-          `listing fee paid: session ${input.checkoutSessionId}; calculation ${calculation.id} locked; ` +
+          `${simulated ? 'simulated listing fee recorded' : `listing fee paid: session ${input.checkoutSessionId}`}; calculation ${calculation.id} locked; ` +
           `${openedAssociationIds.length} formal ${openedAssociationIds.length === 1 ? 'opportunity' : 'opportunities'} opened` +
           (skippedRevoked.length > 0
             ? `; ${skippedRevoked.length} revoked association(s) NOT opened — needs Admin review`
@@ -674,10 +680,12 @@ export async function applyListingPayment(
           freeCancellationDeadlineAt: freeCancellationDeadlineAt.toISOString(),
           skippedRevokedAssociations: skippedRevoked,
         },
-        providerObjectIds: {
-          checkoutSessionId: input.checkoutSessionId,
-          paymentIntentId: input.paymentIntentId,
-        },
+        providerObjectIds: simulated
+          ? null
+          : {
+              checkoutSessionId: input.checkoutSessionId,
+              paymentIntentId: input.paymentIntentId,
+            },
       });
 
       /* Effect 7 — the notifications — happens after this commits, in
@@ -695,11 +703,13 @@ export async function applyListingPayment(
   } catch (error) {
     if (error instanceof Unreconciled) {
       await audit({
-        action: 'listing.payment_unreconciled',
+        action: simulated
+          ? 'listing.simulated_payment_unreconciled'
+          : 'listing.payment_unreconciled',
         targetType: 'campaign',
         targetId: input.campaignId,
         internalReason:
-          `a signed checkout.session.completed could not be applied: ${error.message}. ` +
+          `${simulated ? 'a simulated payment' : 'a signed checkout.session.completed'} could not be applied: ${error.message}. ` +
           'Recorded and routed to Admin; no domain effect was performed.',
         newValue: { checkoutSessionId: input.checkoutSessionId, providerEventId: input.providerEventId },
       });
@@ -718,6 +728,51 @@ export async function applyListingPayment(
     }
     throw error;
   }
+}
+
+export type ApplySimulatedPaymentOutcome =
+  | ApplyPaymentOutcome
+  | { status: 'no_calculation' };
+
+/**
+ * Records the pitch flow's fake Pay click. This performs no gateway operation:
+ * it uses the latest stored fee, records zero tax, and sends the existing
+ * atomic lifecycle transition through `applyListingPayment` with provider
+ * object recording disabled.
+ */
+export async function applySimulatedListingPayment(
+  db: Database,
+  deps: { gateway: StripeGateway; audit: AuditWriter },
+  input: { campaignId: string; actor: string; paidAt?: Date },
+): Promise<ApplySimulatedPaymentOutcome> {
+  const [calculation] = await db
+    .select()
+    .from(listingFeeCalculations)
+    .where(eq(listingFeeCalculations.campaignId, input.campaignId))
+    .orderBy(desc(listingFeeCalculations.calculatedAt))
+    .limit(1);
+
+  if (!calculation) return { status: 'no_calculation' };
+
+  return applyListingPayment(
+    db,
+    deps,
+    {
+      campaignId: input.campaignId,
+      calculationId: calculation.id,
+      checkoutSessionId: `simulated-listing-payment:${input.campaignId}`,
+      paymentIntentId: null,
+      amountTotalCents: calculation.subtotalCents,
+      subtotalCents: calculation.subtotalCents,
+      taxCents: 0n,
+      taxCalculationId: null,
+      newsletterOptIn: false,
+      paidAt: input.paidAt ?? new Date(),
+      providerEventId: null,
+      actor: input.actor,
+      source: 'simulated',
+    },
+  );
 }
 
 /** An anomaly a person must look at. Never applied, always recorded. */

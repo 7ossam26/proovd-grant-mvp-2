@@ -99,7 +99,7 @@ export function ListingFeeStage({ detail, panel, onSaved, onOpenStage }: StagePr
       body: JSON.stringify({}),
     })
       .then(() => {
-        setNote('Checkout link sent and recorded');
+        setNote('Payment link resent and recorded');
         onSaved();
       })
       .catch((e: unknown) => setNote(refusalLine(asRequestError(e))))
@@ -249,7 +249,7 @@ export function ListingFeeStage({ detail, panel, onSaved, onOpenStage }: StagePr
                 disabled={sending}
                 onClick={sendPaymentLink}
               >
-                Send payment link
+                Resend payment link
               </button>
             )}
           </div>

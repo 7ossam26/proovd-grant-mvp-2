@@ -133,10 +133,10 @@ export function deriveRosterReadiness(snapshot: RosterReadinessSnapshot): Roster
 
 /* ── §23.2 review readiness ────────────────────────────────────────────────── */
 
-/** §23.2: derived, never stored. True only for launch_ready + complete. */
+/** Review readiness follows Campaign Setup; matching is tracked separately. */
 export function deriveReviewReady(
-  rosterStatus: 'forming' | 'launch_ready' | 'failed',
+  _rosterStatus: 'forming' | 'launch_ready' | 'failed',
   buildStatus: BuildStatus,
 ): boolean {
-  return rosterStatus === 'launch_ready' && buildStatus === 'complete';
+  return buildStatus === 'complete';
 }
