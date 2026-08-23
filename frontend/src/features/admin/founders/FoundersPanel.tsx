@@ -7,10 +7,10 @@
  * mounting it inside `AdminLayout` would put two topbars and two wordmarks on
  * screen and let `AdminLayout`'s `.topbar` rules fight the reference's.
  *
- * So this panel is routed OUTSIDE `AdminLayout`, and the reference stylesheet
- * is loaded verbatim — all 7,775 lines of it, its seven `:root` token blocks
- * included. That is the whole reason it can be byte-for-byte the reference:
- * nothing else is on screen to collide with it.
+ * So this panel is routed OUTSIDE `AdminLayout`, and its dedicated reference
+ * stylesheet is loaded with it, including its seven `:root` token blocks.
+ * That isolation lets the panel preserve the reference while extending its
+ * own topbar with the authenticated session exit.
  *
  * The stylesheet is attached on mount and removed on unmount, so its tokens
  * govern this panel and stop governing the moment you leave it.
@@ -24,11 +24,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { invalidateSession } from '../../../lib/session.js';
+import { signOut } from '../api.js';
 import { Directory } from './Directory.js';
 import { Workspace } from './Workspace.js';
 
 /**
- * The reference stylesheet, served verbatim.
+ * The panel's isolated reference stylesheet.
  *
  * There is no scale sheet beside it any more. The panel briefly carried
  * `html { font-size: 87.5% }` to stop the bands clipping, which treated a
@@ -90,12 +92,27 @@ export function FoundersPanel() {
   const { prospectId } = useParams();
   const navigate = useNavigate();
   const stylesReady = useReferenceStylesheet();
+  const [signingOut, setSigningOut] = useState(false);
 
   const openFounder = useCallback(
     (id: string) => navigate(`/admin/founders/${encodeURIComponent(id)}`),
     [navigate],
   );
   const backToDirectory = useCallback(() => navigate('/admin/founders'), [navigate]);
+  const onSignOut = useCallback(async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+
+    try {
+      await signOut();
+    } finally {
+      // The route guard shares a cached account read. Clear it before leaving
+      // so the sign-in door asks the server again instead of briefly restoring
+      // the Admin page from an identity whose cookie has just been removed.
+      invalidateSession();
+      navigate('/admin/signin', { replace: true });
+    }
+  }, [navigate, signingOut]);
 
   if (!stylesReady) {
     // Deliberately bare: this is the sub-second gap before the reference's own
@@ -110,11 +127,21 @@ export function FoundersPanel() {
         <a className="wordmark u" href="#main">
           PROOVD
         </a>
-        <button className="search-trigger" type="button">
-          <span>Search anything</span>
-          <kbd>⌘ K</kbd>
-        </button>
         <span className="admin-label">ADMIN</span>
+        <div className="topbar-actions">
+          <button className="search-trigger" type="button">
+            <span>Search anything</span>
+            <kbd>⌘ K</kbd>
+          </button>
+          <button
+            className="sign-out-button"
+            type="button"
+            disabled={signingOut}
+            onClick={() => void onSignOut()}
+          >
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
       </header>
 
       {prospectId ? (

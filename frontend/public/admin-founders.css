@@ -632,6 +632,7 @@ html.no-motion a:not(.pv-btn):hover::after { transform: scaleX(1); }
 .live-controls button:not(.primary),
 .note-form button:not(.primary),
 .recap-row button:not(.primary),
+.sign-out-button,
 .back-button {
   position: relative;
   display: inline-flex;
@@ -661,11 +662,13 @@ html.no-motion a:not(.pv-btn):hover::after { transform: scaleX(1); }
 .live-controls button:not(.primary):hover,
 .note-form button:not(.primary):hover,
 .recap-row button:not(.primary):hover,
+.sign-out-button:hover:not(:disabled),
 .back-button:hover {
   background-color: var(--brand-5);
   border-color: var(--brand);
   color: var(--brand);
 }
+.sign-out-button:disabled { opacity: .4; cursor: default; }
 
 
 /* wayfinding gets a direction mark so "back" is readable without the word */
@@ -1090,6 +1093,11 @@ html.no-motion .primary:hover:not(:disabled) { background-color: var(--brand-0);
 html.no-motion .search-trigger:hover,
 html.no-motion .create-founder-button:hover,
 html.no-motion .post-link:hover { background-color: var(--brand); color: var(--mint); }
+html.no-motion .sign-out-button:hover:not(:disabled) {
+  background-color: var(--brand-5);
+  border-color: var(--brand);
+  color: var(--brand);
+}
 
 
 
@@ -1102,7 +1110,7 @@ html.no-motion .post-link:hover { background-color: var(--brand); color: var(--m
 
 /* ══════════════════════════════════════════════════ TOPBAR (§4.17 §9.2)
    The quietest band on the page: product identity as one lockup on the left
-   rail, the single utility control on the right. No fill and no bottom
+   rail, and the search/session utility group on the right. No fill and no bottom
    border — its smallness is what marks it as chrome, and the grey glance band
    two rows down is what closes the chrome stack (§4.8).
 
@@ -1151,14 +1159,18 @@ html.no-motion .post-link:hover { background-color: var(--brand); color: var(--m
   line-height: 1.2;
 }
 
-/* the search trigger keeps its tier-2 identity from 15-identity. All that
-   changes here is where it sits and that it hugs its own label instead of
-   stretching across a 520px track — a button that fills a track reads as an
-   input, which was the original failure (§7.1). */
-.topbar .search-trigger {
+/* Search and session exit are one utility group. Search keeps its tier-2
+   identity while Sign out stays at the quieter tier 3, so the page's working
+   action remains the strongest control. */
+.topbar-actions {
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-8);
   max-width: 100%;
 }
 
@@ -1668,10 +1680,11 @@ kbd {
   }
   .wordmark    { grid-column: 1; grid-row: 1; }
   .admin-label { grid-column: 2; grid-row: 1; }
-  .topbar .search-trigger {
+  .topbar-actions {
     grid-column: 1 / -1;
     grid-row: 2;
     justify-self: start;
+    justify-content: flex-start;
   }
 
   .recordbar {
