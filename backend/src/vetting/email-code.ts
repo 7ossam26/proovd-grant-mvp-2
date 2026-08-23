@@ -217,9 +217,12 @@ export type VerifyEmailCodeResult =
  * the correct answer rather than an edge case: the thing being verified is an
  * address, and the address changed.
  *
- * `email_ownership` is the whole of what this service writes. The route mints
- * the separate flow authorization only after this succeeds. No account,
- * consent, or campaign status move occurs here.
+ * `email_ownership` and `email_code_verified_at` are the two views of the same
+ * accepted code: one is the current state, the other is the durable instant
+ * the Admin panel renders. They are written together so the customer flow and
+ * Admin record cannot disagree. The route mints the separate flow
+ * authorization only after this succeeds. No account, consent, or campaign
+ * status move occurs here.
  */
 export async function verifyFounderEmailCode(
   deps: Pick<EmailCodeDeps, 'db' | 'tokens'>,
@@ -244,9 +247,14 @@ export async function verifyFounderEmailCode(
 
   if (!result.ok) return { ok: false, error: TOKEN_INVALID };
 
+  const verifiedAt = new Date();
   await deps.db
     .update(founderClaimProfiles)
-    .set({ emailOwnership: 'code_verified' })
+    .set({
+      emailOwnership: 'code_verified',
+      emailCodeVerifiedAt: verifiedAt,
+      updatedAt: verifiedAt,
+    })
     .where(eq(founderClaimProfiles.id, profile.id));
 
   return { ok: true, email };

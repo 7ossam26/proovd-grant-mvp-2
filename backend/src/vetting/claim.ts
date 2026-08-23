@@ -391,6 +391,10 @@ export async function saveClaimProfile(
           : next === f.email.prefilled
             ? 'invited_link'
             : 'self_supplied_unverified';
+      // The timestamp belongs to the address that received the code. A new
+      // address has not inherited that proof, even when only case or spacing
+      // made the stored value differ.
+      patch['emailCodeVerifiedAt'] = null;
       patch['emailEditedAt'] = now;
     }
   }

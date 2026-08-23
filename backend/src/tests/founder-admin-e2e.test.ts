@@ -36,7 +36,7 @@ const invitationBody = (requestKey: string, email: string) => ({
   campaignType: 'pre_build',
 });
 
-async function createInviteAndClaim(required: boolean) {
+async function createInviteAndClaim() {
   const requestKey = randomUUID();
   const email = `founder-e2e-${randomUUID()}@example.com`;
   const body = invitationBody(requestKey, email);
@@ -63,12 +63,6 @@ async function createInviteAndClaim(required: boolean) {
     alreadySent: true,
   });
   expect(h.sentEmails.messages).toHaveLength(before + 1);
-
-  await request(h.app)
-    .put(`/api/admin/campaigns/${created.body.campaignId}/application-review-requirement`)
-    .set('cookie', admin.cookie)
-    .send({ required, internalReason: `E2E gate is ${required ? 'required' : 'skipped'}.` })
-    .expect(200);
 
   const raw = /http:\/\/localhost:3000\/draft\/([A-Za-z0-9_-]+)/.exec(
     h.sentEmails.messages[before]!.text,
@@ -102,7 +96,7 @@ async function createInviteAndClaim(required: boolean) {
   expect(campaign).toMatchObject({
     status: 'account_claimed',
     workflowStageReached: 'onboarding',
-    applicationReviewRequired: required,
+    applicationReviewRequired: true,
   });
 
   return {
@@ -115,8 +109,8 @@ async function createInviteAndClaim(required: boolean) {
 }
 
 describe('Admin invitation to authenticated Founder and back to Admin', () => {
-  it('enforces and completes the optional blocking Application Review', async () => {
-    const founder = await createInviteAndClaim(true);
+  it('enforces and completes the mandatory blocking Application Review', async () => {
+    const founder = await createInviteAndClaim();
 
     const waiting = await request(h.app)
       .post(`/api/founder/campaigns/${founder.campaignId}/application-review/submit`)
@@ -203,25 +197,24 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
     await request(h.app).get('/api/founder/campaigns').set('cookie', founder.founderCookie).expect(401);
   });
 
-  it('skips Application Review when the Admin switch is off', async () => {
-    const founder = await createInviteAndClaim(false);
+  it('refuses an Admin attempt to disable Application Review', async () => {
+    const founder = await createInviteAndClaim();
 
-    const skipped = await request(h.app)
-      .post(`/api/founder/campaigns/${founder.campaignId}/application-review/submit`)
-      .set('cookie', founder.founderCookie)
-      .send({})
-      .expect(200);
-    expect(skipped.body.applicationReview).toMatchObject({
-      required: false,
-      mayContinue: true,
-      review: null,
+    const refusal = await request(h.app)
+      .put(`/api/admin/campaigns/${founder.campaignId}/application-review-requirement`)
+      .set('cookie', admin.cookie)
+      .send({ required: false, internalReason: 'Attempt to skip the mandatory review.' })
+      .expect(422);
+    expect(refusal.body).toMatchObject({
+      error: 'review_required',
+      whatHappened: 'Application Review is required for every campaign and cannot be skipped.',
     });
 
     const [campaign] = await h.db
       .select()
       .from(campaigns)
       .where(eq(campaigns.id, founder.campaignId));
-    expect(campaign?.workflowStageReached).toBe('fee');
+    expect(campaign?.applicationReviewRequired).toBe(true);
 
     const [prospect] = await h.db
       .select()

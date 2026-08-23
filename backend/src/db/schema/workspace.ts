@@ -242,6 +242,38 @@ export const campaignAssets = pgTable(
   }),
 );
 
+/* ── campaign_visual_links ──────────────────────────────────────────────── */
+
+/**
+ * A Founder-supplied link that helps an Admin see the product.
+ *
+ * It is deliberately separate from `campaign_assets`: a mutable third-party
+ * URL is not a stored, byte-verified object and must never inherit an upload's
+ * approval or optional-item evidence state. The Founder surface can still save
+ * and remove it, and Admin projections can name it honestly as a link.
+ */
+export const campaignVisualLinks = pgTable(
+  'campaign_visual_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id),
+    url: text('url').notNull(),
+    removedAt: timestamp('removed_at', { withTimezone: true }),
+    removedBy: text('removed_by'),
+    createdBy: text('created_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    campaignIdx: index('campaign_visual_links_campaign_idx').on(t.campaignId),
+    liveUrlIdx: uniqueIndex('campaign_visual_links_live_url_idx')
+      .on(t.campaignId, t.url)
+      .where(sql`${t.removedAt} IS NULL`),
+  }),
+);
+
 /* ── campaign_social_profiles ────────────────────────────────────────────── */
 
 /**
@@ -635,6 +667,7 @@ export const listingFeeCalculations = pgTable(
 
 export type CampaignWorkspace = typeof campaignWorkspace.$inferSelect;
 export type CampaignAsset = typeof campaignAssets.$inferSelect;
+export type CampaignVisualLink = typeof campaignVisualLinks.$inferSelect;
 export type CampaignSocialProfile = typeof campaignSocialProfiles.$inferSelect;
 export type FounderInterviewBooking = typeof founderInterviewBookings.$inferSelect;
 export type CampaignOptionalItem = typeof campaignOptionalItems.$inferSelect;

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createMemoryStorage, createR2Storage } from './object-storage.js';
+import {
+  createDevelopmentStorage,
+  createMemoryStorage,
+  createR2Storage,
+} from './object-storage.js';
 
 describe('browser-safe object-storage presigning', () => {
   it('signs Content-Type without requiring JavaScript to set Content-Length', async () => {
@@ -34,5 +38,31 @@ describe('browser-safe object-storage presigning', () => {
 
     expect(upload.requiredHeaders).toEqual({ 'content-type': 'image/png' });
     expect(createMemoryStorage().browserUploadOrigin).toBeNull();
+  });
+
+  it('accepts a one-use local-development browser PUT and reads it back', async () => {
+    const storage = createDevelopmentStorage({
+      appBaseUrl: 'http://localhost:3000',
+      maxBytes: 1_024,
+    });
+    const upload = await storage.presignUpload({
+      key: 'campaigns/campaign-id/visual/file.png',
+      contentType: 'image/png',
+      contentLength: 4,
+    });
+    const token = new URL(upload.url).pathname.split('/').pop()!;
+    const receiver = storage.browserUploadReceiver!;
+
+    await expect(
+      receiver.receive({ token, contentType: 'image/png', body: Buffer.from([1, 2, 3, 4]) }),
+    ).resolves.toBe('stored');
+    await expect(storage.getObject(upload.key)).resolves.toMatchObject({
+      key: upload.key,
+      contentType: 'image/png',
+      byteSize: 4,
+    });
+    await expect(
+      receiver.receive({ token, contentType: 'image/png', body: Buffer.from([1, 2, 3, 4]) }),
+    ).resolves.toBe('not_found');
   });
 });

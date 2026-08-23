@@ -42,11 +42,13 @@ import {
   AdminRequestError,
   addFounderNote,
   addFounderWarning,
+  deleteFounder,
   fetchFounder,
   fetchFounderPanel,
   listFounders,
   openFounderSupportCase,
   recordAccessDecision,
+  recordFounderDeletionRequest,
   revokeFounderSessions,
   sendFounderPasswordRecovery,
   stopFounderCampaign,
@@ -59,6 +61,8 @@ import { relativeTime } from './format.js';
 import { StageMenu } from './StageMenu.js';
 import { DecisionDialog } from './dialogs/DecisionDialog.js';
 import { DetailDialog } from './dialogs/DetailDialog.js';
+import { DeletionRequestDialog } from './dialogs/DeletionRequestDialog.js';
+import { DeleteFounderDialog } from './dialogs/DeleteFounderDialog.js';
 import { HistoryDialog } from './dialogs/HistoryDialog.js';
 import { ManualEditDialog } from './dialogs/ManualEditDialog.js';
 import { MessageDialog } from './dialogs/MessageDialog.js';
@@ -150,6 +154,8 @@ type WorkspaceOverlay =
   | { kind: 'support' }
   | { kind: 'notes' }
   | { kind: 'history' }
+  | { kind: 'deletion-request' }
+  | { kind: 'delete-founder' }
   | { kind: 'stages' }
   | { kind: 'settings' }
   | { kind: 'detail'; title: string; body: string }
@@ -383,15 +389,13 @@ export function Workspace({ prospectId, onBack }: Props) {
     if (!campaign) return;
     setOverlay({
       kind: 'decision',
-      title: required ? 'Require Application Review' : 'Skip Application Review',
-      prompt: required
-        ? 'Record why this Founder must receive Application Review approval before listing-fee payment.'
-        : 'Record why this Founder may skip Application Review and continue directly to listing-fee payment.',
-      confirmLabel: required ? 'Turn on review' : 'Turn off review',
+      title: 'Require Application Review',
+      prompt: 'Record why this campaign is being corrected to require Application Review approval before listing-fee payment.',
+      confirmLabel: 'Turn on review',
       run: async (reason: string) => {
         await setApplicationReviewRequirement(campaign.campaignId, required, reason);
         load();
-        toast.show(required ? 'Application Review is now required' : 'Application Review will be skipped');
+        toast.show('Application Review is now required');
       },
     });
   }
@@ -663,6 +667,8 @@ export function Workspace({ prospectId, onBack }: Props) {
             });
             toast.show('Founder account export downloaded');
           }}
+          onDeletionRequest={() => setOverlay({ kind: 'deletion-request' })}
+          onDeleteFounder={() => setOverlay({ kind: 'delete-founder' })}
           onExportCampaign={() => {
             if (!campaign) return;
             exportJson(`campaign-${campaign.campaignId}.json`, {
@@ -676,6 +682,38 @@ export function Workspace({ prospectId, onBack }: Props) {
           onStopCampaign={askCampaignStop}
           onChangeOwner={askOwnerChange}
           onClose={closeOverlay}
+        />
+      ) : null}
+
+      {overlay?.kind === 'deletion-request' ? (
+        <DeletionRequestDialog
+          founderName={header.preferredName}
+          busy={busy}
+          onConfirm={(input) => {
+            void run(async () => {
+              const updated = await recordFounderDeletionRequest(prospectId, input);
+              setDetail(updated);
+              toast.show('Account-closure request recorded');
+            });
+          }}
+          onClose={closeOverlay}
+          onRefuse={(message) => toast.show(message)}
+        />
+      ) : null}
+
+      {overlay?.kind === 'delete-founder' ? (
+        <DeleteFounderDialog
+          founderName={header.legalName}
+          founderEmail={header.email}
+          busy={busy}
+          onConfirm={(confirmationEmail, reason) => {
+            void run(async () => {
+              await deleteFounder(prospectId, confirmationEmail, reason);
+              onBack();
+            });
+          }}
+          onClose={closeOverlay}
+          onRefuse={(message) => toast.show(message)}
         />
       ) : null}
 

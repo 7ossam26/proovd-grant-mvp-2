@@ -49,6 +49,7 @@ import { campaigns } from '../db/schema/domain.js';
 import {
   campaignWorkspace,
   campaignAssets,
+  campaignVisualLinks,
   campaignSocialProfiles,
   campaignOptionalItems,
   founderInterviewBookings,
@@ -167,6 +168,7 @@ export async function ensureWorkspace(
 export interface WorkspaceRows {
   workspace: typeof campaignWorkspace.$inferSelect;
   assets: (typeof campaignAssets.$inferSelect)[];
+  visualLinks: (typeof campaignVisualLinks.$inferSelect)[];
   socials: (typeof campaignSocialProfiles.$inferSelect)[];
   booking: typeof founderInterviewBookings.$inferSelect | null;
   items: (typeof campaignOptionalItems.$inferSelect)[];
@@ -185,8 +187,12 @@ export async function loadWorkspaceRows(
 
   if (!workspace) return null;
 
-  const [assets, socials, bookings, items] = await Promise.all([
+  const [assets, visualLinks, socials, bookings, items] = await Promise.all([
     db.select().from(campaignAssets).where(eq(campaignAssets.campaignId, campaignId)),
+    db
+      .select()
+      .from(campaignVisualLinks)
+      .where(eq(campaignVisualLinks.campaignId, campaignId)),
     db
       .select()
       .from(campaignSocialProfiles)
@@ -208,7 +214,7 @@ export async function loadWorkspaceRows(
   const booking =
     bookings.find((b) => b.status === 'confirmed' || b.status === 'selected') ?? bookings[0] ?? null;
 
-  return { workspace, assets, socials, booking, items };
+  return { workspace, assets, visualLinks, socials, booking, items };
 }
 
 function toSnapshot(rows: WorkspaceRows): WorkspaceSnapshot {

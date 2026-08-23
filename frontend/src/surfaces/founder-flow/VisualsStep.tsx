@@ -42,19 +42,10 @@
  * calculation to read it says `optional: discount` rather than inventing a
  * number this browser made up (§1.4). There is no fee arithmetic in this file.
  *
- * ── The link row is drawn and it is not wired, and that is stated on it ────
- * The reference's `addLink` appends the URL to the same `files` list an upload
- * lands in. There is no such record here: `campaign_assets.storage_key` is NOT
- * NULL, so a visual is an object we fetched and read, and §12's whole evidence
- * rule for this item is "we opened it and looked at it". A URL would have to be
- * fetched from wherever a Founder pointed, on a schedule nobody defined, and
- * could change after approval into something they never approved. Building that
- * is a §12 evidence decision and a migration, not a surface rebuild.
- *
- * So the row is drawn at the reference's own geometry and is honestly
- * unavailable: the control says so before anybody types rather than taking a
- * link and dropping it, which is the R2 arrangement this flow already uses in
- * three places.
+ * ── Links are saved as references, never disguised as uploaded evidence ───
+ * A visual link has its own record and lifecycle. It appears on this screen and
+ * in Admin, but it cannot acquire an upload's byte verification or approval and
+ * therefore does not earn the Visuals completion by itself.
  *
  * ── What the reference's file row does not carry ───────────────────────────
  * Its row is a label and an `x`. Pending and rejected objects also state their
@@ -97,8 +88,10 @@ import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { socialAddPop, socialNudge, stageRelayIn } from '../../components/anim.js';
 import {
   fileChecksum,
+  addVisualLink,
   putToStorage,
   removeAsset,
+  removeVisualLink,
   requestUpload,
   verifyUpload,
   FounderRequestError,
@@ -218,10 +211,10 @@ function VisualsScreen({
   const direction = useRef<1 | -1 | null>(null);
   if (direction.current === null) direction.current = flowDirection();
 
-  // The reference's `st.linkDraft`. Held here and nowhere else — there is no
-  // record behind it, which is what the row says.
+  // The reference's `st.linkDraft`; the saved record arrives on refresh.
   const [linkDraft, setLinkDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [said, setSaid] = useState('');
 
@@ -247,6 +240,7 @@ function VisualsScreen({
   const locked = state.listingPaid;
   const uploads = state.uploadsAvailable && !locked;
   const items = state.visuals;
+  const links = state.visualLinks ?? [];
 
   /**
    * The reference's `addFile` — presign, PUT, then the server reads the object
@@ -295,25 +289,44 @@ function VisualsScreen({
     [campaignId, refresh],
   );
 
-  /**
-   * `addLink`, as far as it can honestly go.
-   *
-   * The reference's empty and malformed branches both end in `linkErr`, which
-   * nothing on its screen renders — pressing Add on a bad address there does
-   * nothing at all, visibly. That is reproduced as the nudge its sibling
-   * `addSocial` uses for the same case, plus a sentence, because a control that
-   * silently declines is one somebody presses again (§27.1). A well-formed
-   * address gets the same answer the row already carries.
-   */
-  function addLink() {
+  async function addLink() {
     const value = linkDraft.trim();
     if (!URL_SHAPE.test(value)) {
       socialNudge(linkInput.current);
       setSaid(value ? 'That does not look like a web address.' : 'Paste a link first.');
       return;
     }
-    socialAddPop(addButton.current);
-    setSaid('This link was not added.');
+    if (locked || linkBusy) return;
+    setLinkBusy(true);
+    setFailure(null);
+    try {
+      await refresh(addVisualLink(campaignId, value));
+      setLinkDraft('');
+      socialAddPop(addButton.current);
+      setSaid('Link added.');
+    } catch (error) {
+      socialNudge(linkInput.current);
+      setFailure(
+        error instanceof FounderRequestError
+          ? (error.detail.whatHappened ?? error.detail.title)
+          : 'That link could not be added. Nothing else has changed.',
+      );
+    } finally {
+      setLinkBusy(false);
+    }
+  }
+
+  function openFilePicker() {
+    setFailure(null);
+    if (locked) {
+      setFailure('Your files are locked because the listing fee has been paid.');
+      return;
+    }
+    if (!state.uploadsAvailable) {
+      setFailure('File uploads are not configured on this deployment yet.');
+      return;
+    }
+    if (!busy) fileInput.current?.click();
   }
 
   /** `visualsNext:()=>this.afterSection({vStep:4,brandStage:'logo'})` — Your brand. */
@@ -410,6 +423,7 @@ function VisualsScreen({
                 ref={fileInput}
                 type="file"
                 id="ff-vis-file"
+                aria-label="Choose a product file"
                 className="ff-vis__fileinput"
                 accept="image/*,video/mp4,video/quicktime"
                 disabled={!uploads || busy}
@@ -418,9 +432,11 @@ function VisualsScreen({
                   if (file) void upload(file);
                 }}
               />
-              <label
+              <button
+                type="button"
                 className={uploads ? 'ff-vis__drop' : 'ff-vis__drop is-off'}
-                htmlFor="ff-vis-file"
+                onClick={openFilePicker}
+                disabled={busy}
               >
                 <svg viewBox="0 0 24 24" width="126" height="126" fill="#8FCBA3" aria-hidden="true">
                   <path d="M12 2.6 3.6 11h4.6v6.2h7.6V11h4.6z" />
@@ -441,7 +457,7 @@ function VisualsScreen({
                     <span className="ff-vis__droptypes">PNG, JPG, MP4</span>
                   </>
                 )}
-              </label>
+              </button>
 
               <div className="ff-vis__linkrow">
                 <input
@@ -451,6 +467,7 @@ function VisualsScreen({
                   placeholder="paste your link"
                   aria-label="Paste a link to your product"
                   value={linkDraft}
+                  disabled={locked || linkBusy}
                   onChange={(event) => setLinkDraft(event.target.value)}
                   onKeyDown={(event) => {
                     /* Enter presses Add, which is this row's own action.
@@ -472,13 +489,14 @@ function VisualsScreen({
                   type="button"
                   className="ff-vis__add"
                   onClick={addLink}
+                  disabled={locked || linkBusy}
                 >
-                  Add
+                  {linkBusy ? 'Adding…' : 'Add'}
                 </button>
               </div>
             </div>
 
-            {items.length ? (
+            {items.length || links.length ? (
               <ul className="ff-vis__list">
                 {items.map((asset, index) => (
                   <FileRow
@@ -489,6 +507,17 @@ function VisualsScreen({
                     onRemove={() => {
                       void refresh(removeAsset(campaignId, asset.id));
                       setSaid('File removed.');
+                    }}
+                  />
+                ))}
+                {links.map((link) => (
+                  <LinkRow
+                    key={link.id}
+                    url={link.url}
+                    locked={locked}
+                    onRemove={() => {
+                      void refresh(removeVisualLink(campaignId, link.id));
+                      setSaid('Link removed.');
                     }}
                   />
                 ))}
@@ -580,6 +609,45 @@ function FileRow({
           <span className="ff-vis__filenote">{rejectionText(asset.rejection ?? '')}</span>
         </div>
       ) : null}
+    </li>
+  );
+}
+
+function LinkRow({
+  url,
+  locked,
+  onRemove,
+}: {
+  url: string;
+  locked: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <li className="ff-vis__file">
+      <div className="ff-vis__filetop">
+        <a
+          className="ff-vis__filename ff-vis__savedlink"
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          title={url}
+        >
+          {url}
+        </a>
+        {locked ? null : (
+          <button
+            type="button"
+            className="ff-vis__filex"
+            aria-label={`Remove ${url}`}
+            onClick={onRemove}
+          >
+            x
+          </button>
+        )}
+      </div>
+      <div className="ff-vis__filemeta">
+        <span className="ff-vis__filenote">Product link</span>
+      </div>
     </li>
   );
 }

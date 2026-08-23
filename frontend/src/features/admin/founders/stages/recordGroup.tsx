@@ -418,6 +418,16 @@ export interface FounderPanel {
   } | null;
 }
 
+interface FounderPanelResponse extends FounderPanel {
+  /** Names used by the panel supplement returned by the server. */
+  invitePrefills?: Omit<NonNullable<FounderPanel['prefills']>, 'username'> | null;
+  identity?: {
+    username?: string | null;
+    emailCodeVerifiedAt?: string | null;
+    passwordSetAt?: string | null;
+  } | null;
+}
+
 /**
  * The prop arrives as `unknown` so this file's optimistic view of the route can
  * never fail a build against whatever type the panel client settles on. Reads
@@ -425,7 +435,30 @@ export interface FounderPanel {
  * absences.
  */
 export function readPanel(panel: unknown): FounderPanel {
-  return panel && typeof panel === 'object' ? (panel as FounderPanel) : {};
+  if (!panel || typeof panel !== 'object' || Array.isArray(panel)) return {};
+
+  const response = panel as FounderPanelResponse;
+  const hasResponsePrefills = response.invitePrefills !== undefined || response.identity !== undefined;
+  const hasResponseAccount = response.identity !== undefined;
+
+  return {
+    ...response,
+    prefills: hasResponsePrefills
+      ? {
+          ...(response.prefills ?? {}),
+          ...(response.invitePrefills ?? {}),
+          username: response.identity?.username ?? response.prefills?.username ?? null,
+        }
+      : response.prefills,
+    account: hasResponseAccount
+      ? {
+          ...(response.account ?? {}),
+          emailVerifiedAt:
+            response.identity?.emailCodeVerifiedAt ?? response.account?.emailVerifiedAt ?? null,
+          passwordSetAt: response.identity?.passwordSetAt ?? response.account?.passwordSetAt ?? null,
+        }
+      : response.account,
+  };
 }
 
 export function panelItem(panel: FounderPanel, key: string): PanelOptionalItem | undefined {

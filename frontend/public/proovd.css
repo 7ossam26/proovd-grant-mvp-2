@@ -13970,6 +13970,7 @@ html.no-motion .ff-story__say { transition: none; }
    not offer a pointer. */
 .ff-vis__drop.is-off { cursor: default; }
 .ff-vis__drop.is-off:hover { transform: none; }
+.ff-vis__drop:disabled { opacity: 1; }
 
 .ff-vis__drop svg { width: 126px; height: 126px; flex: none; display: block; }
 
@@ -14058,6 +14059,7 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-vis__add:hover { background: #012D10; }
 .ff-vis__add:active { transform: scale(0.94); transition-duration: 0.12s; }
 .ff-vis__add:focus-visible { outline: 3px solid #013F17; outline-offset: 4px; }
+.ff-vis__add:disabled { cursor: wait; opacity: 0.72; }
 
 /* ── The right-hand column: the empty rule, then the list ────────────────── */
 
@@ -14112,6 +14114,9 @@ html.no-motion .ff-story__say { transition: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ff-vis__savedlink { text-decoration: underline; text-underline-offset: 4px; }
+.ff-vis__savedlink:hover { color: #08783C; }
+.ff-vis__savedlink:focus-visible { outline: 3px solid #013F17; outline-offset: 3px; }
 .ff-vis__filex {
   flex: none;
   padding: 0 8px;

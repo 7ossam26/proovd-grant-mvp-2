@@ -118,6 +118,7 @@ import {
   type FounderMutationDeps,
 } from '../founders/mutations.js';
 import type { OnboardingContext } from '../payments/onboarding.js';
+import { hardDeleteFounder, postgresErrorCode } from '../founders/hard-delete.js';
 
 export const ADMIN_FOUNDERS_PATH = '/api/admin/founders';
 export const ADMIN_CAMPAIGNS_PATH = '/api/admin/campaigns';
@@ -362,6 +363,64 @@ export function createAdminFoundersRouter({
       }),
     });
   });
+
+  /**
+   * Permanently removes one Founder and the complete foreign-key graph rooted
+   * at their campaigns, drafts, prospect, and (Founder-only) account.
+   *
+   * This is intentionally distinct from §25.8's deletion-request record. It is
+   * the explicit Admin hard-delete requested for disposable or incorrectly
+   * created records, so it takes the freshness gate and requires both a typed
+   * email confirmation and a substantial reason at the database boundary.
+   */
+  router.delete(
+    `${ADMIN_FOUNDERS_PATH}/:prospectId`,
+    admin,
+    fresh,
+    json,
+    async (req, res, next) => {
+      const prospectId = req.params['prospectId'] as string;
+      const body = req.body as Record<string, unknown>;
+      if (!looksLikeRecordId(prospectId)) {
+        notFound(res, 'No such Founder', 'There is no Founder at that address.');
+        return;
+      }
+
+      try {
+        const deleted = await hardDeleteFounder(db, {
+          prospectId,
+          confirmationEmail: str(body, 'confirmationEmail') ?? '',
+          reason: str(body, 'reason') ?? '',
+          actor: actorOf(req),
+        });
+        res.json({ deleted: true, ...deleted });
+      } catch (error) {
+        const code = postgresErrorCode(error);
+        if (code === 'P0002') {
+          notFound(res, 'No such Founder', 'There is no Founder at that address.');
+          return;
+        }
+        if (code === '22023') {
+          badRequest(
+            res,
+            error instanceof Error ? error.message : 'The deletion confirmation was not valid.',
+            'Check the Founder email and give a deletion reason. Nothing was deleted.',
+          );
+          return;
+        }
+        if (code === '54001' || code === '23503' || code === 'P0001') {
+          res.status(409).json({
+            error: 'deletion_blocked',
+            title: 'That Founder was not deleted',
+            whatHappened: 'A protected related record prevented permanent deletion. Nothing was deleted.',
+            next: 'Keep the closure request for retention review, or remove the protected test data first.',
+          });
+          return;
+        }
+        next(error);
+      }
+    },
+  );
 
   /* ── §7's first act: writing somebody down ─────────────────────────────── */
 

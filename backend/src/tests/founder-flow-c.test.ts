@@ -73,6 +73,7 @@ const COMPOSE = {
 };
 
 interface Invited {
+  prospectId: string;
   draftId: string;
   campaignId: string;
   email: string;
@@ -174,6 +175,8 @@ describe('the email-code constants are restated, not re-decided', () => {
       'campaign-type',
       'email',
       'code',
+      'confirm-problem',
+      'confirm-solution',
       'positioning',
     ]);
     for (const page of stageOne) expect(page.param, page.id).toBe('token');
@@ -230,10 +233,14 @@ describe('the six-digit code', () => {
     const code = await askForCode(invited);
 
     const [before] = await h.db
-      .select({ ownership: founderClaimProfiles.emailOwnership })
+      .select({
+        ownership: founderClaimProfiles.emailOwnership,
+        verifiedAt: founderClaimProfiles.emailCodeVerifiedAt,
+      })
       .from(founderClaimProfiles)
       .where(eq(founderClaimProfiles.draftId, invited.draftId));
     expect(before?.ownership).not.toBe('code_verified');
+    expect(before?.verifiedAt).toBeNull();
 
     await request(h.app)
       .post(`/api/draft/${invited.raw}/email-code/verify`)
@@ -242,10 +249,20 @@ describe('the six-digit code', () => {
       .expect((res) => expect(res.body).toEqual({ verified: true }));
 
     const [after] = await h.db
-      .select({ ownership: founderClaimProfiles.emailOwnership })
+      .select({
+        ownership: founderClaimProfiles.emailOwnership,
+        verifiedAt: founderClaimProfiles.emailCodeVerifiedAt,
+      })
       .from(founderClaimProfiles)
       .where(eq(founderClaimProfiles.draftId, invited.draftId));
     expect(after?.ownership).toBe('code_verified');
+    expect(after?.verifiedAt).toBeInstanceOf(Date);
+
+    const panel = await request(h.app)
+      .get(`/api/admin/founder-panel/${invited.prospectId}`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect(panel.body.identity.emailCodeVerifiedAt).toBe(after?.verifiedAt?.toISOString());
   });
 
   it('answers byte-identically for wrong, reused, and never-requested', async () => {
@@ -630,15 +647,15 @@ describe('deviation 1 does not become an account-creation path', () => {
     ).toHaveLength(0);
   });
 
-  it('adds no column matching %verif% to `founder_claim_profiles` (§33.1.8)', async () => {
-    // §33.1.8's own scan, restated here because this is the session that would
-    // have broken it. The fact lands in `email_ownership`'s fourth VALUE, and a
-    // value is not a column.
+  it('stores only the email-code verification instant on the claim profile', async () => {
+    // Migration 0059 added the durable instant the Admin panel renders. Its
+    // deliberately email-specific name is the guardrail: no phone field gains
+    // a verification state or timestamp alongside it.
     const columns = await h.db.execute(
       sql`select column_name from information_schema.columns
           where table_name = 'founder_claim_profiles' and column_name ilike '%verif%'`,
     );
-    expect(columns.rows).toHaveLength(0);
+    expect(columns.rows).toEqual([{ column_name: 'email_code_verified_at' }]);
   });
 
   it('adds no phone verification anywhere', async () => {

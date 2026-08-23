@@ -358,8 +358,8 @@ export function createAdminFounderPanelRouter(deps: AdminFounderPanelDeps): Rout
         sendRefusal(res, {
           ok: false,
           code: 'invalid_required',
-          message: 'Application Review must be explicitly turned on or off.',
-          next: 'Choose one state and try again. Nothing has changed.',
+          message: 'Application Review must be explicitly confirmed as required.',
+          next: 'Confirm the requirement and try again. Nothing has changed.',
         });
         return;
       }

@@ -255,6 +255,7 @@ const ROUTES: ReadonlyArray<{ method: 'get' | 'put' | 'post' | 'delete'; path: s
   { method: 'get', path: '/api/admin/founders', gated: false },
   { method: 'post', path: '/api/admin/founders', gated: false },
   { method: 'get', path: `/api/admin/founders/${randomUUID()}`, gated: false },
+  { method: 'delete', path: `/api/admin/founders/${randomUUID()}`, gated: true },
   // Gated because the process cannot tell whose record this is: an unknown
   // Founder takes the gate, which is `guards.ts`'s posture everywhere else. The
   // pre-claim case, where the gate correctly does NOT apply, is asserted below.

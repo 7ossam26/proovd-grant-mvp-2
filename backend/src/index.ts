@@ -101,7 +101,10 @@ async function main() {
   // §12 uploads (tech-stack §9). Same shape, same reasoning: R2 is Track A4 and
   // an unconfigured deployment refuses uploads loudly rather than reporting a
   // file as stored when no bucket exists.
-  const { createR2Storage, unconfiguredStorage } = await import('./storage/object-storage.js');
+  const { createDevelopmentStorage, createR2Storage, unconfiguredStorage } = await import(
+    './storage/object-storage.js'
+  );
+  const { MAX_UPLOAD_BYTES } = await import('./storage/media.js');
   const { objectStorageConfigured, schedulerConfigured } = await import('./env.js');
   const objectStorage = objectStorageConfigured(env)
     ? createR2Storage({
@@ -110,7 +113,12 @@ async function main() {
         secretAccessKey: env.R2_SECRET_ACCESS_KEY!,
         bucket: env.R2_BUCKET!,
       })
-    : unconfiguredStorage;
+    : env.NODE_ENV === 'development'
+      ? createDevelopmentStorage({
+          appBaseUrl: env.APP_BASE_URL,
+          maxBytes: MAX_UPLOAD_BYTES,
+        })
+      : unconfiguredStorage;
 
   // §12's booking provider (tech-stack §12). Same shape again: an unconfigured
   // deployment renders no embed and accepts no webhook, rather than an empty

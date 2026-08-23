@@ -208,6 +208,7 @@ export interface FounderWorkspaceView {
   };
   story: { text: string | null; approved: boolean };
   visuals: ReturnType<typeof assetViews>;
+  visualLinks: Array<{ id: string; url: string }>;
   socials: Array<{
     id: string;
     url: string;
@@ -342,6 +343,9 @@ export async function readFounderWorkspace(
       approved: rows.workspace.storyApprovedAt !== null,
     },
     visuals: assetViews(rows, 'visual'),
+    visualLinks: rows.visualLinks
+      .filter((link) => link.removedAt === null)
+      .map((link) => ({ id: link.id, url: link.url })),
     socials: rows.socials
       .filter((s) => s.removedAt === null)
       .map((s) => ({
@@ -452,6 +456,13 @@ export async function readAdminWorkspace(db: Database, campaignId: string) {
       storageKey: a.storageKey,
       createdBy: a.createdBy,
       createdAt: a.createdAt.toISOString(),
+    })),
+    visualLinks: rows.visualLinks.map((link) => ({
+      id: link.id,
+      url: link.url,
+      removed: link.removedAt !== null,
+      createdBy: link.createdBy,
+      createdAt: link.createdAt.toISOString(),
     })),
     socials: rows.socials.map((s) => ({
       id: s.id,

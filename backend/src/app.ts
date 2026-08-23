@@ -295,6 +295,35 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // which includes both signed webhook endpoints. See `auth/origin-guard.ts`.
   app.use(crossOriginWriteGuard(corsOrigins));
 
+  // Local development can exercise the exact presign → browser PUT → verify
+  // sequence without a cloud bucket. The opaque one-use token is the
+  // authorization for this route; production R2 storage has no receiver and
+  // therefore mounts no endpoint that can accept file bytes on the app server.
+  const browserUploadReceiver = config.objectStorage?.browserUploadReceiver;
+  if (browserUploadReceiver) {
+    app.put(
+      browserUploadReceiver.path,
+      express.raw({ type: '*/*', limit: browserUploadReceiver.maxBytes }),
+      async (req, res) => {
+        const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+        const result = await browserUploadReceiver.receive({
+          token: String(req.params['token'] ?? ''),
+          contentType: req.headers['content-type'] ?? 'application/octet-stream',
+          body,
+        });
+        if (result === 'stored') {
+          res.status(201).end();
+          return;
+        }
+        if (result === 'invalid') {
+          res.status(422).json({ error: 'upload_invalid' });
+          return;
+        }
+        res.status(result === 'expired' ? 410 : 404).json({ error: `upload_${result}` });
+      },
+    );
+  }
+
   // ── Routes (per-router body parsing — no global express.json()) ────────────
   //
   // DO NOT add app.use(express.json()) here. Phase 10 mounts Stripe webhook

@@ -8,9 +8,8 @@
  * refused by the SERVER without a reason, not merely by the dialog.
  *
  * Every action shown as a button has a real route or a local export behind it.
- * Two rows remain explanatory by product rule: bulk account deletion is
- * prohibited by retention obligations, and arbitrary campaign archival is not
- * a lifecycle transition. Neither is rendered as an enable-able control.
+ * Account closure records a deletion request rather than destroying retained
+ * records. Arbitrary campaign archival remains explanatory by product rule.
  *
  * ── Two reference strings are not reproduced, and both are mock data ────────
  * The reference's owner control reads `Change to Omar` because its roster is
@@ -70,6 +69,8 @@ interface Props {
   warningCount: number;
   onAddWarning: () => void;
   onExportAccount: () => void;
+  onDeletionRequest: () => void;
+  onDeleteFounder: () => void;
   onExportCampaign: () => void;
   onStopCampaign: () => void;
   onChangeOwner: () => void;
@@ -87,6 +88,8 @@ export function SettingsDialog({
   warningCount,
   onAddWarning,
   onExportAccount,
+  onDeletionRequest,
+  onDeleteFounder,
   onExportCampaign,
   onStopCampaign,
   onChangeOwner,
@@ -95,6 +98,11 @@ export function SettingsDialog({
   const { header, campaigns } = detail;
   const suspended = header.account === 'Access suspended';
   const accessAvailable = header.availableActions.includes(suspended ? 'restore' : 'suspend');
+  const deletionRequest =
+    detail.details && typeof detail.details === 'object'
+      ? (detail.details as { deletionRequest?: { requestedAt?: string | null } | null })
+          .deletionRequest
+      : null;
 
   return (
     <Overlay label="Founder and campaign settings" onClose={onClose}>
@@ -170,11 +178,21 @@ export function SettingsDialog({
           />
           <SettingRow
             danger
-            title="Account deletion"
-            description="Account-closure requests are recorded and reviewed; retained campaign, payment, tax, support and audit records are never bulk-deleted."
+            title="Close Founder account"
+            description="Record the Founder’s deletion request for review. Retained campaign, payment, tax, support and audit records are preserved."
             action={
-              <NotBuilt>Bulk deletion is prohibited by the retention policy.</NotBuilt>
+              deletionRequest?.requestedAt ? (
+                <NotBuilt>Deletion request recorded and awaiting retention review.</NotBuilt>
+              ) : (
+                <button type="button" onClick={onDeletionRequest}>Record request</button>
+              )
             }
+          />
+          <SettingRow
+            danger
+            title="Delete Founder permanently"
+            description="Permanently remove this Founder, every linked campaign and draft, and the Founder account and sessions. This cannot be undone."
+            action={<button type="button" onClick={onDeleteFounder}>Delete Founder</button>}
           />
         </section>
 
@@ -186,10 +204,12 @@ export function SettingsDialog({
 
           <SettingRow
             title="Require Application Review"
-            description="When on, the Founder must receive approval before the listing-fee step. When off, the flow skips Application Review."
+            description="Every Founder must receive Application Review approval before the listing-fee step."
             action={
               applicationReviewRequirement ? (
-                applicationReviewRequirement.locked ? (
+                applicationReviewRequirement.required ? (
+                  <NotBuilt>Required for every campaign.</NotBuilt>
+                ) : applicationReviewRequirement.locked ? (
                   <NotBuilt>
                     {applicationReviewRequirement.lockedReason ??
                       'This setting is locked because the campaign has progressed.'}
@@ -198,11 +218,9 @@ export function SettingsDialog({
                   <button
                     type="button"
                     aria-pressed={applicationReviewRequirement.required}
-                    onClick={() =>
-                      onApplicationReviewRequirement(!applicationReviewRequirement.required)
-                    }
+                    onClick={() => onApplicationReviewRequirement(true)}
                   >
-                    {applicationReviewRequirement.required ? 'Turn off' : 'Turn on'}
+                    Turn on
                   </button>
                 )
               ) : (

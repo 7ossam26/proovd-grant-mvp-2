@@ -6702,6 +6702,39 @@ html.no-motion .live-kpis article.primary:hover {
   min-height: clamp(11rem, 32svh, 18rem);
 }
 
+.deletion-request-form {
+  display: grid;
+  gap: var(--sp-16);
+}
+.deletion-request-form label {
+  margin-block-start: 0;
+}
+.deletion-request-form textarea {
+  min-height: 8rem;
+}
+.deletion-request-form input {
+  width: min(100%, 34rem);
+}
+
+.hard-delete-form {
+  display: grid;
+  gap: var(--sp-16);
+}
+.hard-delete-form label {
+  margin-block-start: 0;
+}
+.hard-delete-form input,
+.hard-delete-form textarea {
+  width: min(100%, 38rem);
+}
+.hard-delete-form textarea {
+  min-height: 8rem;
+}
+.hard-delete-form .hard-delete-button {
+  background: var(--dark);
+  border-color: var(--dark);
+}
+
 /* MANUAL EDIT — the same form class, and it must not read as the same dialog.
    The object is one saved value, so the sheet takes the narrowest step in the
    ladder and the field is capped to the shape of a value rather than stretched

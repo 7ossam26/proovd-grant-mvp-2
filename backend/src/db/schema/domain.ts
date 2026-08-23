@@ -186,14 +186,10 @@ export const campaigns = pgTable(
     status: campaignStatus('status').notNull().default('invited_draft'),
 
     /**
-     * Per-campaign gate for the early Founder Application Review.
-     *
-     * False preserves the historic flow (Creator payment -> listing fee). When
-     * true, the server requires a decided, approved application-review round
-     * before listing preparation may begin. This lives on the campaign rather
-     * than in browser state so a copied URL cannot bypass the Admin's choice.
+     * Durable gate for Founder Application Review. Every campaign requires a
+     * decided, approved review round before listing preparation may begin.
      */
-    applicationReviewRequired: boolean('application_review_required').notNull().default(false),
+    applicationReviewRequired: boolean('application_review_required').notNull().default(true),
 
     /**
      * The furthest workflow stage this campaign has ever reached — the Admin

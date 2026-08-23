@@ -1459,6 +1459,7 @@ function workspaceState(overrides: Record<string, unknown> = {}): Record<string,
     brand: { colors: null, typography: null, notes: null, approved: false, logos: [] },
     story: { text: null, approved: false },
     visuals: [],
+    visualLinks: [],
     socials: [],
     interview: {
       bookable: false,
@@ -1599,6 +1600,52 @@ describe('the five §12 answers (10–14)', () => {
     expect(screen.getByText('Tap to add a file')).toBeInTheDocument();
     expect(screen.getByText('PNG, JPG, MP4')).toBeInTheDocument();
     expect(document.querySelector('#ff-vis-file')).toBeDisabled();
+  });
+
+  it('opens the native file chooser from Tap to add a file when uploads are available', async () => {
+    const user = userEvent.setup();
+    stubStage3({ uploadsAvailable: true });
+    renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+
+    const input = document.querySelector('#ff-vis-file') as HTMLInputElement;
+    const click = vi.spyOn(input, 'click');
+    await user.click(screen.getByRole('button', { name: /tap to add a file/i }));
+
+    expect(input).not.toBeDisabled();
+    expect(click).toHaveBeenCalledOnce();
+  });
+
+  it('saves a product link and renders the server copy', async () => {
+    const user = userEvent.setup();
+    stubStage3({ visualLinks: [] });
+    handlers.push((url, init) => {
+      if (!url.endsWith('/visual-links') || init?.method !== 'POST') return undefined;
+      return {
+        status: 200,
+        body: {
+          workspace: workspaceState({
+            visualLinks: [{ id: 'visual-link-1', url: 'https://example.com/demo' }],
+          }),
+        },
+      };
+    });
+    renderAt(at('visuals'));
+    await screen.findByRole('heading', { level: 1 });
+
+    await user.type(screen.getByRole('textbox', { name: /paste a link to your product/i }), 'example.com/demo');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    const saved = await screen.findByRole('link', { name: 'https://example.com/demo' });
+    expect(saved).toHaveAttribute('href', 'https://example.com/demo');
+    expect(
+      requests.some(
+        (request) =>
+          request.method === 'POST' &&
+          request.url.endsWith('/visual-links') &&
+          request.body?.['url'] === 'example.com/demo',
+      ),
+    ).toBe(true);
   });
 
   it('uses the reference ordinal label for an added logo instead of its filename', async () => {

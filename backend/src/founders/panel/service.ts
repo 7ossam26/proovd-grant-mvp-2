@@ -916,15 +916,7 @@ export interface AccountWarningView {
   createdAt: string;
 }
 
-/**
- * Turns the early Application Review gate on or off for one campaign.
- *
- * The switch is intentionally mutable only before a review exists and before
- * payment preparation begins. Changing it later would either strand a Founder
- * behind a review they already passed or let them bypass a decision already in
- * progress. The row is locked and the prior value is audited in the same
- * transaction as the write.
- */
+/** Ensures the mandatory early Application Review gate is on for a campaign. */
 export async function setApplicationReviewRequirement(
   db: Database,
   who: PanelActor,
@@ -939,6 +931,13 @@ export async function setApplicationReviewRequirement(
 > {
   if (!looksLikeId(input.campaignId)) {
     return refuse('not_found', 'There is no campaign at that address.', 'Go back to the Founder record.');
+  }
+  if (!input.required) {
+    return refuse(
+      'review_required',
+      'Application Review is required for every campaign and cannot be skipped.',
+      'Continue with Application Review. Nothing has changed.',
+    );
   }
   const internalReason = input.internalReason.trim();
   if (!internalReason) {

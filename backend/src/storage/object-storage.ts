@@ -36,7 +36,7 @@
  * Postgres.
  */
 
-import { createHash, createHmac } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 
 export interface PresignedUpload {
   /** The URL the browser PUTs to. Carries the signature in the query string. */
@@ -73,6 +73,19 @@ export interface ObjectStorage {
   presignUpload(input: PresignInput): Promise<PresignedUpload>;
   /** Reads the object back for §12's verification. Throws if it is not there. */
   getObject(key: string): Promise<StoredObject>;
+  /**
+   * Development-only same-origin receiver. Production R2 implementations do
+   * not expose this: their presigned URL still sends the bytes straight to R2.
+   */
+  readonly browserUploadReceiver?: {
+    path: string;
+    maxBytes: number;
+    receive(input: {
+      token: string;
+      contentType: string;
+      body: Buffer;
+    }): Promise<'stored' | 'not_found' | 'expired' | 'invalid'>;
+  };
 }
 
 /** Raised when the object is not in the bucket — an abandoned upload. */
@@ -305,6 +318,87 @@ export function createMemoryStorage(bucket = 'test-bucket'): ObjectStorage & {
       const found = objects.get(key);
       if (!found) throw new ObjectNotStored(key);
       return { key, contentType: found.contentType, byteSize: found.body.byteLength, body: found.body };
+    },
+  };
+}
+
+/* ── Local-development browser uploads ──────────────────────────────────── */
+
+/** The receiver is mounted only when this exact opt-in implementation is used. */
+export const DEVELOPMENT_UPLOAD_PATH = '/api/development-storage/:token';
+
+/**
+ * Same-origin, in-memory storage for walking the real browser flow locally.
+ *
+ * A random, one-use capability stands in for R2's signed query string. The
+ * upload still uses the production three-step sequence (presign, browser PUT,
+ * server read-back and media verification), but no cloud account is required.
+ * It is selected only by `index.ts` when NODE_ENV is `development` and R2 is
+ * absent; production continues to fail closed through `unconfiguredStorage`.
+ */
+export function createDevelopmentStorage(input: {
+  appBaseUrl: string;
+  bucket?: string;
+  maxBytes: number;
+}): ObjectStorage {
+  const bucket = input.bucket ?? 'local-development';
+  const objects = new Map<string, { contentType: string; body: Buffer }>();
+  const pending = new Map<
+    string,
+    { key: string; contentType: string; contentLength: number; expiresAt: Date }
+  >();
+
+  return {
+    configured: true,
+    bucket,
+    // The receiver is on the application origin, already allowed by `self`.
+    browserUploadOrigin: null,
+    browserUploadReceiver: {
+      path: DEVELOPMENT_UPLOAD_PATH,
+      maxBytes: input.maxBytes,
+      async receive({ token, contentType, body }) {
+        const grant = pending.get(token);
+        if (!grant) return 'not_found';
+        pending.delete(token);
+        if (grant.expiresAt.getTime() < Date.now()) return 'expired';
+        if (contentType.split(';', 1)[0]?.trim().toLowerCase() !== grant.contentType.toLowerCase()) {
+          return 'invalid';
+        }
+        if (body.byteLength !== grant.contentLength || body.byteLength > input.maxBytes) {
+          return 'invalid';
+        }
+        objects.set(grant.key, { contentType: grant.contentType, body: Buffer.from(body) });
+        return 'stored';
+      },
+    },
+    async presignUpload(presignInput) {
+      const expiresInSeconds = presignInput.expiresInSeconds ?? DEFAULT_EXPIRY_SECONDS;
+      const token = randomUUID();
+      const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
+      pending.set(token, {
+        key: presignInput.key,
+        contentType: presignInput.contentType,
+        contentLength: presignInput.contentLength,
+        expiresAt,
+      });
+      const url = new URL(DEVELOPMENT_UPLOAD_PATH.replace(':token', encodeURIComponent(token)), input.appBaseUrl);
+      return {
+        url: url.toString(),
+        requiredHeaders: { 'content-type': presignInput.contentType },
+        expiresAt,
+        key: presignInput.key,
+        bucket,
+      };
+    },
+    async getObject(key) {
+      const found = objects.get(key);
+      if (!found) throw new ObjectNotStored(key);
+      return {
+        key,
+        contentType: found.contentType,
+        byteSize: found.body.byteLength,
+        body: Buffer.from(found.body),
+      };
     },
   };
 }

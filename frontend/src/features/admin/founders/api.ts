@@ -555,6 +555,42 @@ export const recordAccessDecision = (
     body: JSON.stringify({ action, reason }),
   });
 
+export interface FounderDeletionRequestInput {
+  detail: string;
+  receivedVia: string;
+  requestedAt: string;
+}
+
+/** Records a Founder's dated account-closure request; retained records remain. */
+export const recordFounderDeletionRequest = (
+  prospectId: string,
+  input: FounderDeletionRequestInput,
+): Promise<FounderWorkspaceDetail> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/deletion-request`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+
+export interface HardDeleteFounderResult {
+  deleted: true;
+  legalName: string | null;
+  email: string;
+  campaignCount: number;
+  deletedAccount: boolean;
+  deletedRows: number;
+}
+
+/** Permanently deletes a Founder and every database-linked dependent record. */
+export const deleteFounder = (
+  prospectId: string,
+  confirmationEmail: string,
+  reason: string,
+): Promise<HardDeleteFounderResult> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ confirmationEmail, reason }),
+  });
+
 /* ── The panel supplement ─────────────────────────────────────────────────── */
 
 /**
@@ -661,11 +697,7 @@ export const stopFounderCampaign = (
     }),
   });
 
-/**
- * Changes whether Application Review is an early blocking gate for one
- * campaign. The server records the reason and refuses changes once review or
- * payment progression has started.
- */
+/** Ensures Application Review is the blocking gate for a campaign. */
 export const setApplicationReviewRequirement = (
   campaignId: string,
   required: boolean,

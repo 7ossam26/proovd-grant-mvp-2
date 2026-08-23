@@ -134,6 +134,11 @@ export interface AssetState {
   byteSize: string | null;
 }
 
+export interface VisualLinkState {
+  id: string;
+  url: string;
+}
+
 export interface SocialState {
   id: string;
   url: string;
@@ -161,6 +166,8 @@ export interface WorkspaceState {
   };
   story: { text: string | null; approved: boolean };
   visuals: AssetState[];
+  /** Present on current servers; optional keeps cached pre-migration fixtures readable. */
+  visualLinks?: VisualLinkState[];
   socials: SocialState[];
   interview: {
     bookable: boolean;
@@ -379,6 +386,23 @@ export const removeAsset = (
   assetId: string,
 ): Promise<{ workspace: WorkspaceState }> =>
   call(`${base(campaignId)}/uploads/${encodeURIComponent(assetId)}`, { method: 'DELETE' });
+
+export const addVisualLink = (
+  campaignId: string,
+  url: string,
+): Promise<{ workspace: WorkspaceState }> =>
+  call(`${base(campaignId)}/visual-links`, {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  });
+
+export const removeVisualLink = (
+  campaignId: string,
+  linkId: string,
+): Promise<{ workspace: WorkspaceState }> =>
+  call(`${base(campaignId)}/visual-links/${encodeURIComponent(linkId)}`, {
+    method: 'DELETE',
+  });
 
 /* ── Socials ──────────────────────────────────────────────────────────────── */
 

@@ -73,6 +73,7 @@ import {
 } from '../workspace/service.js';
 import { readFounderWorkspace } from '../workspace/projection.js';
 import { requestUpload, verifyUpload, setAssetApproval, removeAsset } from '../workspace/uploads.js';
+import { addVisualLink, removeVisualLink } from '../workspace/visual-links.js';
 import {
   addSocialProfile,
   recheckSocialProfile,
@@ -683,6 +684,54 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
       }
 
       await evaluateWorkspace(db, { campaignId, actor: actorId(req), trigger: 'asset_removed' });
+      await respond(res, campaignId);
+    },
+  );
+
+  /* ── Visual links ─────────────────────────────────────────────────────── */
+
+  router.post(
+    `${FOUNDER_PATH}/campaigns/:campaignId/visual-links`,
+    founder,
+    json,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const result = await addVisualLink(db, {
+        campaignId,
+        url: String((req.body as Record<string, unknown>)['url'] ?? ''),
+        actor: actorId(req),
+      });
+      if (!result.ok) {
+        res.status(422).json({
+          error: result.code,
+          title: 'That link cannot be added',
+          whatHappened: result.message,
+          next: 'Check the address and try again. Nothing else on this page has changed.',
+        });
+        return;
+      }
+      await respond(res, campaignId);
+    },
+  );
+
+  router.delete(
+    `${FOUNDER_PATH}/campaigns/:campaignId/visual-links/:linkId`,
+    founder,
+    async (req, res) => {
+      const campaignId = await resolve(req, res);
+      if (!campaignId) return;
+
+      const ok = await removeVisualLink(db, {
+        id: String(req.params['linkId']),
+        campaignId,
+        actor: actorId(req),
+      });
+      if (!ok) {
+        notFound(res);
+        return;
+      }
       await respond(res, campaignId);
     },
   );
