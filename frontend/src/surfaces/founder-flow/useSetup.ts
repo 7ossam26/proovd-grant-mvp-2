@@ -26,6 +26,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  cacheFounderWorkspace,
   fetchWorkspace,
   saveWorkspace,
   FounderRequestError,
@@ -76,10 +77,14 @@ export function useSetupWorkspace(campaignId: string): SetupWorkspace {
     ),
   );
 
-  const refresh = useCallback(async (promise: Promise<{ workspace: WorkspaceState }>) => {
-    const { workspace } = await promise;
-    setState(workspace);
-  }, []);
+  const refresh = useCallback(
+    async (promise: Promise<{ workspace: WorkspaceState }>) => {
+      const result = await promise;
+      cacheFounderWorkspace(campaignId, result);
+      setState(result.workspace);
+    },
+    [campaignId],
+  );
 
   return { state, failure, autosave, refresh };
 }

@@ -1669,6 +1669,120 @@ describe('the five §12 answers (10–14)', () => {
     expect(screen.queryByRole('button', { name: /summari[sz]e|rewrite|suggest/i })).toBeNull();
   });
 
+  it('saves the Founder approval that completes a written Story', async () => {
+    const user = userEvent.setup();
+    stubStage3();
+    renderAt(at('story'));
+
+    const story = await screen.findByRole('textbox', { name: 'Your story' });
+    const approval = screen.getByRole('checkbox', {
+      name: /approve this story for my public campaign page/i,
+    });
+    expect(approval).toBeDisabled();
+
+    await user.type(story, 'Built from a real customer problem.');
+    expect(approval).toBeEnabled();
+    await user.click(approval);
+
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) => request.method === 'PATCH' && request.body?.['storyApproved'] === true,
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('lets the Founder approve a stored logo for Branding evidence', async () => {
+    const user = userEvent.setup();
+    const logo = {
+      id: 'logo-approval',
+      filename: 'logo.png',
+      contentType: 'image/png',
+      state: 'stored',
+      rejection: null,
+      approved: false,
+      width: 1200,
+      height: 1200,
+      byteSize: '48120',
+    };
+    const initial = {
+      brand: {
+        colors: '#41ED98 — primary',
+        typography: 'Bold headings and a clean sans-serif body',
+        notes: null,
+        approved: false,
+        logos: [logo],
+      },
+    };
+    handlers.push((url, init) =>
+      url.endsWith('/uploads/logo-approval/approval') && init?.method === 'POST'
+        ? {
+            status: 200,
+            body: {
+              workspace: workspaceState({
+                ...initial,
+                brand: { ...initial.brand, logos: [{ ...logo, approved: true }] },
+              }),
+            },
+          }
+        : undefined,
+    );
+    stubStage3(initial);
+    renderAt(at('branding'));
+
+    const approval = await screen.findByRole('checkbox', { name: 'Approved' });
+    await user.click(approval);
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.url.endsWith('/uploads/logo-approval/approval') &&
+            request.body?.['approved'] === true,
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('saves typography and approval to complete the Brand direction', async () => {
+    const user = userEvent.setup();
+    stubStage3({
+      brand: {
+        colors: '#41ED98 — primary',
+        typography: null,
+        notes: null,
+        approved: false,
+        logos: [],
+      },
+    });
+    renderAt(at('color'));
+
+    const typography = await screen.findByRole('textbox', { name: 'Typography or style' });
+    const approval = screen.getByRole('checkbox', {
+      name: /approve this brand direction for my campaign/i,
+    });
+    expect(approval).toBeDisabled();
+
+    await user.type(typography, 'Bold headings and a clean sans-serif body');
+    expect(approval).toBeEnabled();
+    await user.click(approval);
+
+    await waitFor(() => {
+      expect(
+        requests.some(
+          (request) =>
+            request.method === 'PATCH' &&
+            request.body?.['brandTypography'] === 'Bold headings and a clean sans-serif body',
+        ),
+      ).toBe(true);
+      expect(
+        requests.some(
+          (request) => request.method === 'PATCH' && request.body?.['brandApproved'] === true,
+        ),
+      ).toBe(true);
+    });
+  });
+
   it('walks the sequence forward and back, naming each destination', async () => {
     // DELIBERATELY CHANGED (2026-08-20): `visuals` was rebuilt to the supplied
     // reference, whose forward control is its own word — `Next` — so the

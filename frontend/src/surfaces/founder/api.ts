@@ -223,6 +223,15 @@ export const listCampaigns = (): Promise<{
 
 const workspaceCache = new Map<string, { workspace: WorkspaceState }>();
 
+/** Keep navigation reads aligned with the latest server-derived workspace. */
+export const cacheFounderWorkspace = (
+  campaignId: string,
+  result: { workspace: WorkspaceState },
+): { workspace: WorkspaceState } => {
+  workspaceCache.set(campaignId, result);
+  return result;
+};
+
 /** Clears session-scoped Founder workspace reads when a consumer starts fresh. */
 export const clearFounderWorkspaceCache = (): void => {
   workspaceCache.clear();
@@ -236,8 +245,7 @@ export const fetchWorkspace = async (
   const result = await call<{ workspace: WorkspaceState }>(
     `${base(campaignId)}/workspace`,
   );
-  workspaceCache.set(campaignId, result);
-  return result;
+  return cacheFounderWorkspace(campaignId, result);
 };
 
 /**
@@ -262,8 +270,7 @@ export const saveWorkspace = async (
     `${base(campaignId)}/workspace`,
     { method: 'PATCH', body: JSON.stringify(patch) },
   );
-  workspaceCache.set(campaignId, result);
-  return result;
+  return cacheFounderWorkspace(campaignId, result);
 };
 
 /* ── Your details (screen 16) ─────────────────────────────────────────────── */

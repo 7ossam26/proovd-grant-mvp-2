@@ -12874,9 +12874,28 @@ html.no-motion .ff-story__say { transition: none; }
 }
 .ff-story__sub p { margin: 0; max-width: 1500px; }
 
-/* `.ff-story__approve` and `.ff-story__check` stood here — the §12 approval
-   checkbox and its label. Removed 2026-08-20 by explicit product direction,
-   along with the control in `StoryStep.tsx`; see that file for what is lost. */
+.ff-story__approve {
+  min-height: 110px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  color: #013F17;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.ff-story__check {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  accent-color: #41ED98;
+  cursor: pointer;
+}
+.ff-story__check:disabled,
+.ff-story__check:disabled + span { cursor: not-allowed; opacity: .55; }
+.ff-story__check:focus-visible { outline: 6px solid #013F17; outline-offset: 5px; }
 
 .ff-story__note {
   font-size: 30px;
@@ -13539,6 +13558,29 @@ html.no-motion .ff-story__say { transition: none; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ff-brandlogo__file > .ff-brandlogo__fileactions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 28px;
+  overflow: visible;
+}
+.ff-brandlogo__approve {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 28px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-brandlogo__approve input {
+  width: 42px;
+  height: 42px;
+  accent-color: #41ED98;
+  cursor: pointer;
+}
+.ff-brandlogo__approve input:disabled { cursor: not-allowed; }
+.ff-brandlogo__filestate { font-size: 28px; font-weight: 600; }
 .ff-brandlogo__file button {
   flex: none;
   padding: 0 8px;
@@ -13575,6 +13617,7 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-brandlogo__mailbtn:focus-visible,
 .ff-brandlogo__drop:focus-visible,
 .ff-brandlogo__file button:focus-visible,
+.ff-brandlogo__approve input:focus-visible,
 .ff-brandlogo__cta:focus-visible {
   outline: 6px solid #013F17;
   outline-offset: 6px;
@@ -14747,6 +14790,52 @@ html.no-motion .ff-story__say { transition: none; }
      than the budget would visibly crowd the CTA, which is a signal rather than
      a disappearance. */
 }
+.ff-col__direction {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #013F17;
+  font-size: 27px;
+  font-weight: 700;
+}
+.ff-col__direction > span { flex: none; }
+.ff-col__direction input {
+  min-width: 0;
+  height: 48px;
+  flex: 1;
+  padding: 0 16px;
+  border: 2px solid #8FCBA3;
+  border-radius: 0;
+  background: #FAFAFA;
+  color: #013F17;
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+.ff-col__direction input:focus { border-color: #41ED98; }
+.ff-col__approve {
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  color: #013F17;
+  font-size: 26px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ff-col__approve input {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  accent-color: #41ED98;
+  cursor: pointer;
+}
+.ff-col__approve input:disabled,
+.ff-col__approve input:disabled + span { cursor: not-allowed; opacity: .55; }
+.ff-col__direction input:focus-visible,
+.ff-col__approve input:focus-visible { outline: 5px solid #013F17; outline-offset: 4px; }
 .ff-col__note,
 .ff-col__status {
   margin: 0;
@@ -14758,7 +14847,9 @@ html.no-motion .ff-story__say { transition: none; }
   color: #013F17;
 }
 .ff-col__status {
-  margin-top: 6px;
+  margin-top: 3px;
+  font-size: 24px;
+  line-height: 1.1;
   font-weight: 700;
   /* `--moss` is the caption tone and this is not a caption: it is the answer to
      "did that save", at 12 CSS px. It takes the page's own ink, and the failure

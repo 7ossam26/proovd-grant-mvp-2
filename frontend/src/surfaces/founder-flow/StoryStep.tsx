@@ -97,16 +97,10 @@
  * the approval below still has to happen afterwards, by a person, on the words
  * as they stand.
  *
- * ── The approval checkbox and the completion note are gone, by request ─────
- * §12's approval control and its `FLOW_COMPLETION_IS_DECIDED` note used to sit
- * in the stage-scaled block below the column (the `PositioningStep` precedent
- * for holding something the reference draws no room for). Both were removed on
- * 2026-08-20 by explicit product direction, matching the reference's own
- * composition exactly: no control on this screen sets `state.story.approved`,
- * and `storyApproved` is unreachable from here. `evaluateWorkspace` still
- * re-derives `complete` from stored content on every save — that machinery is
- * untouched — but this screen no longer explains it or offers anything that
- * writes the approval flag.
+ * ── Approval is the completing act ─────────────────────────────────────────
+ * A saved story only earns its optional-item discount after the Founder has
+ * approved the words as they stand. The control lives in the stage-scaled
+ * block below the reference composition, so it does not move that composition.
  *
  * ── §12's helper resources moved into the drawer, not out of the product ──
  * The reference's composition has nowhere to put a four-section accordion, and
@@ -290,6 +284,7 @@ function StoryScreen({
   // The local copy is the only copy of what was typed (§9). A save response
   // never writes back into it, which is why it is seeded exactly once.
   const [answer, setAnswer] = useState(state.story.text ?? '');
+  const [approved, setApproved] = useState(state.story.approved);
   const [phase, setPhase] = useState<Phase>('idle');
   const [seconds, setSeconds] = useState(0);
   /** Bumped whenever the say-row must come back with no GSAP left on it. */
@@ -427,7 +422,11 @@ function StoryScreen({
 
   function change(nextText: string) {
     setAnswer(nextText);
-    autosave.queue({ storyText: nextText });
+    if (approved) setApproved(false);
+    autosave.queue({
+      storyText: nextText,
+      ...(approved ? { storyApproved: false } : {}),
+    });
   }
 
   /**
@@ -978,6 +977,22 @@ function StoryScreen({
                 Your listing fee is paid, so this answer and the fee it earned are locked. You can
                 read your story here; changing it is a support request.
               </p>
+            ) : null}
+
+            {!locked ? (
+              <label className="ff-story__approve">
+                <input
+                  className="ff-story__check"
+                  type="checkbox"
+                  checked={approved}
+                  disabled={!answer.trim()}
+                  onChange={(event) => {
+                    setApproved(event.target.checked);
+                    autosave.queue({ storyApproved: event.target.checked });
+                  }}
+                />
+                <span>I approve this story for my public campaign page</span>
+              </label>
             ) : null}
 
             <p

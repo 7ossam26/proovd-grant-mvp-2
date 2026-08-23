@@ -253,6 +253,8 @@ function ColorScreen({
      the typed value never comes back from the server, so this is the only copy
      of it and a save that raced an edit cannot reinstate a removed line. */
   const [colors, setColors] = useState(state.brand.colors ?? '');
+  const [typography, setTypography] = useState(state.brand.typography ?? '');
+  const [approved, setApproved] = useState(state.brand.approved);
 
   /* The reference's `dH/dS/dV`. It starts them at the same three numbers every
      time and never seeds them from `brand.colors` — the picker is where a NEW
@@ -295,9 +297,25 @@ function ColorScreen({
   const write = useCallback(
     (next: string) => {
       setColors(next);
-      autosave.queue({ brandColors: next });
+      if (approved) setApproved(false);
+      autosave.queue({
+        brandColors: next,
+        ...(approved ? { brandApproved: false } : {}),
+      });
     },
-    [autosave],
+    [approved, autosave],
+  );
+
+  const writeTypography = useCallback(
+    (next: string) => {
+      setTypography(next);
+      if (approved) setApproved(false);
+      autosave.queue({
+        brandTypography: next,
+        ...(approved ? { brandApproved: false } : {}),
+      });
+    },
+    [approved, autosave],
   );
 
   /**
@@ -731,8 +749,37 @@ function ColorScreen({
               <p className="ff-col__note" id="ff-col-note">
                 Your listing fee is paid, so your brand direction stays as it was checked.
               </p>
-            ) : null}
-            <p className="ff-col__status" data-state={autosave.state.status}>
+            ) : (
+              <>
+                <label className="ff-col__direction">
+                  <span>Typography or style</span>
+                  <input
+                    type="text"
+                    value={typography}
+                    placeholder="e.g. Bold headings, clean sans-serif"
+                    onChange={(event) => writeTypography(event.target.value)}
+                  />
+                </label>
+                <label className="ff-col__approve">
+                  <input
+                    type="checkbox"
+                    checked={approved}
+                    disabled={!colors.trim() || !typography.trim()}
+                    onChange={(event) => {
+                      setApproved(event.target.checked);
+                      autosave.queue({ brandApproved: event.target.checked });
+                    }}
+                  />
+                  <span>I approve this brand direction for my campaign</span>
+                </label>
+              </>
+            )}
+            <p
+              className="ff-col__status"
+              role="status"
+              aria-live="polite"
+              data-state={autosave.state.status}
+            >
               {describeSaveState(autosave.state)}
             </p>
           </div>
