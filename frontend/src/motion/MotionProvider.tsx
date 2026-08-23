@@ -85,9 +85,9 @@ interface MotionProviderProps {
  *  1. Publish the runtime through context.
  *  2. Re-run a global `init()` after each navigation, once the new route's DOM
  *     has committed.
- *  3. Surface a fail-loud notice if the runtime never arrived — the script tag
- *     is missing or 404ing, which is a deploy bug, not a user-facing state to
- *     swallow.
+ *  3. Log a fail-loud console error if the runtime never arrived — the script
+ *     tag is missing or 404ing, which is a deploy bug, not a user-facing state
+ *     to swallow.
  */
 export function MotionProvider({
   children,
@@ -97,7 +97,7 @@ export function MotionProvider({
   const location = useLocation();
 
   // Deploy-time guard. If the script tag is wrong, proovd-motion.js never runs,
-  // so its own fail-loud notice never renders either. Cover that gap here.
+  // so its own fail-loud error never fires either. Cover that gap here.
   useEffect(() => {
     if (runtime) return;
     // eslint-disable-next-line no-console
@@ -105,14 +105,6 @@ export function MotionProvider({
       '[proovd] window.Proovd is undefined. proovd-motion.js did not execute — ' +
         'check the <script src="/proovd-motion.js"> tag and the /vendor/gsap/ paths.',
     );
-    const host = document.createElement('div');
-    host.className = 'pv-notices';
-    const notice = document.createElement('div');
-    notice.className = 'pv-notice';
-    notice.textContent = 'Motion failed to load';
-    host.appendChild(notice);
-    document.body.appendChild(host);
-    return () => host.remove();
   }, [runtime]);
 
   // useLayoutEffect so bindings attach before paint — otherwise the first

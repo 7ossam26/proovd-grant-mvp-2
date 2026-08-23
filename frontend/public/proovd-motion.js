@@ -17,11 +17,12 @@
    later replaces, and animations then die silently as the app grows.
 
    What it does:
-   1. Fails loud + safe (§6.6): missing GSAP → html.no-motion + visible
-      notice; proovd.css then provides jump-cut fallbacks. Nothing is ever
+   1. Fails loud + safe (§6.6): missing GSAP → html.no-motion + a console
+      error; proovd.css then provides jump-cut fallbacks. Nothing is ever
       trapped behind motion.
    2. Ships the Satoshi verification (§3) — measured against the fallback
-      after document.fonts.ready, with a timeout backstop.
+      after document.fonts.ready, confirmed once the face has actually
+      loaded, and reported to the console.
    3. Implements the §6.5 kit with the exact tuned parameters, exposed two
       ways:
         - declaratively, via data-attributes bound by Proovd.init()
@@ -58,24 +59,20 @@
     dist: { enter: 16 },
   };
 
-  /* ─────────────────────────── fail-loud notice (§3, §6.6) — accent yellow */
+  /* ─────────────────────────── fail-loud notice (§3, §6.6) — console only.
+     USER REVISION 2026-08-24: this used to paint an accent-yellow bar across
+     the top of the page. It is reported to the console instead, by product
+     direction — a false brand-failure banner shown to a real customer is worse
+     than the failure it was built to catch. Nothing is swallowed: the checks
+     still run, the error still fires, and html.no-motion + proovd.css's
+     jump-cut fallbacks remain the user-visible degrade. The Set replaces the
+     old data-msg DOM dedupe: init() re-runs on every navigation, and a repeat
+     of the same message says nothing new. */
+  const reported = new Set();
   function notice(msg) {
-    const add = () => {
-      let host = document.querySelector('.pv-notices');
-      if (!host) {
-        host = document.createElement('div');
-        host.className = 'pv-notices';
-        document.body.appendChild(host);
-      }
-      if (host.querySelector('[data-msg="' + msg + '"]')) return;
-      const n = document.createElement('div');
-      n.className = 'pv-notice';
-      n.setAttribute('data-msg', msg);
-      n.textContent = msg;
-      host.appendChild(n);
-    };
-    if (document.body) add();
-    else document.addEventListener('DOMContentLoaded', add);
+    if (reported.has(msg)) return;
+    reported.add(msg);
+    console.error('[proovd] ' + msg);
   }
 
   /* ───────────────────────────── §6.6 GUARD: no GSAP → degrade loudly.
@@ -162,22 +159,44 @@
     new Promise(function (res) { setTimeout(res, 1800); }),
   ]);
 
+  /* One measurement is not a verdict. fontsReady above resolves at 1800ms
+     whether or not the font arrived, so on a cold cache or a slow connection
+     the first measure lands while font-display:swap is still painting the
+     fallback — which is how a working font got reported as missing. So: check
+     once, and only if it looks missing, wait for the face to actually load and
+     measure again. Reported only if the second measure still matches. Once per
+     page load, because init() re-runs on every navigation. */
+  let satoshiChecked = false;
+
   function verifySatoshi() {
+    if (satoshiChecked) return;
+    satoshiChecked = true;
     try {
-      const mk = function (family) {
-        const s = document.createElement('span');
-        s.textContent = 'ILoveProovd1234@#';
-        s.style.cssText =
-          'position:absolute;left:-9999px;top:-9999px;visibility:hidden;' +
-          'white-space:nowrap;font-size:48px;font-weight:700;font-family:' + family;
-        document.body.appendChild(s);
-        return s;
+      const looksMissing = function () {
+        const mk = function (family) {
+          const s = document.createElement('span');
+          s.textContent = 'ILoveProovd1234@#';
+          s.style.cssText =
+            'position:absolute;left:-9999px;top:-9999px;visibility:hidden;' +
+            'white-space:nowrap;font-size:48px;font-weight:700;font-family:' + family;
+          document.body.appendChild(s);
+          return s;
+        };
+        const a = mk("'Satoshi', monospace");
+        const b = mk('monospace');
+        const same = Math.abs(a.offsetWidth - b.offsetWidth) < 0.5;
+        a.remove(); b.remove();
+        return same;
       };
-      const a = mk("'Satoshi', monospace");
-      const b = mk('monospace');
-      const same = Math.abs(a.offsetWidth - b.offsetWidth) < 0.5;
-      a.remove(); b.remove();
-      if (same) notice("Satoshi didn't load.");
+      if (!looksMissing()) return;                   // Satoshi is rendering
+      const settle = (document.fonts && document.fonts.load)
+        ? document.fonts.load("700 48px 'Satoshi'").catch(function () {})
+        : Promise.resolve();
+      settle.then(function () {
+        try {
+          if (looksMissing()) notice("Satoshi didn't load.");
+        } catch (e) { /* verification must never break the page */ }
+      });
     } catch (e) { /* verification must never break the page */ }
   }
 

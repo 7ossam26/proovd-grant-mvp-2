@@ -75,7 +75,7 @@ export interface ProovdAPI {
 
   /**
    * True when GSAP failed to load. The runtime has already added
-   * `html.no-motion` and rendered the accent-yellow notice; proovd.css
+   * `html.no-motion` and logged the fail-loud console error; proovd.css
    * supplies jump-cut fallbacks. Never suppress this in production (DNA §6.6).
    */
   readonly failed: boolean;
@@ -87,7 +87,7 @@ export interface ProovdAPI {
    */
   init(root?: ParentNode): void;
 
-  /** Renders a fail-loud accent-yellow notice. */
+  /** Reports a fail-loud failure to the console, once per message per load. */
   notice(msg: string): void;
 
   /* ── Text (DNA §6.4, §6.5). Splits are reverted automatically. ────────── */

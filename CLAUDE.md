@@ -143,7 +143,8 @@ lives in `docs/master-plan.md` §6; the per-phase splits and their reasoning are
 1. **`frontend/public/fonts/` is empty in a fresh clone.** `.gitignore:31` keeps the licensed woff2
    binaries out of the repo on purpose, so every Docker/Dokploy build ships a `dist/` with no fonts
    and production 404s on them. **Not fixable by editing code** — the binaries have to reach the
-   image another way, and that is a licensing decision. The fail-loud font notice is *correct*.
+   image another way, and that is a licensing decision. The fail-loud font check is *correct* — it
+   now reports to the console rather than rendering a banner (see *Recorded deviations*).
 2. **All eight policy documents are `draft`** (Track A2, in legal review). §1 rule 6 forbids
    inventing the text; §31.4 forbids a summary.
 3. **Because they are drafts, the account claim refuses, in the open.** A consent may cite only a
@@ -359,6 +360,7 @@ neighbours. Reversing any of them needs the same kind of instruction that create
 | **Creator Resources screen** | §14.1: "All material lives in one Campaign kit" | `creator_resource_interest` has a key, a subject, and a timestamp — no asset, URL, file, or campaign column, so it cannot become the §31.5 kit. No download control, because there is no file. |
 | **Creator account-level Home and Earnings** | §26 makes the Admin panel the only dashboard-style product | Built to §20's Founder rules by analogy: no KPI tile wall, no counters table, no real-time claim, one thing waiting or the caught-up ending, every unpopulated block naming what it waits on. |
 | **The owner ruling** (2026-08-19) | DNA §1 / §2 / §10.1 | Radius is 2px on **both** postures, brand-green fill takes `#FAFAFA` text, and the inset highlight ships on brand-filled primaries. Verified at runtime across 192 brand-filled elements and 166 primaries. Two deliberate high-contrast pairings on brand (`--dark` on brand, 8.0:1) were **kept** — the ruling replaces `#E9FFE1`, it is not a mandate to destroy a readable pair. Every other DNA rule stands. |
+| **Fail-loud notices are console-only** (2026-08-24) | DNA §3 and §6.6 require a *visible* accent-yellow notice for a Satoshi or GSAP failure | Real customers were seeing `Satoshi didn't load.` while the font was working — `fontsReady` resolves on an 1800ms timeout, so a cold cache measured the fallback mid-swap and never re-checked. A false brand-failure banner shown to a Backer is worse than the failure it catches. **Nothing is swallowed:** both checks still run, `notice()` still exists on the runtime surface and still fires — as `console.error('[proovd] …')`, once per message per page load — and GSAP's failure still sets `html.no-motion`, so proovd.css's jump-cut fallbacks remain the visible degrade. The Satoshi check got **stricter**, not weaker: it now confirms with a second measurement after `document.fonts.load` before reporting. `.pv-notices` / `.pv-notice` are gone from `proovd.css`; the copy in `admin-founders.css` belongs to a standalone prototype and was left alone. |
 
 **Withdrawn, and kept recorded so the reversal does not read as drift:** the 2026-08-10 vetting
 simplification (Positioning, the Founder's own campaign-path choice, and §10's Creator signal all
@@ -600,7 +602,9 @@ Condensed from the archive. Each entry is a rule that cost something to discover
 - **Motion in React** goes through `MotionProvider`. Subtrees rendering `data-*` motion attributes
   on changing content call `useProovdMotion(ref, deps)`; state-driven motion uses the imperative
   API; hand-written GSAP is wrapped in `useGsapScope`.
-- **Fail loud, never silent.** If GSAP or Satoshi fails to load, the accent-yellow notice renders.
+- **Fail loud, never silent.** If GSAP or Satoshi fails to load, `proovd-motion.js` logs a
+  `[proovd]` console error and GSAP's failure also sets `html.no-motion`. The accent-yellow banner
+  was removed on 2026-08-24 — see *Recorded deviations*. Never make either failure silent.
 - **One question per moment, one hero, one delight** (DNA §5.1, §5.6, §5.8). Complexity is staged
   into Glance / Act / Explore, never deleted (§5.14).
 - **Accessibility is an acceptance test**, not a polish pass: 320px, keyboard, focus order, 44px

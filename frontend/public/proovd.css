@@ -778,15 +778,10 @@ a::after, .u::after {
 .toast--yellow { background: var(--accent-yellow); }
 .toast--blue   { background: var(--accent-blue); }
 
-/* fail-loud notices (§3, §6.6) — created by proovd-motion.js */
-.pv-notices { position: fixed; inset-inline: 0; top: 0; z-index: 2147483000; }
-.pv-notice {
-  background: var(--accent-yellow);
-  color: var(--darker);
-  font-weight: 700;
-  text-align: center;
-  padding: var(--sp-12) var(--sp-16);
-}
+/* The .pv-notices / .pv-notice fail-loud bar was removed on 2026-08-24 by
+   product direction: proovd-motion.js reports both failures (§3 Satoshi, §6.6
+   GSAP) to the console instead of painting a banner at customers. The
+   html.no-motion fallbacks below are unchanged and remain the visible degrade. */
 
 
 /* ───────────────────────────────── §1 DRAWER (Explore surface, §5.2, §8) */
@@ -1704,7 +1699,7 @@ main:focus { outline: none; }          /* programmatic focus target, not a contr
 
 /* ──────────────────────────── NO-MOTION FALLBACKS (§6.6 fail loud + safe)
    Motion is GSAP-only. If GSAP is missing, proovd-motion.js adds
-   html.no-motion and shows the notice; these rules keep every state
+   html.no-motion and logs the failure; these rules keep every state
    reachable — jump-cuts, but nothing is trapped or invisible. */
 
 html.no-motion .btn--primary:hover,
