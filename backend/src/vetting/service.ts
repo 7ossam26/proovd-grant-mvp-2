@@ -337,7 +337,7 @@ export async function saveVetting(
     return {
       ok: false,
       message:
-        'You have already submitted this form, so its answers are now read-only.',
+        'This form was already submitted earlier. It is now locked, so you cannot change its answers or submit it again.',
       next: 'Nothing was changed. If something in it is wrong, reply to your invitation email and we will pick it up.',
     };
   }
