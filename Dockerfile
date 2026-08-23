@@ -11,6 +11,15 @@ RUN npm ci --workspace=@proovd/frontend --workspace=@proovd/shared
 COPY shared/ ./shared/
 COPY frontend/ ./frontend/
 
+# MatchStep imports these reference assets through `new URL(..., import.meta.url)`.
+# Keep the files at the same repository-relative path so Vite fingerprints and
+# bundles them instead of leaving production-only `/docs/...` URLs that 404.
+COPY docs/design-refrence/Proovd-Founder-Flow-v2/assets/match-lockup.png \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-left.png \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-right.png \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg \
+     ./docs/design-refrence/Proovd-Founder-Flow-v2/assets/
+
 # Every workspace tsconfig extends this. Without it tsc reports TS5083 and then
 # silently falls back to compiler defaults (target ES3, no skipLibCheck), which
 # surfaces as ~120 bogus errors about BigInt literals and downlevelIteration.
