@@ -2383,8 +2383,13 @@ function buildState(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function stubBuild(initial: Record<string, unknown> = {}) {
-  let state = buildState(initial);
+interface BuildStubOptions {
+  beforeFaqSave?: () => Promise<void>;
+  beforeRewardSave?: () => Promise<void>;
+}
+
+function stubBuild(initial: Record<string, unknown> = {}, options: BuildStubOptions = {}) {
+  let state: Record<string, unknown> = buildState(initial);
   handlers.push((url, init) => {
     if (!/\/build$/.test(url)) return undefined;
     if (init?.method === 'PATCH') {
@@ -2393,22 +2398,60 @@ function stubBuild(initial: Record<string, unknown> = {}) {
       // deliberately not echoed.
       state = {
         ...state,
-        build: { ...(state.build as object), ...patch } as typeof state.build,
+        build: { ...(state['build'] as object), ...patch },
       };
-      return { status: 200, body: { buildStatus: state.buildStatus, missing: state.missing, build: state.build } };
+      return {
+        status: 200,
+        body: {
+          buildStatus: state['buildStatus'],
+          missing: state['missing'],
+          build: state['build'],
+        },
+      };
     }
     return { status: 200, body: state };
   });
-  handlers.push((url, init) =>
-    /\/build\/faqs$/.test(url) && init?.method === 'PUT'
-      ? { status: 200, body: { faq: { id: 'faq-1', question: 'When?', answer: 'March 2027.' } } }
-      : undefined,
-  );
-  handlers.push((url, init) =>
-    /\/build\/rewards$/.test(url) && init?.method === 'PUT'
-      ? { status: 200, body: { package: { id: 'rw-1' } } }
-      : undefined,
-  );
+  handlers.push(async (url, init) => {
+    if (!/\/build\/faqs$/.test(url) || init?.method !== 'PUT') return undefined;
+    await options.beforeFaqSave?.();
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    const faqs = (state['faqs'] ?? []) as Array<Record<string, unknown>>;
+    const id = typeof body['faqId'] === 'string' ? body['faqId'] : `faq-${String(faqs.length + 1)}`;
+    const faq = {
+      id,
+      question: String(body['question'] ?? ''),
+      answer: String(body['answer'] ?? ''),
+    };
+    state = { ...state, faqs: [...faqs.filter((entry) => entry['id'] !== id), faq] };
+    return { status: 200, body: { faq } };
+  });
+  handlers.push(async (url, init) => {
+    if (!/\/build\/rewards$/.test(url) || init?.method !== 'PUT') return undefined;
+    await options.beforeRewardSave?.();
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    const rewards = (state['rewardPackages'] ?? []) as Array<Record<string, unknown>>;
+    const id =
+      typeof body['packageId'] === 'string'
+        ? body['packageId']
+        : `rw-${String(rewards.length + 1)}`;
+    const reward = {
+      id,
+      sku: String(body['sku'] ?? ''),
+      title: String(body['title'] ?? ''),
+      priceCents: String(body['priceCents'] ?? ''),
+      contents: String(body['contents'] ?? ''),
+      fulfillmentCommitment: String(body['fulfillmentCommitment'] ?? ''),
+      delivery: String(body['delivery'] ?? ''),
+      limitedQuantity: body['limitedQuantity'] ?? null,
+      badge: body['badge'] ?? null,
+      sortOrder: body['sortOrder'] ?? 0,
+    };
+    state = {
+      ...state,
+      rewardPackages: [...rewards.filter((entry) => entry['id'] !== id), reward],
+    };
+    return { status: 200, body: { package: reward } };
+  });
   return () => state;
 }
 
@@ -2437,6 +2480,7 @@ function stubStage5(
   build: Record<string, unknown> = {},
   openness: Record<string, unknown> = {},
   applicationReviewRequired = false,
+  buildOptions: BuildStubOptions = {},
 ) {
   handlers.push((url) =>
     url.startsWith('/api/account/me')
@@ -2465,7 +2509,7 @@ function stubStage5(
     }
     return undefined;
   });
-  stubBuild(build);
+  stubBuild(build, buildOptions);
   handlers.push((url) =>
     /\/roster$/.test(url)
       ? {
@@ -2660,6 +2704,33 @@ describe('the build steps (23–26)', () => {
     expect(within(preview).getByText('When will I get it?')).toBeInTheDocument();
   });
 
+  it('waits for an in-flight FAQ save and restores it after returning to the page', async () => {
+    let releaseSave!: () => void;
+    const saveGate = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    stubStage5({}, {}, false, { beforeFaqSave: () => saveGate });
+    const user = userEvent.setup();
+    renderAt(at('faqs'));
+    await screen.findByRole('heading', { name: /add your faq/i });
+
+    await user.type(screen.getByLabelText(/FAQ 1 Title/i), 'When will I get it?');
+    await user.type(screen.getByLabelText(/FAQ 1 Body/i), 'March 2027.');
+    await waitFor(() =>
+      expect(requests.some((request) => request.url.endsWith('/build/faqs'))).toBe(true),
+    );
+
+    await user.click(screen.getByRole('button', { name: /next.*backer rewards/i }));
+    expect(screen.getByRole('heading', { name: /add your faq/i })).toBeInTheDocument();
+
+    releaseSave();
+    await screen.findByRole('heading', { name: /backer rewards/i });
+    await user.click(screen.getByRole('button', { name: /back to your faqs/i }));
+
+    expect(await screen.findByLabelText(/FAQ 1 Title/i)).toHaveValue('When will I get it?');
+    expect(screen.getByLabelText(/FAQ 1 Body/i)).toHaveValue('March 2027.');
+  });
+
   it('converts a typed price to integer cents exactly once', async () => {
     stubStage5();
     renderAt(at('rewards'));
@@ -2676,6 +2747,41 @@ describe('the build steps (23–26)', () => {
     );
     const sent = requests.find((r) => r.url.includes('/build/rewards'))!;
     expect((sent.body as Record<string, unknown>)['priceCents']).toBe('12050');
+  });
+
+  it('waits for a reward save and restores the reward after returning to the page', async () => {
+    let releaseSave!: () => void;
+    const saveGate = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    stubStage5({}, {}, false, { beforeRewardSave: () => saveGate });
+    const user = userEvent.setup();
+    renderAt(at('rewards'));
+    await screen.findByRole('heading', { name: /backer rewards/i });
+
+    await user.type(screen.getByLabelText('Reward title'), 'Founding Edition');
+    await user.type(screen.getByLabelText('Reward description'), 'One lamp.');
+    await user.type(screen.getByLabelText('Reward price'), '120.5');
+    await user.type(screen.getByLabelText('Delivered by'), '0327');
+    await user.click(screen.getByRole('button', { name: /1\/3 add rewards/i }));
+
+    await waitFor(() =>
+      expect(requests.some((request) => request.url.endsWith('/build/rewards'))).toBe(true),
+    );
+    expect(screen.getByLabelText('Reward title')).toHaveValue('Founding Edition');
+
+    releaseSave();
+    await waitFor(() => expect(screen.getByLabelText('Reward title')).toHaveValue(''));
+    await user.click(screen.getByRole('button', { name: /back to your faqs/i }));
+    await screen.findByRole('heading', { name: /add your faq/i });
+    await user.click(screen.getByRole('button', { name: /next.*backer rewards/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Reward title')).toHaveValue('Founding Edition'),
+    );
+    expect(screen.getByLabelText('Reward description')).toHaveValue('One lamp.');
+    expect(screen.getByLabelText('Reward price')).toHaveValue('$120.50');
+    expect(screen.getByLabelText('Delivered by')).toHaveValue('03/27');
   });
 
   it('does not claim the build is finished when it is not', async () => {
