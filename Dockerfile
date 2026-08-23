@@ -18,6 +18,12 @@ COPY docs/design-refrence/Proovd-Founder-Flow-v2/assets/match-lockup.png \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-left.png \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-right.png \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/reward-gift.png \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/stripe.svg \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-id.svg \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-bank.svg \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-ssn.svg \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/piggy.png \
      ./docs/design-refrence/Proovd-Founder-Flow-v2/assets/
 
 # Every workspace tsconfig extends this. Without it tsc reports TS5083 and then
