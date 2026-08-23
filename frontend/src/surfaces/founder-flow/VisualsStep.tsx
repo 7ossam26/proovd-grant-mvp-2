@@ -57,12 +57,9 @@
  * three places.
  *
  * ── What the reference's file row does not carry ───────────────────────────
- * Its row is a label and an `x`. §12 needs two more things on it: which state
- * the object is in (`pending` / `stored` / `rejected`, and the reason when it
- * did not count) and the Founder's approval, which §28.4 forbids folding into
- * the upload — a file can sit there stored and not counting, and the row has to
- * say which. Both go INSIDE the reference's own `#DEF6FF` block as a second
- * line, so the list keeps its width, its 34px gap and its position.
+ * Its row is a label and an `x`. Pending and rejected objects also state their
+ * upload status inside the reference's own `#DEF6FF` block as a second line,
+ * so the list keeps its width, its 34px gap and its position.
  *
  * The label is the real filename rather than the reference's `File N added`,
  * which is what that string stands in for; a record with no filename falls back
@@ -103,7 +100,6 @@ import {
   putToStorage,
   removeAsset,
   requestUpload,
-  setAssetApproval,
   verifyUpload,
   FounderRequestError,
   type AssetState,
@@ -490,14 +486,6 @@ function VisualsScreen({
                     asset={asset}
                     index={index}
                     locked={locked}
-                    onApprove={(approved) => {
-                      void refresh(setAssetApproval(campaignId, asset.id, approved));
-                      setSaid(
-                        approved
-                          ? 'Approved for your campaign.'
-                          : 'Approval removed. It stays here and does not count.',
-                      );
-                    }}
                     onRemove={() => {
                       void refresh(removeAsset(campaignId, asset.id));
                       setSaid('File removed.');
@@ -549,21 +537,18 @@ function VisualsScreen({
 /**
  * One file, in the reference's own `#DEF6FF` block.
  *
- * Its label and its `x` are the reference's line, unchanged. The second line is
- * §12's: which state the object is in, and the approval §28.4 keeps as its own
- * unchecked control.
+ * Its label and its `x` are the reference's line, unchanged. Upload progress or
+ * rejection is shown on a second line only while it is relevant.
  */
 function FileRow({
   asset,
   index,
   locked,
-  onApprove,
   onRemove,
 }: {
   asset: AssetState;
   index: number;
   locked: boolean;
-  onApprove: (approved: boolean) => void;
   onRemove: () => void;
 }) {
   const name = asset.filename ?? `File ${index + 1} added`;
@@ -586,26 +571,15 @@ function FileRow({
         )}
       </div>
 
-      <div className="ff-vis__filemeta">
-        {asset.state === 'pending' ? (
+      {asset.state === 'pending' ? (
+        <div className="ff-vis__filemeta">
           <span className="ff-vis__filenote">Still uploading.</span>
-        ) : asset.state === 'rejected' ? (
+        </div>
+      ) : asset.state === 'rejected' ? (
+        <div className="ff-vis__filemeta">
           <span className="ff-vis__filenote">{rejectionText(asset.rejection ?? '')}</span>
-        ) : locked ? (
-          <span className={asset.approved ? 'ff-vis__filenote is-ok' : 'ff-vis__filenote'}>
-            {asset.approved ? 'Approved and counting.' : 'Not approved, so it does not count.'}
-          </span>
-        ) : (
-          <label className="ff-vis__approve">
-            <input
-              type="checkbox"
-              checked={asset.approved}
-              onChange={(event) => onApprove(event.target.checked)}
-            />
-            Approved for use on my campaign
-          </label>
-        )}
-      </div>
+        </div>
+      ) : null}
     </li>
   );
 }

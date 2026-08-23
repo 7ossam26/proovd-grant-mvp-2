@@ -1719,20 +1719,21 @@ describe('the five §12 answers (10–14)', () => {
     );
   });
 
-  it('lets the Founder approve a stored logo for Branding evidence', async () => {
-    const user = userEvent.setup();
-    const logo = {
-      id: 'logo-approval',
-      filename: 'logo.png',
+  it('does not show approval controls on stored visuals or logos', async () => {
+    const visual = {
+      id: 'visual-without-approval',
+      filename: 'campaign.jpg',
       contentType: 'image/png',
       state: 'stored',
       rejection: null,
-      approved: false,
+      approved: true,
       width: 1200,
       height: 1200,
       byteSize: '48120',
     };
-    const initial = {
+    const logo = { ...visual, id: 'logo-without-approval', filename: 'logo.png' };
+    stubStage3({
+      visuals: [visual],
       brand: {
         colors: '#41ED98 — primary',
         typography: 'Bold headings and a clean sans-serif body',
@@ -1740,34 +1741,18 @@ describe('the five §12 answers (10–14)', () => {
         approved: false,
         logos: [logo],
       },
-    };
-    handlers.push((url, init) =>
-      url.endsWith('/uploads/logo-approval/approval') && init?.method === 'POST'
-        ? {
-            status: 200,
-            body: {
-              workspace: workspaceState({
-                ...initial,
-                brand: { ...initial.brand, logos: [{ ...logo, approved: true }] },
-              }),
-            },
-          }
-        : undefined,
-    );
-    stubStage3(initial);
-    renderAt(at('branding'));
+    });
 
-    const approval = await screen.findByRole('checkbox', { name: 'Approved' });
-    await user.click(approval);
-    await waitFor(() =>
-      expect(
-        requests.some(
-          (request) =>
-            request.url.endsWith('/uploads/logo-approval/approval') &&
-            request.body?.['approved'] === true,
-        ),
-      ).toBe(true),
-    );
+    const visuals = renderAt(at('visuals'));
+    await screen.findByText('campaign.jpg');
+    expect(
+      screen.queryByRole('checkbox', { name: /approved for use on my campaign/i }),
+    ).not.toBeInTheDocument();
+    visuals.unmount();
+
+    renderAt(at('branding'));
+    await screen.findByText('Logo 1 added');
+    expect(screen.queryByRole('checkbox', { name: 'Approved' })).not.toBeInTheDocument();
   });
 
   it('does not show typography or approval controls on the brand colour screen', async () => {

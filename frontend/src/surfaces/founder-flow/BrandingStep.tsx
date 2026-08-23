@@ -16,7 +16,6 @@ import {
   putToStorage,
   removeAsset,
   requestUpload,
-  setAssetApproval,
   verifyUpload,
   type AssetState,
   type WorkspaceState,
@@ -273,14 +272,6 @@ function BrandLogoScreen({
                     asset={asset}
                     index={index}
                     locked={locked}
-                    onApprove={(approved) => {
-                      void refresh(setAssetApproval(campaignId, asset.id, approved));
-                      setSaid(
-                        approved
-                          ? 'Logo approved for your campaign.'
-                          : 'Logo approval removed.',
-                      );
-                    }}
                     onRemove={() => {
                       void refresh(removeAsset(campaignId, asset.id));
                       setSaid('Logo removed.');
@@ -304,13 +295,11 @@ function LogoRow({
   asset,
   index,
   locked,
-  onApprove,
   onRemove,
 }: {
   asset: AssetState;
   index: number;
   locked: boolean;
-  onApprove: (approved: boolean) => void;
   onRemove: () => void;
 }) {
   // The reference names the slot, not the local file. Removing a row therefore
@@ -320,17 +309,7 @@ function LogoRow({
     <li className="ff-brandlogo__file" data-brandlogo-file-row="1">
       <span title={label}>{label}</span>
       <span className="ff-brandlogo__fileactions">
-        {asset.state === 'stored' ? (
-          <label className="ff-brandlogo__approve">
-            <input
-              type="checkbox"
-              checked={asset.approved}
-              disabled={locked}
-              onChange={(event) => onApprove(event.target.checked)}
-            />
-            Approved
-          </label>
-        ) : (
+        {asset.state === 'stored' ? null : (
           <span className="ff-brandlogo__filestate">
             {asset.state === 'pending' ? 'Still uploading' : 'Upload rejected'}
           </span>

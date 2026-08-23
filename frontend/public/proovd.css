@@ -13577,21 +13577,6 @@ html.no-motion .ff-story__say { transition: none; }
   gap: 28px;
   overflow: visible;
 }
-.ff-brandlogo__approve {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 28px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.ff-brandlogo__approve input {
-  width: 42px;
-  height: 42px;
-  accent-color: #41ED98;
-  cursor: pointer;
-}
-.ff-brandlogo__approve input:disabled { cursor: not-allowed; }
 .ff-brandlogo__filestate { font-size: 28px; font-weight: 600; }
 .ff-brandlogo__file button {
   flex: none;
@@ -13629,7 +13614,6 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-brandlogo__mailbtn:focus-visible,
 .ff-brandlogo__drop:focus-visible,
 .ff-brandlogo__file button:focus-visible,
-.ff-brandlogo__approve input:focus-visible,
 .ff-brandlogo__cta:focus-visible {
   outline: 6px solid #013F17;
   outline-offset: 6px;
@@ -14144,7 +14128,7 @@ html.no-motion .ff-story__say { transition: none; }
 .ff-vis__filex:hover { color: #41ED98; }
 .ff-vis__filex:focus-visible { outline: 3px solid #013F17; outline-offset: 3px; }
 
-/* §12's state and §28.4's approval, inside the reference's own block. */
+/* Upload progress or rejection, inside the reference's own block. */
 .ff-vis__filemeta { display: flex; }
 .ff-vis__filenote {
   font-size: 28px;
@@ -14154,26 +14138,6 @@ html.no-motion .ff-story__say { transition: none; }
      and this decides whether a file counts. */
   color: #013F17;
 }
-.ff-vis__filenote.is-ok { color: #0B6B33; }
-.ff-vis__approve {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  font-size: 28px;
-  font-weight: 500;
-  line-height: 1.3;
-  color: #013F17;
-  cursor: pointer;
-}
-.ff-vis__approve input {
-  flex: none;
-  width: 36px;
-  height: 36px;
-  margin: 0;
-  accent-color: #013F17;
-  cursor: pointer;
-}
-
 /* ── The CTA, and the two lines the reference does not draw ──────────────── */
 
 .ff-vis__cta {
