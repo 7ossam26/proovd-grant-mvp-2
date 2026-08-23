@@ -395,6 +395,14 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     stage: 5,
   },
   {
+    id: 'live',
+    path: '/campaigns/:campaignId/setup/live',
+    param: 'campaignId',
+    title: 'Your campaign is live',
+    help: 'The campaign launch handoff, followed by securing your Founder account and opening its dashboard.',
+    stage: 5,
+  },
+  {
     id: 'password',
     path: '/campaigns/:campaignId/setup/password',
     param: 'campaignId',

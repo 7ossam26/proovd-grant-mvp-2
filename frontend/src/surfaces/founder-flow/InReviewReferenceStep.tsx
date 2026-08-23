@@ -10,7 +10,6 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router';
-import { founderFlowPath } from '@proovd/shared';
 import { HelpDrawer, FlowPage, useFlowNav } from './FlowPage.js';
 import { InReviewStep } from './InReviewStep.js';
 import { PITCH_DEMO } from './referenceWalkthrough.js';
@@ -48,7 +47,7 @@ export function InReviewReferenceStep() {
 }
 
 function ReviewBody() {
-  const { param } = useFlowNav();
+  const { param, swapToPage } = useFlowNav();
   const [accepted, setAccepted] = useState(1);
 
   useEffect(() => {
@@ -113,7 +112,7 @@ function ReviewBody() {
       <button
         type="button"
         className="ff-review-ref__continue"
-        onClick={() => window.location.assign(founderFlowPath('live', param))}
+        onClick={() => swapToPage('live')}
       >
         Continue to launch
       </button>
