@@ -19,6 +19,7 @@ COPY docs/design-refrence/Proovd-Founder-Flow-v2/assets/match-lockup.png \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/cupid-right.png \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/proovd-logo.svg \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/reward-gift.png \
+     docs/design-refrence/Proovd-Founder-Flow-v2/assets/review-lens.png \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/stripe.svg \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-id.svg \
      docs/design-refrence/Proovd-Founder-Flow-v2/assets/kyc-bank.svg \

@@ -17919,12 +17919,9 @@ html.no-motion .ff-story__say { transition: none; }
   .ff-reward-ref__back { bottom: 92px; padding: 8px 14px; }
 }
 
-/* Campaign in review — fixed 2496×1542 reference stage. */
-.ff[data-flow-page='in-review'] .ff__top,
-.ff[data-flow-page='in-review'] .ff__badge { display: none; }
-.ff[data-flow-page='in-review'] .ff__stage { gap: 0; padding: 0; }
-.ff[data-flow-page='in-review'] .ff__body { display: block; max-width: none; margin: 0; padding: 0; }
-
+/* Campaign in review — fixed 2496×1542 pitch-demo stage. The fixed demo
+   covers the regular FlowPage chrome; leaving that chrome untouched keeps the
+   genuine lifecycle screen correctly padded when no walkthrough is active. */
 .ff-review-ref {
   position: fixed;
   z-index: 25;
@@ -18043,6 +18040,32 @@ html.no-motion .ff-story__say { transition: none; }
   letter-spacing: -.012em;
   text-align: center;
 }
+.ff-review-ref__demo {
+  position: absolute;
+  z-index: 7;
+  bottom: clamp(22px, 3vw, 42px);
+  left: clamp(20px, 3vw, 46px);
+  max-width: min(48vw, 520px);
+  margin: 0;
+  color: var(--grey);
+  font-size: clamp(12px, .95vw, 15px);
+  font-weight: 700;
+}
+.ff-review-ref__continue {
+  position: absolute;
+  z-index: 7;
+  right: clamp(20px, 3vw, 46px);
+  bottom: clamp(20px, 3vw, 40px);
+  min-height: 48px;
+  padding: 12px 24px;
+  border: 2px solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--brand);
+  color: var(--dark);
+  font: 900 clamp(13px, 1vw, 16px)/1 'Satoshi', sans-serif;
+  cursor: pointer;
+}
+.ff-review-ref__continue:hover { background: var(--mint); }
 
 /* ══════════════════════ SCREEN 22 — reference `scGoal` ═══════════════════ */
 .ff[data-flow-page='threshold'] .ff__top,

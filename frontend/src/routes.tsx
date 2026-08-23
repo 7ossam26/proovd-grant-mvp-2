@@ -83,7 +83,7 @@ import { ApplicationReviewStep } from './surfaces/founder-flow/ApplicationReview
 import { ThresholdStep } from './surfaces/founder-flow/ThresholdStep.js';
 import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
-import { InReviewStep } from './surfaces/founder-flow/InReviewStep.js';
+import { InReviewRoute } from './surfaces/founder-flow/InReviewReferenceStep.js';
 import { FounderPasswordStep } from './surfaces/founder-flow/FounderPasswordStep.js';
 
 /**
@@ -878,7 +878,7 @@ const rootChildren: RouteObject[] = [
       somebody may have bookmarked.
     */
     path: 'campaigns/:campaignId/setup/in-review',
-    element: <InReviewStep />,
+    element: <InReviewRoute />,
   },
   {
     // Retired because campaign state now lives in the supplied dashboard.
