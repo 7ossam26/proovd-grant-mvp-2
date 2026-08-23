@@ -19,10 +19,10 @@
  * against a fresh token — hits the constraint and the whole transaction rolls
  * back, so there is no second account either.
  *
- * `tokens.claimDraft` is Phase 04's conditional UPDATE and settles the race
- * between two requests holding the *same* link. It runs inside the same
- * transaction, so a claim that fails after it cannot leave a token burned with
- * no account behind it.
+ * `tokens.claimDraft` settles the race between requests holding a legacy live
+ * invite. In the verified flow the invitation was already consumed when the
+ * independent flow session was established, so the account transaction relies
+ * on the same idempotency key and conditional campaign move instead.
  *
  * The event itself is the idempotency row plus the audit row. Phase 08 consumes
  * it to reveal the preparing campaign to recruited Affiliates; §10's Affiliate
@@ -434,6 +434,8 @@ export async function saveClaimProfile(
 export interface CompleteClaimInput {
   draftId: string;
   tokenId: string;
+  /** Email verification may already have consumed the initial-access invite. */
+  inviteAlreadyConsumed?: boolean;
   /** §10: "Password creation or Google sign-in." */
   password?: string;
   /** An already-authenticated Founder, when they arrived through Google (§5.2). */
@@ -711,11 +713,15 @@ export async function completeClaim(
         result: { campaignId: profile.campaignId, founderUserId: userId, draftId: input.draftId },
       });
 
-      // §10: "Invalidates the draft token." Phase 04's conditional UPDATE, run
-      // inside this transaction so a later failure cannot leave a burned token
-      // beside a claim that never happened.
-      const claimed = await tokens.claimDraft(input.tokenId, tx);
-      if (!claimed.ok) throw new ClaimConflict();
+      // Email verification now consumes the invitation when it establishes the
+      // separate Founder Flow session. Legacy/direct submissions can still
+      // arrive with a live invite, so only that path performs the conditional
+      // claim here. The idempotency key and conditional campaign move remain
+      // the exactly-once boundary for the account claim itself.
+      if (!input.inviteAlreadyConsumed) {
+        const claimed = await tokens.claimDraft(input.tokenId, tx);
+        if (!claimed.ok) throw new ClaimConflict();
+      }
 
       const moved = await tx
         .update(campaigns)
@@ -931,7 +937,7 @@ export async function claimAndSignIn(
   db: Database,
   auth: Auth,
   tokens: TokenService,
-  input: { draftId: string; tokenId: string; actor: string },
+  input: { draftId: string; tokenId: string; actor: string; inviteAlreadyConsumed?: boolean },
 ): Promise<
   | { ok: true; campaignId: string; userId: string; setCookie: string[] }
   | { ok: false; code: ClaimRefusal; message: string; next: string; missing?: string[] }
@@ -953,6 +959,7 @@ export async function claimAndSignIn(
   const claimed = await completeClaim(db, auth, tokens, {
     draftId: input.draftId,
     tokenId: input.tokenId,
+    ...(input.inviteAlreadyConsumed ? { inviteAlreadyConsumed: true } : {}),
     password: temporary,
     // Nothing was shown and nothing was accepted, and the empty list says so
     // rather than a caller quietly passing the slugs anyway.

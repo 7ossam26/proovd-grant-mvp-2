@@ -449,6 +449,27 @@
       "when": 1788019200000,
       "tag": "0063_founder_account_warnings",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1788105600000,
+      "tag": "0064_founder_token_live_invariants",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1788192000000,
+      "tag": "0065_founder_flow_session_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1788278400000,
+      "tag": "0066_founder_flow_session_binding",
+      "breakpoints": true
     }
   ]
 }

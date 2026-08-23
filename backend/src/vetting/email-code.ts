@@ -3,9 +3,10 @@
  *
  * ── A RECORDED §1 rule 6 DEVIATION, built by product direction ──────────────
  * `shared/src/vetting/email-code.ts` carries the full record and the scoping.
- * The short version: it **verifies an email**. It creates no account, mints no
- * session, and does not touch `completeClaim` — §10 still owns account creation
- * and its `founder_signup_complete` exactly-once transaction is unchanged.
+ * The short version: it **verifies an email**. The route then establishes a
+ * draft-scoped flow authorization, not an account sign-in. It does not touch
+ * `completeClaim` — §10 still owns account creation and its
+ * `founder_signup_complete` exactly-once transaction is unchanged.
  *
  * ── The three rules this file inherits, and where each comes from ───────────
  *  1. **One rejection, one status, one body.** Wrong, expired, already-used,
@@ -21,20 +22,20 @@
  *     a response. `token-service.ts` writes the audit row and it names the
  *     draft and the version and stops there.
  *
- * ── Requesting answers before it works, and that is deliberate ──────────────
- * A draft whose profile has an address mints and sends; one without returns
- * immediately. That difference is measurable even when the bodies match, so the
- * route answers FIRST and calls this afterwards — `magic-link-reissue.ts`'s
- * shape, for its reason: the result of the request arrives by email, so
- * answering before the work is honest rather than a claim of completion.
+ * ── Success means the provider accepted the message ─────────────────────────
+ * Minting, superseding, and delivery run as one transaction. Provider refusal
+ * rolls the replacement back, so an existing code remains usable. Missing
+ * configuration, missing address, limiter refusal, and provider failure share
+ * one generic failure response; the frozen success acknowledgement is emitted
+ * only after provider acceptance.
  *
  * ── A resend is a second message; a retry is not ────────────────────────────
  * §7's rule. The delivery is deduped on the token ROW, and a resend supersedes
- * the previous code and inserts the next version — so asking again earns a new
- * message and a double-submitted request does not.
+ * the previous code and inserts the next version only when delivery commits. A
+ * per-draft advisory lock rejects overlapping requests before either can mint.
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
 import { ensureClaimProfile } from './claim.js';
@@ -68,6 +69,11 @@ export const EMAIL_CODE_ACK = Object.freeze({
   title: 'Check your email',
   whatHappened: 'If we have an address for this campaign, a six-digit code is on its way to it.',
   next: 'It works for a short while. If nothing arrives, check your spam folder and ask for another.',
+});
+
+/** The one public failure for every request-time send failure. */
+export const EMAIL_CODE_FAILURE = Object.freeze({
+  error: 'email_code_unavailable' as const,
 });
 
 /** Renders the code message. Exported so the §27 catalog renders the same one. */
@@ -113,55 +119,90 @@ export async function renderEmailCodeNotice(input: {
 /**
  * Mints a code for this draft's current address and sends it.
  *
- * Returns nothing a caller could branch on, because there is no caller that
- * should — the route has already answered. Exported so the suite can drive it
- * and assert what it did, which is the same thing a real caller cannot see.
+ * Returns only whether a provider-confirmed send committed. Internal failure
+ * reasons are for audit evidence; the route maps every one to its single
+ * generic public failure.
  */
 export async function requestFounderEmailCode(
   deps: EmailCodeDeps,
   input: { draftId: string; campaignId: string },
-): Promise<void> {
-  if (!deps.notifier) return;
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!deps.notifier) return { ok: false, reason: 'email notifier is not configured' };
 
   /*
    * The address lives on the claim profile, and the profile is created on
    * first read with the invitation address prefilled. In the flow the email
    * screen has already read it — but a caller that reached this route without
-   * one would otherwise silently send nothing to a Founder whose invited
-   * address we have had all along, which is a §1.4 failure that looks exactly
-   * like a provider outage. Ensuring here is idempotent and runs after the
-   * route has answered, so it costs no timing.
+   * one would otherwise fail despite an invited address we already hold.
+   * Ensuring here is idempotent.
    */
   const profile = await ensureClaimProfile(deps.db, input.draftId, `draft:${input.draftId}`);
 
-  const email = profile?.fields.email.value?.trim();
-  if (!email) return;
+  if (!profile) return { ok: false, reason: 'claim profile is unavailable' };
 
-  const { code, record } = await deps.tokens.issueFounderEmailCode(input.draftId, email);
+  try {
+    return await deps.db.transaction(async (tx) => {
+      /*
+       * A transaction-scoped, non-blocking lock makes a concurrent resend a
+       * refusal instead of a second email. It is held through provider
+       * acceptance: the old code remains visible to every other transaction
+       * until this one commits, and a failed delivery rolls the replacement
+       * back with the old code still usable.
+       */
+      const lock = await tx.execute(
+        sql`select pg_try_advisory_xact_lock(hashtextextended(${`founder-email-code:${input.draftId}`}, 0)) as acquired`,
+      );
+      const acquired = (lock.rows[0] as { acquired?: boolean } | undefined)?.acquired === true;
+      if (!acquired) return { ok: false as const, reason: 'another code request is in flight' };
 
-  const notice = await renderEmailCodeNotice({
-    code,
-    reference: input.campaignId,
-    supportEmail: deps.supportEmail,
-  });
+      const [current] = await tx
+        .select({ email: founderClaimProfiles.email })
+        .from(founderClaimProfiles)
+        .where(eq(founderClaimProfiles.draftId, input.draftId))
+        .for('update')
+        .limit(1);
+      const email = current?.email?.trim();
+      if (!email) return { ok: false as const, reason: 'claim profile has no email address' };
 
-  await deps.notifier.send({
-    eventKey: FOUNDER_EMAIL_CODE,
-    entityType: 'secure_token',
-    /*
-     * The token ROW, not the draft. §7's resend rule: asking again is a
-     * deliberate second act and earns a second message, while a
-     * double-submitted request must not. A new row exists only when a new code
-     * was minted, so keying on it gets both halves for free.
-     */
-    entityId: record.id,
-    from: deps.fromAddress,
-    to: email,
-    subject: notice.subject,
-    html: notice.html,
-    text: notice.text,
-  });
+      const { code, record } = await deps.tokens.issueFounderEmailCode(
+        input.draftId,
+        email,
+        tx,
+      );
+      const notice = await renderEmailCodeNotice({
+        code,
+        reference: input.campaignId,
+        supportEmail: deps.supportEmail,
+      });
+
+      const outcome = await deps.notifier!.send({
+        eventKey: FOUNDER_EMAIL_CODE,
+        entityType: 'secure_token',
+        entityId: record.id,
+        from: deps.fromAddress,
+        to: email,
+        subject: notice.subject,
+        html: notice.html,
+        text: notice.text,
+      });
+
+      if (outcome.status !== 'sent') {
+        throw new EmailCodeSendFailure(
+          outcome.status === 'failed' ? outcome.reason : 'duplicate delivery was suppressed',
+        );
+      }
+
+      return { ok: true as const };
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : 'unknown email code send failure',
+    };
+  }
 }
+
+class EmailCodeSendFailure extends Error {}
 
 export type VerifyEmailCodeResult =
   | { ok: true; email: string }
@@ -176,9 +217,9 @@ export type VerifyEmailCodeResult =
  * the correct answer rather than an edge case: the thing being verified is an
  * address, and the address changed.
  *
- * `email_ownership` is the whole of what a success writes. No account, no
- * session, no consent, no status move — `completeClaim` still owns every one
- * of those and is not called from here.
+ * `email_ownership` is the whole of what this service writes. The route mints
+ * the separate flow authorization only after this succeeds. No account,
+ * consent, or campaign status move occurs here.
  */
 export async function verifyFounderEmailCode(
   deps: Pick<EmailCodeDeps, 'db' | 'tokens'>,

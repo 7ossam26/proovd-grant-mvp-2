@@ -21,32 +21,21 @@
  * genuinely new email rather than being swallowed as a duplicate of the first.
  * Keying dedup on the draft would satisfy §27.2 and break §7.
  *
- * ── The order of operations, and the windows it leaves ──────────────────────
- * Token, then send row, then the provider, then confirmation. Two orderings
- * were chosen deliberately and both are about which way a crash fails.
+ * ── Rotation commits only after provider acceptance ─────────────────────────
+ * Token rotation, the append-only send row, and confirmation share one database
+ * transaction. The provider call happens inside it. Other transactions keep
+ * seeing the previous usable link until the provider accepts the replacement
+ * and the transaction commits; a refusal or crash rolls the rotation back.
+ * A transaction-scoped per-draft lock prevents overlapping sends.
  *
- * **Token before send.** If the provider refuses, the rotated token has already
- * invalidated the previous one, so the Founder's old link is dead and no new
- * one has arrived. That is recorded, visible in Admin, and recoverable by
- * resending. The alternative — send first, then rotate — risks delivering a
- * link the next statement invalidates, which is worse: the Founder holds
- * something that looks live and is not.
- *
- * **Send row before the provider.** The row carries `notification_id` NULL
- * until the provider acknowledges. Writing it afterwards instead would leave a
- * crash-shaped hole where an email was delivered with no send row — therefore
- * no retention clock, therefore a draft §25.8 would never sweep. §25.8 sets a
- * maximum, not a minimum: a clock that starts slightly early deletes sooner,
- * which is the safe side; one that never starts keeps personal data forever.
- *
- * The cost is the opposite window — a row recorded for a message that may not
- * have gone out. That is why `notification_id` NULL is a *state*, not missing
- * data: the draft stays out of `sent` until delivery is confirmed, and Admin
- * renders the send as "not confirmed" rather than implying it arrived (§1.4).
+ * The send row is staged before the provider call but stays invisible inside
+ * the transaction until delivery is accepted. A rejection rolls the row and
+ * replacement token back together; acceptance records the provider id before
+ * the transaction commits.
  */
 
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import type { TokenService } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
@@ -428,6 +417,7 @@ export async function readDraft(db: Database, draftId: string): Promise<DraftRec
         eq(secureTokens.campaignDraftId, draftId),
         isNull(secureTokens.revokedAt),
         isNull(secureTokens.claimedAt),
+        or(isNull(secureTokens.expiresAt), gt(secureTokens.expiresAt, new Date())),
       ),
     )
     .limit(1);
@@ -600,6 +590,7 @@ export async function sendInvitation(
   if (!recipient.email) {
     return { ok: false, message: 'This prospect has no email address to send to.' };
   }
+  const recipientEmail = recipient.email;
 
   // Non-visible provenance values do not gate the reference's Invite stage.
   const missingFields = missingInvitationFields(record);
@@ -625,154 +616,178 @@ export async function sendInvitation(
     };
   }
 
-  const resent = record.hasLiveToken;
-
-  // Token first. See the note at the top of this file for why this ordering,
-  // and what it costs when the provider refuses.
-  let raw: string;
-  let tokenId: string;
-  let tokenVersion: number;
-  let tokenExpiresAt: Date | null;
-
-  if (resent) {
-    const [live] = await db
-      .select({ lineageId: secureTokens.lineageId })
-      .from(secureTokens)
-      .where(
-        and(
-          eq(secureTokens.scope, 'founder_draft'),
-          eq(secureTokens.campaignDraftId, input.draftId),
-          isNull(secureTokens.revokedAt),
-          isNull(secureTokens.claimedAt),
-        ),
-      )
-      .limit(1);
-
-    const rotated = await tokens.rotate(live!.lineageId, { actorId: input.actor });
-    if ('ok' in rotated) {
-      return { ok: false, message: 'The existing link could not be rotated. Nothing was sent.' };
-    }
-    raw = rotated.raw;
-    tokenId = rotated.record.id;
-    tokenVersion = rotated.record.version;
-    tokenExpiresAt = rotated.record.expiresAt;
-  } else {
-    const issued = await tokens.issue(
-      { scope: 'founder_draft', campaignDraftId: input.draftId },
-      { actorId: input.actor },
-    );
-    raw = issued.raw;
-    tokenId = issued.record.id;
-    tokenVersion = issued.record.version;
-    tokenExpiresAt = issued.record.expiresAt;
-  }
-
-  // The dedup identity. The SEND, not the draft — see the note at the top.
+  const resent = record.sends.length > 0;
   const sendId = randomUUID();
 
-  const message = await renderFounderInvitation(
-    variablesFor(
-      record,
-      `${input.context.appBaseUrl}${DRAFT_PATH}/${raw}`,
-      input.context.supportEmail,
-    ),
-  );
+  try {
+    return await db.transaction(async (tx) => {
+      const lock = await tx.execute(
+        sql`select pg_try_advisory_xact_lock(hashtextextended(${`founder-invitation:${input.draftId}`}, 0)) as acquired`,
+      );
+      const acquired = (lock.rows[0] as { acquired?: boolean } | undefined)?.acquired === true;
+      if (!acquired) {
+        return { ok: false as const, message: 'Another invitation send is already in progress.' };
+      }
 
-  // The send row lands BEFORE the provider call, with `notification_id` NULL.
-  // This is what guarantees a retention clock exists for anything that might
-  // have been delivered — see the ordering note at the top of this file.
-  await db.insert(campaignInvitationSends).values({
-    id: sendId,
-    draftId: input.draftId,
-    // §7 records what was DELIVERED, so the send row snapshots the resolved
-    // recipient. A later profile edit or a changed override cannot rewrite it —
-    // this row is the historical answer to "who did we actually write to".
-    recipientEmail: recipient.email,
-    recipientName: recipient.name,
-    senderName: record.draft.senderName!,
-    senderEmail: record.draft.senderEmail!,
-    invitationSource: record.prospect.invitationSource,
-    notificationId: null,
-    tokenId,
-    tokenVersion,
-    tokenExpiresAt,
-    status: 'sent',
-    sentBy: input.actor,
-  });
+      const now = new Date();
+      const outstanding = await tx
+        .select()
+        .from(secureTokens)
+        .where(
+          and(
+            eq(secureTokens.scope, 'founder_draft'),
+            eq(secureTokens.campaignDraftId, input.draftId),
+            isNull(secureTokens.revokedAt),
+            isNull(secureTokens.claimedAt),
+          ),
+        )
+        .for('update');
 
-  const outcome = await notifier.send({
-    eventKey: FOUNDER_INVITATION,
-    entityType: 'campaign_invitation_send',
-    entityId: sendId,
-    to: recipient.email,
-    from: input.context.fromAddress,
-    replyTo: record.draft.senderEmail ?? undefined,
-    subject: message.subject,
-    html: message.html,
-    text: message.text,
-  });
+      // The per-draft unique index deliberately cannot use `now()` in its
+      // predicate, so expired rows are explicitly retired before a new first
+      // issue. This keeps the database invariant durable between sweep runs.
+      if (outstanding.some((token) => token.expiresAt && token.expiresAt <= now)) {
+        await tx
+          .update(secureTokens)
+          .set({ revokedAt: now, revokedReason: 'expired' })
+          .where(
+            and(
+              eq(secureTokens.scope, 'founder_draft'),
+              eq(secureTokens.campaignDraftId, input.draftId),
+              isNull(secureTokens.revokedAt),
+              isNull(secureTokens.claimedAt),
+              lte(secureTokens.expiresAt, now),
+            ),
+          );
+      }
 
-  if (outcome.status === 'failed') {
-    // The send row stays, with `notification_id` NULL. It is not a claim that
-    // a message arrived — it is the record that an attempt was made, and the
-    // retention clock that attempt has to start in case it did.
+      const usable = outstanding.filter(
+        (token) => !token.expiresAt || token.expiresAt > now,
+      );
+      const previous = usable.length
+        ? usable.reduce((a, b) => (a.version >= b.version ? a : b))
+        : null;
+      const issued = previous
+        ? await tokens.rotate(previous.lineageId, { actorId: input.actor }, tx)
+        : await tokens.issue(
+            { scope: 'founder_draft', campaignDraftId: input.draftId },
+            { actorId: input.actor },
+            tx,
+          );
+      if ('ok' in issued) {
+        throw new InvitationSendFailure('The existing link could not be rotated. Nothing was sent.');
+      }
+
+      const tokenId = issued.record.id;
+      const tokenVersion = issued.record.version;
+      const tokenExpiresAt = issued.record.expiresAt;
+      const message = await renderFounderInvitation(
+        variablesFor(
+          record,
+          `${input.context.appBaseUrl}${DRAFT_PATH}/${issued.raw}`,
+          input.context.supportEmail,
+        ),
+      );
+
+      await tx.insert(campaignInvitationSends).values({
+        id: sendId,
+        draftId: input.draftId,
+        recipientEmail,
+        recipientName: recipient.name,
+        senderName: record.draft.senderName!,
+        senderEmail: record.draft.senderEmail!,
+        invitationSource: record.prospect.invitationSource,
+        notificationId: null,
+        tokenId,
+        tokenVersion,
+        tokenExpiresAt,
+        status: 'sent',
+        sentBy: input.actor,
+      });
+
+      const outcome = await notifier.send({
+        eventKey: FOUNDER_INVITATION,
+        entityType: 'campaign_invitation_send',
+        entityId: sendId,
+        to: recipientEmail,
+        from: input.context.fromAddress,
+        replyTo: record.draft.senderEmail ?? undefined,
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      });
+      if (outcome.status !== 'sent') {
+        throw new InvitationSendFailure(
+          outcome.status === 'failed'
+            ? `The email provider did not accept the message: ${outcome.reason}`
+            : 'That exact send has already been delivered.',
+          tokenVersion,
+        );
+      }
+
+      await tx
+        .update(campaignInvitationSends)
+        .set({ notificationId: outcome.notificationId })
+        .where(eq(campaignInvitationSends.id, sendId));
+      await tx
+        .update(campaignDrafts)
+        .set({ status: 'sent' })
+        .where(eq(campaignDrafts.id, input.draftId));
+      await tx.insert(auditEvents).values({
+        actor: input.actor,
+        targetType: 'campaign_draft',
+        targetId: input.draftId,
+        action: resent ? 'invitation.resent' : 'invitation.sent',
+        internalReason: resent
+          ? `resent; token rotated to v${tokenVersion} after delivery acceptance and the 30-day retention clock restarted`
+          : `invitation sent with token v${tokenVersion}`,
+        customerExplanation: 'We sent you a personal link to your Proovd draft.',
+        newValue: {
+          sendId,
+          tokenVersion,
+          notificationId: outcome.notificationId,
+          expiresAt: tokenExpiresAt,
+        },
+        relatedNotificationIds: [outcome.notificationId],
+      });
+
+      return { ok: true as const, sendId, tokenVersion, resent };
+    });
+  } catch (error) {
+    const failure =
+      error instanceof InvitationSendFailure
+        ? error
+        : new InvitationSendFailure('The invitation could not be sent. The previous link is unchanged.');
     await db.insert(auditEvents).values({
       actor: input.actor,
       targetType: 'campaign_draft',
       targetId: input.draftId,
       action: 'invitation.send_failed',
-      internalReason: `provider refused: ${outcome.reason}`,
+      internalReason: failure.message,
       customerExplanation: null,
-      newValue: { sendId, tokenVersion, resent, deliveryConfirmed: false },
+      newValue: {
+        sendId,
+        tokenVersion: failure.tokenVersion,
+        resent,
+        deliveryConfirmed: false,
+        previousLinkPreserved: record.hasLiveToken,
+      },
     });
     return {
       ok: false,
       message:
         'The email provider did not accept the message, so nothing was delivered. ' +
-        (resent
-          ? 'The previous link has already been replaced, so the Founder currently has no working link — send again.'
+        (record.hasLiveToken
+          ? 'The previous invitation link still works — try sending the replacement again.'
           : 'No link has reached the Founder — send again.'),
     };
   }
+}
 
-  if (outcome.status === 'duplicate') {
-    return { ok: false, message: 'That exact send has already been delivered.' };
+class InvitationSendFailure extends Error {
+  constructor(message: string, readonly tokenVersion: number | null = null) {
+    super(message);
   }
-
-  await db.transaction(async (tx) => {
-    // Confirmation. `notification_id` is the only column of this row the
-    // application may write after insert (migration 0006), so `sent_at` and
-    // `token_version` — the facts the retention clock rests on — stay fixed.
-    await tx
-      .update(campaignInvitationSends)
-      .set({ notificationId: outcome.notificationId })
-      .where(eq(campaignInvitationSends.id, sendId));
-
-    await tx
-      .update(campaignDrafts)
-      .set({ status: 'sent' })
-      .where(eq(campaignDrafts.id, input.draftId));
-
-    await tx.insert(auditEvents).values({
-      actor: input.actor,
-      targetType: 'campaign_draft',
-      targetId: input.draftId,
-      action: resent ? 'invitation.resent' : 'invitation.sent',
-      internalReason: resent
-        ? `resent; token rotated to v${tokenVersion} and the 30-day retention clock restarted`
-        : `invitation sent with token v${tokenVersion}`,
-      customerExplanation: 'We sent you a personal link to your Proovd draft.',
-      newValue: {
-        sendId,
-        tokenVersion,
-        notificationId: outcome.notificationId,
-        expiresAt: tokenExpiresAt,
-      },
-      relatedNotificationIds: [outcome.notificationId],
-    });
-  });
-
-  return { ok: true, sendId, tokenVersion, resent };
 }
 
 /* ── Revoking (§7) ────────────────────────────────────────────────────────── */

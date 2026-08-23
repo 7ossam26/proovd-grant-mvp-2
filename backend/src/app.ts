@@ -654,7 +654,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // It takes a token, never a draft id, so there is nothing in the request to
   // substitute — see `routes/draft.ts`.
   app.use(
-    createDraftRouter(db, tokens, {
+    createDraftRouter(db, auth, tokens, {
       ...(config.draftVerifyLimit !== undefined
         ? { verifyLimit: config.draftVerifyLimit }
         : {}),
@@ -671,9 +671,8 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       // Phase 08c (§10, §33.1.9). The account claim is the event; this is its
       // consumer. Idempotent, so a failed run costs nothing but a retry.
       handoff: { db, notifier, context: config.invitationContext },
-      // Founder Flow v2 Session C (§5.2 — a recorded §1 rule 6 deviation).
-      // The code VERIFIES AN EMAIL: it creates no account, mints no session,
-      // and `completeClaim` is untouched.
+      // The code verifies an email and establishes only the draft-scoped flow
+      // session. Account creation and `founder_signup_complete` stay at submit.
       emailCode: {
         db,
         tokens,
@@ -682,6 +681,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         supportEmail: config.invitationContext.supportEmail,
         audit,
       },
+      useSecureCookies: config.appBaseUrl.startsWith('https://'),
       // Deviation 2. Unset everywhere today, so the port refuses loudly and
       // the Positioning screen renders the absence (Track A).
       ...(config.transcription ? { transcription: config.transcription } : {}),

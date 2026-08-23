@@ -195,6 +195,43 @@ async function completeVetting(
   return res.body;
 }
 
+describe('Founder Flow authorization survives invite consumption', () => {
+  it('reopens claimed draft routes with the owning Founder session only', async () => {
+    const invited = await invite('claimed-session-resume');
+    const founder = request.agent(h.app);
+
+    await founder
+      .patch(`/api/draft/${invited.raw}/vetting`)
+      .send({ selectedType: 'pre_launch', ...ANSWERS })
+      .expect(200);
+    const submitted = await founder
+      .post(`/api/draft/${invited.raw}/vetting/submit`)
+      .send({})
+      .expect(201);
+    expect(submitted.body.signedIn).toBe(true);
+
+    // The invitation is consumed, but the durable owning session can reload,
+    // reopen, and traverse Back/Forward URLs for the same persisted draft.
+    await founder.get(`/api/draft/${invited.raw}`).expect(200);
+    const resumed = await founder.get(`/api/draft/${invited.raw}/vetting`).expect(200);
+    expect(resumed.body.problem).toBe(ANSWERS.problem);
+    expect(resumed.body.solution).toBe(ANSWERS.solution);
+    expect(resumed.body.competition).toBe(ANSWERS.competition);
+
+    const continued = await founder
+      .post(`/api/draft/${invited.raw}/vetting/submit`)
+      .send({})
+      .expect(200);
+    expect(continued.body.signedIn).toBe(true);
+
+    // The spent invite itself was not revived: without the owning session it
+    // still receives the ordinary opaque unavailable-link response.
+    await request(h.app)
+      .get(`/api/draft/${invited.raw}/vetting`)
+      .expect(TOKEN_REJECTION_STATUS);
+  });
+});
+
 function recordSignal(campaignId: string, count: number, basis = 'six recruited channels in this niche') {
   return request(h.app)
     .post(`/api/admin/campaigns/${campaignId}/creator-signal`)

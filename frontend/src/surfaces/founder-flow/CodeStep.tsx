@@ -96,7 +96,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import {
   EMAIL_CODE_CREATES_NO_ACCOUNT,
   EMAIL_CODE_LENGTH,
@@ -182,6 +182,9 @@ export function CodeStep() {
   if (!loaded) {
     return <SurfaceLoading subject="your confirmation step" reference="Your invitation link" />;
   }
+  if (loaded.founderSessionAuthorized) {
+    return <Navigate to={founderFlowPath('confirm-problem', token)} replace />;
+  }
 
   // No `badge`: the reference draws none on this screen. `FlowPage`'s top row
   // is hidden by `.ff[data-flow-page='code'] .ff__top { display: none }`.
@@ -204,6 +207,10 @@ function CodeScreen({ token, loaded }: { token: string; loaded: ClaimView }) {
   // 0 until the control is used, which is the reference's own initial state.
   const [resendIn, setResendIn] = useState(0);
   const [resent, setResent] = useState(false);
+  const [resending, setResending] = useState(false);
+  // State updates render asynchronously; the ref closes the double-click gap
+  // synchronously, before a second event can start another request.
+  const resendLock = useRef(false);
 
   const address = loaded.profile.fields.email.value ?? 'your email address';
   const already = loaded.profile.emailOwnership === 'code_verified';
@@ -283,14 +290,24 @@ function CodeScreen({ token, loaded }: { token: string; loaded: ClaimView }) {
   }
 
   async function resend() {
-    if (resendIn > 0) return;
-    // One answer for every outcome, and 202 whether or not a code was minted.
-    await requestEmailCode(token);
-    setResent(true);
-    setResendIn(EMAIL_CODE_RESEND_SECONDS);
-    setDigits(SLOTS.map(() => ''));
-    setRejected(false);
-    boxes.current[0]?.focus();
+    if (resendIn > 0 || resendLock.current) return;
+    resendLock.current = true;
+    setResending(true);
+    try {
+      await requestEmailCode(token);
+      // The cooldown starts only after the server confirms provider acceptance.
+      setResent(true);
+      setResendIn(EMAIL_CODE_RESEND_SECONDS);
+      setDigits(SLOTS.map(() => ''));
+      setRejected(false);
+      boxes.current[0]?.focus();
+    } catch {
+      // Keep the current digits/code path intact and make Resend usable again.
+      setResent(false);
+    } finally {
+      resendLock.current = false;
+      setResending(false);
+    }
   }
 
   const code = digits.join('');
@@ -400,7 +417,7 @@ function CodeScreen({ token, loaded }: { token: string; loaded: ClaimView }) {
               // The reference's `pointer-events:none` while counting. Disabled
               // rather than unclickable, so the state is announced and not just
               // unreachable.
-              disabled={counting}
+              disabled={counting || resending}
               onClick={() => void resend()}
             >
               {counting ? `resend again in ${resendIn}s` : 'resend'}

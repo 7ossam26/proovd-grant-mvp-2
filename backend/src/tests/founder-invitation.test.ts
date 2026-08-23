@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { and, eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, isNull, sql } from 'drizzle-orm';
 
 import { startHarness, type Harness } from './app-harness.js';
 import { createAdmin, type AdminSession } from './admin-session.js';
@@ -937,7 +937,31 @@ describe('§33.1.2 alteration, cross-Founder access, replay, expiry, revoke, res
     expect(detail.body.hasLiveToken).toBe(true);
   });
 
-  it('records an unconfirmed send when the provider refuses, and does not call it sent', async () => {
+  it('does not classify an expired invitation as live', async () => {
+    const founder = await invitedFounder('expired-live-state');
+    await h.db
+      .update(secureTokens)
+      .set({ expiresAt: new Date(Date.now() - 1_000) })
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_draft'),
+          eq(secureTokens.campaignDraftId, founder.draftId),
+          isNull(secureTokens.revokedAt),
+          isNull(secureTokens.claimedAt),
+        ),
+      );
+
+    const detail = await request(h.app)
+      .get(`/api/admin/founders/${founder.draftId}`)
+      .set('cookie', admin.cookie)
+      .expect(200);
+    expect(detail.body.hasLiveToken).toBe(false);
+    await request(h.app)
+      .get(`/api/draft/${founder.raw}`)
+      .expect(TOKEN_REJECTION_STATUS);
+  });
+
+  it('rolls back an unconfirmed send when the provider refuses, and does not call it sent', async () => {
     const created = await createProspect('refused');
     await compose(created.draftId);
 
@@ -950,16 +974,13 @@ describe('§33.1.2 alteration, cross-Founder access, replay, expiry, revoke, res
 
     expect(res.body.whatHappened).toContain('did not accept');
 
-    // The send row exists so a retention clock exists for a message that may
-    // have gone out — §25.8 sets a maximum, and erring early is the safe side.
+    // A definite provider refusal commits neither a delivered-link record nor
+    // a live token.
     const sends = await h.db
       .select()
       .from(campaignInvitationSends)
       .where(eq(campaignInvitationSends.draftId, created.draftId));
-    expect(sends).toHaveLength(1);
-
-    // …but it is not a claim that anything arrived (§1.4).
-    expect(sends[0]!.notificationId).toBeNull();
+    expect(sends).toHaveLength(0);
     const [draft] = await h.db
       .select()
       .from(campaignDrafts)
@@ -973,6 +994,31 @@ describe('§33.1.2 alteration, cross-Founder access, replay, expiry, revoke, res
       .where(eq(notificationDeliveries.target, created.email));
     expect(undelivered).toHaveLength(1);
     expect(undelivered[0]!.deliveredAt).toBeNull();
+  });
+
+  it('keeps the previous invitation live when a resend is refused', async () => {
+    const founder = await invitedFounder('resend-refused-safe');
+    h.sentEmails.failNext = true;
+
+    await request(h.app)
+      .post(`/api/admin/founders/${founder.draftId}/send`)
+      .set('cookie', admin.cookie)
+      .send({})
+      .expect(422);
+
+    await request(h.app).get(`/api/draft/${founder.raw}`).expect(200);
+    const live = await h.db
+      .select({ id: secureTokens.id })
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_draft'),
+          eq(secureTokens.campaignDraftId, founder.draftId),
+          isNull(secureTokens.revokedAt),
+          isNull(secureTokens.claimedAt),
+        ),
+      );
+    expect(live).toHaveLength(1);
   });
 
   it('confirms the send only once the provider accepts it', async () => {

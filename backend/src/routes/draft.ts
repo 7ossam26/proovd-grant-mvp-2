@@ -27,8 +27,9 @@
 
 import { Router } from 'express';
 import type { Database } from '../db/client.js';
+import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
-import { requireDraftToken, createTokenVerifyLimiter } from '../auth/token-middleware.js';
+import { requireFounderDraftAccess, createTokenVerifyLimiter } from '../auth/token-middleware.js';
 import { TOKEN_REJECTION_STATUS, TOKEN_REJECTION_BODY } from '../auth/token-rejection.js';
 import { DRAFT_TOKEN_PATH, TOKEN_PARAM } from '../auth/token-routes.js';
 import { readDraftLanding, DRAFT_PATH } from '../invitations/service.js';
@@ -48,6 +49,7 @@ export const DRAFT_VERIFY_LIMIT = 20;
 
 export function createDraftRouter(
   db: Database,
+  auth: Auth,
   tokens: TokenService,
   options: { verifyLimit?: number } = {},
 ): Router {
@@ -65,7 +67,7 @@ export function createDraftRouter(
       limit: options.verifyLimit ?? DRAFT_VERIFY_LIMIT,
       windowMs: 15 * 60 * 1000,
     }),
-    requireDraftToken(tokens),
+    requireFounderDraftAccess(db, auth, tokens),
     async (req, res) => {
       const draftId = req.draftSubject?.campaignDraftId;
       if (!draftId) {

@@ -83,6 +83,12 @@ export interface DraftSubject {
   campaignDraftId: string;
 }
 
+/** Persistent, cookie-carried authorization for one pre-account Founder draft. */
+export interface FounderFlowSessionSubject {
+  scope: 'founder_flow_session';
+  campaignDraftId: string;
+}
+
 export interface MagicLinkSubject {
   scope: 'backer_magic_link';
   campaignId: string;
@@ -130,6 +136,7 @@ export interface CampaignFollowSubject {
 
 export type TokenSubject =
   | DraftSubject
+  | FounderFlowSessionSubject
   | MagicLinkSubject
   | AffiliateInvitationSubject
   | CampaignFollowSubject
@@ -244,18 +251,21 @@ export interface TokenServiceDeps {
    * revoke, claim, and failed verification is recorded here — this is where
    * the real reason for a rejection lives, since the caller never sees it.
    */
-  audit: (event: {
-    action: string;
-    targetType: 'secure_token';
-    targetId: string | null;
-    internalReason: string;
-    priorValue?: unknown;
-    newValue?: unknown;
-    actorId?: string | null;
-  }) => Promise<void>;
+  audit: (
+    event: {
+      action: string;
+      targetType: 'secure_token';
+      targetId: string | null;
+      internalReason: string;
+      priorValue?: unknown;
+      newValue?: unknown;
+      actorId?: string | null;
+    },
+    executor?: Pick<NodePgDatabase<Record<string, unknown>>, 'insert'>,
+  ) => Promise<void>;
   /**
    * `BETTER_AUTH_SECRET`. Keys the HMAC that stores a six-digit email code
-   * (see `codeHash`) and nothing else — the other four scopes hold a plain
+   * (see `codeHash`) and nothing else — the opaque-token scopes hold a plain
    * SHA-256 of a 256-bit value, which needs no key.
    */
   secret: string;
@@ -282,13 +292,14 @@ export function createTokenService({
   /**
    * Issues a brand-new token and its lineage.
    *
-   * The raw value is returned exactly once and is never recoverable. If an
-   * email fails to send, rotate and issue a fresh one — do not attempt to
-   * reconstruct the old value.
+   * The raw value is returned exactly once and is never recoverable. A caller
+   * coupling issuance to delivery can pass its transaction executor, so a
+   * provider refusal rolls the new row and its audit evidence back together.
    */
   async function issue(
     subject: TokenSubject,
     opts: { expiresAt?: Date | null; actorId?: string | null } = {},
+    executor: Pick<NodePgDatabase<Record<string, unknown>>, 'insert'> = db,
   ): Promise<IssuedToken> {
     const raw = generateRawToken();
     const tokenHash = hashToken(raw);
@@ -301,7 +312,9 @@ export function createTokenService({
           // Founder draft: it is a private link to a signup that either happens
           // or is resent. Only magic links have no stamp at issue time, because
           // §19 derives their expiry from campaign resolution + 180 days.
-          subject.scope === 'founder_draft' || subject.scope === 'affiliate_invitation'
+          subject.scope === 'founder_draft' ||
+            subject.scope === 'founder_flow_session' ||
+            subject.scope === 'affiliate_invitation'
           ? new Date(now().getTime() + DRAFT_TTL_DAYS * 86_400_000)
           : // A follow CONFIRM link expires and an UNFOLLOW link does not, and
             // that difference is the only thing distinguishing the two
@@ -312,7 +325,7 @@ export function createTokenService({
             ? new Date(now().getTime() + FOLLOW_CONFIRM_TTL_DAYS * 86_400_000)
             : null;
 
-    const [record] = await db
+    const [record] = await executor
       .insert(secureTokens)
       .values({
         scope: subject.scope,
@@ -321,7 +334,9 @@ export function createTokenService({
         lineageId,
         expiresAt,
         campaignDraftId:
-          subject.scope === 'founder_draft' ? subject.campaignDraftId : null,
+          subject.scope === 'founder_draft' || subject.scope === 'founder_flow_session'
+            ? subject.campaignDraftId
+            : null,
         campaignId: subject.scope === 'backer_magic_link' ? subject.campaignId : null,
         backerIdentityId:
           subject.scope === 'backer_magic_link' ? subject.backerIdentityId : null,
@@ -332,16 +347,59 @@ export function createTokenService({
       })
       .returning();
 
-    await audit({
-      action: 'token.issued',
-      targetType: 'secure_token',
-      targetId: record.id,
-      internalReason: `issued ${subject.scope} v1`,
-      newValue: { scope: subject.scope, version: 1, expiresAt },
-      actorId: opts.actorId ?? null,
-    });
+    await audit(
+      {
+        action: 'token.issued',
+        targetType: 'secure_token',
+        targetId: record.id,
+        internalReason: `issued ${subject.scope} v1`,
+        newValue: { scope: subject.scope, version: 1, expiresAt },
+        actorId: opts.actorId ?? null,
+      },
+      executor,
+    );
 
     return { raw, record };
+  }
+
+  /**
+   * Establishes or replaces the persistent authorization for one Founder draft.
+   *
+   * The invitation is deliberately absent from this lineage. Reissuing an
+   * invite therefore cannot revoke this session, while re-verifying after a
+   * genuinely expired/revoked session replaces only the session itself.
+   */
+  async function issueFounderFlowSession(campaignDraftId: string): Promise<IssuedToken> {
+    return db.transaction(async (tx) => {
+      const current = await tx
+        .select({ id: secureTokens.id })
+        .from(secureTokens)
+        .where(
+          and(
+            eq(secureTokens.scope, 'founder_flow_session'),
+            eq(secureTokens.campaignDraftId, campaignDraftId),
+            isNull(secureTokens.revokedAt),
+            isNull(secureTokens.claimedAt),
+          ),
+        )
+        .for('update');
+
+      if (current.length > 0) {
+        await tx
+          .update(secureTokens)
+          .set({ revokedAt: now(), revokedReason: 'superseded_by_rotation' })
+          .where(
+            and(
+              eq(secureTokens.scope, 'founder_flow_session'),
+              eq(secureTokens.campaignDraftId, campaignDraftId),
+              isNull(secureTokens.revokedAt),
+              isNull(secureTokens.claimedAt),
+            ),
+          );
+      }
+
+      return issue({ scope: 'founder_flow_session', campaignDraftId }, {}, tx);
+    });
   }
 
   /**
@@ -357,8 +415,11 @@ export function createTokenService({
   async function rotate(
     lineageId: string,
     opts: { actorId?: string | null } = {},
+    executor?: Pick<NodePgDatabase<Record<string, unknown>>, 'select' | 'insert' | 'update'>,
   ): Promise<IssuedToken | { ok: false; error: TokenInvalid }> {
-    return db.transaction(async (tx) => {
+    const rotateWith = async (
+      tx: Pick<NodePgDatabase<Record<string, unknown>>, 'select' | 'insert' | 'update'>,
+    ) => {
       const live = await tx
         .select()
         .from(secureTokens)
@@ -403,18 +464,23 @@ export function createTokenService({
         })
         .returning();
 
-      await audit({
-        action: 'token.rotated',
-        targetType: 'secure_token',
-        targetId: record.id,
-        internalReason: `rotated ${previous.scope} v${previous.version} → v${nextVersion}`,
-        priorValue: { tokenId: previous.id, version: previous.version },
-        newValue: { tokenId: record.id, version: nextVersion, expiresAt },
-        actorId: opts.actorId ?? null,
-      });
+      await audit(
+        {
+          action: 'token.rotated',
+          targetType: 'secure_token',
+          targetId: record.id,
+          internalReason: `rotated ${previous.scope} v${previous.version} → v${nextVersion}`,
+          priorValue: { tokenId: previous.id, version: previous.version },
+          newValue: { tokenId: record.id, version: nextVersion, expiresAt },
+          actorId: opts.actorId ?? null,
+        },
+        tx,
+      );
 
       return { raw, record };
-    });
+    };
+
+    return executor ? rotateWith(executor) : db.transaction(rotateWith);
   }
 
   /* ── The Founder's six-digit email code (Founder Flow v2, Session C) ───── */
@@ -436,11 +502,14 @@ export function createTokenService({
   async function issueFounderEmailCode(
     campaignDraftId: string,
     email: string,
+    executor?: Pick<NodePgDatabase<Record<string, unknown>>, 'select' | 'insert' | 'update'>,
   ): Promise<{ code: string; record: SecureToken }> {
     const code = generateCode();
     const expiresAt = new Date(now().getTime() + EMAIL_CODE_TTL_MINUTES * 60_000);
 
-    return db.transaction(async (tx) => {
+    const issueWith = async (
+      tx: Pick<NodePgDatabase<Record<string, unknown>>, 'select' | 'insert' | 'update'>,
+    ) => {
       const live = await tx
         .select()
         .from(secureTokens)
@@ -483,20 +552,62 @@ export function createTokenService({
         })
         .returning();
 
-      await audit({
-        action: 'token.issued',
-        targetType: 'secure_token',
-        targetId: record.id,
-        internalReason: `issued founder_email_code v${record.version}`,
-        // Deliberately no code, and no address either: the address is on the
-        // claim profile, which is where support looks, and copying it into an
-        // insert-only table would put a second permanent copy of a personal
-        // fact somewhere §25.8's sweep cannot reach.
-        newValue: { scope: 'founder_email_code', version: record.version, expiresAt },
-      });
+      await audit(
+        {
+          action: 'token.issued',
+          targetType: 'secure_token',
+          targetId: record.id,
+          internalReason: `issued founder_email_code v${record.version}`,
+          // Deliberately no code, and no address either: the address is on the
+          // claim profile, which is where support looks, and copying it into an
+          // insert-only table would put a second permanent copy of a personal
+          // fact somewhere §25.8's sweep cannot reach.
+          newValue: { scope: 'founder_email_code', version: record.version, expiresAt },
+        },
+        tx,
+      );
 
       return { code, record };
-    });
+    };
+
+    return executor ? issueWith(executor) : db.transaction(issueWith);
+  }
+
+  /**
+   * Resolves the draft named by a raw Founder invitation without treating the
+   * invitation as live.
+   *
+   * This is intentionally narrower than `verify`: it exists only so the
+   * Founder-flow middleware can pair a consumed/expired/revoked invitation
+   * reference with an authenticated Founder session that owns the resulting
+   * draft. The row alone grants nothing. Callers must prove that ownership
+   * before attaching the subject to a request.
+   */
+  async function resolveFounderDraftReference(
+    raw: string,
+  ): Promise<{ token: SecureToken; subject: DraftSubject } | null> {
+    if (typeof raw !== 'string' || raw.length < 32 || raw.length > 256) return null;
+
+    const tokenHash = hashToken(raw);
+    const [row] = await db
+      .select()
+      .from(secureTokens)
+      .where(eq(secureTokens.tokenHash, tokenHash))
+      .limit(1);
+
+    if (
+      !row ||
+      !safeCompareHex(row.tokenHash, tokenHash) ||
+      row.scope !== 'founder_draft' ||
+      !row.campaignDraftId
+    ) {
+      return null;
+    }
+
+    return {
+      token: row,
+      subject: { scope: 'founder_draft', campaignDraftId: row.campaignDraftId },
+    };
   }
 
   /**
@@ -701,6 +812,8 @@ export function createTokenService({
     const subject: TokenSubject =
       row.scope === 'founder_draft'
         ? { scope: 'founder_draft', campaignDraftId: row.campaignDraftId! }
+        : row.scope === 'founder_flow_session'
+          ? { scope: 'founder_flow_session', campaignDraftId: row.campaignDraftId! }
         : // Unreachable in practice, and by two independent mechanisms: no route
           // passes this as an expected scope, and a six-character raw value is
           // rejected by the length guard at the top of this function long
@@ -931,6 +1044,8 @@ export function createTokenService({
     claimDraft,
     claimAffiliateInvitation,
     issueFounderEmailCode,
+    issueFounderFlowSession,
+    resolveFounderDraftReference,
     verifyFounderEmailCode,
     revoke,
     revokeDraftTokens,

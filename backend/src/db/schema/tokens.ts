@@ -9,8 +9,9 @@
  * express that scope, and creating Backer accounts would contradict the spec
  * outright.
  *
- * Better Auth still owns Founder, Affiliate, and Admin. This table owns the two
- * tokenised surfaces that have no account behind them.
+ * Better Auth still owns Founder, Affiliate, and Admin account sessions. This
+ * table also owns the draft-scoped Founder Flow authorization established by
+ * email verification before the account claim exists.
  *
  * ── Why one table for both ──────────────────────────────────────────────────
  * Spec §28.1 imposes an identical security contract on Founder draft tokens and
@@ -37,6 +38,7 @@ import {
   uniqueIndex,
   pgEnum,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /**
  * Token scope. Determines which entity columns are populated and which
@@ -89,6 +91,13 @@ export const tokenScope = pgEnum('token_scope', [
    * only writer and `verifyFounderEmailCode` the only reader.
    */
   'founder_email_code',
+  /**
+   * `founder_flow_session` — persistent authorization for ONE invited draft.
+   * It is minted only after the email code succeeds and is carried in an
+   * HttpOnly cookie, never in a URL. Its lifecycle is independent from the
+   * invitation that established initial access.
+   */
+  'founder_flow_session',
 ]);
 
 /**
@@ -141,7 +150,7 @@ export const secureTokens = pgTable(
        is not bound to a specific entity is a token that grants broad access,
        which is the failure §28.1 exists to prevent. */
 
-    /** `founder_draft` — the invited draft this token opens. */
+    /** Founder invite/code/flow-session — the one invited draft in scope. */
     campaignDraftId: uuid('campaign_draft_id'),
 
     /** `backer_magic_link` — the campaign this link is scoped to. */
@@ -235,6 +244,27 @@ export const secureTokens = pgTable(
     /** The 30-day unclaimed-draft anonymisation sweep. */
     draftIdx: index('secure_tokens_draft_idx').on(t.campaignDraftId),
 
+    /** One usable Founder invitation per draft, even across lineages. */
+    liveFounderDraftIdx: uniqueIndex('secure_tokens_one_live_founder_draft_per_draft')
+      .on(t.campaignDraftId)
+      .where(
+        sql`"scope" = 'founder_draft' AND "revoked_at" IS NULL AND "claimed_at" IS NULL`,
+      ),
+
+    /** One usable email code per draft, even under concurrent first issue. */
+    liveFounderEmailCodeIdx: uniqueIndex('secure_tokens_one_live_email_code_per_draft')
+      .on(t.campaignDraftId)
+      .where(
+        sql`"scope" = 'founder_email_code' AND "revoked_at" IS NULL AND "claimed_at" IS NULL`,
+      ),
+
+    /** One valid persistent Founder Flow session per draft. */
+    liveFounderFlowSessionIdx: uniqueIndex('secure_tokens_one_live_founder_flow_session_per_draft')
+      .on(t.campaignDraftId)
+      .where(
+        sql`"scope" = 'founder_flow_session' AND "revoked_at" IS NULL AND "claimed_at" IS NULL`,
+      ),
+
     /** Admin: the live invitation for one Affiliate association (§8). */
     associationIdx: index('secure_tokens_association_idx').on(t.associationId),
   }),
@@ -265,7 +295,7 @@ export type NewSecureToken = typeof secureTokens.$inferInsert;
  *     ON secure_tokens (lineage_id)
  *     WHERE revoked_at IS NULL AND claimed_at IS NULL;
  *
- * The partial unique index is what makes "two concurrent claims yield one
- * account and one failed safe response" (Spec §33.1.2) a database guarantee
- * rather than an application race.
+ * The lineage index makes rotation atomic. The per-draft partial indexes
+ * above additionally prevent concurrent first issues from creating separate
+ * live lineages for a Founder invite, email-code challenge, or flow session.
  */

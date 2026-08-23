@@ -63,7 +63,7 @@ function isRole(value: unknown): value is ProovdRole {
  * authenticated" and treating an error as anything else is how a fail-open bug
  * gets written.
  */
-async function loadSession(
+export async function loadSession(
   auth: Auth,
   req: Request,
 ): Promise<{ user: AuthenticatedUser; session: AuthenticatedSession } | null> {

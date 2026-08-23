@@ -1,11 +1,11 @@
 /**
- * Express middleware for the three token-bearing surfaces (§7, §8, §19).
+ * Express middleware for the token-bearing surfaces (§7, §8, §19).
  *
- * This layer does three things and no more: read the raw value out of the URL,
- * hand it to `token-service.verify()`, and attach the scoped subject to the
- * request. It does not reimplement verification, does not inspect the hash, and
- * does not learn why a token was rejected — `verify()` returns one opaque
- * failure by design and this file is not entitled to more.
+ * Ordinarily this layer reads the raw value, asks `token-service.verify()`, and
+ * attaches the scoped subject. The Founder guard has two narrow continuations:
+ * a historical draft-token reference plus either the draft-scoped flow cookie
+ * or the claimed owner's Better Auth session. It still never handles or
+ * compares token hashes itself.
  *
  * The subject it attaches is the authorization boundary for everything
  * downstream. §33.1.1: a draft link "grants no other access" — no account, no
@@ -25,8 +25,14 @@ import type {
   CampaignFollowSubject,
 } from './token-service.js';
 import type { SecureToken } from '../db/schema/tokens.js';
+import type { Database } from '../db/client.js';
+import type { Auth } from './auth.js';
+import { loadSession } from './guards.js';
+import { campaignDrafts, founderProspects } from '../db/schema/invitations.js';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { sendTokenRejection } from './token-rejection.js';
 import { TOKEN_PARAM } from './token-routes.js';
+import { readFounderFlowSessionCookie } from './founder-flow-session.js';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -40,6 +46,8 @@ declare module 'express-serve-static-core' {
     campaignFollowSubject?: CampaignFollowSubject;
     /** The verified row, for routes that need its version or issue time. */
     secureToken?: SecureToken;
+    /** The persistent pre-account session for this exact Founder draft. */
+    founderFlowSession?: SecureToken;
   }
 }
 
@@ -80,9 +88,10 @@ export function createTokenVerifyLimiter(overrides: Partial<RateLimitOptions> = 
  * Resend rate limit (§28.1, §5.5). Tighter than verification: a resend sends
  * mail, so an unthrottled one is a way to use Proovd to flood someone's inbox.
  *
- * §5.5 permits a self-resend only if it stays non-enumerating, so this shares
- * the rejection path — a throttled resend must be indistinguishable from an
- * accepted one, exactly as an unknown address must be.
+ * §5.5 permits a self-resend only if it stays non-enumerating, so the default
+ * shares the opaque rejection path. A route may override the handler with its
+ * own single generic failure, but must never report that an unsent message was
+ * accepted.
  */
 export function createTokenResendLimiter(overrides: Partial<RateLimitOptions> = {}): RequestHandler {
   return rateLimit({
@@ -136,6 +145,8 @@ function createTokenGuard(tokens: TokenService, scope: TokenSubject['scope']): R
       // become one — a request arriving with only a code has no draft this
       // guard could name. The branch exists so the union stays total and a
       // code can never fall through into `magicLinkSubject`.
+    } else if (result.subject.scope === 'founder_flow_session') {
+      req.founderFlowSession = result.token;
     } else {
       req.magicLinkSubject = result.subject;
     }
@@ -151,6 +162,93 @@ function createTokenGuard(tokens: TokenService, scope: TokenSubject['scope']): R
  */
 export function requireDraftToken(tokens: TokenService): RequestHandler {
   return createTokenGuard(tokens, 'founder_draft');
+}
+
+/**
+ * Admits a live Founder invitation, its valid persistent flow session, or the
+ * authenticated Founder who already claimed the draft.
+ *
+ * The fallback never revives a token: the raw value is used only to recover a
+ * stable draft reference, then a separately scoped flow token must name that
+ * same draft or the Better Auth session must match its claimed owner. A token
+ * from another draft/scope and a made-up token receive the same rejection.
+ */
+export function requireFounderDraftAccess(
+  db: Database,
+  auth: Auth,
+  tokens: TokenService,
+): RequestHandler {
+  return async function founderDraftAccess(req: Request, res: Response, next: NextFunction) {
+    const startedAt = Date.now();
+    const raw = readRawToken(req);
+
+    try {
+      const restorePersistentAccess = async (draftId: string): Promise<boolean> => {
+        const flowRaw = readFounderFlowSessionCookie(req, draftId);
+        if (flowRaw) {
+          const flow = await tokens.verify(flowRaw, 'founder_flow_session');
+          if (
+            flow.ok &&
+            flow.subject.scope === 'founder_flow_session' &&
+            flow.subject.campaignDraftId === draftId
+          ) {
+            req.founderFlowSession = flow.token;
+            return true;
+          }
+        }
+
+        const session = await loadSession(auth, req);
+        if (!session || session.user.role !== 'founder') return false;
+
+        const [owned] = await db
+          .select({ draftId: campaignDrafts.id })
+          .from(campaignDrafts)
+          .innerJoin(founderProspects, eq(campaignDrafts.prospectId, founderProspects.id))
+          .where(
+            and(
+              eq(campaignDrafts.id, draftId),
+              eq(campaignDrafts.status, 'claimed'),
+              eq(founderProspects.claimedUserId, session.user.id),
+              isNotNull(founderProspects.claimedAt),
+            ),
+          )
+          .limit(1);
+
+        if (!owned) return false;
+        req.authUser = session.user;
+        req.authSession = session.session;
+        return true;
+      };
+
+      const verified = await tokens.verify(raw, 'founder_draft');
+      if (verified.ok && verified.subject.scope === 'founder_draft') {
+        req.secureToken = verified.token;
+        req.draftSubject = verified.subject;
+        // A live invite remains sufficient for initial access. Restoring a
+        // matching flow/account session as well lets the response distinguish
+        // "email already verified in this browser" without trusting memory.
+        try {
+          await restorePersistentAccess(verified.subject.campaignDraftId);
+        } catch {
+          /* The independently valid invitation still authorizes this request. */
+        }
+        next();
+        return;
+      }
+
+      const reference = await tokens.resolveFounderDraftReference(raw);
+      if (!reference || !(await restorePersistentAccess(reference.subject.campaignDraftId))) {
+        await sendTokenRejection(res, startedAt);
+        return;
+      }
+
+      req.secureToken = reference.token;
+      req.draftSubject = reference.subject;
+      next();
+    } catch {
+      await sendTokenRejection(res, startedAt);
+    }
+  };
 }
 
 /**

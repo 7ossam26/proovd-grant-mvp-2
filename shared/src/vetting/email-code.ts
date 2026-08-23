@@ -20,12 +20,10 @@
  * §5.2 records today as `self_supplied_unverified` precisely because nothing
  * could verify it.
  *
- * **It verifies an email. It does not create an account.** Account creation
- * stays exactly where §10 puts it — the claim surface — and `completeClaim`
- * stays one transaction with its `founder_signup_complete` exactly-once
- * guarantee untouched. Building the code as a second account-creation path
- * would be a far larger deviation and would put a second writer on the most
- * carefully-guarded transaction in the product.
+ * **It verifies an email. It does not create an account.** The server records a
+ * draft-scoped Founder Flow authorization so refresh/reopen does not ask again;
+ * that cookie is not an account sign-in. Account creation stays exactly where
+ * §10 puts it, and `completeClaim` keeps its exactly-once guarantee untouched.
  *
  * ── What a later phase must not read this as licence for ────────────────────
  * This verifies an email; it is not the beginning of a passwordless product.

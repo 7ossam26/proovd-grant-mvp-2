@@ -1,11 +1,10 @@
 /**
  * The Founder's vetting and account-claim routes — Spec §9, §10, §28.1.
  *
- * Every route here is reached with a draft token and nothing else. The draft id
- * comes from the *verified subject*, never from the request, so there is no id
- * to substitute and no second Founder's record these routes could be argued
- * into serving (§33.1.1). That is the same shape `routes/draft.ts` established;
- * this file extends it from reading to writing.
+ * Initial access arrives through the invitation. After email verification, the
+ * same draft id is restored from a separate persistent Founder Flow session;
+ * after account claim, the owning Better Auth session can restore it too. Every
+ * path still derives the id server-side from an exact scoped subject.
  *
  * ── Two limiters, because the two shapes of traffic are different ───────────
  * §28.1 requires rate limiting on token verification, and every request below
@@ -31,7 +30,7 @@ import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
 import {
-  requireDraftToken,
+  requireFounderDraftAccess,
   createTokenVerifyLimiter,
   createTokenResendLimiter,
 } from '../auth/token-middleware.js';
@@ -41,6 +40,7 @@ import {
   sendTokenRejection,
 } from '../auth/token-rejection.js';
 import { DRAFT_TOKEN_PATH, TOKEN_PARAM } from '../auth/token-routes.js';
+import { setFounderFlowSessionCookie } from '../auth/founder-flow-session.js';
 import {
   ensureVetting,
   saveVetting,
@@ -59,6 +59,7 @@ import {
 } from '../vetting/claim.js';
 import {
   EMAIL_CODE_ACK,
+  EMAIL_CODE_FAILURE,
   requestFounderEmailCode,
   verifyFounderEmailCode,
   type EmailCodeDeps,
@@ -98,9 +99,9 @@ export function createVettingRouter(
     /**
      * The six-digit email code's sender (Founder Flow v2 Session C).
      *
-     * Optional, and absent means the route still answers its frozen ack and
-     * sends nothing — the same shape every notifier-less context in this
-     * product takes. What it must never do is answer differently.
+     * Optional, and absent means the route returns the same generic temporary
+     * failure as any other delivery failure. The frozen success acknowledgement
+     * is reserved for a message the notifier actually accepted.
      */
     emailCode?: (EmailCodeDeps & {
       audit: (event: {
@@ -126,6 +127,8 @@ export function createVettingRouter(
      * limiter itself on a harness that leaves it alone.
      */
     emailCodeLimit?: number | undefined;
+    /** Mirrors Better Auth's session-cookie transport policy for this origin. */
+    useSecureCookies?: boolean | undefined;
   } = {},
 ): Router {
   const handoff = options.handoff;
@@ -144,7 +147,7 @@ export function createVettingRouter(
     windowMs: 15 * 60 * 1000,
   });
 
-  const draft = requireDraftToken(tokens);
+  const draft = requireFounderDraftAccess(db, auth, tokens);
   const base = `${DRAFT_TOKEN_PATH}/:${TOKEN_PARAM}`;
 
   /** The draft id, or the standard rejection. Never an id from the request. */
@@ -344,17 +347,25 @@ export function createVettingRouter(
       draftId,
       tokenId,
       actor: actorOf(draftId),
+      ...(req.founderFlowSession ? { inviteAlreadyConsumed: true } : {}),
     });
 
     if (!claimed.ok) {
       /*
-        An account that already exists is not a failure to report as one. It is
-        the state a Founder reaches by coming back to a spent link, and what
-        they need is their campaign, not an error — so the campaign id goes
-        back with `signedIn: false` and the surface sends them to sign in.
+        An account that already exists is not a failure to report as one. The
+        historical-link guard admits only its owning Founder session, so that
+        session remains signed in; a request that lacks it never reaches here.
       */
       if (claimed.code === 'already_claimed') {
-        res.status(200).json({ ...state, campaignId: state!.campaignId, signedIn: false });
+        // A consumed-link request admitted by `requireFounderDraftAccess`
+        // already proved this exact claimed draft belongs to this Founder
+        // session. Continuing from an earlier Back/history entry must preserve
+        // that truth rather than instructing an authenticated owner to sign in.
+        res.status(200).json({
+          ...state,
+          campaignId: state!.campaignId,
+          signedIn: req.authUser?.role === 'founder',
+        });
         return;
       }
       res.status(422).json({
@@ -393,15 +404,14 @@ export function createVettingRouter(
    * record, `vetting/email-code.ts` the service.
    *
    * ── Ask for a code ────────────────────────────────────────────────────────
-   * Answers `EMAIL_CODE_ACK` for every outcome — an address on the profile, no
-   * address, a provider that refuses, and a caller over the limit — and answers
-   * it BEFORE doing the work, because minting-and-sending against returning
-   * immediately is measurable even when the bodies match. `magic-link-reissue`
-   * is the worked example and this is the same shape.
+   * Answers `EMAIL_CODE_ACK` only after the notifier accepts the message. No
+   * address, unavailable configuration, provider refusal, overlapping request,
+   * and rate-limit refusal all receive the same generic temporary failure; no
+   * branch can claim a code was sent when it was not.
    *
-   * 202, never a 429. Phase 04's rule, and the one that most often gets
-   * "corrected" by somebody who thinks a limiter should announce itself: a 429
-   * on the fifth try tells the caller the first four were interesting.
+   * Success is 202 and the generic temporary failure is 503, never a 429. The
+   * status distinguishes delivery from non-delivery, while the failure body
+   * does not reveal whether the cause was address, provider, lock, or limiter.
    */
   router.post(
     `${base}/email-code`,
@@ -412,13 +422,12 @@ export function createVettingRouter(
      * legitimately asks twice (the first landed in spam, or they fixed a typo
      * in the address), and five an hour covers that without covering a script.
      *
-     * Its handler answers the ordinary ack at 202 rather than the token
-     * rejection, because on this route the ack IS the ordinary answer.
+     * Its handler uses the same generic 503 as every other unsent outcome.
      */
     createTokenResendLimiter({
       ...(options.emailCodeLimit !== undefined ? { limit: options.emailCodeLimit } : {}),
       handler: (_req, res) => {
-        res.status(202).json(EMAIL_CODE_ACK);
+        res.status(503).json(EMAIL_CODE_FAILURE);
       },
     }),
     draft,
@@ -433,28 +442,27 @@ export function createVettingRouter(
         return;
       }
 
-      // Answer first. Everything below is what a hit does and a miss does not.
-      res.status(202).json(EMAIL_CODE_ACK);
+      if (!emailCode) {
+        res.status(503).json(EMAIL_CODE_FAILURE);
+        return;
+      }
 
-      if (!emailCode) return;
-      try {
-        await requestFounderEmailCode(emailCode, {
-          draftId,
-          campaignId: state.campaignId,
-        });
-      } catch (error) {
-        // The response is already out, so this can only be recorded. It must
-        // not surface: an error path that behaved differently would be the
-        // oracle the route is built to avoid.
+      const outcome = await requestFounderEmailCode(emailCode, {
+        draftId,
+        campaignId: state.campaignId,
+      });
+      if (!outcome.ok) {
         await emailCode.audit({
           action: 'founder.email_code_send_failed',
           targetType: 'campaign_draft',
           targetId: draftId,
-          internalReason: `§5.2 email code send failed: ${
-            error instanceof Error ? error.message : 'unknown'
-          }`,
+          internalReason: `§5.2 email code send failed: ${outcome.reason}`,
         });
+        res.status(503).json(EMAIL_CODE_FAILURE);
+        return;
       }
+
+      res.status(202).json(EMAIL_CODE_ACK);
     },
   );
 
@@ -489,8 +497,35 @@ export function createVettingRouter(
         return;
       }
 
-      // The whole of what a success returns. No session, no account, no token —
-      // the surface re-reads the claim profile and finds `code_verified` there.
+      let flowSession;
+      try {
+        flowSession = await tokens.issueFounderFlowSession(draftId);
+      } catch {
+        // A consumed code without durable authorization is not a successful
+        // verification response. The live invite remains usable to request a
+        // replacement code and retry.
+        await sendTokenRejection(res, startedAt);
+        return;
+      }
+
+      // The invitation established initial access and has now finished its
+      // job. Session issuance is already committed, so a concurrent resend or
+      // a transient claim failure cannot strand the verified Founder.
+      const inviteTokenId = req.secureToken?.id;
+      if (inviteTokenId) {
+        try {
+          await tokens.claimDraft(inviteTokenId);
+        } catch {
+          /* The independently valid flow session remains authoritative. */
+        }
+      }
+
+      setFounderFlowSessionCookie(
+        res,
+        draftId,
+        flowSession,
+        options.useSecureCookies === true,
+      );
       res.json({ verified: true });
     },
   );
@@ -625,6 +660,8 @@ export function createVettingRouter(
 
     res.json({
       profile,
+      founderSessionAuthorized:
+        req.founderFlowSession !== undefined || req.authUser?.role === 'founder',
       // §10's acceptances, with the version each would cite. A document still in
       // draft is reported as such rather than hidden: the Founder is entitled to
       // know why the button is not there (§27.1).

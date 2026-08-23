@@ -14,6 +14,7 @@
 
 import { auditEvents } from '../db/schema/integrity.js';
 import type { Database } from '../db/client.js';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 /**
  * Used when a rejection cannot be attributed to a stored row — the "no matching
@@ -48,11 +49,13 @@ export interface AuditEventInput {
   evidenceLinks?: Record<string, unknown> | null;
 }
 
-export type AuditWriter = (event: AuditEventInput) => Promise<void>;
+export type AuditExecutor = Pick<NodePgDatabase<Record<string, unknown>>, 'insert'>;
+
+export type AuditWriter = (event: AuditEventInput, executor?: AuditExecutor) => Promise<void>;
 
 export function createAuditWriter(db: Database): AuditWriter {
-  return async function audit(event) {
-    await db.insert(auditEvents).values({
+  return async function audit(event, executor) {
+    await (executor ?? db).insert(auditEvents).values({
       actor: event.actorId ? `user:${event.actorId}` : ANONYMOUS_ACTOR,
       mfaContext: event.mfaContext ?? null,
       reauthContext: event.reauthContext ?? null,

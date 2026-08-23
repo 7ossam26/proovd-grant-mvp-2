@@ -98,7 +98,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useParams } from 'react-router';
+import { Navigate, useParams } from 'react-router';
 import { founderFlowPath } from '@proovd/shared';
 import { Measure, Section, StatePanel } from '../../components/index.js';
 import { stageRelayIn } from '../../components/anim.js';
@@ -232,6 +232,9 @@ export function EmailStep() {
       </Section>
     );
   }
+  if (loaded.founderSessionAuthorized) {
+    return <Navigate to={founderFlowPath('confirm-problem', token)} replace />;
+  }
 
   return (
     <FlowPage pageId="email" param={token}>
@@ -348,9 +351,11 @@ function VerifyScreen({ token, loaded }: { token: string; loaded: ClaimView }) {
       // hash binds it, so a code sent against a half-saved address would not
       // verify against the saved one.
       await autosave.flush();
-      // One answer for every outcome, and nothing here branches on it.
       await requestEmailCode(token);
       leave(founderFlowPath('code', token), 1);
+    } catch {
+      // Provider acceptance was not confirmed. Stay on the saved email step so
+      // the same action is immediately usable again.
     } finally {
       setBusy(false);
     }

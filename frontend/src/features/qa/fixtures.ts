@@ -167,6 +167,7 @@ const vetting: VettingState = {
 };
 
 const claim: ClaimView = {
+  founderSessionAuthorized: false,
   profile: {
     draftId: QA.draftId,
     campaignId: QA.campaignId,

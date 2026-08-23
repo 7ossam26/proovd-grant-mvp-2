@@ -31,16 +31,19 @@ import { startHarness, type Harness } from './app-harness.js';
 import { createAdmin, type AdminSession } from './admin-session.js';
 import { seedAdminReauthWindow } from '../settings/service.js';
 import { secureTokens } from '../db/schema/tokens.js';
-import { founderClaimProfiles } from '../db/schema/vetting.js';
+import { campaignVetting, founderClaimProfiles } from '../db/schema/vetting.js';
+import { campaignDrafts } from '../db/schema/invitations.js';
+import { session as sessionTable, user as userTable } from '../db/schema/auth.js';
 import { auditEvents, notificationDeliveries } from '../db/schema/integrity.js';
 import { TOKEN_REJECTION_STATUS, TOKEN_REJECTION_BODY } from '../auth/token-rejection.js';
+import { founderFlowSessionCookieName } from '../auth/founder-flow-session.js';
 import {
   EMAIL_CODE_LENGTH,
   EMAIL_CODE_MAX_ATTEMPTS,
   EMAIL_CODE_TTL_MINUTES,
   isCodeShaped,
 } from '../vetting/email-code-logic.js';
-import { EMAIL_CODE_ACK } from '../vetting/email-code.js';
+import { EMAIL_CODE_ACK, EMAIL_CODE_FAILURE } from '../vetting/email-code.js';
 import { unconfiguredTranscription, TRANSCRIPTION_UNAVAILABLE } from '../transcription/index.js';
 import {
   EMAIL_CODE_LENGTH as SHARED_CODE_LENGTH,
@@ -130,10 +133,6 @@ const invite = (label: string) => inviteOn(h, admin, label);
 async function askForCode(invited: Invited): Promise<string> {
   const before = h.sentEmails.messages.length;
   await request(h.app).post(`/api/draft/${invited.raw}/email-code`).send({}).expect(202);
-  // The route answers before it works, so the message may not be out yet.
-  for (let i = 0; i < 60 && h.sentEmails.messages.length === before; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 25));
-  }
   const message = h.sentEmails.messages[before];
   expect(message, 'no code email was sent').toBeTruthy();
   const code = new RegExp(`\\b(\\d{${EMAIL_CODE_LENGTH}})\\b`).exec(message!.subject)?.[1];
@@ -354,6 +353,49 @@ describe('the six-digit code', () => {
     expect(deliveries.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('keeps the previous code usable when replacement delivery fails', async () => {
+    const invited = await invite('resend-failure-safe');
+    const first = await askForCode(invited);
+    h.sentEmails.failNext = true;
+
+    await request(h.app)
+      .post(`/api/draft/${invited.raw}/email-code`)
+      .send({})
+      .expect(503)
+      .expect((res) => expect(res.body).toEqual(EMAIL_CODE_FAILURE));
+
+    await request(h.app)
+      .post(`/api/draft/${invited.raw}/email-code/verify`)
+      .send({ code: first })
+      .expect(200);
+  });
+
+  it('admits one concurrent resend and leaves exactly one live code', async () => {
+    const invited = await invite('resend-concurrent');
+    await askForCode(invited);
+    const before = h.sentEmails.messages.length;
+
+    const responses = await Promise.all([
+      request(h.app).post(`/api/draft/${invited.raw}/email-code`).send({}),
+      request(h.app).post(`/api/draft/${invited.raw}/email-code`).send({}),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([202, 503]);
+    expect(h.sentEmails.messages).toHaveLength(before + 1);
+
+    const live = await h.db
+      .select({ id: secureTokens.id })
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_email_code'),
+          eq(secureTokens.campaignDraftId, invited.draftId),
+          sql`${secureTokens.revokedAt} is null`,
+          sql`${secureTokens.claimedAt} is null`,
+        ),
+      );
+    expect(live).toHaveLength(1);
+  });
+
   it('never puts the raw code in a log, an audit row, or a response', async () => {
     const invited = await invite('no-leak');
     const before = h.sentEmails.messages.length;
@@ -382,7 +424,7 @@ describe('the six-digit code', () => {
     expect(`${message.subject}${message.text}`).toContain(code);
   });
 
-  it('answers the frozen ack for a draft with no address, and sends nothing', async () => {
+  it('reports no successful send for a draft with no address, and sends nothing', async () => {
     const invited = await invite('no-address');
     await request(h.app)
       .patch(`/api/draft/${invited.raw}/claim`)
@@ -393,14 +435,14 @@ describe('the six-digit code', () => {
     const response = await request(h.app)
       .post(`/api/draft/${invited.raw}/email-code`)
       .send({})
-      .expect(202);
-    expect(JSON.stringify(response.body)).toBe(JSON.stringify(EMAIL_CODE_ACK));
+      .expect(503);
+    expect(response.body).toEqual(EMAIL_CODE_FAILURE);
 
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(h.sentEmails.messages.length).toBe(before);
   });
 
-  it('answers the same ack over the limit, at 202 rather than 429', async () => {
+  it('uses the same generic failure for throttled requests', async () => {
     // Phase 04's rule: a limiter that announces itself is the same enumeration
     // oracle wearing a different hat. Driven rather than read off the config —
     // and on its OWN harness, because the shared one raises the limit to keep
@@ -411,18 +453,17 @@ describe('the six-digit code', () => {
       const limitedAdmin = await createAdmin(limited, `flowc-limit-admin`);
       await seedAdminReauthWindow(limited.db, 3600);
       const invited = await inviteOn(limited, limitedAdmin, `limited`);
-      const bodies = new Set<string>();
+      const accepted: string[] = [];
+      const refused: string[] = [];
       for (let i = 0; i < 8; i++) {
         const response = await request(limited.app)
           .post(`/api/draft/${invited.raw}/email-code`)
           .send({});
-        expect(response.status).toBe(202);
-        bodies.add(JSON.stringify(response.body));
+        (response.status === 202 ? accepted : refused).push(JSON.stringify(response.body));
       }
-      // Every response — accepted and throttled alike — was the same bytes at
-      // the same status. Five of the eight were refused.
-      expect(bodies.size).toBe(1);
-      expect([...bodies][0]).toBe(JSON.stringify(EMAIL_CODE_ACK));
+      expect(accepted).toHaveLength(3);
+      expect(refused).toHaveLength(5);
+      expect(new Set(refused)).toEqual(new Set([JSON.stringify(EMAIL_CODE_FAILURE)]));
       const rows = await limited.db
         .select({ id: secureTokens.id })
         .from(secureTokens)
@@ -449,12 +490,121 @@ describe('the six-digit code', () => {
     // service's own length guard, so this never reaches a lookup.
     await request(h.app).get(`/api/draft/${code}/vetting`).expect(TOKEN_REJECTION_STATUS);
   });
+
+  it('restores one persistent Founder session across refresh, direct steps, resend, and claim', async () => {
+    const invited = await invite('persistent-founder-session');
+    const founder = request.agent(h.app);
+    const beforeCode = h.sentEmails.messages.length;
+
+    await founder.post(`/api/draft/${invited.raw}/email-code`).send({}).expect(202);
+    const codeMessage = h.sentEmails.messages[beforeCode]!;
+    const code = new RegExp(`\\b(\\d{${EMAIL_CODE_LENGTH}})\\b`).exec(codeMessage.subject)?.[1];
+    expect(code).toBeTruthy();
+
+    const verified = await founder
+      .post(`/api/draft/${invited.raw}/email-code/verify`)
+      .send({ code })
+      .expect(200);
+    const setCookies = (verified.headers['set-cookie'] ?? []) as unknown as string[];
+    expect(setCookies.some((value) => value.startsWith(`${founderFlowSessionCookieName(invited.draftId)}=`))).toBe(true);
+
+    // Verification establishes only the draft-scoped flow session. The account
+    // and Better Auth session still belong to the later account-claim boundary.
+    expect(
+      await h.db.select({ id: userTable.id }).from(userTable).where(eq(userTable.email, invited.email)),
+    ).toHaveLength(0);
+    const betterAuthSessionsBeforeClaim = await h.db.select({ id: sessionTable.id }).from(sessionTable);
+
+    const [inviteRow] = await h.db
+      .select({ claimedAt: secureTokens.claimedAt, revokedAt: secureTokens.revokedAt })
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_draft'),
+          eq(secureTokens.campaignDraftId, invited.draftId),
+        ),
+      );
+    expect(inviteRow?.claimedAt).toBeTruthy();
+    expect(inviteRow?.revokedAt).toBeTruthy();
+
+    // The consumed invite alone opens nothing; the persistent cookie restores
+    // authorization and persisted state on every new request.
+    await request(h.app).get(`/api/draft/${invited.raw}/vetting`).expect(TOKEN_REJECTION_STATUS);
+    const claim = await founder.get(`/api/draft/${invited.raw}/claim`).expect(200);
+    expect(claim.body.founderSessionAuthorized).toBe(true);
+
+    await founder
+      .patch(`/api/draft/${invited.raw}/vetting`)
+      .send({ selectedType: 'pre_launch', problem: 'Persisted problem', resumeStep: 'solution' })
+      .expect(200);
+    const refreshed = await founder.get(`/api/draft/${invited.raw}/vetting`).expect(200);
+    expect(refreshed.body.problem).toBe('Persisted problem');
+    expect(refreshed.body.resumeStep).toBe('solution');
+
+    await request(h.app)
+      .post(`/api/admin/founders/${invited.draftId}/revoke`)
+      .set('cookie', admin.cookie)
+      .send({ reason: 'rotate the initial-access invitation only' })
+      .expect(200);
+    const afterInviteRevocation = await founder
+      .get(`/api/draft/${invited.raw}/vetting`)
+      .expect(200);
+    expect(afterInviteRevocation.body.problem).toBe('Persisted problem');
+
+    // Admin resend creates a new invitation lifecycle. It does not revoke the
+    // already-active flow session, on either the old or the new URL.
+    const beforeResend = h.sentEmails.messages.length;
+    await request(h.app)
+      .post(`/api/admin/founders/${invited.draftId}/send`)
+      .set('cookie', admin.cookie)
+      .send({})
+      .expect(201);
+    const resentMessage = h.sentEmails.messages[beforeResend]!;
+    const resentRaw = /http:\/\/localhost:3000\/draft\/([A-Za-z0-9_-]+)/.exec(resentMessage.text)?.[1];
+    expect(resentRaw).toBeTruthy();
+
+    await founder.get(`/api/draft/${invited.raw}/vetting`).expect(200);
+    const throughResentUrl = await founder.get(`/api/draft/${resentRaw}/claim`).expect(200);
+    expect(throughResentUrl.body.founderSessionAuthorized).toBe(true);
+
+    await founder
+      .patch(`/api/draft/${invited.raw}/vetting`)
+      .send({ solution: 'Persisted solution', competition: 'Persisted positioning' })
+      .expect(200);
+    const submitted = await founder
+      .post(`/api/draft/${invited.raw}/vetting/submit`)
+      .send({})
+      .expect(201);
+    expect(submitted.body.signedIn).toBe(true);
+
+    expect(await h.db.select().from(campaignDrafts).where(eq(campaignDrafts.id, invited.draftId))).toHaveLength(1);
+    expect(await h.db.select().from(campaignVetting).where(eq(campaignVetting.draftId, invited.draftId))).toHaveLength(1);
+    expect(await h.db.select().from(founderClaimProfiles).where(eq(founderClaimProfiles.draftId, invited.draftId))).toHaveLength(1);
+    expect(
+      await h.db.select({ id: userTable.id }).from(userTable).where(eq(userTable.email, invited.email)),
+    ).toHaveLength(1);
+    expect((await h.db.select({ id: sessionTable.id }).from(sessionTable)).length).toBeGreaterThan(
+      betterAuthSessionsBeforeClaim.length,
+    );
+
+    const liveFlowSessions = await h.db
+      .select({ id: secureTokens.id })
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_flow_session'),
+          eq(secureTokens.campaignDraftId, invited.draftId),
+          sql`${secureTokens.revokedAt} is null`,
+        ),
+      );
+    expect(liveFlowSessions).toHaveLength(1);
+  });
 });
 
 /* ── The deviations' absences ─────────────────────────────────────────────── */
 
 describe('deviation 1 does not become an account-creation path', () => {
-  it('creates no user and no session when a code verifies', async () => {
+  it('creates no user or Better Auth session when a code verifies', async () => {
     const invited = await invite('no-account');
     const code = await askForCode(invited);
     const response = await request(h.app)
@@ -462,14 +612,17 @@ describe('deviation 1 does not become an account-creation path', () => {
       .send({ code })
       .expect(200);
 
-    // No cookie, and nothing that looks like one.
-    expect(response.headers['set-cookie']).toBeUndefined();
+    const setCookies = (response.headers['set-cookie'] ?? []) as unknown as string[];
+    expect(setCookies.some((value) => value.startsWith(`${founderFlowSessionCookieName(invited.draftId)}=`))).toBe(true);
 
     const [profile] = await h.db
       .select({ claimedUserId: founderClaimProfiles.claimedUserId })
       .from(founderClaimProfiles)
       .where(eq(founderClaimProfiles.draftId, invited.draftId));
     expect(profile?.claimedUserId ?? null).toBeNull();
+    expect(
+      await h.db.select({ id: userTable.id }).from(userTable).where(eq(userTable.email, invited.email)),
+    ).toHaveLength(0);
   });
 
   it('adds no column matching %verif% to `founder_claim_profiles` (§33.1.8)', async () => {

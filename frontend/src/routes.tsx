@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useParams, type RouteObject } from 'react-router';
-import { lazy, Suspense } from 'react';
+import { Fragment, lazy, Suspense, type ReactNode } from 'react';
 import { POLICY_DOCUMENTS, founderDashboardPath, founderFlowPath } from '@proovd/shared';
 import { MotionProvider } from './motion/MotionProvider.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
@@ -119,6 +119,18 @@ function CreatorFinishRedirect() {
 function DraftResultRedirect() {
   const { token = '' } = useParams();
   return <Navigate to={founderFlowPath('positioning', token)} replace />;
+}
+
+/**
+ * Raw-token routes can be reused by React Router when only `:token` changes.
+ * Keying the protected surface by that value prevents a previously authorised
+ * draft from remaining rendered while the replacement token is being checked.
+ * Each surface's existing loading/error branch then decides before its content
+ * is mounted, and an invalid reference renders only LinkUnavailable.
+ */
+function FounderDraftRoute({ children }: { children: ReactNode }) {
+  const { token = '' } = useParams();
+  return <Fragment key={token}>{children}</Fragment>;
 }
 
 /**
@@ -423,15 +435,15 @@ const rootChildren: RouteObject[] = [
       `draft/:token` is the address in the invitation email and does not move.
     */
     path: 'draft/:token',
-    element: <InviteClaim />,
+    element: <FounderDraftRoute><InviteClaim /></FounderDraftRoute>,
   },
   {
     path: 'draft/:token/problem',
-    element: <ProblemConfirm />,
+    element: <FounderDraftRoute><ProblemConfirm /></FounderDraftRoute>,
   },
   {
     path: 'draft/:token/solution',
-    element: <SolutionConfirm />,
+    element: <FounderDraftRoute><SolutionConfirm /></FounderDraftRoute>,
   },
   {
     /*
@@ -439,11 +451,11 @@ const rootChildren: RouteObject[] = [
       path, which is where the reference's own screen order puts it.
     */
     path: 'draft/:token/reach',
-    element: <ReachStep />,
+    element: <FounderDraftRoute><ReachStep /></FounderDraftRoute>,
   },
   {
     path: 'draft/:token/campaign-type',
-    element: <CampaignTypeStep />,
+    element: <FounderDraftRoute><CampaignTypeStep /></FounderDraftRoute>,
   },
   {
     /*
@@ -452,11 +464,11 @@ const rootChildren: RouteObject[] = [
       the last screen before the claim.
     */
     path: 'draft/:token/email',
-    element: <EmailStep />,
+    element: <FounderDraftRoute><EmailStep /></FounderDraftRoute>,
   },
   {
     path: 'draft/:token/code',
-    element: <CodeStep />,
+    element: <FounderDraftRoute><CodeStep /></FounderDraftRoute>,
   },
   {
     /*
@@ -467,7 +479,7 @@ const rootChildren: RouteObject[] = [
       record. See `ConfirmProblem.tsx`.
     */
     path: 'draft/:token/confirm-problem',
-    element: <ConfirmProblem />,
+    element: <FounderDraftRoute><ConfirmProblem /></FounderDraftRoute>,
   },
   {
     /*
@@ -479,11 +491,11 @@ const rootChildren: RouteObject[] = [
       See `ConfirmSolution.tsx`.
     */
     path: 'draft/:token/confirm-solution',
-    element: <ConfirmSolution />,
+    element: <FounderDraftRoute><ConfirmSolution /></FounderDraftRoute>,
   },
   {
     path: 'draft/:token/positioning',
-    element: <PositioningStep />,
+    element: <FounderDraftRoute><PositioningStep /></FounderDraftRoute>,
   },
   {
     // Phase 15 (§19, §20). The Backer's long-lived campaign-scoped magic-link

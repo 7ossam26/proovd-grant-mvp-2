@@ -1,9 +1,10 @@
 /**
- * The token-scoped Founder client — Spec §9, §10, §28.1.
+ * The Founder draft client — Spec §9, §10, §28.1.
  *
- * Separate from the Admin client on purpose. These calls carry a raw token in
- * the URL and no session cookie; the Admin ones carry a session and no token.
- * One module doing both would eventually send one to the other's routes.
+ * Separate from the Admin client on purpose. These calls retain the original
+ * invitation URL as a stable draft reference. After verification, a scoped
+ * HttpOnly flow session authorizes that exact draft; after account claim, the
+ * same-origin account session can do so too.
  *
  * ── The token is in the path and stays there ────────────────────────────────
  * §28.1 keeps the raw value in the delivered URL and nowhere else. Nothing here
@@ -37,10 +38,11 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, {
-      // No credentials: a draft link grants access to one draft and nothing
-      // else (§33.1.1), and sending a session cookie alongside it would be the
-      // beginning of the two being confused.
+      // Same-origin credentials carry either the pre-account flow session or
+      // the later Founder account session. Neither widens this URL to a second
+      // draft.
       headers: init?.body ? { 'content-type': 'application/json' } : {},
+      credentials: 'same-origin',
       ...init,
     });
   } catch {
@@ -264,6 +266,8 @@ export interface ClaimPolicy {
 export interface ClaimView {
   profile: ClaimProfileState;
   policies: ClaimPolicy[];
+  /** Restored by the server from the draft-scoped HttpOnly session cookie. */
+  founderSessionAuthorized: boolean;
 }
 
 export interface ClaimPatch {

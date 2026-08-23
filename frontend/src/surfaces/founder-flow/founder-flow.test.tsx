@@ -50,7 +50,7 @@ import { clearDraftFlowCache } from '../draft/api.js';
 import { clearFounderWorkspaceCache } from '../founder/api.js';
 
 type StubResult = { status: number; body: unknown } | undefined;
-type Handler = (url: string, init?: RequestInit) => StubResult;
+type Handler = (url: string, init?: RequestInit) => StubResult | Promise<StubResult>;
 
 let handlers: Handler[] = [];
 let requests: Array<{ url: string; method: string; body: Record<string, unknown> | null }> = [];
@@ -75,7 +75,7 @@ beforeEach(() => {
       body: init?.body ? JSON.parse(String(init.body)) : null,
     });
     for (const handler of handlers) {
-      const result = handler(url, init);
+      const result = await handler(url, init);
       if (result) return respond(result.status, result.body);
     }
     return respond(404, { error: 'not_found', title: 'No stub' });
@@ -792,6 +792,7 @@ const DRAFT_POLICIES = [
 function claimView(
   overrides: Record<string, unknown> = {},
   policies: unknown[] = DRAFT_POLICIES,
+  founderSessionAuthorized = false,
 ): Record<string, unknown> {
   return {
     profile: {
@@ -817,12 +818,17 @@ function claimView(
       ...overrides,
     },
     policies,
+    founderSessionAuthorized,
     canComplete: policies.length > 0,
   };
 }
 
-function stubClaim(overrides: Record<string, unknown> = {}, policies: unknown[] = DRAFT_POLICIES) {
-  const view = claimView(overrides, policies);
+function stubClaim(
+  overrides: Record<string, unknown> = {},
+  policies: unknown[] = DRAFT_POLICIES,
+  founderSessionAuthorized = false,
+) {
+  const view = claimView(overrides, policies, founderSessionAuthorized);
   handlers.push((url, init) => {
     if (!/\/api\/draft\/[^/]+\/claim$/.test(url)) return undefined;
     const profile = view['profile'] as Record<string, unknown>;
@@ -869,6 +875,15 @@ function stubCode(accept = '418306') {
 }
 
 describe('the address', () => {
+  it('restores an existing Founder session and does not ask for email verification again', async () => {
+    stubClaim({ emailOwnership: 'code_verified' }, DRAFT_POLICIES, true);
+    stubVetting(ANSWERED);
+    renderAt(at('email'));
+
+    expect(await screen.findByRole('heading', { name: /who else is solving this/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /confirm email/i })).toBeNull();
+  });
+
   it('is prefilled from the invitation, in a field a screen reader can name', async () => {
     stubClaim();
     renderAt(at('email'));
@@ -949,6 +964,37 @@ describe('the address', () => {
 });
 
 describe('the six-digit code', () => {
+  it('restores an existing Founder session and skips the code on Back, Forward, or reopen', async () => {
+    stubClaim({ emailOwnership: 'code_verified' }, DRAFT_POLICIES, true);
+    stubVetting(ANSWERED);
+    renderAt(at('code'));
+
+    expect(await screen.findByRole('heading', { name: /who else is solving this/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Digit 1 of 6')).toBeNull();
+  });
+
+  it('renders only link-unavailable when authorization fails', async () => {
+    handlers.push((url) =>
+      /\/api\/draft\/[^/]+\/claim$/.test(url)
+        ? {
+            status: 401,
+            body: {
+              error: 'link_unavailable',
+              title: 'We cannot open this link',
+              detail: '',
+              next: '',
+              support: '/support/link',
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('code'));
+
+    expect(await screen.findByRole('heading', { name: /open this link/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Digit 1 of 6')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^resend$/i })).toBeNull();
+  });
+
   it('labels every box and says what confirming does NOT do', async () => {
     stubClaim();
     stubCode();
@@ -1026,9 +1072,81 @@ describe('the six-digit code', () => {
     expect(screen.getByLabelText('Digit 2 of 6')).toHaveValue('');
     expect(screen.getByLabelText('Digit 1 of 6')).toHaveValue('4');
   });
+
+  it('locks Resend while its request is in flight', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    let finish!: () => void;
+    const pending = new Promise<StubResult>((resolve) => {
+      finish = () =>
+        resolve({
+          status: 202,
+          body: { status: 'sent', title: 'Check your email', whatHappened: 'x', next: 'y' },
+        });
+    });
+    let calls = 0;
+    handlers.push((url) => {
+      if (!/\/email-code$/.test(url)) return undefined;
+      calls += 1;
+      return pending;
+    });
+
+    renderAt(at('code'));
+    const resend = await screen.findByRole('button', { name: /^resend$/i });
+    const first = user.click(resend);
+    const second = user.click(resend);
+    await Promise.all([first, second]);
+
+    expect(calls).toBe(1);
+    expect(resend).toBeDisabled();
+    finish();
+  });
+
+  it('restores Resend and preserves the current code when the request fails', async () => {
+    const user = userEvent.setup();
+    stubClaim();
+    handlers.push((url) =>
+      /\/email-code$/.test(url)
+        ? { status: 503, body: { error: 'email_code_unavailable' } }
+        : undefined,
+    );
+
+    renderAt(at('code'));
+    await user.click(await screen.findByLabelText('Digit 1 of 6'));
+    await user.keyboard('41');
+    const resend = screen.getByRole('button', { name: /^resend$/i });
+    await user.click(resend);
+
+    await waitFor(() => expect(resend).toBeEnabled());
+    expect(screen.getByLabelText('Digit 1 of 6')).toHaveValue('4');
+    expect(screen.getByLabelText('Digit 2 of 6')).toHaveValue('1');
+    expect(screen.queryByText(/a new code is on its way/i)).toBeNull();
+  });
 });
 
 describe('positioning', () => {
+  it('hard-stops an unauthorized direct middle-step URL before Founder content renders', async () => {
+    handlers.push((url) =>
+      /\/api\/draft\/[^/]+\/vetting$/.test(url)
+        ? {
+            status: 401,
+            body: {
+              error: 'link_unavailable',
+              title: 'We cannot open this link',
+              detail: '',
+              next: '',
+              support: '/support/link',
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('positioning'));
+
+    expect(await screen.findByRole('heading', { name: /open this link/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/positioning/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /next|back/i })).toBeNull();
+  });
+
   it('renders blank with no Proovd draft behind it (§9, §33.1.5)', async () => {
     stubVetting(ANSWERED);
     renderAt(at('positioning'));
