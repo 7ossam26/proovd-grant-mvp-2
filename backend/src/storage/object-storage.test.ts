@@ -19,6 +19,7 @@ describe('browser-safe object-storage presigning', () => {
     });
 
     expect(upload.requiredHeaders).toEqual({ 'content-type': 'image/jpeg' });
+    expect(storage.browserUploadOrigin).toBe('https://r2.example.test');
     expect(new URL(upload.url).searchParams.get('X-Amz-SignedHeaders')).toBe(
       'content-type;host',
     );
@@ -32,5 +33,6 @@ describe('browser-safe object-storage presigning', () => {
     });
 
     expect(upload.requiredHeaders).toEqual({ 'content-type': 'image/png' });
+    expect(createMemoryStorage().browserUploadOrigin).toBeNull();
   });
 });

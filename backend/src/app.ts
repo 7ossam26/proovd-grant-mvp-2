@@ -1,5 +1,4 @@
 import express from 'express';
-import helmet from 'helmet';
 import cors from 'cors';
 import path from 'node:path';
 import type { Database } from './db/client.js';
@@ -31,6 +30,7 @@ import { createCreatorRouter } from './routes/creator.js';
 import { createFounderRouter } from './routes/founder.js';
 import { createAdminWorkspaceRouter } from './routes/admin-workspace.js';
 import { unconfiguredStorage, type ObjectStorage } from './storage/object-storage.js';
+import { createSecurityHeaders } from './security-headers.js';
 import { unconfiguredScheduler, type Scheduler } from './interviews/calcom.js';
 import type { Transcription } from './transcription/index.js';
 import { createCalcomWebhookRouter } from './routes/calcom-webhook.js';
@@ -276,7 +276,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   });
 
   // ── Security headers ───────────────────────────────────────────────────────
-  app.use(helmet());
+  app.use(createSecurityHeaders(config.objectStorage ?? unconfiguredStorage));
 
   // ── CORS ───────────────────────────────────────────────────────────────────
   //

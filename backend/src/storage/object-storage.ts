@@ -68,6 +68,8 @@ export interface ObjectStorage {
   /** False when Track A4 has not landed. The prerequisites panel reads it. */
   readonly configured: boolean;
   readonly bucket: string;
+  /** Exact cross-origin destination the browser must be allowed to PUT to. */
+  readonly browserUploadOrigin: string | null;
   presignUpload(input: PresignInput): Promise<PresignedUpload>;
   /** Reads the object back for §12's verification. Throws if it is not there. */
   getObject(key: string): Promise<StoredObject>;
@@ -91,6 +93,7 @@ export class ObjectNotStored extends Error {
 export const unconfiguredStorage: ObjectStorage = {
   configured: false,
   bucket: '',
+  browserUploadOrigin: null,
   async presignUpload() {
     throw new Error(
       'No object storage is configured, so uploads cannot be accepted. Set R2_ACCOUNT_ID, ' +
@@ -225,6 +228,7 @@ export function createR2Storage(config: R2Config): ObjectStorage {
   return {
     configured: true,
     bucket: config.bucket,
+    browserUploadOrigin: `https://${host}`,
 
     async presignUpload(input) {
       const expiresInSeconds = input.expiresInSeconds ?? DEFAULT_EXPIRY_SECONDS;
@@ -279,6 +283,7 @@ export function createMemoryStorage(bucket = 'test-bucket'): ObjectStorage & {
   return {
     configured: true,
     bucket,
+    browserUploadOrigin: null,
     put(key, contentType, body) {
       objects.set(key, { contentType, body });
     },
