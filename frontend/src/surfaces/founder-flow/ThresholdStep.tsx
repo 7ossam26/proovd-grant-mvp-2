@@ -1,5 +1,5 @@
 /**
- * Step 24 — Set your order threshold, rebuilt from the reference's `scGoal`.
+ * Step 24 — Set your order goal, rebuilt from the reference's `scGoal`.
  * The fixed stage, copy, states, relay, $500 beat, and Help drawer below are
  * the reference implementation. The existing API still persists the value.
  */
@@ -11,6 +11,7 @@ import {
   referenceDrawerClose,
   referenceDrawerOpen,
   stageRelayIn,
+  thresholdLimitShake,
 } from '../../components/anim.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import { FlowPage, flowDirection, useFlowNav } from './FlowPage.js';
@@ -78,6 +79,7 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
   const { swapToPage } = useFlowNav();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const direction = useRef<1 | -1 | null>(null);
   if (direction.current === null) direction.current = flowDirection();
 
@@ -85,6 +87,7 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
   const initial = useMemo(() => stored === null || stored === undefined ? '' : String(stored), [stored]);
   const [digits, setDigits] = useState(initial);
   const [drawer, setDrawer] = useState(false);
+  const [limitError, setLimitError] = useState<'minimum' | 'maximum' | null>(null);
   const amount = Number(digits || 0);
   const empty = digits === '';
 
@@ -101,24 +104,38 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
   const write = useCallback((next: string) => {
     const onlyDigits = next.replace(/[^0-9]/g, '');
     setDigits(onlyDigits);
-    build.autosave.queue({ orderThreshold: onlyDigits === '' ? null : Number(onlyDigits) });
+    setLimitError(null);
+    const nextAmount = Number(onlyDigits || 0);
+    if (onlyDigits === '' || (nextAmount >= 500 && nextAmount <= 50_000)) {
+      build.autosave.queue({ orderThreshold: onlyDigits === '' ? null : nextAmount });
+    }
   }, [build.autosave]);
 
   const continueToFaqs = useCallback(() => {
-    if (empty || amount <= 0) return;
+    if (empty) return;
+    if (amount < 500) {
+      setLimitError('minimum');
+      thresholdLimitShake(panel.current);
+      return;
+    }
+    if (amount > 50_000) {
+      setLimitError('maximum');
+      thresholdLimitShake(panel.current);
+      return;
+    }
     void build.autosave.flush();
     swapToPage('faqs');
   }, [amount, build.autosave, empty, swapToPage]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Enter' || event.isComposing || drawer || amount <= 0) return;
+      if (event.key !== 'Enter' || event.isComposing || drawer || empty) return;
       event.preventDefault();
       continueToFaqs();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [amount, continueToFaqs, drawer]);
+  }, [continueToFaqs, drawer, empty]);
 
   return (
     <div className="ff-goal" ref={root}>
@@ -138,21 +155,30 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
 
       <div className="ff-goal__stage" data-page-stage="1" ref={stage}>
         <div className="ff-goal__column">
-          <h1 className="ff-goal__note" data-stage-anim="note">Set your order threshold</h1>
-          <span className="ff-goal__sub" data-stage-anim="sub">Unique Backers</span>
-          <div className="ff-goal__panel" data-stage-anim="panel" data-empty={empty ? 'true' : 'false'}>
-            <input id="thresholdInput" className="ff-goal__input" inputMode="numeric"
-              aria-label="Active pre-orders needed at close"
-              value={digits}
+          <h1 className="ff-goal__note" data-stage-anim="note">Set your order goal</h1>
+          <span className="ff-goal__sub" data-stage-anim="sub">(USD)</span>
+          <div ref={panel} className="ff-goal__panel" data-stage-anim="panel" data-empty={empty ? 'true' : 'false'}>
+            <input id="goalInput" className="ff-goal__input" inputMode="numeric"
+              aria-label="Order goal in US dollars"
+              aria-invalid={limitError !== null}
+              aria-describedby={limitError ? 'goalLimitError' : undefined}
+              value={empty ? '' : `$${amount.toLocaleString('en-US')}`}
               onChange={(event) => write(event.currentTarget.value)} />
             {empty ? (
               <span className="ff-goal__placeholder" aria-hidden="true">
-                <span className="ff-goal__example-value">Enter a number</span>
+                <span className="ff-goal__example">Ex:</span>
+                <span className="ff-goal__example-value">$1,000</span>
+                <span className="ff-goal__minimum">Min.&nbsp;&nbsp;$500</span>
               </span>
             ) : null}
           </div>
-          <p className="ff-goal__body">{ORDER_THRESHOLD_IS_A_COUNT}</p>
-          {!empty && amount > 0 ? <button type="button" className="ff-goal__continue" data-stage-anim="cta"
+          {empty ? <p className="ff-goal__body">This should be high enough that you and the affiliates are excited, and low enough that you and the backers belive its achievable.</p> : null}
+          {limitError ? (
+            <span id="goalLimitError" className="ff-goal__hint" role="alert">
+              {limitError === 'minimum' ? 'Minimum $500' : 'Maximum $50K'}
+            </span>
+          ) : null}
+          {!empty ? <button type="button" className="ff-goal__continue" data-stage-anim="cta"
             onClick={continueToFaqs}>Continue</button> : null}
         </div>
       </div>

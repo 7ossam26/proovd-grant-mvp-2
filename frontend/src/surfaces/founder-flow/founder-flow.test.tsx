@@ -32,7 +32,6 @@ import {
   OBJECTLESS_CTA_LABELS,
   LISTING_FEE_CHECKOUT_CANCELED,
   NOTHING_HERE_IS_A_TIMER,
-  ORDER_THRESHOLD_IS_A_COUNT,
   ROSTER_CHIPS_ARE_RECORDED,
   LISTING_FEE_LOCKED_AFTER_PAYMENT,
   LISTING_FEE_NEWSLETTER_LABEL,
@@ -2959,20 +2958,26 @@ describe('the build steps (23–26)', () => {
     ).toBe(false);
   });
 
-  it('takes the threshold as a count, never an amount (§4.1)', async () => {
+  it('uses the original USD order-goal screen', async () => {
     stubStage5({ model: 'idea' });
     renderAt(at('threshold'));
-    await screen.findByRole('heading', { name: /order threshold/i });
+    await screen.findByRole('heading', { name: /set your order goal/i });
 
-    expect(screen.getByText(ORDER_THRESHOLD_IS_A_COUNT)).toBeInTheDocument();
-    // The reference labels this `(USD)` with `Ex: $1,000` and `Min. $500`.
-    const page = document.querySelector('.ff') as HTMLElement;
-    expect(page.textContent).not.toMatch(/USD|\$|minimum|Min\./i);
-    // §3.2 bans the word for an Idea threshold in every audience.
-    expect(page.textContent).not.toMatch(/\bgoals?\b/i);
+    expect(screen.getByText('(USD)')).toBeInTheDocument();
+    expect(screen.getByText('$1,000')).toBeInTheDocument();
+    expect(screen.getByText(/Min\.\s*\$500/i)).toBeInTheDocument();
+    const input = screen.getByLabelText(/order goal in us dollars/i);
+    expect(input).toBeInTheDocument();
 
-    await userEvent.type(screen.getByLabelText(/pre-orders needed/i), '12a0');
-    expect((screen.getByLabelText(/pre-orders needed/i) as HTMLInputElement).value).toBe('120');
+    await userEvent.type(input, '499');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Minimum $500');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+
+    await userEvent.clear(input);
+    await userEvent.type(input, '50001');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Maximum $50K');
   });
 
   it('tells a Product Founder the threshold step is not theirs (§14.4)', async () => {

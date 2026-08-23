@@ -1933,21 +1933,22 @@ export function stageRelayIn(
   };
 }
 
-/** Screen 22's below-floor input beat, copied from `goalNext`. */
-export function thresholdFloorPop(input: HTMLElement | null): void {
+/** Screen 22's invalid-limit shake. */
+export function thresholdLimitShake(box: HTMLElement | null): void {
   const g = gsap();
-  if (!g || !input || !motionLive()) return;
-  g.killTweensOf(input);
-  g.fromTo(
-    input,
-    { scale: 0.97 },
-    {
-      scale: 1,
-      duration: refDur(0.45),
-      ease: 'back.out(2)',
-      clearProps: 'transform',
-    },
-  );
+  if (!g || !box || !motionLive()) return;
+  g.killTweensOf(box);
+  g.to(box, {
+    keyframes: [
+      { x: -18, duration: refDur(0.07) },
+      { x: 16, duration: refDur(0.08) },
+      { x: -12, duration: refDur(0.08) },
+      { x: 8, duration: refDur(0.08) },
+      { x: 0, duration: refDur(0.09) },
+    ],
+    ease: 'power2.out',
+    clearProps: 'transform',
+  });
 }
 
 /** The reference Help drawer's literal desktop entrance. */
