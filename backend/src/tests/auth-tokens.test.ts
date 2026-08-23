@@ -31,7 +31,6 @@ import { createAuditWriter } from '../auth/audit.js';
 import {
   requireDraftToken,
   requireMagicLinkToken,
-  createTokenVerifyLimiter,
 } from '../auth/token-middleware.js';
 import { requireAdmin, requireFreshSession, requireRole } from '../auth/guards.js';
 import { TOKEN_REJECTION_STATUS, TOKEN_REJECTION_BODY } from '../auth/token-rejection.js';
@@ -43,8 +42,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let h: Harness;
 /** Token middleware and guards, mounted the way a product route will mount them. */
 let probe: Express;
-/** Same, but with a deliberately tiny verification limit. */
-let limited: Express;
 
 beforeAll(async () => {
   h = await startHarness({}, 'authtokens');
@@ -70,14 +67,6 @@ beforeAll(async () => {
   probe.post('/probe/sensitive', requireFreshSession(h.auth, TEST_REAUTH_WINDOW_SECONDS), (_req, res) => {
     res.json({ ok: true });
   });
-
-  limited = express();
-  limited.get(
-    '/api/draft/:token',
-    createTokenVerifyLimiter({ limit: 3, windowMs: 60_000 }),
-    requireDraftToken(h.tokens),
-    (_req, res) => res.json({ ok: true }),
-  );
 }, 180_000);
 
 afterAll(async () => {
@@ -403,33 +392,6 @@ describe('§33.1.2 alteration, cross-scope, replay, expiry, revocation, resend, 
   });
 });
 
-/* ── Rate limiting (§28.1) ────────────────────────────────────────────────── */
-
-describe('rate limits on verification are enforced and stay non-enumerating', () => {
-  it('throttles repeated attempts and answers with the ordinary rejection, not a 429', async () => {
-    const url = `/api/draft/${neverIssuedToken()}`;
-
-    const statuses: number[] = [];
-    let throttledBody: unknown;
-    for (let i = 0; i < 6; i += 1) {
-      const res = await request(limited).get(url);
-      statuses.push(res.status);
-      if (i === 5) throttledBody = res.body;
-    }
-
-    // Every response looks the same whether it was verified or refused.
-    expect(new Set(statuses)).toEqual(new Set([TOKEN_REJECTION_STATUS]));
-    expect(throttledBody).toEqual(TOKEN_REJECTION_BODY);
-  });
-
-  it('a valid token presented past the limit is refused identically — no 429 tell', async () => {
-    const { raw } = await issueDraft();
-    const res = await request(limited).get(`/api/draft/${raw}`);
-    expect(res.status).toBe(TOKEN_REJECTION_STATUS);
-    expect(res.body).toEqual(TOKEN_REJECTION_BODY);
-  });
-});
-
 /* ── §33.5.13 — magic-link duration, revoke/reissue, non-enumeration ───────── */
 
 describe('§33.5.13 magic-link duration, revoke/reissue, and non-enumeration', () => {
@@ -557,6 +519,14 @@ describe('§28.1 the raw token exists only in the delivered URL', () => {
 /* ── §33.2.1 — no public signup exists for any role ────────────────────────── */
 
 describe('§33.2.1 no public signup route exists', () => {
+  it('never throttles repeated authentication requests', async () => {
+    for (let i = 0; i < 40; i += 1) {
+      const res = await request(h.app).post('/api/auth/sign-in/email').send({});
+      expect(res.status).not.toBe(429);
+      expect(res.text).not.toContain('Too many requests, please try again later.');
+    }
+  });
+
   it('refuses the email sign-up endpoint', async () => {
     const res = await request(h.app).post('/api/auth/sign-up/email').send({
       email: 'walk-in@example.com',

@@ -58,8 +58,6 @@ beforeAll(async () => {
         returnUrl: 'https://app.example.com/stripe/return',
         refreshUrl: 'https://app.example.com/stripe/refresh',
       },
-      authRouteLimit: 1_000_000,
-      globalRateLimit: 1_000_000,
     },
     'fdd',
   );

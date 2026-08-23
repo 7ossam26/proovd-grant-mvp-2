@@ -101,7 +101,7 @@ let admin: AdminSession;
 
 beforeAll(async () => {
   h = await startHarness(
-    { stripeGateway: gateway, authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    { stripeGateway: gateway },
     'support-ops',
   );
   await seedAdminReauthWindow(h.db, 900);

@@ -64,7 +64,7 @@ beforeAll(async () => {
   // needs no gateway of its own; it lives in that router because it is the
   // recovery path for the surface that router serves.
   h = await startHarness(
-    { stripeGateway: createMemoryStripeGateway({}), globalRateLimit: 1_000_000 },
+    { stripeGateway: createMemoryStripeGateway({}) },
     'remainder',
   );
 }, 180_000);
@@ -616,6 +616,25 @@ describe('§5.5 magic-link reissue', () => {
     }
     // Byte-identical, not merely equal-shaped: any per-request value is a channel.
     expect(new Set([hit.text, miss.text, noCampaign.text, malformed.text, empty.text]).size).toBe(1);
+  });
+
+  it('processes repeated link resend requests beyond the former limit', async () => {
+    const s = await seedCampaign('link-unlimited');
+    await seedReservation(s);
+    const before = h.sentEmails.messages.length;
+
+    for (let i = 0; i < 22; i += 1) {
+      const res = await request(h.app)
+        .post('/api/link/request')
+        .send({ email: s.backerEmail, campaignId: s.campaignId });
+      expect(res.status).toBe(202);
+      expect(res.text).not.toContain('Too many requests, please try again later.');
+
+      for (let attempt = 0; attempt < 100 && h.sentEmails.messages.length <= before + i; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(h.sentEmails.messages.length).toBe(before + i + 1);
+    }
   });
 
   it('carries nothing per-request in the acknowledgement', () => {

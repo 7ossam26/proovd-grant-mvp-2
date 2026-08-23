@@ -44,18 +44,7 @@ let h: Harness;
 let admin: AdminSession;
 
 beforeAll(async () => {
-  h = await startHarness(
-    {
-      // This file drives whole multi-actor journeys — Admin, Founder, and
-      // several Creators, all from one loopback address. Both limiters are
-      // raised so a limiter never becomes the thing an unrelated assertion
-      // fails on. Their production defaults are proved in `auth-tokens.test.ts`.
-      globalRateLimit: 100_000,
-      draftVerifyLimit: 10_000,
-      authRouteLimit: 100_000,
-    },
-    'preparing',
-  );
+  h = await startHarness({}, 'preparing');
   admin = await createAdmin(h, 'preparing-admin');
   await seedAdminReauthWindow(h.db, 3600);
   // Every claim in this file needs published agreements. Publication is

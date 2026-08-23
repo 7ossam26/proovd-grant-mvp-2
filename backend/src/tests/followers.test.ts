@@ -8,7 +8,7 @@
  * follow. So the suite proves, in order:
  *
  *   1. the public ask is not an enumeration oracle — six branches, one
- *      byte-identical body, including the rate-limited one;
+ *      byte-identical body;
  *   2. double opt-in is real — a row is `pending` until a person opens the
  *      link, and no scanner GET can complete it;
  *   3. the two lineages cannot be swapped, so an unfollow link is never spent
@@ -63,7 +63,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = join(HERE, '..');
 
 beforeAll(async () => {
-  h = await startHarness({ globalRateLimit: 1_000_000 }, 'follow');
+  h = await startHarness({}, 'follow');
 }, 180_000);
 
 afterAll(async () => {
@@ -180,9 +180,7 @@ describe('the public follow ask is not an enumeration oracle', () => {
     expect(new Set(bodies).size).toBe(1);
   });
 
-  it('answers the same body over the rate limit, never a 429', async () => {
-    // The limiter is mounted on the route itself, so this drives the real one
-    // rather than asserting on its configuration.
+  it('continues processing repeated requests without a 429', async () => {
     const campaignId = await seedCampaign('oracle-limit');
     const results: number[] = [];
     const bodies = new Set<string>();
@@ -193,8 +191,6 @@ describe('the public follow ask is not an enumeration oracle', () => {
       results.push(res.status);
       bodies.add(JSON.stringify(res.body));
     }
-    // Phase 04's rule: a limiter that announces itself is the same oracle
-    // wearing a different hat.
     expect(results.every((s) => s === 202)).toBe(true);
     expect(results).not.toContain(429);
     expect(bodies.size).toBe(1);

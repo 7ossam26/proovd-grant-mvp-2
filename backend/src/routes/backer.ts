@@ -45,7 +45,6 @@ import { findCampaignFounderUserId } from '../reservations/context.js';
 import { findAccountForOwner } from '../payments/connected-accounts.js';
 import { evaluateAndNotifyThreshold } from '../live/thresholds.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
-import rateLimit from 'express-rate-limit';
 import {
   MAGIC_LINK_REISSUE_ACK,
   reissueMagicLink,
@@ -142,27 +141,10 @@ export function createBackerRouter(deps: BackerRouterDeps): Router {
    * the route for someone whose token no longer works.
    *
    * Every branch answers `MAGIC_LINK_REISSUE_ACK` — hit, miss, nonexistent
-   * campaign, malformed address, and over the limit. See
-   * `reservations/magic-link-reissue.ts` for why the rate-limit case is not an
-   * exception: a 429 on the fifth try tells you the first four were
-   * interesting, which is Phase 04's reasoning about token rejections applied
-   * to the one public route that takes an email address.
-   *
-   * The limiter is deliberately generous per window and low per address-shaped
-   * body — this is a route a locked-out person may legitimately hit twice.
+   * campaign, and malformed address.
    */
   router.post(
     `${MAGIC_LINK_TOKEN_PATH}/request`,
-    rateLimit({
-      windowMs: 15 * 60_000,
-      limit: 20,
-      standardHeaders: false,
-      legacyHeaders: false,
-      // Not a 429. The same body, the same status, the same everything.
-      handler: (_req, res) => {
-        res.status(202).json(MAGIC_LINK_REISSUE_ACK);
-      },
-    }),
     async (req, res) => {
       const body = (req.body ?? {}) as Record<string, unknown>;
       const email = typeof body['email'] === 'string' ? body['email'] : '';

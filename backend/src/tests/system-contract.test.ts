@@ -52,7 +52,7 @@ const gateway = createMemoryStripeGateway({ mode: 'test' });
 
 beforeAll(async () => {
   h = await startHarness(
-    { stripeGateway: gateway, authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    { stripeGateway: gateway },
     'system-contract',
   );
   admin = await createAdmin(h, 'system-contract-admin');

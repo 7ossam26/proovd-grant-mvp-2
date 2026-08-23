@@ -129,7 +129,7 @@ const AFTER_DAY_3 = () => new Date(Date.now() + (3 * 24 + 2) * 3_600_000);
 
 beforeAll(async () => {
   h = await startHarness(
-    { stripeGateway: gateway, authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    { stripeGateway: gateway },
     'refunds',
   );
   audit = createAuditWriter(h.db);

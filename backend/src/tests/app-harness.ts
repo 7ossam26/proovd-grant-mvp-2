@@ -120,20 +120,6 @@ export async function startHarness(
       supportEmail: 'support@proovd.co',
       fromAddress: 'hello@proovd.co',
     },
-    // Every request in the suite arrives from one loopback address, so the
-    // production §28.1 limit would trip partway through and turn unrelated
-    // assertions into limiter tests. The limiter's own behaviour is covered by
-    // `auth-tokens.test.ts`, which mounts it with a deliberately tiny limit.
-    draftVerifyLimit: 100_000,
-    // The email code route sends mail, so it carries the tight resend limit
-    // in production (five an hour, per address). A suite that shares one
-    // client address would exhaust it after five requests and every later
-    // test would silently receive no code — which is exactly the failure the
-    // limiter's own test drives on purpose, with its own harness.
-    emailCodeLimit: 100_000,
-    // Same reasoning for the blanket limiter: one loopback address drives every
-    // request in the suite, and a whole Founder journey is dozens of autosaves.
-    globalRateLimit: 1_000_000,
     // Captured, never sent. The real Resend transport is not exercised by the
     // suite — what has to be proved is that a duplicate cannot produce a second
     // message (§27.2), and that is a property of `createNotifier`, not of the

@@ -61,7 +61,7 @@ const NOTICE_CONTEXT: LaunchNotificationContext = {
 };
 
 beforeAll(async () => {
-  h = await startHarness({ authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 }, 'attribution');
+  h = await startHarness({}, 'attribution');
   audit = createAuditWriter(h.db);
 }, 180_000);
 

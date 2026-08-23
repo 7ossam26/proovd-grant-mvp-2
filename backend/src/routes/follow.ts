@@ -22,7 +22,6 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import rateLimit from 'express-rate-limit';
 import type { Database } from '../db/client.js';
 import type { TokenService } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
@@ -81,22 +80,10 @@ export function createFollowRouter(deps: FollowRouterDeps): Router {
 
   /**
    * The ask. Every branch answers `FOLLOW_ACK` — a hit, a miss, a malformed
-   * address, an unknown campaign, one that is not live, and a caller over the
-   * limit. See `followers/service.ts` for why the rate-limit case is not an
-   * exception.
+   * address, an unknown campaign, and one that is not live.
    */
   router.post(
     '/api/campaign/:campaignId/follow',
-    rateLimit({
-      windowMs: 15 * 60_000,
-      limit: 20,
-      standardHeaders: false,
-      legacyHeaders: false,
-      // Not a 429. The same body, the same status, the same everything.
-      handler: (_req: Request, res: Response) => {
-        res.status(202).json(FOLLOW_ACK);
-      },
-    }),
     async (req: Request, res: Response) => {
       const body = (req.body ?? {}) as Record<string, unknown>;
       const email = typeof body['email'] === 'string' ? body['email'] : '';

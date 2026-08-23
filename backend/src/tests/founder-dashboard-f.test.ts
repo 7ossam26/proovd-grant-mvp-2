@@ -39,7 +39,7 @@ let h: Harness;
 
 beforeAll(async () => {
   h = await startHarness(
-    { authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    {},
     'fdf',
   );
 }, 180_000);

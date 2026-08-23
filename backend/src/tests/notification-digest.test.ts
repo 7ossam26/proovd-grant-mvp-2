@@ -111,7 +111,7 @@ function sweepInstant(): Date {
 }
 
 beforeAll(async () => {
-  h = await startHarness({ globalRateLimit: 1_000_000 }, 'digest');
+  h = await startHarness({}, 'digest');
 }, 180_000);
 
 afterAll(async () => {

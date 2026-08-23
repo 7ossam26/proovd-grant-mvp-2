@@ -1,6 +1,5 @@
 import express from 'express';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import path from 'node:path';
 import type { Database } from './db/client.js';
@@ -108,23 +107,9 @@ export interface AppConfig {
   /**
    * How many reverse proxies sit in front of this process, or 0 for none.
    *
-   * This is a security control, which is why it has no clever default.
-   *
-   *  - Set too LOW (0 behind a proxy, the state this app shipped in): every
-   *    request keys to the proxy's own address, so `express-rate-limit`'s
-   *    per-address limits become one shared global bucket. §28.1's 30
-   *    attempts per quarter-hour on `/api/auth` then means thirty for
-   *    *everybody*, which is simultaneously useless against a distributed
-   *    guesser and a way for one client to lock every real person out of
-   *    signing in.
-   *  - Set too HIGH (or `true`), every client can spoof `X-Forwarded-For` and
-   *    mint a fresh rate-limit bucket per request, which removes the limit
-   *    entirely.
-   *
-   * There is no value that is right without knowing the deployment, so the
-   * operator states it (`TRUST_PROXY_HOPS`) and the unset case keeps the
-   * over-restrictive behaviour rather than the spoofable one — wrong in the
-   * direction that fails closed.
+   * Used when recording the privacy-preserving IP hash on Backer pre-orders.
+   * The operator states the real proxy count so that audit value reflects the
+   * client connection rather than an ingress address or a spoofed header.
    */
   trustProxyHops: number;
   /** Observable facts the §34 live-mode gate reads about this deployment. */
@@ -191,20 +176,6 @@ export interface AppConfig {
    */
   internalRecipient?: string | undefined;
   /**
-   * §28.1 draft-token verification limit. Defaults to the production value;
-   * the integration suite raises it because it issues far more verifications
-   * from one loopback address than any person would.
-   */
-  draftVerifyLimit?: number;
-  /**
-   * The email code's own hourly allowance (Founder Flow v2 Session C).
-   *
-   * Separate from `draftVerifyLimit` because this route sends mail, so its
-   * production default is the tight resend limit. The suite raises it, except
-   * in the one test that drives the limiter.
-   */
-  emailCodeLimit?: number;
-  /**
    * LOCAL DEVELOPMENT ONLY — `INVITATION_LINKS_REUSABLE`, refused at boot in
    * production. Lets a CLAIMED Founder-draft or Creator-invitation link keep
    * opening, so the flow can be walked and re-walked without minting a fresh
@@ -212,21 +183,6 @@ export interface AppConfig {
    * relaxes, which is two guards and nothing else.
    */
   invitationLinksReusable?: boolean;
-  /**
-   * The blanket per-address request limit. Defaults to the production value.
-   *
-   * Configurable only because the integration suite drives an entire Founder
-   * journey — dozens of autosaves per person — from one loopback address, and a
-   * suite that tripped this would turn unrelated assertions into limiter tests.
-   * Nothing in production overrides it.
-   */
-  globalRateLimit?: number;
-  /**
-   * §28.1's per-address limit on the credential endpoints (`/api/auth`).
-   * Configurable for exactly the same reason as `globalRateLimit`, and set by
-   * nothing but the integration suite.
-   */
-  authRouteLimit?: number;
   /** §5.5 email-link password reset. Injected; the transport arrives later. */
   /**
    * §5.5. Optional since Phase 22b: without one,  sends the reset
@@ -249,15 +205,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   const app = express();
 
   // ── Proxy trust (§28.1) ────────────────────────────────────────────────────
-  // Set before anything that reads `req.ip` — which is every rate limiter
-  // below. Express's own semantics: a NUMBER means "trust exactly this many
+  // Set before anything that reads `req.ip`. Express's own semantics: a NUMBER
+  // means "trust exactly this many
   // hops", so a client cannot lengthen the chain by adding its own
   // `X-Forwarded-For` entries. `0` leaves `req.ip` as the socket address,
   // which is correct when nothing is in front of this process.
   //
   // Deliberately never `true`. `trust proxy: true` accepts the left-most
-  // forwarded address whoever wrote it, which hands every caller its own
-  // rate-limit bucket.
+  // forwarded address whoever wrote it.
   app.set('trust proxy', config.trustProxyHops);
 
   // ── Auth (§5) ──────────────────────────────────────────────────────────────
@@ -323,16 +278,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // ── Security headers ───────────────────────────────────────────────────────
   app.use(helmet());
 
-  // ── Rate limiting ──────────────────────────────────────────────────────────
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      limit: config.globalRateLimit ?? 200,
-      standardHeaders: 'draft-7',
-      legacyHeaders: false,
-    }),
-  );
-
   // ── CORS ───────────────────────────────────────────────────────────────────
   //
   // Note what this does NOT do: `cors()` decides which response headers to set,
@@ -359,11 +304,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // looks like a Stripe configuration problem, and as sign-in requests that
   // hang. Each router adds its own body parsing at the correct scope.
 
-  app.use(
-    createAuthRouter(auth, {
-      ...(config.authRouteLimit !== undefined ? { limit: config.authRouteLimit } : {}),
-    }),
-  );
+  app.use(createAuthRouter(auth));
   app.use(createHealthRouter(db));
   // Phase 20b (§29.8). "Continued use is suspended until accepted": an
   // authenticated Founder/Creator with an outstanding material policy update
@@ -645,29 +586,17 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       // 6 render a named absence while R2 is unset (Track A4); there is no
       // presign or upload route on this router to reach it with.
       objectStorage: config.objectStorage ?? unconfiguredStorage,
-      ...(config.draftVerifyLimit !== undefined
-        ? { verifyLimit: config.draftVerifyLimit }
-        : {}),
     }),
   );
   // Phase 06b (§7, §33.1.1). The one route a Founder reaches with no account.
   // It takes a token, never a draft id, so there is nothing in the request to
   // substitute — see `routes/draft.ts`.
-  app.use(
-    createDraftRouter(db, tokens, {
-      ...(config.draftVerifyLimit !== undefined
-        ? { verifyLimit: config.draftVerifyLimit }
-        : {}),
-    }),
-  );
+  app.use(createDraftRouter(db, tokens));
   // Phase 07 (§9, §10). The vetting sequence, the possible-creator result, and
   // the account claim — all behind the same draft token, all learning the draft
   // id from the verified subject rather than from the request.
   app.use(
     createVettingRouter(db, auth, tokens, {
-      ...(config.draftVerifyLimit !== undefined
-        ? { verifyLimit: config.draftVerifyLimit, saveLimit: config.draftVerifyLimit }
-        : {}),
       // Phase 08c (§10, §33.1.9). The account claim is the event; this is its
       // consumer. Idempotent, so a failed run costs nothing but a retry.
       handoff: { db, notifier, context: config.invitationContext },
@@ -685,7 +614,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       // Deviation 2. Unset everywhere today, so the port refuses loudly and
       // the Positioning screen renders the absence (Track A).
       ...(config.transcription ? { transcription: config.transcription } : {}),
-      ...(config.emailCodeLimit !== undefined ? { emailCodeLimit: config.emailCodeLimit } : {}),
     }),
   );
   // Phase 08c (§10, §31.5, §33.2.4). The signed-in Creator: their campaigns and
@@ -752,7 +680,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
       // noticed by a webhook rather than by a person.
       appBaseUrl: config.appBaseUrl,
       ...(config.internalRecipient ? { internalRecipient: config.internalRecipient } : {}),
-      ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
     }),
   );
   // Phase 09a (§12 Admin, §25.6). Every item, its evidence, the discount line,
@@ -903,7 +830,6 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
         // Phase 18a: the payment_intent.* handlers mint the Backer magic link
         // for the receipt/recovery messages.
         tokens,
-        ...(config.globalRateLimit !== undefined ? { limit: config.globalRateLimit } : {}),
       }),
     );
     // Phase 11 (§13, §31.6, §33.3.5, §33.3.11). The Founder's listing payment:

@@ -79,8 +79,6 @@ beforeAll(async () => {
     {
       authSecret: TEST_AUTH_SECRET,
       interviewScheduler: scheduler,
-      authRouteLimit: 1_000_000,
-      globalRateLimit: 1_000_000,
     },
     'interviews',
   );

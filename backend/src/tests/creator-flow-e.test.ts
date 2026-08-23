@@ -59,7 +59,7 @@ import * as backendLogic from '../creator-flow/logic.js';
 let h: Harness;
 
 beforeAll(async () => {
-  h = await startHarness({ authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 }, 'creatorpitch');
+  h = await startHarness({}, 'creatorpitch');
 }, 180_000);
 
 afterAll(async () => {

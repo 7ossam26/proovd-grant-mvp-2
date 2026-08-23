@@ -99,7 +99,7 @@ let admin: AdminSession;
 
 beforeAll(async () => {
   h = await startHarness(
-    { authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    {},
     'campaign-workspace',
   );
   await seedAdminReauthWindow(h.db, 900);

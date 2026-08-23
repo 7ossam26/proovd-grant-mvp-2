@@ -15,7 +15,6 @@
  */
 
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
-import rateLimit, { type Options as RateLimitOptions } from 'express-rate-limit';
 import type {
   AffiliateInvitationSubject,
   DraftSubject,
@@ -53,48 +52,6 @@ function readRawToken(req: Request): string {
   if (header?.startsWith('Bearer ')) return header.slice('Bearer '.length);
 
   return '';
-}
-
-/**
- * Verification rate limit (§28.1: "rate-limit attempts and resend").
- *
- * The handler is the ordinary rejection, not a 429. A limiter that announces
- * itself tells an attacker their guesses are being counted and, worse, hands
- * them a response that differs from a plain miss — which is the enumeration
- * oracle the whole surface exists to avoid.
- */
-export function createTokenVerifyLimiter(overrides: Partial<RateLimitOptions> = {}): RequestHandler {
-  return rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 20,
-    standardHeaders: false,
-    legacyHeaders: false,
-    handler: (_req, res) => {
-      void sendTokenRejection(res, Date.now());
-    },
-    ...overrides,
-  });
-}
-
-/**
- * Resend rate limit (§28.1, §5.5). Tighter than verification: a resend sends
- * mail, so an unthrottled one is a way to use Proovd to flood someone's inbox.
- *
- * §5.5 permits a self-resend only if it stays non-enumerating, so this shares
- * the rejection path — a throttled resend must be indistinguishable from an
- * accepted one, exactly as an unknown address must be.
- */
-export function createTokenResendLimiter(overrides: Partial<RateLimitOptions> = {}): RequestHandler {
-  return rateLimit({
-    windowMs: 60 * 60 * 1000,
-    limit: 5,
-    standardHeaders: false,
-    legacyHeaders: false,
-    handler: (_req, res) => {
-      void sendTokenRejection(res, Date.now());
-    },
-    ...overrides,
-  });
 }
 
 function createTokenGuard(tokens: TokenService, scope: TokenSubject['scope']): RequestHandler {

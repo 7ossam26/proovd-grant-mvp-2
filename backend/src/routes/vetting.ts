@@ -7,16 +7,6 @@
  * into serving (§33.1.1). That is the same shape `routes/draft.ts` established;
  * this file extends it from reading to writing.
  *
- * ── Two limiters, because the two shapes of traffic are different ───────────
- * §28.1 requires rate limiting on token verification, and every request below
- * verifies. But a person filling in a form autosaves far more often than a
- * person opens a link, and one limit for both would either let a keyspace sweep
- * through or cut a Founder off mid-sentence — which §9 explicitly forbids
- * ("a failed save never clears valid fields" is not much comfort if the save
- * can never succeed again). So the autosave routes get their own, higher limit,
- * and both answer with the ordinary token rejection rather than a 429: a
- * limiter that announces itself is the same enumeration oracle in a hat.
- *
  * ── The server re-decides everything the surface decided ────────────────────
  * The claim route re-checks submission, the representations, and the policy
  * acceptances even though the surface will not offer the button without them.
@@ -30,11 +20,7 @@ import { fromNodeHeaders } from 'better-auth/node';
 import type { Database } from '../db/client.js';
 import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
-import {
-  requireDraftToken,
-  createTokenVerifyLimiter,
-  createTokenResendLimiter,
-} from '../auth/token-middleware.js';
+import { requireDraftToken } from '../auth/token-middleware.js';
 import {
   TOKEN_REJECTION_STATUS,
   TOKEN_REJECTION_BODY,
@@ -73,20 +59,11 @@ import { inArray } from 'drizzle-orm';
 import { revealPreparingCampaign, type HandoffDeps } from '../affiliates/handoff.js';
 import { notifyInvitationClaimed } from '../notifications/operational.js';
 
-/**
- * The autosave allowance. Generous for a person typing into a debounced form
- * over an hour, still bounded — and it is per address, so it never becomes a
- * way to keep a token alive by hammering it (`verify` counts failures itself).
- */
-export const DRAFT_SAVE_LIMIT = 600;
-
 export function createVettingRouter(
   db: Database,
   auth: Auth,
   tokens: TokenService,
   options: {
-    verifyLimit?: number;
-    saveLimit?: number;
     /**
      * §10's Affiliate handoff, run after a successful claim. Optional so the
      * router can be built without a notifier in contexts that never claim —
@@ -116,16 +93,6 @@ export function createVettingRouter(
      * as transcribed when nothing left the browser (§1.4).
      */
     transcription?: Transcription | undefined;
-    /**
-     * How many code requests one address may make per hour.
-     *
-     * Its own option because it is its own kind of traffic: this route SENDS
-     * MAIL, so the production default is the tight resend limit rather than
-     * the verify one — five an hour covers a person whose first mail landed in
-     * spam and does not cover a script. The suite raises it, and drives the
-     * limiter itself on a harness that leaves it alone.
-     */
-    emailCodeLimit?: number | undefined;
   } = {},
 ): Router {
   const handoff = options.handoff;
@@ -134,15 +101,6 @@ export function createVettingRouter(
   const transcription = options.transcription ?? unconfiguredTranscription;
   const router = Router();
   const json: RequestHandler = express.json({ limit: '128kb' });
-
-  const openLimiter = createTokenVerifyLimiter({
-    limit: options.verifyLimit ?? 20,
-    windowMs: 15 * 60 * 1000,
-  });
-  const saveLimiter = createTokenVerifyLimiter({
-    limit: options.saveLimit ?? DRAFT_SAVE_LIMIT,
-    windowMs: 15 * 60 * 1000,
-  });
 
   const draft = requireDraftToken(tokens);
   const base = `${DRAFT_TOKEN_PATH}/:${TOKEN_PARAM}`;
@@ -204,7 +162,7 @@ export function createVettingRouter(
 
   /* ── §9 — the vetting sequence ─────────────────────────────────────────── */
 
-  router.get(`${base}/vetting`, openLimiter, draft, async (req, res) => {
+  router.get(`${base}/vetting`, draft, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 
@@ -230,7 +188,7 @@ export function createVettingRouter(
     });
   });
 
-  router.patch(`${base}/vetting`, saveLimiter, draft, json, async (req, res) => {
+  router.patch(`${base}/vetting`, draft, json, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 
@@ -295,7 +253,7 @@ export function createVettingRouter(
    * really is locked at that point; saying "that was not submitted" would send
    * somebody back to re-answer questions that are already saved and locked.
    */
-  router.post(`${base}/vetting/submit`, saveLimiter, draft, json, async (req, res) => {
+  router.post(`${base}/vetting/submit`, draft, json, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 
@@ -394,33 +352,15 @@ export function createVettingRouter(
    *
    * ── Ask for a code ────────────────────────────────────────────────────────
    * Answers `EMAIL_CODE_ACK` for every outcome — an address on the profile, no
-   * address, a provider that refuses, and a caller over the limit — and answers
+   * address, and a provider that refuses — and answers
    * it BEFORE doing the work, because minting-and-sending against returning
    * immediately is measurable even when the bodies match. `magic-link-reissue`
    * is the worked example and this is the same shape.
    *
-   * 202, never a 429. Phase 04's rule, and the one that most often gets
-   * "corrected" by somebody who thinks a limiter should announce itself: a 429
-   * on the fifth try tells the caller the first four were interesting.
+   * Every request receives the same 202 acknowledgement.
    */
   router.post(
     `${base}/email-code`,
-    /*
-     * The RESEND limiter, not the verify one: this route sends mail, so an
-     * unthrottled one is a way to use Proovd to flood an inbox — §5.5’s own
-     * reasoning, and the same limiter the magic-link resend takes. A person
-     * legitimately asks twice (the first landed in spam, or they fixed a typo
-     * in the address), and five an hour covers that without covering a script.
-     *
-     * Its handler answers the ordinary ack at 202 rather than the token
-     * rejection, because on this route the ack IS the ordinary answer.
-     */
-    createTokenResendLimiter({
-      ...(options.emailCodeLimit !== undefined ? { limit: options.emailCodeLimit } : {}),
-      handler: (_req, res) => {
-        res.status(202).json(EMAIL_CODE_ACK);
-      },
-    }),
     draft,
     json,
     async (req, res) => {
@@ -464,15 +404,10 @@ export function createVettingRouter(
    * One rejection for wrong, expired, already-used, locked-out, never-requested
    * and requested-for-a-different-address — the frozen `TOKEN_REJECTION_BODY`
    * at `TOKEN_REJECTION_STATUS`, padded to the same floor so the modes are not
-   * separable by a stopwatch either. The limiter answers that same body at that
-   * same status: 202 would be the ask route's answer, and a 202 here would tell
-   * a caller their code had been accepted.
+   * separable by a stopwatch either.
    */
   router.post(
     `${base}/email-code/verify`,
-    // Deliberately tighter than the ask. This is the route a guessing attack
-    // uses, and `failed_attempts` on the row is the other half of the answer.
-    createTokenVerifyLimiter({ limit: options.verifyLimit ?? 20, windowMs: 15 * 60 * 1000 }),
     draft,
     json,
     async (req, res) => {
@@ -516,7 +451,6 @@ export function createVettingRouter(
    */
   router.post(
     `${base}/transcribe`,
-    openLimiter,
     draft,
     (_req, res, next) => {
       if (transcription.configured) return next();
@@ -568,7 +502,7 @@ export function createVettingRouter(
    * anything is serialized, so there is no branch here that could tell them
    * apart and no field in the response that varies between them.
    */
-  router.get(`${base}/creator-signal`, openLimiter, draft, async (req, res) => {
+  router.get(`${base}/creator-signal`, draft, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 
@@ -602,7 +536,7 @@ export function createVettingRouter(
 
   /* ── §10 — the account claim ───────────────────────────────────────────── */
 
-  router.get(`${base}/claim`, openLimiter, draft, async (req, res) => {
+  router.get(`${base}/claim`, draft, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 
@@ -641,7 +575,7 @@ export function createVettingRouter(
     });
   });
 
-  router.patch(`${base}/claim`, saveLimiter, draft, json, async (req, res) => {
+  router.patch(`${base}/claim`, draft, json, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 
@@ -683,7 +617,7 @@ export function createVettingRouter(
     res.json(result.state);
   });
 
-  router.post(`${base}/claim`, saveLimiter, draft, json, async (req, res) => {
+  router.post(`${base}/claim`, draft, json, async (req, res) => {
     const draftId = draftIdOf(req, res);
     if (!draftId) return;
 

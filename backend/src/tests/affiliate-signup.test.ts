@@ -251,6 +251,15 @@ describe('the signup confirmation uses the §27.4 key', () => {
 /* ══ §33.2.2 — two primary actions, no bank form, no tour ════════════════ */
 
 describe('§33.2.2 — the compact flow has exactly two primary actions', () => {
+  it('keeps opening the same invitation beyond the former refresh limit', async () => {
+    const { raw } = await invited();
+    for (let i = 0; i < 25; i += 1) {
+      const res = await request(h.app).get(`/api/affiliate-invitation/${raw}`);
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain('Too many requests, please try again later.');
+    }
+  });
+
   it('serves the whole flow from one address', async () => {
     const { raw } = await invited();
     const res = await request(h.app).get(`/api/affiliate-invitation/${raw}`).expect(200);

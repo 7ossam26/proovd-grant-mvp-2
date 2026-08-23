@@ -51,8 +51,6 @@ beforeAll(async () => {
     {
       stripeGateway: gateway,
       stripeConnectUrls: { returnUrl: RETURN_URL, refreshUrl: REFRESH_URL },
-      authRouteLimit: 1_000_000,
-      globalRateLimit: 1_000_000,
     },
     'onboarding',
   );

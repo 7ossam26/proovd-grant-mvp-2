@@ -171,15 +171,6 @@ async function main() {
     authSecret: env.BETTER_AUTH_SECRET,
     adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
     trustProxyHops: env.TRUST_PROXY_HOPS,
-    // §28.1's token limits, relaxed for local work only. `env.ts` refuses to
-    // boot if this is set under NODE_ENV=production, so there is no production
-    // path through here — and unset leaves every limiter on its own default.
-    // It covers the draft open/save, the affiliate invitation, and the
-    // six-digit code's ask and verify, which is every token limiter a person
-    // meets while walking the flow.
-    ...(env.DRAFT_VERIFY_LIMIT !== undefined
-      ? { draftVerifyLimit: env.DRAFT_VERIFY_LIMIT, emailCodeLimit: env.DRAFT_VERIFY_LIMIT }
-      : {}),
     // Same posture, same boot refusal: a claimed invitation link keeps opening
     // for local work only, so the flow can be re-walked without a fresh invite.
     invitationLinksReusable: env.INVITATION_LINKS_REUSABLE,

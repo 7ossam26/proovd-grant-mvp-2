@@ -80,7 +80,7 @@ let audit: ReturnType<typeof createAuditWriter>;
 
 beforeAll(async () => {
   h = await startHarness(
-    { stripeGateway: gateway, authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    { stripeGateway: gateway },
     'launch',
   );
   admin = await createAdmin(h, 'launch-admin');
