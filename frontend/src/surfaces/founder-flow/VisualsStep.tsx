@@ -93,6 +93,7 @@ import {
   removeAsset,
   removeVisualLink,
   requestUpload,
+  setAssetApproval,
   verifyUpload,
   FounderRequestError,
   type AssetState,
@@ -504,6 +505,14 @@ function VisualsScreen({
                     asset={asset}
                     index={index}
                     locked={locked}
+                    onApproval={(approved) => {
+                      void refresh(setAssetApproval(campaignId, asset.id, approved));
+                      setSaid(
+                        approved
+                          ? `${asset.filename ?? 'File'} approved for campaign use.`
+                          : `${asset.filename ?? 'File'} approval removed.`,
+                      );
+                    }}
                     onRemove={() => {
                       void refresh(removeAsset(campaignId, asset.id));
                       setSaid('File removed.');
@@ -573,11 +582,13 @@ function FileRow({
   asset,
   index,
   locked,
+  onApproval,
   onRemove,
 }: {
   asset: AssetState;
   index: number;
   locked: boolean;
+  onApproval: (approved: boolean) => void;
   onRemove: () => void;
 }) {
   const name = asset.filename ?? `File ${index + 1} added`;
@@ -600,7 +611,17 @@ function FileRow({
         )}
       </div>
 
-      {asset.state === 'pending' ? (
+      {asset.state === 'stored' ? (
+        <label className="ff-vis__filemeta ff-vis__approval">
+          <input
+            type="checkbox"
+            checked={asset.approved}
+            disabled={locked}
+            onChange={(event) => onApproval(event.target.checked)}
+          />
+          <span>Approved for use on my campaign</span>
+        </label>
+      ) : asset.state === 'pending' ? (
         <div className="ff-vis__filemeta">
           <span className="ff-vis__filenote">Still uploading.</span>
         </div>

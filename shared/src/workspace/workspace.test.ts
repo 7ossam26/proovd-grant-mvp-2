@@ -48,23 +48,22 @@ describe('the §12 optional-item register', () => {
     }
   });
 
-  it('describes the interview item by confirmation, never by booking', () => {
+  it('describes the interview item by a saved platform and time', () => {
     const interview = optionalItem('interview');
-    expect(interview.completesWhen.toLowerCase()).toContain('confirmed');
-    // §12: "A selected-but-unconfirmed, canceled, or abandoned slot does not
-    // count." All three have to be named, or the Founder learns the rule from
-    // a discount that did not arrive.
+    expect(interview.completesWhen.toLowerCase()).toContain('save');
+    expect(interview.completesWhen.toLowerCase()).toContain('time');
     const excluded = interview.doesNotCount.join(' ').toLowerCase();
-    expect(excluded).toContain('never confirmed');
+    expect(excluded).toContain('not saved');
     expect(excluded).toContain('left');
     expect(excluded).toContain('canceled');
   });
 
-  it('describes the story item by approval, never by having written something', () => {
+  it('describes the story item by saved written content', () => {
+    expect(optionalItem('story').completesWhen.toLowerCase()).toContain('written and saved');
     const excluded = optionalItem('story').doesNotCount.join(' ').toLowerCase();
     expect(excluded).toContain('transcript');
     expect(excluded).toContain('summary');
-    expect(excluded).toContain('draft');
+    expect(excluded).toContain('empty');
   });
 
   it('gives every rejection code a sentence, and no generic one', () => {
@@ -111,25 +110,22 @@ describe('§12 helper resources', () => {
   it('says that a transcript and a summary are raw material, not a story', () => {
     const story = HELPER_RESOURCES.find((r) => r.subject === 'story')!;
     const limits = story.limits.join(' ').toLowerCase();
-    expect(limits).toContain('transcript is not a story');
-    expect(limits).toContain('approve');
+    expect(limits).toContain('transcript is raw material');
+    expect(limits).toContain('write and save');
   });
 });
 
 describe('the interview status rules (§12)', () => {
-  it('completes the item on `confirmed` and on nothing else', () => {
+  it('completes the item on a saved selection or confirmation', () => {
     for (const status of INTERVIEW_STATUSES) {
-      expect(interviewCompletesItem(status)).toBe(status === 'confirmed');
+      expect(interviewCompletesItem(status)).toBe(status === 'selected' || status === 'confirmed');
     }
     expect(interviewCompletesItem(null)).toBe(false);
   });
 
-  it('counts `selected` for high-effort but not for the discount', () => {
-    // §12 uses the wider phrase "scheduled/confirmed" for the high-effort input
-    // and the narrower `confirmed` for the item. Reading one for both would
-    // either pay the US$2 early or classify an engaged Founder as high-effort.
+  it('counts `selected` for high-effort and for the discount', () => {
     expect(interviewCountsForHighEffort('selected')).toBe(true);
-    expect(interviewCompletesItem('selected')).toBe(false);
+    expect(interviewCompletesItem('selected')).toBe(true);
     expect(interviewCountsForHighEffort('canceled')).toBe(false);
     expect(interviewCountsForHighEffort('abandoned')).toBe(false);
     expect(interviewCountsForHighEffort(null)).toBe(false);

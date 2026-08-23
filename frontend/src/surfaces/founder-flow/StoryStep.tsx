@@ -284,7 +284,6 @@ function StoryScreen({
   // The local copy is the only copy of what was typed (§9). A save response
   // never writes back into it, which is why it is seeded exactly once.
   const [answer, setAnswer] = useState(state.story.text ?? '');
-  const [approved, setApproved] = useState(state.story.approved);
   const [phase, setPhase] = useState<Phase>('idle');
   const [seconds, setSeconds] = useState(0);
   /** Bumped whenever the say-row must come back with no GSAP left on it. */
@@ -422,11 +421,7 @@ function StoryScreen({
 
   function change(nextText: string) {
     setAnswer(nextText);
-    if (approved) setApproved(false);
-    autosave.queue({
-      storyText: nextText,
-      ...(approved ? { storyApproved: false } : {}),
-    });
+    autosave.queue({ storyText: nextText });
   }
 
   /**
@@ -960,8 +955,9 @@ function StoryScreen({
                 data-say-next="1"
                 aria-label={fromReview ? 'Next — back to Last look' : 'Next — your socials'}
                 onClick={forward}
+                disabled={phase === 'working'}
               >
-                Next
+                {phase === 'working' ? 'Working…' : 'Next'}
               </button>
             </div>
           )}
@@ -977,22 +973,6 @@ function StoryScreen({
                 Your listing fee is paid, so this answer and the fee it earned are locked. You can
                 read your story here; changing it is a support request.
               </p>
-            ) : null}
-
-            {!locked ? (
-              <label className="ff-story__approve">
-                <input
-                  className="ff-story__check"
-                  type="checkbox"
-                  checked={approved}
-                  disabled={!answer.trim()}
-                  onChange={(event) => {
-                    setApproved(event.target.checked);
-                    autosave.queue({ storyApproved: event.target.checked });
-                  }}
-                />
-                <span>I approve this story for my public campaign page</span>
-              </label>
             ) : null}
 
             <p

@@ -62,13 +62,10 @@ export type MeetingProvider = (typeof MEETING_PROVIDERS)[number];
 /**
  * §12's two interview rules, which are deliberately different.
  *
- * The item completes only on `confirmed`; the high-effort input is satisfied by
- * "scheduled/confirmed". Reading one for both would either pay the US$2 early
- * or classify an engaged Founder as high-effort. Both live here so the two
- * sentences of §12 have one implementation each.
+ * Saving a selected time or receiving provider confirmation completes the item.
  */
 export function interviewCompletesItem(status: InterviewStatus | null | undefined): boolean {
-  return status === 'confirmed';
+  return status === 'selected' || status === 'confirmed';
 }
 
 export function interviewCountsForHighEffort(status: InterviewStatus | null | undefined): boolean {

@@ -6,7 +6,7 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
-import { founderFlowPath } from '@proovd/shared';
+import { EVIDENCE_REJECTIONS, founderFlowPath } from '@proovd/shared';
 import { NO_ACTION, StatePanel } from '../../components/index.js';
 import { fileRowIn, stageRelayIn } from '../../components/anim.js';
 import { SurfaceLoading } from '../../features/public/states.js';
@@ -16,6 +16,7 @@ import {
   putToStorage,
   removeAsset,
   requestUpload,
+  setAssetApproval,
   verifyUpload,
   type AssetState,
   type WorkspaceState,
@@ -46,6 +47,12 @@ function discountLabel(cents: string | undefined): string {
   if (!Number.isFinite(value) || value <= 0) return 'optional: discount';
   const dollars = value / 100;
   return `optional: $${value % 100 === 0 ? String(dollars) : dollars.toFixed(2)} discount`;
+}
+
+function uploadRejectionLabel(code: string | null): string {
+  return code && code in EVIDENCE_REJECTIONS
+    ? EVIDENCE_REJECTIONS[code as keyof typeof EVIDENCE_REJECTIONS]
+    : EVIDENCE_REJECTIONS.file_unreadable;
 }
 
 export function BrandingStep() {
@@ -272,6 +279,14 @@ function BrandLogoScreen({
                     asset={asset}
                     index={index}
                     locked={locked}
+                    onApproval={(approved) => {
+                      void refresh(setAssetApproval(campaignId, asset.id, approved));
+                      setSaid(
+                        approved
+                          ? `Logo ${index + 1} approved for campaign use.`
+                          : `Logo ${index + 1} approval removed.`,
+                      );
+                    }}
                     onRemove={() => {
                       void refresh(removeAsset(campaignId, asset.id));
                       setSaid('Logo removed.');
@@ -295,11 +310,13 @@ function LogoRow({
   asset,
   index,
   locked,
+  onApproval,
   onRemove,
 }: {
   asset: AssetState;
   index: number;
   locked: boolean;
+  onApproval: (approved: boolean) => void;
   onRemove: () => void;
 }) {
   // The reference names the slot, not the local file. Removing a row therefore
@@ -309,9 +326,22 @@ function LogoRow({
     <li className="ff-brandlogo__file" data-brandlogo-file-row="1">
       <span title={label}>{label}</span>
       <span className="ff-brandlogo__fileactions">
+        {asset.state === 'stored' ? (
+          <label className="ff-brandlogo__approval">
+            <input
+              type="checkbox"
+              checked={asset.approved}
+              disabled={locked}
+              onChange={(event) => onApproval(event.target.checked)}
+            />
+            <span>Approved</span>
+          </label>
+        ) : null}
         {asset.state === 'stored' ? null : (
           <span className="ff-brandlogo__filestate">
-            {asset.state === 'pending' ? 'Still uploading' : 'Upload rejected'}
+            {asset.state === 'pending'
+              ? 'Still uploading'
+              : `Automatic file check: ${uploadRejectionLabel(asset.rejection)}`}
           </span>
         )}
         {locked ? null : <button type="button" aria-label={`Remove ${label}`} onClick={onRemove}>x</button>}

@@ -13,10 +13,9 @@
  * on the server, no model client in the tree, and no field on any record that
  * would hold a generated result.
  *
- * The distinction shows up in the Story rule too. §12 lets a Founder use voice
- * mode as a guided conversation, and then says a transcript or a generated
- * summary "does not count" — Founder approval is the completing act. The
- * guidance can point at the tool; the product cannot do the writing.
+ * The distinction shows up in the Story rule too. Voice and generated summaries
+ * can supply raw material, while the Founder-written saved story is what counts.
+ * The guidance can point at the tool; the product cannot do the writing.
  *
  * ── Why the text lives in `shared` ──────────────────────────────────────────
  * The workspace renders it and the Admin evidence panel quotes the rule the
@@ -176,8 +175,8 @@ export const HELPER_RESOURCES: readonly HelperResource[] = [
       },
     ],
     limits: [
-      'A transcript is not a story. Nor is a summary. Nor is a draft you have not approved.',
-      'You approve the public version. That approval is what completes the item.',
+      'A transcript is raw material, not a finished story. Nor is a generated summary.',
+      'The version you write and save is the version that completes the item.',
     ],
     specRef: '§12 · Founder helper resources · Story',
   },

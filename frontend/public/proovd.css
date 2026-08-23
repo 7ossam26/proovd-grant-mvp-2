@@ -13578,6 +13578,21 @@ html.no-motion .ff-story__say { transition: none; }
   overflow: visible;
 }
 .ff-brandlogo__filestate { font-size: 28px; font-weight: 600; }
+.ff-brandlogo__approval {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 28px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ff-brandlogo__approval input {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  margin: 0;
+  accent-color: #013F17;
+}
 .ff-brandlogo__file button {
   flex: none;
   padding: 0 8px;
@@ -14135,6 +14150,20 @@ html.no-motion .ff-story__say { transition: none; }
 
 /* Upload progress or rejection, inside the reference's own block. */
 .ff-vis__filemeta { display: flex; }
+.ff-vis__approval {
+  align-items: center;
+  gap: 14px;
+  font-size: 28px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ff-vis__approval input {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  margin: 0;
+  accent-color: #013F17;
+}
 .ff-vis__filenote {
   font-size: 28px;
   font-weight: 500;

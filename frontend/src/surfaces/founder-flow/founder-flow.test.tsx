@@ -1487,6 +1487,23 @@ function workspaceState(overrides: Record<string, unknown> = {}): Record<string,
 function stubWorkspace(initial: Record<string, unknown> = {}) {
   let state = workspaceState(initial);
   handlers.push((url, init) => {
+    const approval = url.match(/\/uploads\/([^/]+)\/approval$/);
+    if (approval && init?.method === 'POST') {
+      const assetId = decodeURIComponent(approval[1]!);
+      const approved = JSON.parse(String(init.body))['approved'] as boolean;
+      const updateAsset = (asset: Record<string, unknown>) =>
+        asset['id'] === assetId ? { ...asset, approved } : asset;
+      const brand = state['brand'] as Record<string, unknown>;
+      state = {
+        ...state,
+        visuals: (state['visuals'] as Record<string, unknown>[]).map(updateAsset),
+        brand: {
+          ...brand,
+          logos: (brand['logos'] as Record<string, unknown>[]).map(updateAsset),
+        },
+      };
+      return { status: 200, body: { workspace: state } };
+    }
     if (!url.includes('/workspace')) return undefined;
     if (init?.method === 'PATCH') {
       const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
@@ -1742,31 +1759,30 @@ describe('the five §12 answers (10–14)', () => {
     expect(screen.queryByRole('button', { name: /summari[sz]e|rewrite|suggest/i })).toBeNull();
   });
 
-  it('saves the Founder approval that completes a written Story', async () => {
+  it('saves a written Story without requiring a second approval control', async () => {
     const user = userEvent.setup();
     stubStage3();
     renderAt(at('story'));
 
     const story = await screen.findByRole('textbox', { name: 'Your story' });
-    const approval = screen.getByRole('checkbox', {
-      name: /approve this story for my public campaign page/i,
-    });
-    expect(approval).toBeDisabled();
-
     await user.type(story, 'Built from a real customer problem.');
-    expect(approval).toBeEnabled();
-    await user.click(approval);
+    expect(
+      screen.queryByRole('checkbox', { name: /approve this story for my public campaign page/i }),
+    ).toBeNull();
 
     await waitFor(() =>
       expect(
         requests.some(
-          (request) => request.method === 'PATCH' && request.body?.['storyApproved'] === true,
+          (request) =>
+            request.method === 'PATCH' &&
+            request.body?.['storyText'] === 'Built from a real customer problem.',
         ),
       ).toBe(true),
     );
   });
 
-  it('does not show approval controls on stored visuals or logos', async () => {
+  it('lets the Founder approve stored visuals and logos for their campaign', async () => {
+    const user = userEvent.setup();
     const visual = {
       id: 'visual-without-approval',
       filename: 'campaign.jpg',
@@ -1792,17 +1808,35 @@ describe('the five §12 answers (10–14)', () => {
 
     const visuals = renderAt(at('visuals'));
     await screen.findByText('campaign.jpg');
+    const visualApproval = screen.getByRole('checkbox', {
+      name: /approved for use on my campaign/i,
+    });
+    expect(visualApproval).toBeChecked();
+    await user.click(visualApproval);
     expect(
-      screen.queryByRole('checkbox', { name: /approved for use on my campaign/i }),
-    ).not.toBeInTheDocument();
+      requests.some(
+        (request) =>
+          request.url.includes('/uploads/visual-without-approval/approval') &&
+          request.body?.['approved'] === false,
+      ),
+    ).toBe(true);
     visuals.unmount();
 
     renderAt(at('branding'));
     await screen.findByText('Logo 1 added');
-    expect(screen.queryByRole('checkbox', { name: 'Approved' })).not.toBeInTheDocument();
+    const logoApproval = screen.getByRole('checkbox', { name: 'Approved' });
+    expect(logoApproval).toBeChecked();
+    await user.click(logoApproval);
+    expect(
+      requests.some(
+        (request) =>
+          request.url.includes('/uploads/logo-without-approval/approval') &&
+          request.body?.['approved'] === false,
+      ),
+    ).toBe(true);
   });
 
-  it('does not show typography or approval controls on the brand colour screen', async () => {
+  it('keeps typography and brand-direction approval controls off the brand colour screen', async () => {
     stubStage3({
       brand: {
         colors: '#41ED98 — primary',

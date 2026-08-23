@@ -427,6 +427,18 @@ export async function readAdminWorkspace(db: Database, campaignId: string) {
 
   return {
     campaignId,
+    workspace: {
+      brand: {
+        colors: rows.workspace.brandColors,
+        typography: rows.workspace.brandTypography,
+        notes: rows.workspace.brandNotes,
+        approved: rows.workspace.brandApprovedAt !== null,
+      },
+      story: {
+        text: rows.workspace.storyText,
+        approved: rows.workspace.storyApprovedAt !== null,
+      },
+    },
     items: OPTIONAL_ITEM_KEYS.map((key) => {
       const row = rows.items.find((i) => i.item === key);
       if (!row) return null;
@@ -538,10 +550,10 @@ export async function readKitMaterials(
     visuals: approvedVisuals.map((a) => ({ id: a.id, contentType: a.contentType })),
     hasLogo: approvedLogo,
     brandDirection:
-      rows.workspace.brandApprovedAt !== null
-        ? { colors: rows.workspace.brandColors, typography: rows.workspace.brandTypography }
+      approvedLogo && rows.workspace.brandColors?.trim()
+        ? { colors: rows.workspace.brandColors, typography: null }
         : null,
-    story: rows.workspace.storyApprovedAt !== null ? rows.workspace.storyText : null,
+    story: rows.workspace.storyText?.trim() ? rows.workspace.storyText : null,
     socials: rows.socials
       .filter((s) => s.removedAt === null && s.accessible === true)
       .map((s) => ({ url: s.url, platform: s.platform })),

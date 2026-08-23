@@ -221,7 +221,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     path: '/campaigns/:campaignId/setup/branding',
     param: 'campaignId',
     title: 'Your brand',
-    help: 'A logo, the colours, and what the type is doing. Written direction rather than a mood board — a reviewer and a Creator both read it. US$2 off.',
+    help: 'Upload and approve a logo, then save your campaign colours. Together they take US$2 off your listing fee.',
     stage: 3,
   },
   {
@@ -242,7 +242,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     path: '/campaigns/:campaignId/setup/color',
     param: 'campaignId',
     title: 'Your brand colours',
-    help: 'Pick up to three colours and they land in the brand direction you just wrote. Part of the same answer as your logo — it is not a fourth thing to finish.',
+    help: 'Pick up to three campaign colours. They are part of the same answer as your approved logo — not another item to finish.',
     stage: 3,
   },
   {
@@ -258,7 +258,7 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
     path: '/campaigns/:campaignId/setup/story',
     param: 'campaignId',
     title: 'Your story',
-    help: 'Why you are building this, in your words, for the public page. You approve it before it counts — a draft or a transcript on its own does not. US$2 off.',
+    help: 'Why you are building this, in your words, for the public page. Save the written story and it takes US$2 off.',
     stage: 3,
   },
   {

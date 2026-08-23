@@ -149,6 +149,19 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
       .send({ campaignId: founder.campaignId, password: 'StrongFounderPassword1!' })
       .expect(200);
 
+    const discounted = await request(h.app)
+      .patch(`/api/founder/campaigns/${founder.campaignId}/workspace`)
+      .set('cookie', founder.founderCookie)
+      .send({
+        storyText: 'We built this after watching independent teams lose hours to the same problem.',
+        storyApproved: true,
+      })
+      .expect(200);
+    expect(discounted.body.workspace).toMatchObject({
+      story: { approved: true },
+      fee: { completedItems: 1, discountCents: '200', subtotalCents: '3300' },
+    });
+
     const workspace = await request(h.app)
       .get(`/api/admin/founders/${founder.prospectId}`)
       .set('cookie', admin.cookie)
@@ -178,6 +191,22 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
     expect(panel.body.notes).toHaveLength(1);
     expect(panel.body.warnings).toHaveLength(1);
     expect(panel.body.applicationReview).toMatchObject({ outcome: 'approved' });
+    expect(panel.body.optionalItems).toHaveLength(5);
+    expect(panel.body.optionalItems).toContainEqual(
+      expect.objectContaining({
+        key: 'story',
+        complete: true,
+        savingCents: '200',
+        content: 'We built this after watching independent teams lose hours to the same problem.',
+      }),
+    );
+    expect(panel.body.listingFee).toMatchObject({
+      status: 'Calculated',
+      baseCents: '3500',
+      savedCents: '200',
+      subtotalCents: '3300',
+    });
+    expect(panel.body.listingFee.lines).toHaveLength(5);
 
     const resetsBefore = h.resetLinks.length;
     await request(h.app)

@@ -65,24 +65,11 @@
  * per render: `new Date()` inside the map would let a chip's instant move
  * between the render that displayed it and the click that books it.
  *
- * ── Two independent absences, and the screen says which ────────────────────
- * §6 names the interview providers, availability, interviewers and reminder
- * lead time as settings and fixes none of them; Cal.com is Track A4. Either
- * missing means nothing to book, and they are different problems for different
- * people — the server folds them into `bookable` and `embed.available`, and
- * this reports which (§1.4, §27.1).
- *
- * While `bookable` is false the chips still render exactly as the reference
- * draws them and are `aria-disabled` rather than `disabled`, so a keyboard user
- * meets the explanation a sighted user can see (§28.5, the Support workspace's
- * own rule). Offering a slot nobody is available for is §1.4's failure with a
- * border on it; removing the chips would not be this screen.
- *
- * ── §12's rule is confirmation, and the screen says which state it is in ───
- * "A selected-but-unconfirmed, canceled, or abandoned slot does not count."
- * Those are five different facts and a Founder who picked a time is entitled to
- * know their US$2 is not earned yet, so the record below the CTA names the
- * state rather than showing a date and leaving it at that. It is absolutely
+ * ── The visible selection is the saved commitment ──────────────────────────
+ * The Founder can save a platform and time even before operator scheduling
+ * configuration exists. Provider confirmation can add joining details later;
+ * the selected record already earns the item and remains visible below the CTA.
+ * It is absolutely
  * positioned under the column, in the room the composition already leaves, so
  * not one reference box moves for it.
  *
@@ -231,8 +218,8 @@ function resolveSlots(now: Date): { label: string; at: Date }[] {
 /** §12's five booking states, in the words a Founder needs (§3.1). */
 const BOOKING_STATE: Record<string, { tag: string; line: string }> = {
   selected: {
-    tag: 'Not confirmed yet',
-    line: 'You picked this time and nobody at Proovd has confirmed it, so it does not count towards your listing fee yet. We will email you when it is confirmed.',
+    tag: 'Saved',
+    line: 'Your platform and time are saved. This counts towards your listing fee.',
   },
   confirmed: {
     tag: 'Confirmed',
@@ -359,7 +346,7 @@ function InterviewScreen({
   // function's earlier branches is false.
   useLayoutEffect(() => stageRelayIn(root.current, direction.current ?? 1, RELAY), []);
 
-  const bookable = interview.bookable && !locked && !live;
+  const bookable = !locked && !live;
 
   /** Why a chip or tile cannot be operated, in the words that name which. */
   const blockedBecause = locked

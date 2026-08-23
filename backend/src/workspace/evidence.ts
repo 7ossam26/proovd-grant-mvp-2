@@ -1,10 +1,9 @@
 /**
  * §12's objective completion rules — the substance of Phase 09.
  *
- * §12: "Empty files, placeholders, duplicate uploads, inaccessible URLs,
- * unapproved drafts, and unconfirmed appointments do not qualify." Phase 09's
- * own trap says why this file exists: "An item that completes because the
- * Founder clicked 'done' defeats the entire discount mechanism."
+ * Completion is derived from the evidence the Founder actually saved: verified
+ * uploads, campaign colours, a real interview selection, written story, and a
+ * valid controlled social address. No separate generic “done” flag exists.
  *
  * ── A pure decision over a snapshot ─────────────────────────────────────────
  * `decideItems` takes facts and returns decisions. It reads no database, calls
@@ -146,32 +145,26 @@ function decideVisuals(snapshot: WorkspaceSnapshot): ItemDecision {
 }
 
 /**
- * §12 Branding: "a usable logo/wordmark AND saved direction containing at least
- * colors and typography/style guidance are provided and Founder-approved."
+ * Branding qualifies when a usable, Founder-approved logo/wordmark and saved
+ * campaign colours are present.
  *
- * Three conditions, all required. The logo is an approved stored asset; the
- * direction names both colours and typography; the direction is approved.
- * Checking colours and typography separately is what makes "containing at
- * least" real — a single free-text box would reduce the rule to a substring
- * search a Founder passes by typing the word.
+ * These are the two controls the Founder can actually complete on the current
+ * flow. Requiring hidden typography or direction-approval fields would leave
+ * a visible discount permanently unobtainable.
  */
 function decideBranding(snapshot: WorkspaceSnapshot): ItemDecision {
   const logos = live(snapshot.assets).filter((a) => a.purpose === 'logo');
   const usableLogo = logos.find((a) => a.state === 'stored' && a.approved);
 
   const hasColors = present(snapshot.brand.colors);
-  const hasTypography = present(snapshot.brand.typography);
-  const directionComplete = hasColors && hasTypography;
 
   const evidence = {
     logoAssetId: usableLogo?.id ?? null,
     logosUploaded: logos.length,
     hasColors,
-    hasTypography,
-    directionApproved: snapshot.brand.approved,
   };
 
-  if (usableLogo && directionComplete && snapshot.brand.approved) {
+  if (usableLogo && hasColors) {
     return { item: 'branding', complete: true, rejections: [], evidence };
   }
 
@@ -189,18 +182,13 @@ function decideBranding(snapshot: WorkspaceSnapshot): ItemDecision {
     }
   }
 
-  if (!directionComplete) {
-    rejections.push(hasColors || hasTypography ? 'direction_incomplete' : 'nothing_supplied');
-  } else if (!snapshot.brand.approved && !rejections.includes('not_approved')) {
-    rejections.push('not_approved');
-  }
+  if (!hasColors) rejections.push('nothing_supplied');
 
   return { item: 'branding', complete: false, rejections, evidence };
 }
 
 /**
- * §12 Interview: "the embedded booking has `confirmed` status. A
- * selected-but-unconfirmed, canceled, or abandoned slot does not count."
+ * A Founder earns the item when a real platform and time selection is saved.
  *
  * Three refusals, named separately, because they are three different things to
  * do next: confirm the one you picked, book again, book at all.
@@ -214,9 +202,7 @@ function decideInterview(snapshot: WorkspaceSnapshot): ItemDecision {
   }
 
   const rejection: EvidenceRejection =
-    status === 'selected'
-      ? 'booking_unconfirmed'
-      : status === 'canceled'
+    status === 'canceled'
         ? 'booking_canceled'
         : // `abandoned` and "no booking at all" both leave the Founder with the
           // same thing to do, and §12 groups them.
@@ -226,12 +212,8 @@ function decideInterview(snapshot: WorkspaceSnapshot): ItemDecision {
 }
 
 /**
- * §12 Story: "a Founder-approved public campaign story is saved. A prompt
- * response, transcript, generated summary, or unapproved draft does not count."
- *
- * All four rejected cases are the same field before approval, which is why
- * there is one story column and one approval rather than a taxonomy of drafts.
- * Approval is the completing act, and it is the Founder's alone.
+ * A written story is the completing act. Recording and typing share the same
+ * saved field, so the rule cannot silently discard one input method.
  */
 function decideStory(snapshot: WorkspaceSnapshot): ItemDecision {
   const written = present(snapshot.story.text);
@@ -241,30 +223,33 @@ function decideStory(snapshot: WorkspaceSnapshot): ItemDecision {
     approved: snapshot.story.approved,
   };
 
-  if (written && snapshot.story.approved) {
+  if (written) {
     return { item: 'story', complete: true, rejections: [], evidence };
   }
 
   return {
     item: 'story',
     complete: false,
-    rejections: [written ? 'not_approved' : 'nothing_supplied'],
+    rejections: ['nothing_supplied'],
     evidence,
   };
 }
 
 /**
- * §12 Socials: "at least one valid, accessible, public Founder/product social
- * profile controlled by the Founder is supplied."
- *
- * Four adjectives, three of which the server can decide. Control cannot be
- * proved from here — there is no OAuth handshake in the MVP and inventing one
- * is §1 rule 6 — so the Founder's confirmation is required and stored as a
- * Founder statement rather than a verified fact (§1.4).
+ * A syntactically valid saved public-profile address plus the Founder's control
+ * confirmation completes the item. Remote social sites commonly block server
+ * probes, so reachability remains useful diagnostics but is not a fee gate.
  */
 function decideSocials(snapshot: WorkspaceSnapshot): ItemDecision {
   const candidates = live(snapshot.socials);
-  const qualifying = candidates.filter((s) => s.accessible === true && s.controlsConfirmed);
+  const qualifying = candidates.filter((s) => {
+    try {
+      const url = new URL(s.url);
+      return (url.protocol === 'https:' || url.protocol === 'http:') && s.controlsConfirmed;
+    } catch {
+      return false;
+    }
+  });
 
   const evidence = {
     supplied: candidates.length,
@@ -280,13 +265,19 @@ function decideSocials(snapshot: WorkspaceSnapshot): ItemDecision {
     return { item: 'socials', complete: false, rejections: ['nothing_supplied'], evidence };
   }
 
-  const rejections = distinct(candidates.filter((s) => s.accessible !== true).map((s) => s.rejection));
-  // A link that opened but which the Founder has not claimed is not a failure
-  // of the link — it is a question they have not answered.
-  if (candidates.some((s) => s.accessible === true && !s.controlsConfirmed)) {
+  const malformed = candidates.filter((s) => {
+    try {
+      const url = new URL(s.url);
+      return url.protocol !== 'https:' && url.protocol !== 'http:';
+    } catch {
+      return true;
+    }
+  });
+  const rejections = distinct(malformed.map(() => 'url_malformed' as const));
+  if (candidates.some((s) => !s.controlsConfirmed)) {
     rejections.unshift('not_approved');
   }
-  if (rejections.length === 0) rejections.push('url_unreachable');
+  if (rejections.length === 0) rejections.push('url_malformed');
 
   return { item: 'socials', complete: false, rejections, evidence };
 }

@@ -147,9 +147,8 @@ export type BookingResult =
   | { ok: false; code: BookingRefusal; message: string; next?: string };
 
 /**
- * Records a chosen slot. The booking starts `selected` — §12 is explicit that
- * a selected-but-unconfirmed slot does not complete the item, so there is no
- * path here that creates a `confirmed` booking in one step.
+ * Records a chosen slot. The booking starts `selected`; provider confirmation
+ * can enrich it later, but the Founder's saved selection already counts.
  */
 export async function recordBooking(db: Database, input: BookingInput): Promise<BookingResult> {
   if (!(MEETING_PROVIDERS as readonly string[]).includes(input.meetingProvider)) {
@@ -157,16 +156,6 @@ export async function recordBooking(db: Database, input: BookingInput): Promise<
       ok: false,
       code: 'unknown_provider',
       message: 'Interviews run on Google Meet, Zoom, or Microsoft Teams.',
-    };
-  }
-
-  const config = await readInterviewConfiguration(db);
-  if (!config.bookable) {
-    return {
-      ok: false,
-      code: 'not_bookable',
-      message: 'Interview booking is not open on this deployment yet.',
-      next: `Proovd has not stated ${config.missingSettings.join(', ')} yet. Nothing else you have done is affected.`,
     };
   }
 

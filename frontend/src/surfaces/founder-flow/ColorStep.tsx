@@ -25,7 +25,7 @@
  * such column here and this screen does not add one: `campaign_build` has no
  * colour array, §12 asks for "saved direction containing at least colors and
  * typography/style guidance", and the branding screen has written that
- * direction into `brandColors` — free text — since Session D, with its own hex
+ * colours into `brandColors` — free text — since Session D, with its own hex
  * field appending `#XXXXXX — ` lines to it.
  *
  * So the three slots are a READING of that one text, through `swatchesIn`,
@@ -723,7 +723,7 @@ function ColorScreen({
           <div className="ff-col__gap">
             {locked ? (
               <p className="ff-col__note" id="ff-col-note">
-                Your listing fee is paid, so your brand direction stays as it was checked.
+                Your listing fee is paid, so your campaign colours stay as they were checked.
               </p>
             ) : null}
             <p

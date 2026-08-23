@@ -13,8 +13,8 @@
  * name, and the absence is what enforces it. The text lands in the caller's own
  * box as ordinary editable Founder text and saves through the same autosave
  * typing does — which is what keeps §9's "never represented as AI-generated"
- * true, and what keeps §12's "a transcript does not count" true for Story,
- * because the Founder's approval is still the completing act afterwards.
+ * true. For Story, the transcript becomes ordinary Founder-editable text and
+ * counts only after the same autosave path has stored it.
  *
  * ── The recording is not kept, here or anywhere ─────────────────────────────
  * The blob goes out of scope with the callback below and nothing holds a

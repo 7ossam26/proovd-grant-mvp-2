@@ -2,11 +2,8 @@
  * The Founder interview booking — Spec §12, tech-stack §12.
  *
  * ── Four statuses, and §12 names all four ───────────────────────────────────
- * §12: "the embedded booking has `confirmed` status. A selected-but-unconfirmed,
- * canceled, or abandoned slot does not count." That is one qualifying state and
- * three disqualifying ones, stated by the Spec rather than invented here. There
- * is no fifth: a rescheduled booking is still `confirmed` at a different time,
- * which is why §12 asks for reschedule *history* rather than a reschedule state.
+ * Saving a selected platform and time completes the item. Provider confirmation
+ * can add joining details later; canceled and abandoned bookings do not count.
  *
  * ── Why the record is ours ──────────────────────────────────────────────────
  * tech-stack §12: "The booking record in our database is the source of truth,
@@ -54,22 +51,17 @@ export const MEETING_PROVIDER_LABELS: Record<MeetingProvider, string> = {
  * Whether a booking completes §12's Interview item.
  *
  * One function, because the fee calculation and the surface must never disagree
- * about it, and because `status === 'confirmed'` written in two places is one
+ * about it, and because the accepted statuses written in two places are one
  * refactor away from being written as `status !== 'canceled'` in one of them.
  */
 export function interviewCompletesItem(status: InterviewStatus | null | undefined): boolean {
-  return status === 'confirmed';
+  return status === 'selected' || status === 'confirmed';
 }
 
 /**
  * Whether a booking counts as "scheduled or confirmed" for high-effort (§12).
  *
- * §12 uses a deliberately wider phrase for the third high-effort input than for
- * the discount: the item completes only on `confirmed`, but high-effort is false
- * as soon as an interview is "scheduled/confirmed". A Founder who has booked a
- * time and not yet confirmed it has engaged — they simply have not earned the
- * US$2 yet. Reading one rule for both would either hand out the discount early
- * or classify an engaged Founder as high-effort.
+ * A saved or confirmed interview also satisfies the high-effort input.
  */
 export function interviewCountsForHighEffort(status: InterviewStatus | null | undefined): boolean {
   return status === 'selected' || status === 'confirmed';

@@ -40,6 +40,13 @@ export interface SocialCheck {
   rejection: EvidenceRejection | null;
 }
 
+/** Accept the way people normally type a social address in a form. */
+export function normalizeSocialUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed || /^[a-z][a-z\d+.-]*:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 /* ── Address safety ───────────────────────────────────────────────────────── */
 
 function isPrivateIPv4(address: string): boolean {
@@ -133,7 +140,7 @@ export async function checkSocialUrl(
   raw: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<SocialCheck> {
-  let target = raw;
+  let target = normalizeSocialUrl(raw);
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     const unsafe = await assertPublicUrl(target);
@@ -230,7 +237,7 @@ export async function addSocialProfile(
     fetchImpl?: typeof fetch;
   },
 ): Promise<AddSocialResult> {
-  const trimmed = input.url.trim();
+  const trimmed = normalizeSocialUrl(input.url);
   if (!trimmed) {
     return { ok: false, code: 'url_malformed', message: 'Enter a web address.' };
   }
@@ -292,11 +299,13 @@ export async function recheckSocialProfile(
 
   if (!row) return null;
 
-  const check = await checkSocialUrl(row.url, input.fetchImpl ?? fetch);
+  const normalizedUrl = normalizeSocialUrl(row.url);
+  const check = await checkSocialUrl(normalizedUrl, input.fetchImpl ?? fetch);
 
   await db
     .update(campaignSocialProfiles)
     .set({
+      url: normalizedUrl,
       checkedAt: new Date(),
       httpStatus: check.httpStatus,
       accessible: check.accessible,

@@ -60,6 +60,8 @@ import {
 } from '../../db/schema/admin-founder-panel.js';
 import { recomputeBuildStatus } from '../../campaign/service.js';
 import { loadFounderContext } from '../workspace.js';
+import { readAdminWorkspace } from '../../workspace/projection.js';
+import { OPTIONAL_ITEM_KEYS } from '../../workspace/registry.js';
 import {
   APPLICATION_REVIEW_OUTCOMES,
   applicationReviewDecided,
@@ -192,6 +194,36 @@ export interface FounderPanelView {
     publishedVersion: number | null;
   };
   recentFieldEdits: FieldEditView[];
+  optionalItems: Array<{
+    key: string;
+    complete: boolean;
+    savingCents: string | null;
+    content: string | null;
+    logo: string | null;
+    colors: string | null;
+    source: string;
+    reason: string | null;
+  }> | null;
+  listingFee: {
+    status: string;
+    calculatedAt: string | null;
+    baseCents: string;
+    lines: Array<{
+      key: string;
+      label: string;
+      amountCents: string;
+      qualifies: boolean;
+    }>;
+    subtotalCents: string;
+    savedCents: string;
+    minSubtotalCents: string;
+    taxCents: null;
+    totalCents: null;
+    paid: boolean;
+    paidAt: string | null;
+    transactionId: null;
+    nextLabel: string;
+  } | null;
 }
 
 export interface ApplicationReviewView {
@@ -297,6 +329,7 @@ export async function readFounderPanel(
   const campaign = ctx.currentCampaign?.campaign ?? null;
   const campaignId = campaign?.id ?? null;
   const allCampaignIds = ctx.campaignRows.map((row) => row.campaign.id);
+  const optionalWorkspace = campaignId ? await readAdminWorkspace(db, campaignId) : null;
 
   /* ── Workflow position ─────────────────────────────────────────────────── */
 
@@ -473,6 +506,87 @@ export async function readFounderPanel(
         .limit(RECENT_EDIT_LIMIT)
     : [];
 
+  const discountByItem = new Map(
+    optionalWorkspace?.fee?.discountLines.map((line) => [line.item, line.discountCents]) ?? [],
+  );
+  const visibleAssets = optionalWorkspace?.assets.filter((asset) => !asset.removed) ?? [];
+  const visibleLinks = optionalWorkspace?.visualLinks.filter((link) => !link.removed) ?? [];
+  const visibleSocials = optionalWorkspace?.socials.filter((social) => !social.removed) ?? [];
+  const itemByKey = new Map(
+    optionalWorkspace?.items
+      .filter((item) => item !== null)
+      .map((item) => [item.item, item]) ?? [],
+  );
+  const rejectionReason = (codes: string[]): string | null =>
+    codes.length
+      ? codes.map((code) => code.replaceAll('_', ' ')).join(' · ')
+      : null;
+
+  const optionalItems = optionalWorkspace
+    ? OPTIONAL_ITEM_KEYS.map((key) => {
+        const item = itemByKey.get(key);
+        const visuals = visibleAssets
+          .filter((asset) => asset.purpose === 'visual')
+          .map((asset) => asset.filename)
+          .filter((name): name is string => Boolean(name));
+        const logos = visibleAssets
+          .filter((asset) => asset.purpose === 'logo')
+          .map((asset) => asset.filename)
+          .filter((name): name is string => Boolean(name));
+
+        const content =
+          key === 'visuals'
+            ? [...visuals, ...visibleLinks.map((link) => link.url)].join(' · ') || null
+            : key === 'branding'
+              ? optionalWorkspace.workspace.brand.colors
+              : key === 'interview'
+                ? optionalWorkspace.interview.booking?.status ?? null
+                : key === 'story'
+                  ? optionalWorkspace.workspace.story.text
+                  : visibleSocials.map((social) => social.url).join(' · ') || null;
+
+        return {
+          key,
+          complete: item?.complete ?? false,
+          savingCents: discountByItem.get(key) ?? null,
+          content,
+          logo: key === 'branding' ? logos.join(' · ') || null : null,
+          colors: key === 'branding' ? optionalWorkspace.workspace.brand.colors : null,
+          source:
+            key === 'visuals' || key === 'branding'
+              ? 'Founder upload and approval'
+              : key === 'interview'
+                ? 'Scheduling provider'
+                : 'Founder saved',
+          reason: rejectionReason(item?.rejections ?? []),
+        };
+      })
+    : null;
+
+  const fee = optionalWorkspace?.fee ?? null;
+  const listingFee = fee
+    ? {
+        status: fee.locked ? 'Paid' : 'Calculated',
+        calculatedAt: fee.calculatedAt,
+        baseCents: fee.baseCents,
+        lines: OPTIONAL_ITEM_KEYS.map((key) => ({
+          key,
+          label: key[0]!.toUpperCase() + key.slice(1),
+          amountCents: fee.itemDiscountCents,
+          qualifies: itemByKey.get(key)?.complete ?? false,
+        })),
+        subtotalCents: fee.subtotalCents,
+        savedCents: fee.discountCents,
+        minSubtotalCents: fee.minSubtotalCents,
+        taxCents: null,
+        totalCents: null,
+        paid: fee.locked,
+        paidAt: campaign?.listingPaidAt?.toISOString() ?? null,
+        transactionId: null,
+        nextLabel: fee.locked ? 'Matching' : 'Founder completes checkout',
+      }
+    : null;
+
   return {
     prospectId,
     campaignId,
@@ -521,6 +635,8 @@ export async function readFounderPanel(
       publishedVersion: snapshotRow?.publishedVersion ?? null,
     },
     recentFieldEdits: editRows.map(toFieldEditView),
+    optionalItems,
+    listingFee,
   };
 }
 

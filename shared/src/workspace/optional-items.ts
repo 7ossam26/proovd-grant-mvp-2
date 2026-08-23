@@ -80,15 +80,14 @@ export const OPTIONAL_ITEMS: readonly OptionalItemRecord[] = [
   {
     key: 'branding',
     label: 'Branding',
-    question: 'Do you have a logo and a written brand direction?',
+    question: 'Do you have a logo and campaign colours?',
     completesWhen:
-      'A usable logo or wordmark is uploaded and a saved direction describes at least your colours and your typography or style — and you have approved both.',
+      'A usable logo or wordmark is uploaded and approved for campaign use, and your campaign colours are saved.',
     why: 'A campaign that looks like itself reads as real. It also takes US$2 off your listing fee.',
     doesNotCount: [
-      'A logo with no written direction beside it.',
-      'A direction that names neither colours nor typography or style.',
+      'A logo with no campaign colours saved beside it.',
       'An empty or placeholder logo file.',
-      'A direction you have written but not approved.',
+      'A logo you have uploaded but not approved for campaign use.',
     ],
     specRef: '§12 · Objective completion rules · Branding',
   },
@@ -96,10 +95,10 @@ export const OPTIONAL_ITEMS: readonly OptionalItemRecord[] = [
     key: 'interview',
     label: 'Founder interview',
     question: 'Would you like to talk to someone at Proovd?',
-    completesWhen: 'Your booking is confirmed.',
+    completesWhen: 'You save a platform and time for your Founder interview.',
     why: 'It is a real conversation with a person here. It also takes US$2 off your listing fee.',
     doesNotCount: [
-      'A time you picked but never confirmed.',
+      'A time that was not saved.',
       'A booking you started and left.',
       'A booking that was canceled.',
     ],
@@ -109,13 +108,13 @@ export const OPTIONAL_ITEMS: readonly OptionalItemRecord[] = [
     key: 'story',
     label: 'Story',
     question: 'Is your campaign story written and ready to be public?',
-    completesWhen: 'A story is saved and you have approved it for the public campaign page.',
+    completesWhen: 'Your campaign story is written and saved.',
     why: 'It is the part Backers read before they decide. It also takes US$2 off your listing fee.',
     doesNotCount: [
       'Answers to the prompts, on their own.',
       'A transcript of a conversation.',
       'A summary of a conversation.',
-      'A draft you have not approved.',
+      'An empty story.',
     ],
     specRef: '§12 · Objective completion rules · Story',
   },
@@ -123,11 +122,10 @@ export const OPTIONAL_ITEMS: readonly OptionalItemRecord[] = [
     key: 'socials',
     label: 'Socials',
     question: 'Where can people find you or the product?',
-    completesWhen:
-      'At least one public profile you control is saved and opens when we check it.',
+    completesWhen: 'At least one valid public profile you control is saved.',
     why: 'It is how a Backer checks you are real. It also takes US$2 off your listing fee.',
     doesNotCount: [
-      'A link that does not open when we check it.',
+      'Text that is not a valid web address.',
       'A private or restricted profile.',
       'A profile you do not control.',
     ],
@@ -173,7 +171,7 @@ export const EVIDENCE_REJECTIONS = {
 
   /* Missing content */
   nothing_supplied: 'Nothing has been added for this yet.',
-  direction_incomplete: 'The direction needs at least colours and typography or style.',
+  direction_incomplete: 'Campaign colours have not been saved yet.',
   logo_missing: 'A logo or wordmark has not been uploaded.',
 
   /* Interview — §12 "unconfirmed appointments" */

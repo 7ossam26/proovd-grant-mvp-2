@@ -49,6 +49,15 @@ import type { EvidenceRejection } from './registry.js';
 
 export type AssetPurpose = 'visual' | 'logo';
 
+/** Logos may intentionally be compact; only campaign visuals use the 320px floor. */
+export function imageIsPlaceholder(
+  purpose: AssetPurpose,
+  width: number,
+  height: number,
+): boolean {
+  return width < 1 || height < 1 || (purpose === 'visual' && Math.max(width, height) < MIN_VISUAL_EDGE_PX);
+}
+
 export interface RequestUploadInput {
   campaignId: string;
   purpose: AssetPurpose;
@@ -244,11 +253,7 @@ export async function verifyUpload(
     } else if (isImageType(facts.detectedType)) {
       if (facts.width === null || facts.height === null) {
         rejection = 'file_unreadable';
-      } else if (
-        Math.max(facts.width, facts.height) < MIN_VISUAL_EDGE_PX ||
-        facts.width < 1 ||
-        facts.height < 1
-      ) {
+      } else if (imageIsPlaceholder(asset.purpose, facts.width, facts.height)) {
         rejection = 'file_placeholder';
       }
     }
@@ -281,9 +286,11 @@ export async function verifyUpload(
       height,
       byteSize: byteSize > 0 ? BigInt(byteSize) : asset.byteSize,
       verifiedAt: new Date(),
-      // A file that fails verification cannot stay approved. The approval was of
-      // something we have now established is not usable.
-      ...(state === 'rejected' ? { approvedAt: null, approvedBy: null } : {}),
+      // A successful Founder upload is usable campaign evidence immediately.
+      // The approval control remains available as an explicit opt-out.
+      ...(state === 'stored'
+        ? { approvedAt: new Date(), approvedBy: input.actor }
+        : { approvedAt: null, approvedBy: null }),
       updatedAt: new Date(),
     })
     .where(eq(campaignAssets.id, asset.id));
