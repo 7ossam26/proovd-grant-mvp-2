@@ -45,24 +45,15 @@ import { SurfaceLoading } from '../../features/public/states.js';
 import { PayoutOnboarding, type PayoutState } from '../payouts/PayoutOnboarding.js';
 import { fetchPayouts, requestOnboardingLink, PayoutRequestError } from '../payouts/api.js';
 import { flowDirection, FlowPage, useFlowNav } from './FlowPage.js';
+import { PITCH_DEMO } from './referenceWalkthrough.js';
 
 /**
  * Pitch builds need the complete Founder Flow without pretending that a real
- * payment provider exists. Vite development therefore follows the reference
- * prototype's own behaviour: `Take me to stripe` advances to the "You're all
- * set to get paid!" screen and never opens a hosted onboarding link. Set
- * `VITE_PITCH_DEMO=false` only when deliberately exercising Stripe's test-mode
- * integration locally. Production can never enter this branch.
- *
- * `FeeStep` carries the same constant for the same reason; the two are
- * deliberately separate rather than shared, because either screen may need to
- * leave the demo independently of the other.
+ * payment provider exists. `Take me to stripe` advances to the "You're all set
+ * to get paid!" screen and never opens a hosted onboarding link. Development
+ * uses the demo unless explicitly disabled; a production build must explicitly
+ * set `VITE_PITCH_DEMO=true`.
  */
-const PITCH_DEMO =
-  import.meta.env.DEV &&
-  import.meta.env.MODE !== 'test' &&
-  import.meta.env.VITE_PITCH_DEMO !== 'false';
-
 const PAYOUT_ASSETS = {
   logo: '/assets/proovd-logo.svg',
   stripe: new URL(

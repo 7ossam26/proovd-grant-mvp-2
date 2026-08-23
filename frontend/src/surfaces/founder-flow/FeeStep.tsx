@@ -159,10 +159,10 @@ const MAX_REFERENCE_SCALE = 0.37;
  * TODO(stripe-setup): remove this pitch bypass once the Founder Stripe account
  * and tax configuration are ready to exercise end to end.
  *
- * Local Vite development renders the reference fee screen and lets `Pay &
- * Start` continue to the builder without opening Checkout. Set
- * `VITE_PITCH_DEMO=false` to restore the real payout/Stripe gate locally.
- * Production can never enter this branch.
+ * Development renders the reference fee screen and lets `Pay & Start` continue
+ * to the builder without opening Checkout. Set `VITE_PITCH_DEMO=false` to
+ * restore the real payout/Stripe gate locally. A production pitch build opts in
+ * explicitly with `VITE_PITCH_DEMO=true`.
  */
 function stageScale(): string {
   const fitted = Math.min(window.innerWidth / FIT_W, window.innerHeight / FIT_H) * PAGE_SCALE;
@@ -638,6 +638,10 @@ function FeeScreen({
       {canceled ? (
         <p className="ff-fee__note" role="status">
           {LISTING_FEE_CHECKOUT_CANCELED}
+        </p>
+      ) : PITCH_DEMO && !paid ? (
+        <p className="ff-fee__note" role="status">
+          Demo mode — no card details or real payment will be collected.
         </p>
       ) : null}
       {paid && !canceled ? (
