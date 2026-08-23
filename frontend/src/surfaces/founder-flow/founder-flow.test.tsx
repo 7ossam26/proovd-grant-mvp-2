@@ -48,6 +48,15 @@ import { invalidateSession } from '../../lib/session.js';
 import { appRoutes } from '../../routes.js';
 import { clearDraftFlowCache } from '../draft/api.js';
 import { clearFounderWorkspaceCache } from '../founder/api.js';
+import { resolvePitchDemoMode } from './referenceWalkthrough.js';
+
+describe('Founder Flow pitch-demo build flag', () => {
+  it('requires an explicit opt-in in production and never bypasses payment tests', () => {
+    expect(resolvePitchDemoMode({ dev: false, mode: 'production' })).toBe(false);
+    expect(resolvePitchDemoMode({ dev: false, mode: 'production', flag: 'true' })).toBe(true);
+    expect(resolvePitchDemoMode({ dev: false, mode: 'test', flag: 'true' })).toBe(false);
+  });
+});
 
 type StubResult = { status: number; body: unknown } | undefined;
 type Handler = (url: string, init?: RequestInit) => StubResult | Promise<StubResult>;
