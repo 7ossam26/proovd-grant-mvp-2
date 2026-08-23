@@ -52,6 +52,8 @@ export interface AutosaveController<Patch> {
   flush: () => Promise<void>;
 }
 
+type SendOutcome = 'idle' | 'saved' | 'retrying' | 'failed';
+
 export function useAutosave<Patch extends object>(
   save: (patch: Patch) => Promise<unknown>,
 ): AutosaveController<Patch> {
@@ -61,31 +63,38 @@ export function useAutosave<Patch extends object>(
   const pending = useRef<Patch | null>(null);
   const timer = useRef<number | null>(null);
   const inFlight = useRef(false);
+  const inFlightDone = useRef<Promise<SendOutcome> | null>(null);
   // `save` is redefined on every render by most callers; holding it in a ref
   // keeps the debounce timer from being torn down on every keystroke.
   const saveRef = useRef(save);
   saveRef.current = save;
 
-  const send = useCallback(async (attempt: number): Promise<void> => {
+  const send = useCallback(async (attempt: number): Promise<SendOutcome> => {
+    // `flush()` is also a navigation barrier. If a debounce fired just before
+    // the person clicked Next, it must wait for that exact request instead of
+    // treating "already sending" as "nothing to wait for".
+    if (inFlight.current && inFlightDone.current) return inFlightDone.current;
+
     const patch = pending.current;
-    if (!patch || inFlight.current) return;
+    if (!patch) return 'idle';
 
     inFlight.current = true;
     pending.current = null;
     setState(attempt === 1 ? { status: 'saving' } : { status: 'retrying', attempt });
 
+    let finish!: (outcome: SendOutcome) => void;
+    const done = new Promise<SendOutcome>((resolve) => {
+      finish = resolve;
+    });
+    inFlightDone.current = done;
+
+    let outcome: SendOutcome;
     try {
       await saveRef.current(patch);
-      inFlight.current = false;
       setState({ status: 'saved', at: new Date() });
-      // Another keystroke landed while this was in flight.
-      if (pending.current) {
-        void send(1);
-      } else {
-        setDirty(false);
-      }
+      outcome = 'saved';
+      if (!pending.current) setDirty(false);
     } catch (error) {
-      inFlight.current = false;
       const detail =
         error instanceof RequestError
           ? error.detail
@@ -98,16 +107,29 @@ export function useAutosave<Patch extends object>(
 
       if (isRetryable(detail.status) && attempt < MAX_SAVE_ATTEMPTS) {
         setState({ status: 'retrying', attempt: attempt + 1 });
-        timer.current = window.setTimeout(() => void send(attempt + 1), retryDelayMs(attempt));
-        return;
+        timer.current = window.setTimeout(() => {
+          timer.current = null;
+          void send(attempt + 1);
+        }, retryDelayMs(attempt));
+        outcome = 'retrying';
+      } else {
+        setState({
+          status: 'failed',
+          title: detail.title,
+          detail: detail.whatHappened,
+        });
+        outcome = 'failed';
       }
-
-      setState({
-        status: 'failed',
-        title: detail.title,
-        detail: detail.whatHappened,
-      });
     }
+
+    inFlight.current = false;
+    if (inFlightDone.current === done) inFlightDone.current = null;
+    finish(outcome);
+
+    // Another keystroke landed while this was in flight. Keep the ordinary
+    // autosave flowing; a concurrent `flush()` will observe and await it too.
+    if (outcome === 'saved' && pending.current) void send(1);
+    return outcome;
   }, []);
 
   const queue = useCallback(
@@ -121,11 +143,16 @@ export function useAutosave<Patch extends object>(
   );
 
   const flush = useCallback(async () => {
-    if (timer.current !== null) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
+    while (true) {
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
+
+      const outcome = await send(1);
+      if (outcome !== 'saved') return;
+      if (!inFlight.current && !pending.current) return;
     }
-    await send(1);
   }, [send]);
 
   // §9: "Leaving with newer unsaved data causes a browser warning." Registered

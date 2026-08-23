@@ -152,6 +152,7 @@ function RewardsBody({
   refresh: () => Promise<void>;
 }) {
   const { leaveToPage, param } = useFlowNav();
+  const [saving, setSaving] = useState(false);
   const card = cards[index] ?? blankReward();
 
   const patchCard = useCallback(
@@ -167,9 +168,17 @@ function RewardsBody({
   const persist = useCallback(
     async (reward: RewardDraft, rewardIndex: number) => {
       const cents = toCents(reward.price);
-      if (!reward.title.trim() || !reward.body.trim() || !reward.date.trim() || cents === null) return;
-      if (isReferenceWalkthrough(campaignId)) return;
+      const hasInput = Boolean(
+        reward.title.trim() || reward.body.trim() || reward.date.trim() || reward.price.trim(),
+      );
+      if (!hasInput) return true;
+      if (!reward.title.trim() || !reward.body.trim() || !reward.date.trim() || cents === null) {
+        setError('Add a title, description, delivery date, and valid price before leaving this reward.');
+        return false;
+      }
+      if (isReferenceWalkthrough(campaignId)) return true;
       setError(null);
+      setSaving(true);
       try {
         const result = await saveRewardPackage(campaignId, {
           ...(reward.id ? { packageId: reward.id } : {}),
@@ -192,21 +201,35 @@ function RewardsBody({
           ),
         );
         await refresh();
+        return true;
       } catch {
         setError('We could not save that reward. Nothing has changed.');
+        return false;
+      } finally {
+        setSaving(false);
       }
     },
     [campaignId, refresh, setCards, setError],
   );
 
-  const addOrContinue = () => {
-    void persist(card, index);
+  const addOrContinue = async () => {
+    if (!(await persist(card, index))) return;
     if (cards.length >= 3) {
       leaveToPage('payouts');
       return;
     }
     setCards((current) => [...current, blankReward()]);
     setIndex(cards.length);
+    setFocus(null);
+  };
+
+  const goBack = async () => {
+    if (await persist(card, index)) leaveToPage('faqs', -1);
+  };
+
+  const moveTo = async (nextIndex: number) => {
+    if (!(await persist(card, index))) return;
+    setIndex(nextIndex);
     setFocus(null);
   };
 
@@ -230,7 +253,8 @@ function RewardsBody({
         type="button"
         className="ff-reward-ref__back"
         aria-label="Back to your FAQs"
-        onClick={() => leaveToPage('faqs', -1)}
+        onClick={() => void goBack()}
+        disabled={saving}
       >
         <Chevron direction="left" small /> Back
       </button>
@@ -334,16 +358,16 @@ function RewardsBody({
                   <button
                     type="button"
                     aria-label="Previous reward"
-                    disabled={index === 0}
-                    onClick={() => setIndex((current) => Math.max(0, current - 1))}
+                    disabled={saving || index === 0}
+                    onClick={() => void moveTo(Math.max(0, index - 1))}
                   >
                     <Chevron direction="left" />
                   </button>
                   <button
                     type="button"
                     aria-label="Next reward"
-                    disabled={index >= cards.length - 1}
-                    onClick={() => setIndex((current) => Math.min(cards.length - 1, current + 1))}
+                    disabled={saving || index >= cards.length - 1}
+                    onClick={() => void moveTo(Math.min(cards.length - 1, index + 1))}
                   >
                     <Chevron direction="right" />
                   </button>
@@ -354,7 +378,8 @@ function RewardsBody({
                 type="button"
                 data-reward-anim="cta"
                 className="ff-reward-ref__cta"
-                onClick={addOrContinue}
+                onClick={() => void addOrContinue()}
+                disabled={saving}
               >
                 {index + 1}/3 Add Rewards
               </button>
@@ -362,7 +387,12 @@ function RewardsBody({
             </div>
 
             {cards.length > 1 ? (
-              <button type="button" className="ff-reward-ref__delete" onClick={() => void removeCurrent()}>
+              <button
+                type="button"
+                className="ff-reward-ref__delete"
+                onClick={() => void removeCurrent()}
+                disabled={saving}
+              >
                 Delete reward {index + 1}
               </button>
             ) : null}
