@@ -10,9 +10,10 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router';
+import { founderFlowPath } from '@proovd/shared';
 import { HelpDrawer, FlowPage, useFlowNav } from './FlowPage.js';
 import { InReviewStep } from './InReviewStep.js';
-import { isReferenceWalkthrough } from './referenceWalkthrough.js';
+import { PITCH_DEMO } from './referenceWalkthrough.js';
 
 const REVIEW_ASSETS = {
   logo: new URL(
@@ -33,8 +34,7 @@ const REFERENCE_CREATORS = [
 
 /** Keep the pitch simulation separate from the truthful production state. */
 export function InReviewRoute() {
-  const { campaignId = '' } = useParams();
-  return isReferenceWalkthrough(campaignId) ? <InReviewReferenceStep /> : <InReviewStep />;
+  return PITCH_DEMO ? <InReviewReferenceStep /> : <InReviewStep />;
 }
 
 export function InReviewReferenceStep() {
@@ -48,7 +48,7 @@ export function InReviewReferenceStep() {
 }
 
 function ReviewBody() {
-  const { param, swapToPage } = useFlowNav();
+  const { param } = useFlowNav();
   const [accepted, setAccepted] = useState(1);
 
   useEffect(() => {
@@ -113,7 +113,7 @@ function ReviewBody() {
       <button
         type="button"
         className="ff-review-ref__continue"
-        onClick={() => swapToPage('live')}
+        onClick={() => window.location.assign(founderFlowPath('live', param))}
       >
         Continue to launch
       </button>

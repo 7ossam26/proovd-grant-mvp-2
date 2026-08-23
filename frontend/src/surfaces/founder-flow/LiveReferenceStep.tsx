@@ -4,13 +4,13 @@ import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router';
 import { founderDashboardPath } from '@proovd/shared';
 import { FlowPage, useFlowNav } from './FlowPage.js';
-import { isReferenceWalkthrough } from './referenceWalkthrough.js';
+import { PITCH_DEMO } from './referenceWalkthrough.js';
 
 /** Preserve the dashboard redirect for every genuine, non-demo visit. */
 export function LiveRoute() {
   const { campaignId = '' } = useParams();
 
-  return isReferenceWalkthrough(campaignId) ? (
+  return PITCH_DEMO ? (
     <LiveReferenceStep />
   ) : (
     <Navigate to={founderDashboardPath(campaignId)} replace />
