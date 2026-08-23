@@ -54,6 +54,7 @@ import {
   type AffiliateInvitationVariables,
   type RenderedAffiliateInvitation,
 } from '../notifications/templates/affiliate-invitation.js';
+import { invitationArtUrl } from '../notifications/templates/email-art.js';
 import { campaignAffiliateAssociations } from '../db/schema/domain.js';
 import { affiliateProspects, affiliateInvitationSends } from '../db/schema/affiliates.js';
 import { campaignDrafts, founderProspects } from '../db/schema/invitations.js';
@@ -257,6 +258,7 @@ function variablesFor(
   record: AffiliateInvitationRecord,
   claimUrl: string,
   supportEmail: string,
+  appBaseUrl: string,
 ): AffiliateInvitationVariables {
   return {
     recipientName: record.recipientName,
@@ -272,6 +274,9 @@ function variablesFor(
     claimUrl,
     reference: record.campaignId,
     supportEmail,
+    // Not composed and not overridable — a per-deployment address, resolved the
+    // same way for a preview, the preflight render, and the real send.
+    artUrl: invitationArtUrl(appBaseUrl),
   };
 }
 
@@ -304,7 +309,12 @@ export async function previewAffiliateInvitation(
   if (!record) return null;
 
   const rendered = await renderAffiliateInvitation(
-    variablesFor(record, previewClaimUrl(context.appBaseUrl), context.supportEmail),
+    variablesFor(
+      record,
+      previewClaimUrl(context.appBaseUrl),
+      context.supportEmail,
+      context.appBaseUrl,
+    ),
   );
 
   return {
@@ -359,6 +369,7 @@ export async function sendAffiliateInvitation(
       record,
       `${input.context.appBaseUrl}${AFFILIATE_CLAIM_PATH}/preflight`,
       input.context.supportEmail,
+      input.context.appBaseUrl,
     ),
   );
   if (rendered.unresolved.length > 0) {
@@ -418,6 +429,7 @@ export async function sendAffiliateInvitation(
       record,
       `${input.context.appBaseUrl}${AFFILIATE_CLAIM_PATH}/${raw}`,
       input.context.supportEmail,
+      input.context.appBaseUrl,
     ),
   );
 

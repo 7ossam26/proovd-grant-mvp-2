@@ -30,6 +30,7 @@
 
 import type { NotificationEventKey } from './events.js';
 import { renderFounderInvitation } from './templates/founder-invitation.js';
+import { INVITATION_ART_PATH } from './templates/email-art.js';
 import { renderAffiliateInvitation } from './templates/affiliate-invitation.js';
 import { renderSignupConfirmed } from './templates/affiliate-signup-confirmed.js';
 import { renderPreparingAvailable } from './templates/affiliate-preparing-available.js';
@@ -140,6 +141,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       draftUrl: `${APP}/draft/sample-token`,
       reference: REF,
       supportEmail: SUPPORT,
+      artUrl: `${APP}${INVITATION_ART_PATH}`,
     }),
 
   founder_interview_confirmed: () => interview('confirmed'),
@@ -366,6 +368,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       claimUrl: `${APP}/creator/signup/sample-token`,
       reference: REF,
       supportEmail: SUPPORT,
+      artUrl: `${APP}${INVITATION_ART_PATH}`,
     }),
 
   affiliate_signup_confirmed: () =>

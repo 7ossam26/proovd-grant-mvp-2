@@ -533,6 +533,7 @@ describe('§8 — the private campaign-specific invitation', () => {
       senderName: 'Ada',
       senderEmail: 'ada@proovd.co',
       claimUrl: 'https://app.proovd.co/creator-invitation/abc',
+      artUrl: 'https://app.proovd.co/assets/email-invite.png',
       reference: 'ref',
       supportEmail: 'support@proovd.co',
     });

@@ -45,6 +45,7 @@ import {
   type InvitationVariables,
   type RenderedInvitation,
 } from '../notifications/templates/founder-invitation.js';
+import { invitationArtUrl } from '../notifications/templates/email-art.js';
 import { campaigns, campaignStatusHistory } from '../db/schema/domain.js';
 import {
   founderProspects,
@@ -465,7 +466,12 @@ export async function previewInvitation(
   if (!record) return null;
 
   const rendered = await renderFounderInvitation(
-    variablesFor(record, previewDraftUrl(context.appBaseUrl), context.supportEmail),
+    variablesFor(
+      record,
+      previewDraftUrl(context.appBaseUrl),
+      context.supportEmail,
+      context.appBaseUrl,
+    ),
   );
 
   const missingFields = missingInvitationFields(record);
@@ -513,6 +519,7 @@ function variablesFor(
   record: DraftRecord,
   draftUrl: string,
   supportEmail: string,
+  appBaseUrl: string,
 ): InvitationVariables {
   /*
    * The profile is the source; this invitation may override it.
@@ -548,6 +555,9 @@ function variablesFor(
     draftUrl,
     reference: record.draft.campaignId,
     supportEmail,
+    // Not composed and not overridable — a per-deployment address, resolved the
+    // same way for a preview, the preflight render, and the real send.
+    artUrl: invitationArtUrl(appBaseUrl),
   };
 }
 
@@ -605,7 +615,12 @@ export async function sendInvitation(
   // §7's gate, enforced on the rendered output rather than on a list of fields
   // the caller might not share. Runs before anything is issued or written.
   const rendered = await renderFounderInvitation(
-    variablesFor(record, `${input.context.appBaseUrl}${DRAFT_PATH}/preflight`, input.context.supportEmail),
+    variablesFor(
+      record,
+      `${input.context.appBaseUrl}${DRAFT_PATH}/preflight`,
+      input.context.supportEmail,
+      input.context.appBaseUrl,
+    ),
   );
   if (rendered.unresolved.length > 0) {
     return {
@@ -686,6 +701,7 @@ export async function sendInvitation(
           record,
           `${input.context.appBaseUrl}${DRAFT_PATH}/${issued.raw}`,
           input.context.supportEmail,
+          input.context.appBaseUrl,
         ),
       );
 

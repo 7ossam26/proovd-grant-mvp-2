@@ -28,6 +28,7 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
@@ -80,6 +81,18 @@ export interface InvitationVariables {
   reference: string;
   /** §27.8's published support address. */
   supportEmail: string;
+  /**
+   * The absolute URL of the header art. Derived from `APP_BASE_URL` by
+   * `invitationArtUrl`, never composed by an Admin — but it is a variable
+   * because it is a per-deployment value and the render must not reach for
+   * config of its own.
+   *
+   * Deliberately absent from `MARKERS` and from `OPTIONAL_VARIABLES`: a blank
+   * one resolves to `[ARTURL]`, which the §7 gate catches before anything is
+   * sent. `env.ts` makes that unreachable, and a backstop that costs nothing is
+   * better than a message that goes out pointing at nowhere.
+   */
+  artUrl: string;
 }
 
 type Resolved = {
@@ -154,7 +167,15 @@ function InvitationEmail({ v }: { v: Resolved }) {
       <Body style={body}>
         <Container style={container}>
           <Text style={wordmark}>proovd</Text>
-          <Section style={art}>&nbsp;</Section>
+
+          {/* The band keeps its colour behind the image on purpose. A client
+              with images off shows the mat rather than a hole, and the art is
+              already composited onto the same `#DEFAFC` so the two cannot come
+              apart. `alt=""` because the envelope says nothing the heading two
+              lines down does not say better. */}
+          <Section style={art}>
+            <Img src={v.artUrl} alt="" width="512" height="112" style={artImage} />
+          </Section>
 
           <Heading style={heading}>{v.recipientName}, your invite is ready.</Heading>
           <Heading as="h2" style={subheading}>
@@ -283,7 +304,13 @@ const body = {
 };
 const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const wordmark = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px', color: '#012D10', margin: 0 };
-const art = { height: '112px', backgroundColor: '#DEFAFC', margin: '34px 0 0' };
+/* The band no longer fixes its own height: the art is exactly 512x112 for the
+   512px content box, so the image sets it. The colour stays — see the note at
+   the `<Section>`. */
+const art = { backgroundColor: '#DEFAFC', margin: '34px 0 0' };
+/* The `width`/`height` ATTRIBUTES on the `<Img>` are what Outlook reads; these
+   are what lets every other client shrink the art on a narrow phone. */
+const artImage = { display: 'block', width: '100%', maxWidth: '512px', height: 'auto', border: 0 };
 const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '46px 0 0' };
 const subheading = { fontSize: '24px', lineHeight: '32px', fontWeight: 700, letterSpacing: '-0.02em', color: '#012D10', margin: '14px 0 0' };
 const intro = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, letterSpacing: '-0.012em', color: '#013F17', margin: '24px 0 36px' };

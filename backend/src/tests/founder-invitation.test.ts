@@ -597,6 +597,7 @@ describe('§7 the invitation email carries all nine items and one primary action
       senderEmail: 'ada@proovd.co',
       expectedSetupTime: 'two hours',
       draftUrl: 'https://app.proovd.co/draft/abc',
+      artUrl: 'https://app.proovd.co/assets/email-invite.png',
       reference: 'campaign-1',
       supportEmail: 'support@proovd.co',
     });

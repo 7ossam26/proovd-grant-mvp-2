@@ -264,9 +264,25 @@ function InviteScreen({ token, draft }: { token: string; draft: DraftLandingData
             />
           </div>
 
-          {/* Empty in the reference and empty here. `aria-hidden` because a
-              band with nothing in it announces nothing. */}
-          <div className="ff-invite__band" data-invite="band" aria-hidden="true" />
+          {/* The band the reference left empty, holding the visual it reserved
+              its `36px 144px` inset for. `aria-hidden` because the envelope
+              says nothing the headline below does not say better, and
+              `alt=""` keeps it out of the reading order either way.
+
+              `fetchPriority` is not premature: this is the first screen of the
+              flow, so there is no preceding screen to preload from the way
+              `MatchStep` does, and the band opens about 0.9s in. */}
+          <div className="ff-invite__band" data-invite="band" aria-hidden="true">
+            <img
+              className="ff-invite__band-art"
+              src="/assets/email-invite.webp"
+              alt=""
+              width={1354}
+              height={471}
+              decoding="async"
+              fetchPriority="high"
+            />
+          </div>
 
           {/* §33.11.2: the page's own title, and it is text. The reference sets
               it with a 28px mint text-stroke behind the glyphs — a treatment on

@@ -134,7 +134,23 @@ function Body({ token, name }: { token: string; name: string }) {
         <div className="claim-wide-stage" ref={stageRef}>
           <div className="claim-wide-shell">
             <div className="claim-meta-space" aria-hidden="true" />
-            <div className="claim-band" aria-hidden="true" />
+            {/* The same envelope the Founder invitation opens on, so the two
+                private invitations arrive the same way. Decorative: the band is
+                `aria-hidden` and the image carries an empty alt. The inset is
+                expressed on the art rather than as padding on the band, because
+                the band animates from `height: 0` and padding would start it
+                72px tall. */}
+            <div className="claim-band" aria-hidden="true">
+              <img
+                className="claim-band-art"
+                src="/assets/email-invite.webp"
+                alt=""
+                width={1354}
+                height={471}
+                decoding="async"
+                fetchPriority="high"
+              />
+            </div>
             {/* The label is the only thing here the reference does not have,
                 and it changes no pixel and no behaviour: the mint stroke needs
                 the spans, and the spans are separated by a margin rather than
