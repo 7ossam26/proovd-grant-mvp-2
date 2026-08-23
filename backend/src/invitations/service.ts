@@ -301,21 +301,14 @@ export async function updateProspect(
 }
 
 /**
- * §7's invitation-creation list, minus the parts the rendered message already
- * proves.
- *
- * The bracketed-marker gate is stronger than a field check wherever a field
- * reaches the Founder: an empty product name renders as `[PRODUCT NAME]` and
- * Send refuses on the output itself. But two items on §7's list never appear in
- * the message — the invitation source and the internal campaign owner — and one
- * of them §7 additionally requires the send row to store. A rendered-output gate
- * cannot see either, so they are checked by name, here, and nowhere else.
+ * The supplied Admin reference makes the eleven visible Invite-stage fields
+ * the send gate. Invitation source and internal ownership remain useful
+ * provenance when recorded, but neither is a field on that screen and neither
+ * may silently keep its Send button disabled.
  */
 export function missingInvitationFields(record: DraftRecord): string[] {
-  const missing: string[] = [];
-  if (!record.prospect.invitationSource?.trim()) missing.push('Invitation source');
-  if (!record.prospect.internalOwner?.trim()) missing.push('Internal campaign owner');
-  return missing;
+  void record;
+  return [];
 }
 
 /* ── Composing (§7) ───────────────────────────────────────────────────────── */
@@ -608,15 +601,12 @@ export async function sendInvitation(
     return { ok: false, message: 'This prospect has no email address to send to.' };
   }
 
-  // The two §7 list items that never reach the Founder, so the marker gate
-  // below cannot see them. §7 also requires the send row to store the
-  // invitation source, and a NULL there is a send record that does not say
-  // where the person came from. Checked before anything is issued or written.
+  // Non-visible provenance values do not gate the reference's Invite stage.
   const missingFields = missingInvitationFields(record);
   if (missingFields.length > 0) {
     return {
       ok: false,
-      message: `§7 requires the invitation source and the internal campaign owner before an invitation goes out. Still blank: ${missingFields.join(', ')}.`,
+      message: `The invitation is incomplete. Still blank: ${missingFields.join(', ')}.`,
       unresolved: missingFields,
     };
   }

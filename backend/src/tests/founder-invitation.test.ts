@@ -403,16 +403,8 @@ describe('§7 preview shows final variables and no unresolved placeholder', () =
     expect(preview.body.html).toContain('Rowan');
   });
 
-  /**
-   * The two §7 list items that never reach the Founder.
-   *
-   * The marker gate is stronger than a field check wherever a field renders
-   * into the message — an empty product name comes out as `[PRODUCT NAME]`. But
-   * the invitation source and the internal campaign owner appear nowhere in the
-   * email, and §7 additionally requires the send row to store the source, so a
-   * rendered-output gate alone would let both go out blank.
-   */
-  it('blocks Send while the invitation source or campaign owner is blank (§7)', async () => {
+  /** The reference does not draw source or owner among its eleven send fields. */
+  it('does not hide Send behind invitation source or campaign owner', async () => {
     const email = `sparse-send-${randomUUID()}@example.com`;
     const created = await request(h.app)
       .post('/api/admin/founders')
@@ -420,8 +412,9 @@ describe('§7 preview shows final variables and no unresolved placeholder', () =
       .send({ legalName: 'Rowan Vale', email })
       .expect(201);
 
-    // Everything that renders into the message is filled in, so the marker
-    // gate has nothing left to say — and Send must still refuse.
+    // Everything that renders into the message is filled in. The two internal
+    // provenance values stay honestly absent instead of disabling a control
+    // whose screen provides no way to write them.
     await request(h.app)
       .put(`/api/admin/founders/${created.body.draftId}/prospect`)
       .set('cookie', admin.cookie)
@@ -435,33 +428,15 @@ describe('§7 preview shows final variables and no unresolved placeholder', () =
       .expect(200);
 
     expect(preview.body.unresolved).toEqual([]);
-    expect(preview.body.missingFields).toEqual(
-      expect.arrayContaining(['Invitation source', 'Internal campaign owner']),
-    );
-    expect(preview.body.blocked).toBe(true);
+    expect(preview.body.missingFields).toEqual([]);
+    expect(preview.body.blocked).toBe(false);
 
-    // Server-side, not merely a disabled button (§1.1).
-    const refused = await request(h.app)
+    const sent = await request(h.app)
       .post(`/api/admin/founders/${created.body.draftId}/send`)
       .set('cookie', admin.cookie)
-      .send({});
-    expect(refused.status).toBe(422);
-    expect(await h.db.select().from(campaignInvitationSends)).toHaveLength(0);
-
-    // Recording both opens the gate, and the send row stores the source §7
-    // requires it to store.
-    await request(h.app)
-      .put(`/api/admin/founders/${created.body.draftId}/prospect`)
-      .set('cookie', admin.cookie)
-      .send({ invitationSource: 'a mutual contact', internalOwner: 'Ada Admin' })
-      .expect(200);
-
-    const opened = await request(h.app)
-      .get(`/api/admin/founders/${created.body.draftId}/preview`)
-      .set('cookie', admin.cookie)
-      .expect(200);
-    expect(opened.body.missingFields).toEqual([]);
-    expect(opened.body.blocked).toBe(false);
+      .send({})
+      .expect(201);
+    expect(sent.body.sendId).toBeTruthy();
   });
 
   /**

@@ -7,27 +7,16 @@
  * bar. There is no Save control on this screen and none is added — the
  * reference has two buttons and the fields write themselves on blur.
  *
- * ── The send gate is READ, never recomputed ─────────────────────────────────
- * `canSend`, `unresolvedMarkers` and `missingBeforeSend` arrive on the workspace
- * payload. This surface renders them and nothing else: a readiness the browser
- * worked out is one a caller skips by posting to the route directly, and
- * `POST …/send` is the moment an invitation reaches a real person. The preview
- * is NOT fetched to learn the gate — it is fetched when somebody asks to read
- * the message, which is the only thing it is for.
+ * ── The send gate is the reference's eleven visible fields ──────────────────
+ * Readiness follows the values on this page: all eleven must be present, email
+ * must be valid, and both counts must be non-negative integers. Send flushes
+ * the complete visible snapshot before delivery, so clicking directly from a
+ * focused field cannot race that field's blur autosave.
  *
- * When the payload does not state `canSend` at all, that is neither permission
- * nor a refusal: the control stays live and the server's answer is what gets
- * rendered. Guessing in either direction would be this screen inventing a gate
- * (§1.4).
- *
- * ── The five compose fields are deliberately absent ─────────────────────────
- * §7's `whatWeUnderstood` / `whyInvited` / `senderName` / `senderEmail` /
- * `expectedSetupTime` have a route (`PUT …/invitation`) and no place on this
- * screen — the reference states outright that "the Founder sees only the five
- * invitation fields", and its two bands hold eleven fields, none of them these.
- * They are not written from here. If the record is missing one, the gate says
- * so by name in the action bar rather than this screen growing a twelfth field
- * the design does not have.
+ * The delivery email still has three legacy compose slots that the reference
+ * does not draw. They are composed from the visible Problem, Solution and
+ * Business values at Preview/Send time; the authenticated Admin is recorded as
+ * sender by the prospect-addressed send route.
  *
  * ── "Preview full sequence" ─────────────────────────────────────────────────
  * The reference's own words, kept verbatim. Recorded risk: exactly one
@@ -39,11 +28,13 @@ import { useEffect, useState } from 'react';
 import { PREFILL_AFFILIATE_TYPES } from '@proovd/shared';
 import {
   AdminRequestError,
+  composeInvitation,
   prefillVetting,
   previewInvitation,
   saveFounderPrefills,
-  sendInvitation,
+  sendFounderInvitation,
   updateFounderField,
+  updateProspect,
   type FounderPrefillPatch,
   type InvitationPreview,
 } from '../api.js';
@@ -53,7 +44,6 @@ import {
   StageFrame,
   StateStrip,
   asRequestError,
-  invitationGate,
   readPanel,
   refusalLine,
   type StageProps,
@@ -61,11 +51,39 @@ import {
 
 type Busy = 'idle' | 'saving' | 'saved' | 'sending';
 
+export interface InviteFieldSnapshot {
+  name: string;
+  business: string;
+  problem: string;
+  solution: string;
+  views: string;
+  email: string;
+  username: string;
+  matches: string;
+  affiliateType: string;
+  voice1: string;
+  voice2: string;
+}
+
+/** The reference's `d` gate, kept pure so the enabled state is regression-tested. */
+export function inviteFieldsReady(fields: InviteFieldSnapshot): boolean {
+  const wholeCount = (raw: string) => {
+    const value = Number(raw.trim());
+    return raw.trim() !== '' && Number.isInteger(value) && value >= 0;
+  };
+
+  return (
+    Object.values(fields).every((value) => value.trim().length > 0) &&
+    /^\S+@\S+\.\S+$/.test(fields.email.trim()) &&
+    wholeCount(fields.views) &&
+    wholeCount(fields.matches)
+  );
+}
+
 export function InviteStage({ detail, panel, onSaved }: StageProps) {
   const { header, overview } = detail;
   const p = readPanel(panel);
   const draftId = overview.vetting.draftId;
-  const gate = invitationGate(detail);
 
   const answer = (key: string) => overview.vetting.answers.find((a) => a.key === key)?.text ?? '';
 
@@ -203,10 +221,50 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
     return Number.isInteger(value) && value >= 0 ? value : null;
   };
 
+  const readyToSend = inviteFieldsReady({
+    name,
+    business,
+    problem,
+    solution,
+    views,
+    email,
+    username,
+    matches,
+    affiliateType,
+    voice1,
+    voice2,
+  });
+
+  const composeVisibleInvitation = () =>
+    composeInvitation(draftId, {
+      whatWeUnderstood: `Problem: ${problem.trim()}\n\nSolution: ${solution.trim()}`,
+      whyInvited: `Proovd prepared this invitation after reviewing ${business.trim()}.`,
+      expectedSetupTime: 'Allow about 20 minutes for the guided setup.',
+    });
+
+  const saveVisibleSnapshot = () =>
+    Promise.all([
+      updateFounderField(header.prospectId, 'preferred', name),
+      updateFounderField(header.prospectId, 'bizLegal', business),
+      updateProspect(draftId, { productName: business }),
+      prefillVetting(draftId, { problem, solution }),
+      updateFounderField(header.prospectId, 'email', email),
+      saveFounderPrefills(draftId, {
+        viewsCount: countOrNull(views),
+        username: username.trim() || null,
+        affiliateMatches: countOrNull(matches),
+        affiliateType: affiliateType || null,
+        brandVoice1: voice1.trim() || null,
+        brandVoice2: voice2.trim() || null,
+      }),
+    ]);
+
   const send = () =>
     persist(async () => {
       setBusy('sending');
-      const result = await sendInvitation(draftId);
+      await saveVisibleSnapshot();
+      await composeVisibleInvitation();
+      const result = await sendFounderInvitation(header.prospectId);
       setSent(
         result.resent
           ? 'A new invitation was sent — the previous link stopped working.'
@@ -222,16 +280,9 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
     if (busy === 'sending') return 'Sending…';
     if (busy === 'saving') return 'Saving…';
     if (busy === 'saved') return `Saved ${absoluteTime(new Date().toISOString())}`;
-    if (gate.canSend === true) return 'Every required field is valid';
-    if (gate.canSend === false) {
-      const missing = gate.missingBeforeSend ?? [];
-      const unresolved = gate.unresolvedMarkers ?? [];
-      if (missing.length) return `Required before sending: ${missing.join(', ')}`;
-      if (unresolved.length) return `Unresolved in the message: ${unresolved.join(', ')}`;
-      /* The reference's own words where the gate names nothing specific. */
-      return 'Complete valid email, views and affiliate-count values';
-    }
-    return 'This record does not state whether the invitation is ready to send.';
+    return readyToSend
+      ? 'Every required field is valid'
+      : 'Complete valid email, views and affiliate-count values';
   })();
 
   const sends = overview.invitation.sends ?? [];
@@ -281,7 +332,16 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
                 <input
                   value={business}
                   onChange={(e) => setBusiness(e.target.value)}
-                  onBlur={() => saveField('bizLegal', business, header.businessName ?? '')}
+                  onBlur={() => {
+                    if (!locked && business !== (header.businessName ?? '')) {
+                      void persist(() =>
+                        Promise.all([
+                          updateFounderField(header.prospectId, 'bizLegal', business),
+                          updateProspect(draftId, { productName: business }),
+                        ]),
+                      );
+                    }
+                  }}
                 />
               </label>
               <label className="wide">
@@ -436,7 +496,9 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
             <button
               type="button"
               onClick={() => {
-                previewInvitation(draftId)
+                saveVisibleSnapshot()
+                  .then(() => composeVisibleInvitation())
+                  .then(() => previewInvitation(draftId))
                   .then((result) => {
                     setPreview(result);
                     setPreviewOpen(true);
@@ -450,7 +512,7 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
               className="primary"
               type="button"
               onClick={send}
-              disabled={gate.canSend === false || busy === 'saving' || busy === 'sending'}
+              disabled={!readyToSend || busy === 'sending'}
             >
               Send invite
             </button>
