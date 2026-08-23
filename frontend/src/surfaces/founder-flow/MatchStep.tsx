@@ -14,7 +14,7 @@ import {
   prefillAffiliateTypeLabel,
   summarizePrefillAffiliateTypes,
 } from '@proovd/shared';
-import { flowDirection, resetFlowDirection } from './FlowPage.js';
+import { flowDirection, resetFlowDirection, startFlowTransition } from './FlowPage.js';
 import { fetchFounderDetails, type FounderDetails } from '../founder/api.js';
 
 const ASSETS = {
@@ -114,6 +114,7 @@ export function MatchStep() {
   const advance = useCallback(() => {
     if (leaving.current) return;
     leaving.current = true;
+    startFlowTransition(1);
     void navigate(founderFlowPath('creator-payment', campaignId));
   }, [campaignId, navigate]);
 

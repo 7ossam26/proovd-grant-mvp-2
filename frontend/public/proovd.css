@@ -5082,6 +5082,13 @@ html.no-motion .ff-prob__rail { transition: none; }
   letter-spacing: -.012em;
   text-align: center;
 }
+.ff-application-review__action {
+  min-width: 700px;
+  min-height: 120px;
+  margin-top: 56px;
+  padding: 24px 52px;
+  font-size: 42px;
+}
 
 .ff[data-flow-page='payouts'] .ff__top,
 .ff[data-flow-page='payouts'] .ff__badge { display: none; }

@@ -110,6 +110,17 @@ export function resetFlowDirection(): void {
   pendingDirection = 1;
 }
 
+/** Hide a destination's record-loading fallback during an internal handoff. */
+export function startFlowTransition(direction: 1 | -1 = 1): void {
+  pendingDirection = direction;
+  document.documentElement.classList.add('ff-transitioning');
+  if (transitionGuardTimer !== null) window.clearTimeout(transitionGuardTimer);
+  transitionGuardTimer = window.setTimeout(() => {
+    document.documentElement.classList.remove('ff-transitioning');
+    transitionGuardTimer = null;
+  }, 3000);
+}
+
 interface FlowNav {
   /** Fade this page out, then go. `direction` drives the next page's relay. */
   leave: (to: string, direction?: 1 | -1, state?: unknown) => void;
@@ -178,17 +189,7 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
 
   const leave = useCallback(
     (to: string, direction: 1 | -1 = 1, state?: unknown) => {
-      pendingDirection = direction;
-      document.documentElement.classList.add('ff-transitioning');
-      if (transitionGuardTimer !== null) window.clearTimeout(transitionGuardTimer);
-      // If the destination fails before it can mount FlowPage, do not leave
-      // its error/loading state hidden forever. This is only a safety escape;
-      // normal successful transitions clear it in the destination layout
-      // effect before the first visible frame.
-      transitionGuardTimer = window.setTimeout(() => {
-        document.documentElement.classList.remove('ff-transitioning');
-        transitionGuardTimer = null;
-      }, 3000);
+      startFlowTransition(direction);
       // The reference fades the page-owned stage, not its chrome wrapper. The
       // invite and paper screens use these markers so their fixed composition
       // is the exact element that participates in the route handoff.

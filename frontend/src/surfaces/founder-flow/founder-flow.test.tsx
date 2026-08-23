@@ -2572,7 +2572,41 @@ describe('what Session E moved', () => {
     renderAt(at('match'));
 
     expect(await screen.findByRole('heading', { name: '4 Affiliates' })).toBeInTheDocument();
-    expect(screen.getByText('Community owner')).toBeInTheDocument();
+    expect(screen.getByText('4 Community owners')).toBeInTheDocument();
+  });
+
+  it('hides the next screen loading record during the Match handoff', async () => {
+    stubStage3();
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    handlers.unshift(async (url) => {
+      if (!/fixed-payment-openness$/.test(url)) return undefined;
+      await held;
+      return {
+        status: 200,
+        body: {
+          openness: {
+            applicable: true,
+            campaignType: 'pre_launch',
+            stance: null,
+            recordedAt: null,
+            standardBasePercent: 30,
+            withFixedBasePercent: 20,
+          },
+        },
+      };
+    });
+    renderAt(at('match'));
+
+    await screen.findByRole('heading', { name: '4 Affiliates' });
+    await userEvent.click(screen.getByRole('button', { name: 'Lets start' }));
+    expect(document.documentElement).toHaveClass('ff-transitioning');
+
+    release();
+    await screen.findByRole('heading', { name: 'No optional fixed Creator payment' });
+    expect(document.documentElement).not.toHaveClass('ff-transitioning');
   });
 });
 
@@ -2808,9 +2842,42 @@ describe('how Creators are paid (18)', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Select' }));
 
-    expect(await screen.findByRole('heading', { name: 'Application Review' })).toBeInTheDocument();
-    expect(screen.getByText(/with our review team/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Application in review' })).toBeInTheDocument();
+    expect(screen.getByText(/reviewing the information/i)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /please pay/i })).not.toBeInTheDocument();
+  });
+
+  it('shows an approved Application Review in the supplied designed shell', async () => {
+    stubStage5();
+    handlers.unshift((url) =>
+      /\/application-review$/.test(url)
+        ? {
+            status: 200,
+            body: {
+              applicationReview: {
+                required: true,
+                mayContinue: true,
+                review: {
+                  round: 1,
+                  outcome: 'approved',
+                  submittedAt: '2026-08-23T09:00:00.000Z',
+                  decidedAt: '2026-08-23T10:00:00.000Z',
+                  customerExplanation: null,
+                  changeRequests: [],
+                },
+              },
+            },
+          }
+        : undefined,
+    );
+
+    renderAt(at('application-review'));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Your application is approved' }),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.ff-application-review')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue to listing fee' })).toBeInTheDocument();
   });
 
   it('gives an Idea campaign the reference explainer and continuation instead of the picker', async () => {
