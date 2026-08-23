@@ -154,15 +154,15 @@ export function stageForStatus(status: string | null | undefined): FounderWorkfl
  * the §5.3 subtype of any actual Creator, which stays on the Creator's record.
  */
 export const PREFILL_AFFILIATE_TYPES = [
-  { id: 'social_media_creator', label: 'Social media creator' },
-  { id: 'newsletter_operator', label: 'Newsletter operator' },
-  { id: 'blog_operator', label: 'Blog operator' },
-  { id: 'podcast_host', label: 'Podcast host' },
-  { id: 'community_owner', label: 'Community owner' },
-  { id: 'course_instructor', label: 'Course instructor' },
-  { id: 'student_affiliate', label: 'Student affiliate' },
-  { id: 'network_distributor', label: 'Network distributor' },
-  { id: 'niche_marketer', label: 'Niche marketer' },
+  { id: 'social_media_creator', label: 'Social media creator', pluralLabel: 'Social media creators' },
+  { id: 'newsletter_operator', label: 'Newsletter operator', pluralLabel: 'Newsletter operators' },
+  { id: 'blog_operator', label: 'Blog operator', pluralLabel: 'Blog operators' },
+  { id: 'podcast_host', label: 'Podcast host', pluralLabel: 'Podcast hosts' },
+  { id: 'community_owner', label: 'Community owner', pluralLabel: 'Community owners' },
+  { id: 'course_instructor', label: 'Course instructor', pluralLabel: 'Course instructors' },
+  { id: 'student_affiliate', label: 'Student affiliate', pluralLabel: 'Student affiliates' },
+  { id: 'network_distributor', label: 'Network distributor', pluralLabel: 'Network distributors' },
+  { id: 'niche_marketer', label: 'Niche marketer', pluralLabel: 'Niche marketers' },
 ] as const;
 
 export type PrefillAffiliateTypeId = (typeof PREFILL_AFFILIATE_TYPES)[number]['id'];
@@ -173,6 +173,23 @@ export const PREFILL_AFFILIATE_TYPE_IDS: readonly string[] = PREFILL_AFFILIATE_T
 
 export function prefillAffiliateTypeLabel(id: string | null | undefined): string | null {
   return PREFILL_AFFILIATE_TYPES.find((t) => t.id === id)?.label ?? null;
+}
+
+export function summarizePrefillAffiliateTypes(
+  ids: readonly string[] | null | undefined,
+): string | null {
+  if (!ids?.length) return null;
+
+  const counts = new Map<string, number>();
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+
+  const labels = Array.from(counts, ([id, count]) => {
+    const type = PREFILL_AFFILIATE_TYPES.find((candidate) => candidate.id === id);
+    if (!type) return null;
+    return count === 1 ? type.label : `${count} ${type.pluralLabel}`;
+  }).filter((label): label is string => label !== null);
+
+  return labels.length ? labels.join(' · ') : null;
 }
 
 /* ── The application-review outcomes (migration 0059) ──────────────────────── */

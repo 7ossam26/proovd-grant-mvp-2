@@ -83,6 +83,7 @@ import {
 import { loadFounderContext, type FounderContext } from './workspace.js';
 
 import { createProspect, type CreatedProspect } from '../invitations/service.js';
+import { isAtLeastFounderAge, isCalendarDate } from '../vetting/age.js';
 import { prefillVetting } from '../vetting/service.js';
 import { recordGhostBan, type RecordGhostBanOutcome } from '../fulfillment/ghost-ban.js';
 import { recordNextCampaignReadiness } from '../completion/next-campaign.js';
@@ -427,10 +428,15 @@ export async function updateFounderField(
   // Both `date_of_birth` columns are Postgres `date`s, so a value the database
   // cannot read would surface as a 500 after the Admin pressed Save. Refusing
   // here names the shape instead (§27.1); clearing with an empty value is fine.
-  if (field.key === 'dob' && value !== null && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return invalid(
-      'A date of birth is entered as YYYY-MM-DD, e.g. 1990-04-23. Nothing has changed.',
-    );
+  if (field.key === 'dob' && value !== null) {
+    if (!isCalendarDate(value)) {
+      return invalid(
+        'A date of birth is entered as YYYY-MM-DD, e.g. 1990-04-23. Nothing has changed.',
+      );
+    }
+    if (!isAtLeastFounderAge(value)) {
+      return invalid('Founders must be 18 or older. Nothing has changed.');
+    }
   }
 
   const priorValue = readStoredValue(ctx, field.key);

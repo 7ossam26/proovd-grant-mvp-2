@@ -251,6 +251,8 @@ export const campaignDrafts = pgTable(
     prefillAffiliateMatches: integer('prefill_affiliate_matches'),
     /** One of `PREFILL_AFFILIATE_TYPES` — nine values, CHECK-pinned. */
     prefillAffiliateType: text('prefill_affiliate_type'),
+    /** One ordered type per possible match (migration 0072). */
+    prefillAffiliateTypes: text('prefill_affiliate_types').array(),
     /** Two independent controls in the reference, so two columns. */
     prefillBrandVoice1: text('prefill_brand_voice_1'),
     prefillBrandVoice2: text('prefill_brand_voice_2'),

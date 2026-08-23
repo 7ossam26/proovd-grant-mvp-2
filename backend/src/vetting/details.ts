@@ -26,14 +26,9 @@
  * §9's autosave rule, restated: `undefined` means "not in this request", so
  * saving a phone number cannot blank a date of birth recorded on another visit.
  *
- * ── No age is derived, and none is enforced ────────────────────────────────
- * §10 collects the date and lists the 18+ representation separately, as
- * something the Founder states. Proovd derives no age and never claims to have
- * verified one — the Admin Eligibility tab already renders it that way, and
- * `DateOfBirthField` records the same reasoning. The reference's own desktop
- * Next has no gate either: `helloNext` advances unconditionally. So the only
- * refusals below are about the SHAPE of a date — a value that is not a real
- * calendar day, or one in the future, neither of which is a birthday.
+ * A Founder must be at least 18 on the day the date is saved. The browser
+ * prevents younger dates from being picked, and this service repeats the rule
+ * so a direct request cannot bypass it.
  */
 
 import { eq } from 'drizzle-orm';
@@ -41,6 +36,7 @@ import type { Database } from '../db/client.js';
 import { auditEvents } from '../db/schema/integrity.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
 import { campaignDrafts } from '../db/schema/invitations.js';
+import { isAtLeastFounderAge, isCalendarDate } from './age.js';
 
 export interface FounderDetailsView {
   /** Display fallback when no username has been prepared. */
@@ -52,6 +48,7 @@ export interface FounderDetailsView {
   /** Admin-prepared matching summary shown on the next onboarding screen. */
   readonly affiliateMatches: number | null;
   readonly affiliateType: string | null;
+  readonly affiliateTypes: string[] | null;
 }
 
 export interface FounderDetailsPatch {
@@ -64,29 +61,6 @@ export type SaveFounderDetailsResult =
   | { ok: true; details: FounderDetailsView }
   | { ok: false; code: 'not_found' | 'refused' | 'invalid'; message: string };
 
-/** `YYYY-MM-DD` that is also a real calendar day, and not in the future. */
-function validDate(value: string): boolean {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return false;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  if (mo < 1 || mo > 12 || d < 1) return false;
-  // The day-count of the month, without constructing a `Date` from the string:
-  // `new Date('1990-01-31')` parses as UTC midnight and reads as the 30th in
-  // every timezone west of London, which on a birthday is a silent off-by-one.
-  const dim = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-  if (d > dim) return false;
-  const today = new Date();
-  const iso =
-    today.getFullYear() +
-    '-' +
-    String(today.getMonth() + 1).padStart(2, '0') +
-    '-' +
-    String(today.getDate()).padStart(2, '0');
-  return value <= iso;
-}
-
 function project(row: {
   legalName: string | null;
   preferredName: string | null;
@@ -95,6 +69,7 @@ function project(row: {
   dateOfBirth: string | null;
   affiliateMatches: number | null;
   affiliateType: string | null;
+  affiliateTypes: string[] | null;
 }): FounderDetailsView {
   return {
     // The name the reference shows is a display name, so a preferred one wins
@@ -107,6 +82,7 @@ function project(row: {
     dateOfBirth: row.dateOfBirth ?? null,
     affiliateMatches: row.affiliateMatches,
     affiliateType: row.affiliateType,
+    affiliateTypes: row.affiliateTypes,
   };
 }
 
@@ -123,6 +99,7 @@ export async function readFounderDetails(
       dateOfBirth: founderClaimProfiles.dateOfBirth,
       affiliateMatches: campaignDrafts.prefillAffiliateMatches,
       affiliateType: campaignDrafts.prefillAffiliateType,
+      affiliateTypes: campaignDrafts.prefillAffiliateTypes,
     })
     .from(founderClaimProfiles)
     .innerJoin(campaignDrafts, eq(campaignDrafts.id, founderClaimProfiles.draftId))
@@ -144,11 +121,18 @@ export async function saveFounderDetails(
   const dob =
     patch.dateOfBirth === undefined ? undefined : (patch.dateOfBirth ?? '').trim() || null;
 
-  if (dob !== undefined && dob !== null && !validDate(dob)) {
+  if (dob !== undefined && dob !== null && !isCalendarDate(dob)) {
     return {
       ok: false,
       code: 'invalid',
       message: 'That is not a date we can read. Pick it from the calendar and it is saved.',
+    };
+  }
+  if (dob !== undefined && dob !== null && !isAtLeastFounderAge(dob)) {
+    return {
+      ok: false,
+      code: 'invalid',
+      message: 'Founders must be 18 or older. Choose an eligible date of birth.',
     };
   }
 
@@ -180,6 +164,7 @@ export async function saveFounderDetails(
       .select({
         affiliateMatches: campaignDrafts.prefillAffiliateMatches,
         affiliateType: campaignDrafts.prefillAffiliateType,
+        affiliateTypes: campaignDrafts.prefillAffiliateTypes,
       })
       .from(campaignDrafts)
       .where(eq(campaignDrafts.id, row.draftId))
@@ -222,6 +207,7 @@ export async function saveFounderDetails(
           ...row,
           affiliateMatches: draft?.affiliateMatches ?? null,
           affiliateType: draft?.affiliateType ?? null,
+          affiliateTypes: draft?.affiliateTypes ?? null,
         }),
       };
     }
@@ -248,6 +234,7 @@ export async function saveFounderDetails(
         dateOfBirth: founderClaimProfiles.dateOfBirth,
         affiliateMatches: campaignDrafts.prefillAffiliateMatches,
         affiliateType: campaignDrafts.prefillAffiliateType,
+        affiliateTypes: campaignDrafts.prefillAffiliateTypes,
       })
       .from(founderClaimProfiles)
       .innerJoin(campaignDrafts, eq(campaignDrafts.id, founderClaimProfiles.draftId))

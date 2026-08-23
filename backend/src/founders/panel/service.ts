@@ -62,6 +62,7 @@ import { recomputeBuildStatus } from '../../campaign/service.js';
 import { loadFounderContext } from '../workspace.js';
 import { readAdminWorkspace } from '../../workspace/projection.js';
 import { OPTIONAL_ITEM_KEYS } from '../../workspace/registry.js';
+import { isAtLeastFounderAge } from '../../vetting/age.js';
 import {
   APPLICATION_REVIEW_OUTCOMES,
   applicationReviewDecided,
@@ -187,6 +188,10 @@ export interface FounderPanelView {
     passwordSetAt: string | null;
     lastActiveAt: string | null;
   };
+  account: {
+    dateOfBirth: string | null;
+    ageCheck: string | null;
+  };
   versions: {
     /** `campaign_build.draft_version`. Bumped by every recorded Admin edit. */
     draftVersion: number | null;
@@ -295,6 +300,7 @@ export interface InvitePrefillView {
   viewsCount: number | null;
   affiliateMatches: number | null;
   affiliateType: string | null;
+  affiliateTypes: string[] | null;
   affiliateTypeLabel: string | null;
   brandVoice1: string | null;
   brandVoice2: string | null;
@@ -474,6 +480,7 @@ export async function readFounderPanel(
         viewsCount: draft.prefillViewsCount,
         affiliateMatches: draft.prefillAffiliateMatches,
         affiliateType: draft.prefillAffiliateType,
+        affiliateTypes: draft.prefillAffiliateTypes,
         affiliateTypeLabel: prefillAffiliateTypeLabel(draft.prefillAffiliateType),
         brandVoice1: draft.prefillBrandVoice1,
         brandVoice2: draft.prefillBrandVoice2,
@@ -488,6 +495,7 @@ export async function readFounderPanel(
   const passwordSetAt = allCampaignIds.length
     ? await readPasswordSetAt(db, allCampaignIds)
     : null;
+  const dateOfBirth = ctx.claim?.dateOfBirth ?? ctx.prospect.dateOfBirth ?? null;
 
   /* ── Versions ──────────────────────────────────────────────────────────── */
 
@@ -671,6 +679,10 @@ export async function readFounderPanel(
       emailCodeVerifiedAt: iso(ctx.claim?.emailCodeVerifiedAt ?? null),
       passwordSetAt,
       lastActiveAt: iso(ctx.prospect.lastActiveAt),
+    },
+    account: {
+      dateOfBirth,
+      ageCheck: dateOfBirth && isAtLeastFounderAge(dateOfBirth) ? '18 or older' : null,
     },
     versions: {
       draftVersion: buildRow?.draftVersion ?? null,
@@ -877,6 +889,7 @@ export interface PrefillPatch {
   viewsCount?: number | null;
   affiliateMatches?: number | null;
   affiliateType?: string | null;
+  affiliateTypes?: string[] | null;
   brandVoice1?: string | null;
   brandVoice2?: string | null;
   username?: string | null;
@@ -916,6 +929,26 @@ export async function updateInvitePrefills(
       );
     }
   }
+  if (patch.affiliateTypes !== undefined && patch.affiliateTypes !== null) {
+    if (patch.affiliateTypes.some((type) => !PREFILL_AFFILIATE_TYPE_IDS.includes(type))) {
+      return refuse(
+        'unknown_affiliate_type',
+        'One of those creator types is not in the available list.',
+        'Choose each creator type from the list. Nothing you entered was lost.',
+      );
+    }
+    if (
+      patch.affiliateMatches !== undefined &&
+      patch.affiliateMatches !== null &&
+      patch.affiliateTypes.length !== patch.affiliateMatches
+    ) {
+      return refuse(
+        'affiliate_type_count_mismatch',
+        'Choose one creator type for each possible affiliate match.',
+        'Nothing you entered was lost.',
+      );
+    }
+  }
   for (const [key, label] of [
     ['viewsCount', 'number of views'],
     ['affiliateMatches', 'number of affiliate matches'],
@@ -937,7 +970,12 @@ export async function updateInvitePrefills(
   if (patch.affiliateMatches !== undefined) {
     draftSet['prefillAffiliateMatches'] = patch.affiliateMatches;
   }
-  if (patch.affiliateType !== undefined) draftSet['prefillAffiliateType'] = patch.affiliateType;
+  if (patch.affiliateTypes !== undefined) {
+    draftSet['prefillAffiliateTypes'] = patch.affiliateTypes;
+    draftSet['prefillAffiliateType'] = patch.affiliateTypes?.[0] ?? null;
+  } else if (patch.affiliateType !== undefined) {
+    draftSet['prefillAffiliateType'] = patch.affiliateType;
+  }
   if (patch.brandVoice1 !== undefined) {
     draftSet['prefillBrandVoice1'] = trimToNull(patch.brandVoice1, 500);
   }
@@ -957,12 +995,19 @@ export async function updateInvitePrefills(
       viewsCount: draft.prefillViewsCount,
       affiliateMatches: draft.prefillAffiliateMatches,
       affiliateType: draft.prefillAffiliateType,
+      affiliateTypes: draft.prefillAffiliateTypes,
       brandVoice1: draft.prefillBrandVoice1,
       brandVoice2: draft.prefillBrandVoice2,
       username: null as string | null,
     };
 
     let updated = draft;
+    if (patch.affiliateTypes === undefined && patch.affiliateType !== undefined) {
+      draftSet['prefillAffiliateTypes'] =
+        patch.affiliateType && (draft.prefillAffiliateMatches ?? 0) > 0
+          ? Array.from({ length: draft.prefillAffiliateMatches! }, () => patch.affiliateType!)
+          : null;
+    }
     if (Object.keys(draftSet).length > 0) {
       draftSet['updatedAt'] = new Date();
       const [row] = await tx
@@ -1023,6 +1068,7 @@ export async function updateInvitePrefills(
         viewsCount: updated.prefillViewsCount,
         affiliateMatches: updated.prefillAffiliateMatches,
         affiliateType: updated.prefillAffiliateType,
+        affiliateTypes: updated.prefillAffiliateTypes,
         brandVoice1: updated.prefillBrandVoice1,
         brandVoice2: updated.prefillBrandVoice2,
         ...(patch.username !== undefined ? { username: trimToNull(patch.username, 200) } : {}),
@@ -1043,6 +1089,7 @@ export async function updateInvitePrefills(
       viewsCount: result.prefillViewsCount,
       affiliateMatches: result.prefillAffiliateMatches,
       affiliateType: result.prefillAffiliateType,
+      affiliateTypes: result.prefillAffiliateTypes,
       affiliateTypeLabel: prefillAffiliateTypeLabel(result.prefillAffiliateType),
       brandVoice1: result.prefillBrandVoice1,
       brandVoice2: result.prefillBrandVoice2,

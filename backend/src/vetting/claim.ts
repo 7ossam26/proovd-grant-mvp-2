@@ -60,6 +60,7 @@ import {
 import { policyVersions } from '../db/schema/policies.js';
 import { auditEvents, idempotencyKeys } from '../db/schema/integrity.js';
 import { user as userTable } from '../db/schema/auth.js';
+import { isAtLeastFounderAge, isCalendarDate } from './age.js';
 
 /**
  * The domain event §10 names and §33.1.9 counts.
@@ -297,13 +298,6 @@ function normalise(value: string | null | undefined): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
-/** `YYYY-MM-DD`, and a real date. Nothing here computes an age (§10, §5.2). */
-function validDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
-
 export async function saveClaimProfile(
   db: Database,
   draftId: string,
@@ -325,11 +319,18 @@ export async function saveClaimProfile(
 
   if (input.dateOfBirth !== undefined && input.dateOfBirth !== null) {
     const value = normalise(input.dateOfBirth);
-    if (value !== null && !validDate(value)) {
+    if (value !== null && !isCalendarDate(value)) {
       return {
         ok: false,
         message: 'That date of birth is not a real date.',
         next: 'Use the format YYYY-MM-DD. Everything else you have entered is still saved.',
+      };
+    }
+    if (value !== null && !isAtLeastFounderAge(value)) {
+      return {
+        ok: false,
+        message: 'Founders must be 18 or older.',
+        next: 'Choose an eligible date of birth. Everything else you have entered is still saved.',
       };
     }
   }

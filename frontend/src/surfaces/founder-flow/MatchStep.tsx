@@ -9,7 +9,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { founderFlowPath, prefillAffiliateTypeLabel } from '@proovd/shared';
+import {
+  founderFlowPath,
+  prefillAffiliateTypeLabel,
+  summarizePrefillAffiliateTypes,
+} from '@proovd/shared';
 import { flowDirection, resetFlowDirection } from './FlowPage.js';
 import { fetchFounderDetails, type FounderDetails } from '../founder/api.js';
 
@@ -374,7 +378,8 @@ export function MatchStep() {
               </h1>
               <span className="ff-match__types">
                 <span>
-                  {prefillAffiliateTypeLabel(details?.affiliateType) ??
+                  {summarizePrefillAffiliateTypes(details?.affiliateTypes) ??
+                    prefillAffiliateTypeLabel(details?.affiliateType) ??
                     'Proovd is preparing the right creator type'}
                 </span>
               </span>

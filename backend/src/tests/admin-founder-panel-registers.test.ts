@@ -30,6 +30,7 @@ import {
   FOUNDER_WORKFLOW_STATUSES as SHARED_STATUSES,
   FOUNDER_WORKFLOW_EXIT_STATUSES as SHARED_EXIT_STATUSES,
   PREFILL_AFFILIATE_TYPES as SHARED_PREFILL_TYPES,
+  summarizePrefillAffiliateTypes,
   APPLICATION_REVIEW_OUTCOMES as SHARED_OUTCOMES,
   AFFILIATE_SUBTYPES,
   CAMPAIGN_STATUSES,
@@ -91,6 +92,16 @@ describe('the workflow register does not drift across the package boundary', () 
     expect(PREFILL_AFFILIATE_TYPES.map((t) => [t.id, t.label])).toEqual(
       SHARED_PREFILL_TYPES.map((t) => [t.id, t.label]),
     );
+  });
+
+  it('groups repeated creator types and pluralizes only repeated types', () => {
+    expect(
+      summarizePrefillAffiliateTypes([
+        'social_media_creator',
+        'podcast_host',
+        'social_media_creator',
+      ]),
+    ).toBe('2 Social media creators · Podcast host');
   });
 
   it('restates the seven application-review outcomes', () => {

@@ -44,6 +44,7 @@ import {
   MEETING_PROVIDER_LABELS,
   formatCents,
   prefillAffiliateTypeLabel,
+  summarizePrefillAffiliateTypes,
   type MeetingProvider,
 } from '@proovd/shared';
 import { AdminRequestError, type FounderWorkspaceDetail } from '../api.js';
@@ -351,6 +352,7 @@ export interface FounderPanel {
     affiliateMatches?: number | null;
     /** A `PREFILL_AFFILIATE_TYPES` id, never a label. */
     affiliateType?: string | null;
+    affiliateTypes?: string[] | null;
     brandVoice1?: string | null;
     brandVoice2?: string | null;
     username?: string | null;
@@ -1064,7 +1066,9 @@ export function campaignAnswerRows(detail: FounderWorkspaceDetail, p: FounderPan
 
   const views = p.prefills?.viewsCount;
   const matches = p.prefills?.affiliateMatches;
-  const typeLabel = prefillAffiliateTypeLabel(p.prefills?.affiliateType);
+  const typeLabel =
+    summarizePrefillAffiliateTypes(p.prefills?.affiliateTypes) ??
+    prefillAffiliateTypeLabel(p.prefills?.affiliateType);
   const noViews = views === null || views === undefined;
   const noMatches = matches === null || matches === undefined;
 
@@ -1101,7 +1105,7 @@ export function campaignAnswerRows(detail: FounderWorkspaceDetail, p: FounderPan
     },
     {
       key: 'affiliate_type',
-      label: 'Affiliate type',
+      label: 'Affiliate types',
       value: typeLabel,
       absence: 'No type prefilled',
       source: 'Admin prefill',

@@ -115,6 +115,19 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
   it('enforces and completes the mandatory blocking Application Review', async () => {
     const founder = await createInviteAndClaim();
 
+    const underageYear = new Date().getUTCFullYear() - 17;
+    await request(h.app)
+      .patch(`/api/founder/campaigns/${founder.campaignId}/details`)
+      .set('cookie', founder.founderCookie)
+      .send({ dateOfBirth: `${underageYear}-01-01` })
+      .expect(400);
+
+    await request(h.app)
+      .patch(`/api/founder/campaigns/${founder.campaignId}/details`)
+      .set('cookie', founder.founderCookie)
+      .send({ dateOfBirth: '1990-01-31' })
+      .expect(200);
+
     const waiting = await request(h.app)
       .post(`/api/founder/campaigns/${founder.campaignId}/application-review/submit`)
       .set('cookie', founder.founderCookie)
@@ -235,6 +248,10 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
     expect(panel.body.notes).toHaveLength(1);
     expect(panel.body.warnings).toHaveLength(1);
     expect(panel.body.applicationReview).toMatchObject({ outcome: 'approved' });
+    expect(panel.body.account).toEqual({
+      dateOfBirth: '1990-01-31',
+      ageCheck: '18 or older',
+    });
     expect(panel.body.optionalItems).toHaveLength(5);
     expect(panel.body.optionalItems).toContainEqual(
       expect.objectContaining({

@@ -505,6 +505,13 @@
       "when": 1788710400000,
       "tag": "0071_onboarding_evidence_repairs",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1788796800000,
+      "tag": "0072_affiliate_match_types",
+      "breakpoints": true
     }
   ]
 }

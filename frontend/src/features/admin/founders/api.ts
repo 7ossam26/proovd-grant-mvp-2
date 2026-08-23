@@ -476,6 +476,7 @@ export interface FounderPrefillPatch {
   viewsCount?: number | null;
   affiliateMatches?: number | null;
   affiliateType?: string | null;
+  affiliateTypes?: string[] | null;
   brandVoice1?: string | null;
   brandVoice2?: string | null;
   username?: string | null;

@@ -382,6 +382,23 @@ export function createAdminFounderPanelRouter(deps: AdminFounderPanelDeps): Rout
       }
       if (matches !== undefined) patch.affiliateMatches = matches;
 
+      if (Object.prototype.hasOwnProperty.call(body, 'affiliateTypes')) {
+        const value = body['affiliateTypes'];
+        if (
+          value !== null &&
+          (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))
+        ) {
+          sendRefusal(res, {
+            ok: false,
+            code: 'invalid_value',
+            message: '“affiliateTypes” must be a list of creator types, or null to clear it.',
+            next: 'Nothing you entered was lost.',
+          });
+          return;
+        }
+        patch.affiliateTypes = value as string[] | null;
+      }
+
       for (const key of ['affiliateType', 'brandVoice1', 'brandVoice2', 'username'] as const) {
         const value = optionalString(body, key);
         if (value === 'invalid') {

@@ -52,7 +52,7 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { prefillAffiliateTypeLabel } from '@proovd/shared';
+import { prefillAffiliateTypeLabel, summarizePrefillAffiliateTypes } from '@proovd/shared';
 import { AdminRequestError, call } from '../../api.js';
 import { relativeTime } from '../format.js';
 import {
@@ -192,6 +192,9 @@ export function MatchingStage({ detail, panel, onSaved, onOpenStage }: StageProp
   const offers = matching?.offers ?? [];
   const model = matching?.paymentModel ?? null;
   const accepted = offers.filter((o) => founderResponseLabel(o) === 'Accepted').length;
+  const creatorTypeSummary =
+    summarizePrefillAffiliateTypes(supplement.prefills?.affiliateTypes) ??
+    prefillAffiliateTypeLabel(supplement.prefills?.affiliateType);
 
   const [candidates, setCandidates] = useState<PanelCandidate[] | null>(null);
   const [candidateRefusal, setCandidateRefusal] = useState<string | null>(null);
@@ -274,8 +277,8 @@ export function MatchingStage({ detail, panel, onSaved, onOpenStage }: StageProp
               <span>Possible matches</span>
               <strong>{supplement.prefills?.affiliateMatches ?? 'Not prefilled'}</strong>
               <small>
-                {prefillAffiliateTypeLabel(supplement.prefills?.affiliateType)
-                  ? `${prefillAffiliateTypeLabel(supplement.prefills?.affiliateType)} · Admin prefill, not calculated`
+                {creatorTypeSummary
+                  ? `${creatorTypeSummary} · Admin prefill, not calculated`
                   : 'Admin prefill, not calculated'}
               </small>
             </div>

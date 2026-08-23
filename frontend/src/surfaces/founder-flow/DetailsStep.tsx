@@ -176,6 +176,7 @@ const DOWS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 /** `dobBase`'s floor, and `dobYears`' page size. */
 const YEAR_FLOOR = 1940;
 const YEAR_PAGE = 12;
+const MINIMUM_FOUNDER_AGE = 18;
 
 interface View {
   y: number;
@@ -189,11 +190,12 @@ function pretty(iso: string): string {
   return `${Number(m[3])} ${MONTHS_SHORT[Number(m[2]) - 1]} ${m[1]}`;
 }
 
-/** `dobView()` — the stored date's month, or January of this year. */
+/** `dobView()` — the stored date's month, or the latest eligible month. */
 function viewFor(iso: string | null): View {
   const m = iso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso) : null;
   if (m) return { y: Number(m[1]), m: Number(m[2]) - 1 };
-  return { y: new Date().getFullYear(), m: 0 };
+  const latest = /^(\d{4})-(\d{2})/.exec(latestEligibleBirthdate())!;
+  return { y: Number(latest[1]), m: Number(latest[2]) - 1 };
 }
 
 /** `dobBase()` — the decade page a year falls on. */
@@ -204,26 +206,17 @@ function baseFor(year: number): number {
   );
 }
 
-/**
- * Today, as `YYYY-MM-DD` in the viewer's own timezone.
- *
- * Built from the three integers rather than from `toISOString()`, which is UTC
- * and puts "today" a day out for anybody west of London — on a calendar that
- * greys out the future, that is a day nobody can pick.
- */
-function todayIso(): string {
-  const d = new Date();
-  return (
-    d.getFullYear() +
-    '-' +
-    String(d.getMonth() + 1).padStart(2, '0') +
-    '-' +
-    String(d.getDate()).padStart(2, '0')
-  );
-}
-
 function isoOf(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** Latest selectable birthday for somebody who must already be 18. */
+function latestEligibleBirthdate(): string {
+  const today = new Date();
+  const year = today.getFullYear() - MINIMUM_FOUNDER_AGE;
+  const month = today.getMonth();
+  const day = Math.min(today.getDate(), new Date(year, month + 1, 0).getDate());
+  return isoOf(year, month, day);
 }
 
 /**
@@ -311,6 +304,7 @@ function Screen({
   const [dob, setDob] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const seeded = useRef(false);
+  const relayed = useRef(false);
 
   if (details && !seeded.current) {
     seeded.current = true;
@@ -335,7 +329,8 @@ function Screen({
   // The relay. It waits for the record, because the panel cannot travel before
   // there is a panel.
   useLayoutEffect(() => {
-    if (!details) return;
+    if (!details || relayed.current) return;
+    relayed.current = true;
     return stageRelayIn(root.current, direction.current ?? 1, RELAY);
   }, [details]);
 
@@ -576,9 +571,10 @@ function DobRow({
 
   const current: View = view ?? viewFor(value);
   const decadeBase = base ?? baseFor(current.y);
-  const now = new Date().getFullYear();
-  const decadeMax = Math.floor((now - YEAR_FLOOR) / YEAR_PAGE) * YEAR_PAGE + YEAR_FLOOR;
-  const today = todayIso();
+  const latestEligible = latestEligibleBirthdate();
+  const latestView = viewFor(latestEligible);
+  const decadeMax =
+    Math.floor((latestView.y - YEAR_FLOOR) / YEAR_PAGE) * YEAR_PAGE + YEAR_FLOOR;
 
   /* `dobToggle`'s open: the panel grows from the field's own height to its
      natural height over 0.45s `power3.out`, its rows fade in behind that on a
@@ -651,7 +647,7 @@ function DobRow({
     setOpen(true);
   };
 
-  /** `dobStep(dir)` — refuses to walk past the floor or past this year. */
+  /** `dobStep(dir)` — refuses to walk into a month for an under-18 birthday. */
   const step = (dir: 1 | -1) => {
     let m = current.m + dir;
     let y = current.y;
@@ -663,7 +659,13 @@ function DobRow({
       m = 0;
       y += 1;
     }
-    if (y < YEAR_FLOOR || y > now) return;
+    if (
+      y < YEAR_FLOOR ||
+      y > latestView.y ||
+      (y === latestView.y && m > latestView.m)
+    ) {
+      return;
+    }
     setView({ y, m });
   };
 
@@ -680,6 +682,7 @@ function DobRow({
 
   /** `dobPick(iso)` — the cell pops, then the panel shuts 300ms later. */
   const pick = (iso: string) => {
+    if (iso > latestEligible) return;
     onPick(iso);
     setView(viewFor(iso));
     dobCellPop(panel.current);
@@ -692,12 +695,12 @@ function DobRow({
   const dim = new Date(current.y, current.m + 1, 0).getDate();
   const cells = Array.from({ length: dim }, (_, i) => {
     const iso = isoOf(current.y, current.m, i + 1);
-    return { d: i + 1, iso, sel: value === iso, future: iso > today };
+    return { d: i + 1, iso, sel: value === iso, blocked: iso > latestEligible };
   });
 
   const years = Array.from({ length: YEAR_PAGE }, (_, i) => {
     const y = decadeBase + i;
-    return { y, on: y === current.y, off: y > now };
+    return { y, on: y === current.y, off: y > latestView.y };
   });
 
   return (
@@ -839,7 +842,7 @@ function DobRow({
                         </svg>
                       </button>
                       <span className="ff-hl__cal-decade-label">
-                        {decadeBase} – {Math.min(decadeBase + 11, now)}
+                        {decadeBase} – {Math.min(decadeBase + 11, latestView.y)}
                       </span>
                       <button
                         type="button"
@@ -875,6 +878,7 @@ function DobRow({
                                 : 'ff-hl__cal-year'
                           }
                           aria-pressed={y.on}
+                          disabled={y.off}
                           onClick={() => {
                             if (y.off) return;
                             setView({ y: y.y, m: current.m });
@@ -938,15 +942,16 @@ function DobRow({
                           className={
                             cell.sel
                               ? 'ff-hl__cal-cell is-sel'
-                              : cell.future
+                              : cell.blocked
                                 ? 'ff-hl__cal-cell is-future'
                                 : 'ff-hl__cal-cell'
                           }
                           style={i === 0 ? { gridColumnStart: start + 1 } : undefined}
                           aria-pressed={cell.sel}
                           aria-label={`${cell.d} ${MONTHS[current.m]} ${current.y}`}
+                          disabled={cell.blocked}
                           onClick={() => {
-                            if (cell.future) return;
+                            if (cell.blocked) return;
                             pick(cell.iso);
                           }}
                         >

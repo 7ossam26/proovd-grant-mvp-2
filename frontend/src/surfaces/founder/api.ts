@@ -291,6 +291,7 @@ export interface FounderDetails {
   dateOfBirth: string | null;
   affiliateMatches: number | null;
   affiliateType: string | null;
+  affiliateTypes: string[] | null;
 }
 
 export interface FounderDetailsPatch {

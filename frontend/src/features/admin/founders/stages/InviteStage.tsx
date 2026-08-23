@@ -60,7 +60,7 @@ export interface InviteFieldSnapshot {
   email: string;
   username: string;
   matches: string;
-  affiliateType: string;
+  affiliateTypes: string[];
   voice1: string;
   voice2: string;
 }
@@ -72,12 +72,39 @@ export function inviteFieldsReady(fields: InviteFieldSnapshot): boolean {
     return raw.trim() !== '' && Number.isInteger(value) && value >= 0;
   };
 
+  const matchCount = Number(fields.matches.trim());
+  const textFields = [
+    fields.name,
+    fields.business,
+    fields.problem,
+    fields.solution,
+    fields.views,
+    fields.email,
+    fields.username,
+    fields.matches,
+    fields.voice1,
+    fields.voice2,
+  ];
+
   return (
-    Object.values(fields).every((value) => value.trim().length > 0) &&
+    textFields.every((value) => value.trim().length > 0) &&
     /^\S+@\S+\.\S+$/.test(fields.email.trim()) &&
     wholeCount(fields.views) &&
-    wholeCount(fields.matches)
+    wholeCount(fields.matches) &&
+    fields.affiliateTypes.length === matchCount &&
+    fields.affiliateTypes.every((value) => value.trim().length > 0)
   );
+}
+
+function creatorTypesForCount(
+  count: number,
+  saved: readonly string[] | null | undefined,
+  legacy: string | null | undefined,
+): string[] {
+  const next = (saved ?? []).slice(0, count);
+  const fallback = next[0] || legacy || '';
+  while (next.length < count) next.push(fallback);
+  return next;
 }
 
 export function InviteStage({ detail, panel, onSaved }: StageProps) {
@@ -106,7 +133,13 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
       ? ''
       : String(p.prefills.affiliateMatches),
   );
-  const [affiliateType, setAffiliateType] = useState(p.prefills?.affiliateType ?? '');
+  const [affiliateTypes, setAffiliateTypes] = useState(() =>
+    creatorTypesForCount(
+      p.prefills?.affiliateMatches ?? 0,
+      p.prefills?.affiliateTypes,
+      p.prefills?.affiliateType,
+    ),
+  );
   const [voice1, setVoice1] = useState(p.prefills?.brandVoice1 ?? '');
   const [voice2, setVoice2] = useState(p.prefills?.brandVoice2 ?? '');
 
@@ -128,6 +161,7 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
     p.prefills?.username ?? '',
     p.prefills?.affiliateMatches ?? null,
     p.prefills?.affiliateType ?? '',
+    p.prefills?.affiliateTypes ?? null,
     p.prefills?.brandVoice1 ?? '',
     p.prefills?.brandVoice2 ?? '',
   ]);
@@ -143,9 +177,10 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
       nextUsername,
       nextMatches,
       nextType,
+      nextTypes,
       nextVoice1,
       nextVoice2,
-    ] = JSON.parse(serverValues) as (string | number | null)[];
+    ] = JSON.parse(serverValues) as unknown[];
     setName(String(nextName ?? ''));
     setBusiness(String(nextBusiness ?? ''));
     setProblem(String(nextProblem ?? ''));
@@ -154,7 +189,13 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
     setEmail(String(nextEmail ?? ''));
     setUsername(String(nextUsername ?? ''));
     setMatches(nextMatches === null ? '' : String(nextMatches));
-    setAffiliateType(String(nextType ?? ''));
+    setAffiliateTypes(
+      creatorTypesForCount(
+        nextMatches === null ? 0 : Number(nextMatches),
+        Array.isArray(nextTypes) ? nextTypes.map(String) : null,
+        String(nextType ?? ''),
+      ),
+    );
     setVoice1(String(nextVoice1 ?? ''));
     setVoice2(String(nextVoice2 ?? ''));
   }, [serverValues]);
@@ -230,7 +271,7 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
     email,
     username,
     matches,
-    affiliateType,
+    affiliateTypes,
     voice1,
     voice2,
   });
@@ -253,7 +294,8 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
         viewsCount: countOrNull(views),
         username: username.trim() || null,
         affiliateMatches: countOrNull(matches),
-        affiliateType: affiliateType || null,
+        affiliateType: affiliateTypes[0] || null,
+        affiliateTypes,
         brandVoice1: voice1.trim() || null,
         brandVoice2: voice2.trim() || null,
       }),
@@ -387,7 +429,7 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
                 <h2>Saved for onboarding</h2>
                 <p>Required before sending. The Founder does not see these on the invitation.</p>
               </div>
-              <span>6 fields</span>
+              <span>{5 + affiliateTypes.length} fields</span>
             </div>
             <div className="prefill-grid">
               <label>
@@ -414,32 +456,46 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
                   min={0}
                   step={1}
                   value={matches}
-                  onChange={(e) => setMatches(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setMatches(next);
+                    const count = countOrNull(next);
+                    setAffiliateTypes(
+                      creatorTypesForCount(count ?? 0, affiliateTypes, affiliateTypes[0]),
+                    );
+                  }}
                   onBlur={() => savePrefill({ affiliateMatches: countOrNull(matches) })}
                 />
               </label>
-              <label>
-                <span>Type of affiliate</span>
-                {/*
-                  The reference's OWN nine, not `AFFILIATE_SUBTYPES`. The two
-                  registers are deliberately different: this one splits
-                  newsletter from blog and student from network distributor.
-                */}
-                <select
-                  value={affiliateType}
-                  onChange={(e) => {
-                    setAffiliateType(e.target.value);
-                    savePrefill({ affiliateType: e.target.value || null });
-                  }}
-                >
-                  <option value="">Select one</option>
-                  {PREFILL_AFFILIATE_TYPES.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {affiliateTypes.map((affiliateType, index) => (
+                <label key={index}>
+                  <span>Creator type {index + 1}</span>
+                  <select
+                    value={affiliateType}
+                    onChange={(e) => {
+                      const selected = e.target.value;
+                      const next = affiliateTypes.map((value, itemIndex) =>
+                        itemIndex === index || (index === 0 && value === '') ? selected : value,
+                      );
+                      setAffiliateTypes(next);
+                      if (next.every(Boolean)) {
+                        savePrefill({
+                          affiliateMatches: countOrNull(matches),
+                          affiliateType: next[0] || null,
+                          affiliateTypes: next,
+                        });
+                      }
+                    }}
+                  >
+                    <option value="">Select one</option>
+                    {PREFILL_AFFILIATE_TYPES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
               <label>
                 <span>Brand voice descriptor 1</span>
                 <input

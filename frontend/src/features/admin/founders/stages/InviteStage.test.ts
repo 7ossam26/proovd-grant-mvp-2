@@ -11,7 +11,7 @@ const COMPLETE: InviteFieldSnapshot = {
   email: 'mohsen@example.com',
   username: 'mohsen4',
   matches: '5',
-  affiliateType: 'social_media_creator',
+  affiliateTypes: Array.from({ length: 5 }, () => 'social_media_creator'),
   voice1: 'fun',
   voice2: 'lucky',
 };
@@ -25,6 +25,7 @@ describe('Invite-stage Send button readiness', () => {
     expect(inviteFieldsReady({ ...COMPLETE, voice2: '' })).toBe(false);
     expect(inviteFieldsReady({ ...COMPLETE, email: 'not-an-email' })).toBe(false);
     expect(inviteFieldsReady({ ...COMPLETE, matches: '2.5' })).toBe(false);
+    expect(inviteFieldsReady({ ...COMPLETE, affiliateTypes: ['podcast_host'] })).toBe(false);
   });
 });
 
@@ -35,6 +36,13 @@ describe('Invite-stage saved values', () => {
         viewsCount: 10_000,
         affiliateMatches: 5,
         affiliateType: 'social_media_creator',
+        affiliateTypes: [
+          'social_media_creator',
+          'social_media_creator',
+          'podcast_host',
+          'community_owner',
+          'blog_operator',
+        ],
         brandVoice1: 'fun',
         brandVoice2: 'lucky',
       },
@@ -43,12 +51,23 @@ describe('Invite-stage saved values', () => {
         emailCodeVerifiedAt: '2026-08-23T10:00:00.000Z',
         passwordSetAt: null,
       },
+      account: {
+        dateOfBirth: '1990-01-31',
+        ageCheck: '18 or older',
+      },
     });
 
     expect(panel.prefills).toMatchObject({
       viewsCount: 10_000,
       affiliateMatches: 5,
       affiliateType: 'social_media_creator',
+      affiliateTypes: [
+        'social_media_creator',
+        'social_media_creator',
+        'podcast_host',
+        'community_owner',
+        'blog_operator',
+      ],
       brandVoice1: 'fun',
       brandVoice2: 'lucky',
       username: 'mohsen4',
@@ -56,6 +75,8 @@ describe('Invite-stage saved values', () => {
     expect(panel.account).toMatchObject({
       emailVerifiedAt: '2026-08-23T10:00:00.000Z',
       passwordSetAt: null,
+      dateOfBirth: '1990-01-31',
+      ageCheck: '18 or older',
     });
   });
 });

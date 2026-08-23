@@ -1543,6 +1543,7 @@ function stubStage3(initial: Record<string, unknown> = {}) {
       dateOfBirth: '1990-01-01',
       affiliateMatches: 4,
       affiliateType: 'community_owner',
+      affiliateTypes: Array.from({ length: 4 }, () => 'community_owner'),
     };
     if (init?.method === 'PATCH') {
       const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
