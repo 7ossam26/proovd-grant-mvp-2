@@ -119,7 +119,7 @@ const evidence: EvidenceEntry[] = [];
 
 beforeAll(async () => {
   h = await startHarness(
-    { stripeGateway: gateway, authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    { stripeGateway: gateway },
     'p0-pass',
   );
   audit = createAuditWriter(h.db);

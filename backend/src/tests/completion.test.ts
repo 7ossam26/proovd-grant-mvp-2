@@ -109,7 +109,7 @@ let audit: ReturnType<typeof createAuditWriter>;
 
 beforeAll(async () => {
   h = await startHarness(
-    { stripeGateway: createMemoryStripeGateway({}), globalRateLimit: 1_000_000 },
+    { stripeGateway: createMemoryStripeGateway({}) },
     'completion',
   );
   audit = createAuditWriter(h.db);

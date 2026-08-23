@@ -9,10 +9,9 @@
  * ── The two things this file is really about ────────────────────────────────
  * A six-digit secret is 10^6 values. What makes it a secret is that every
  * failure mode answers identically and the attempt counter is on the row, and
- * both are easy to lose to a well-meaning edit — a "helpful" error message, a
- * 429 from a limiter, a client-side format check. So the tests below compare
- * SERIALIZED responses rather than fields, and drive the limiter rather than
- * reading its configuration.
+ * both are easy to lose to a well-meaning edit — a "helpful" error message or
+ * a client-side format check. So the tests below compare SERIALIZED responses
+ * rather than fields.
  *
  * And a transcription vendor in the tree is one refactor from being the
  * embedded AI product §12 forbids. The tests for it are absences: no audio
@@ -80,13 +79,7 @@ interface Invited {
   raw: string;
 }
 
-/**
- * One invited Founder on a given harness.
- *
- * Parameterised because the limiter test runs on its own harness — the code
- * route carries a five-an-hour allowance keyed on the client address, and a
- * suite that shares one address would exhaust it after five requests.
- */
+/** One invited Founder on a given harness. */
 async function inviteOn(
   harness: Harness,
   session: AdminSession,
@@ -187,6 +180,17 @@ describe('the email-code constants are restated, not re-decided', () => {
     expect(
       FOUNDER_FLOW_PAGES.filter((page) => page.param === 'token').at(-1)?.id,
     ).toBe('positioning');
+  });
+});
+
+describe('Founder invitation navigation', () => {
+  it('keeps opening the same draft beyond the former refresh limit', async () => {
+    const invited = await invite('unlimited-refresh');
+    for (let i = 0; i < 25; i += 1) {
+      const res = await request(h.app).get(`/api/draft/${invited.raw}`);
+      expect(res.status).toBe(200);
+      expect(res.text).not.toContain('Too many requests, please try again later.');
+    }
   });
 });
 
@@ -442,37 +446,26 @@ describe('the six-digit code', () => {
     expect(h.sentEmails.messages.length).toBe(before);
   });
 
-  it('uses the same generic failure for throttled requests', async () => {
-    // Phase 04's rule: a limiter that announces itself is the same enumeration
-    // oracle wearing a different hat. Driven rather than read off the config —
-    // and on its OWN harness, because the shared one raises the limit to keep
-    // every other test from exhausting a five-an-hour allowance that is per
-    // address and therefore shared by the whole suite.
-    const limited = await startHarness({ emailCodeLimit: 3 }, 'flowc-limit');
-    try {
-      const limitedAdmin = await createAdmin(limited, `flowc-limit-admin`);
-      await seedAdminReauthWindow(limited.db, 3600);
-      const invited = await inviteOn(limited, limitedAdmin, `limited`);
-      const accepted: string[] = [];
-      const refused: string[] = [];
-      for (let i = 0; i < 8; i++) {
-        const response = await request(limited.app)
-          .post(`/api/draft/${invited.raw}/email-code`)
-          .send({});
-        (response.status === 202 ? accepted : refused).push(JSON.stringify(response.body));
-      }
-      expect(accepted).toHaveLength(3);
-      expect(refused).toHaveLength(5);
-      expect(new Set(refused)).toEqual(new Set([JSON.stringify(EMAIL_CODE_FAILURE)]));
-      const rows = await limited.db
-        .select({ id: secureTokens.id })
-        .from(secureTokens)
-        .where(eq(secureTokens.scope, 'founder_email_code'));
-      expect(rows.length).toBeLessThanOrEqual(3);
-    } finally {
-      await limited.stop();
+  it('processes resend requests beyond the former limit without a 429', async () => {
+    const invited = await invite('unlimited-resend');
+    const before = h.sentEmails.messages.length;
+
+    for (let i = 0; i < 8; i++) {
+      await askForCode(invited);
     }
-  }, 180_000);
+
+    expect(h.sentEmails.messages.length).toBe(before + 8);
+    const rows = await h.db
+      .select({ id: secureTokens.id })
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_email_code'),
+          eq(secureTokens.campaignDraftId, invited.draftId),
+        ),
+      );
+    expect(rows).toHaveLength(8);
+  });
   it('is bound to one draft: a code minted for A cannot verify B', async () => {
     const a = await invite('bind-a');
     const b = await invite('bind-b');
@@ -586,6 +579,18 @@ describe('the six-digit code', () => {
     expect((await h.db.select({ id: sessionTable.id }).from(sessionTable)).length).toBeGreaterThan(
       betterAuthSessionsBeforeClaim.length,
     );
+
+    const liveInvitations = await h.db
+      .select({ id: secureTokens.id })
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_draft'),
+          eq(secureTokens.campaignDraftId, invited.draftId),
+          sql`${secureTokens.revokedAt} is null`,
+        ),
+      );
+    expect(liveInvitations).toHaveLength(0);
 
     const liveFlowSessions = await h.db
       .select({ id: secureTokens.id })

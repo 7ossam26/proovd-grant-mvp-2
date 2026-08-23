@@ -63,7 +63,7 @@ let admin: AdminSession;
 let second: AdminSession;
 
 beforeAll(async () => {
-  h = await startHarness({ authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 }, 'admin-tasks');
+  h = await startHarness({}, 'admin-tasks');
   await seedAdminReauthWindow(h.db, 900);
   admin = await createAdmin(h, 'tasks1');
   second = await createAdmin(h, 'tasks2');

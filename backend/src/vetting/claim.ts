@@ -713,12 +713,14 @@ export async function completeClaim(
         result: { campaignId: profile.campaignId, founderUserId: userId, draftId: input.draftId },
       });
 
-      // Email verification now consumes the invitation when it establishes the
-      // separate Founder Flow session. Legacy/direct submissions can still
-      // arrive with a live invite, so only that path performs the conditional
-      // claim here. The idempotency key and conditional campaign move remain
-      // the exactly-once boundary for the account claim itself.
-      if (!input.inviteAlreadyConsumed) {
+      // Email verification consumes the invitation used for initial access.
+      // Admin may have resent another invitation while this independent flow
+      // session stayed active, so account claim also closes any remaining live
+      // invitation for the draft without touching the flow session itself.
+      // Legacy/direct submissions still claim the presented live invite.
+      if (input.inviteAlreadyConsumed) {
+        await tokens.revokeDraftTokens(input.draftId, 'claimed', tx);
+      } else {
         const claimed = await tokens.claimDraft(input.tokenId, tx);
         if (!claimed.ok) throw new ClaimConflict();
       }

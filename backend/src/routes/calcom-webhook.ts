@@ -30,7 +30,6 @@
 
 import { Router } from 'express';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import type { Database } from '../db/client.js';
 import type { Notifier } from '../notifications/send.js';
 import type { AuditWriter } from '../auth/audit.js';
@@ -61,8 +60,6 @@ export interface CalcomWebhookDeps {
    */
   appBaseUrl?: string | undefined;
   internalRecipient?: string | undefined;
-  /** Raised only by the integration suite, which drives many deliveries. */
-  limit?: number;
 }
 
 export function createCalcomWebhookRouter({
@@ -74,20 +71,11 @@ export function createCalcomWebhookRouter({
   referenceSecret,
   appBaseUrl,
   internalRecipient,
-  limit,
 }: CalcomWebhookDeps): Router {
   const router = Router();
 
-  const limiter = rateLimit({
-    windowMs: 60_000,
-    limit: limit ?? 120,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-  });
-
   router.post(
     CALCOM_WEBHOOK_PATH,
-    limiter,
     // 256 KB. A booking payload is a few kilobytes; anything near this is not
     // one, and an unbounded raw parser on an unauthenticated route is a way to
     // be exhausted by a body nobody will ever read.

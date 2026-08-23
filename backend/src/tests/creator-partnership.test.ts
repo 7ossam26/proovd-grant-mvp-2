@@ -34,7 +34,7 @@ let h: Harness;
 let audit: ReturnType<typeof createAuditWriter>;
 
 beforeAll(async () => {
-  h = await startHarness({ authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 }, 'partnership');
+  h = await startHarness({}, 'partnership');
   audit = createAuditWriter(h.db);
 }, 180_000);
 

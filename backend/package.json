@@ -12,7 +12,6 @@
     "cors": "^2.8.5",
     "drizzle-orm": "^0.45.2",
     "express": "^5.1.0",
-    "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "pg": "^8.13.3",
     "pg-boss": "^12.26.3",

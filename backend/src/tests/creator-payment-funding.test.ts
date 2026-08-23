@@ -104,8 +104,6 @@ beforeAll(async () => {
     {
       stripeGateway: gateway,
       stripeConnectUrls: { returnUrl: `${APP_BASE}/stripe/return`, refreshUrl: `${APP_BASE}/stripe/refresh` },
-      authRouteLimit: 1_000_000,
-      globalRateLimit: 1_000_000,
     },
     'funding',
   );

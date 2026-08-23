@@ -880,7 +880,9 @@ describe('the address', () => {
     stubVetting(ANSWERED);
     renderAt(at('email'));
 
-    expect(await screen.findByRole('heading', { name: /who else is solving this/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /you confirmed this was the problem/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /confirm email/i })).toBeNull();
   });
 
@@ -969,7 +971,9 @@ describe('the six-digit code', () => {
     stubVetting(ANSWERED);
     renderAt(at('code'));
 
-    expect(await screen.findByRole('heading', { name: /who else is solving this/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /you confirmed this was the problem/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText('Digit 1 of 6')).toBeNull();
   });
 

@@ -34,7 +34,6 @@
 
 import { Router } from 'express';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import type { Database } from '../db/client.js';
 import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
@@ -60,8 +59,6 @@ export interface StripeWebhookDeps {
   internalRecipient?: string | undefined;
   /** Phase 18a: the Backer receipt/recovery messages carry a magic link. */
   tokens?: TokenService;
-  /** Raised only by the integration suite, which drives many deliveries. */
-  limit?: number;
 }
 
 export function createStripeWebhookRouter({
@@ -72,16 +69,8 @@ export function createStripeWebhookRouter({
   notificationContext,
   internalRecipient,
   tokens,
-  limit,
 }: StripeWebhookDeps): Router {
   const router = Router();
-
-  const limiter = rateLimit({
-    windowMs: 60_000,
-    limit: limit ?? 300,
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-  });
 
   // 1 MB. A dispute payload with evidence metadata is the largest thing Stripe
   // sends here and is well inside it; an unbounded raw parser on an
@@ -89,7 +78,7 @@ export function createStripeWebhookRouter({
   const raw = express.raw({ type: '*/*', limit: '1mb' });
 
   function mount(path: string, endpoint: WebhookEndpoint): void {
-    router.post(path, limiter, raw, async (req, res) => {
+    router.post(path, raw, async (req, res) => {
       const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
       const signature = req.header(STRIPE_SIGNATURE_HEADER) ?? undefined;
 

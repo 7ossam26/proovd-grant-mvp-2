@@ -14,7 +14,7 @@
  *
  * ── Every failure is the same failure ───────────────────────────────────────
  * Altered, cross-scope, replayed, expired, revoked, superseded by a resend,
- * never issued, malformed, rate-limited: one status, one body, byte-identical.
+ * never issued or malformed: one status, one body, byte-identical.
  * Including a revoked invitation, whose token would still verify in the window
  * between the two if `readInvitationLanding` did not refuse it.
  *
@@ -50,10 +50,7 @@ import { notifyInvitationClaimed } from '../notifications/operational.js';
 import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
-import {
-  requireAffiliateInvitationToken,
-  createTokenVerifyLimiter,
-} from '../auth/token-middleware.js';
+import { requireAffiliateInvitationToken } from '../auth/token-middleware.js';
 import { TOKEN_REJECTION_STATUS, TOKEN_REJECTION_BODY } from '../auth/token-rejection.js';
 import { AFFILIATE_INVITATION_TOKEN_PATH, TOKEN_PARAM } from '../auth/token-routes.js';
 import { readInvitationLanding } from '../affiliates/invitation.js';
@@ -77,15 +74,12 @@ import { unconfiguredStorage, type ObjectStorage } from '../storage/object-stora
 import { policyVersions } from '../db/schema/policies.js';
 import { inArray } from 'drizzle-orm';
 
-export const AFFILIATE_INVITATION_VERIFY_LIMIT = 20;
-
 export interface AffiliateInvitationDeps {
   db: Database;
   auth: Auth;
   tokens: TokenService;
   notifier: Notifier;
   context: { appBaseUrl: string; supportEmail: string; fromAddress: string };
-  verifyLimit?: number;
   /** Phase 22b: §27.6's new-account notice. Unset → it does not send. */
   internalRecipient?: string | undefined;
   /**
@@ -102,26 +96,19 @@ export function createAffiliateInvitationRouter({
   tokens,
   notifier,
   context,
-  verifyLimit,
   internalRecipient,
   objectStorage,
 }: AffiliateInvitationDeps): Router {
   const router = Router();
   const json: RequestHandler = express.json({ limit: '64kb' });
 
-  const guard = [
-    createTokenVerifyLimiter({
-      limit: verifyLimit ?? AFFILIATE_INVITATION_VERIFY_LIMIT,
-      windowMs: 15 * 60 * 1000,
-    }),
-    requireAffiliateInvitationToken(tokens),
-  ];
+  const guard = requireAffiliateInvitationToken(tokens);
 
   const base = `${AFFILIATE_INVITATION_TOKEN_PATH}/:${TOKEN_PARAM}`;
   const storage = objectStorage ?? unconfiguredStorage;
 
   /** Everything the surface needs to render, for a verified invitation. */
-  router.get(base, ...guard, async (req, res) => {
+  router.get(base, guard, async (req, res) => {
     const associationId = req.affiliateInvitationSubject?.associationId;
     if (!associationId) {
       res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
@@ -191,7 +178,7 @@ export function createAffiliateInvitationRouter({
   });
 
   /** Autosave. A save writes only the keys it was given (§11). */
-  router.patch(base, ...guard, json, async (req, res) => {
+  router.patch(base, guard, json, async (req, res) => {
     const associationId = req.affiliateInvitationSubject?.associationId;
     if (!associationId) {
       res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
@@ -246,7 +233,7 @@ export function createAffiliateInvitationRouter({
    * unrepresentable. The record supersedes rather than edits, so each PUT is a
    * new row and the previous answer survives.
    */
-  router.put(`${base}/voice`, ...guard, json, async (req, res) => {
+  router.put(`${base}/voice`, guard, json, async (req, res) => {
     const associationId = req.affiliateInvitationSubject?.associationId;
     if (!associationId) {
       res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
@@ -285,7 +272,7 @@ export function createAffiliateInvitationRouter({
    * nothing — 0055 requires a non-blank value, and "I would rather not say" is
    * the absence of a live row rather than an empty one (§16a).
    */
-  router.put(`${base}/metrics`, ...guard, json, async (req, res) => {
+  router.put(`${base}/metrics`, guard, json, async (req, res) => {
     const associationId = req.affiliateInvitationSubject?.associationId;
     if (!associationId) {
       res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);
@@ -318,7 +305,7 @@ export function createAffiliateInvitationRouter({
   });
 
   /** §11's one primary action: `Confirm and create account`. */
-  router.post(`${base}/claim`, ...guard, json, async (req, res) => {
+  router.post(`${base}/claim`, guard, json, async (req, res) => {
     const associationId = req.affiliateInvitationSubject?.associationId;
     const tokenId = req.secureToken?.id;
     if (!associationId || !tokenId) {
@@ -389,7 +376,7 @@ export function createAffiliateInvitationRouter({
    * offer a control that would do nothing, and it does not collect a single
    * banking or identity field.
    */
-  router.get(`${base}/payout`, ...guard, async (req, res) => {
+  router.get(`${base}/payout`, guard, async (req, res) => {
     const associationId = req.affiliateInvitationSubject?.associationId;
     if (!associationId) {
       res.status(TOKEN_REJECTION_STATUS).json(TOKEN_REJECTION_BODY);

@@ -62,7 +62,7 @@ let h: Harness;
 
 beforeAll(async () => {
   h = await startHarness(
-    { stripeGateway: gateway, authRouteLimit: 1_000_000, globalRateLimit: 1_000_000 },
+    { stripeGateway: gateway },
     'backer-preorder',
   );
 }, 180_000);

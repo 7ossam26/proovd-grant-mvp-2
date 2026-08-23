@@ -66,7 +66,7 @@ const gateway = createStripeGateway({
 let h: Harness;
 
 beforeAll(async () => {
-  h = await startHarness({ stripeGateway: gateway, globalRateLimit: 1_000_000 }, 'stripe');
+  h = await startHarness({ stripeGateway: gateway }, 'stripe');
 }, 180_000);
 
 afterAll(async () => {
