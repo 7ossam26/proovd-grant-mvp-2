@@ -24,6 +24,7 @@ import {
   Section,
   Text,
 } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 /* ── Backer delivery (§22.5, §33.10.1) ─────────────────────────────────────── */
@@ -46,7 +47,7 @@ export function deliveryNoticeSubject(v: DeliveryNoticeVariables): string {
 function DeliveryNoticeEmail({ v }: { v: DeliveryNoticeVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`Access to your ${v.rewardTitle} from ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -116,7 +117,7 @@ export function day14ResultSubject(v: Day14ResultVariables): string {
 function Day14ResultEmail({ v }: { v: Day14ResultVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>
         {v.outcome === 'pass'
           ? `Your Day 14 Progress Check passed for ${v.campaignTitle}.`
@@ -185,8 +186,8 @@ export async function renderDay14Result(v: Day14ResultVariables) {
 
 /* ── Styles (read from proovd.css's palette; no hex invented here) ─────────── */
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' } as const;
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' } as const;
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' } as const;
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' } as const;
 const eyebrow = {
   color: '#012D10',
   fontSize: '20px',

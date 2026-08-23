@@ -37,6 +37,7 @@
 
 import { eq, sql } from 'drizzle-orm';
 import { Body, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
+import { BrandEmailTheme } from '../notifications/templates/brand-email-theme.js';
 import { render } from '@react-email/render';
 import type { Database } from '../db/client.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
@@ -110,7 +111,7 @@ export async function renderEmailCodeNotice(input: {
     subject,
     html: await render(
       <Html lang="en">
-        <Head />
+        <Head><BrandEmailTheme /></Head>
         <Preview>Type it in to confirm it's you it expires in 10 minutes.</Preview>
         <Body style={codeBody}>
           <Container style={codeContainer}>
@@ -148,12 +149,12 @@ export async function renderEmailCodeNotice(input: {
 }
 
 const codeBody = {
-  backgroundColor: '#F1F3F2',
+  backgroundColor: '#FFFFFF',
   fontFamily: 'Satoshi, Arial, Helvetica, sans-serif',
   margin: 0,
   padding: '24px 12px',
 };
-const codeContainer = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const codeContainer = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const codeWordmark = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px', color: '#012D10', margin: 0 };
 const codeHeading = { fontSize: '38px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: '46px', color: '#012D10', margin: '42px 0 0' };
 const codeIntro = { fontSize: '18px', fontWeight: 500, letterSpacing: '-0.012em', lineHeight: '28px', color: '#013F17', margin: '22px 0 0' };

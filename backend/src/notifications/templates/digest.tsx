@@ -38,6 +38,7 @@ import {
   Section,
   Text,
 } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 import { DIGEST_NEVER_REPLACES_TRANSACTIONAL, type DigestAudience } from '../digest-logic.js';
 import type { RenderedNotice } from './plain.js';
@@ -91,7 +92,7 @@ function headlineFor(v: DigestVariables): string {
 function DigestEmail({ v }: { v: DigestVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{headlineFor(v)}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -152,8 +153,8 @@ export async function renderDigest(v: DigestVariables): Promise<RenderedNotice> 
   };
 }
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = {
   fontSize: '20px',
   fontWeight: 700,

@@ -39,6 +39,7 @@ import {
   Section,
   Text,
 } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 export interface NoticeFact {
@@ -75,7 +76,7 @@ const SLA_LINE =
 function PlainNoticeEmail({ v }: { v: PlainNoticeVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{v.headline}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -166,8 +167,8 @@ export async function renderInternalNotice(
   };
 }
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = {
   fontSize: '20px',
   fontWeight: 700,

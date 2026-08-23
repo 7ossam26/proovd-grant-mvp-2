@@ -37,6 +37,7 @@ import {
   Section,
   Text,
 } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 /**
@@ -142,7 +143,7 @@ export function listingReceiptSubject(v: ListingReceiptVariables): string {
 function ReceiptEmail({ v }: { v: ListingReceiptVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${named(v.founderName, 'founderName')}, your listing payment succeeded.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -269,7 +270,7 @@ export function listingRefundSubject(v: ListingRefundVariables): string {
 function RefundEmail({ v }: { v: ListingRefundVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${named(v.founderName, 'founderName')}, your listing fee is refunded in full.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -358,8 +359,8 @@ export async function renderListingRefund(v: ListingRefundVariables): Promise<Re
 
 /* ── Styles — the proovd.css values written out by hand, as email requires ── */
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = { fontSize: '0.875rem', fontWeight: 900, letterSpacing: '0.08em', color: '#012D10', textTransform: 'uppercase' as const, margin: '0 0 1.5rem' };
 const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '0 0 24px' };
 const section = { margin: '0 0 1.5rem' };

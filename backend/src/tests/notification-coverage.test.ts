@@ -135,6 +135,17 @@ describe('§27 coverage — every sent event has a template', () => {
       expect({ key, unresolved }, key).toEqual({ key, unresolved: [] });
     }
   });
+
+  it('locks every email to the white Proovd palette in device dark mode', () => {
+    for (const key of CATALOG_KEYS) {
+      const html = rendered.get(key)!.html;
+      expect(html, key).toContain('name="color-scheme" content="light only"');
+      expect(html, key).toContain('name="supported-color-schemes" content="light only"');
+      expect(html, key).toContain('background-color:#FFFFFF');
+      expect(html, key).not.toContain('#F1F3F2');
+      expect(html, key).not.toContain('#FAFAFA');
+    }
+  });
 });
 
 describe('§27.2 — the transactional rules, against the rendered message', () => {

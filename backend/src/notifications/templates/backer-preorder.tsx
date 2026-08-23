@@ -27,6 +27,7 @@ import {
   Section,
   Text,
 } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 /** Appendix B.2's exact lead. Tested here and on the success page. */
@@ -55,7 +56,7 @@ export function preorderConfirmationSubject(v: PreorderConfirmationVariables): s
 function PreorderConfirmationEmail({ v }: { v: PreorderConfirmationVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${PREORDER_SAVED_LEAD}. US$0 charged today for ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -169,8 +170,8 @@ export async function renderPreorderConfirmation(
 
 /* ── Styles — proovd.css values written out by hand, as email requires ── */
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = {
   fontSize: '0.875rem',
   fontWeight: 900,

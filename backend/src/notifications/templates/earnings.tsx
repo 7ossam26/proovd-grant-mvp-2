@@ -14,6 +14,7 @@
  */
 
 import { Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 export interface RenderedEarningsEmail {
@@ -25,8 +26,8 @@ export interface RenderedEarningsEmail {
 const SLA_LINE =
   'we respond within one business day, Monday to Friday, excluding U.S. federal holidays.';
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', color: '#012D10' };
 const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10' };
 const section = { margin: '1rem 0' };
@@ -85,7 +86,7 @@ export interface CompletionDecisionVariables {
 function CompletionDecisionEmail({ v }: { v: CompletionDecisionVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${COMPLETION_DECISION_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -149,7 +150,7 @@ export interface CommissionFinalizedVariables {
 function CommissionFinalizedEmail({ v }: { v: CommissionFinalizedVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${COMMISSION_FINALIZED_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -220,7 +221,7 @@ export interface TransferCreatedVariables {
 function TransferCreatedEmail({ v }: { v: TransferCreatedVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${TRANSFER_CREATED_LEAD} US$${v.totalAmount} for ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -299,7 +300,7 @@ export interface TransferFailureVariables {
 function TransferFailureEmail({ v }: { v: TransferFailureVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${TRANSFER_FAILURE_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -368,7 +369,7 @@ export interface PayoutVariables {
 function PayoutEmail({ v, lead, detail }: { v: PayoutVariables; lead: string; detail: string }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${lead} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>

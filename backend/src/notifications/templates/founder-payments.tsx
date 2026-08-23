@@ -12,6 +12,7 @@
  */
 
 import { Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 export interface RenderedFounderPaymentEmail {
@@ -23,8 +24,8 @@ export interface RenderedFounderPaymentEmail {
 const SLA_LINE =
   'we respond within one business day, Monday to Friday, excluding U.S. federal holidays.';
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', color: '#012D10' };
 const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10' };
 const section = { margin: '1rem 0' };
@@ -81,7 +82,7 @@ export interface W9PromptVariables {
 function W9PromptEmail({ v }: { v: W9PromptVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${W9_PROMPT_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -157,7 +158,7 @@ export interface W9BlockVariables {
 function W9BlockEmail({ v }: { v: W9BlockVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${W9_BLOCK_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -231,7 +232,7 @@ export interface PaymentReleasedVariables {
 function PaymentReleasedEmail({ v }: { v: PaymentReleasedVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${v.kindLabel} released — ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -301,7 +302,7 @@ export interface EarlyRequestVariables {
 function EarlyRequestEmail({ v }: { v: EarlyRequestVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${EARLY_REQUEST_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -377,7 +378,7 @@ function EarlyResultEmail({ v }: { v: EarlyResultVariables }) {
     : 'Your early remaining payment request was declined.';
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${lead} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>

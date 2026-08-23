@@ -33,6 +33,7 @@ import {
   Section,
   Text,
 } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 /**
@@ -146,7 +147,7 @@ export function invitationSubject(variables: InvitationVariables): string {
 function InvitationEmail({ v }: { v: Resolved }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>
         We filled it in from our call, read it over, fix what we got wrong, and it’s yours.
       </Preview>
@@ -275,12 +276,12 @@ export async function renderFounderInvitation(
    a mail client has no CSS variables to read a mode slot from. */
 
 const body = {
-  backgroundColor: '#F1F3F2',
+  backgroundColor: '#FFFFFF',
   fontFamily: 'Satoshi, Arial, Helvetica, sans-serif',
   margin: 0,
   padding: '24px 12px',
 };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const wordmark = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px', color: '#012D10', margin: 0 };
 const art = { height: '112px', backgroundColor: '#DEFAFC', margin: '34px 0 0' };
 const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '46px 0 0' };

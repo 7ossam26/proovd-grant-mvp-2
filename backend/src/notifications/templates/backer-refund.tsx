@@ -10,6 +10,7 @@
  */
 
 import { Body, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 export interface RefundNoticeVariables {
@@ -32,7 +33,7 @@ export function refundNoticeSubject(v: RefundNoticeVariables): string {
 function RefundNoticeEmail({ v }: { v: RefundNoticeVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`Refund ${v.statusWord} for ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -92,8 +93,8 @@ export async function renderRefundNotice(v: RefundNoticeVariables): Promise<Rend
   };
 }
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', borderRadius: '1px', margin: '0 auto', maxWidth: '600px', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', borderRadius: '1px', margin: '0 auto', maxWidth: '600px', padding: '44px' };
 const eyebrow = { color: '#012D10', fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', margin: '0 0 34px' };
 const heading = { color: '#012D10', fontSize: '38px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: '46px', margin: '0 0 24px' };
 const section = { margin: '0 0 8px' };

@@ -27,6 +27,7 @@
  */
 
 import { Body, Button, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 export interface RenderedCloseEmail {
@@ -59,7 +60,7 @@ export interface ChargeReceiptVariables {
 function ChargeReceiptEmail({ v }: { v: ChargeReceiptVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${CHARGE_RECEIPT_LEAD} US$${v.totalCaptured} for ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -136,7 +137,7 @@ export interface FailedPaymentEmailVariables {
 function FailedPaymentEmail({ v }: { v: FailedPaymentEmailVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`We could not complete this pre-order charge for ${v.campaignTitle}. No money has moved.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -199,7 +200,7 @@ export interface NoChargeClosureVariables {
 function NoChargeClosureEmail({ v }: { v: NoChargeClosureVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${NO_CHARGE_LEAD} Amount charged: US$0.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -268,7 +269,7 @@ export interface CampaignEndedVariables {
 function CampaignEndedEmail({ v }: { v: CampaignEndedVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${CAMPAIGN_ENDED_LEAD} ${v.campaignTitle} closed at ${v.closedAtUtc}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -353,7 +354,7 @@ export interface RetrySuccessVariables {
 function RetrySuccessEmail({ v }: { v: RetrySuccessVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${RETRY_SUCCESS_LEAD} US$${v.totalCaptured} for ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -440,7 +441,7 @@ export interface ResultsReadyVariables {
 function ResultsReadyEmail({ v }: { v: ResultsReadyVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${RESULTS_READY_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -529,7 +530,7 @@ export const CREATOR_THANK_YOU =
 function CreatorClosedEmail({ v }: { v: CreatorClosedVariables }) {
   return (
     <Html lang="en">
-      <Head />
+      <Head><BrandEmailTheme /></Head>
       <Preview>{`${CREATOR_CLOSED_LEAD} ${v.campaignTitle}.`}</Preview>
       <Body style={body}>
         <Container style={container}>
@@ -591,8 +592,8 @@ export async function renderCreatorClosed(v: CreatorClosedVariables): Promise<Re
   };
 }
 
-const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = { fontSize: '0.875rem', fontWeight: 900, letterSpacing: '0.08em', color: '#012D10', textTransform: 'uppercase' as const, margin: '0 0 1.5rem' };
 const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '0 0 24px' };
 const section = { margin: '0 0 1.5rem' };
