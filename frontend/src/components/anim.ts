@@ -2607,12 +2607,12 @@ export function recIntro(root: HTMLElement | null): () => void {
    motion enabled — which is the reference viewport, and the screenshot — gets
    the reference's own behaviour frame for frame.
 
-   ── Nothing here counts anything ──────────────────────────────────────────
-   `REACH_TARGET` is the reference's own `RTARGET` constant. It is a
-   presentation figure the surface labels as such; no record is read, no
-   audience is measured, and there is no path from this file to one. */
+   ── Nothing here measures anything ────────────────────────────────────────
+   `REACH_TARGET` remains the reference fallback for isolated animation calls.
+   The Founder reach screen passes the Admin-prepared invitation value into
+   `reachIntro`; this module only animates that number. */
 
-/** The reference's `RTARGET`. */
+/** The reference fallback used when a caller does not supply a target. */
 export const REACH_TARGET = 10000;
 
 /**
@@ -2681,7 +2681,11 @@ function reachRnd(i: number): number {
  * Returns the teardown — `reachStop`, which removes the ticker, kills the
  * timeline and every per-card tween, and drops the resize listener.
  */
-export function reachIntro(root: HTMLElement | null, onCta: () => void): () => void {
+export function reachIntro(
+  root: HTMLElement | null,
+  onCta: () => void,
+  target: number = REACH_TARGET,
+): () => void {
   if (!root) return () => {};
 
   const stage = root.querySelector<HTMLElement>('[data-reach-stage]');
@@ -2896,7 +2900,7 @@ export function reachIntro(root: HTMLElement | null, onCta: () => void): () => v
       p.pop = 1;
       p.popped = true;
     }
-    setNum(REACH_TARGET);
+    setNum(target);
     frame(0);
     onCta();
   };
@@ -2962,14 +2966,14 @@ export function reachIntro(root: HTMLElement | null, onCta: () => void): () => v
   // threshold and pops when the number passes it, so the last phone lands on
   // the last digit however long a frame took.
   tl.to(counter, {
-    v: REACH_TARGET,
+    v: target,
     duration: refDur(1),
     ease: 'power2.out',
     snap: { v: 1 },
     onUpdate: () => {
       const v = Math.round(counter.v);
       setNum(v);
-      const prog = v / REACH_TARGET;
+      const prog = target === 0 ? 1 : v / target;
       for (let i = 0; i < cards.length; i++) {
         const p = cards[i]!;
         if (!p.popped && prog >= p.thr) {
@@ -2978,7 +2982,7 @@ export function reachIntro(root: HTMLElement | null, onCta: () => void): () => v
         }
       }
     },
-    onComplete: () => setNum(REACH_TARGET),
+    onComplete: () => setNum(target),
   });
 
   // The collapse. `rMul` widens the ring as the cards shrink, so they leave

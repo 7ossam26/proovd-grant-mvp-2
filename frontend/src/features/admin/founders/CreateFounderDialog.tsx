@@ -38,7 +38,6 @@ import { Overlay } from './dialogs/Overlay.js';
 const EMAIL = /^\S+@\S+\.\S+$/;
 
 export interface CreateFounderValues {
-  requestKey: string;
   name: string;
   email: string;
   company: string;
@@ -46,10 +45,6 @@ export interface CreateFounderValues {
   location: string;
   campaign: string;
   owner: string;
-  invitationSource: string;
-  whatWeUnderstood: string;
-  whyInvited: string;
-  expectedSetupTime: string;
 }
 
 interface Props {
@@ -62,7 +57,6 @@ interface Props {
 export function CreateFounderDialog({ onSubmit, onClose, onRefuse }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AdminRequestError | null>(null);
-  const [requestKey] = useState(() => globalThis.crypto.randomUUID());
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,7 +66,6 @@ export function CreateFounderDialog({ onSubmit, onClose, onRefuse }: Props) {
     const read = (key: string) => String(form.get(key) ?? '').trim();
 
     const values: CreateFounderValues = {
-      requestKey,
       name: read('name'),
       email: read('email'),
       company: read('company'),
@@ -80,23 +73,10 @@ export function CreateFounderDialog({ onSubmit, onClose, onRefuse }: Props) {
       location: read('location'),
       campaign: read('campaign'),
       owner: read('owner'),
-      invitationSource: read('invitationSource'),
-      whatWeUnderstood: read('whatWeUnderstood'),
-      whyInvited: read('whyInvited'),
-      expectedSetupTime: read('expectedSetupTime'),
     };
 
-    if (
-      !values.name ||
-      !values.company ||
-      !EMAIL.test(values.email) ||
-      !values.owner ||
-      !values.invitationSource ||
-      !values.whatWeUnderstood ||
-      !values.whyInvited ||
-      !values.expectedSetupTime
-    ) {
-      onRefuse('Complete every invitation field and enter a valid email before sending');
+    if (!values.name || !values.company || !EMAIL.test(values.email)) {
+      onRefuse('Name, business and a valid email are required');
       return;
     }
 
@@ -160,30 +140,14 @@ export function CreateFounderDialog({ onSubmit, onClose, onRefuse }: Props) {
           </label>
           <label>
             <span>Owner</span>
-            <input required name="owner" placeholder="Who owns this record" />
+            <input name="owner" placeholder="Who owns this record" />
             <small>There is no owner roster; this is recorded as free text.</small>
-          </label>
-          <label>
-            <span>Invitation source</span>
-            <input required name="invitationSource" placeholder="Founder call, referral, or event" />
-          </label>
-          <label>
-            <span>What Proovd understood</span>
-            <textarea required name="whatWeUnderstood" placeholder="A factual summary of the product and problem" />
-          </label>
-          <label>
-            <span>Why this Founder was invited</span>
-            <textarea required name="whyInvited" placeholder="Why this is a fit for the Proovd process" />
-          </label>
-          <label>
-            <span>Expected setup time</span>
-            <input required name="expectedSetupTime" placeholder="About 20 minutes" />
           </label>
         </div>
 
         <p className="form-note">
-          Creating this record sends the personal invitation immediately. The server blocks delivery
-          if any required value or email placeholder is missing.
+          A separate campaign record opens in Invite. Complete its invitation and onboarding fields,
+          then use Send invite when you are ready.
         </p>
 
         {error ? (
@@ -199,7 +163,7 @@ export function CreateFounderDialog({ onSubmit, onClose, onRefuse }: Props) {
             Cancel
           </button>
           <button className="primary" type="submit" disabled={busy}>
-            {busy ? 'Creating and sending…' : 'Create Founder and send invite'}
+            {busy ? 'Creating…' : 'Create Founder'}
           </button>
         </div>
       </form>

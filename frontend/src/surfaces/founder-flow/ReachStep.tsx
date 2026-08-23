@@ -14,31 +14,25 @@
  *
  * ── This is a recorded reversal, and saying so is the point ─────────────────
  * `FOUNDER_FLOW_ABSENCES` refused this screen from the day the flow was
- * rebuilt: §7 forbids Admin promising results, and no record in this product
- * holds an audience number — the reference's own is the constant `RTARGET`.
+ * rebuilt: §7 forbids Admin promising results, and the original reference
+ * supplied a constant audience number rather than a campaign value.
  * That entry has now left the register, on explicit product direction, because
  * a register saying an element is absent while a surface renders it is worse
  * than no register (`EmailStep`'s own precedent, 2026-08-18). Two things
  * narrow it, and both are mechanisms rather than intentions:
  *
- *   1. **Nothing is read and nothing is stored.** There is no fetch for a
- *      reach figure, no column that could hold one, and no path from this file
- *      to `possible_creator_results`. The figure is the reference's own
- *      `RTARGET` constant and nothing about it can become a measurement.
+ *   1. **The figure is an Admin prefill, not a measurement.** It comes from
+ *      the invitation draft's `prefill_views_count`; this screen does not
+ *      calculate traffic or read `possible_creator_results`.
  *
  *      A caveat sentence beneath the headline was added on 2026-08-20 and
  *      REMOVED the same day, by product direction. It is recorded here rather
  *      than forgotten: the screen now renders the reference's copy and nothing
  *      else, so the whole of what keeps the figure from reading as a
- *      measurement is the absence of any record behind it.
+ *      measurement is that the record is explicitly an Admin-prepared value.
  *   2. **§10's relevance signal is not this screen.** The Match beat now has
  *      its own campaign route after Details. This screen does not stand in for
  *      it: it names no Creator, no category, and no participation.
- *
- * A later phase asked to make this number dynamic — to read it from a record,
- * to vary it per campaign, or to derive it from §10's count — is asking for
- * exactly the §7 promise the register entry refused, and this file is not the
- * licence for it.
  *
  * ── The product name is the real one ───────────────────────────────────────
  * The reference hardcodes `Teeb`. The sentence structure is kept exactly and
@@ -67,7 +61,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { founderFlowPath } from '@proovd/shared';
 import { Measure, Section, StatePanel } from '../../components/index.js';
-import { REACH_TARGET, reachCtaIn, reachIntro } from '../../components/anim.js';
+import { reachCtaIn, reachIntro } from '../../components/anim.js';
 import {
   fetchDraftLanding,
   type DraftLanding,
@@ -120,7 +114,11 @@ export function ReachStep() {
 
   return (
     <FlowPage pageId="reach" param={token}>
-      <ReachScreen token={token} productName={draft.productName} />
+      <ReachScreen
+        token={token}
+        productName={draft.productName}
+        viewsCount={draft.viewsCount}
+      />
     </FlowPage>
   );
 }
@@ -128,9 +126,11 @@ export function ReachStep() {
 function ReachScreen({
   token,
   productName,
+  viewsCount,
 }: {
   token: string;
   productName: string;
+  viewsCount: number | null;
 }) {
   const navigate = useNavigate();
   const { leave } = useFlowNav();
@@ -144,7 +144,7 @@ function ReachScreen({
   // The whole screen: layout, ticker, count, pop, collapse, then the CTA.
   // Mount only — re-running it would restart the count under somebody.
   useLayoutEffect(() => {
-    return reachIntro(root.current, () => setCtaShown(true));
+    return reachIntro(root.current, () => setCtaShown(true), viewsCount ?? 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -200,7 +200,7 @@ function ReachScreen({
         <br />
         of{' '}
         <span className="ff-reach__num" data-reach-num="1">
-          {REACH_TARGET.toLocaleString('en-US')}
+          {viewsCount === null ? '—' : viewsCount.toLocaleString('en-US')}
         </span>
         &nbsp;new people
       </h1>

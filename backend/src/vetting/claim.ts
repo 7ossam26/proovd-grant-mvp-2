@@ -50,6 +50,7 @@ import type { Auth } from '../auth/auth.js';
 import type { TokenService } from '../auth/token-service.js';
 import { campaigns, campaignStatusHistory } from '../db/schema/domain.js';
 import { campaignDrafts, founderProspects } from '../db/schema/invitations.js';
+import { campaignBuild } from '../db/schema/build.js';
 import {
   campaignVetting,
   founderClaimProfiles,
@@ -219,6 +220,7 @@ export async function ensureClaimProfile(
   const preferredName = row.prospect.preferredName;
   const email = row.prospect.email;
   const phone = row.prospect.phone;
+  const username = row.prospect.username;
 
   await db
     .insert(founderClaimProfiles)
@@ -239,6 +241,9 @@ export async function ensureClaimProfile(
       // ownership." The address arrived on the invitation, so it is owned until
       // the Founder replaces it with one nobody has verified.
       emailOwnership: email === null ? null : 'invited_link',
+      username,
+      usernamePrefilled: username,
+      usernameSupplier: username === null ? null : 'proovd',
       phone,
       phonePrefilled: phone,
       phoneSupplier: phone === null ? null : 'proovd',
@@ -600,7 +605,11 @@ export async function completeClaim(
   const email = profile.fields.email.value!.toLowerCase();
 
   const [draftRow] = await db
-    .select({ prospectId: campaignDrafts.prospectId })
+    .select({
+      prospectId: campaignDrafts.prospectId,
+      brandVoice1: campaignDrafts.prefillBrandVoice1,
+      brandVoice2: campaignDrafts.prefillBrandVoice2,
+    })
     .from(campaignDrafts)
     .where(eq(campaignDrafts.id, input.draftId))
     .limit(1);
@@ -728,6 +737,25 @@ export async function completeClaim(
         toStatus: 'account_claimed',
         actor: `user:${userId}`,
       });
+
+      /* The two Admin descriptors are the starting value for the later brand
+         voice editor. They become one ordinary build value, so the Founder can
+         replace either word, add context, or clear the suggestion using the
+         same controls as any other brand voice. */
+      const brandVoice = [draftRow.brandVoice1, draftRow.brandVoice2]
+        .map((value) => value?.trim() ?? '')
+        .filter(Boolean)
+        .join(', ');
+      if (brandVoice) {
+        await tx
+          .insert(campaignBuild)
+          .values({
+            campaignId: profile.campaignId,
+            brandVoice,
+            updatedBy: `admin-prefill:${input.draftId}`,
+          })
+          .onConflictDoNothing({ target: campaignBuild.campaignId });
+      }
 
       await tx
         .update(founderClaimProfiles)

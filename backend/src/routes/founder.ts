@@ -461,12 +461,14 @@ export function createFounderRouter(config: FounderRouterConfig): Router {
       if (!campaignId) return;
 
       const body = req.body as Record<string, unknown>;
-      const patch: { phone?: string | null; dateOfBirth?: string | null } = {};
+      const patch: { username?: string | null; phone?: string | null; dateOfBirth?: string | null } = {};
       const text = (key: string) =>
         typeof body[key] === 'string' || body[key] === null
           ? (body[key] as string | null)
           : undefined;
 
+      const username = text('username');
+      if (username !== undefined) patch.username = username;
       const phone = text('phone');
       if (phone !== undefined) patch.phone = phone;
       const dob = text('dateOfBirth');

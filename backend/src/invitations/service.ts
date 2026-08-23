@@ -862,6 +862,8 @@ export interface DraftLanding {
    * the surface formats it against ITS clock, not the server's.
    */
   lastContactAt: Date | null;
+  /** Admin-prepared reach shown on the invitation's reach screen. */
+  viewsCount: number | null;
   reference: string;
 }
 
@@ -882,6 +884,7 @@ export async function readDraftLanding(
       whatWeUnderstood: campaignDrafts.whatWeUnderstood,
       senderName: campaignDrafts.senderName,
       expectedSetupTime: campaignDrafts.expectedSetupTime,
+      viewsCount: campaignDrafts.prefillViewsCount,
       campaignId: campaignDrafts.campaignId,
       status: campaignDrafts.status,
       anonymisedAt: campaignDrafts.anonymisedAt,
@@ -905,6 +908,7 @@ export async function readDraftLanding(
     senderName: row.senderName,
     expectedSetupTime: row.expectedSetupTime,
     lastContactAt: row.lastContactAt,
+    viewsCount: row.viewsCount,
     reference: row.campaignId,
   };
 }

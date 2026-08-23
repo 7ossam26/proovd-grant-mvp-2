@@ -106,6 +106,7 @@ const LANDING = {
   senderName: 'Ada',
   expectedSetupTime: 'about 3 minutes',
   lastContactAt: '2026-08-15T09:00:00.000Z',
+  viewsCount: 24000,
   reference: 'F-ABCDE',
   processSummary: ['We read it by hand.'],
   noGuarantee: 'Proovd cannot promise acceptance or results.',
@@ -618,8 +619,8 @@ describe('the refusals', () => {
       const view = renderAt(at(page.id));
       await screen.findByRole('heading', { level: 1 });
       const text = document.body.textContent ?? '';
-      if (page.id === 'reach') expect(text).toMatch(/10,000\s*new people/i);
-      else expect(text).not.toMatch(/10,000\s*new people/i);
+      if (page.id === 'reach') expect(text).toMatch(/24,000\s*new people/i);
+      else expect(text).not.toMatch(/24,000\s*new people/i);
       view.unmount();
     }
   });
@@ -1360,7 +1361,14 @@ function stubStage3(initial: Record<string, unknown> = {}) {
   stubWorkspace(initial);
   handlers.push((url, init) => {
     if (!/\/details$/.test(url)) return undefined;
-    const details = { name: 'Rowan', phone: '+1 555 0100', dateOfBirth: '1990-01-01' };
+    const details = {
+      name: 'Rowan',
+      username: 'rowanbuilds',
+      phone: '+1 555 0100',
+      dateOfBirth: '1990-01-01',
+      affiliateMatches: 4,
+      affiliateType: 'community_owner',
+    };
     if (init?.method === 'PATCH') {
       const patch = JSON.parse(String(init.body)) as Record<string, unknown>;
       return { status: 200, body: { details: { ...details, ...patch } } };
@@ -2172,6 +2180,37 @@ describe('what Session E moved', () => {
     expect(body.toLowerCase()).not.toContain('poor');
     expect(body.toLowerCase()).not.toContain('judgement');
   });
+
+  it('prefills the onboarding username and lets the Founder correct it', async () => {
+    stubStage3();
+    renderAt(at('details'));
+
+    const username = await screen.findByLabelText('Username:');
+    expect(username).toHaveValue('rowanbuilds');
+
+    await userEvent.clear(username);
+    await userEvent.type(username, 'rowan-labs');
+    await userEvent.tab();
+
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.method === 'PATCH' &&
+            request.url.endsWith('/details') &&
+            request.body?.['username'] === 'rowan-labs',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('uses the saved onboarding match count and type', async () => {
+    stubStage3();
+    renderAt(at('match'));
+
+    expect(await screen.findByRole('heading', { name: '4 Affiliates' })).toBeInTheDocument();
+    expect(screen.getByText('Community owner')).toBeInTheDocument();
+  });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2379,6 +2418,16 @@ describe('how Creators are paid (18)', () => {
 });
 
 describe('the build steps (23–26)', () => {
+  it('opens with the two Admin brand-voice descriptors ready to edit', async () => {
+    stubStage5({
+      build: { ...BUILD_FIELDS, brandVoice: 'Confident, Friendly' },
+    });
+    renderAt(at('voice'));
+
+    expect(await screen.findByRole('button', { name: 'Replace Confident' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace Friendly' })).toBeInTheDocument();
+  });
+
   it('composes the voice chips into the one §14.4 field, with no cap', async () => {
     stubStage5();
     renderAt(at('voice'));

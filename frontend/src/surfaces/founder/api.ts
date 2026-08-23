@@ -269,14 +269,18 @@ export const saveWorkspace = async (
 /* ── Your details (screen 16) ─────────────────────────────────────────────── */
 
 export interface FounderDetails {
-  /** Shown back, never written from that screen. */
+  /** Display fallback when no username is present. */
   name: string | null;
+  username: string | null;
   phone: string | null;
   /** `YYYY-MM-DD`, or null. A date, never an age. */
   dateOfBirth: string | null;
+  affiliateMatches: number | null;
+  affiliateType: string | null;
 }
 
 export interface FounderDetailsPatch {
+  username?: string | null;
   phone?: string | null;
   dateOfBirth?: string | null;
 }

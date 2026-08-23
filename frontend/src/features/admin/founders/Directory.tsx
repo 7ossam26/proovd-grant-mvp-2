@@ -31,9 +31,11 @@ import {
 } from '@proovd/shared';
 import {
   AdminRequestError,
-  createAndInviteFounder,
+  createFounder,
   listFounders,
-  type CreateAndInviteFounderInput,
+  setCampaignPath,
+  updateFounderField,
+  type CreateFounderInput,
   type FounderListRow,
 } from './api.js';
 import { CreateFounderDialog, type CreateFounderValues } from './CreateFounderDialog.js';
@@ -114,25 +116,47 @@ export function Directory({ onOpenFounder }: Props) {
   const corpus = useMemo(() => buildSearchCorpus(rows ?? [], null), [rows]);
 
   async function create(values: CreateFounderValues) {
-    const input: CreateAndInviteFounderInput = {
-      requestKey: values.requestKey,
+    const input: CreateFounderInput = {
       legalName: values.name,
       email: values.email,
-      businessName: values.company,
-      invitationSource: values.invitationSource,
-      internalOwner: values.owner,
-      campaignType: values.campaign === 'Product Campaign' ? 'pre_launch' : 'pre_build',
-      whatWeUnderstood: values.whatWeUnderstood,
-      whyInvited: values.whyInvited,
-      expectedSetupTime: values.expectedSetupTime,
+      productName: values.company,
       ...(values.phone ? { phone: values.phone } : {}),
-      ...(values.location ? { location: values.location } : {}),
+      ...(values.owner ? { internalOwner: values.owner } : {}),
     };
-    const created = await createAndInviteFounder(input);
+
+    // Creation stops at the draft record. It does not compose, mint, or send
+    // an invitation; the Invite stage owns that separate Admin decision.
+    const created = await createFounder(input);
+
+    const unsaved: string[] = [];
+    try {
+      await updateFounderField(created.prospectId, 'bizLegal', values.company);
+    } catch {
+      unsaved.push('the business');
+    }
+    if (values.location) {
+      try {
+        await updateFounderField(created.prospectId, 'state', values.location);
+      } catch {
+        unsaved.push('the location');
+      }
+    }
+    try {
+      await setCampaignPath(
+        created.draftId,
+        values.campaign === 'Product Campaign' ? 'pre_launch' : 'pre_build',
+      );
+    } catch {
+      unsaved.push('the expected campaign path');
+    }
 
     setOverlay(null);
     load();
-    toast.show('Founder created and invitation sent');
+    toast.show(
+      unsaved.length
+        ? `Founder created. ${unsaved.join(' and ')} could not be saved — open the record and set it there.`
+        : 'Founder and first campaign created',
+    );
     onOpenFounder(created.prospectId);
   }
 

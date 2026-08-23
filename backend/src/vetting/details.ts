@@ -1,10 +1,10 @@
 /**
  * Screen 16 — Your details — the record behind it.
  *
- * Founder Flow v2. The reference's `[data-hello]` page collects three things:
- * a name it only ever shows back, a phone number, and a date of birth. All
- * three already have columns — `founder_claim_profiles.legal_name`,
- * `.phone`, `.date_of_birth` — written by §10's account claim since Phase 07.
+ * Founder Flow v2. The reference's `[data-hello]` page carries a username, a
+ * phone number, and a date of birth. The username starts with Admin's “Saved
+ * for onboarding” value and is editable here; the following Match screen reads
+ * its count and type from the same draft without inventing prototype values.
  *
  * ── Why this is not `correctFounderField` ──────────────────────────────────
  * That service is §5.2's CORRECTION path: it demands a reason, because
@@ -40,16 +40,22 @@ import { eq } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
 import { auditEvents } from '../db/schema/integrity.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
+import { campaignDrafts } from '../db/schema/invitations.js';
 
 export interface FounderDetailsView {
-  /** What the screen shows back. Never editable there — see `DetailsStep`. */
+  /** Display fallback when no username has been prepared. */
   readonly name: string | null;
+  readonly username: string | null;
   readonly phone: string | null;
   /** `YYYY-MM-DD`, or null. A date, never an age. */
   readonly dateOfBirth: string | null;
+  /** Admin-prepared matching summary shown on the next onboarding screen. */
+  readonly affiliateMatches: number | null;
+  readonly affiliateType: string | null;
 }
 
 export interface FounderDetailsPatch {
+  readonly username?: string | null;
   readonly phone?: string | null;
   readonly dateOfBirth?: string | null;
 }
@@ -84,8 +90,11 @@ function validDate(value: string): boolean {
 function project(row: {
   legalName: string | null;
   preferredName: string | null;
+  username: string | null;
   phone: string | null;
   dateOfBirth: string | null;
+  affiliateMatches: number | null;
+  affiliateType: string | null;
 }): FounderDetailsView {
   return {
     // The name the reference shows is a display name, so a preferred one wins
@@ -93,8 +102,11 @@ function project(row: {
     // what Stripe is later given, and §5.2 keeps it on the guarded settings
     // path with its own reason and its own audit row.
     name: row.preferredName?.trim() || row.legalName?.trim() || null,
+    username: row.username?.trim() || null,
     phone: row.phone?.trim() || null,
     dateOfBirth: row.dateOfBirth ?? null,
+    affiliateMatches: row.affiliateMatches,
+    affiliateType: row.affiliateType,
   };
 }
 
@@ -106,10 +118,14 @@ export async function readFounderDetails(
     .select({
       legalName: founderClaimProfiles.legalName,
       preferredName: founderClaimProfiles.preferredName,
+      username: founderClaimProfiles.username,
       phone: founderClaimProfiles.phone,
       dateOfBirth: founderClaimProfiles.dateOfBirth,
+      affiliateMatches: campaignDrafts.prefillAffiliateMatches,
+      affiliateType: campaignDrafts.prefillAffiliateType,
     })
     .from(founderClaimProfiles)
+    .innerJoin(campaignDrafts, eq(campaignDrafts.id, founderClaimProfiles.draftId))
     .where(eq(founderClaimProfiles.campaignId, input.campaignId))
     .limit(1);
   return row ? project(row) : null;
@@ -121,6 +137,8 @@ export async function saveFounderDetails(
 ): Promise<SaveFounderDetailsResult> {
   const { patch } = input;
 
+  const username =
+    patch.username === undefined ? undefined : (patch.username ?? '').trim() || null;
   const phone =
     patch.phone === undefined ? undefined : (patch.phone ?? '').trim() || null;
   const dob =
@@ -158,6 +176,15 @@ export async function saveFounderDetails(
       };
     }
 
+    const [draft] = await tx
+      .select({
+        affiliateMatches: campaignDrafts.prefillAffiliateMatches,
+        affiliateType: campaignDrafts.prefillAffiliateType,
+      })
+      .from(campaignDrafts)
+      .where(eq(campaignDrafts.id, row.draftId))
+      .limit(1);
+
     const next: Record<string, unknown> = {
       updatedBy: input.actor,
       updatedAt: new Date(),
@@ -165,6 +192,13 @@ export async function saveFounderDetails(
     const prior: Record<string, unknown> = {};
     const wrote: Record<string, unknown> = {};
 
+    if (username !== undefined && username !== (row.username ?? null)) {
+      next['username'] = username;
+      next['usernameSupplier'] = 'founder';
+      next['usernameEditedAt'] = new Date();
+      prior['username'] = row.username ?? null;
+      wrote['username'] = username;
+    }
     if (phone !== undefined && phone !== (row.phone ?? null)) {
       next['phone'] = phone;
       // §9's provenance: the Founder typed it, so the Founder supplied it.
@@ -182,7 +216,14 @@ export async function saveFounderDetails(
     }
 
     if (Object.keys(wrote).length === 0) {
-      return { ok: true as const, details: project(row) };
+      return {
+        ok: true as const,
+        details: project({
+          ...row,
+          affiliateMatches: draft?.affiliateMatches ?? null,
+          affiliateType: draft?.affiliateType ?? null,
+        }),
+      };
     }
 
     await tx.update(founderClaimProfiles).set(next).where(eq(founderClaimProfiles.id, row.id));
@@ -202,10 +243,14 @@ export async function saveFounderDetails(
       .select({
         legalName: founderClaimProfiles.legalName,
         preferredName: founderClaimProfiles.preferredName,
+        username: founderClaimProfiles.username,
         phone: founderClaimProfiles.phone,
         dateOfBirth: founderClaimProfiles.dateOfBirth,
+        affiliateMatches: campaignDrafts.prefillAffiliateMatches,
+        affiliateType: campaignDrafts.prefillAffiliateType,
       })
       .from(founderClaimProfiles)
+      .innerJoin(campaignDrafts, eq(campaignDrafts.id, founderClaimProfiles.draftId))
       .where(eq(founderClaimProfiles.id, row.id))
       .limit(1);
 

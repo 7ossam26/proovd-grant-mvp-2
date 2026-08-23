@@ -39,12 +39,11 @@
  * occupies is identical to the reference's span, measured. Nothing about the
  * picture changes; what changes is that a screen reader can find the page.
  *
- * ── The name is shown and never asked for ──────────────────────────────────
- * The reference's field is a label and a value, not an input, and `helloName`
- * falls back to a literal `AhmedEhab`. Here it is the Founder's own recorded
- * name; `legal_name` is what Stripe is later given, and §5.2 keeps changing it
- * on the guarded settings path with its own reason and its own audit row, so
- * there is deliberately no control for it on this screen.
+ * ── The Admin username is a starting value ─────────────────────────────────
+ * The reference labels this row `Username`. Admin prepares that value in the
+ * “Saved for onboarding” section; this screen shows it in the same understated
+ * input treatment as the phone number so the Founder can confirm it unchanged
+ * or correct it before continuing.
  *
  * ── Next is not gated; Enter is, and the reference does both ───────────────
  * `helloNext` advances unconditionally, so the visible control never refuses.
@@ -138,7 +137,7 @@ const DOB_LABEL = 'Birthdate:';
 const DOB_EMPTY = 'Pick your date of birth';
 const CLEAR = 'Clear';
 const CTA_LABEL = 'Next';
-/** Not the reference's — it has a record in memory and no name to be missing. */
+/** Not the reference's — it has a record in memory and no username to be missing. */
 const NAME_ABSENT = 'Not on file yet';
 
 /* ── The calendar's own vocabulary ─────────────────────────────────────────
@@ -307,6 +306,7 @@ function Screen({
   /* The typed value never comes back from the server (§9's rule): the box is
      the only copy of what was typed, and a save that raced a keystroke must not
      reinstate a digit somebody had just deleted. */
+  const [username, setUsername] = useState<string | null>(null);
   const [phone, setPhone] = useState<string | null>(null);
   const [dob, setDob] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -314,6 +314,7 @@ function Screen({
 
   if (details && !seeded.current) {
     seeded.current = true;
+    setUsername(details.username ?? '');
     setPhone(details.phone ?? '');
     setDob(details.dateOfBirth);
   }
@@ -339,7 +340,7 @@ function Screen({
   }, [details]);
 
   const save = useCallback(
-    async (patch: { phone?: string | null; dateOfBirth?: string | null }) => {
+    async (patch: { username?: string | null; phone?: string | null; dateOfBirth?: string | null }) => {
       try {
         const { details: next } = await saveFounderDetails(campaignId, patch);
         onDetails(next);
@@ -357,11 +358,12 @@ function Screen({
 
   /** `helloNext`, plus the one flush the reference has no server to need. */
   const advance = useCallback(() => {
+    if ((username ?? '') !== (details?.username ?? '')) void save({ username });
     if ((phone ?? '') !== (details?.phone ?? '')) void save({ phone });
     // The reference swaps `intake` to `match` immediately. The arriving Match
     // screen owns the full transition, so there is no outgoing page fade here.
     swapToPage('match');
-  }, [phone, details, save, swapToPage]);
+  }, [username, phone, details, save, swapToPage]);
 
   /*
     `enterAdvance`, with its three exemptions and its `ctaState()` gate.
@@ -469,8 +471,21 @@ function Screen({
               <h1 className="ff-hl__greet">{GREETING}</h1>
 
               <div className="ff-hl__row ff-hl__row--name">
-                <span className="ff-hl__label">{NAME_LABEL}</span>
-                <span className="ff-hl__value">{details.name ?? NAME_ABSENT}</span>
+                <label className="ff-hl__label" htmlFor="ff-hl-username">
+                  {NAME_LABEL}
+                </label>
+                <input
+                  id="ff-hl-username"
+                  className="ff-hl__input"
+                  value={username ?? ''}
+                  placeholder={NAME_ABSENT}
+                  onChange={(event) => setUsername(event.target.value)}
+                  onBlur={(event) => {
+                    if (event.target.value !== (details.username ?? '')) {
+                      void save({ username: event.target.value });
+                    }
+                  }}
+                />
               </div>
 
               <div className="ff-hl__row ff-hl__row--phone">

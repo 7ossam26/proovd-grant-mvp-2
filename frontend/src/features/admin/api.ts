@@ -170,6 +170,8 @@ export interface DraftLanding {
   expectedSetupTime: string | null;
   /** §7's "when we last spoke", as an ISO instant. Null when unrecorded. */
   lastContactAt: string | null;
+  /** Prepared by Admin and shown on the reach screen; never calculated here. */
+  viewsCount: number | null;
   reference: string;
   processSummary: string[];
   noGuarantee: string;

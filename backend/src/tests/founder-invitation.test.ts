@@ -683,12 +683,17 @@ describe('§33.1.1 a personalized draft opens without an account and grants no o
 
   it('names the Founder and product and explains what happens before an account or payment', async () => {
     const founder = await invitedFounder();
+    await h.db
+      .update(campaignDrafts)
+      .set({ prefillViewsCount: 24000 })
+      .where(eq(campaignDrafts.id, founder.draftId));
     const res = await request(h.app).get(`/api/draft/${founder.raw}`).expect(200);
 
     expect(res.body.whatWeUnderstood).toBe(COMPLETE_COMPOSE.whatWeUnderstood);
     expect(res.body.processSummary).toEqual([...PROCESS_SUMMARY]);
     expect(res.body.noGuarantee).toBe(NO_GUARANTEE_TEXT);
     expect(res.body.expectedSetupTime).toBe(COMPLETE_COMPOSE.expectedSetupTime);
+    expect(res.body.viewsCount).toBe(24000);
   });
 
   it('reveals nothing operational — no Admin notes, source, owner, or evidence', async () => {
@@ -729,6 +734,7 @@ describe('§33.1.1 a personalized draft opens without an account and grants no o
       'recipientName',
       'reference',
       'senderName',
+      'viewsCount',
       'whatWeUnderstood',
     ]);
   });

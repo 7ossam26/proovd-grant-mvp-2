@@ -9,8 +9,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { founderFlowPath } from '@proovd/shared';
+import { founderFlowPath, prefillAffiliateTypeLabel } from '@proovd/shared';
 import { flowDirection, resetFlowDirection } from './FlowPage.js';
+import { fetchFounderDetails, type FounderDetails } from '../founder/api.js';
 
 const ASSETS = {
   lockup: new URL(
@@ -90,6 +91,21 @@ export function MatchStep() {
   const leaving = useRef(false);
   const [portrait, setPortrait] = useState(() => isSmallPortrait());
   const [rotateOk, setRotateOk] = useState(false);
+  const [details, setDetails] = useState<FounderDetails | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFounderDetails(campaignId)
+      .then(({ details: next }) => {
+        if (!cancelled) setDetails(next);
+      })
+      .catch(() => {
+        if (!cancelled) setDetails(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [campaignId]);
 
   const advance = useCallback(() => {
     if (leaving.current) return;
@@ -351,10 +367,16 @@ export function MatchStep() {
             />
 
             <div className="ff-match__panel" data-match-anim="panel">
-              <h1 className="ff-match__count">3 Affiliates</h1>
+              <h1 className="ff-match__count">
+                {details?.affiliateMatches === null || details?.affiliateMatches === undefined
+                  ? 'Creator matches pending'
+                  : `${details.affiliateMatches} ${details.affiliateMatches === 1 ? 'Affiliate' : 'Affiliates'}`}
+              </h1>
               <span className="ff-match__types">
-                <span>1 Newsletter / blog operator</span>
-                <span>2 Community owners</span>
+                <span>
+                  {prefillAffiliateTypeLabel(details?.affiliateType) ??
+                    'Proovd is preparing the right creator type'}
+                </span>
               </span>
             </div>
 

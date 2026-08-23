@@ -107,9 +107,9 @@ export const FOUNDER_FLOW_PAGES: readonly FounderFlowPage[] = [
       It is the one page in this register whose matching `FOUNDER_FLOW_ABSENCES`
       entry was DELETED rather than never written. The reasons that entry gave
       are recorded on `ReachStep.tsx`, together with the two mechanisms that
-      keep the reversal narrow: this screen reads no record and stores nothing,
-      and §10's relevance signal — the honest version of the same beat — is
-      untouched two pages later.
+      keep the reversal narrow: this screen reads only the Admin-prepared
+      invitation value and stores nothing, while §10's separate relevance
+      signal remains untouched two pages later.
     */
     id: 'reach',
     path: '/draft/:token/reach',
@@ -496,16 +496,10 @@ export const FOUNDER_FLOW_ABSENCES: readonly FounderFlowAbsence[] = [
 
     What it said: the screen promises a result; §7 forbids Admin promising
     acceptance, results, reward pricing, or a named Creator's participation;
-    and no record holds an audience number, the prototype's own being the
-    constant 10,000. Every word of that is still true of the FIGURE. What
-    holds it there is that `ReachStep.tsx` reads no record and stores nothing:
-    a caveat sentence beneath the headline was added and then removed the same
-    day by product direction, so the absence of anything behind the number is
-    the whole of the guarantee rather than half of it.
-
-    A later phase asked to make the number dynamic, per-campaign, or derived
-    from §10's count is asking for the promise this entry refused. This note is
-    not the licence for it.
+    and the prototype used a constant 10,000. Product direction later made the
+    figure an explicit, per-invitation Admin prefill. `ReachStep.tsx` reads that
+    recorded value without calculating traffic or deriving it from Creator
+    matches, and stores nothing when the Founder continues.
   */
   {
     element:

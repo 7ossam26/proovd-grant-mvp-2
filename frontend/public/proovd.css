@@ -16046,7 +16046,7 @@ html.no-motion .ff-story__say { transition: none; }
 
 .ff-hl__row { display: flex; gap: 26px; }
 /* A label and a value: they share a baseline. */
-.ff-hl__row--name { margin-top: 96px; align-items: baseline; }
+.ff-hl__row--name { margin-top: 96px; align-items: center; }
 /* A label and a control: they share a centre line. */
 .ff-hl__row--phone,
 .ff-hl__row--dob { margin-top: 74px; align-items: center; }
@@ -16060,6 +16060,7 @@ html.no-motion .ff-story__say { transition: none; }
 }
 /* Only the two rows with a control shrink-lock their label, exactly as there:
    the name row has nothing to shrink against. */
+.ff-hl__row--name .ff-hl__label,
 .ff-hl__row--phone .ff-hl__label,
 .ff-hl__row--dob .ff-hl__label { flex: none; }
 

@@ -89,6 +89,7 @@ export function createDraftRouter(
         senderName: landing.senderName,
         expectedSetupTime: landing.expectedSetupTime,
         lastContactAt: landing.lastContactAt,
+        viewsCount: landing.viewsCount,
         reference: landing.reference,
         // The same fixed copy the email carried, so the two cannot drift and
         // the Founder reads one story (§7, §27.1).

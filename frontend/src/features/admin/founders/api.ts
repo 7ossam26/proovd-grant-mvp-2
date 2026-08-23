@@ -101,36 +101,6 @@ export interface CreatedFounder {
 export const createFounder = (input: CreateFounderInput): Promise<CreatedFounder> =>
   call('/api/admin/founders', { method: 'POST', body: JSON.stringify(input) });
 
-export interface CreateAndInviteFounderInput {
-  requestKey: string;
-  legalName: string;
-  email: string;
-  businessName: string;
-  phone?: string;
-  location?: string;
-  campaignType: 'pre_build' | 'pre_launch';
-  invitationSource: string;
-  internalOwner: string;
-  whatWeUnderstood: string;
-  whyInvited: string;
-  expectedSetupTime: string;
-}
-
-export interface CreatedAndInvitedFounder extends CreatedFounder {
-  sendId: string;
-  tokenVersion: number;
-  resent: boolean;
-  alreadySent: boolean;
-}
-
-export const createAndInviteFounder = (
-  input: CreateAndInviteFounderInput,
-): Promise<CreatedAndInvitedFounder> =>
-  call('/api/admin/founders/create-and-invite', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  });
-
 /* ── Workspace detail (§26.1, §26.2) ──────────────────────────────────────── */
 
 export interface OverrideField {
