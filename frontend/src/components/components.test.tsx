@@ -9,8 +9,8 @@
  * exception (tech-stack §3.6), not a bug to catch here.
  */
 import { useState } from 'react';
-import { describe, it, expect } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 import {
@@ -219,6 +219,59 @@ describe('Progress', () => {
 });
 
 describe('StatePanel (six questions)', () => {
+  it('does not flash a transient loading panel before a fast read settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const { container, rerender } = render(
+        <StatePanel
+          state="Checking your session"
+          whatHappened="Proovd is confirming who you are."
+          next="Your page appears as soon as that comes back."
+          owner="Proovd"
+          nextUpdate="Within a few seconds"
+          action="No action needed"
+          reference="CMP-4821"
+        />,
+      );
+      const panel = container.querySelector('.state-panel') as HTMLElement;
+
+      expect(panel).toHaveAttribute('hidden');
+
+      rerender(
+        <StatePanel
+          state="Your campaign is ready"
+          whatHappened="Proovd opened it."
+          next="Continue editing."
+          owner="You"
+          nextUpdate="No update is pending"
+          action="No action needed"
+          reference="CMP-4821"
+        />,
+      );
+      expect(panel).not.toHaveAttribute('hidden');
+
+      rerender(
+        <StatePanel
+          state="Loading your campaign"
+          whatHappened="Proovd is reading it."
+          next="It appears as soon as that comes back."
+          owner="Proovd"
+          nextUpdate="Within a few seconds"
+          action="No action needed"
+          reference="CMP-4821"
+        />,
+      );
+      expect(panel).toHaveAttribute('hidden');
+
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      expect(panel).not.toHaveAttribute('hidden');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('answers all six and names its region', async () => {
     const { container } = render(
       <StatePanel

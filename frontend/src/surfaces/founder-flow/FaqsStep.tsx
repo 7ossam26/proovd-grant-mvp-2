@@ -85,7 +85,11 @@ import { useAutosave } from '../../lib/useAutosave.js';
 import { removeFaq, saveFaq, type FaqView } from '../founder/api.js';
 import { FlowPage, HelpDrawer, flowDirection, useFlowNav } from './FlowPage.js';
 import { useBuildFlow, type BuildFlowState } from './useBuild.js';
-import { isReferenceWalkthrough } from './referenceWalkthrough.js';
+import {
+  isReferenceWalkthrough,
+  readReferenceDraft,
+  writeReferenceDraft,
+} from './referenceWalkthrough.js';
 
 /* ── The stage ─────────────────────────────────────────────────────────────
    `fitStages()` for a page it treats as ordinary: the stage's own size as the
@@ -156,6 +160,21 @@ function seed(faqs: readonly FaqView[]): Card[] {
   return faqs.map((faq) => ({ id: faq.id, t: faq.question, b: faq.answer }));
 }
 
+function readWalkthroughCards(campaignId: string): Card[] | null {
+  const value = readReferenceDraft(campaignId, 'faqs');
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const cards = value.filter(
+    (entry): entry is Card =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof (entry as Partial<Card>).t === 'string' &&
+      typeof (entry as Partial<Card>).b === 'string' &&
+      (typeof (entry as Partial<Card>).id === 'string' ||
+        typeof (entry as Partial<Card>).id === 'undefined'),
+  );
+  return cards.length === value.length ? cards : null;
+}
+
 export function FaqsStep() {
   const { campaignId = '' } = useParams();
   const build = useBuildFlow(campaignId);
@@ -208,14 +227,17 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
   // The record, read once. §9's rule, and `useBuildFlow`'s: the typed value
   // never comes back from the server, because a save that raced a keystroke
   // would otherwise reinstate the sentence the Founder had just deleted.
+  const walkthrough = isReferenceWalkthrough(campaignId);
   const stored = build.state?.faqs;
-  const initial = useMemo(() => seed(stored ?? []), [stored]);
+  const initial = useMemo(
+    () => (walkthrough ? (readWalkthroughCards(campaignId) ?? seed(stored ?? [])) : seed(stored ?? [])),
+    [campaignId, stored, walkthrough],
+  );
   const [cards, setCards] = useState<Card[]>(initial);
   const [index, setIndex] = useState(0);
   const [said, setSaid] = useState('');
 
   const model = build.state?.model ?? 'product';
-  const walkthrough = isReferenceWalkthrough(campaignId);
   const locked =
     !walkthrough && !EDITABLE_STATUSES.includes(build.state?.campaignStatus ?? '');
 
@@ -262,11 +284,15 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
   const persist = useCallback(
     async (patch: FaqPatch) => {
       if (isReferenceWalkthrough(campaignId)) {
-        setCards((list) =>
-          list.map((card, i) =>
-            i === patch.at ? { ...card, id: card.id ?? `walkthrough-faq-${String(i)}` } : card,
-          ),
-        );
+        setCards((list) => {
+          const next = list.map((card, i) =>
+            i === patch.at
+              ? { ...card, id: card.id ?? `walkthrough-faq-${String(i)}` }
+              : card,
+          );
+          writeReferenceDraft(campaignId, 'faqs', next);
+          return next;
+        });
         return;
       }
       const { faq } = await saveFaq(campaignId, patch.faq);
@@ -311,11 +337,12 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
     (patch: Partial<Card>) => {
       setCards((list) => {
         const next = list.map((card, i) => (i === index ? { ...card, ...patch } : card));
+        if (walkthrough) writeReferenceDraft(campaignId, 'faqs', next);
         write(next[index]!, index);
         return next;
       });
     },
-    [index, write],
+    [campaignId, index, walkthrough, write],
   );
 
   /** `faqPrev:()=>{ if(st.faqIx>0)this.setState({faqIx:st.faqIx-1}); }` */
@@ -336,7 +363,11 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
   async function add() {
     await autosave.flush();
     const at = cards.length;
-    setCards((list) => [...list, { t: '', b: '' }]);
+    setCards((list) => {
+      const next = [...list, { t: '', b: '' }];
+      if (walkthrough) writeReferenceDraft(campaignId, 'faqs', next);
+      return next;
+    });
     setIndex(at);
     setSaid(`FAQ ${String(at + 1)} added. Write the question and the answer.`);
     titleField.current?.focus();
@@ -354,7 +385,11 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
     if (!canDelete) return;
     const going = cards[index];
     const label = `FAQ ${String(index + 1)}`;
-    setCards((list) => list.filter((_, i) => i !== index));
+    setCards((list) => {
+      const next = list.filter((_, i) => i !== index);
+      if (walkthrough) writeReferenceDraft(campaignId, 'faqs', next);
+      return next;
+    });
     setIndex((i) => Math.max(0, i - 1));
     if (going?.id && !walkthrough) {
       try {

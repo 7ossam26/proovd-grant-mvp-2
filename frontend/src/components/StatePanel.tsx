@@ -11,7 +11,7 @@
  * must preserve context — the caller wires it to a support action that carries
  * the reference, never a blank form.
  */
-import { useId, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Tag, type TagVariant } from './Tag.js';
 import { Button } from './Button.js';
 import { HelpIcon } from './icons.js';
@@ -25,6 +25,13 @@ const OWNER_TAG: Record<StateOwner, TagVariant> = {
   Creator: 'sage',
   Stripe: 'mint',
 };
+
+/**
+ * Fast reads should land directly on their content instead of painting a
+ * full-page waiting panel for a single frame. A genuinely slow read still
+ * needs the complete six-question state, so only defer it — never remove it.
+ */
+const TRANSIENT_REVEAL_DELAY_MS = 250;
 
 /**
  * §27.1's "what can I do now" when the honest answer is nothing, and §11's
@@ -90,8 +97,25 @@ export function StatePanel({
 }: StatePanelProps) {
   const headId = useId();
   const isNoAction = action === NO_ACTION;
-  const isFounderFlowLoading =
-    typeof state === 'string' && /^(opening|loading)\b/i.test(state);
+  const transientKey =
+    typeof state === 'string' && /^(checking|opening|loading)\b/i.test(state)
+      ? state
+      : null;
+  const [revealedTransient, setRevealedTransient] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!transientKey) {
+      setRevealedTransient(null);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setRevealedTransient(transientKey),
+      TRANSIENT_REVEAL_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [transientKey]);
+
+  const hideTransient = Boolean(transientKey && revealedTransient !== transientKey);
 
   return (
     <section
@@ -99,12 +123,13 @@ export function StatePanel({
         [
           'state-panel',
           ring ? 'state-panel--ring' : '',
-          isFounderFlowLoading ? 'state-panel--transient' : '',
+          transientKey ? 'state-panel--transient' : '',
         ]
           .filter(Boolean)
           .join(' ')
       }
       aria-labelledby={headId}
+      hidden={hideTransient}
     >
       <p className="state-panel__head" id={headId}>
         {state}

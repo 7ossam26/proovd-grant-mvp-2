@@ -31,6 +31,8 @@ export const PITCH_DEMO = resolvePitchDemoMode({
 });
 
 const key = (campaignId: string) => `proovd:founder-reference-walkthrough:${campaignId}`;
+const draftKey = (campaignId: string, area: 'faqs' | 'rewards') =>
+  `${key(campaignId)}:${area}`;
 
 export function startReferenceWalkthrough(campaignId: string): void {
   if (!PITCH_DEMO) return;
@@ -39,4 +41,27 @@ export function startReferenceWalkthrough(campaignId: string): void {
 
 export function isReferenceWalkthrough(campaignId: string): boolean {
   return PITCH_DEMO && window.sessionStorage.getItem(key(campaignId)) === '1';
+}
+
+/**
+ * The pitch walkthrough deliberately writes no campaign rows, but its authored
+ * build cards still have to survive moving between its pages. Keep that copy
+ * session-scoped and campaign-scoped beside the walkthrough marker.
+ */
+export function readReferenceDraft(campaignId: string, area: 'faqs' | 'rewards'): unknown {
+  const stored = window.sessionStorage.getItem(draftKey(campaignId, area));
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+export function writeReferenceDraft(
+  campaignId: string,
+  area: 'faqs' | 'rewards',
+  value: unknown,
+): void {
+  window.sessionStorage.setItem(draftKey(campaignId, area), JSON.stringify(value));
 }

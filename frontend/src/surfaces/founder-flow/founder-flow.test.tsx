@@ -48,13 +48,39 @@ import { invalidateSession } from '../../lib/session.js';
 import { appRoutes } from '../../routes.js';
 import { clearDraftFlowCache } from '../draft/api.js';
 import { clearFounderWorkspaceCache } from '../founder/api.js';
-import { resolvePitchDemoMode } from './referenceWalkthrough.js';
+import {
+  readReferenceDraft,
+  resolvePitchDemoMode,
+  writeReferenceDraft,
+} from './referenceWalkthrough.js';
 
 describe('Founder Flow pitch-demo build flag', () => {
   it('requires an explicit opt-in in production and never bypasses payment tests', () => {
     expect(resolvePitchDemoMode({ dev: false, mode: 'production' })).toBe(false);
     expect(resolvePitchDemoMode({ dev: false, mode: 'production', flag: 'true' })).toBe(true);
     expect(resolvePitchDemoMode({ dev: false, mode: 'test', flag: 'true' })).toBe(false);
+  });
+
+  it('keeps authored walkthrough cards scoped to their campaign and session', () => {
+    sessionStorage.clear();
+    const faqs = [{ id: 'walkthrough-faq-0', t: 'When?', b: 'March 2027.' }];
+    const rewards = [
+      {
+        id: 'walkthrough-reward-0',
+        title: 'Founding Edition',
+        date: '03/27',
+        body: 'One lamp.',
+        price: '$120.50',
+        commitment: 'One lamp.',
+      },
+    ];
+
+    writeReferenceDraft('campaign-a', 'faqs', faqs);
+    writeReferenceDraft('campaign-a', 'rewards', rewards);
+
+    expect(readReferenceDraft('campaign-a', 'faqs')).toEqual(faqs);
+    expect(readReferenceDraft('campaign-a', 'rewards')).toEqual(rewards);
+    expect(readReferenceDraft('campaign-b', 'faqs')).toBeNull();
   });
 });
 

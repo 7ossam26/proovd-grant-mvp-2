@@ -35,7 +35,11 @@ import {
   type RewardPackageView,
 } from '../founder/api.js';
 import { flowDirection, FlowPage, HelpDrawer, useFlowNav } from './FlowPage.js';
-import { isReferenceWalkthrough } from './referenceWalkthrough.js';
+import {
+  isReferenceWalkthrough,
+  readReferenceDraft,
+  writeReferenceDraft,
+} from './referenceWalkthrough.js';
 
 /** Dollars as typed → integer cents, once. `12.5` and `12.50` are the same. */
 function toCents(typed: string): string | null {
@@ -57,12 +61,16 @@ export function RewardsStep() {
   useEffect(() => {
     if (!build.state || seeded.current) return;
     seeded.current = true;
+    const walkthroughCards = isReferenceWalkthrough(campaignId)
+      ? readWalkthroughRewards(campaignId)
+      : null;
     setCards(
-      build.state.rewardPackages.length
-        ? build.state.rewardPackages.map(fromPackage)
-        : [blankReward()],
+      walkthroughCards ??
+        (build.state.rewardPackages.length
+          ? build.state.rewardPackages.map(fromPackage)
+          : [blankReward()]),
     );
-  }, [build.state]);
+  }, [build.state, campaignId]);
 
   if (!build.state || build.failure) {
     return (
@@ -112,6 +120,24 @@ function blankReward(): RewardDraft {
   return { title: '', date: '', body: '', price: '', commitment: '' };
 }
 
+function readWalkthroughRewards(campaignId: string): RewardDraft[] | null {
+  const value = readReferenceDraft(campaignId, 'rewards');
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const rewards = value.filter(
+    (entry): entry is RewardDraft =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof (entry as Partial<RewardDraft>).title === 'string' &&
+      typeof (entry as Partial<RewardDraft>).date === 'string' &&
+      typeof (entry as Partial<RewardDraft>).body === 'string' &&
+      typeof (entry as Partial<RewardDraft>).price === 'string' &&
+      typeof (entry as Partial<RewardDraft>).commitment === 'string' &&
+      (typeof (entry as Partial<RewardDraft>).id === 'string' ||
+        typeof (entry as Partial<RewardDraft>).id === 'undefined'),
+  );
+  return rewards.length === value.length ? rewards : null;
+}
+
 function fromPackage(reward: RewardPackageView): RewardDraft {
   const cents = BigInt(reward.priceCents);
   const dollars = cents / 100n;
@@ -153,16 +179,19 @@ function RewardsBody({
 }) {
   const { leaveToPage, param } = useFlowNav();
   const [saving, setSaving] = useState(false);
+  const walkthrough = isReferenceWalkthrough(campaignId);
   const card = cards[index] ?? blankReward();
 
   const patchCard = useCallback(
     (patch: Partial<RewardDraft>) =>
-      setCards((current) =>
-        current.map((reward, rewardIndex) =>
+      setCards((current) => {
+        const next = current.map((reward, rewardIndex) =>
           rewardIndex === index ? { ...reward, ...patch } : reward,
-        ),
-      ),
-    [index, setCards],
+        );
+        if (walkthrough) writeReferenceDraft(campaignId, 'rewards', next);
+        return next;
+      }),
+    [campaignId, index, setCards, walkthrough],
   );
 
   const persist = useCallback(
@@ -176,7 +205,18 @@ function RewardsBody({
         setError('Add a title, description, delivery date, and valid price before leaving this reward.');
         return false;
       }
-      if (isReferenceWalkthrough(campaignId)) return true;
+      if (walkthrough) {
+        setCards((current) => {
+          const next = current.map((entry, entryIndex) =>
+            entryIndex === rewardIndex
+              ? { ...entry, id: entry.id ?? `walkthrough-reward-${String(entryIndex)}` }
+              : entry,
+          );
+          writeReferenceDraft(campaignId, 'rewards', next);
+          return next;
+        });
+        return true;
+      }
       setError(null);
       setSaving(true);
       try {
@@ -209,7 +249,7 @@ function RewardsBody({
         setSaving(false);
       }
     },
-    [campaignId, refresh, setCards, setError],
+    [campaignId, refresh, setCards, setError, walkthrough],
   );
 
   const addOrContinue = async () => {
@@ -218,7 +258,11 @@ function RewardsBody({
       leaveToPage('payouts');
       return;
     }
-    setCards((current) => [...current, blankReward()]);
+    setCards((current) => {
+      const next = [...current, blankReward()];
+      if (walkthrough) writeReferenceDraft(campaignId, 'rewards', next);
+      return next;
+    });
     setIndex(cards.length);
     setFocus(null);
   };
@@ -238,7 +282,11 @@ function RewardsBody({
     setError(null);
     try {
       if (card.id) await removeRewardPackage(campaignId, card.id);
-      setCards((current) => current.filter((_, rewardIndex) => rewardIndex !== index));
+      setCards((current) => {
+        const next = current.filter((_, rewardIndex) => rewardIndex !== index);
+        if (walkthrough) writeReferenceDraft(campaignId, 'rewards', next);
+        return next;
+      });
       setIndex(Math.max(0, index - 1));
       setFocus(null);
       if (card.id) await refresh();
