@@ -12886,28 +12886,6 @@ html.no-motion .ff-story__say { transition: none; }
 }
 .ff-story__sub p { margin: 0; max-width: 1500px; }
 
-.ff-story__approve {
-  min-height: 110px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  color: #013F17;
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1.3;
-  cursor: pointer;
-}
-.ff-story__check {
-  width: 56px;
-  height: 56px;
-  flex: none;
-  accent-color: #41ED98;
-  cursor: pointer;
-}
-.ff-story__check:disabled,
-.ff-story__check:disabled + span { cursor: not-allowed; opacity: .55; }
-.ff-story__check:focus-visible { outline: 6px solid #013F17; outline-offset: 5px; }
 
 .ff-story__note {
   font-size: 30px;
@@ -13578,21 +13556,6 @@ html.no-motion .ff-story__say { transition: none; }
   overflow: visible;
 }
 .ff-brandlogo__filestate { font-size: 28px; font-weight: 600; }
-.ff-brandlogo__approval {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 28px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.ff-brandlogo__approval input {
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
-  margin: 0;
-  accent-color: #013F17;
-}
 .ff-brandlogo__file button {
   flex: none;
   padding: 0 8px;

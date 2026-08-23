@@ -1781,7 +1781,7 @@ describe('the five §12 answers (10–14)', () => {
     );
   });
 
-  it('lets the Founder approve stored visuals and logos for their campaign', async () => {
+  it('keeps the visual approval and removes the branding-upload approval control', async () => {
     const user = userEvent.setup();
     const visual = {
       id: 'visual-without-approval',
@@ -1824,16 +1824,9 @@ describe('the five §12 answers (10–14)', () => {
 
     renderAt(at('branding'));
     await screen.findByText('Logo 1 added');
-    const logoApproval = screen.getByRole('checkbox', { name: 'Approved' });
-    expect(logoApproval).toBeChecked();
-    await user.click(logoApproval);
     expect(
-      requests.some(
-        (request) =>
-          request.url.includes('/uploads/logo-without-approval/approval') &&
-          request.body?.['approved'] === false,
-      ),
-    ).toBe(true);
+      screen.queryByRole('checkbox', { name: 'Approved' }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps typography and brand-direction approval controls off the brand colour screen', async () => {
