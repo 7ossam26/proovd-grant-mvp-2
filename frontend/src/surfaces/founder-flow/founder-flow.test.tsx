@@ -1770,8 +1770,7 @@ describe('the five §12 answers (10–14)', () => {
     );
   });
 
-  it('saves typography and approval to complete the Brand direction', async () => {
-    const user = userEvent.setup();
+  it('does not show typography or approval controls on the brand colour screen', async () => {
     stubStage3({
       brand: {
         colors: '#41ED98 — primary',
@@ -1783,30 +1782,13 @@ describe('the five §12 answers (10–14)', () => {
     });
     renderAt(at('color'));
 
-    const typography = await screen.findByRole('textbox', { name: 'Typography or style' });
-    const approval = screen.getByRole('checkbox', {
-      name: /approve this brand direction for my campaign/i,
-    });
-    expect(approval).toBeDisabled();
-
-    await user.type(typography, 'Bold headings and a clean sans-serif body');
-    expect(approval).toBeEnabled();
-    await user.click(approval);
-
-    await waitFor(() => {
-      expect(
-        requests.some(
-          (request) =>
-            request.method === 'PATCH' &&
-            request.body?.['brandTypography'] === 'Bold headings and a clean sans-serif body',
-        ),
-      ).toBe(true);
-      expect(
-        requests.some(
-          (request) => request.method === 'PATCH' && request.body?.['brandApproved'] === true,
-        ),
-      ).toBe(true);
-    });
+    await screen.findByRole('heading', { name: /more about your brand/i });
+    expect(screen.queryByRole('textbox', { name: 'Typography or style' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', {
+        name: /approve this brand direction for my campaign/i,
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('walks the sequence forward and back, naming each destination', async () => {

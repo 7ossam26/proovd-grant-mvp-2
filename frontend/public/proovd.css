@@ -14802,52 +14802,6 @@ html.no-motion .ff-story__say { transition: none; }
      than the budget would visibly crowd the CTA, which is a signal rather than
      a disappearance. */
 }
-.ff-col__direction {
-  width: 100%;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  color: #013F17;
-  font-size: 27px;
-  font-weight: 700;
-}
-.ff-col__direction > span { flex: none; }
-.ff-col__direction input {
-  min-width: 0;
-  height: 48px;
-  flex: 1;
-  padding: 0 16px;
-  border: 2px solid #8FCBA3;
-  border-radius: 0;
-  background: #FAFAFA;
-  color: #013F17;
-  font: inherit;
-  font-weight: 500;
-  outline: none;
-}
-.ff-col__direction input:focus { border-color: #41ED98; }
-.ff-col__approve {
-  margin-top: 7px;
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  color: #013F17;
-  font-size: 26px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.ff-col__approve input {
-  width: 36px;
-  height: 36px;
-  flex: none;
-  accent-color: #41ED98;
-  cursor: pointer;
-}
-.ff-col__approve input:disabled,
-.ff-col__approve input:disabled + span { cursor: not-allowed; opacity: .55; }
-.ff-col__direction input:focus-visible,
-.ff-col__approve input:focus-visible { outline: 5px solid #013F17; outline-offset: 4px; }
 .ff-col__note,
 .ff-col__status {
   margin: 0;
@@ -14859,9 +14813,7 @@ html.no-motion .ff-story__say { transition: none; }
   color: #013F17;
 }
 .ff-col__status {
-  margin-top: 3px;
-  font-size: 24px;
-  line-height: 1.1;
+  margin-top: 6px;
   font-weight: 700;
   /* `--moss` is the caption tone and this is not a caption: it is the answer to
      "did that save", at 12 CSS px. It takes the page's own ink, and the failure

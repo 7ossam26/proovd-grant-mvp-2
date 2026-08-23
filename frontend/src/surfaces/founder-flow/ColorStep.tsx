@@ -253,8 +253,6 @@ function ColorScreen({
      the typed value never comes back from the server, so this is the only copy
      of it and a save that raced an edit cannot reinstate a removed line. */
   const [colors, setColors] = useState(state.brand.colors ?? '');
-  const [typography, setTypography] = useState(state.brand.typography ?? '');
-  const [approved, setApproved] = useState(state.brand.approved);
 
   /* The reference's `dH/dS/dV`. It starts them at the same three numbers every
      time and never seeds them from `brand.colors` — the picker is where a NEW
@@ -297,25 +295,9 @@ function ColorScreen({
   const write = useCallback(
     (next: string) => {
       setColors(next);
-      if (approved) setApproved(false);
-      autosave.queue({
-        brandColors: next,
-        ...(approved ? { brandApproved: false } : {}),
-      });
+      autosave.queue({ brandColors: next });
     },
-    [approved, autosave],
-  );
-
-  const writeTypography = useCallback(
-    (next: string) => {
-      setTypography(next);
-      if (approved) setApproved(false);
-      autosave.queue({
-        brandTypography: next,
-        ...(approved ? { brandApproved: false } : {}),
-      });
-    },
-    [approved, autosave],
+    [autosave],
   );
 
   /**
@@ -736,44 +718,14 @@ function ColorScreen({
           </button>
 
           {/* ONE absolutely positioned block inside the 130px gap the
-              composition already leaves above the CTA, so neither line can move
-              a reference box — and, because they stack in flow rather than at
-              two fixed offsets, the second cannot print on top of the first
-              when the first wraps. The browser pass caught exactly that.
-
-              The note is what the picker is FOR: §12 reads the writing, not the
-              code. It is kept to one line at this column width for the same
-              reason — two lines plus a save status is taller than the gap. */}
+              composition already leaves above the CTA, so save feedback cannot
+              move a reference box. */}
           <div className="ff-col__gap">
             {locked ? (
               <p className="ff-col__note" id="ff-col-note">
                 Your listing fee is paid, so your brand direction stays as it was checked.
               </p>
-            ) : (
-              <>
-                <label className="ff-col__direction">
-                  <span>Typography or style</span>
-                  <input
-                    type="text"
-                    value={typography}
-                    placeholder="e.g. Bold headings, clean sans-serif"
-                    onChange={(event) => writeTypography(event.target.value)}
-                  />
-                </label>
-                <label className="ff-col__approve">
-                  <input
-                    type="checkbox"
-                    checked={approved}
-                    disabled={!colors.trim() || !typography.trim()}
-                    onChange={(event) => {
-                      setApproved(event.target.checked);
-                      autosave.queue({ brandApproved: event.target.checked });
-                    }}
-                  />
-                  <span>I approve this brand direction for my campaign</span>
-                </label>
-              </>
-            )}
+            ) : null}
             <p
               className="ff-col__status"
               role="status"
