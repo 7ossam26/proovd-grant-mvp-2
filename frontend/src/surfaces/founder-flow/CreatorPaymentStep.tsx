@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
+import { founderFlowPath } from '@proovd/shared';
 import { StatePanel, NO_ACTION } from '../../components/index.js';
 import { SurfaceLoading } from '../../features/public/states.js';
 import {
   fetchOpenness,
+  fetchApplicationReview,
   recordOpenness,
   submitApplicationReview,
   FounderRequestError,
@@ -36,14 +38,23 @@ function fittedScale(): number {
 
 export function CreatorPaymentStep() {
   const { campaignId = '' } = useParams();
+  const navigate = useNavigate();
   const [openness, setOpenness] = useState<OpennessState | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchOpenness(campaignId)
-      .then(({ openness: result }) => {
-        if (!cancelled) setOpenness(result);
+    Promise.all([fetchOpenness(campaignId), fetchApplicationReview(campaignId)])
+      .then(([{ openness: result }, { applicationReview }]) => {
+        if (cancelled) return;
+        if (applicationReview.required && applicationReview.review) {
+          void navigate(
+            founderFlowPath(applicationReview.mayContinue ? 'fee' : 'application-review', campaignId),
+            { replace: true },
+          );
+          return;
+        }
+        setOpenness(result);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -54,7 +65,7 @@ export function CreatorPaymentStep() {
         );
       });
     return () => { cancelled = true; };
-  }, [campaignId]);
+  }, [campaignId, navigate]);
 
   if (failure) {
     return (

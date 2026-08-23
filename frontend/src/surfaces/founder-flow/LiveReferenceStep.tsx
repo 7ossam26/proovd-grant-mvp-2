@@ -1,20 +1,11 @@
 /** Pitch-only celebration shown after the simulated campaign review. */
 
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { Navigate, useParams } from 'react-router';
-import { founderDashboardPath } from '@proovd/shared';
+import { useParams } from 'react-router';
 import { FlowPage, useFlowNav } from './FlowPage.js';
-import { PITCH_DEMO } from './referenceWalkthrough.js';
 
-/** Preserve the dashboard redirect for every genuine, non-demo visit. */
 export function LiveRoute() {
-  const { campaignId = '' } = useParams();
-
-  return PITCH_DEMO ? (
-    <LiveReferenceStep />
-  ) : (
-    <Navigate to={founderDashboardPath(campaignId)} replace />
-  );
+  return <LiveReferenceStep />;
 }
 
 export function LiveReferenceStep() {
@@ -30,27 +21,31 @@ export function LiveReferenceStep() {
 function LiveBody() {
   const { swapToPage } = useFlowNav();
 
+  return <FounderEntryCelebration onContinue={() => swapToPage('password')} />;
+}
+
+export function FounderEntryCelebration({ onContinue }: { onContinue: () => void }) {
+
   return (
     <section className="ff-live">
       <LiveStage>
         <div className="ff-live__col">
           <h1 className="ff-live__head" data-live-anim="head">
-            You’re Live!
+            You’re in!
           </h1>
           <p className="ff-live__lede" data-live-anim="panel">
-            Your content creators are hard at work, kick back and check your dashboard for backers!
+            we've matched you with your content creators, kick back and check your dashboard for affiliate offers
           </p>
           <button
             type="button"
             className="ff-live__cta"
             data-live-anim="cta"
-            onClick={() => swapToPage('password')}
+            onClick={onContinue}
           >
             Secure account and open my dashboard
           </button>
         </div>
       </LiveStage>
-      <p className="ff-live__demo">Demo walkthrough — no real campaign launch is recorded</p>
     </section>
   );
 }

@@ -1170,6 +1170,8 @@ export interface FounderDashboardView {
   listingPaidAt: string | null;
   highEffort: boolean;
   title: string | null;
+  founderName: string | null;
+  founderEmail: string | null;
 }
 
 export const fetchFounderDashboard = (

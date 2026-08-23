@@ -248,9 +248,7 @@ function VoiceScreen({
     } finally {
       setBusy(false);
     }
-    // The reference goes straight into the model-specific build walk here:
-    // Idea campaigns have a threshold; Product campaigns do not.
-    swapToPage(build.state?.model === 'idea' ? 'threshold' : 'faqs', 1);
+    swapToPage('threshold', 1);
   }
 
   const status = describeSaveState(build.autosave.state);
@@ -372,7 +370,7 @@ function VoiceScreen({
             type="button"
             className="ff-vc__cta"
             data-stage-anim="cta"
-            aria-label={build.state?.model === 'idea' ? 'Continue to your pre-order threshold' : 'Continue to your FAQs'}
+            aria-label="Continue to your order goal"
             onClick={() => void goOn()}
             disabled={busy}
           >

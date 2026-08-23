@@ -97,12 +97,12 @@ export async function renderEnforcementNotice(
   };
 }
 
-const body = { backgroundColor: '#f6f5f1', fontFamily: 'Helvetica, Arial, sans-serif', margin: 0 };
-const container = { backgroundColor: '#ffffff', borderRadius: '12px', margin: '24px auto', maxWidth: '560px', padding: '32px' };
-const eyebrow = { color: '#6b6b66', fontSize: '12px', letterSpacing: '0.08em', margin: '0 0 8px', textTransform: 'uppercase' as const };
-const heading = { color: '#1a1a17', fontSize: '22px', lineHeight: '1.3', margin: '0 0 16px' };
+const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FAFAFA', borderRadius: '1px', margin: '0 auto', maxWidth: '600px', padding: '44px' };
+const eyebrow = { color: '#012D10', fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', margin: '0 0 34px' };
+const heading = { color: '#012D10', fontSize: '38px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: '46px', margin: '0 0 24px' };
 const section = { margin: '0 0 8px' };
-const text = { color: '#1a1a17', fontSize: '14px', lineHeight: '1.6', margin: '0 0 8px' };
+const text = { color: '#013F17', fontSize: '18px', fontWeight: 500, lineHeight: '28px', margin: '0 0 8px' };
 const notice = {
   color: '#1a1a17',
   fontSize: '14px',
@@ -110,5 +110,5 @@ const notice = {
   margin: '0 0 8px',
   whiteSpace: 'pre-line' as const,
 };
-const quiet = { color: '#6b6b66', fontSize: '12px', lineHeight: '1.6', margin: '0 0 8px' };
-const rule = { borderColor: '#e8e6df', margin: '16px 0' };
+const quiet = { color: '#A2AFA8', fontSize: '12px', lineHeight: '20px', margin: '0 0 8px' };
+const rule = { borderColor: '#41ED98', margin: '40px 0 30px' };

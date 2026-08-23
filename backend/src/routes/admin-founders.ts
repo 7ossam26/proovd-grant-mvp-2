@@ -243,6 +243,24 @@ export function createAdminFoundersRouter({
 
   const mutations: FounderMutationDeps = { db, audit };
 
+  /**
+   * Resolve the invitation's sender from the authenticated Admin account.
+   *
+   * Older drafts can predate automatic sender capture. Preview and both send
+   * routes must nevertheless resolve the same real values, so this repairs a
+   * missing sender once and leaves an existing sender snapshot untouched.
+   */
+  const ensureInvitationSender = (req: Request, draftId: string) =>
+    recordInvitationSender(
+      mutations,
+      {
+        draftId,
+        senderName: req.authUser?.name ?? '',
+        senderEmail: req.authUser?.email ?? '',
+      },
+      whoOf(req),
+    );
+
   /** The whole workspace, re-read after every write. One source of truth. */
   const workspaceOf = (prospectId: string) =>
     readFounderWorkspace(
@@ -928,6 +946,12 @@ export function createAdminFoundersRouter({
         return;
       }
 
+      const sender = await ensureInvitationSender(req, draft.id);
+      if (!sender.ok) {
+        refused(res, 'That invitation cannot be previewed', sender.message);
+        return;
+      }
+
       const preview = await previewInvitation(db, draft.id, context);
       if (!preview) {
         notFound(res, 'No invitation to preview', 'This Founder has no invitation to preview.');
@@ -1005,15 +1029,7 @@ export function createAdminFoundersRouter({
     // Admin pressing Send is that person, so it is recorded from their own
     // account rather than typed into a box — and never overwritten, because a
     // resend by a colleague must not rewrite who the first message came from.
-    const sender = await recordInvitationSender(
-      mutations,
-      {
-        draftId: draft.id,
-        senderName: req.authUser?.name ?? '',
-        senderEmail: req.authUser?.email ?? '',
-      },
-      whoOf(req),
-    );
+    const sender = await ensureInvitationSender(req, draft.id);
     if (!sender.ok) {
       refused(res, 'That invitation was not sent', sender.message);
       return;
@@ -1608,7 +1624,18 @@ export function createAdminFoundersRouter({
   /* ── Preview — §7's gate ───────────────────────────────────────────────── */
 
   router.get(`${ADMIN_FOUNDERS_PATH}/:draftId/preview`, admin, async (req, res) => {
-    const preview = await previewInvitation(db, req.params['draftId'] as string, context);
+    const draftId = req.params['draftId'] as string;
+    const sender = await ensureInvitationSender(req, draftId);
+    if (!sender.ok) {
+      if (sender.code === 'not_found') {
+        res.status(404).json({ error: 'not_found', title: 'No such draft' });
+        return;
+      }
+      refused(res, 'That invitation cannot be previewed', sender.message);
+      return;
+    }
+
+    const preview = await previewInvitation(db, draftId, context);
     if (!preview) {
       res.status(404).json({ error: 'not_found', title: 'No such draft' });
       return;
@@ -1628,9 +1655,16 @@ export function createAdminFoundersRouter({
   /* ── Send and revoke, addressed by the draft (§7) ──────────────────────── */
 
   router.post(`${ADMIN_FOUNDERS_PATH}/:draftId/send`, admin, fresh, json, async (req, res) => {
+    const draftId = req.params['draftId'] as string;
+    const sender = await ensureInvitationSender(req, draftId);
+    if (!sender.ok) {
+      refused(res, 'That invitation was not sent', sender.message);
+      return;
+    }
+
     const result = await sendInvitation(
       { db, tokens, notifier },
-      { draftId: req.params['draftId'] as string, actor: actorOf(req), context },
+      { draftId, actor: actorOf(req), context },
     );
 
     if (!result.ok) {

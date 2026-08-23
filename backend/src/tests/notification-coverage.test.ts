@@ -44,6 +44,7 @@ import {
 import { NOTIFICATION_CATALOG, CATALOG_KEYS } from '../notifications/catalog.js';
 import { NON_TRANSACTIONAL_KEYS } from '../notifications/contract-logic.js';
 import { previewNotification, checkTransactionalContract } from '../notifications/preview.js';
+import { unresolvedEmailVariables } from '../notifications/send.js';
 
 const SENT = BACKEND_NOTIFICATION_EVENTS as readonly string[];
 const UNSENT = UNSENT_NOTIFICATION_KEYS as readonly string[];
@@ -125,6 +126,13 @@ describe('§27 coverage — every sent event has a template', () => {
       // A rendered message is a document, not a fragment. `<p>${summary}</p>`
       // passed every other check and was not an email.
       expect(message.html.toLowerCase(), key).toContain('<html');
+    }
+  });
+
+  it('every rendered template resolves every bracket and moustache variable', () => {
+    for (const key of CATALOG_KEYS) {
+      const unresolved = unresolvedEmailVariables(rendered.get(key)!);
+      expect({ key, unresolved }, key).toEqual({ key, unresolved: [] });
     }
   });
 });

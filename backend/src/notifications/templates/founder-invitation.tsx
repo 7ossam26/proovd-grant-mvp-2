@@ -4,21 +4,6 @@
  * This is the first thing a real person receives from Proovd, and almost every
  * rule that governs it is a restraint rather than a feature.
  *
- * ── The nine things §7 requires it to contain ───────────────────────────────
- *  1. the Founder/product reference          6. an honest time expectation
- *  2. what Proovd understood                 7. no guarantee of Creator
- *  3. why they were selected                    acceptance or campaign result
- *  4. who sent it                            8. a reply/support path
- *  5. what the process includes              9. ONE secure draft action
- *
- * ── The no-guarantee language is fixed, not a field ─────────────────────────
- * §7: Admin "must not promise acceptance, results, reward pricing, or
- * participation by a specific Creator." If that paragraph were a database
- * column it would be editable, and an editable disclaimer is one that gets
- * softened for a Founder who wants reassurance. So it is a constant in this
- * file, the compose surface renders it read-only, and a test compares the sent
- * body against it.
- *
  * ── One primary action ──────────────────────────────────────────────────────
  * §27.2 allows at most one, and §7 names it: the secure draft link. There is no
  * second button, no "book a call", no "reply to get started" styled as an
@@ -153,66 +138,38 @@ function resolve(variables: InvitationVariables): Resolved {
  * later cannot find.
  */
 export function invitationSubject(variables: InvitationVariables): string {
+  const recipientName = variables.recipientName?.trim() || MARKERS['recipientName']!;
   const productName = variables.productName?.trim() || MARKERS['productName']!;
-  return `Proovd invitation: run a campaign for ${productName}`;
+  return `${recipientName}, ${productName}'s first campaign is set up, come claim it`;
 }
 
 function InvitationEmail({ v }: { v: Resolved }) {
   return (
     <Html lang="en">
       <Head />
-      <Preview>{`An invitation from ${v.senderName} at Proovd about ${v.productName}`}</Preview>
+      <Preview>
+        We filled it in from our call, read it over, fix what we got wrong, and it’s yours.
+      </Preview>
       <Body style={body}>
         <Container style={container}>
-          <Text style={eyebrow}>Proovd</Text>
+          <Text style={wordmark}>proovd</Text>
+          <Section style={art}>&nbsp;</Section>
 
-          <Heading style={heading}>
-            {v.recipientName}, we would like to invite {v.productName} to run a campaign
-            on Proovd.
+          <Heading style={heading}>{v.recipientName}, your invite is ready.</Heading>
+          <Heading as="h2" style={subheading}>
+            {v.productName}'s first campaign, already set up on proovd.
           </Heading>
-
-          {/* §7 item 2 — what Proovd understood. */}
-          <Section style={section}>
-            <Text style={label}>What we understood about {v.productName}</Text>
-            <Text style={text}>{v.whatWeUnderstood}</Text>
-            {/* Optional — an empty line here would read as a missing fact. */}
-            {v.productUrl ? <Text style={quiet}>{v.productUrl}</Text> : null}
-          </Section>
-
-          {/* §7 item 3 — why this Founder. */}
-          <Section style={section}>
-            <Text style={label}>Why we are writing to you</Text>
-            <Text style={text}>{v.whyInvited}</Text>
-          </Section>
-
-          {/* §7 item 5 — what the process includes. */}
-          <Section style={section}>
-            <Text style={label}>What the process involves</Text>
-            {PROCESS_SUMMARY.map((step, index) => (
-              <Text key={index} style={text}>
-                {index + 1}. {step}
-              </Text>
-            ))}
-          </Section>
-
-          {/* §7 item 6 — an honest time expectation. */}
-          <Section style={section}>
-            <Text style={label}>How long the setup takes</Text>
-            <Text style={text}>{v.expectedSetupTime}</Text>
-          </Section>
-
-          {/* §7 item 7 — the no-guarantee language, fixed. */}
-          <Section style={section}>
-            <Text style={label}>What this is not</Text>
-            <Text style={text}>{NO_GUARANTEE_TEXT}</Text>
-          </Section>
+          <Text style={intro}>
+            It came out of our call, so most of it is filled in. Read it over, fix
+            anything we got wrong, and it's yours.
+          </Text>
 
           <Hr style={rule} />
 
           {/* §7 item 9 / §27.2 — exactly one primary action. */}
           <Section style={section}>
             <Link href={v.draftUrl} style={action}>
-              Open your draft
+              See your invite
             </Link>
             <Text style={quiet}>
               This link is personal to you and works once. It does not create an account,
@@ -232,7 +189,7 @@ function InvitationEmail({ v }: { v: Resolved }) {
             </Text>
             <Text style={quiet}>
               Reply to this email, or write to {v.senderEmail}. For anything else,{' '}
-              {v.supportEmail} — we respond within one business day, Monday to Friday,
+              {v.supportEmail}. We respond within one business day, Monday to Friday,
               excluding U.S. federal holidays.
             </Text>
             <Text style={quiet}>Reference: {v.reference}</Text>
@@ -252,27 +209,12 @@ function InvitationEmail({ v }: { v: Resolved }) {
  *  happened to put them. */
 function plainText(v: Resolved): string {
   return [
-    `${v.recipientName}, we would like to invite ${v.productName} to run a campaign on Proovd.`,
+    `${v.recipientName}, your invite is ready.`,
+    `${v.productName}'s first campaign, already set up on proovd.`,
     '',
-    `WHAT WE UNDERSTOOD ABOUT ${v.productName.toUpperCase()}`,
-    v.whatWeUnderstood,
-    // Optional — spread rather than a blank line, so a Founder with no site
-    // does not read a stray gap where a URL would have been.
-    ...(v.productUrl ? [v.productUrl] : []),
+    "It came out of our call, so most of it is filled in. Read it over, fix anything we got wrong, and it's yours.",
     '',
-    'WHY WE ARE WRITING TO YOU',
-    v.whyInvited,
-    '',
-    'WHAT THE PROCESS INVOLVES',
-    ...PROCESS_SUMMARY.map((step, index) => `${index + 1}. ${step}`),
-    '',
-    'HOW LONG THE SETUP TAKES',
-    v.expectedSetupTime,
-    '',
-    'WHAT THIS IS NOT',
-    NO_GUARANTEE_TEXT,
-    '',
-    'OPEN YOUR DRAFT',
+    'SEE YOUR INVITE',
     v.draftUrl,
     'This link is personal to you and works once. It does not create an account, and',
     'nothing is charged. If it stops working, reply to this email and we will send a',
@@ -283,7 +225,7 @@ function plainText(v: Resolved): string {
     'Proovd',
     '',
     `Reply to this email, or write to ${v.senderEmail}.`,
-    `For anything else, ${v.supportEmail} — we respond within one business day,`,
+    `For anything else, ${v.supportEmail}. We respond within one business day,`,
     'Monday to Friday, excluding U.S. federal holidays.',
     '',
     `Reference: ${v.reference}`,
@@ -332,13 +274,20 @@ export async function renderFounderInvitation(
    values written out by hand — a `<link>` to it would not survive the trip, and
    a mail client has no CSS variables to read a mode slot from. */
 
-const body = { backgroundColor: '#FAFAFA', fontFamily: 'Helvetica, Arial, sans-serif' };
-const container = { maxWidth: '37.5rem', margin: '0 auto', padding: '2rem 1.5rem' };
-const eyebrow = { fontSize: '0.875rem', fontWeight: 900, letterSpacing: '0.08em', color: '#012D10', textTransform: 'uppercase' as const, margin: '0 0 1.5rem' };
-const heading = { fontSize: '1.5rem', lineHeight: 1.25, fontWeight: 900, color: '#012D10', margin: '0 0 1.5rem' };
-const section = { margin: '0 0 1.5rem' };
-const label = { fontSize: '0.875rem', fontWeight: 700, color: '#669370', margin: '0 0 0.25rem' };
-const text = { fontSize: '1rem', lineHeight: 1.55, color: '#013F17', margin: '0 0 0.5rem' };
-const quiet = { fontSize: '0.875rem', lineHeight: 1.5, color: '#A2AFA8', margin: '0 0 0.5rem' };
-const rule = { borderColor: '#F1F3F2', margin: '2rem 0' };
-const action = { display: 'inline-block', backgroundColor: '#41ED98', color: '#E9FFE1', fontSize: '1rem', fontWeight: 700, textDecoration: 'none', padding: '0.75rem 1.5rem', borderRadius: '1px' };
+const body = {
+  backgroundColor: '#F1F3F2',
+  fontFamily: 'Satoshi, Arial, Helvetica, sans-serif',
+  margin: 0,
+  padding: '24px 12px',
+};
+const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const wordmark = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px', color: '#012D10', margin: 0 };
+const art = { height: '112px', backgroundColor: '#DEFAFC', margin: '34px 0 0' };
+const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '46px 0 0' };
+const subheading = { fontSize: '24px', lineHeight: '32px', fontWeight: 700, letterSpacing: '-0.02em', color: '#012D10', margin: '14px 0 0' };
+const intro = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, letterSpacing: '-0.012em', color: '#013F17', margin: '24px 0 36px' };
+const section = { margin: '0 0 24px' };
+const text = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, color: '#013F17', margin: '0 0 8px' };
+const quiet = { fontSize: '12px', lineHeight: '20px', fontWeight: 500, color: '#A2AFA8', margin: '8px 0 0' };
+const rule = { borderColor: '#41ED98', margin: '40px 0 30px' };
+const action = { display: 'inline-block', backgroundColor: '#41ED98', color: '#E9FFE1', fontSize: '18px', lineHeight: '20px', fontWeight: 900, letterSpacing: '-0.02em', textDecoration: 'none', padding: '20px 44px', borderRadius: '1px' };

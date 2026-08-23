@@ -193,7 +193,34 @@ export async function approveReview(
   deps: { audit: AuditWriter } & Omit<ReviewNotifyDeps, 'db'>,
   input: { campaignId: string; reviewer: string; actor: string },
 ): Promise<ReviewDecisionOutcome> {
-  const review = await openReview(db, input.campaignId);
+  let review = await openReview(db, input.campaignId);
+  if (!review) {
+    review = await db.transaction(async (tx) => {
+      const [campaign] = await tx
+        .select({ status: campaigns.status })
+        .from(campaigns)
+        .where(eq(campaigns.id, input.campaignId))
+        .for('update')
+        .limit(1);
+      if (campaign?.status !== 'affiliate_response_and_build') return null;
+
+      const [latest] = await tx
+        .select({ round: campaignReviews.round })
+        .from(campaignReviews)
+        .where(eq(campaignReviews.campaignId, input.campaignId))
+        .orderBy(desc(campaignReviews.round))
+        .limit(1);
+      const [created] = await tx
+        .insert(campaignReviews)
+        .values({
+          campaignId: input.campaignId,
+          round: (latest?.round ?? 0) + 1,
+          submittedBy: input.actor,
+        })
+        .returning();
+      return created ?? null;
+    });
+  }
   if (!review) {
     return { ok: false, code: 'no_pending_review', message: 'This campaign has no review awaiting a decision.' };
   }
@@ -258,14 +285,18 @@ export async function approveReview(
       .where(eq(campaignReviews.id, review.id))
       .returning();
 
-    if (campaign?.status === 'pending_review') {
+    if (
+      campaign?.status === 'affiliate_response_and_build' ||
+      campaign?.status === 'pending_review'
+    ) {
+      const priorStatus = campaign.status;
       await tx
         .update(campaigns)
         .set({ status: 'approved', updatedAt: new Date() })
-        .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.status, 'pending_review')));
+        .where(and(eq(campaigns.id, input.campaignId), eq(campaigns.status, priorStatus)));
       await tx.insert(campaignStatusHistory).values({
         campaignId: input.campaignId,
-        fromStatus: 'pending_review',
+        fromStatus: priorStatus,
         toStatus: 'approved',
         actor: input.actor,
       });

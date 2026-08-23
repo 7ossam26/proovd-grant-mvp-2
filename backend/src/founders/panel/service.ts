@@ -240,6 +240,28 @@ export interface FounderPanelView {
     transactionId: null;
     nextLabel: string;
   } | null;
+  setup: {
+    status: string;
+    draftVersion: number | null;
+    publishedVersion: number | null;
+    fields: Record<
+      string,
+      {
+        value: string | null;
+        status: string;
+        tone: 'plain' | 'done' | 'waiting' | 'action';
+        source: string;
+      }
+    >;
+    faqs: Array<{ id: string; question: string; answer: string }>;
+    rewards: Array<{
+      id: string;
+      title: string;
+      priceCents: string;
+      delivery: string;
+      description: string;
+    }>;
+  } | null;
 }
 
 export interface ApplicationReviewView {
@@ -501,10 +523,26 @@ export async function readFounderPanel(
 
   const [buildRow] = campaignId
     ? await db
-        .select({ draftVersion: campaignBuild.draftVersion })
+        .select()
         .from(campaignBuild)
         .where(eq(campaignBuild.campaignId, campaignId))
         .limit(1)
+    : [];
+
+  const faqRows = campaignId
+    ? await db
+        .select()
+        .from(campaignFaqs)
+        .where(eq(campaignFaqs.campaignId, campaignId))
+        .orderBy(campaignFaqs.sortOrder)
+    : [];
+
+  const rewardRows = campaignId
+    ? await db
+        .select()
+        .from(campaignRewardPackages)
+        .where(eq(campaignRewardPackages.campaignId, campaignId))
+        .orderBy(campaignRewardPackages.sortOrder)
     : [];
 
   const [snapshotRow] = campaignId
@@ -637,6 +675,87 @@ export async function readFounderPanel(
       }
     : null;
 
+  const voiceParts = (buildRow?.brandVoice ?? '').split(/\n\s*\n/);
+  const voiceWords = (voiceParts.shift() ?? '').trim() || null;
+  const voiceContext = voiceParts.join('\n\n').trim() || null;
+  const orderGoalCents = campaign?.type === 'pre_launch'
+    ? buildRow?.internalTargetCents?.toString() ?? null
+    : buildRow?.orderThreshold === null || buildRow?.orderThreshold === undefined
+      ? null
+      : (BigInt(buildRow.orderThreshold) * 100n).toString();
+
+  const setup = campaignId
+    ? {
+        status:
+          campaign?.campaignBuildStatus === 'complete'
+            ? 'Complete'
+            : buildRow
+              ? 'In progress'
+              : 'Not started',
+        draftVersion: buildRow?.draftVersion ?? null,
+        publishedVersion: snapshotRow?.publishedVersion ?? null,
+        fields: {
+          brandVoicePrefill: {
+            value:
+              [draft?.prefillBrandVoice1, draft?.prefillBrandVoice2]
+                .filter((value): value is string => Boolean(value?.trim()))
+                .join(', ') || null,
+            status: 'Starting values',
+            tone: 'plain' as const,
+            source: 'Admin prefill',
+          },
+          brandVoice: {
+            value: voiceWords,
+            status: voiceWords ? 'Founder saved' : 'Not stated',
+            tone: voiceWords ? ('done' as const) : ('action' as const),
+            source: 'Founder saved',
+          },
+          brandVoiceContext: {
+            value: voiceContext,
+            status: voiceContext ? 'Founder saved' : 'Not stated',
+            tone: voiceContext ? ('done' as const) : ('plain' as const),
+            source: 'Founder saved',
+          },
+          founderOrderGoal: {
+            value: orderGoalCents,
+            status: orderGoalCents ? 'Founder saved' : 'Not stated',
+            tone: orderGoalCents ? ('done' as const) : ('action' as const),
+            source: 'Founder input',
+          },
+          successRule: {
+            value: campaign?.type === 'pre_build' ? 'USD' : null,
+            status: 'Locked before launch',
+            tone: 'done' as const,
+            source: 'Campaign configuration',
+          },
+          campaignLimit: {
+            value: '5000000',
+            status: 'Separate from goal',
+            tone: 'plain' as const,
+            source: 'System rule',
+          },
+          refundsUrl: {
+            value: buildRow?.refundPolicySourceUrl ?? null,
+            status: buildRow?.refundPolicySourceUrl ? 'Required URL present' : 'Not stated',
+            tone: buildRow?.refundPolicySourceUrl ? ('done' as const) : ('action' as const),
+            source: 'Founder saved',
+          },
+        },
+        faqs: faqRows.map((row) => ({
+          id: row.id,
+          question: row.question,
+          answer: row.answer,
+        })),
+        rewards: rewardRows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          priceCents: row.priceCents.toString(),
+          delivery: row.delivery,
+          description: row.contents,
+        })),
+      }
+    : null;
+
   return {
     prospectId,
     campaignId,
@@ -691,6 +810,7 @@ export async function readFounderPanel(
     recentFieldEdits: editRows.map(toFieldEditView),
     optionalItems,
     listingFee,
+    setup,
   };
 }
 

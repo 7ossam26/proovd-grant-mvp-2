@@ -124,7 +124,11 @@ export interface BuildFlowStep {
  */
 export const BUILD_FLOW_STEPS: readonly BuildFlowStep[] = [
   { id: 'voice', models: ['idea', 'product'], writes: 'campaign_build.brand_voice' },
-  { id: 'threshold', models: ['idea'], writes: 'campaign_build.order_threshold' },
+  {
+    id: 'threshold',
+    models: ['idea', 'product'],
+    writes: 'campaign_build.order_threshold | campaign_build.internal_target_cents',
+  },
   { id: 'faqs', models: ['idea', 'product'], writes: 'campaign_faqs' },
   { id: 'rewards', models: ['idea', 'product'], writes: 'campaign_reward_packages' },
 ];

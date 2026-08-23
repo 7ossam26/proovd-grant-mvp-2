@@ -179,6 +179,12 @@ const approveSetup = (campaignId: string): Promise<unknown> =>
     body: JSON.stringify({}),
   });
 
+const resendApprovalEmail = (campaignId: string): Promise<unknown> =>
+  call(`/api/admin/campaigns/${enc(campaignId)}/review/approval-email/resend`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
 export function CampaignSetupStage({ detail, panel, onSaved }: StageProps) {
   const supplement = readSupplement(panel);
   const campaignId = detail.campaigns.current?.campaignId ?? null;
@@ -302,17 +308,33 @@ export function CampaignSetupStage({ detail, panel, onSaved }: StageProps) {
             </div>
             <div className="action-buttons">
               <button
+                type="button"
+                disabled={busy || !campaignId}
+                aria-disabled={busy || !campaignId}
+                onClick={
+                  campaignId
+                    ? () =>
+                        void run(
+                          () => resendApprovalEmail(campaignId),
+                          'Approval email resent.',
+                        )
+                    : undefined
+                }
+              >
+                Resend approval email
+              </button>
+              <button
                 className="primary"
                 type="button"
                 disabled={busy || !campaignId}
                 aria-disabled={busy || !campaignId}
                 onClick={
                   campaignId
-                    ? () => void run(() => approveSetup(campaignId), 'Campaign Setup approved.')
+                    ? () => void run(() => approveSetup(campaignId), 'Campaign approved.')
                     : undefined
                 }
               >
-                Approve Setup
+                Approve campaign
               </button>
             </div>
           </div>

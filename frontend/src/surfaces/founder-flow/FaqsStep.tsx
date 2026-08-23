@@ -237,7 +237,6 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
   const [index, setIndex] = useState(0);
   const [said, setSaid] = useState('');
 
-  const model = build.state?.model ?? 'product';
   const locked =
     !walkthrough && !EDITABLE_STATUSES.includes(build.state?.campaignStatus ?? '');
 
@@ -414,11 +413,10 @@ function FaqScreen({ campaignId, build }: { campaignId: string; build: BuildFlow
         type="button"
         className="ff-faq__back"
         aria-label={
-          model === 'idea' ? 'Back to your order threshold' : 'Back to your brand voice'
+          'Back to your order goal'
         }
         onClick={() => {
-          const to = model === 'idea' ? 'threshold' : 'voice';
-          void autosave.flush().finally(() => leave(founderFlowPath(to, campaignId), -1));
+          void autosave.flush().finally(() => leave(founderFlowPath('threshold', campaignId), -1));
         }}
       >
         <svg

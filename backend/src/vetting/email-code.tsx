@@ -36,6 +36,8 @@
  */
 
 import { eq, sql } from 'drizzle-orm';
+import { Body, Container, Head, Heading, Hr, Html, Preview, Section, Text } from '@react-email/components';
+import { render } from '@react-email/render';
 import type { Database } from '../db/client.js';
 import { founderClaimProfiles } from '../db/schema/vetting.js';
 import { ensureClaimProfile } from './claim.js';
@@ -43,7 +45,6 @@ import type { TokenService } from '../auth/token-service.js';
 import { TOKEN_INVALID, type TokenInvalid } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
 import { FOUNDER_EMAIL_CODE } from '../notifications/events.js';
-import { renderPlainNotice } from '../notifications/templates/plain.js';
 import { EMAIL_CODE_TTL_MINUTES } from './email-code-logic.js';
 
 export interface EmailCodeDeps {
@@ -81,40 +82,87 @@ export async function renderEmailCodeNotice(input: {
   code: string;
   reference: string;
   supportEmail: string;
+  founderName?: string | null;
+  companyName?: string | null;
 }) {
-  return renderPlainNotice({
-    subject: `${input.code} is your Proovd confirmation code`,
-    headline: 'Confirm your email address',
-    facts: [
-      { label: 'Your code', value: input.code },
-      { label: 'How long it lasts', value: `${EMAIL_CODE_TTL_MINUTES} minutes` },
-      {
-        label: 'What it does',
-        // §1.4, and the sentence that keeps this message from reading as a
-        // sign-in. The account, the agreements and the representations are
-        // §10's, later, and each is its own control (§28.4).
-        value:
-          'Confirms we can reach you at this address. It creates no account and signs you into nothing.',
-      },
-      {
-        label: 'If you did not ask for this',
-        value:
-          'Nothing has changed and nothing has been charged. Ignore this email and the code stops working on its own.',
-      },
-    ],
-    paragraphs: [
-      'Type it into the page you already have open. We will not ask you for this code anywhere else, and nobody at Proovd will ever ask you to read it out.',
-    ],
-    /*
-     * No action, deliberately. §27.2 permits one and this message needs none:
-     * the person is looking at the six boxes already. A link here would be a
-     * second way in — one that works from a forwarded email, which is exactly
-     * what a code sent to prove reachability must not be.
-     */
-    reference: input.reference,
-    supportEmail: input.supportEmail,
-  });
+  const founderName = input.founderName?.trim() || '';
+  const companyName = input.companyName?.trim() || '';
+  const greeting = founderName ? `${founderName}, here’s your code.` : 'Here’s your code.';
+  const formattedCode = `${input.code.slice(0, 3)}\u00a0${input.code.slice(3)}`;
+  const subject = 'Your proovd confirmation code';
+  const text = [
+    greeting,
+    '',
+    "Type it into proovd to confirm it's you. It expires in 10 minutes.",
+    '',
+    formattedCode.replace('\u00a0', ' '),
+    '',
+    "Didn't ask for a code? Ignore this email and nothing happens.",
+    '',
+    companyName ? `Wishing ${companyName} the best,` : 'Wishing you the best,',
+    'the Proovd team.',
+    '',
+    `Questions: ${input.supportEmail}`,
+    `Reference: ${input.reference}`,
+  ].join('\n');
+
+  return {
+    subject,
+    html: await render(
+      <Html lang="en">
+        <Head />
+        <Preview>Type it in to confirm it's you it expires in 10 minutes.</Preview>
+        <Body style={codeBody}>
+          <Container style={codeContainer}>
+            <Text style={codeWordmark}>proovd</Text>
+            <Heading style={codeHeading}>{greeting}</Heading>
+            <Text style={codeIntro}>
+              Type it into proovd to confirm it's you. It expires in 10 minutes.
+            </Text>
+            <Section style={codeBox}>
+              <Text style={codeDigits}>{formattedCode}</Text>
+            </Section>
+            <Text style={codeQuiet}>
+              Didn't ask for a code? Ignore this email and nothing happens.
+            </Text>
+            <Hr style={codeRule} />
+            <Text style={codeSignoff}>
+              {companyName ? `Wishing ${companyName} the best,` : 'Wishing you the best,'}
+              <br />
+              the Proovd team.
+            </Text>
+            <Text style={codeFooter}>
+              You're getting this because your email was used to confirm your address on
+              proovd. Questions: {input.supportEmail}
+              <br />
+              Reference: {input.reference}
+              <br />
+              Proovd, 254 Chapman Rd, Ste 208 #27541, Newark, Delaware 19702
+            </Text>
+          </Container>
+        </Body>
+      </Html>,
+    ),
+    text,
+  };
 }
+
+const codeBody = {
+  backgroundColor: '#F1F3F2',
+  fontFamily: 'Satoshi, Arial, Helvetica, sans-serif',
+  margin: 0,
+  padding: '24px 12px',
+};
+const codeContainer = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const codeWordmark = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px', color: '#012D10', margin: 0 };
+const codeHeading = { fontSize: '38px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: '46px', color: '#012D10', margin: '42px 0 0' };
+const codeIntro = { fontSize: '18px', fontWeight: 500, letterSpacing: '-0.012em', lineHeight: '28px', color: '#013F17', margin: '22px 0 0' };
+const codeBox = { border: '2px solid #41ED98', borderRadius: '1px', backgroundColor: '#F1F9F5', padding: '26px 20px', margin: '36px 0 0', textAlign: 'center' as const };
+const codeDigits = { fontSize: '40px', fontWeight: 700, letterSpacing: '0.18em', lineHeight: '48px', color: '#012D10', margin: 0 };
+const codeQuiet = { fontSize: '14px', fontWeight: 500, lineHeight: '22px', color: '#A2AFA8', margin: '22px 0 0' };
+const codeRule = { borderColor: '#41ED98', margin: '48px 0 30px' };
+const codeSignoff = { fontSize: '17px', fontWeight: 500, lineHeight: '27px', color: '#013F17', margin: 0 };
+const codeFooter = { fontSize: '12px', fontWeight: 500, lineHeight: '20px', color: '#A2AFA8', margin: '26px 0 0' };
 
 /**
  * Mints a code for this draft's current address and sends it.
@@ -156,7 +204,12 @@ export async function requestFounderEmailCode(
       if (!acquired) return { ok: false as const, reason: 'another code request is in flight' };
 
       const [current] = await tx
-        .select({ email: founderClaimProfiles.email })
+        .select({
+          email: founderClaimProfiles.email,
+          legalName: founderClaimProfiles.legalName,
+          preferredName: founderClaimProfiles.preferredName,
+          businessName: founderClaimProfiles.businessName,
+        })
         .from(founderClaimProfiles)
         .where(eq(founderClaimProfiles.draftId, input.draftId))
         .for('update')
@@ -173,6 +226,8 @@ export async function requestFounderEmailCode(
         code,
         reference: input.campaignId,
         supportEmail: deps.supportEmail,
+        founderName: current.preferredName || current.legalName,
+        companyName: current.businessName,
       });
 
       const outcome = await deps.notifier!.send({

@@ -9,6 +9,7 @@
  * Founder route that reaches this machinery.
  */
 
+import { randomUUID } from 'node:crypto';
 import { Router, type RequestHandler } from 'express';
 import express from 'express';
 import { eq } from 'drizzle-orm';
@@ -19,7 +20,10 @@ import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import type { AuditWriter } from '../auth/audit.js';
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
-import { reviewNotifyDeps } from '../campaign/review-notifications.js';
+import {
+  notifyCampaignApproved,
+  reviewNotifyDeps,
+} from '../campaign/review-notifications.js';
 import { campaigns } from '../db/schema/domain.js';
 import {
   evaluateRosterReadiness,
@@ -161,6 +165,61 @@ export function createAdminReviewRouter(deps: AdminReviewDeps): Router {
     }
     res.json({ review: { outcome: result.outcome, round: result.review.round } });
   });
+
+  router.post(
+    '/api/admin/campaigns/:campaignId/review/approval-email/resend',
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const campaignId = req.params['campaignId'] as string;
+      const reviews = await listReviews(db, campaignId);
+      const approved = reviews.find((review) => review.outcome === 'approved');
+      if (!approved) {
+        res.status(409).json({
+          error: 'campaign_not_approved',
+          whatHappened: 'There is no approved campaign email to resend yet.',
+        });
+        return;
+      }
+
+      const outcome = await notifyCampaignApproved(
+        { db, ...reviewNotifyDeps(deps) },
+        {
+          campaignId,
+          review: approved,
+          deliveryEntityId: `${approved.id}:resend:${randomUUID()}`,
+        },
+      );
+
+      if (outcome.status === 'unavailable') {
+        res.status(503).json({
+          error: 'email_unavailable',
+          whatHappened:
+            outcome.reason === 'missing_email'
+              ? 'The Founder record has no email address.'
+              : 'Email delivery is not configured.',
+        });
+        return;
+      }
+      if (outcome.status === 'failed') {
+        res.status(502).json({
+          error: 'email_rejected',
+          whatHappened: 'The email provider did not accept the approval email.',
+        });
+        return;
+      }
+
+      await audit({
+        action: 'review.approval_email_resent',
+        targetType: 'campaign',
+        targetId: campaignId,
+        internalReason: 'Admin deliberately resent the approved campaign dashboard link',
+        actorId: req.authUser?.id ?? null,
+      });
+      res.json({ email: { status: 'sent', reviewRound: approved.round } });
+    },
+  );
 
   router.post('/api/admin/campaigns/:campaignId/review/changes', admin, fresh, json, async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;

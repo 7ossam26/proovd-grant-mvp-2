@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { ORDER_THRESHOLD_IS_A_COUNT } from '@proovd/shared';
-import { Button, NO_ACTION, StatePanel } from '../../components/index.js';
+import { NO_ACTION, StatePanel } from '../../components/index.js';
 import {
   referenceDrawerClose,
   referenceDrawerOpen,
@@ -43,39 +43,22 @@ export function ThresholdStep() {
     );
   }
   if (!build.state) return <SurfaceLoading subject="your campaign page" reference="Your campaign" />;
-  if (build.state.model !== 'idea') {
-    return (
-      <FlowPage pageId="threshold" param={campaignId}>
-        <ProductCampaignNotice campaignId={campaignId} />
-      </FlowPage>
-    );
-  }
   return (
     <FlowPage pageId="threshold" param={campaignId}>
-      <GoalScreen campaignId={campaignId} build={build} />
+      <GoalScreen campaignId={campaignId} build={build} model={build.state.model} />
     </FlowPage>
   );
 }
 
-function ProductCampaignNotice({ campaignId }: { campaignId: string }) {
-  const { swapToPage } = useFlowNav();
-  return (
-    <div className="ff-goal__state">
-      <h1 className="sr-only">This step is for Idea Campaigns</h1>
-      <StatePanel
-        state="This step is for Idea Campaigns"
-        whatHappened="A Product Campaign has no public order threshold."
-        next="Carry on with your FAQs."
-        owner="You"
-        nextUpdate="No further update needed"
-        action={<Button tier="primary" onClick={() => swapToPage('faqs')}>On to your FAQs</Button>}
-        reference={campaignId}
-      />
-    </div>
-  );
-}
-
-function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlowState }) {
+function GoalScreen({
+  campaignId,
+  build,
+  model,
+}: {
+  campaignId: string;
+  build: BuildFlowState;
+  model: 'idea' | 'product';
+}) {
   const { swapToPage } = useFlowNav();
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -83,8 +66,13 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
   const direction = useRef<1 | -1 | null>(null);
   if (direction.current === null) direction.current = flowDirection();
 
-  const stored = build.state?.build?.orderThreshold;
-  const initial = useMemo(() => stored === null || stored === undefined ? '' : String(stored), [stored]);
+  const stored = model === 'idea'
+    ? build.state?.build?.orderThreshold
+    : build.state?.build?.internalTargetCents;
+  const initial = useMemo(() => {
+    if (stored === null || stored === undefined) return '';
+    return model === 'idea' ? String(stored) : String(Math.round(Number(stored) / 100));
+  }, [model, stored]);
   const [digits, setDigits] = useState(initial);
   const [drawer, setDrawer] = useState(false);
   const [limitError, setLimitError] = useState<'minimum' | 'maximum' | null>(null);
@@ -107,9 +95,13 @@ function GoalScreen({ campaignId, build }: { campaignId: string; build: BuildFlo
     setLimitError(null);
     const nextAmount = Number(onlyDigits || 0);
     if (onlyDigits === '' || (nextAmount >= 500 && nextAmount <= 50_000)) {
-      build.autosave.queue({ orderThreshold: onlyDigits === '' ? null : nextAmount });
+      build.autosave.queue(
+        model === 'idea'
+          ? { orderThreshold: onlyDigits === '' ? null : nextAmount }
+          : { internalTargetCents: onlyDigits === '' ? null : String(nextAmount * 100) },
+      );
     }
-  }, [build.autosave]);
+  }, [build.autosave, model]);
 
   const continueToFaqs = useCallback(() => {
     if (empty) return;

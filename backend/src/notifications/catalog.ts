@@ -1322,7 +1322,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
         { label: 'Campaign', value: CAMPAIGN },
         { label: 'What happens next', value: 'Continue to the listing-fee step.' },
       ],
-      action: { label: 'Continue setup', url: `${APP}/campaigns/c1/setup/creator-payment` },
+      action: { label: 'Continue setup', url: `${APP}/campaigns/c1/setup/fee` },
       reference: REF,
       supportEmail: SUPPORT,
     }),

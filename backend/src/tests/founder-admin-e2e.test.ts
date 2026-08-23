@@ -6,6 +6,13 @@ import { eq } from 'drizzle-orm';
 import { campaigns } from '../db/schema/domain.js';
 import { founderProspects } from '../db/schema/invitations.js';
 import { campaignAssets } from '../db/schema/workspace.js';
+import {
+  approvedCampaignSnapshots,
+  campaignBuild,
+  campaignFaqs,
+  campaignReviews,
+  campaignRewardPackages,
+} from '../db/schema/build.js';
 import { seedAdminReauthWindow } from '../settings/service.js';
 import { createMemoryStorage } from '../storage/object-storage.js';
 import { startHarness, type Harness } from './app-harness.js';
@@ -200,6 +207,29 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
       fee: { completedItems: 2, discountCents: '400', subtotalCents: '3100' },
     });
 
+    await h.db.insert(campaignBuild).values({
+      campaignId: founder.campaignId,
+      brandVoice: 'Clear, Warm\n\nUse plain language.',
+      orderThreshold: 600,
+      updatedBy: 'founder:e2e',
+    });
+    await h.db.insert(campaignFaqs).values({
+      campaignId: founder.campaignId,
+      question: 'How does this work?',
+      answer: 'The campaign records the answer.',
+      sortOrder: 0,
+    });
+    await h.db.insert(campaignRewardPackages).values({
+      campaignId: founder.campaignId,
+      sku: 'e2e-reward',
+      title: 'Early access',
+      priceCents: 5300n,
+      contents: 'Access to the first release.',
+      fulfillmentCommitment: 'Delivered digitally.',
+      delivery: 'December 2030',
+      sortOrder: 0,
+    });
+
     const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     const storageKey = `campaigns/${founder.campaignId}/logo.png`;
     storage.put(storageKey, 'image/png', image);
@@ -289,6 +319,31 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
       subtotalCents: '3100',
     });
     expect(panel.body.listingFee.lines).toHaveLength(5);
+    expect(panel.body.setup).toMatchObject({
+      status: 'In progress',
+      draftVersion: 1,
+      fields: {
+        brandVoice: { value: 'Clear, Warm', source: 'Founder saved' },
+        brandVoiceContext: { value: 'Use plain language.', source: 'Founder saved' },
+        founderOrderGoal: { value: '60000', source: 'Founder input' },
+        successRule: { value: 'USD' },
+        campaignLimit: { value: '5000000' },
+      },
+      faqs: [
+        expect.objectContaining({
+          question: 'How does this work?',
+          answer: 'The campaign records the answer.',
+        }),
+      ],
+      rewards: [
+        expect.objectContaining({
+          title: 'Early access',
+          priceCents: '5300',
+          delivery: 'December 2030',
+          description: 'Access to the first release.',
+        }),
+      ],
+    });
 
     const downloaded = await request(h.app)
       .get(`/api/admin/founder-panel/${founder.prospectId}/assets/${logo!.id}/download`)
@@ -340,5 +395,64 @@ describe('Admin invitation to authenticated Founder and back to Admin', () => {
       .from(founderProspects)
       .where(eq(founderProspects.id, founder.prospectId));
     expect(prospect?.claimedUserId).not.toBeNull();
+  });
+
+  it('approves a campaign from the Admin panel even when the walkthrough has not submitted a review', async () => {
+    const founder = await createInviteAndClaim();
+    await h.db
+      .update(campaigns)
+      .set({ status: 'affiliate_response_and_build' })
+      .where(eq(campaigns.id, founder.campaignId));
+    await h.db.insert(campaignBuild).values({
+      campaignId: founder.campaignId,
+      title: 'Admin approval test',
+      updatedBy: 'founder:e2e',
+    });
+    const emailsBeforeApproval = h.sentEmails.messages.length;
+
+    await request(h.app)
+      .post(`/api/admin/campaigns/${founder.campaignId}/review/approve`)
+      .set('cookie', admin.cookie)
+      .send({ reviewer: 'Admin panel' })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.review).toMatchObject({ outcome: 'approved', round: 1 });
+      });
+
+    expect(h.sentEmails.messages).toHaveLength(emailsBeforeApproval + 1);
+    expect(h.sentEmails.messages[emailsBeforeApproval]!.text).toContain(
+      `http://localhost:3000/campaigns/${founder.campaignId}/setup/live`,
+    );
+
+    await request(h.app)
+      .post(`/api/admin/campaigns/${founder.campaignId}/review/approval-email/resend`)
+      .set('cookie', admin.cookie)
+      .send({})
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.email).toMatchObject({ status: 'sent', reviewRound: 1 });
+      });
+    expect(h.sentEmails.messages).toHaveLength(emailsBeforeApproval + 2);
+    expect(h.sentEmails.messages[emailsBeforeApproval + 1]!.text).toContain(
+      `http://localhost:3000/campaigns/${founder.campaignId}/setup/live`,
+    );
+
+    const [campaign] = await h.db
+      .select({ status: campaigns.status, stage: campaigns.workflowStageReached })
+      .from(campaigns)
+      .where(eq(campaigns.id, founder.campaignId));
+    expect(campaign).toEqual({ status: 'approved', stage: 'launch' });
+
+    const [review] = await h.db
+      .select({ outcome: campaignReviews.outcome, submittedBy: campaignReviews.submittedBy })
+      .from(campaignReviews)
+      .where(eq(campaignReviews.campaignId, founder.campaignId));
+    expect(review).toMatchObject({ outcome: 'approved', submittedBy: expect.stringContaining('admin') });
+
+    const [snapshot] = await h.db
+      .select({ campaignId: approvedCampaignSnapshots.campaignId })
+      .from(approvedCampaignSnapshots)
+      .where(eq(approvedCampaignSnapshots.campaignId, founder.campaignId));
+    expect(snapshot?.campaignId).toBe(founder.campaignId);
   });
 });

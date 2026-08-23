@@ -153,13 +153,13 @@ export async function renderFormalOpportunity(v: FormalOpportunityVariables): Pr
 
 /* ── Styles — the proovd.css values written out by hand, as email requires ── */
 
-const body = { backgroundColor: '#FAFAFA', fontFamily: 'Helvetica, Arial, sans-serif' };
-const container = { maxWidth: '37.5rem', margin: '0 auto', padding: '2rem 1.5rem' };
+const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = { fontSize: '0.875rem', fontWeight: 900, letterSpacing: '0.08em', color: '#012D10', textTransform: 'uppercase' as const, margin: '0 0 1.5rem' };
-const heading = { fontSize: '1.5rem', lineHeight: 1.25, fontWeight: 900, color: '#012D10', margin: '0 0 1.5rem' };
+const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '0 0 24px' };
 const section = { margin: '0 0 1.5rem' };
 const label = { fontSize: '0.875rem', fontWeight: 700, color: '#669370', margin: '0 0 0.25rem' };
-const text = { fontSize: '1rem', lineHeight: 1.55, color: '#013F17', margin: '0 0 0.5rem' };
+const text = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, color: '#013F17', margin: '0 0 8px' };
 const quiet = { fontSize: '0.875rem', lineHeight: 1.5, color: '#A2AFA8', margin: '0 0 0.5rem' };
-const rule = { borderColor: '#F1F3F2', margin: '2rem 0' };
-const button = { backgroundColor: '#012D10', color: '#FAFAFA', fontSize: '1rem', fontWeight: 700, padding: '0.75rem 1.5rem', borderRadius: '1px', textDecoration: 'none', display: 'inline-block' };
+const rule = { borderColor: '#41ED98', margin: '40px 0 30px' };
+const button = { backgroundColor: '#41ED98', color: '#E9FFE1', fontSize: '18px', fontWeight: 900, padding: '20px 44px', borderRadius: '1px', textDecoration: 'none', display: 'inline-block' };

@@ -47,6 +47,8 @@ export interface FounderDashboardView {
   readonly listingPaidAt: string | null;
   /** §12's classification, locked at listing-fee payment. */
   readonly highEffort: boolean;
+  readonly founderName: string | null;
+  readonly founderEmail: string | null;
   /**
    * §14.4's own title, or null while the build has none. Null renders as
    * nothing rather than as an invented name (§1.4) — the shell has a campaign
@@ -75,6 +77,8 @@ export async function readFounderDashboard(
       listingPaidAt: campaigns.listingPaidAt,
       highEffort: campaigns.highEffort,
       title: campaignBuild.title,
+      founderName: founderClaimProfiles.preferredName,
+      founderEmail: founderClaimProfiles.email,
     })
     .from(campaigns)
     .innerJoin(founderClaimProfiles, eq(founderClaimProfiles.campaignId, campaigns.id))
@@ -102,5 +106,7 @@ export async function readFounderDashboard(
     listingPaidAt: row.listingPaidAt?.toISOString() ?? null,
     highEffort: row.highEffort ?? false,
     title: row.title ?? null,
+    founderName: row.founderName ?? null,
+    founderEmail: row.founderEmail ?? null,
   };
 }

@@ -3632,23 +3632,23 @@ label.btn{ cursor:pointer; }
 
 /* P4's two objects filled the screen edge to edge; the pair and its contents
    step down while the commit button and the footer keep their size. */
-.pre-stage > .frame.standard:has(.p4-col){ max-width:min(66rem,100%) }
+.pre-stage > .frame.standard:has(.p4-col){ max-width:min(80rem,100%) }
 .p4-col > .pre-head{ align-items:center; text-align:center; width:100%;
   margin-bottom:clamp(.8rem,2.2svh,1.6rem) }
 .p4-col > .pre-head .h1{ font-size:calc(var(--h1) * 1.06); max-width:100%;
   margin-inline:auto }
 .p4-col > .pre-head .lede{ font-size:var(--body); max-width:min(44rem,100%);
   margin-inline:auto }
-.p4-objttl{ font-size:var(--small) }
-.p4-price{ font-size:var(--small) }
-.p4-mark{ width:1.5rem; height:1.5rem }
-.p4-obj{ padding:clamp(.55rem,1.2vw,.85rem) }
-.p4-obj .field{ min-height:calc(var(--ctrl-s-h) * .82); font-size:var(--micro) }
-.p4-add{ font-size:var(--micro) }
-.p4-del{ font-size:calc(var(--micro) * .92) }
-.p4-objhead .box{ width:1rem; height:1rem }
-.p4-col{ gap:clamp(.9rem,2.2svh,1.5rem) }
-.p4-rows{ gap:clamp(.45rem,1.1svh,.75rem) }
+.p4-objttl{ font-size:var(--body) }
+.p4-price{ font-size:var(--h3) }
+.p4-mark{ width:2rem; height:2rem }
+.p4-obj{ padding:clamp(.9rem,1.8vw,1.35rem) }
+.p4-obj .field{ min-height:var(--ctrl-s-h); font-size:var(--small) }
+.p4-add{ font-size:var(--small) }
+.p4-del{ font-size:var(--body) }
+.p4-objhead .box{ width:1.25rem; height:1.25rem }
+.p4-col{ gap:clamp(1.15rem,2.8svh,1.9rem) }
+.p4-rows{ gap:clamp(.65rem,1.5svh,1rem) }
 
 /* P4's foot carries a way back and an opt-out; they sit at opposite ends so the
    pair isn't read as one group */
@@ -3669,7 +3669,7 @@ label.btn{ cursor:pointer; }
 .p4-build > .p4-del{ grid-area:del }
 .p4-build > .tag-quiet{ grid-area:tag }
 .p4-build > .p4-price{ grid-area:price }
-.p4-build .ph{ width:clamp(7rem,14vw,11rem) !important; height:100% !important }
+.p4-build .ph{ width:clamp(8.5rem,16vw,13rem) !important; height:100% !important }
 .p4-del{ font-size:var(--small) }
 .p4-price{ font-size:var(--body) }
 
@@ -3832,20 +3832,25 @@ label.btn{ cursor:pointer; }
 .ch-copy .b-offerpct{font-size:var(--h3)}
 
 /* the work strip takes more of the row */
-.ch-body{grid-template-columns:minmax(0,1fr) 26rem}
-.ch-tile{flex:0 0 14rem}
-.ch-track{padding:0 6rem}
+.ch-body{grid-template-columns:minmax(0,1fr) 34rem}
+.ch-tile{flex:0 0 18rem}
+.ch-track{padding:0 8rem}
 
 /* Centring is arithmetic, not a guess: half the difference between the window
    and a tile on each side, and a stride of exactly one tile plus one gap. The
    fades ramp gently instead of whiting the neighbours out, and the controls
    are big enough to hit. */
-.ch-track{padding:0 calc((26rem - 14rem) / 2)}
+.ch-track{padding:0 calc((34rem - 18rem) / 2)}
 .ch-fade{width:38%}
 .ch-fade.l{background:linear-gradient(270deg,rgba(250,250,250,0) 0%,rgba(250,250,250,.35) 52%,rgba(250,250,250,.92) 100%)}
 .ch-fade.r{background:linear-gradient(90deg,rgba(250,250,250,0) 0%,rgba(250,250,250,.35) 52%,rgba(250,250,250,.92) 100%)}
 .ch-nav{width:2.9rem;height:2.9rem}
 .ch-nav i{width:.62rem;height:.62rem;border-right-width:.19rem;border-bottom-width:.19rem}
+
+@media (max-width:900px){
+  .ch-body{grid-template-columns:1fr}
+  .ch-work{width:min(34rem,100%);max-width:none}
+}
 
 /* the foot sits clear of the decision above it */
 .ch-foot{margin-top:clamp(1rem,2.6svh,2rem)}
@@ -4153,13 +4158,10 @@ if (HAS_GSAP){
 
 /* ---------- state ------------------------------------------------------ */
 var params  = new URLSearchParams(location.search);
-var demoKey = 'proovd-founder-dashboard-v5';
-/* Every refresh starts the story over. Reloading is how you re-watch the flow,
-   so a resumed session gets in the way rather than helping. persist() still
-   runs and nothing downstream changes — only the boot-time restore is gone,
-   and the key is cleared so a stale save can never leak into the next run. */
+var campaignId = params.get('campaign') || '';
+var demoKey = 'proovd-founder-dashboard-v6:' + campaignId;
 var saved   = null;
-try{ localStorage.removeItem(demoKey); }catch(e){}
+try{ saved = JSON.parse(localStorage.getItem(demoKey) || 'null'); }catch(e){ saved = null; }
 
 var seedAffiliates=[
   {id:'farah',name:'Farah Nassar',handle:'@scentbyfarah',url:'https://www.instagram.com/',followers:'184K',reach:'620K',eng:'7.8%',desc:'Short, high-energy fragrance reviews and “what I would actually wear” comparisons. Strong women 18–29 audience.',offer:50,status:'offer',backers:92,revenue:6440,bonus:false,meeting:'',posts:['“Egyptian perfume that surprised me”','3 scents under $50','What I wore this week']},
@@ -4171,14 +4173,14 @@ var seedAffiliates=[
 ];
 
 var initial={
-  campaignType:params.get('type')==='idea'?'idea':'product',highEffort:params.get('effort')!=='standard',upfront:params.get('upfront')==='1'&&params.get('type')!=='idea',
-  onboarding:'P1',passwordSet:false,refundLink:'https://teeb.co/refunds',communityMode:'',communityLink:'',communityPaid:false,
+  campaignType:params.get('type')==='product'?'product':'idea',highEffort:params.get('effort')==='high',upfront:params.get('upfront')==='1'&&params.get('type')==='product',
+  onboarding:'P1',passwordSet:false,refundLink:'',communityMode:'',communityLink:'',communityPaid:false,
   section:'choose',phase:params.get('phase')||'matching',campaignDay:Number(params.get('day')||4),campaignLength:14,selectedAffiliate:'farah',affiliates:seedAffiliates,
   bonusDraft:{pct:5,period:'week',backers:60},counterDraft:35,rejectReason:'',toast:'',modal:null,drawer:null,
   notifications:{backer:true,daily:true,creator:true,updates:true,payout:true},interviewUpcoming:true,
   campaignUpdateStatus:'none',postedUpdates:[{date:'Day 3',title:'We passed 100 backers',body:'Thank you. We’re already working through the feedback you left at checkout.'}],
   w9:false,proofDelivery:false,payoutRequested:false,payoutApproved:false,ideaPaid:false,firstPayoutPaid:false,restRequested:false,remainingPayoutPaid:false,progressUpdateDue:false,progressUpdateSubmitted:false,marketingAccess:false,marketingPurpose:'marketing',
-  settingsTab:'account',profile:{name:'Ahmed Ehab',email:'ahmed.ehab@teeb.com',phone:'+20 10 5555 2481'},personal:{legalName:'Ahmed Ehab',dob:'1997-03-12'},communityLinks:['https://discord.gg/teeb-founders'],goodStanding:true,resetPasswordSent:false,cancelled:false,
+  settingsTab:'account',profile:{name:params.get('founder')||'',email:params.get('email')||'',phone:''},personal:{legalName:params.get('founder')||'',dob:''},communityLinks:[],goodStanding:true,resetPasswordSent:false,cancelled:false,
   likedPosts:{},issues:{},workAgainRequests:{},afterPlayed:false,
   story:{chooseIntroSeen:false,liveRecapDone:false,liveRecapStep:0,closeRecapDone:false,closeRecapStep:0,returnSection:'choose'},
   scene:{choose:0,live:0,payouts:0,after:0}, page:null
@@ -4188,12 +4190,18 @@ var state = Object.assign({}, initial, saved||{});
 state.affiliates = (saved && saved.affiliates) ? saved.affiliates : seedAffiliates;
 state.story = Object.assign({chooseIntroSeen:false,liveRecapDone:false,liveRecapStep:0,closeRecapDone:false,closeRecapStep:0,returnSection:'choose'}, state.story||{});
 state.scene = Object.assign({choose:0,live:0,payouts:0,after:0}, state.scene||{});
-if (params.has('type'))   state.campaignType = params.get('type')==='idea'?'idea':'product';
-if (params.has('effort')) state.highEffort   = params.get('effort')!=='standard';
+if (params.has('type'))   state.campaignType = params.get('type')==='product'?'product':'idea';
+if (params.has('effort')) state.highEffort   = params.get('effort')==='high';
 if (params.has('day'))    state.campaignDay  = Number(params.get('day'));
 if (params.has('upfront'))state.upfront      = params.get('upfront')==='1';
 if (state.campaignType==='idea') state.upfront = false;
 if (params.has('phase'))  state.phase        = params.get('phase');
+if (params.has('founder')) state.profile.name = params.get('founder') || '';
+if (params.has('email')) state.profile.email = params.get('email') || '';
+if (!state.highEffort && state.onboarding === 'P2')
+  state.onboarding = state.campaignType === 'product' ? 'P3' : 'P4';
+if (state.campaignType !== 'product' && (state.onboarding === 'P3' || state.onboarding === 'P3b'))
+  state.onboarding = 'P4';
 var S = state;                       /* the chapters address it as S */
 
 function persist(){
@@ -4926,7 +4934,7 @@ function renderStoryChrome(){
      and the chapter behind it becomes the way back (DNA 5.12). */
   const here = offStory ? `<span class="ch here" aria-current="page"><span class="chl">Settings</span></span>` : '';
 
-  return `<header class="band"><button type="button" class="f-wm" data-action="story-home">${WORDMARK}</button><div class="dayline"><span class="nm">Teeb</span><span class="ph">${esc(phaseLabel())}</span></div><div class="right">${offStory?`<button type="button" class="back-now" data-action="story-back-now">Back to story</button>`:''}<button type="button" class="bell" aria-label="Notifications" data-action="notifications">${icon('bell')}<span class="badge">4</span></button><button type="button" class="explore-btn" aria-label="Settings" data-action="story-explore">${icon('dots')}<span>Settings</span></button></div></header>`;
+  return `<header class="band"><button type="button" class="f-wm" data-action="story-home">${WORDMARK}</button><div class="dayline"><span class="nm">${esc(PCAMP.name)}</span><span class="ph">${esc(phaseLabel())}</span></div><div class="right">${offStory?`<button type="button" class="back-now" data-action="story-back-now">Back to story</button>`:''}<button type="button" class="bell" aria-label="Notifications" data-action="notifications">${icon('bell')}<span class="badge">4</span></button><button type="button" class="explore-btn" aria-label="Settings" data-action="story-explore">${icon('dots')}<span>Settings</span></button></div></header>`;
 }
 
 /* ---- the story drawer: the whole campaign on one night field ---- */
@@ -4948,7 +4956,7 @@ function renderStoryDrawer(){
   /* the intro line was explaining what every card already states on its
      face ("Now" / "Available" / "Not yet" plus the unlock sentence), so it
      failed the deletion test (DNA 5.7). */
-  return `<div id="scrim" data-close-drawer></div><aside id="drawer" class="f-don"><div class="dhead"><div class="f-dh"><span class="kicker">Teeb · your campaign</span><h2>The whole story.</h2></div><button type="button" class="xbtn" data-close-drawer aria-label="Close">×</button></div><div class="f-dlist">${chapters}</div><div class="f-dsec"><span class="kicker">Always available</span><div class="f-djumps">${links}</div></div></aside>`;
+  return `<div id="scrim" data-close-drawer></div><aside id="drawer" class="f-don"><div class="dhead"><div class="f-dh"><span class="kicker">${esc(PCAMP.name)} · your campaign</span><h2>The whole story.</h2></div><button type="button" class="xbtn" data-close-drawer aria-label="Close">×</button></div><div class="f-dlist">${chapters}</div><div class="f-dsec"><span class="kicker">Always available</span><div class="f-djumps">${links}</div></div></aside>`;
 }
 
 function renderDrawer(){
@@ -5017,7 +5025,7 @@ function renderModal(){
     closeBtn('t','Back') + btn('p','Send to affiliates',{act:'send-affiliates'}));
 
   if (S.modal==='campaignPreview') return modalShell('Campaign preview','This is the version creators and backers see.',
-    `<div class="f-preview">${tagQuiet('Preview')}<h2 class="h2">Teeb makes everyday perfume smell imported.</h2>${ph({on:'light',seed:0,w:'100%',h:'var(--dossier-media)'})}<p class="copy">A perfume line made in Egypt that smells like the imported ones, priced for everyday wear, starting with the women’s range.</p>${S.campaignType==='product'?`<hr class="rule"><h3 class="h3">Refunds</h3><p class="copy"><a href="${escAttr(S.refundLink||'#')}" target="_blank" rel="noreferrer">${esc(S.refundLink||'yourstore.com/refunds')}</a></p>`:''}</div>`,
+    `<div class="f-preview">${tagQuiet('Preview')}<h2 class="h2">${esc(PCAMP.name)}</h2>${ph({on:'light',seed:0,w:'100%',h:'var(--dossier-media)'})}${S.campaignType==='product'?`<hr class="rule"><h3 class="h3">Refunds</h3><p class="copy"><a href="${escAttr(S.refundLink||'#')}" target="_blank" rel="noreferrer">${esc(S.refundLink||'yourstore.com/refunds')}</a></p>`:''}</div>`,
     closeBtn('t','Close preview'));
 
   if (S.modal==='editCampaign') return modalShell('Request a page update','Draft the change. A Proovd rep approves it before it replaces the live version.',
@@ -5205,7 +5213,7 @@ var CFG = {
   buildCents: 500,          /* the one-time Proovd-builds-it charge */
   taxCents: 0,              /* a tax line renders only when this is non-zero */
   minPolicyChars: 200,      /* the floor a pasted refund policy has to clear */
-  minPassword: 10,          /* the only password rule */
+  minPassword: 12,
   ceilingPct: 50,           /* founder + creator can't cross this together */
   deliverables: [
     'A Discord server in your name',
@@ -5217,7 +5225,7 @@ var CFG = {
 /* The campaign facts this chapter needs that the dashboard's own state does
    not carry. Everything else — email, campaign type, effort, community — is
    read from S so the dashboard downstream sees what the founder chose. */
-var PCAMP = { name:'Teeb', url:'https://proovd.com/c/teeb', liveAt:'2026-08-07T16:00:00Z' };
+var PCAMP = { name:params.get('name') || 'Campaign', url:'', liveAt:'' };
 
 /* ---------------------------------------------------------------------------
    MODULE STATE — drafts survive Back, Explore and interruption (DNA 5.12).
@@ -5455,7 +5463,7 @@ PSCREENS.P1 = {
     h +=       '<div class="p1-fieldwrap">';
     h +=         '<input id="pd-p1" class="p1-input" type="' + (PRE.p1.show ? 'text' : 'password') + '"' +
                ' value="' + escAttr(PRE.p1.value) + '" autocomplete="new-password"' +
-               ' aria-label="Your password" placeholder="At least ten characters">';
+               ' aria-label="Your password" placeholder="At least twelve characters">';
     h +=         '<button type="button" class="p1-show" data-action="p1show">' +
                (PRE.p1.show ? 'Hide' : 'Show') + '</button>';
     h +=       '</div>';
@@ -5482,7 +5490,7 @@ PSCREENS.P1 = {
     h +=   btn('p', 'Save it and let me in', { act:'p1save', cls:'pre-cta p1-cta' +
              (pend ? ' pending' : '') + (PRE.p1.confirm.length ? '' : ' veiled') });
     h +=   '<p class="pre-note" data-p1min' + (PRE.p1.warn ? '' : ' hidden') + '>' +
-             esc(PRE.p1.warnMsg || 'Ten characters minimum.') + '</p>';
+             esc(PRE.p1.warnMsg || 'Twelve characters minimum.') + '</p>';
     h += '</div>';
     return h;
   },
@@ -5593,12 +5601,18 @@ function setBar(bar, n, instant){
 }
 /* P1 asks one thing in two fields: long enough, then the same twice. */
 function p1Ready(){
-  return PRE.p1.value.length >= CFG.minPassword && PRE.p1.confirm === PRE.p1.value;
+  return !PRE.p1.saving && !p1PolicyProblem(PRE.p1.value) && PRE.p1.confirm === PRE.p1.value;
+}
+function p1PolicyProblem(value){
+  if (value.length < CFG.minPassword) return 'Twelve characters minimum.';
+  if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/[^A-Za-z0-9]/.test(value))
+    return 'Add uppercase, lowercase and a special character.';
+  return '';
 }
 function p1Problem(){
-  var n = PRE.p1.value.length;
-  if (n > 0 && n < CFG.minPassword) return 'Ten characters minimum.';
-  if (n >= CFG.minPassword && PRE.p1.confirm.length && PRE.p1.confirm !== PRE.p1.value)
+  var policy = PRE.p1.value ? p1PolicyProblem(PRE.p1.value) : '';
+  if (policy) return policy;
+  if (PRE.p1.confirm.length && PRE.p1.confirm !== PRE.p1.value)
     return 'The second one doesn\u2019t match yet.';
   return '';
 }
@@ -5619,7 +5633,7 @@ function p1Match(root, instant){
 function showWarn(root, msg){
   var w = root.querySelector('[data-p1min]');
   if (!w) return;
-  var text = msg || 'Ten characters minimum.';
+  var text = msg || 'Twelve characters minimum.';
   var fresh = w.hasAttribute('hidden') || w.textContent !== text;
   PRE.p1.warn = true;
   PRE.p1.warnMsg = text;
@@ -5657,12 +5671,12 @@ function ctaState(root, ok){
 }
 function p1save(){
   var root = stage();
-  if (!root) return;
-  if (PRE.p1.value.length < CFG.minPassword){
+  if (!root || PRE.p1.saving) return;
+  var policy = p1PolicyProblem(PRE.p1.value);
+  if (policy){
     PRE.p1.focus = 'value';
-    showWarn(root, 'Ten characters minimum.');
-    ptoast('A few more characters.',
-           (CFG.minPassword - PRE.p1.value.length) + ' more and you are in.');
+    showWarn(root, policy);
+    ptoast('That password is not ready.', policy);
     return;
   }
   if (!PRE.p1.confirm.length){
@@ -5678,7 +5692,32 @@ function p1save(){
     return;
   }
   capture('p1bar', root.querySelector('[data-p1bar]'));
-  advance('P1');
+  if (!campaignId){
+    showWarn(root, 'This dashboard is not connected to a campaign.');
+    return;
+  }
+  PRE.p1.saving = true;
+  quietRender();
+  fetch('/api/founder/settings/initial-password', {
+    method:'POST', credentials:'same-origin',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({campaignId:campaignId,password:PRE.p1.value})
+  }).then(function(response){
+    if (response.ok) return null;
+    return response.json().catch(function(){ return {}; }).then(function(body){
+      throw new Error(body.whatHappened || body.title || 'That password was not set.');
+    });
+  }).then(function(){
+    PRE.p1.saving = false;
+    PRE.p1.value = '';
+    PRE.p1.confirm = '';
+    advance('P1');
+  }).catch(function(error){
+    PRE.p1.saving = false;
+    PRE.p1.warn = true;
+    PRE.p1.warnMsg = error && error.message ? error.message : 'That password was not set.';
+    quietRender();
+  });
 }
 
 /* ============================================================================
@@ -6640,7 +6679,7 @@ function renderChooseHub(){
       </div>
       <div class="ch-work">
         <div class="ch-strip">
-          <div class="ch-track" data-vtrack data-vat="1" style="transform:translateX(-15rem)">${tiles}</div>
+          <div class="ch-track" data-vtrack data-vat="1" style="transform:translateX(-19rem)">${tiles}</div>
           <span class="ch-fade l"></span>
           <span class="ch-fade r"></span>
           <button type="button" class="ch-nav l" data-vstep="-1" aria-label="Previous piece"><i></i></button>
@@ -7213,7 +7252,7 @@ function renderCloseRecap(){
   const step=Math.max(0,Math.min(2,S.story.closeRecapStep||0));
   const beats=[
     {k:'The campaign closed',n:'128%',h:'You cleared the threshold.',p:'The campaign finished above goal. Now the story turns from momentum into money.'},
-    {k:'What people made possible',n:'$12,840',h:'183 people backed Teeb.',p:'That is the final campaign result before affiliate and Proovd cuts.'},
+    {k:'What people made possible',n:'$12,840',h:'183 people backed '+PCAMP.name+'.',p:'That is the final campaign result before affiliate and Proovd cuts.'},
     {k:'Next chapter',n:S.campaignType==='product'?'40%':'3 days',h:S.campaignType==='product'?'Your first payout comes first.':'Then you can request payment.',p:S.campaignType==='product'?'The payout chapter starts with the card retry window, then the first 40% request.':'The payout chapter starts with the card retry window, then your payment request.'}
   ];
   const b=beats[step], last=step===beats.length-1;

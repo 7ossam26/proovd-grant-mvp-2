@@ -67,8 +67,8 @@ export type SendOutcome =
   | { status: 'sent'; notificationId: string; deliveryId: string }
   /** A delivery for this (event, target, entity) already exists. Not an error. */
   | { status: 'duplicate' }
-  /** Claimed, then the provider refused. The claim stays, unconfirmed. */
-  | { status: 'failed'; deliveryId: string; reason: string };
+  /** A template is rejected before claim, or the claimed provider send fails. */
+  | { status: 'failed'; deliveryId?: string; reason: string };
 
 export interface NotifierDeps {
   db: Database;
@@ -84,8 +84,40 @@ export interface NotifierDeps {
   }) => Promise<void>;
 }
 
+/** Product copy rule: no outbound email may contain an em dash in any part. */
+export function removeEmailEmDashes(value: string): string {
+  return value
+    .replaceAll('\u2014', ',')
+    .replace(/&mdash;|&#8212;|&#x2014;/gi, ',');
+}
+
+/** Bracket and moustache variables that must never reach an email provider. */
+const UNRESOLVED_EMAIL_VARIABLE = /\[[A-Z][A-Z0-9 _/-]{2,}\]|\{\{\s*[^{}]+?\s*\}\}/g;
+
+export function unresolvedEmailVariables(
+  message: Pick<OutgoingEmail, 'subject' | 'html' | 'text'>,
+): string[] {
+  const found = new Set<string>();
+  for (const part of [message.subject, message.html, message.text]) {
+    for (const match of part.matchAll(UNRESOLVED_EMAIL_VARIABLE)) found.add(match[0]);
+  }
+  return [...found].sort();
+}
+
 export function createNotifier({ db, transport, audit }: NotifierDeps) {
   async function send(request: SendRequest): Promise<SendOutcome> {
+    const unresolved = unresolvedEmailVariables(request);
+    if (unresolved.length > 0) {
+      const reason = `Email contains unresolved variables: ${unresolved.join(', ')}`;
+      await audit({
+        action: 'notification.template_rejected',
+        targetType: request.entityType,
+        targetId: request.entityId,
+        internalReason: `${request.eventKey} was not claimed or sent: ${reason}`,
+      });
+      return { status: 'failed', reason };
+    }
+
     const claimed = await db
       .insert(notificationDeliveries)
       .values({
@@ -116,9 +148,9 @@ export function createNotifier({ db, transport, audit }: NotifierDeps) {
         to: request.to,
         from: request.from,
         replyTo: request.replyTo,
-        subject: request.subject,
-        html: request.html,
-        text: request.text,
+        subject: removeEmailEmDashes(request.subject),
+        html: removeEmailEmDashes(request.html),
+        text: removeEmailEmDashes(request.text),
       }));
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);

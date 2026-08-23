@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildFlowStepsFor } from './build-flow.js';
 import { FOUNDER_FLOW_PAGES, founderFlowPath } from './flow.js';
 
 describe('Founder Flow Stage 5', () => {
@@ -23,5 +24,10 @@ describe('Founder Flow Stage 5', () => {
 
   it('builds the campaign launch address used by Continue to launch', () => {
     expect(founderFlowPath('live', 'campaign-a')).toBe('/campaigns/campaign-a/setup/live');
+  });
+
+  it('includes the order-goal page in both campaign build walks', () => {
+    expect(buildFlowStepsFor('idea').map((step) => step.id)).toContain('threshold');
+    expect(buildFlowStepsFor('product').map((step) => step.id)).toContain('threshold');
   });
 });

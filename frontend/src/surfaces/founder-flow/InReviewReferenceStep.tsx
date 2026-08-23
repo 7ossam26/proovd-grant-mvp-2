@@ -8,7 +8,7 @@
  * a payment, review, or Creator decision to the database.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { HelpDrawer, FlowPage, useFlowNav } from './FlowPage.js';
 import { InReviewStep } from './InReviewStep.js';
@@ -24,12 +24,6 @@ const REVIEW_ASSETS = {
     import.meta.url,
   ).href,
 };
-
-const REFERENCE_CREATORS = [
-  { initials: 'AA', handle: 'ahmedamr' },
-  { initials: 'H', handle: 'Habiba' },
-  { initials: 'KS', handle: 'KhaledSamer' },
-] as const;
 
 /** Keep the pitch simulation separate from the truthful production state. */
 export function InReviewRoute() {
@@ -47,17 +41,7 @@ export function InReviewReferenceStep() {
 }
 
 function ReviewBody() {
-  const { param, swapToPage } = useFlowNav();
-  const [accepted, setAccepted] = useState(1);
-
-  useEffect(() => {
-    const second = window.setTimeout(() => setAccepted(2), 1500);
-    const third = window.setTimeout(() => setAccepted(3), 3000);
-    return () => {
-      window.clearTimeout(second);
-      window.clearTimeout(third);
-    };
-  }, []);
+  const { param } = useFlowNav();
 
   return (
     <section className="ff-review-ref">
@@ -84,38 +68,17 @@ function ReviewBody() {
           />
           <h1 data-review-anim="head">Campaign in review</h1>
           <p data-review-anim="sub" className="ff-review-ref__sub">
-            We’re reviewing your campaign — this won’t take long
+            We’re reviewing your campaign. This won’t take long
           </p>
-          <div data-review-anim="cta" className="ff-review-ref__creators">
-            {REFERENCE_CREATORS.map((creator, index) => {
-              const hasAccepted = index < accepted;
-              return (
-                <div
-                  className={`ff-review-ref__creator${hasAccepted ? ' is-accepted' : ''}`}
-                  key={creator.handle}
-                >
-                  <span className="ff-review-ref__avatar">{creator.initials}</span>
-                  <span className="ff-review-ref__creator-copy">
-                    @{creator.handle} {hasAccepted ? 'has accepted' : 'is looking at'} your campaign
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          <p data-review-anim="cta" className="ff-review-ref__affiliate-setup">
+            Setting up your affiliates.
+          </p>
           <p data-review-anim="note" className="ff-review-ref__note">
             Our team will reach out as soon as all your affiliates are in place
           </p>
         </div>
       </ReviewStage>
 
-      <p className="ff-review-ref__demo">Demo walkthrough — no payment or review decision is recorded</p>
-      <button
-        type="button"
-        className="ff-review-ref__continue"
-        onClick={() => swapToPage('live')}
-      >
-        Continue to launch
-      </button>
     </section>
   );
 }

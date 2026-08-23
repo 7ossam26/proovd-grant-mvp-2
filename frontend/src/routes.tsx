@@ -85,7 +85,6 @@ import { FaqsStep } from './surfaces/founder-flow/FaqsStep.js';
 import { RewardsStep } from './surfaces/founder-flow/RewardsStep.js';
 import { InReviewRoute } from './surfaces/founder-flow/InReviewReferenceStep.js';
 import { LiveRoute } from './surfaces/founder-flow/LiveReferenceStep.js';
-import { FounderPasswordStep } from './surfaces/founder-flow/FounderPasswordStep.js';
 
 /**
  * `/draft/:token/vetting` — retired by Founder Flow v2 Session C.
@@ -148,7 +147,11 @@ function WorkspaceRedirect() {
   return <Navigate to={founderFlowPath('fee', campaignId)} replace />;
 }
 
-/** The reference-only application-review timer never represented stored state. */
+/** The supplied dashboard owns its password-first onboarding flow. */
+function FounderSetupTailRedirect() {
+  const { campaignId = '' } = useParams();
+  return <Navigate to={`${founderDashboardPath(campaignId)}?entry=complete`} replace />;
+}
 
 /**
  * The retired roster and Creator-readiness addresses (Founder Dashboard Session
@@ -876,16 +879,15 @@ const rootChildren: RouteObject[] = [
     element: <InReviewRoute />,
   },
   {
-    // The pitch walkthrough celebrates before account setup. Genuine visits
-    // still redirect to the supplied dashboard inside LiveRoute.
+    // The approval handoff precedes the supplied dashboard's password screen.
     path: 'campaigns/:campaignId/setup/live',
     element: <LiveRoute />,
   },
   {
-    // The claim session proves ownership; this replaces its server-generated
-    // temporary credential before the Founder enters the dashboard.
+    // The supplied dashboard starts with its own password setup. Existing
+    // bookmarks and approval-email links hand directly to that intro.
     path: 'campaigns/:campaignId/setup/password',
-    element: <FounderPasswordStep />,
+    element: <FounderSetupTailRedirect />,
   },
   {
     /*

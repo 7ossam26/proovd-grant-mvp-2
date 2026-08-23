@@ -129,8 +129,9 @@ async function askForCode(invited: Invited): Promise<string> {
   await request(h.app).post(`/api/draft/${invited.raw}/email-code`).send({}).expect(202);
   const message = h.sentEmails.messages[before];
   expect(message, 'no code email was sent').toBeTruthy();
-  const code = new RegExp(`\\b(\\d{${EMAIL_CODE_LENGTH}})\\b`).exec(message!.subject)?.[1];
-  expect(code, 'no code in the subject').toBeTruthy();
+  const match = /\b(\d{3})\s(\d{3})\b/.exec(message!.text);
+  const code = match ? `${match[1]}${match[2]}` : undefined;
+  expect(code, 'no code in the email body').toBeTruthy();
   return code!;
 }
 
@@ -442,7 +443,7 @@ describe('the six-digit code', () => {
 
     // The one place it legitimately exists is the delivered message.
     const message = h.sentEmails.messages[before]!;
-    expect(`${message.subject}${message.text}`).toContain(code);
+    expect(`${message.subject}${message.text}`.replace(/\s/g, '')).toContain(code);
   });
 
   it('reports no successful send for a draft with no address, and sends nothing', async () => {
@@ -508,7 +509,8 @@ describe('the six-digit code', () => {
 
     await founder.post(`/api/draft/${invited.raw}/email-code`).send({}).expect(202);
     const codeMessage = h.sentEmails.messages[beforeCode]!;
-    const code = new RegExp(`\\b(\\d{${EMAIL_CODE_LENGTH}})\\b`).exec(codeMessage.subject)?.[1];
+    const match = /\b(\d{3})\s(\d{3})\b/.exec(codeMessage.text);
+    const code = match ? `${match[1]}${match[2]}` : undefined;
     expect(code).toBeTruthy();
 
     const verified = await founder

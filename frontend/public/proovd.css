@@ -18018,6 +18018,41 @@ html.no-motion .ff-story__say { transition: none; }
 }
 .ff-review-ref__creator.is-accepted { border-color: #41ED98; }
 .ff-review-ref__creator.is-accepted .ff-review-ref__avatar { background: #013F17; }
+.ff-review-ref__affiliate-setup {
+  position: relative;
+  overflow: hidden;
+  width: min(1500px, 78%);
+  margin: 150px 0 0;
+  padding: 58px 72px;
+  border: 2px solid #41ED98;
+  background: #FAFAFA;
+  color: #013F17;
+  font-size: 64px;
+  font-weight: 700;
+  letter-spacing: -.012em;
+  text-align: center;
+}
+.ff-review-ref__affiliate-setup::after {
+  position: absolute;
+  top: -35%;
+  bottom: -35%;
+  left: -32%;
+  width: 24%;
+  background: linear-gradient(105deg, transparent, rgba(65, 237, 152, .22), transparent);
+  content: '';
+  transform: skewX(-18deg);
+  animation: ff-review-affiliate-sheen 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ff-review-affiliate-sheen {
+  0%, 16% { left: -32%; opacity: 0; }
+  26% { opacity: 1; }
+  68% { left: 108%; opacity: 1; }
+  78%, 100% { left: 108%; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-review-ref__affiliate-setup::after { animation: none; }
+}
 .ff-review-ref__note {
   margin: 130px 0 0;
   color: #A2AFA8;

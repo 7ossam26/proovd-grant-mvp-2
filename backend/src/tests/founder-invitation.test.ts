@@ -369,7 +369,7 @@ describe('§7 Admin creates a Founder prospect and the initial campaign containe
 /* ── §7: the preview gate ─────────────────────────────────────────────────── */
 
 describe('§7 preview shows final variables and no unresolved placeholder', () => {
-  it('names every unfilled field and blocks while any remain', async () => {
+  it('resolves the sender from the signed-in Admin without gating on removed email sections', async () => {
     const created = await createProspect();
 
     const preview = await request(h.app)
@@ -377,15 +377,17 @@ describe('§7 preview shows final variables and no unresolved placeholder', () =
       .set('cookie', admin.cookie)
       .expect(200);
 
-    expect(preview.body.blocked).toBe(true);
-    expect(preview.body.unresolved).toEqual(
-      expect.arrayContaining([
-        '[WHAT PROOVD UNDERSTOOD]',
-        '[WHY THIS FOUNDER WAS INVITED]',
-        '[SENDER NAME]',
-        '[EXPECTED SETUP TIME]',
-      ]),
-    );
+    expect(preview.body.blocked).toBe(false);
+    expect(preview.body.unresolved).toEqual([]);
+    expect(preview.body.unresolved).not.toContain('[SENDER NAME]');
+    expect(preview.body.unresolved).not.toContain('[SENDER EMAIL]');
+
+    const [draft] = await h.db
+      .select()
+      .from(campaignDrafts)
+      .where(eq(campaignDrafts.id, created.draftId));
+    expect(draft!.senderName).toBe('Seeded admin');
+    expect(draft!.senderEmail).toBe(admin.email);
   });
 
   it('clears once every field is written', async () => {
@@ -538,31 +540,27 @@ describe('§7 preview shows final variables and no unresolved placeholder', () =
     expect(row!.productName).toBe('Waitlist');
   });
 
-  it('refuses the send itself while a placeholder remains — the gate is server-side', async () => {
+  it('does not gate sending on copy removed from the email', async () => {
     const created = await createProspect();
     await compose(created.draftId, { whyInvited: null });
 
-    const res = await request(h.app)
+    const before = h.sentEmails.messages.length;
+    await request(h.app)
       .post(`/api/admin/founders/${created.draftId}/send`)
       .set('cookie', admin.cookie)
       .send({})
-      .expect(422);
+      .expect(201);
 
-    expect(res.body.unresolved).toContain('[WHY THIS FOUNDER WAS INVITED]');
-    // Nothing was issued and nothing was sent.
-    expect(h.sentEmails.messages.filter((m) => m.to === created.email)).toHaveLength(0);
-    const tokens = await h.db
-      .select()
-      .from(secureTokens)
-      .where(eq(secureTokens.campaignDraftId, created.draftId));
-    expect(tokens).toHaveLength(0);
+    const message = h.sentEmails.messages[before]!;
+    expect(message.text).not.toContain('[WHY THIS FOUNDER WAS INVITED]');
+    expect(message.text).not.toContain('WHY WE ARE WRITING TO YOU');
   });
 });
 
 /* ── §7: what the email contains ──────────────────────────────────────────── */
 
 describe('§7 the invitation email carries all nine items and one primary action', () => {
-  it('contains every §7 item', async () => {
+  it('keeps the invitation concise and omits the removed explanatory block', async () => {
     const created = await createProspect();
     await compose(created.draftId);
     const before = h.sentEmails.messages.length;
@@ -571,16 +569,18 @@ describe('§7 the invitation email carries all nine items and one primary action
 
     // 1 · product reference, in the subject as §27.2 requires
     expect(message.subject).toContain('Waitlist');
-    // 2 · what Proovd understood   3 · why they were selected
-    expect(message.text).toContain(COMPLETE_COMPOSE.whatWeUnderstood);
-    expect(message.text).toContain(COMPLETE_COMPOSE.whyInvited);
-    // 4 · who sent it              5 · what the process includes
+    expect(message.text).not.toContain(COMPLETE_COMPOSE.whatWeUnderstood);
+    expect(message.text).not.toContain(COMPLETE_COMPOSE.whyInvited);
+    expect(message.text).not.toContain('WHAT WE UNDERSTOOD');
+    expect(message.text).not.toContain('WHY WE ARE WRITING TO YOU');
+    expect(message.text).not.toContain('WHAT THE PROCESS INVOLVES');
+    expect(message.text).not.toContain('HOW LONG THE SETUP TAKES');
+    expect(message.text).not.toContain('WHAT THIS IS NOT');
+    // The sender and support route remain.
     expect(message.text).toContain('Ada Admin');
-    for (const step of PROCESS_SUMMARY) expect(message.text).toContain(step);
-    // 6 · honest time expectation  7 · no guarantee
-    expect(message.text).toContain(COMPLETE_COMPOSE.expectedSetupTime);
-    expect(message.text).toContain(NO_GUARANTEE_TEXT);
-    // 8 · reply/support path       9 · one secure draft action
+    for (const step of PROCESS_SUMMARY) expect(message.text).not.toContain(step);
+    expect(message.text).not.toContain(COMPLETE_COMPOSE.expectedSetupTime);
+    expect(message.text).not.toContain(NO_GUARANTEE_TEXT);
     expect(message.text).toContain('support@proovd.co');
     expect(message.replyTo).toBe('ada@proovd.co');
     expect(message.text).toContain('http://localhost:3000/draft/');

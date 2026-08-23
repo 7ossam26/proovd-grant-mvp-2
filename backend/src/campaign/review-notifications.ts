@@ -51,6 +51,10 @@ export interface ReviewNotifyDeps {
   internalRecipient?: string | undefined;
 }
 
+export type CampaignApprovedNotificationOutcome =
+  | Awaited<ReturnType<Notifier['send']>>
+  | { status: 'unavailable'; reason: 'not_configured' | 'missing_email' };
+
 /**
  * The notify half of a router's deps, in one place.
  *
@@ -247,11 +251,13 @@ export async function notifyChangesRequired(
 /** §27.3 "Approval". States what was approved and what it does not yet mean. */
 export async function notifyCampaignApproved(
   deps: ReviewNotifyDeps,
-  input: { campaignId: string; review: CampaignReview },
-): Promise<void> {
-  if (!deps.notifier || !deps.context) return;
+  input: { campaignId: string; review: CampaignReview; deliveryEntityId?: string },
+): Promise<CampaignApprovedNotificationOutcome> {
+  if (!deps.notifier || !deps.context) {
+    return { status: 'unavailable', reason: 'not_configured' };
+  }
   const founder = await loadFounder(deps.db, input.campaignId);
-  if (!founder.email) return;
+  if (!founder.email) return { status: 'unavailable', reason: 'missing_email' };
 
   const title = await campaignTitle(deps.db, input.campaignId);
   const notice = await renderPlainNotice({
@@ -273,17 +279,17 @@ export async function notifyCampaignApproved(
       'Approved is not live yet. We keep an exact copy of what was approved — your build and the terms each Creator accepted — and that copy is what goes public on launch day.',
     ],
     action: {
-      label: 'View your campaign',
-      url: `${deps.context.appBaseUrl}/campaigns/${input.campaignId}/build`,
+      label: 'Open your dashboard',
+      url: `${deps.context.appBaseUrl}/campaigns/${input.campaignId}/setup/live`,
     },
     reference: input.review.id,
     supportEmail: deps.context.supportEmail,
   });
 
-  await deps.notifier.send({
+  return deps.notifier.send({
     eventKey: FOUNDER_CAMPAIGN_APPROVED,
     entityType: 'campaign_review',
-    entityId: input.review.id,
+    entityId: input.deliveryEntityId ?? input.review.id,
     to: founder.email,
     from: deps.context.fromAddress,
     replyTo: deps.context.supportEmail,

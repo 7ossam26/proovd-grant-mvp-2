@@ -2574,6 +2574,38 @@ describe('what Session E moved', () => {
     expect(screen.getByText('4 Community owners')).toBeInTheDocument();
   });
 
+  it('stacks different affiliate types without a middle-dot separator', async () => {
+    stubStage3();
+    handlers.unshift((url) =>
+      /\/details$/.test(url)
+        ? {
+            status: 200,
+            body: {
+              details: {
+                name: 'Rowan',
+                username: 'rowanbuilds',
+                phone: '+1 555 0100',
+                dateOfBirth: '1990-01-01',
+                affiliateMatches: 2,
+                affiliateType: 'blog_operator',
+                affiliateTypes: ['blog_operator', 'student_affiliate'],
+              },
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('match'));
+
+    expect(await screen.findByRole('heading', { name: '2 Affiliates' })).toBeInTheDocument();
+    const types = document.querySelector('.ff-match__types');
+    expect(types).not.toBeNull();
+    expect(Array.from(types!.children).map((item) => item.textContent)).toEqual([
+      'Blog operator',
+      'Student affiliate',
+    ]);
+    expect(types).not.toHaveTextContent('·');
+  });
+
   it('hides the next screen loading record during the Match handoff', async () => {
     stubStage3();
     let release = () => {};
@@ -2753,20 +2785,24 @@ function stubStage5(
       : undefined,
   );
   stubOpenness(openness);
+  let applicationSubmitted = false;
   handlers.push((url, init) => {
     if (!/\/application-review(?:\/submit)?$/.test(url)) return undefined;
+    if (init?.method === 'POST') applicationSubmitted = true;
     const review = applicationReviewRequired
       ? {
           required: true,
           mayContinue: false,
-          review: {
-            round: 1,
-            outcome: 'waiting',
-            submittedAt: '2026-08-23T09:00:00.000Z',
-            decidedAt: null,
-            customerExplanation: null,
-            changeRequests: [],
-          },
+          review: applicationSubmitted
+            ? {
+                round: 1,
+                outcome: 'waiting',
+                submittedAt: '2026-08-23T09:00:00.000Z',
+                decidedAt: null,
+                customerExplanation: null,
+                changeRequests: [],
+              }
+            : null,
         }
       : { required: false, mayContinue: true, review: null };
     if (init?.method === 'POST' || !init?.method) {
@@ -2844,6 +2880,69 @@ describe('how Creators are paid (18)', () => {
     expect(await screen.findByRole('heading', { name: 'Application in review' })).toBeInTheDocument();
     expect(screen.getByText(/reviewing the information/i)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /please pay/i })).not.toBeInTheDocument();
+  });
+
+  it('does not show Creator payment again after Application Review has started', async () => {
+    stubStage5({}, { stance: 'open', recordedAt: '2026-08-23T08:30:00.000Z' }, true);
+    handlers.unshift((url) =>
+      /\/application-review$/.test(url)
+        ? {
+            status: 200,
+            body: {
+              applicationReview: {
+                required: true,
+                mayContinue: false,
+                review: {
+                  round: 1,
+                  outcome: 'waiting',
+                  submittedAt: '2026-08-23T09:00:00.000Z',
+                  decidedAt: null,
+                  customerExplanation: null,
+                  changeRequests: [],
+                },
+              },
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('creator-payment'));
+
+    expect(await screen.findByRole('heading', { name: 'Application in review' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Open to an optional fixed Creator payment' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sends an old Creator-payment link straight to the fee after approval', async () => {
+    stubStage5({}, { stance: 'open', recordedAt: '2026-08-23T08:30:00.000Z' }, true);
+    stubMoney({ state: 'complete', listingFeeEligible: true });
+    handlers.unshift((url) =>
+      /\/application-review$/.test(url)
+        ? {
+            status: 200,
+            body: {
+              applicationReview: {
+                required: true,
+                mayContinue: true,
+                review: {
+                  round: 1,
+                  outcome: 'approved',
+                  submittedAt: '2026-08-23T09:00:00.000Z',
+                  decidedAt: '2026-08-23T10:00:00.000Z',
+                  customerExplanation: null,
+                  changeRequests: [],
+                },
+              },
+            },
+          }
+        : undefined,
+    );
+    renderAt(at('creator-payment'));
+
+    expect(await screen.findByRole('heading', { name: /please pay/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Open to an optional fixed Creator payment' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows an approved Application Review in the supplied designed shell', async () => {
@@ -2980,14 +3079,27 @@ describe('the build steps (23–26)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Maximum $50K');
   });
 
-  it('tells a Product Founder the threshold step is not theirs (§14.4)', async () => {
-    stubStage5({ model: 'product' });
+  it('shows and saves the same order-goal screen for a Product Founder', async () => {
+    stubStage5({ model: 'product', build: { ...BUILD_FIELDS, internalTargetCents: '75000' } });
     renderAt(at('threshold'));
-    await screen.findByRole('heading', { name: /This step is for Idea Campaigns/i });
+    await screen.findByRole('heading', { name: /set your order goal/i });
 
-    // No field to disable — a Product campaign has no public threshold.
-    expect(screen.queryByLabelText(/pre-orders needed/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /on to your faqs/i })).toBeInTheDocument();
+    const input = screen.getByLabelText(/order goal in us dollars/i);
+    expect(input).toHaveValue('$750');
+
+    await userEvent.clear(input);
+    await userEvent.type(input, '1250');
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() =>
+      expect(
+        requests.some(
+          (request) =>
+            request.method === 'PATCH' &&
+            /\/build$/.test(request.url) &&
+            request.body?.['internalTargetCents'] === '125000',
+        ),
+      ).toBe(true),
+    );
   });
 
   // DELIBERATELY UPDATED (2026-08-21): screen 23 was rebuilt 1:1 from the
@@ -3131,6 +3243,8 @@ describe('the two waiting states (19, 26)', () => {
 
     expect(screen.getByText(/with our review team/i)).toBeInTheDocument();
     expect(screen.getByText(NOTHING_HERE_IS_A_TIMER)).toBeInTheDocument();
+    expect(screen.queryByText(/demo walkthrough/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue to launch/i })).not.toBeInTheDocument();
 
     // The reference auto-advances after five seconds. Nothing here does.
     const before = document.body.textContent;
@@ -3154,107 +3268,18 @@ describe('the two waiting states (19, 26)', () => {
 });
 
 describe('the founder dashboard handoff', () => {
-  it('sets a durable password before opening the authenticated campaign dashboard', async () => {
-    stubStage5({ campaignStatus: 'pending_review' });
-    handlers.push((url, init) =>
-      /\/api\/founder\/settings\/initial-password$/.test(url) && init?.method === 'POST'
-        ? { status: 200, body: { ok: true } }
-        : undefined,
-    );
-    handlers.push((url) =>
-      /\/api\/founder\/campaigns\/[^/]+\/dashboard$/.test(url)
-        ? {
-            status: 200,
-            body: {
-              dashboard: {
-                campaignId: CAMPAIGN,
-                status: 'pending_review',
-                type: 'pre_launch',
-                campaignLiveAt: null,
-                campaignCloseAt: null,
-                listingPaidAt: '2026-08-23T09:00:00.000Z',
-                highEffort: false,
-                title: 'Benchlight',
-              },
-            },
-          }
-        : undefined,
-    );
-    renderAt(at('in-review'));
-
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Secure account and continue' }),
-    );
-
-    await screen.findByRole('heading', { name: 'Secure your Founder account' });
-    await userEvent.type(screen.getByLabelText('New password'), 'StrongPassword1!');
-    await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPassword1!');
-    await userEvent.click(screen.getByRole('button', { name: 'Set password and open dashboard' }));
-
-    await waitFor(() =>
-      expect(
-        requests.some(
-          (request) =>
-            request.url.endsWith('/api/founder/settings/initial-password') &&
-            request.method === 'POST' &&
-            request.body?.['campaignId'] === CAMPAIGN,
-        ),
-      ).toBe(true),
-    );
-
-    expect(await screen.findByRole('navigation', { name: 'Campaign chapters' })).toBeInTheDocument();
-    expect(
-      requests.some((request) => request.url.endsWith(`/campaigns/${CAMPAIGN}/dashboard`)),
-    ).toBe(true);
-  });
-
-  it('keeps the retired live URL redirecting to the dashboard intro', async () => {
+  it('shows the approval handoff before password setup', async () => {
     stubStage5({ campaignStatus: 'live' });
-    handlers.push((url) =>
-      /\/api\/founder\/campaigns\/[^/]+\/dashboard$/.test(url)
-        ? {
-            status: 200,
-            body: {
-              dashboard: {
-                campaignId: CAMPAIGN,
-                status: 'live',
-                type: 'pre_launch',
-                campaignLiveAt: '2026-08-23T09:00:00.000Z',
-                campaignCloseAt: '2026-09-06T09:00:00.000Z',
-                listingPaidAt: '2026-08-22T09:00:00.000Z',
-                highEffort: false,
-                title: 'Benchlight',
-              },
-            },
-          }
-        : undefined,
-    );
     renderAt(`/campaigns/${CAMPAIGN}/setup/live`);
 
-    expect(await screen.findByRole('navigation', { name: 'Campaign chapters' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'You’re in!' })).toBeInTheDocument();
   });
 
-  it('keeps a failed password write on the credential screen', async () => {
-    stubStage5({ campaignStatus: 'pending_review' });
-    handlers.push((url, init) =>
-      /\/api\/founder\/settings\/initial-password$/.test(url) && init?.method === 'POST'
-        ? {
-            status: 422,
-            body: {
-              error: 'password_rejected',
-              title: 'That password was not set',
-              whatHappened: 'Choose a different password.',
-            },
-          }
-        : undefined,
-    );
-    renderAt(at('password'));
+  it('redirects the password URL to the connected dashboard intro', async () => {
+    stubStage5({ campaignStatus: 'live' });
+    renderAt(`/campaigns/${CAMPAIGN}/setup/password`);
 
-    await userEvent.type(await screen.findByLabelText('New password'), 'StrongPassword1!');
-    await userEvent.type(screen.getByLabelText('Confirm password'), 'StrongPassword1!');
-    await userEvent.click(screen.getByRole('button', { name: 'Set password and open dashboard' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a different password.');
-    expect(screen.queryByRole('main', { name: 'Founder dashboard' })).not.toBeInTheDocument();
+    const frame = await screen.findByTitle<HTMLIFrameElement>('Founder dashboard');
+    expect(new URL(frame.src).pathname).toBe('/founder-dashboard-final.html');
   });
 });

@@ -197,7 +197,7 @@ export async function notifyApplicationReviewOutcome(
         ],
         action: {
           label: 'Continue setup',
-          url: `${deps.context.appBaseUrl}/campaigns/${input.campaignId}/setup/creator-payment`,
+          url: `${deps.context.appBaseUrl}/campaigns/${input.campaignId}/setup/fee`,
         },
         ...base,
       });

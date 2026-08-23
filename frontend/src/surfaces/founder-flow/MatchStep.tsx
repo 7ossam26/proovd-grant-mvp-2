@@ -343,6 +343,12 @@ export function MatchStep() {
     return () => document.removeEventListener('keydown', keydown);
   }, [advance]);
 
+  const affiliateTypeLines = (
+    summarizePrefillAffiliateTypes(details?.affiliateTypes) ??
+    prefillAffiliateTypeLabel(details?.affiliateType) ??
+    'Proovd is preparing the right creator type'
+  ).split(' · ');
+
   return (
     <>
       <main className="ff-match" ref={root} onClick={advance}>
@@ -378,11 +384,9 @@ export function MatchStep() {
                   : `${details.affiliateMatches} ${details.affiliateMatches === 1 ? 'Affiliate' : 'Affiliates'}`}
               </h1>
               <span className="ff-match__types">
-                <span>
-                  {summarizePrefillAffiliateTypes(details?.affiliateTypes) ??
-                    prefillAffiliateTypeLabel(details?.affiliateType) ??
-                    'Proovd is preparing the right creator type'}
-                </span>
+                {affiliateTypeLines.map((label) => (
+                  <span key={label}>{label}</span>
+                ))}
               </span>
             </div>
 

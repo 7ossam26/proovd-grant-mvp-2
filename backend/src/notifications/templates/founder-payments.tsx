@@ -23,22 +23,23 @@ export interface RenderedFounderPaymentEmail {
 const SLA_LINE =
   'we respond within one business day, Monday to Friday, excluding U.S. federal holidays.';
 
-const body = { backgroundColor: '#FAFAFA', fontFamily: 'Helvetica, Arial, sans-serif' };
-const container = { maxWidth: '37.5rem', margin: '0 auto', padding: '2rem 1.5rem' };
-const eyebrow = { fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: '#666666' };
-const heading = { fontSize: '1.375rem', lineHeight: '1.3', color: '#111111' };
+const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
+const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const eyebrow = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', color: '#012D10' };
+const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10' };
 const section = { margin: '1rem 0' };
-const text = { fontSize: '0.9375rem', lineHeight: '1.5', color: '#222222', margin: '0.25rem 0' };
+const text = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, color: '#013F17', margin: '8px 0' };
 const strong = { fontSize: '1.0625rem', lineHeight: '1.5', color: '#111111', margin: '0.25rem 0' };
 const button = {
-  backgroundColor: '#111111',
-  color: '#FFFFFF',
-  padding: '0.75rem 1.25rem',
-  borderRadius: '0.5rem',
-  fontSize: '0.9375rem',
+  backgroundColor: '#41ED98',
+  color: '#E9FFE1',
+  padding: '20px 44px',
+  borderRadius: '1px',
+  fontSize: '18px',
+  fontWeight: 900,
 };
-const rule = { borderColor: '#E5E5E5', margin: '1.5rem 0' };
-const quiet = { fontSize: '0.8125rem', lineHeight: '1.5', color: '#666666', margin: '0.25rem 0' };
+const rule = { borderColor: '#41ED98', margin: '40px 0 30px' };
+const quiet = { fontSize: '12px', lineHeight: '20px', color: '#A2AFA8', margin: '8px 0' };
 
 function footer(supportEmail: string, reference: string) {
   return (

@@ -185,26 +185,27 @@ export async function renderDay14Result(v: Day14ResultVariables) {
 
 /* ── Styles (read from proovd.css's palette; no hex invented here) ─────────── */
 
-const body = { backgroundColor: '#0d0d0f', margin: 0, padding: '32px 0' } as const;
-const container = { maxWidth: '560px', margin: '0 auto', padding: '0 24px' } as const;
+const body = { backgroundColor: '#F1F3F2', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' } as const;
+const container = { backgroundColor: '#FAFAFA', maxWidth: '600px', margin: '0 auto', padding: '44px' } as const;
 const eyebrow = {
-  color: '#f5d90a',
-  fontSize: '12px',
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
-  margin: '0 0 12px',
+  color: '#012D10',
+  fontSize: '20px',
+  fontWeight: 700,
+  letterSpacing: '-0.02em',
+  margin: '0 0 34px',
 } as const;
-const heading = { color: '#fafaf7', fontSize: '24px', lineHeight: '1.3', margin: '0 0 20px' } as const;
+const heading = { color: '#012D10', fontSize: '38px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: '46px', margin: '0 0 24px' } as const;
 const section = { margin: '0 0 18px' } as const;
 const label = {
-  color: '#8f8f96',
-  fontSize: '12px',
+  color: '#669370',
+  fontSize: '14px',
+  fontWeight: 700,
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
   margin: '0 0 4px',
 } as const;
-const value = { color: '#fafaf7', fontSize: '15px', lineHeight: '1.6', margin: 0 } as const;
-const text = { color: '#fafaf7', fontSize: '15px', lineHeight: '1.6', margin: 0 } as const;
-const link = { color: '#f5d90a', textDecoration: 'underline' } as const;
-const rule = { borderColor: '#26262b', margin: '24px 0' } as const;
-const quiet = { color: '#8f8f96', fontSize: '13px', lineHeight: '1.6', margin: 0 } as const;
+const value = { color: '#013F17', fontSize: '18px', fontWeight: 500, lineHeight: '28px', margin: 0 } as const;
+const text = { color: '#013F17', fontSize: '18px', fontWeight: 500, lineHeight: '28px', margin: 0 } as const;
+const link = { display: 'inline-block', backgroundColor: '#41ED98', color: '#E9FFE1', fontSize: '18px', fontWeight: 900, padding: '20px 44px', borderRadius: '1px', textDecoration: 'none' } as const;
+const rule = { borderColor: '#41ED98', margin: '40px 0 30px' } as const;
+const quiet = { color: '#A2AFA8', fontSize: '12px', lineHeight: '20px', margin: 0 } as const;
