@@ -1,6 +1,6 @@
 /* ============================================================================
    PROOVD-MOTION.JS — the GSAP motion layer
-   Source of truth: "Proovd Design System" doc §6 (+ §3 font verification).
+   Source of truth: "Proovd Design System" doc §6.
 
    Load order (§6.7 — vendored files, never CDN, never hand-inlined,
    never imported from npm — never install the gsap package):
@@ -20,9 +20,8 @@
    1. Fails loud + safe (§6.6): missing GSAP → html.no-motion + a console
       error; proovd.css then provides jump-cut fallbacks. Nothing is ever
       trapped behind motion.
-   2. Ships the Satoshi verification (§3) — measured against the fallback
-      after document.fonts.ready, confirmed once the face has actually
-      loaded, and reported to the console.
+   2. Waits for fonts before measuring and splitting text, with a timeout
+      backstop so a blocked font never stalls the interface.
    3. Implements the §6.5 kit with the exact tuned parameters, exposed two
       ways:
         - declaratively, via data-attributes bound by Proovd.init()
@@ -150,55 +149,13 @@
     pending.clear();
   }, 3000);
 
-  /* ───────────────────────────────── §3 SATOSHI — ship the verification.
-     document.fonts.check() lies for never-registered families, so measure
-     against the raw fallback. Timeout backstop so a blocked font never
-     stalls anything. */
+  /* ───────────────────────────────── §3 SATOSHI
+     Wait for fonts before measuring text. Timeout backstop so a blocked font
+     never stalls anything. */
   const fontsReady = Promise.race([
     (document.fonts && document.fonts.ready) || Promise.resolve(),
     new Promise(function (res) { setTimeout(res, 1800); }),
   ]);
-
-  /* One measurement is not a verdict. fontsReady above resolves at 1800ms
-     whether or not the font arrived, so on a cold cache or a slow connection
-     the first measure lands while font-display:swap is still painting the
-     fallback — which is how a working font got reported as missing. So: check
-     once, and only if it looks missing, wait for the face to actually load and
-     measure again. Reported only if the second measure still matches. Once per
-     page load, because init() re-runs on every navigation. */
-  let satoshiChecked = false;
-
-  function verifySatoshi() {
-    if (satoshiChecked) return;
-    satoshiChecked = true;
-    try {
-      const looksMissing = function () {
-        const mk = function (family) {
-          const s = document.createElement('span');
-          s.textContent = 'ILoveProovd1234@#';
-          s.style.cssText =
-            'position:absolute;left:-9999px;top:-9999px;visibility:hidden;' +
-            'white-space:nowrap;font-size:48px;font-weight:700;font-family:' + family;
-          document.body.appendChild(s);
-          return s;
-        };
-        const a = mk("'Satoshi', monospace");
-        const b = mk('monospace');
-        const same = Math.abs(a.offsetWidth - b.offsetWidth) < 0.5;
-        a.remove(); b.remove();
-        return same;
-      };
-      if (!looksMissing()) return;                   // Satoshi is rendering
-      const settle = (document.fonts && document.fonts.load)
-        ? document.fonts.load("700 48px 'Satoshi'").catch(function () {})
-        : Promise.resolve();
-      settle.then(function () {
-        try {
-          if (looksMissing()) notice("Satoshi didn't load.");
-        } catch (e) { /* verification must never break the page */ }
-      });
-    } catch (e) { /* verification must never break the page */ }
-  }
 
   /* ═══════════════════════════════════════════ §6.4/§6.5 TEXT KIT
      All splits revert on complete; masks get breathing room; skip masking
@@ -1007,7 +964,6 @@
     const reveals = $$('[data-reveal]');
     reveals.forEach(holdHidden);
     fontsReady.then(function () {
-      verifySatoshi();
       reveals.forEach(function (el) {
         const fn = REVEALS[el.getAttribute('data-reveal')] || fadeReveal;
         if (ST && el.hasAttribute('data-reveal-scroll')) {

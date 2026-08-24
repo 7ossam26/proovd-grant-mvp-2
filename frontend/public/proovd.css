@@ -22,9 +22,7 @@
    Satoshi is load-bearing. Self-hosted @font-face is the required setup.
    Put the font files next to this stylesheet in ./fonts/ (download the
    Satoshi family from Fontshare and self-host — the Fontshare <link> is
-   allowed only for throwaway prototypes).
-   proovd-motion.js ships the runtime verification (§3): if Satoshi isn't
-   actually rendering, the page shows the accent-yellow notice. */
+   allowed only for throwaway prototypes). */
 
 @font-face {
   font-family: 'Satoshi';
