@@ -19394,6 +19394,10 @@ html.no-motion .ff-story__say { transition: none; }
   }
   .state-screen__artwork { width: clamp(10.5rem, 56vw, 15rem); }
   .state-screen__copy { gap: var(--sp-16); }
+  .state-screen:not(.state-screen--artwork) .state-screen__description {
+    width: calc(100vw - 2rem);
+    max-width: none;
+  }
   .state-screen__action {
     min-height: 3.75rem;
     margin-top: var(--sp-8);
