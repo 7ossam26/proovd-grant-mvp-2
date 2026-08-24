@@ -1028,7 +1028,9 @@ describe('the six-digit code', () => {
     );
     renderAt(at('code'));
 
-    expect(await screen.findByRole('heading', { name: /open this link/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: /link seems to have broken/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText('Digit 1 of 6')).toBeNull();
     expect(screen.queryByRole('button', { name: /^resend$/i })).toBeNull();
   });

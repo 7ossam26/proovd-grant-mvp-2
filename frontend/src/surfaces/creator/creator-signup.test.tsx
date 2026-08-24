@@ -507,7 +507,7 @@ describe('§5.5 — an unusable invitation', () => {
   it('renders the one identical unavailable page', async () => {
     handlers.push(() => ({ status: 401, body: { error: 'invalid' } }));
     await renderAgree();
-    await screen.findByText(/can.t open this link/i);
+    await screen.findByRole('heading', { name: /link seems to have broken/i });
   });
 });
 

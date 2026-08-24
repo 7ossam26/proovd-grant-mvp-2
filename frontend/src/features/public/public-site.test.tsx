@@ -57,11 +57,13 @@ describe('§18 public route inventory', () => {
   it('answers an unknown address with a recovery surface, not a blank page', () => {
     const { container, getByRole } = renderRoute('/no-such-page');
     expect(getByRole('heading', { level: 1 })).toHaveTextContent(
-      /don.t have a page at this address/i,
+      /how.d you get here/i,
     );
-    // §30: never a generic error without money/data status and recovery.
+    expect(container.querySelector('header.site-header')).toBeNull();
+    expect(container.querySelector('footer.site-footer')).toBeNull();
+    expect(container.querySelector('img[src="/assets/404.webp"]')).not.toBeNull();
     expect(normalize(container.textContent)).toContain('nothing has been charged');
-    expect(getByRole('link', { name: /Go to the Proovd homepage/i })).toBeInTheDocument();
+    expect(getByRole('link', { name: /go to the Proovd homepage/i })).toBeInTheDocument();
   });
 });
 
@@ -343,10 +345,10 @@ describe('§33.11.7 — loading, empty, waiting, and failure use the six-questio
     expectSixQuestions(panel, 'policy waiting state');
   });
 
-  it('failure: an address with no page', () => {
+  it('failure: an address with no page uses the focused exception screen', () => {
     const { container } = renderRoute('/nope');
-    const panel = container.querySelector('.state-panel') as HTMLElement;
-    expectSixQuestions(panel, 'not-found state');
+    expect(container.querySelector('.state-screen')).not.toBeNull();
+    expect(container.querySelector('.state-panel')).toBeNull();
   });
 
   it('empty: campaign updates and comments on a sample', () => {
@@ -364,7 +366,7 @@ describe('§33.11.7 — loading, empty, waiting, and failure use the six-questio
   });
 
   it('every state panel offers a context-preserving way to get help', () => {
-    for (const path of ['/terms', '/nope', '/campaign/sample-pre-build']) {
+    for (const path of ['/terms', '/campaign/sample-pre-build']) {
       const { container, unmount } = renderRoute(path);
       for (const panel of container.querySelectorAll('.state-panel')) {
         const help = panel.querySelector('.state-panel__actions a[href^="mailto:"]');

@@ -19253,3 +19253,161 @@ html.no-motion .ff-story__say { transition: none; }
 @media (max-width: 600px) {
   .ff-fee__back { bottom: 92px; padding: 8px 14px; }
 }
+
+/* ═══════════════════════════════════ PUBLIC EXCEPTION SCREENS — 2026-08-24
+   A bad address and a dead one-time link are destinations, not content pages.
+   They own a minimal full-height shell so the recovery message is never
+   crowded by the public nav, sitemap, chat, or the StatePanel definition list. */
+.state-screen {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--white);
+  color: var(--dark);
+}
+.state-screen__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-24);
+  padding: clamp(1.5rem, 4.6vw, 5.5rem) var(--gutter) 0;
+}
+.state-screen__brand {
+  width: clamp(7.5rem, 9vw, 9rem);
+  min-height: var(--touch);
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.state-screen__brand::after { display: none; }
+.state-screen__brand img { display: block; width: 100%; height: auto; }
+.state-screen__help {
+  width: clamp(7.5rem, 10vw, 9rem);
+  min-height: var(--touch);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-8) var(--sp-16);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+  color: var(--brand);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.state-screen__help::after,
+.state-screen__action::after { display: none; }
+.state-screen__help:hover,
+.state-screen__help:focus-visible {
+  background: var(--brand-5);
+  color: var(--dark);
+}
+.state-screen__main {
+  min-height: 0;
+  width: min(100%, 90rem);
+  margin-inline: auto;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: clamp(2rem, 4vw, 4.5rem);
+  padding: clamp(2rem, 4vh, 4rem) var(--gutter) clamp(4rem, 9vh, 8rem);
+  text-align: center;
+}
+.state-screen--artwork .state-screen__main {
+  gap: clamp(1.75rem, 3.25vw, 3.5rem);
+}
+.state-screen__artwork {
+  display: block;
+  width: clamp(13rem, 21vw, 23rem);
+  max-width: 70vw;
+  max-height: 34vh;
+  object-fit: contain;
+}
+.state-screen__copy {
+  width: min(100%, 72rem);
+  display: grid;
+  justify-items: center;
+  gap: clamp(1rem, 2vw, 2rem);
+}
+.state-screen__title {
+  max-width: none;
+  margin: 0;
+  color: var(--brand);
+  font-size: clamp(2.15rem, 3.5vw, 4.25rem);
+  font-weight: 900;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.state-screen__description {
+  max-width: 54rem;
+  margin: 0;
+  color: var(--dark);
+  font-size: clamp(1.05rem, 1.45vw, 1.6rem);
+  font-weight: 700;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+.state-screen__action {
+  width: min(100%, 36rem);
+  min-height: clamp(4.25rem, 6vw, 5.5rem);
+  margin-top: clamp(0.5rem, 1.5vw, 1.5rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-16) var(--sp-24);
+  border: var(--bw) solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--brand);
+  color: var(--white);
+  font-size: clamp(1.35rem, 2vw, 2.1rem);
+  font-weight: 900;
+  line-height: 1.1;
+  text-decoration: none;
+}
+.state-screen__action:hover,
+.state-screen__action:focus-visible {
+  border-color: var(--dark);
+  background: var(--dark);
+  color: var(--white);
+}
+
+/* The layout must keep the complete message and recovery control above the
+   fold on landscape phones and small laptop windows. */
+@media (max-width: 600px) {
+  .state-screen { overflow: auto; }
+  .state-screen__header { padding-top: var(--sp-24); }
+  .state-screen__brand { width: 6.75rem; }
+  .state-screen__help { width: 6.25rem; }
+  .state-screen__main {
+    align-content: center;
+    gap: var(--sp-32);
+    padding-top: var(--sp-32);
+    padding-bottom: clamp(3rem, 8vh, 4.5rem);
+  }
+  .state-screen--artwork .state-screen__main {
+    gap: var(--sp-24);
+  }
+  .state-screen__artwork { width: clamp(10.5rem, 56vw, 15rem); }
+  .state-screen__copy { gap: var(--sp-16); }
+  .state-screen__action {
+    min-height: 3.75rem;
+    margin-top: var(--sp-8);
+  }
+}
+
+@media (max-height: 700px) and (min-width: 601px) {
+  .state-screen__header { padding-top: var(--sp-24); }
+  .state-screen__main {
+    gap: var(--sp-24);
+    padding-top: var(--sp-16);
+    padding-bottom: var(--sp-32);
+  }
+  .state-screen__artwork { width: 12rem; max-height: 27vh; }
+  .state-screen__copy { gap: var(--sp-12); }
+  .state-screen__action { min-height: 3.75rem; margin-top: var(--sp-4); }
+}

@@ -8,12 +8,12 @@
  * real. §5.5 forbids exposing account existence, so the page tells the holder
  * what to do and tells them nothing about what went wrong.
  *
- * It also answers the six questions §27.1 requires of any exception state,
- * which is why it is a `StatePanel` and not a bare error line — including the
- * one §30 keeps calling for: how do I get help without losing context.
+ * The screen exposes only the recovery information a link holder can use. The
+ * standard brand and Help controls stay available, and the same support target
+ * powers the one prominent resend action.
  */
 
-import { Mode, Section, Measure, StatePanel, Button } from '../components/index.js';
+import { StateScreen } from '../components/index.js';
 
 export interface LinkUnavailableProps {
   /**
@@ -25,7 +25,7 @@ export interface LinkUnavailableProps {
    * 2026-08-21 and had never been a route: the only public `support` path is
    * the exact one at `routes.tsx`, and the other is inside the `admin` group.
    * Both controls below read this one value, so the dead default meant every
-   * dead-link panel offered two buttons and both landed on the 404 surface —
+   * dead-link screen offered two links and both landed on the 404 surface —
    * "We don't have a page at this address" — which is the opposite of §27.1's
    * sixth question. `routes.tsx` records the same bug being fixed once before
    * for `/support` itself; this was the variant that fix did not reach.
@@ -35,37 +35,19 @@ export interface LinkUnavailableProps {
 
 export function LinkUnavailable({ supportHref = '/support' }: LinkUnavailableProps) {
   return (
-    <Mode kind="light">
-      <Section breathe>
-        <Measure>
-          <h1>We can&rsquo;t open this link</h1>
-          <p>
-            This link is no longer usable. Links stop working for a few different
-            reasons, and we can&rsquo;t tell which one from here.
-          </p>
-          <StatePanel
-            state="This link can&rsquo;t be used"
-            whatHappened={
-              <>
-                Nothing is wrong with your details, and <strong>nothing has been
-                charged</strong>. Links are single-purpose and time-limited by
-                design.
-              </>
-            }
-            next="Ask whoever sent the link for a fresh one — it takes them a moment to send."
-            owner="You"
-            nextUpdate="As soon as a new link is sent"
-            action={
-              <Button tier="primary" href={supportHref}>
-                Ask us for a new link
-              </Button>
-            }
-            reference="No account details are shown on this page."
-            getHelp={{ href: supportHref }}
-          />
-        </Measure>
-      </Section>
-    </Mode>
+    <StateScreen
+      title={<>We&rsquo;re sorry the link seems to have broken</>}
+      description={
+        <>We&rsquo;re still an early day startup. We&rsquo;d love to try again with you.</>
+      }
+      action={{ href: supportHref, label: 'Send me another link' }}
+      helpHref={supportHref}
+    >
+      <p className="sr-only">
+        Nothing is wrong with your details and nothing has been charged. No
+        account details are shown on this page.
+      </p>
+    </StateScreen>
   );
 }
 

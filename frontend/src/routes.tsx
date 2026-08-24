@@ -234,7 +234,8 @@ const policyRoutes: RouteObject[] = POLICY_DOCUMENTS.map((document) => ({
 const rootChildren: RouteObject[] = [
   {
     // Pathless layout: header, main, footer, and the staffed-hours chat gate
-    // wrap every public route.
+    // wrap every browsable public route. The exception catch-all below owns a
+    // smaller recovery shell.
     element: <PublicLayout />,
     children: [
       { index: true, element: <Home /> },
@@ -285,7 +286,6 @@ const rootChildren: RouteObject[] = [
       // this page, and the token in the emailed link is what authorises the
       // change — not the session.
       { path: 'reset-password', element: <ResetPassword /> },
-      { path: '*', element: <NotFoundSurface /> },
     ],
   },
   {
@@ -1074,6 +1074,13 @@ const rootChildren: RouteObject[] = [
     // reason — a site nav is a list of things to probe.
     path: 'link-unavailable',
     element: <LinkUnavailable />,
+  },
+  {
+    // Exception pages own a deliberately minimal shell. Keeping this catch-all
+    // outside PublicLayout prevents the marketing nav, footer, and chat from
+    // crowding the one answer somebody needs after following a bad address.
+    path: '*',
+    element: <NotFoundSurface />,
   },
 ];
 
