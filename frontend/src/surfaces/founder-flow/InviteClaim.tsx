@@ -29,9 +29,9 @@
  * this composition is what every viewport gets, exactly as there.
  *
  * ── Six elements, and that is the whole screen ──────────────────────────────
- * A meta row (the setup time, and HELP), a pale band, the headline, one line of
- * copy, one control, one legal line. The band is empty in the reference and
- * empty here: it is the space the Founder's own visual will occupy.
+ * A meta row (the setup time, and HELP), a full-width envelope, the headline,
+ * one line of copy, one control, one legal line. The reference's empty band is
+ * now the transparent reveal frame for the Founder's invitation visual.
  *
  * ── It still asks for nothing ───────────────────────────────────────────────
  * No form, no account, no payment field. One control, and it is a door rather
@@ -264,14 +264,14 @@ function InviteScreen({ token, draft }: { token: string; draft: DraftLandingData
             />
           </div>
 
-          {/* The band the reference left empty, holding the visual it reserved
-              its `36px 144px` inset for. `aria-hidden` because the envelope
-              says nothing the headline below does not say better, and
-              `alt=""` keeps it out of the reading order either way.
+          {/* The full-width envelope sits in a transparent wrapper retained for
+              the opening height animation. `aria-hidden` because the envelope
+              says nothing the headline below does not say better, and `alt=""`
+              keeps it out of the reading order either way.
 
               `fetchPriority` is not premature: this is the first screen of the
               flow, so there is no preceding screen to preload from the way
-              `MatchStep` does, and the band opens about 0.9s in. */}
+              `MatchStep` does, and the envelope opens about 0.9s in. */}
           <div className="ff-invite__band" data-invite="band" aria-hidden="true">
             <img
               className="ff-invite__band-art"

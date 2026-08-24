@@ -7,7 +7,7 @@
  * ever sees of Proovd. The reference's `obSplash` screen is the authority for
  * every value here: the structure (`.claim-intro` → `.claim-wide` →
  * `.claim-wide-stage` → `.claim-wide-shell`), the copy, the 84px headline with
- * its 28px mint text stroke, the #DEFAFC band, the 122px CTA, and the four
+ * its 28px mint text stroke, the 285px envelope reveal, the 122px CTA, and the four
  * animation beats. PHASE 57 in `proovd.css` carries the declarations.
  *
  * ── The stage is scaled by measurement, not by a media query ────────────────
@@ -24,7 +24,7 @@
  * t=0      the splash covers the viewport; the brand square scales in (.4s),
  *          its dark inner square .15s behind it (.35s)
  * t=0.68s  the splash slides up and away (.56s)
- * t=0.92s  the band grows 0 → 285px (.62s)
+ * t=0.92s  the envelope is revealed from 0 → 285px (.62s)
  * t=1.27s  the headline's words rise, one every 0.04s
  * t=1.56s  the sentence fades up
  * t=1.76s  the CTA scales in
@@ -134,12 +134,10 @@ function Body({ token, name }: { token: string; name: string }) {
         <div className="claim-wide-stage" ref={stageRef}>
           <div className="claim-wide-shell">
             <div className="claim-meta-space" aria-hidden="true" />
-            {/* The same envelope the Founder invitation opens on, so the two
-                private invitations arrive the same way. Decorative: the band is
-                `aria-hidden` and the image carries an empty alt. The inset is
-                expressed on the art rather than as padding on the band, because
-                the band animates from `height: 0` and padding would start it
-                72px tall. */}
+            {/* The same full-width envelope the Founder invitation opens on, so
+                the two private invitations arrive the same way. The transparent
+                wrapper remains for the height-reveal animation only. Decorative:
+                the wrapper is `aria-hidden` and the image has an empty alt. */}
             <div className="claim-band" aria-hidden="true">
               <img
                 className="claim-band-art"

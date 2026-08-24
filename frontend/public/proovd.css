@@ -4098,22 +4098,14 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
 .ff-invite__help:hover { background: #012D10; }
 .ff-invite__help:focus-visible { outline: 3px solid #41ED98; outline-offset: 4px; }
 
-/* Row 2 — the band. `padding:36px 144px` is the reference's own, and the visual
-   dropped in on 2026-08-24 inherits exactly that inset: 1295 - 288 = 1007 wide
-   by 285 - 72 = 213 tall.
-
-   `overflow:hidden` is load-bearing, not tidiness. `inviteIntro`'s `openBand`
-   clears the inline `overflow` it staged BEFORE it tweens the height 0 -> 285,
-   and this rule declared none, so that cleared to `visible`. With an empty band
-   nothing showed; with a 213px image inside, the art would spill over the meta
-   row and the headline for the whole 0.6s tween. Declaring it here is what the
-   inline clear falls back to, and the band reveals the art as a slit. The
-   `offsetHeight` measurement is unaffected — it reads this stylesheet. */
+/* Row 2 — the envelope. The wrapper remains only because `inviteIntro` reveals
+   it from 0 -> 285px; visually it is transparent. The art occupies the complete
+   1295 x 285 footprint that the old blue band occupied. `overflow:hidden` keeps
+   that entrance a reveal instead of allowing the fixed-height image to spill. */
 .ff-invite__band {
   margin-top: 100px;
   height: 285px;
-  background: #DEFAFC;
-  padding: 36px 144px;
+  background: transparent;
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -4121,28 +4113,16 @@ a.tsk-ref:hover { background: var(--brand); border-color: var(--brand); color: v
   overflow: hidden;
 }
 
-/* `object-fit` is load-bearing here, and the reason is flex.
-
-   In normal flow a replaced element bounded on both axes resolves its own size
-   proportionally (CSS 2.1 §10.4). Inside a flex container it does not: the main
-   size is settled by the flex algorithm FIRST — the global `img { max-width:
-   100% }` at the top of this file makes that 1007, the content box — and only
-   then is the cross size clamped to `max-height`. The clamp never travels back
-   to the width, so the box lands 1007 x 213 and the envelope renders at 4.73:1
-   instead of its own 2.875:1. Measured in Chrome, not reasoned about.
-
-   `contain` lets the box stay 1007 wide and paints the envelope inside it at
-   612 x 213, centred. The band is a flat colour and the art's own margins are
-   transparent, so the letterboxing is invisible.
-
-   `max-height` is a fixed value rather than `100%` because the content box is
-   0 tall for most of the opening tween, and a percentage would squash the art
-   open instead of revealing it. */
+/* Keep the image at its final fixed height while the wrapper opens around it,
+   so the entrance reveals the full-size envelope rather than stretching it up
+   from zero. `fill` deliberately matches the old band's exact dimensions. */
 .ff-invite__band-art {
   display: block;
-  max-width: 100%;
-  max-height: 213px;
-  object-fit: contain;
+  flex: none;
+  width: 100%;
+  height: 285px;
+  max-width: none;
+  object-fit: fill;
 }
 
 /* Row 3 — the headline. `max-width:20ch` is what decides the line break, so it
@@ -10848,7 +10828,7 @@ html.no-motion .ff-reach__cta { opacity: 1; }
 .claim-band {
   height: 0;
   margin-top: 100px;
-  background: #DEFAFC;
+  background: transparent;
   overflow: hidden;
   animation: claimBandWide .62s cubic-bezier(.16, 1, .3, 1) .92s forwards;
   display: flex;
@@ -10856,18 +10836,16 @@ html.no-motion .ff-reach__cta { opacity: 1; }
   justify-content: center;
 }
 
-/* The Founder band's `36px 144px` inset, expressed on the art instead of as
-   padding on the band. The band animates from `height: 0`, and `border-box`
-   padding would floor it at 72px — so the reveal would start as a visible bar
-   rather than from nothing. `calc(100% - 288px)` is the same 2 x 144, and the
-   fixed `max-height` gives the same 612 x 213 the Founder screen shows.
-
-   `object-fit` for the same flex reason recorded on `.ff-invite__band-art`. */
+/* The transparent wrapper still animates from 0 -> 285px. Keeping the image at
+   its final dimensions makes that motion reveal the envelope, while `fill`
+   gives it the complete footprint formerly occupied by the blue rectangle. */
 .claim-band-art {
   display: block;
-  max-width: calc(100% - 288px);
-  max-height: 213px;
-  object-fit: contain;
+  flex: none;
+  width: 100%;
+  height: 285px;
+  max-width: none;
+  object-fit: fill;
 }
 
 .claim-head {
@@ -10993,12 +10971,8 @@ html.no-motion .ff-reach__cta { opacity: 1; }
     flex: none;
     animation-name: claimBandPhone;
   }
-  /* The band is 24vh here, so the desktop inset does not transfer: 288px of it
-     would leave nothing on a 375px screen. Both bounds can bind at once, and
-     the art still scales proportionally to fit inside them. */
   .claim-band-art {
-    max-width: calc(100% - 32px);
-    max-height: 18vh;
+    height: 24vh;
   }
   .claim-head {
     margin: 4vh 0 0;
