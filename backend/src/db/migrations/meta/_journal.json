@@ -519,6 +519,13 @@
       "when": 1788883200000,
       "tag": "0073_matching_before_launch",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1788969600000,
+      "tag": "0074_admin_reauth_window_one_day",
+      "breakpoints": true
     }
   ]
 }

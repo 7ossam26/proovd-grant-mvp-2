@@ -22,6 +22,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { readFile } from 'node:fs/promises';
 import request from 'supertest';
 import { eq, and, desc } from 'drizzle-orm';
 import type { PoolClient } from 'pg';
@@ -410,6 +411,62 @@ describe('the settings table defends itself (§25.6, §29.6)', () => {
 /* ── First-boot seeding ────────────────────────────────────────────────────── */
 
 describe('the Admin reauthentication window is seeded once, then owned by the setting', () => {
+  it('upgrades an existing 15-minute window to one day and preserves its history', async () => {
+    await inRollback(async (client) => {
+      await client.query(
+        `UPDATE app_settings
+            SET value = '900',
+                updated_by = 'system:test',
+                update_reason = 'simulate the existing deployed window'
+          WHERE key = 'admin_reauth_window_seconds'`,
+      );
+      const before = await client.query<{ version: number }>(
+        `SELECT version FROM app_settings WHERE key = 'admin_reauth_window_seconds'`,
+      );
+
+      const migration = await readFile(
+        new URL('../db/migrations/0074_admin_reauth_window_one_day.sql', import.meta.url),
+        'utf8',
+      );
+      await client.query(migration);
+
+      const after = await client.query<{
+        value: string;
+        version: number;
+        updated_by: string;
+        update_reason: string;
+      }>(
+        `SELECT value, version, updated_by, update_reason
+           FROM app_settings
+          WHERE key = 'admin_reauth_window_seconds'`,
+      );
+      expect(after.rows[0]).toMatchObject({
+        value: '86400',
+        version: before.rows[0]!.version + 1,
+        updated_by: 'system:migration',
+        update_reason:
+          'extended the Admin reauthentication window to one day by product direction',
+      });
+
+      const history = await client.query<{
+        prior_value: string;
+        new_value: string;
+        changed_by: string;
+      }>(
+        `SELECT prior_value, new_value, changed_by
+           FROM app_setting_versions
+          WHERE key = 'admin_reauth_window_seconds'
+          ORDER BY version DESC
+          LIMIT 1`,
+      );
+      expect(history.rows[0]).toEqual({
+        prior_value: '900',
+        new_value: '86400',
+        changed_by: 'system:migration',
+      });
+    });
+  });
+
   it('seeds from the environment while unset, and never again', async () => {
     expect(await readAdminReauthWindowSeconds(h.db)).toBeNull();
 

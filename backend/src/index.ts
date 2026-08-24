@@ -79,9 +79,18 @@ async function main() {
   // an honest actor and reason. It runs only while the setting is still unset;
   // once an Admin states a value the setting is authoritative and this is a
   // no-op.
-  const { seedAdminReauthWindow } = await import('./settings/service.js');
+  const { readAdminReauthWindowSeconds, seedAdminReauthWindow } = await import(
+    './settings/service.js'
+  );
   const seedResult = await seedAdminReauthWindow(db, env.ADMIN_REAUTH_WINDOW_SECONDS);
-  logger.info({ adminReauthWindow: seedResult }, 'Settings bootstrap');
+  const adminReauthWindowSeconds = await readAdminReauthWindowSeconds(db);
+  if (adminReauthWindowSeconds === null) {
+    throw new Error('Admin reauthentication window is unavailable after settings bootstrap');
+  }
+  logger.info(
+    { adminReauthWindow: seedResult, adminReauthWindowSeconds },
+    'Settings bootstrap',
+  );
 
   // ── Express app ────────────────────────────────────────────────────────────
   const { createApp } = await import('./app.js');
@@ -180,7 +189,10 @@ async function main() {
     nodeEnv: env.NODE_ENV,
     publicDir,
     authSecret: env.BETTER_AUTH_SECRET,
-    adminReauthWindowSeconds: env.ADMIN_REAUTH_WINDOW_SECONDS,
+    // Better Auth fixes `freshAge` at construction. Read the authoritative
+    // stored setting after migrations/bootstrap so its built-in sensitive
+    // endpoints use the same window as Proovd's per-request Admin guards.
+    adminReauthWindowSeconds,
     trustProxyHops: env.TRUST_PROXY_HOPS,
     // Same posture, same boot refusal: a claimed invitation link keeps opening
     // for local work only, so the flow can be re-walked without a fresh invite.
