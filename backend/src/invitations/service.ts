@@ -45,7 +45,7 @@ import {
   type InvitationVariables,
   type RenderedInvitation,
 } from '../notifications/templates/founder-invitation.js';
-import { invitationArtUrl } from '../notifications/templates/email-art.js';
+import { invitationArtUrl, proovdLogoUrl } from '../notifications/templates/email-art.js';
 import { campaigns, campaignStatusHistory } from '../db/schema/domain.js';
 import {
   founderProspects,
@@ -558,6 +558,7 @@ function variablesFor(
     // Not composed and not overridable — a per-deployment address, resolved the
     // same way for a preview, the preflight render, and the real send.
     artUrl: invitationArtUrl(appBaseUrl),
+    logoUrl: proovdLogoUrl(appBaseUrl),
   };
 }
 

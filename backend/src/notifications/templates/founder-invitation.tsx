@@ -81,6 +81,8 @@ export interface InvitationVariables {
   reference: string;
   /** §27.8's published support address. */
   supportEmail: string;
+  /** Absolute, deployment-specific URL of the email-safe Proovd wordmark. */
+  logoUrl: string;
   /**
    * The absolute URL of the header art. Derived from `APP_BASE_URL` by
    * `invitationArtUrl`, never composed by an Admin — but it is a variable
@@ -166,13 +168,11 @@ function InvitationEmail({ v }: { v: Resolved }) {
       </Preview>
       <Body style={body}>
         <Container style={container}>
-          <Text style={wordmark}>proovd</Text>
+          <Img src={v.logoUrl} alt="Proovd" width="132" height="40" style={brandLogo} />
 
-          {/* The band keeps its colour behind the image on purpose. A client
-              with images off shows the mat rather than a hole, and the art is
-              already composited onto the same `#DEFAFC` so the two cannot come
-              apart. `alt=""` because the envelope says nothing the heading two
-              lines down does not say better. */}
+          {/* The transparent envelope fills the exact slot the old blue band
+              occupied. `alt=""` because it says nothing the heading two lines
+              down does not say better. */}
           <Section style={art}>
             <Img src={v.artUrl} alt="" width="512" height="112" style={artImage} />
           </Section>
@@ -303,11 +303,9 @@ const body = {
   padding: '24px 12px',
 };
 const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
-const wordmark = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px', color: '#012D10', margin: 0 };
-/* The band no longer fixes its own height: the art is exactly 512x112 for the
-   512px content box, so the image sets it. The colour stays — see the note at
-   the `<Section>`. */
-const art = { backgroundColor: '#DEFAFC', margin: '34px 0 0' };
+const brandLogo = { display: 'block', width: '132px', height: '40px', border: 0, margin: 0 };
+/* The image is exactly 512x112 for the content box and sets the row's height. */
+const art = { margin: '34px 0 0' };
 /* The `width`/`height` ATTRIBUTES on the `<Img>` are what Outlook reads; these
    are what lets every other client shrink the art on a narrow phone. */
 const artImage = { display: 'block', width: '100%', maxWidth: '512px', height: 'auto', border: 0 };

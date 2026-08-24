@@ -164,8 +164,7 @@ function AffiliateInvitationEmail({ v }: { v: Resolved }) {
           {/* The same header art the Founder invitation carries, so the two
               private invitations open the same way. Decorative only: it makes
               no claim, adds no action, and `alt=""` keeps it out of the reading
-              order. The band colour stays behind it for a client with images
-              off. */}
+              order. The transparent envelope fills the old band's slot. */}
           <Section style={art}>
             <Img src={v.artUrl} alt="" width="512" height="112" style={artImage} />
           </Section>
@@ -329,9 +328,8 @@ export async function renderAffiliateInvitation(
 const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
 const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const eyebrow = { fontSize: '0.875rem', fontWeight: 900, letterSpacing: '0.08em', color: '#012D10', textTransform: 'uppercase' as const, margin: '0 0 1.5rem' };
-/* The header art, matching the Founder invitation. The image sets the band's
-   height; the colour is the images-off fallback. */
-const art = { backgroundColor: '#DEFAFC', margin: '0 0 34px' };
+/* The header art, matching the Founder invitation. The image sets its height. */
+const art = { margin: '0 0 34px' };
 const artImage = { display: 'block', width: '100%', maxWidth: '512px', height: 'auto', border: 0 };
 const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '0 0 24px' };
 const section = { margin: '0 0 1.5rem' };

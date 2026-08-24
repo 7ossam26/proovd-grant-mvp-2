@@ -30,7 +30,7 @@
 
 import type { NotificationEventKey } from './events.js';
 import { renderFounderInvitation } from './templates/founder-invitation.js';
-import { INVITATION_ART_PATH } from './templates/email-art.js';
+import { INVITATION_ART_PATH, PROOVD_LOGO_PATH } from './templates/email-art.js';
 import { renderAffiliateInvitation } from './templates/affiliate-invitation.js';
 import { renderSignupConfirmed } from './templates/affiliate-signup-confirmed.js';
 import { renderPreparingAvailable } from './templates/affiliate-preparing-available.js';
@@ -142,6 +142,7 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       reference: REF,
       supportEmail: SUPPORT,
       artUrl: `${APP}${INVITATION_ART_PATH}`,
+      logoUrl: `${APP}${PROOVD_LOGO_PATH}`,
     }),
 
   founder_interview_confirmed: () => interview('confirmed'),

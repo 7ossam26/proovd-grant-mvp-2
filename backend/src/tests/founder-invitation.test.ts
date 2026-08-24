@@ -597,7 +597,8 @@ describe('§7 the invitation email carries all nine items and one primary action
       senderEmail: 'ada@proovd.co',
       expectedSetupTime: 'two hours',
       draftUrl: 'https://app.proovd.co/draft/abc',
-      artUrl: 'https://app.proovd.co/assets/email-invite.png',
+      artUrl: 'https://app.proovd.co/assets/email-invite-email.png',
+      logoUrl: 'https://app.proovd.co/assets/proovd-logo.png',
       reference: 'campaign-1',
       supportEmail: 'support@proovd.co',
     });
@@ -606,6 +607,8 @@ describe('§7 the invitation email carries all nine items and one primary action
     // what §27.2 means by a plain-text support route.
     const actionLinks = [...rendered.html.matchAll(/background-color:\s*#41ED98/gi)];
     expect(actionLinks).toHaveLength(1);
+    expect(rendered.html).toContain('src="https://app.proovd.co/assets/proovd-logo.png"');
+    expect(rendered.html).toContain('alt="Proovd"');
     expect(rendered.unresolved).toEqual([]);
   });
 
