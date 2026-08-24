@@ -19268,6 +19268,7 @@ html.no-motion .ff-story__say { transition: none; }
   color: var(--dark);
 }
 .state-screen__header {
+  box-sizing: border-box;
   width: 100%;
   display: flex;
   align-items: center;
@@ -19307,6 +19308,8 @@ html.no-motion .ff-story__say { transition: none; }
   color: var(--dark);
 }
 .state-screen__main {
+  box-sizing: border-box;
+  min-width: 0;
   min-height: 0;
   width: min(100%, 90rem);
   margin-inline: auto;
@@ -19322,7 +19325,7 @@ html.no-motion .ff-story__say { transition: none; }
 }
 .state-screen__artwork {
   display: block;
-  width: clamp(12rem, 18vw, 20rem);
+  width: clamp(7.5rem, 10vw, 12rem);
   max-width: 70vw;
   max-height: 34vh;
   object-fit: contain;
@@ -19392,11 +19395,15 @@ html.no-motion .ff-story__say { transition: none; }
   .state-screen--artwork .state-screen__main {
     gap: var(--sp-8);
   }
-  .state-screen__artwork { width: clamp(9.5rem, 48vw, 13rem); }
+  .state-screen__artwork { width: clamp(6.5rem, 28vw, 8.5rem); }
   .state-screen__copy { gap: var(--sp-16); }
   .state-screen--artwork .state-screen__title {
-    width: calc(100vw - 2rem);
+    width: 100vw;
     max-width: none;
+    font-size: clamp(1.65rem, 7.4vw, 1.75rem);
+  }
+  .state-screen--artwork .state-screen__description {
+    font-size: 0.9rem;
   }
   .state-screen:not(.state-screen--artwork) .state-screen__description {
     width: calc(100vw - 2rem);
