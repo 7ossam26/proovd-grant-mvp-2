@@ -30,6 +30,7 @@
 
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '../db/client.js';
+import type { TokenService } from '../auth/token-service.js';
 
 import type {
   CampaignFactsView,
@@ -126,7 +127,7 @@ import {
   founderMeetingNotes,
 } from '../db/schema/founder-workspace.js';
 
-import { previewInvitation, type InvitationContext } from '../invitations/service.js';
+import { DRAFT_PATH, previewInvitation, type InvitationContext } from '../invitations/service.js';
 import { NO_GUARANTEE_TEXT, PROCESS_SUMMARY } from '../notifications/templates/founder-invitation.js';
 import { readPossibleCreatorSignal } from '../vetting/service.js';
 import { readNextCampaignReadiness } from '../completion/next-campaign.js';
@@ -858,6 +859,7 @@ function firstMoneyBlocker(status: FounderPaymentStatusView | null): string | nu
 
 export interface FounderWorkspaceDeps {
   db: Database;
+  tokens: TokenService;
   invitationContext: InvitationContext;
   /** Absent when this deployment has no Stripe client (§32.2). */
   onboarding?: OnboardingContext | undefined;
@@ -1302,6 +1304,8 @@ async function composeOverview(
           id: campaignInvitationSends.id,
           sentAt: campaignInvitationSends.sentAt,
           sentBy: campaignInvitationSends.sentBy,
+          recipientEmail: campaignInvitationSends.recipientEmail,
+          deliveryMethod: campaignInvitationSends.deliveryMethod,
           tokenVersion: campaignInvitationSends.tokenVersion,
           tokenExpiresAt: campaignInvitationSends.tokenExpiresAt,
         })
@@ -1313,10 +1317,14 @@ async function composeOverview(
   const tokens = draft
     ? await db
         .select({
+          id: secureTokens.id,
+          scope: secureTokens.scope,
+          tokenHash: secureTokens.tokenHash,
           version: secureTokens.version,
           expiresAt: secureTokens.expiresAt,
           firstUsedAt: secureTokens.firstUsedAt,
           revokedAt: secureTokens.revokedAt,
+          revokedReason: secureTokens.revokedReason,
           claimedAt: secureTokens.claimedAt,
         })
         .from(secureTokens)
@@ -1329,14 +1337,26 @@ async function composeOverview(
         .orderBy(desc(secureTokens.version))
     : [];
 
-  const live = tokens.find((t) => t.revokedAt === null && t.claimedAt === null) ?? null;
+  const live =
+    tokens.find(
+      (token) =>
+        token.revokedAt === null &&
+        token.claimedAt === null &&
+        (token.expiresAt === null || token.expiresAt > now),
+    ) ?? null;
+  const recoveredRaw = live ? deps.tokens.recoverFounderDraftRaw(live) : null;
   const openedAt = tokens.reduce<Date | null>(
     (earliest, token) =>
       token.firstUsedAt && (!earliest || token.firstUsedAt < earliest) ? token.firstUsedAt : earliest,
     null,
   );
   const revokedAt = tokens.reduce<Date | null>(
-    (latest, token) => (token.revokedAt && (!latest || token.revokedAt > latest) ? token.revokedAt : latest),
+    (latest, token) =>
+      token.revokedReason === 'admin_revoked' &&
+      token.revokedAt &&
+      (!latest || token.revokedAt > latest)
+        ? token.revokedAt
+        : latest,
     null,
   );
 
@@ -1399,6 +1419,10 @@ async function composeOverview(
     // The server's answer, and the send route re-decides it independently — a
     // disabled control is not authorization (§1.1).
     canSend: preview !== null && !preview.blocked && ctx.prospect.claimedAt === null,
+    linkUrl: recoveredRaw
+      ? `${deps.invitationContext.appBaseUrl}${DRAFT_PATH}/${recoveredRaw}`
+      : null,
+    linkNeedsReplacement: live !== null && recoveredRaw === null,
     history: invitationHistory(ctx, sends, openedAt, revokedAt, names),
     technical: tokenFacts(live, tokens.length),
     facts: {
@@ -1535,7 +1559,12 @@ function invitationFieldValue(ctx: FounderContext, key: string): string | null {
 
 function invitationHistory(
   ctx: FounderContext,
-  sends: ReadonlyArray<{ sentAt: Date; sentBy: string }>,
+  sends: ReadonlyArray<{
+    sentAt: Date;
+    sentBy: string;
+    recipientEmail: string | null;
+    deliveryMethod: 'email' | 'manual';
+  }>,
   openedAt: Date | null,
   revokedAt: Date | null,
   names: ReadonlyMap<string, string>,
@@ -1553,13 +1582,23 @@ function invitationHistory(
 
   const ascending = [...sends].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
   ascending.forEach((send, index) => {
+    const manual = send.deliveryMethod === 'manual';
     entries.push({
       at: send.sentAt,
-      title: index === 0 ? 'Invite sent' : 'New invite sent',
-      body:
-        index === 0
-          ? `Invitation sent to ${ctx.identity.email}.`
-          : 'A new invitation was sent. The previous invitation link stopped working.',
+      title: manual
+        ? index === 0
+          ? 'Invitation link created'
+          : 'Replacement invitation link created'
+        : index === 0
+          ? 'Invite sent'
+          : 'New invite sent',
+      body: manual
+        ? index === 0
+          ? 'A link was created for Admin to copy and deliver manually.'
+          : 'A replacement link was created for Admin to deliver manually. The previous invitation link stopped working.'
+        : index === 0
+          ? `Invitation sent to ${send.recipientEmail ?? ctx.identity.email}.`
+          : `A new invitation was sent to ${send.recipientEmail ?? ctx.identity.email}. The previous invitation link stopped working.`,
     });
   });
 
@@ -1595,11 +1634,9 @@ function invitationHistory(
 }
 
 /**
- * Token facts, never a token value (§28.1).
- *
- * The raw value exists in the delivered URL and nowhere else — not at rest, not
- * in a log, not in an error, and not here. An Admin who needs a Founder to have
- * a working link sends a new one.
+ * Token facts, never a token value (§28.1). Founder draft link material is
+ * reconstructible only by the authenticated application from the token row id
+ * and its secret; plaintext is never stored or logged.
  */
 function tokenFacts(
   live: { version: number; expiresAt: Date | null } | null,
@@ -1607,12 +1644,12 @@ function tokenFacts(
 ): string {
   if (total === 0) return 'No token exists yet — one is created when the invitation is sent.';
   if (!live) {
-    return `No live token · ${total} version${total === 1 ? '' : 's'} issued · only the hash was ever stored · raw link never logged.`;
+    return `No live token · ${total} version${total === 1 ? '' : 's'} issued · plaintext link not stored or logged.`;
   }
   const expiry = formatDay(live.expiresAt);
   return [
     `Token v${live.version}`,
-    'only the hash is stored',
+    'plaintext link not stored',
     total > 1 ? 'previous versions revoked on each resend' : null,
     expiry ? `expires ${expiry}` : null,
     'raw link never logged',

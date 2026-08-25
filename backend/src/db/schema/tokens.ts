@@ -14,12 +14,13 @@
  * email verification before the account claim exists.
  *
  * ── Why one table for both ──────────────────────────────────────────────────
- * Spec §28.1 imposes an identical security contract on Founder draft tokens and
- * Backer magic links: ≥128 bits entropy, raw value only in the delivered URL,
- * one-way hash at rest, version + lineage, constant-time comparison, rate
- * limiting, non-enumerating errors, and immediate revocation of superseded
- * versions on rotation. Two implementations of one contract is two chances to
- * get it wrong.
+ * Spec §28.1 imposes an identical verification contract on Founder draft
+ * tokens and Backer magic links: ≥128 bits entropy, no plaintext at rest,
+ * version + lineage, constant-time comparison, rate limiting, non-enumerating
+ * errors, and immediate revocation of superseded versions on rotation. Founder
+ * draft values are HMAC-derived from their row id so the authenticated Admin
+ * service can reconstruct a copyable URL; other opaque scopes remain random
+ * and unrecoverable.
  *
  * ── Hashing choice ──────────────────────────────────────────────────────────
  * SHA-256, not bcrypt/argon2. Password hashes are deliberately slow because
@@ -122,9 +123,10 @@ export const secureTokens = pgTable(
     scope: tokenScope('scope').notNull(),
 
     /**
-     * SHA-256 of the raw token, hex-encoded. The raw value exists only in the
-     * delivered URL — never at rest, never in a log line, never in an error
-     * message, never in an email body beyond the link itself (Spec §28.1).
+     * SHA-256 verifier of the raw token, hex-encoded. Plaintext is never stored,
+     * logged, or included in an error. Founder draft plaintext can be
+     * reconstructed only with the application secret plus this row's id; all
+     * other opaque scopes are unrecoverable (Spec §28.1).
      */
     tokenHash: text('token_hash').notNull(),
 

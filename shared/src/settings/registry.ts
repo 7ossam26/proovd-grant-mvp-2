@@ -152,7 +152,7 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     group: 'listing_fee',
     kind: 'money_cents',
     provenance: 'specified',
-    specRef: '§6 · US$2 per completed Visuals, Branding, saved Founder interview, Story, Socials',
+    specRef: '§6 · US$2 per completed Visuals, Branding, confirmed Founder interview, Story, Socials',
     defaultValue: String(LISTING_FEE_ITEM_DISCOUNT_CENTS),
     help: 'Applied once for each of the five completed optional items.',
     minimum: 0,

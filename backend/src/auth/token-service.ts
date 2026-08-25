@@ -264,9 +264,9 @@ export interface TokenServiceDeps {
     executor?: Pick<NodePgDatabase<Record<string, unknown>>, 'insert'>,
   ) => Promise<void>;
   /**
-   * `BETTER_AUTH_SECRET`. Keys the HMAC that stores a six-digit email code
-   * (see `codeHash`) and nothing else — the opaque-token scopes hold a plain
-   * SHA-256 of a 256-bit value, which needs no key.
+   * `BETTER_AUTH_SECRET`. Keys both the six-digit email-code HMAC and the
+   * reconstructible Founder draft-link derivation. Other opaque-token scopes
+   * remain random values represented by a plain SHA-256 verifier at rest.
    */
   secret: string;
   now?: () => Date;
@@ -290,18 +290,46 @@ export function createTokenService({
   allowClaimedInvitationReuse = false,
 }: TokenServiceDeps) {
   /**
+   * Founder invitation links must be copyable by an authenticated Admin after
+   * an email send. Their raw value is therefore derived from the token row id
+   * with the deployment secret rather than stored in plaintext. A database
+   * dump still contains only the ordinary SHA-256 verifier; reconstructing the
+   * bearer value additionally requires the application secret.
+   *
+   * Other token scopes keep their original unrecoverable random values.
+   */
+  const founderDraftRaw = (tokenId: string): string =>
+    createHmac('sha256', secret)
+      .update(`proovd:founder-draft-link:v1|${tokenId}`)
+      .digest('base64url');
+
+  const rawFor = (scope: SecureToken['scope'], tokenId: string): string =>
+    scope === 'founder_draft' ? founderDraftRaw(tokenId) : generateRawToken();
+
+  function recoverFounderDraftRaw(
+    token: Pick<SecureToken, 'id' | 'scope' | 'tokenHash'>,
+  ): string | null {
+    if (token.scope !== 'founder_draft') return null;
+    const raw = founderDraftRaw(token.id);
+    return safeCompareHex(hashToken(raw), token.tokenHash) ? raw : null;
+  }
+
+  /**
    * Issues a brand-new token and its lineage.
    *
-   * The raw value is returned exactly once and is never recoverable. A caller
-   * coupling issuance to delivery can pass its transaction executor, so a
-   * provider refusal rolls the new row and its audit evidence back together.
+   * The raw value is returned to the issuer. Founder draft values can later be
+   * reconstructed by this service for authenticated Admin display; other
+   * scopes remain unrecoverable. A caller coupling issuance to delivery can
+   * pass its transaction executor, so a provider refusal rolls the new row and
+   * its audit evidence back together.
    */
   async function issue(
     subject: TokenSubject,
     opts: { expiresAt?: Date | null; actorId?: string | null } = {},
     executor: Pick<NodePgDatabase<Record<string, unknown>>, 'insert'> = db,
   ): Promise<IssuedToken> {
-    const raw = generateRawToken();
+    const tokenId = randomUUID();
+    const raw = rawFor(subject.scope, tokenId);
     const tokenHash = hashToken(raw);
     const lineageId = randomUUID();
 
@@ -328,6 +356,7 @@ export function createTokenService({
     const [record] = await executor
       .insert(secureTokens)
       .values({
+        id: tokenId,
         scope: subject.scope,
         tokenHash,
         version: 1,
@@ -437,7 +466,8 @@ export function createTokenService({
         .set({ revokedAt: now(), revokedReason: 'superseded_by_rotation' })
         .where(and(eq(secureTokens.lineageId, lineageId), isNull(secureTokens.revokedAt)));
 
-      const raw = generateRawToken();
+      const tokenId = randomUUID();
+      const raw = rawFor(previous.scope, tokenId);
       const nextVersion = previous.version + 1;
 
       const expiresAt =
@@ -448,6 +478,7 @@ export function createTokenService({
       const [record] = await tx
         .insert(secureTokens)
         .values({
+          id: tokenId,
           scope: previous.scope,
           tokenHash: hashToken(raw),
           version: nextVersion,
@@ -1040,6 +1071,7 @@ export function createTokenService({
   return {
     issue,
     rotate,
+    recoverFounderDraftRaw,
     verify,
     claimDraft,
     claimAffiliateInvitation,

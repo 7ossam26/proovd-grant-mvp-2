@@ -69,6 +69,12 @@ import { campaigns } from './domain.js';
 import { invitationStatus } from './domain.js';
 export { invitationStatus };
 
+/** How an invitation link left Proovd. Manual means an Admin copied the link. */
+export const invitationDeliveryMethod = pgEnum('invitation_delivery_method', [
+  'email',
+  'manual',
+]);
+
 /* ── founder_prospects (§7, §25.5, §26.1) ───────────────────────────────────*/
 
 export const founderProspects = pgTable(
@@ -333,6 +339,9 @@ export const campaignInvitationSends = pgTable(
 
     /** The invitation's status as a result of this send. */
     status: invitationStatus('status').notNull(),
+
+    /** Email delivery, or a link created for the Admin to send manually. */
+    deliveryMethod: invitationDeliveryMethod('delivery_method').notNull().default('email'),
 
     sentBy: text('sent_by').notNull(),
   },

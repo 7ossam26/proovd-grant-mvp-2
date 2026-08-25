@@ -951,6 +951,11 @@ export async function banFounder(
   const ctx = await loadFounderContext(deps.db, input.prospectId);
   if (!ctx) return { status: 'campaign_not_found' };
 
+  // A ban can only target an account. Check this before campaign resolution so
+  // an invited Founder who has not claimed an account receives the precise,
+  // safe refusal instead of an unrelated "no campaign" 404.
+  if (!ctx.accountUserId) return { status: 'no_founder_account' };
+
   const campaign = ctx.currentCampaign ?? ctx.campaignRows[0] ?? null;
   if (!campaign) return { status: 'no_campaign' };
 

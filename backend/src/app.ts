@@ -1055,6 +1055,14 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
     );
   }
 
+  // Unknown API requests are API failures, never client-side routes. Without
+  // this boundary a POST to an unregistered endpoint falls through to the SPA
+  // and answers 200 with index.html, which can make a forbidden signup or a
+  // misspelled mutation look successful to a caller.
+  app.use('/api', (_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
   // ── SPA fallback ──────────────────────────────────────────────────────────
   // /api/* routes go above. Everything else returns index.html so the SPA
   // router handles it. In development the Vite dev server serves instead;

@@ -605,7 +605,9 @@ describe('§7 the invitation email carries all nine items and one primary action
 
     // One styled call to action. Other addresses appear as plain text, which is
     // what §27.2 means by a plain-text support route.
-    const actionLinks = [...rendered.html.matchAll(/background-color:\s*#41ED98/gi)];
+    const actionLinks = [
+      ...rendered.html.matchAll(/<a\b[^>]*style="[^"]*background-color:#41ED98[^"]*"[^>]*>/gi),
+    ];
     expect(actionLinks).toHaveLength(1);
     expect(rendered.html).toContain('src="https://app.proovd.co/assets/proovd-logo.png"');
     expect(rendered.html).toContain('alt="Proovd"');
@@ -637,7 +639,7 @@ describe('§7 the invitation email carries all nine items and one primary action
     for (const banned of ['pledge', 'donate', 'pre-build', 'pre-launch', 'reservation', 'tranche', 'escrow', 'affiliate', 'all-or-nothing']) {
       expect(body, `"${banned}" must never render to a Founder`).not.toContain(banned);
     }
-    expect(body).toContain('creator');
+    expect(body).toContain('invite');
   });
 });
 

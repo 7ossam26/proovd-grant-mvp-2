@@ -199,8 +199,13 @@ export interface InvitationView {
   missingBeforeSend: string[];
   canSend: boolean;
 
+  /** Active copyable URL, or null for no/legacy/inactive links. */
+  linkUrl: string | null;
+  /** True when a live legacy link exists but must be explicitly replaced. */
+  linkNeedsReplacement: boolean;
+
   history: { at: string; title: string; body: string }[];
-  /** Token facts only — never a value (§28.1). */
+  /** Human-readable token facts; the bearer value is exposed only in linkUrl. */
   technical: string;
 
   /**

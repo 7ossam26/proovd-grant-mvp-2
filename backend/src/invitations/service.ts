@@ -437,10 +437,9 @@ export async function readDraft(db: Database, draftId: string): Promise<DraftRec
 /**
  * The URL shown in a preview.
  *
- * Not a real link. §28.1 keeps the raw token out of everything but the
- * delivered URL, so previewing cannot mint one and cannot recover the last one
- * — the value is unrecoverable by construction. The Admin surface says so
- * beside the preview rather than showing a link that would 404 if clicked.
+ * Not a real link. Previewing must not mint or rotate a token, and it does not
+ * need the currently active bearer value. The authenticated Founder workspace
+ * exposes that value separately when Admin explicitly needs to copy it.
  */
 export function previewDraftUrl(appBaseUrl: string): string {
   return `${appBaseUrl}${DRAFT_PATH}/…`;
@@ -571,7 +570,13 @@ export interface SendInvitationInput {
 }
 
 export type SendInvitationResult =
-  | { ok: true; sendId: string; tokenVersion: number; resent: boolean }
+  | {
+      ok: true;
+      sendId: string;
+      tokenVersion: number;
+      resent: boolean;
+      invitationUrl: string;
+    }
   | { ok: false; message: string; unresolved?: string[] };
 
 export interface InvitationDeps {
@@ -719,6 +724,7 @@ export async function sendInvitation(
         tokenVersion,
         tokenExpiresAt,
         status: 'sent',
+        deliveryMethod: 'email',
         sentBy: input.actor,
       });
 
@@ -768,7 +774,13 @@ export async function sendInvitation(
         relatedNotificationIds: [outcome.notificationId],
       });
 
-      return { ok: true as const, sendId, tokenVersion, resent };
+      return {
+        ok: true as const,
+        sendId,
+        tokenVersion,
+        resent,
+        invitationUrl: `${input.context.appBaseUrl}${DRAFT_PATH}/${issued.raw}`,
+      };
     });
   } catch (error) {
     const failure =
@@ -799,6 +811,154 @@ export async function sendInvitation(
           : 'No link has reached the Founder — send again.'),
     };
   }
+}
+
+/**
+ * Creates a live Founder invitation link for an Admin to deliver manually.
+ * It is a real invitation issue: the prior link is rotated, a versioned send
+ * record starts/restarts retention, and the action is audited. No email is
+ * attempted and no provider delivery is implied.
+ */
+export async function createManualInvitationLink(
+  { db, tokens }: Pick<InvitationDeps, 'db' | 'tokens'>,
+  input: Omit<SendInvitationInput, 'context'> & { context: InvitationContext },
+): Promise<SendInvitationResult> {
+  const record = await readDraft(db, input.draftId);
+  if (!record) return { ok: false, message: 'That draft does not exist.' };
+  if (record.draft.anonymisedAt) {
+    return {
+      ok: false,
+      message: 'This draft was anonymised after 30 calendar days without a claim.',
+    };
+  }
+  if (record.draft.status === 'claimed') {
+    return { ok: false, message: 'This invitation has already been claimed.' };
+  }
+
+  const recipient = resolvedRecipient(record);
+  if (!recipient.email) {
+    return { ok: false, message: 'This prospect has no invitation email address.' };
+  }
+  const missingFields = missingInvitationFields(record);
+  if (missingFields.length > 0) {
+    return {
+      ok: false,
+      message: `The invitation is incomplete. Still blank: ${missingFields.join(', ')}.`,
+      unresolved: missingFields,
+    };
+  }
+  const preview = await renderFounderInvitation(
+    variablesFor(
+      record,
+      `${input.context.appBaseUrl}${DRAFT_PATH}/preflight`,
+      input.context.supportEmail,
+      input.context.appBaseUrl,
+    ),
+  );
+  if (preview.unresolved.length > 0) {
+    return {
+      ok: false,
+      message: 'This invitation still has unfilled fields.',
+      unresolved: preview.unresolved,
+    };
+  }
+
+  const sendId = randomUUID();
+  const resent = record.sends.length > 0;
+  return db.transaction(async (tx) => {
+    const lock = await tx.execute(
+      sql`select pg_try_advisory_xact_lock(hashtextextended(${`founder-invitation:${input.draftId}`}, 0)) as acquired`,
+    );
+    if ((lock.rows[0] as { acquired?: boolean } | undefined)?.acquired !== true) {
+      return { ok: false as const, message: 'Another invitation issue is already in progress.' };
+    }
+
+    const now = new Date();
+    const outstanding = await tx
+      .select()
+      .from(secureTokens)
+      .where(
+        and(
+          eq(secureTokens.scope, 'founder_draft'),
+          eq(secureTokens.campaignDraftId, input.draftId),
+          isNull(secureTokens.revokedAt),
+          isNull(secureTokens.claimedAt),
+        ),
+      )
+      .for('update');
+
+    if (outstanding.some((token) => token.expiresAt && token.expiresAt <= now)) {
+      await tx
+        .update(secureTokens)
+        .set({ revokedAt: now, revokedReason: 'expired' })
+        .where(
+          and(
+            eq(secureTokens.scope, 'founder_draft'),
+            eq(secureTokens.campaignDraftId, input.draftId),
+            isNull(secureTokens.revokedAt),
+            isNull(secureTokens.claimedAt),
+            lte(secureTokens.expiresAt, now),
+          ),
+        );
+    }
+
+    const usable = outstanding.filter((token) => !token.expiresAt || token.expiresAt > now);
+    const previous = usable.length
+      ? usable.reduce((a, b) => (a.version >= b.version ? a : b))
+      : null;
+    const issued = previous
+      ? await tokens.rotate(previous.lineageId, { actorId: input.actor }, tx)
+      : await tokens.issue(
+          { scope: 'founder_draft', campaignDraftId: input.draftId },
+          { actorId: input.actor },
+          tx,
+        );
+    if ('ok' in issued) {
+      return { ok: false as const, message: 'The existing link could not be replaced.' };
+    }
+
+    await tx.insert(campaignInvitationSends).values({
+      id: sendId,
+      draftId: input.draftId,
+      recipientEmail: recipient.email,
+      recipientName: recipient.name,
+      senderName: record.draft.senderName!,
+      senderEmail: record.draft.senderEmail!,
+      invitationSource: record.prospect.invitationSource,
+      notificationId: null,
+      tokenId: issued.record.id,
+      tokenVersion: issued.record.version,
+      tokenExpiresAt: issued.record.expiresAt,
+      status: 'sent',
+      deliveryMethod: 'manual',
+      sentBy: input.actor,
+    });
+    await tx.update(campaignDrafts).set({ status: 'sent' }).where(eq(campaignDrafts.id, input.draftId));
+    await tx.insert(auditEvents).values({
+      actor: input.actor,
+      targetType: 'campaign_draft',
+      targetId: input.draftId,
+      action: resent ? 'invitation.manual_link_replaced' : 'invitation.manual_link_created',
+      internalReason: resent
+        ? `Admin created manual invitation link v${issued.record.version}; previous link revoked`
+        : `Admin created manual invitation link v${issued.record.version}`,
+      customerExplanation: null,
+      newValue: {
+        sendId,
+        tokenVersion: issued.record.version,
+        deliveryMethod: 'manual',
+        expiresAt: issued.record.expiresAt,
+      },
+    });
+
+    return {
+      ok: true as const,
+      sendId,
+      tokenVersion: issued.record.version,
+      resent,
+      invitationUrl: `${input.context.appBaseUrl}${DRAFT_PATH}/${issued.raw}`,
+    };
+  });
 }
 
 class InvitationSendFailure extends Error {

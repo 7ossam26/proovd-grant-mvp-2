@@ -526,6 +526,13 @@
       "when": 1788969600000,
       "tag": "0074_admin_reauth_window_one_day",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1789056000000,
+      "tag": "0075_founder_manual_invitation_links",
+      "breakpoints": true
     }
   ]
 }

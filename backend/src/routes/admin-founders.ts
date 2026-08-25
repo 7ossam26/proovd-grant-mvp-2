@@ -49,11 +49,10 @@
  * data, and every write below stores prior value, new value, reason, evidence,
  * actor, MFA/reauth context, and time. No route accepts a prior value.
  *
- * ── The raw token never appears ─────────────────────────────────────────────
- * No response below carries a draft link. §28.1 puts the raw value in the
- * delivered URL and nowhere else, so Admin sees that a live link exists, its
- * version, and when it expires — never the value. An Admin who needs a Founder
- * to have a working link sends a new one.
+ * ── Copyable invitation links ───────────────────────────────────────────────
+ * Founder links use a server-secret-derived bearer value. The database keeps
+ * only its SHA-256 verifier, while an authenticated Admin may copy the active
+ * URL. Legacy random links are replaced explicitly, never silently on read.
  */
 
 import { Router, type RequestHandler, type Request, type Response, type NextFunction } from 'express';
@@ -73,6 +72,7 @@ import {
   composeInvitation,
   previewInvitation,
   sendInvitation,
+  createManualInvitationLink,
   revokeInvitation,
   readDraft,
   listFounders as listInvitationDrafts,
@@ -264,7 +264,7 @@ export function createAdminFoundersRouter({
   /** The whole workspace, re-read after every write. One source of truth. */
   const workspaceOf = (prospectId: string) =>
     readFounderWorkspace(
-      { db, invitationContext: context, ...(onboarding ? { onboarding } : {}) },
+      { db, tokens, invitationContext: context, ...(onboarding ? { onboarding } : {}) },
       prospectId,
     );
 
@@ -336,6 +336,13 @@ export function createAdminFoundersRouter({
       noGuarantee: NO_GUARANTEE_TEXT,
       retentionDays: UNCLAIMED_DRAFT_RETENTION_DAYS,
     });
+  });
+
+  // Keep every non-read method from falling through to a parameterised
+  // Founder route. The copy is a committed product rule, not an editable
+  // record whose id happens to be `invitation-copy`.
+  router.all(`${ADMIN_FOUNDERS_PATH}/invitation-copy`, admin, (_req, res) => {
+    res.status(404).json({ error: 'Not found' });
   });
 
   /* ══ The person: Users → Founders (§26.1) ═══════════════════════════════ */
@@ -1057,6 +1064,7 @@ export function createAdminFoundersRouter({
       sendId: result.sendId,
       tokenVersion: result.tokenVersion,
       resent: result.resent,
+      invitationUrl: result.invitationUrl,
     });
   }
 
@@ -1077,6 +1085,56 @@ export function createAdminFoundersRouter({
     json,
     async (req, res) => {
       await deliverInvitation(req, res, 'again');
+    },
+  );
+
+  router.post(
+    `${ADMIN_FOUNDERS_PATH}/:prospectId/invitation/link`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const prospectId = req.params['prospectId'] as string;
+      const ctx = await loadFounderContext(db, prospectId);
+      const draft = ctx ? invitableDraftOf(ctx) : null;
+      if (!ctx || !draft) {
+        notFound(res, 'No invitation link', 'This Founder has no invitation to create a link for.');
+        return;
+      }
+      if (ctx.prospect.claimedAt) {
+        refused(
+          res,
+          'That link was not created',
+          'This Founder has already accepted the invitation and owns an account.',
+        );
+        return;
+      }
+      const sender = await ensureInvitationSender(req, draft.id);
+      if (!sender.ok) {
+        refused(res, 'That link was not created', sender.message);
+        return;
+      }
+      const result = await createManualInvitationLink(
+        { db, tokens },
+        { draftId: draft.id, actor: actorOf(req), context },
+      );
+      if (!result.ok) {
+        res.status(422).json({
+          error: 'link_rejected',
+          title: 'That link was not created',
+          whatHappened: result.message,
+          next: result.unresolved?.length
+            ? `Fill in: ${result.unresolved.join(', ')}`
+            : 'Nothing has changed.',
+        });
+        return;
+      }
+      res.status(201).json({
+        sendId: result.sendId,
+        tokenVersion: result.tokenVersion,
+        resent: result.resent,
+        invitationUrl: result.invitationUrl,
+      });
     },
   );
 
@@ -1684,6 +1742,7 @@ export function createAdminFoundersRouter({
       sendId: result.sendId,
       tokenVersion: result.tokenVersion,
       resent: result.resent,
+      invitationUrl: result.invitationUrl,
     });
   });
 

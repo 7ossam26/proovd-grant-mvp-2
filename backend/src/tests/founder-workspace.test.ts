@@ -273,6 +273,7 @@ const ROUTES: ReadonlyArray<{ method: 'get' | 'put' | 'post' | 'delete'; path: s
   { method: 'get', path: `/api/admin/founders/${randomUUID()}/invitation/preview`, gated: false },
   { method: 'post', path: `/api/admin/founders/${randomUUID()}/invitation/send`, gated: true },
   { method: 'post', path: `/api/admin/founders/${randomUUID()}/invitation/new`, gated: true },
+  { method: 'post', path: `/api/admin/founders/${randomUUID()}/invitation/link`, gated: true },
   { method: 'post', path: `/api/admin/founders/${randomUUID()}/invitation/cancel`, gated: true },
   { method: 'post', path: `/api/admin/founders/${randomUUID()}/access`, gated: true },
   { method: 'post', path: `/api/admin/founders/${randomUUID()}/ban`, gated: true },
@@ -483,13 +484,15 @@ describe('§26.1 the workspace serves five panes composed from the records', () 
     expect(Array.isArray(detail.history)).toBe(true);
   });
 
-  it('never puts the raw invitation token anywhere in the payload (§28.1)', async () => {
-    const founder = await invited('no-token-leak');
+  it('exposes the active link only in its explicit Admin field, never in history or token facts', async () => {
+    const founder = await invited('copyable-link');
     const detail = await workspaceOf(founder.prospectId);
 
-    expect(JSON.stringify(detail)).not.toContain(founder.raw);
-    // Admin sees that a live link exists, its version, and its expiry.
-    expect(detail.overview.invitation.technical).toContain('only the hash is stored');
+    expect(detail.overview.invitation.linkUrl).toBe(`http://localhost:3000/draft/${founder.raw}`);
+    expect(detail.overview.invitation.linkNeedsReplacement).toBe(false);
+    expect(JSON.stringify(detail.overview.invitation.history)).not.toContain(founder.raw);
+    expect(detail.overview.invitation.technical).not.toContain(founder.raw);
+    expect(detail.overview.invitation.technical).toContain('plaintext link not stored');
   });
 
   it('says what a money section is waiting for instead of showing a zero (§1.4, §16a)', async () => {
@@ -1093,7 +1096,6 @@ describe('§22.7 a ban is refused unless the record already meets a defined trig
     // account. Nothing about the record meets any of the four.
     const founder = await invited('ban-not-met');
     await completeVetting(founder.raw, 'pre_launch', founder.draftId);
-    await claimAccount(founder, 'ban-not-met-account');
 
     const res = await request(h.app)
       .post(`/api/admin/founders/${founder.prospectId}/ban`)
@@ -1158,7 +1160,6 @@ describe('§22.7 a ban is refused unless the record already meets a defined trig
 
   it('refuses when there is no account to ban, and offers no ban control either', async () => {
     const founder = await invited('ban-no-account');
-    await completeVetting(founder.raw, 'pre_launch', founder.draftId);
     const res = await request(h.app)
       .post(`/api/admin/founders/${founder.prospectId}/ban`)
       .set('cookie', admin.cookie)
@@ -1481,6 +1482,50 @@ describe('the history has no store of its own', () => {
    ══════════════════════════════════════════════════════════════════════════ */
 
 describe('§7 send and resend are two acts with two refusals', () => {
+  it('creates and replaces a copyable manual link without claiming an email was sent', async () => {
+    const founder = await createFounder('manual-link');
+    await compose(founder.draftId);
+    const beforeEmails = h.sentEmails.messages.length;
+
+    const first = await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/invitation/link`)
+      .set('cookie', admin.cookie)
+      .send({})
+      .expect(201);
+
+    expect(first.body.resent).toBe(false);
+    expect(first.body.invitationUrl).toMatch(/^http:\/\/localhost:3000\/draft\//);
+    expect(h.sentEmails.messages).toHaveLength(beforeEmails);
+    const firstRaw = String(first.body.invitationUrl).split('/').at(-1)!;
+    await request(h.app).get(`/api/draft/${firstRaw}`).expect(200);
+
+    const replacement = await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/invitation/link`)
+      .set('cookie', admin.cookie)
+      .send({})
+      .expect(201);
+
+    expect(replacement.body.resent).toBe(true);
+    expect(replacement.body.invitationUrl).not.toBe(first.body.invitationUrl);
+    expect(h.sentEmails.messages).toHaveLength(beforeEmails);
+    await request(h.app).get(`/api/draft/${firstRaw}`).expect(TOKEN_REJECTION_STATUS);
+
+    const sends = await h.db
+      .select()
+      .from(campaignInvitationSends)
+      .where(eq(campaignInvitationSends.draftId, founder.draftId))
+      .orderBy(desc(campaignInvitationSends.sentAt));
+    expect(sends).toHaveLength(2);
+    expect(sends.every((row) => row.deliveryMethod === 'manual')).toBe(true);
+    expect(sends.every((row) => row.notificationId === null)).toBe(true);
+
+    const detail = await workspaceOf(founder.prospectId);
+    expect(detail.overview.invitation.linkUrl).toBe(replacement.body.invitationUrl);
+    expect(detail.overview.invitation.history.at(-1)?.title).toBe(
+      'Replacement invitation link created',
+    );
+  });
+
   it('refuses a first send when a working link already exists, and names the other act', async () => {
     const founder = await invited('send-twice');
     const res = await request(h.app)
@@ -1528,6 +1573,38 @@ describe('§7 send and resend are two acts with two refusals', () => {
     const detail = await workspaceOf(founder.prospectId);
     expect(detail.overview.invitation.state).toBe('New invite sent');
     expect(detail.overview.invitation.meaning).toContain('no longer works');
+  });
+
+  it('edits the invitation email and sends the replacement to the corrected address', async () => {
+    const founder = await invited('resend-corrected-email');
+    const correctedEmail = `corrected-${randomUUID()}@example.com`;
+
+    await request(h.app)
+      .put(`/api/admin/founders/${founder.prospectId}/invitation/overrides/recipientEmail`)
+      .set('cookie', admin.cookie)
+      .send({ value: correctedEmail })
+      .expect(200);
+
+    const before = h.sentEmails.messages.length;
+    const resent = await request(h.app)
+      .post(`/api/admin/founders/${founder.prospectId}/invitation/new`)
+      .set('cookie', admin.cookie)
+      .send({})
+      .expect(201);
+
+    expect(resent.body.resent).toBe(true);
+    expect(resent.body.invitationUrl).toMatch(/^http:\/\/localhost:3000\/draft\//);
+    expect(h.sentEmails.messages).toHaveLength(before + 1);
+    expect(h.sentEmails.messages.at(-1)?.to).toBe(correctedEmail);
+
+    const sends = await h.db
+      .select()
+      .from(campaignInvitationSends)
+      .where(eq(campaignInvitationSends.draftId, founder.draftId))
+      .orderBy(desc(campaignInvitationSends.sentAt));
+    expect(sends[0]?.recipientEmail).toBe(correctedEmail);
+    expect(sends[0]?.deliveryMethod).toBe('email');
+    expect(sends[1]?.recipientEmail).toBe(founder.email);
   });
 
   it('cancels the invitation with a reason, and refuses without one', async () => {
@@ -1968,8 +2045,8 @@ describe('the invitation record renders as facts, never a token value (§28.1)',
     expect(detail.overview.invitation.facts.claimed).toBeNull();
     expect(detail.overview.invitation.facts.revoked).toBe(false);
 
-    // The facts block never carries the raw token (§28.1) — the only place the
-    // value exists is the delivered URL.
+    // The facts block never carries the bearer value; Admin receives it only
+    // through the invitation view's explicit link field.
     expect(JSON.stringify(detail.overview.invitation.facts)).not.toContain(founder.raw);
 
     await request(h.app)
@@ -1981,6 +2058,7 @@ describe('the invitation record renders as facts, never a token value (§28.1)',
     detail = await workspaceOf(founder.prospectId);
     expect(detail.overview.invitation.facts.expiration).toBe('Link inactive');
     expect(detail.overview.invitation.facts.revoked).toBe(true);
+    expect(detail.overview.invitation.linkUrl).toBeNull();
   });
 
   it('a prospect with no send yet says so', async () => {

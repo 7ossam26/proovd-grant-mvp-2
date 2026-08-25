@@ -266,6 +266,15 @@ export interface FounderWorkspaceDetail {
       sends?: { at: string; by: string; to: string; confirmed: boolean }[];
       linkLive?: boolean;
       tokenVersion?: number | null;
+      linkUrl?: string | null;
+      linkNeedsReplacement?: boolean;
+      facts?: {
+        sendCount: number;
+        tokenVersion: number | null;
+        expiration: string;
+        claimed: string | null;
+        revoked: boolean;
+      };
       retentionDueAt?: string | null;
     };
     vetting: {
@@ -420,6 +429,7 @@ export interface SendResult {
   sendId: string;
   tokenVersion: number;
   resent: boolean;
+  invitationUrl: string;
 }
 
 /** Takes `requireFreshSession` on the server. A stale session is refused there. */
@@ -571,6 +581,28 @@ export const recordFounderDeletionRequest = (
     method: 'POST',
     body: JSON.stringify(input),
   });
+
+export const resendFounderInvitation = (prospectId: string): Promise<SendResult> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/invitation/new`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const createFounderInvitationLink = (prospectId: string): Promise<SendResult> =>
+  call(`/api/admin/founders/${encodeURIComponent(prospectId)}/invitation/link`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+export const setFounderInvitationOverride = (
+  prospectId: string,
+  key: 'recipientName' | 'recipientEmail' | 'recipientPhone' | 'product' | 'website',
+  value: string,
+): Promise<FounderWorkspaceDetail> =>
+  call(
+    `/api/admin/founders/${encodeURIComponent(prospectId)}/invitation/overrides/${encodeURIComponent(key)}`,
+    { method: 'PUT', body: JSON.stringify({ value }) },
+  );
 
 export interface HardDeleteFounderResult {
   deleted: true;

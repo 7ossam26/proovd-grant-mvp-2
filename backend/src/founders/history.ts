@@ -206,6 +206,7 @@ export async function readFounderHistory(
           sentAt: campaignInvitationSends.sentAt,
           recipientEmail: campaignInvitationSends.recipientEmail,
           notificationId: campaignInvitationSends.notificationId,
+          deliveryMethod: campaignInvitationSends.deliveryMethod,
           tokenVersion: campaignInvitationSends.tokenVersion,
           sentBy: campaignInvitationSends.sentBy,
         })
@@ -218,17 +219,28 @@ export async function readFounderHistory(
   for (const send of sends) {
     const seen = sendsSeen.get(send.draftId) ?? 0;
     sendsSeen.set(send.draftId, seen + 1);
+    const manual = send.deliveryMethod === 'manual';
     drafts.push({
       category: 'invite',
       at: send.sentAt,
-      title: seen === 0 ? 'Invite sent' : 'New invite sent',
-      body:
-        (seen === 0
-          ? `Invitation sent to ${send.recipientEmail ?? 'the recorded address'}.`
-          : `A new invitation was sent to ${send.recipientEmail ?? 'the recorded address'}. The previous invitation link stopped working.`) +
-        (send.notificationId
-          ? ''
-          : ' Delivery has not been confirmed by the email provider yet.'),
+      title: manual
+        ? seen === 0
+          ? 'Invitation link created'
+          : 'Replacement invitation link created'
+        : seen === 0
+          ? 'Invite sent'
+          : 'New invite sent',
+      body: manual
+        ? seen === 0
+          ? 'A link was created for Admin to copy and deliver manually.'
+          : 'A replacement link was created for Admin to deliver manually. The previous invitation link stopped working.'
+        :
+            (seen === 0
+              ? `Invitation sent to ${send.recipientEmail ?? 'the recorded address'}.`
+              : `A new invitation was sent to ${send.recipientEmail ?? 'the recorded address'}. The previous invitation link stopped working.`) +
+            (send.notificationId
+              ? ''
+              : ' Delivery has not been confirmed by the email provider yet.'),
       source: 'campaign_invitation_sends',
     });
   }

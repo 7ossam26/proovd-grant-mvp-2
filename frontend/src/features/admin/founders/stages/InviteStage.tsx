@@ -29,12 +29,13 @@ import { PREFILL_AFFILIATE_TYPES } from '@proovd/shared';
 import {
   AdminRequestError,
   composeInvitation,
+  createFounderInvitationLink,
   prefillVetting,
   previewInvitation,
+  resendFounderInvitation,
   saveFounderPrefills,
   sendFounderInvitation,
-  updateFounderField,
-  updateProspect,
+  setFounderInvitationOverride,
   type FounderPrefillPatch,
   type InvitationPreview,
 } from '../api.js';
@@ -113,10 +114,14 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
   const draftId = overview.vetting.draftId;
 
   const answer = (key: string) => overview.vetting.answers.find((a) => a.key === key)?.text ?? '';
+  const invitationValue = (key: string, fallback: string) =>
+    overview.invitation.overrides.find((field) => field.key === key)?.value ?? fallback;
 
   /* Shown in the invitation */
-  const [name, setName] = useState(header.preferredName);
-  const [business, setBusiness] = useState(header.businessName ?? '');
+  const [name, setName] = useState(invitationValue('recipientName', header.preferredName));
+  const [business, setBusiness] = useState(
+    invitationValue('product', header.businessName ?? ''),
+  );
   const [problem, setProblem] = useState(answer('problem'));
   const [solution, setSolution] = useState(answer('solution'));
   const [views, setViews] = useState(
@@ -126,7 +131,7 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
   );
 
   /* Saved for onboarding */
-  const [email, setEmail] = useState(header.email);
+  const [email, setEmail] = useState(invitationValue('recipientEmail', header.email));
   const [username, setUsername] = useState(p.prefills?.username ?? '');
   const [matches, setMatches] = useState(
     p.prefills?.affiliateMatches === null || p.prefills?.affiliateMatches === undefined
@@ -147,17 +152,17 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
    * The panel supplement arrives after the workspace payload, so five of these
    * eleven fields are empty on the first render and hold a real value on the
    * next. `useState` only reads its initial value once — without this the
-   * screen would render the Admin's own prefills as blank and then let somebody
+ * screen would render the Admin's own prefills as blank and then let somebody
    * blur an empty field over a saved one. The snapshot is the SERVER's values,
    * so the effect fires only when the record itself changed.
    */
   const serverValues = JSON.stringify([
-    header.preferredName,
-    header.businessName ?? '',
+    invitationValue('recipientName', header.preferredName),
+    invitationValue('product', header.businessName ?? ''),
     answer('problem'),
     answer('solution'),
     p.prefills?.viewsCount ?? null,
-    header.email,
+    invitationValue('recipientEmail', header.email),
     p.prefills?.username ?? '',
     p.prefills?.affiliateMatches ?? null,
     p.prefills?.affiliateType ?? '',
@@ -205,13 +210,20 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
   const [preview, setPreview] = useState<InvitationPreview | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
+  const [linkUrl, setLinkUrl] = useState(overview.invitation.linkUrl ?? '');
+  const [linkStatus, setLinkStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLinkUrl(overview.invitation.linkUrl ?? '');
+  }, [overview.invitation.linkUrl]);
 
   /** The state strip's own value, which is also what the `locked` slot reads. */
   const draftStatus = overview.invitation.state;
 
   /**
-   * The reference's `locked` slot: the fieldset is live until an invitation has
-   * actually gone out, and read-only afterwards.
+   * An accepted invitation is immutable. Until claim, Admin may correct the
+   * recipient/content and resend; the resend rotates the bearer link and
+   * preserves the prior delivery snapshot in history.
    *
    * The reference calls that first state `Draft`; this product's own vocabulary
    * for it is `Not sent` (`INVITATION_STATES` in `founders/logic.ts`, the seven
@@ -219,13 +231,11 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
    * `'Draft'` matched none of them, so the fieldset was locked for every
    * Founder including a brand-new one — the whole screen was read-only.
    *
-   * Locking after the send is the right rule and not merely the reference's:
-   * `campaign_invitation_sends` snapshots what was actually delivered, and an
-   * edit afterwards would leave the record saying something different from the
-   * message in somebody's inbox. Changing the content means sending a new
-   * invitation, which rotates the token and writes a new send row.
+   * `campaign_invitation_sends` snapshots each delivery, so edits do not rewrite
+   * what previously went out. The new values become effective only when Admin
+   * explicitly resends or creates a replacement link.
    */
-  const locked = draftStatus !== 'Not sent';
+  const locked = draftStatus === 'Invite accepted';
 
   async function persist(run: () => Promise<unknown>) {
     setBusy('saving');
@@ -240,9 +250,13 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
     }
   }
 
-  const saveField = (key: string, next: string, current: string) => {
+  const saveOverride = (
+    key: 'recipientName' | 'recipientEmail' | 'product',
+    next: string,
+    current: string,
+  ) => {
     if (locked || next === current) return;
-    void persist(() => updateFounderField(header.prospectId, key, next));
+    void persist(() => setFounderInvitationOverride(header.prospectId, key, next));
   };
 
   const savePrefill = (patch: FounderPrefillPatch) => {
@@ -276,6 +290,9 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
     voice2,
   });
 
+  const sends = overview.invitation.sends ?? [];
+  const sendCount = overview.invitation.facts?.sendCount ?? sends.length;
+
   const composeVisibleInvitation = () =>
     composeInvitation(draftId, {
       whatWeUnderstood: `Problem: ${problem.trim()}\n\nSolution: ${solution.trim()}`,
@@ -285,11 +302,10 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
 
   const saveVisibleSnapshot = () =>
     Promise.all([
-      updateFounderField(header.prospectId, 'preferred', name),
-      updateFounderField(header.prospectId, 'bizLegal', business),
-      updateProspect(draftId, { productName: business }),
+      setFounderInvitationOverride(header.prospectId, 'recipientName', name),
+      setFounderInvitationOverride(header.prospectId, 'product', business),
       prefillVetting(draftId, { problem, solution }),
-      updateFounderField(header.prospectId, 'email', email),
+      setFounderInvitationOverride(header.prospectId, 'recipientEmail', email),
       saveFounderPrefills(draftId, {
         viewsCount: countOrNull(views),
         username: username.trim() || null,
@@ -306,7 +322,10 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
       setBusy('sending');
       await saveVisibleSnapshot();
       await composeVisibleInvitation();
-      const result = await sendFounderInvitation(header.prospectId);
+      const result = sendCount > 0
+        ? await resendFounderInvitation(header.prospectId)
+        : await sendFounderInvitation(header.prospectId);
+      setLinkUrl(result.invitationUrl);
       setSent(
         result.resent
           ? 'A new invitation was sent — the previous link stopped working.'
@@ -314,9 +333,37 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
       );
     });
 
+  const createLink = () =>
+    persist(async () => {
+      setBusy('sending');
+      setLinkStatus(null);
+      await saveVisibleSnapshot();
+      await composeVisibleInvitation();
+      const result = await createFounderInvitationLink(header.prospectId);
+      setLinkUrl(result.invitationUrl);
+      setLinkStatus(
+        result.resent
+          ? 'Replacement link created. The previous link no longer works.'
+          : 'Invitation link created.',
+      );
+    });
+
+  const copyLink = async () => {
+    if (!linkUrl) return;
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+    } catch {
+      const input = document.querySelector<HTMLInputElement>('#founder-invitation-link');
+      input?.select();
+      document.execCommand('copy');
+    }
+    setLinkStatus('Invitation link copied.');
+  };
+
   /* The action bar's one status line, in priority order. */
   const statusLine = (() => {
     if (sent) return sent;
+    if (locked) return 'Invitation accepted — it can no longer be edited or resent';
     const refusal = refusalLine(error);
     if (refusal) return refusal;
     if (busy === 'sending') return 'Sending…';
@@ -327,9 +374,12 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
       : 'Complete valid email, views and affiliate-count values';
   })();
 
-  const sends = overview.invitation.sends ?? [];
-  const version = p.invitation?.version ?? overview.invitation.tokenVersion ?? null;
-  const reminders = p.invitation?.reminders ?? (sends.length > 0 ? sends.length - 1 : null);
+  const version =
+    p.invitation?.version ??
+    overview.invitation.facts?.tokenVersion ??
+    overview.invitation.tokenVersion ??
+    null;
+  const reminders = p.invitation?.reminders ?? (sendCount > 0 ? sendCount - 1 : null);
 
   return (
     <>
@@ -347,7 +397,7 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
           }
           /* The reference's own branch: an accepted invitation's next step is
              Onboarding, not another read of the invitation. */
-          next={draftStatus === 'Accepted' ? 'Onboarding' : 'Founder reviews and accepts'}
+          next={draftStatus === 'Invite accepted' ? 'Onboarding' : 'Founder reviews and accepts'}
         />
 
         {/* The trailing space is the reference's own conditional `locked` slot. */}
@@ -366,7 +416,13 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  onBlur={() => saveField('preferred', name, header.preferredName)}
+                  onBlur={() =>
+                    saveOverride(
+                      'recipientName',
+                      name,
+                      invitationValue('recipientName', header.preferredName),
+                    )
+                  }
                 />
               </label>
               <label>
@@ -374,16 +430,13 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
                 <input
                   value={business}
                   onChange={(e) => setBusiness(e.target.value)}
-                  onBlur={() => {
-                    if (!locked && business !== (header.businessName ?? '')) {
-                      void persist(() =>
-                        Promise.all([
-                          updateFounderField(header.prospectId, 'bizLegal', business),
-                          updateProspect(draftId, { productName: business }),
-                        ]),
-                      );
-                    }
-                  }}
+                  onBlur={() =>
+                    saveOverride(
+                      'product',
+                      business,
+                      invitationValue('product', header.businessName ?? ''),
+                    )
+                  }
                 />
               </label>
               <label className="wide">
@@ -438,7 +491,13 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={() => saveField('email', email, header.email)}
+                  onBlur={() =>
+                    saveOverride(
+                      'recipientEmail',
+                      email,
+                      invitationValue('recipientEmail', header.email),
+                    )
+                  }
                 />
               </label>
               <label>
@@ -544,6 +603,51 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
           </div>
         </section>
 
+        <section className="invite-link-panel" aria-labelledby="founder-invitation-link-heading">
+          <div>
+            <p className="dialog-kicker">Founder invitation link</p>
+            <h2 id="founder-invitation-link-heading">Copy and send it directly</h2>
+            <p>
+              Use this when the invitation email does not arrive. Creating a replacement link
+              immediately disables the previous one.
+            </p>
+          </div>
+          <label htmlFor="founder-invitation-link">Active invite link</label>
+          <div className="invite-link-row">
+            <input
+              id="founder-invitation-link"
+              value={
+                linkUrl ||
+                (overview.invitation.linkNeedsReplacement
+                  ? 'Existing link must be replaced before it can be copied'
+                  : draftStatus === 'Invite accepted'
+                    ? 'Invitation accepted — no active claim link'
+                    : 'No copyable invitation link yet')
+              }
+              readOnly
+              aria-describedby="founder-invitation-link-status"
+            />
+            {linkUrl ? (
+              <button type="button" onClick={() => void copyLink()}>Copy link</button>
+            ) : null}
+            {!locked ? (
+              <button
+                type="button"
+                onClick={() => void createLink()}
+                disabled={!readyToSend || busy === 'sending'}
+              >
+                {overview.invitation.linkNeedsReplacement ? 'Replace link' : 'Create link'}
+              </button>
+            ) : null}
+          </div>
+          <small id="founder-invitation-link-status" role="status">
+            {linkStatus ??
+              (linkUrl
+                ? 'This is the currently active link.'
+                : 'The link is available only to authenticated Admin users.')}
+          </small>
+        </section>
+
         <div className="actionbar">
           <div>
             <small>{statusLine}</small>
@@ -568,9 +672,13 @@ export function InviteStage({ detail, panel, onSaved }: StageProps) {
               className="primary"
               type="button"
               onClick={send}
-              disabled={!readyToSend || busy === 'sending'}
+              disabled={locked || !readyToSend || busy === 'sending'}
             >
-              Send invite
+              {locked
+                ? 'Invitation accepted'
+                : sendCount > 0
+                  ? 'Save edits & resend email'
+                  : 'Send invite email'}
             </button>
           </div>
         </div>
