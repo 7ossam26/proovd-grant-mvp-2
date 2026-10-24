@@ -24,12 +24,16 @@ export function createResendTransport(apiKey: string): EmailTransport {
   return {
     async send(message: OutgoingEmail) {
       const result = await resend.emails.send({
-        from: message.from,
+        // Keep the configured sending address while giving recipients a
+        // recognisable sender. Preserve an explicitly supplied display name.
+        from: message.from.includes('<') ? message.from : `Proovd <${message.from}>`,
         to: message.to,
         subject: message.subject,
         html: message.html,
         text: message.text,
-        ...(message.replyTo ? { replyTo: message.replyTo } : {}),
+        // Codes and signup confirmations have no per-message reply address.
+        // Their replies should still reach the published support inbox.
+        replyTo: message.replyTo ?? 'support@proovd.co',
       });
 
       if (result.error) {

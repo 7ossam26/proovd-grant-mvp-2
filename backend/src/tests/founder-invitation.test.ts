@@ -586,7 +586,7 @@ describe('§7 the invitation email carries all nine items and one primary action
     expect(message.text).toContain('http://localhost:3000/draft/');
   });
 
-  it('offers exactly one primary action (§27.2)', async () => {
+  it('offers one personal invitation link without promotional graphics (§27.2)', async () => {
     const rendered = await renderFounderInvitation({
       recipientName: 'Rowan',
       productName: 'Waitlist',
@@ -603,14 +603,14 @@ describe('§7 the invitation email carries all nine items and one primary action
       supportEmail: 'support@proovd.co',
     });
 
-    // One styled call to action. Other addresses appear as plain text, which is
-    // what §27.2 means by a plain-text support route.
-    const actionLinks = [
-      ...rendered.html.matchAll(/<a\b[^>]*style="[^"]*background-color:#41ED98[^"]*"[^>]*>/gi),
-    ];
-    expect(actionLinks).toHaveLength(1);
-    expect(rendered.html).toContain('src="https://app.proovd.co/assets/proovd-logo.png"');
-    expect(rendered.html).toContain('alt="Proovd"');
+    // One ordinary link remains the primary action; the support addresses are
+    // plain text. Decorative images and the large campaign-style button are gone.
+    expect([...rendered.html.matchAll(/<a\b[^>]*>/gi)]).toHaveLength(1);
+    expect(rendered.html).toContain('href="https://app.proovd.co/draft/abc"');
+    expect(rendered.html).not.toMatch(/<img\b|background-color:#41ED98/i);
+    expect(rendered.subject).toBe('Your Proovd invitation for Waitlist');
+    expect(rendered.text).toContain('Hi Rowan,');
+    expect(rendered.text).toContain('https://app.proovd.co/draft/abc');
     expect(rendered.unresolved).toEqual([]);
   });
 

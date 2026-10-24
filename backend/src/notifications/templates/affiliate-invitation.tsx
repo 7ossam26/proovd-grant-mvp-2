@@ -41,16 +41,11 @@ import {
   Body,
   Container,
   Head,
-  Heading,
-  Hr,
   Html,
-  Img,
   Link,
   Preview,
-  Section,
   Text,
 } from '@react-email/components';
-import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 /**
@@ -110,10 +105,8 @@ export interface AffiliateInvitationVariables {
   /** §27.8's published support address. */
   supportEmail: string;
   /**
-   * The absolute URL of the header art, from `invitationArtUrl`. Derived from
-   * `APP_BASE_URL`, never composed by an Admin. A blank one resolves to
-   * `[ARTURL]` and the §8 gate refuses the send — see the Founder template,
-   * which reasons about the same field at length.
+   * Legacy presentation input, retained for existing compose callers. Personal
+   * invitation emails no longer embed decorative art.
    */
   artUrl: string;
 }
@@ -149,97 +142,70 @@ function resolve(variables: AffiliateInvitationVariables): Resolved {
  */
 export function affiliateInvitationSubject(variables: AffiliateInvitationVariables): string {
   const productName = variables.productName?.trim() || MARKERS['productName']!;
-  return `Proovd invitation: promote ${productName}`;
+  return `Your Proovd invitation for ${productName}`;
 }
 
 function AffiliateInvitationEmail({ v }: { v: Resolved }) {
   return (
     <Html lang="en">
-      <Head><BrandEmailTheme /></Head>
-      <Preview>{`${v.senderName} at Proovd recruited you for ${v.productName}`}</Preview>
+      <Head />
+      <Preview>{`${v.senderName} has invited you to review ${v.productName} on Proovd.`}</Preview>
       <Body style={body}>
         <Container style={container}>
-          <Text style={eyebrow}>Proovd</Text>
-
-          {/* The same header art the Founder invitation carries, so the two
-              private invitations open the same way. Decorative only: it makes
-              no claim, adds no action, and `alt=""` keeps it out of the reading
-              order. The transparent envelope fills the old band's slot. */}
-          <Section style={art}>
-            <Img src={v.artUrl} alt="" width="512" height="112" style={artImage} />
-          </Section>
-
           {/* §8 item 1 — the Founder and the product. */}
-          <Heading style={heading}>
-            {v.recipientName}, we would like you to promote {v.productName} by {v.founderName}.
-          </Heading>
+          <Text style={text}>Hi {v.recipientName},</Text>
+          <Text style={text}>
+            I would like to invite you to review {v.productName} by {v.founderName} on Proovd.
+          </Text>
 
           {/* §8 item 2 — why this Creator and this channel. */}
-          <Section style={section}>
-            <Text style={label}>Why we came to you</Text>
-            <Text style={text}>{v.whyRecruited}</Text>
-          </Section>
+          <Text style={label}>Why we came to you</Text>
+          <Text style={text}>{v.whyRecruited}</Text>
 
           {/* §8 item 3 — which public presence Proovd reviewed. */}
-          <Section style={section}>
-            <Text style={label}>What we looked at</Text>
-            <Text style={text}>{v.reviewedPresence}</Text>
-            <Text style={quiet}>
-              We reviewed what is publicly visible. If anything there is out of date, you can
-              correct it when you create your account.
-            </Text>
-          </Section>
+          <Text style={label}>What we looked at</Text>
+          <Text style={text}>{v.reviewedPresence}</Text>
+          <Text style={text}>
+            We reviewed what is publicly visible. If anything there is out of date, you can
+            correct it when you create your account.
+          </Text>
 
           {/* §8 item 4 — this campaign, and only this campaign. */}
-          <Section style={section}>
-            <Text style={label}>This invitation is for one campaign</Text>
-            <Text style={text}>
-              Signing up here creates your Proovd account and joins you to {v.productName} only.
-              Proovd has no open signup — Creators join one campaign at a time, by invitation.
-            </Text>
-          </Section>
+          <Text style={label}>This invitation is for one campaign</Text>
+          <Text style={text}>
+            Signing up here creates your Proovd account and joins you to {v.productName} only.
+            Proovd has no open signup — Creators join one campaign at a time, by invitation.
+          </Text>
 
           {/* §8 item 5 — it may still be preparing. Fixed text. */}
-          <Section style={section}>
-            <Text style={label}>It may not be ready yet</Text>
-            <Text style={text}>{PREPARING_NOTICE}</Text>
-          </Section>
+          <Text style={text}>{PREPARING_NOTICE}</Text>
 
           {/* §8 item 6 — declining later does not harm standing. Fixed text. */}
-          <Section style={section}>
-            <Text style={label}>You are not committing to anything</Text>
-            <Text style={text}>{DECLINE_NOTICE}</Text>
-          </Section>
-
-          <Hr style={rule} />
+          <Text style={text}>{DECLINE_NOTICE}</Text>
 
           {/* §8 item 7 / §27.2 — exactly one primary action. */}
-          <Section style={section}>
+          <Text style={text}>
             <Link href={v.claimUrl} style={action}>
-              Create your account
+              Review your invitation and create your account
             </Link>
-            <Text style={quiet}>
-              This link is personal to you and works once. If it stops working, reply to this
-              email and we will send a new one.
-            </Text>
-          </Section>
+          </Text>
+          <Text style={text}>
+            This link is personal to you and works once. If it stops working, reply to this
+            email and we will send a new one.
+          </Text>
 
-          <Hr style={rule} />
-
-          <Section style={section}>
-            <Text style={text}>
-              {v.senderName}
-              <br />
-              Proovd
-            </Text>
-            <Text style={quiet}>
-              Reply to this email, or write to {v.senderEmail}. For anything else,{' '}
-              {v.supportEmail} — we respond within one business day, Monday to Friday,
-              excluding U.S. federal holidays.
-            </Text>
-            <Text style={quiet}>Reference: {v.reference}</Text>
-            <Text style={quiet}>{NEVER_ASKS_NOTICE}</Text>
-          </Section>
+          <Text style={text}>
+            {v.senderName}
+            <br />
+            Proovd
+          </Text>
+          <Text style={quiet}>
+            Reply to this email, or write to {v.senderEmail}. For anything else,{' '}
+            {v.supportEmail} — we respond within one business day, Monday to Friday,
+            excluding U.S. federal holidays.
+          </Text>
+          <Text style={quiet}>Reference: {v.reference}</Text>
+          <Text style={quiet}>{NEVER_ASKS_NOTICE}</Text>
         </Container>
       </Body>
     </Html>
@@ -248,32 +214,31 @@ function AffiliateInvitationEmail({ v }: { v: Resolved }) {
 
 function plainText(v: Resolved): string {
   return [
-    `${v.recipientName}, we would like you to promote ${v.productName} by ${v.founderName}.`,
+    `Hi ${v.recipientName},`,
     '',
-    'WHY WE CAME TO YOU',
+    `I would like to invite you to review ${v.productName} by ${v.founderName} on Proovd.`,
+    '',
+    'Why we came to you',
     v.whyRecruited,
     '',
-    'WHAT WE LOOKED AT',
+    'What we looked at',
     v.reviewedPresence,
     'We reviewed what is publicly visible. If anything there is out of date, you can',
     'correct it when you create your account.',
     '',
-    'THIS INVITATION IS FOR ONE CAMPAIGN',
+    'This invitation is for one campaign',
     `Signing up here creates your Proovd account and joins you to ${v.productName} only.`,
     'Proovd has no open signup — Creators join one campaign at a time, by invitation.',
     '',
-    'IT MAY NOT BE READY YET',
     PREPARING_NOTICE,
     '',
-    'YOU ARE NOT COMMITTING TO ANYTHING',
     DECLINE_NOTICE,
     '',
-    'CREATE YOUR ACCOUNT',
+    'Review your invitation and create your account:',
     v.claimUrl,
     'This link is personal to you and works once. If it stops working, reply to this',
     'email and we will send a new one.',
     '',
-    '---',
     v.senderName,
     'Proovd',
     '',
@@ -321,20 +286,11 @@ export async function renderAffiliateInvitation(
   return { subject, html, text, unresolved: [...found].sort() };
 }
 
-/* ── Styles ───────────────────────────────────────────────────────────────────
-   Inline, because email clients strip stylesheets. The same proovd.css values
-   the Founder invitation writes out by hand, for the same reason. */
+/* Inline styles keep the personal note readable across email clients. */
 
-const body = { backgroundColor: '#FFFFFF', fontFamily: 'Satoshi, Arial, Helvetica, sans-serif', margin: 0, padding: '24px 12px' };
-const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
-const eyebrow = { fontSize: '0.875rem', fontWeight: 900, letterSpacing: '0.08em', color: '#012D10', textTransform: 'uppercase' as const, margin: '0 0 1.5rem' };
-/* The header art, matching the Founder invitation. The image sets its height. */
-const art = { margin: '0 0 34px' };
-const artImage = { display: 'block', width: '100%', maxWidth: '512px', height: 'auto', border: 0 };
-const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '0 0 24px' };
-const section = { margin: '0 0 1.5rem' };
-const label = { fontSize: '0.875rem', fontWeight: 700, color: '#669370', margin: '0 0 0.25rem' };
-const text = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, color: '#013F17', margin: '0 0 8px' };
-const quiet = { fontSize: '0.875rem', lineHeight: 1.5, color: '#A2AFA8', margin: '0 0 0.5rem' };
-const rule = { borderColor: '#41ED98', margin: '40px 0 30px' };
-const action = { display: 'inline-block', backgroundColor: '#41ED98', color: '#E9FFE1', fontSize: '18px', fontWeight: 900, textDecoration: 'none', padding: '20px 44px', borderRadius: '1px' };
+const body = { backgroundColor: '#FFFFFF', color: '#222222', fontFamily: 'Arial, Helvetica, sans-serif', margin: 0, padding: '20px 16px' };
+const container = { maxWidth: '640px', margin: '0' };
+const label = { fontSize: '16px', lineHeight: '24px', fontWeight: 700, color: '#222222', margin: '0 0 4px' };
+const text = { fontSize: '16px', lineHeight: '24px', color: '#222222', margin: '0 0 16px' };
+const quiet = { fontSize: '13px', lineHeight: '20px', color: '#555555', margin: '0 0 12px' };
+const action = { color: '#166534', textDecoration: 'underline' };

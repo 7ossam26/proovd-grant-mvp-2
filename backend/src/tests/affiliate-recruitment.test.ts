@@ -539,6 +539,13 @@ describe('§8 — the private campaign-specific invitation', () => {
     });
 
     expect(rendered.text).toContain(NEVER_ASKS_NOTICE);
+    expect(rendered.text).toContain(PREPARING_NOTICE);
+    expect(rendered.text).toContain(DECLINE_NOTICE);
+    expect(rendered.subject).toBe('Your Proovd invitation for Waitlist');
+    expect([...rendered.html.matchAll(/<a\b[^>]*>/gi)]).toHaveLength(1);
+    expect(rendered.html).toContain('href="https://app.proovd.co/creator-invitation/abc"');
+    expect(rendered.html).not.toMatch(/<img\b|background-color:#41ED98/i);
+    expect(rendered.unresolved).toEqual([]);
     for (const part of [rendered.subject, rendered.html, rendered.text]) {
       expect(part).not.toMatch(/routing number|account number|social security|\bSSN\b|W-9 form below/i);
     }
