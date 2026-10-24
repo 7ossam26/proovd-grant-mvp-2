@@ -49,15 +49,22 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    let body: Partial<AdminError> | null = null;
+    let body: (Partial<AdminError> & { code?: unknown }) | null = null;
     try {
-      body = (await response.json()) as Partial<AdminError>;
+      body = (await response.json()) as Partial<AdminError> & { code?: unknown };
     } catch {
       body = null;
     }
-    throw new AdminRequestError(
-      body?.title ? { ...(body as AdminError), status: response.status } : opaque(response.status),
-    );
+    const detail = body?.title
+      ? { ...(body as AdminError), status: response.status }
+      : opaque(response.status);
+    // Better Auth's password-reset refusals use {code, message}, not the
+    // application's error shape. Keep the code for this token-authorized form
+    // so password validation and transport failures are not called bad links.
+    if (path === '/api/auth/reset-password' && typeof body?.code === 'string') {
+      detail.error = body.code;
+    }
+    throw new AdminRequestError(detail);
   }
 
   if (response.status === 204) return undefined as T;
@@ -140,7 +147,7 @@ export const roleHome: Record<AccountRole, string> = {
  */
 export const requestPasswordReset = async (email: string): Promise<void> => {
   try {
-    await call('/api/auth/forget-password', {
+    await call('/api/auth/request-password-reset', {
       method: 'POST',
       body: JSON.stringify({ email, redirectTo: '/reset-password' }),
     });

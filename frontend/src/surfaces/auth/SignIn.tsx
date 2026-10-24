@@ -53,7 +53,7 @@
  * exists to prevent. It is a real gap, recorded rather than papered over.
  */
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router';
 import {
   Button,
@@ -266,59 +266,95 @@ export function SignIn() {
  * page must never publish is who has an account.
  */
 export const RESET_ACKNOWLEDGEMENT =
-  'If that email address has a Proovd account, a reset link is on its way to it. The link expires, and requesting another one replaces it.';
+  'If that email address has a Proovd account, a reset link is on its way to it. Open the link in that email to choose a new password.';
+
+const RESET_LINK_REFUSAL =
+  'That reset link cannot be used. Reset links expire and can only be used once — ask for a new one.';
+// Matches the configured Better Auth defaults; the server also validates these.
+const RESET_PASSWORD_MIN_LENGTH = 8;
+const RESET_PASSWORD_MAX_LENGTH = 128;
+type ResetError = { kind: 'password' | 'confirmation' | 'link' | 'request'; message: string };
 
 export function ResetPassword() {
   const navigate = useNavigate();
-  const [token, setToken] = useState<string | null>(null);
+  const location = useLocation();
+  const parameters = new URLSearchParams(location.search);
+  const invalidCallback = parameters.get('error') === 'INVALID_TOKEN';
+  const token = invalidCallback ? null : parameters.get('token') || null;
   const [email, setEmail] = useState('');
   const [asked, setAsked] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [done, setDone] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ResetError | null>(null);
   const [busy, setBusy] = useState(false);
+  const requestSequence = useRef(0);
 
-  // The token arrives in the URL of the emailed link. Read once, held in
-  // memory, never written to storage and never put back into a URL we build
-  // (§28.1).
+  // The router owns the emailed query, including an invalid-token callback.
+  // Moving to another link clears only transient form state, never stores a token.
   useEffect(() => {
-    const found = new URLSearchParams(window.location.search).get('token');
-    if (found) setToken(found);
-  }, []);
+    requestSequence.current += 1;
+    setPassword('');
+    setConfirmation('');
+    setDone(false);
+    setAsked(false);
+    setBusy(false);
+    setError(invalidCallback ? { kind: 'link', message: RESET_LINK_REFUSAL } : null);
+  }, [location.search]);
 
   async function ask(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
+    const sequence = ++requestSequence.current;
     setBusy(true);
     // The outcome is never inspected: whether an account was found is exactly
     // the fact this route must not leak, and a branch on it here is how the
     // leak gets reintroduced. `requestPasswordReset` resolves either way.
     await requestPasswordReset(email.trim());
-    setAsked(true);
-    setBusy(false);
+    if (sequence === requestSequence.current) {
+      setAsked(true);
+      setError(null);
+      setBusy(false);
+    }
   }
 
   async function set(event: FormEvent) {
     event.preventDefault();
-    if (password !== confirmation) {
-      setError('The two passwords do not match. Type the same one in both boxes.');
+    if (busy) return;
+    if (password.length < RESET_PASSWORD_MIN_LENGTH || password.length > RESET_PASSWORD_MAX_LENGTH) {
+      setError({ kind: 'password', message: 'Use a password between 8 and 128 characters.' });
       return;
     }
+    if (password !== confirmation) {
+      setError({ kind: 'confirmation', message: 'The two passwords do not match. Type the same one in both boxes.' });
+      return;
+    }
+    const sequence = ++requestSequence.current;
     setBusy(true);
     setError(null);
     try {
       await resetPassword(token ?? '', password);
-      setDone(true);
-    } catch {
-      // §5.5: a rejected reset token is indistinguishable from an expired,
-      // revoked, already-used, or never-existed one.
-      setError(
-        'That reset link cannot be used. Reset links expire and can only be used once — ask for a new one and use the newest email.',
-      );
+      if (sequence === requestSequence.current) {
+        setDone(true);
+        setPassword('');
+        setConfirmation('');
+      }
+    } catch (caught) {
+      if (sequence !== requestSequence.current) return;
+      const detail = caught instanceof AccountRequestError ? caught.detail : null;
+      if (detail?.error === 'PASSWORD_TOO_SHORT' || detail?.error === 'PASSWORD_TOO_LONG') {
+        setError({ kind: 'password', message: 'Use a password between 8 and 128 characters.' });
+      } else if (detail?.error === 'INVALID_TOKEN') {
+        // Never distinguish an expired, used, revoked, or nonexistent token.
+        setError({ kind: 'link', message: RESET_LINK_REFUSAL });
+      } else {
+        setError({
+          kind: 'request',
+          message: 'We could not confirm the password change. Try again. If this keeps happening, request a new reset link.',
+        });
+      }
     } finally {
-      setBusy(false);
-      setPassword('');
-      setConfirmation('');
+      if (sequence === requestSequence.current) setBusy(false);
     }
   }
 
@@ -374,6 +410,9 @@ export function ResetPassword() {
               />
             ) : (
               <Card>
+                {error?.kind === 'link' ? (
+                  <p className="field-error" role="alert">{error.message}</p>
+                ) : null}
                 <form className="auth__form" onSubmit={ask} noValidate>
                   <Field label="Email address">
                     <Input
@@ -409,25 +448,41 @@ export function ResetPassword() {
             </div>
 
             <Card>
+              {error?.kind === 'link' || error?.kind === 'request' ? (
+                <p className="field-error" role="alert">{error.message}</p>
+              ) : null}
               <form className="auth__form" onSubmit={set} noValidate>
-                <Field label="New password">
+                <Field
+                  label="New password"
+                  hint="Use between 8 and 128 characters."
+                  {...(error?.kind === 'password' ? { error: error.message } : {})}
+                >
                   <Input
                     type="password"
                     name="new-password"
                     autoComplete="new-password"
                     required
+                    minLength={RESET_PASSWORD_MIN_LENGTH}
+                    maxLength={RESET_PASSWORD_MAX_LENGTH}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError(null);
+                    }}
                   />
                 </Field>
-                <Field label="New password again" {...(error ? { error } : {})}>
+                <Field label="New password again" {...(error?.kind === 'confirmation' ? { error: error.message } : {})}>
                   <Input
                     type="password"
                     name="confirm-password"
                     autoComplete="new-password"
                     required
+                    maxLength={RESET_PASSWORD_MAX_LENGTH}
                     value={confirmation}
-                    onChange={(e) => setConfirmation(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmation(e.target.value);
+                      setError(null);
+                    }}
                   />
                 </Field>
                 <Button type="submit" disabled={busy || !password || !confirmation}>
@@ -437,6 +492,9 @@ export function ResetPassword() {
             </Card>
 
             <div className="auth__aside">
+              <p>
+                <RouterLink to="/reset-password">Request a new reset link</RouterLink>
+              </p>
               <p>
                 <RouterLink to="/signin">Back to sign in</RouterLink>
               </p>

@@ -360,7 +360,7 @@ describe('§5.1–§5.3 — the role decides where you land, and is never render
 describe('§5.5 — the reset acknowledgement is frozen', () => {
   it('renders the same sentence whether or not the address has an account', async () => {
     for (const status of [200, 400, 500]) {
-      stub({ '/api/auth/forget-password': { status, body: {} } });
+      const seen = stub({ '/api/auth/request-password-reset': { status, body: {} } });
       const user = userEvent.setup();
       const { unmount } = renderAt('/reset-password');
 
@@ -369,6 +369,14 @@ describe('§5.5 — the reset acknowledgement is frozen', () => {
 
       const panel = await screen.findByText(RESET_ACKNOWLEDGEMENT);
       expect(panel, `status ${status}`).toBeTruthy();
+      expect(seen).toContain('/api/auth/request-password-reset');
+      expect(seen).not.toContain('/api/auth/forget-password');
+      const request = vi.mocked(fetch).mock.calls.find(([url]) => url === '/api/auth/request-password-reset')?.[1];
+      expect(request?.method).toBe('POST');
+      expect(JSON.parse(request?.body as string)).toEqual({
+        email: 'someone@example.com',
+        redirectTo: '/reset-password',
+      });
       unmount();
       vi.unstubAllGlobals();
     }
@@ -376,7 +384,133 @@ describe('§5.5 — the reset acknowledgement is frozen', () => {
 
   it('confirms nothing about the address', () => {
     expect(RESET_ACKNOWLEDGEMENT).toMatch(/^If that email address has a Proovd account/);
+    expect(RESET_ACKNOWLEDGEMENT).not.toMatch(/replaces|invalidates/i);
   });
+});
+
+describe('the password-reset link', () => {
+  it('uses the emailed router token, saves the password, and offers sign in', async () => {
+    stub({ '/api/auth/reset-password': { status: 200, body: { status: true } } });
+    const user = userEvent.setup();
+    const { router } = renderAt('/reset-password?token=founder-reset-token');
+
+    await user.type(await screen.findByLabelText(/^new password$/i), 'A new founder password');
+    await user.type(screen.getByLabelText(/^new password again$/i), 'A new founder password');
+    await user.click(screen.getByRole('button', { name: /save my new password/i }));
+
+    await screen.findByText('Your password is set');
+    const request = vi.mocked(fetch).mock.calls.find(([url]) => url === '/api/auth/reset-password')?.[1];
+    expect(request?.method).toBe('POST');
+    expect(JSON.parse(request?.body as string)).toEqual({
+      token: 'founder-reset-token',
+      newPassword: 'A new founder password',
+    });
+    await user.click(screen.getByRole('button', { name: /sign in to proovd/i }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/signin'));
+  });
+
+  it('keeps the form and explains a password that is too short', async () => {
+    const seen = stub({});
+    const user = userEvent.setup();
+    renderAt('/reset-password?token=founder-reset-token');
+
+    const password = await screen.findByLabelText(/^new password$/i);
+    await user.type(password, 'short');
+    await user.type(screen.getByLabelText(/^new password again$/i), 'short');
+    await user.click(screen.getByRole('button', { name: /save my new password/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Use a password between 8 and 128 characters.');
+    expect(password).toHaveValue('short');
+    expect(seen).not.toContain('/api/auth/reset-password');
+    expect(password).toHaveAttribute('maxlength', '128');
+  });
+
+  it('keeps both inputs when the passwords do not match', async () => {
+    const seen = stub({});
+    const user = userEvent.setup();
+    renderAt('/reset-password?token=founder-reset-token');
+
+    const password = await screen.findByLabelText(/^new password$/i);
+    const confirmation = screen.getByLabelText(/^new password again$/i);
+    await user.type(password, 'First password');
+    await user.type(confirmation, 'Second password');
+    await user.click(screen.getByRole('button', { name: /save my new password/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The two passwords do not match.');
+    expect(password).toHaveValue('First password');
+    expect(confirmation).toHaveValue('Second password');
+    expect(seen).not.toContain('/api/auth/reset-password');
+  });
+
+  it('explains an invalid emailed callback and allows a fresh request', async () => {
+    const seen = stub({ '/api/auth/request-password-reset': { status: 200 } });
+    const user = userEvent.setup();
+    renderAt('/reset-password?error=INVALID_TOKEN');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('That reset link cannot be used.');
+    expect(screen.queryByLabelText(/^new password$/i)).toBeNull();
+    await user.type(screen.getByLabelText(/email address/i), 'founder@example.com');
+    await user.click(screen.getByRole('button', { name: /send me a reset link/i }));
+    await screen.findByText(RESET_ACKNOWLEDGEMENT);
+    expect(seen).toContain('/api/auth/request-password-reset');
+  });
+
+  for (const code of ['PASSWORD_TOO_SHORT', 'PASSWORD_TOO_LONG']) {
+    it(`shows ${code} as password feedback rather than rejecting the link`, async () => {
+      stub({ '/api/auth/reset-password': { status: 400, body: { code, message: 'Password validation failed' } } });
+      const user = userEvent.setup();
+      renderAt('/reset-password?token=founder-reset-token');
+
+      const password = await screen.findByLabelText(/^new password$/i);
+      await user.type(password, 'A new founder password');
+      await user.type(screen.getByLabelText(/^new password again$/i), 'A new founder password');
+      await user.click(screen.getByRole('button', { name: /save my new password/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Use a password between 8 and 128 characters.');
+      expect(password).toHaveValue('A new founder password');
+      expect(screen.queryByText(/that reset link cannot be used/i)).toBeNull();
+    });
+  }
+
+  it('explains a rejected token and opens a clean request form from the same page', async () => {
+    stub({ '/api/auth/reset-password': { status: 400, body: { code: 'INVALID_TOKEN', message: 'Invalid token' } } });
+    const user = userEvent.setup();
+    const { router } = renderAt('/reset-password?token=used-reset-token');
+
+    await user.type(await screen.findByLabelText(/^new password$/i), 'A new founder password');
+    await user.type(screen.getByLabelText(/^new password again$/i), 'A new founder password');
+    await user.click(screen.getByRole('button', { name: /save my new password/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('That reset link cannot be used.');
+    await user.click(screen.getByRole('link', { name: /request a new reset link/i }));
+    await screen.findByLabelText(/email address/i);
+    expect(router.state.location.search).toBe('');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  for (const failure of ['server', 'network']) {
+    it(`keeps the entered password for retry after a ${failure} failure`, async () => {
+      const reply: Reply = { status: failure === 'server' ? 500 : 200 };
+      stub({ '/api/auth/reset-password': reply });
+      const user = userEvent.setup();
+      renderAt('/reset-password?token=founder-reset-token');
+
+      const password = await screen.findByLabelText(/^new password$/i);
+      const confirmation = screen.getByLabelText(/^new password again$/i);
+      await user.type(password, 'A new founder password');
+      await user.type(confirmation, 'A new founder password');
+      if (failure === 'network') vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Network unavailable'));
+      await user.click(screen.getByRole('button', { name: /save my new password/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('We could not confirm the password change. Try again.');
+      expect(password).toHaveValue('A new founder password');
+      expect(confirmation).toHaveValue('A new founder password');
+      expect(screen.queryByText(/that reset link cannot be used/i)).toBeNull();
+      reply.status = 200;
+      await user.click(screen.getByRole('button', { name: /save my new password/i }));
+      await screen.findByText('Your password is set');
+    });
+  }
 });
 
 /* ══════════════════════════════════════ §1.1: the Founder landing is not a dead end */
