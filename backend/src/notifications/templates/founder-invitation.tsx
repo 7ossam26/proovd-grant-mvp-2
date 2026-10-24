@@ -25,11 +25,16 @@ import {
   Body,
   Container,
   Head,
+  Heading,
+  Hr,
   Html,
+  Img,
   Link,
   Preview,
+  Section,
   Text,
 } from '@react-email/components';
+import { BrandEmailTheme } from './brand-email-theme.js';
 import { render } from '@react-email/render';
 
 /**
@@ -76,11 +81,18 @@ export interface InvitationVariables {
   reference: string;
   /** §27.8's published support address. */
   supportEmail: string;
-  /** Legacy presentation input, retained for existing compose callers. */
+  /** Absolute, deployment-specific URL of the email-safe Proovd wordmark. */
   logoUrl: string;
   /**
-   * Legacy presentation input, retained so existing compose callers keep the
-   * same contract. Personal invitation emails no longer embed decorative art.
+   * The absolute URL of the header art. Derived from `APP_BASE_URL` by
+   * `invitationArtUrl`, never composed by an Admin — but it is a variable
+   * because it is a per-deployment value and the render must not reach for
+   * config of its own.
+   *
+   * Deliberately absent from `MARKERS` and from `OPTIONAL_VARIABLES`: a blank
+   * one resolves to `[ARTURL]`, which the §7 gate catches before anything is
+   * sent. `env.ts` makes that unreachable, and a backstop that costs nothing is
+   * better than a message that goes out pointing at nowhere.
    */
   artUrl: string;
 }
@@ -142,50 +154,72 @@ function resolve(variables: InvitationVariables): Resolved {
  * later cannot find.
  */
 export function invitationSubject(variables: InvitationVariables): string {
+  const recipientName = variables.recipientName?.trim() || MARKERS['recipientName']!;
   const productName = variables.productName?.trim() || MARKERS['productName']!;
-  return `Your Proovd invitation for ${productName}`;
+  return `${recipientName}, ${productName}'s first campaign is set up, come claim it`;
 }
 
 function InvitationEmail({ v }: { v: Resolved }) {
   return (
     <Html lang="en">
-      <Head />
-      <Preview>{`${v.senderName} has sent your invitation for ${v.productName}.`}</Preview>
+      <Head><BrandEmailTheme /></Head>
+      <Preview>
+        We filled it in from our call, read it over, fix what we got wrong, and it’s yours.
+      </Preview>
       <Body style={body}>
         <Container style={container}>
-          <Text style={text}>Hi {v.recipientName},</Text>
-          <Text style={text}>Your Proovd invitation for {v.productName} is ready to review.</Text>
-          <Text style={text}>
+          <Img src={v.logoUrl} alt="Proovd" width="132" height="40" style={brandLogo} />
+
+          {/* The transparent envelope fills the exact slot the old blue band
+              occupied. `alt=""` because it says nothing the heading two lines
+              down does not say better. */}
+          <Section style={art}>
+            <Img src={v.artUrl} alt="" width="512" height="112" style={artImage} />
+          </Section>
+
+          <Heading style={heading}>{v.recipientName}, your invite is ready.</Heading>
+          <Heading as="h2" style={subheading}>
+            {v.productName}'s first campaign, already set up on proovd.
+          </Heading>
+          <Text style={intro}>
             It came out of our call, so most of it is filled in. Read it over, fix
             anything we got wrong, and it's yours.
           </Text>
+
+          <Hr style={rule} />
+
           {/* §7 item 9 / §27.2 — exactly one primary action. */}
-          <Text style={text}>
+          <Section style={section}>
             <Link href={v.draftUrl} style={action}>
-              Review your Proovd invitation
+              See your invite
             </Link>
-          </Text>
-          <Text style={text}>
-            This link is personal to you and works once. It does not create an account,
-            and nothing is charged. If it stops working, reply to this email and we will
-            send a new one.
-          </Text>
+            <Text style={quiet}>
+              This link is personal to you and works once. It does not create an account,
+              and nothing is charged. If it stops working, reply to this email and we will
+              send a new one.
+            </Text>
+          </Section>
+
+          <Hr style={rule} />
+
           {/* §7 item 4 + item 8 — who sent it, and how to reach a person. */}
-          <Text style={text}>
-            {v.senderName}
-            <br />
-            Proovd
-          </Text>
-          <Text style={quiet}>
-            Reply to this email, or write to {v.senderEmail}. For anything else,{' '}
-            {v.supportEmail}. We respond within one business day, Monday to Friday,
-            excluding U.S. federal holidays.
-          </Text>
-          <Text style={quiet}>Reference: {v.reference}</Text>
-          <Text style={quiet}>
-            Proovd will never ask you for your bank details, tax details, password, or
-            identity documents by email.
-          </Text>
+          <Section style={section}>
+            <Text style={text}>
+              {v.senderName}
+              <br />
+              Proovd
+            </Text>
+            <Text style={quiet}>
+              Reply to this email, or write to {v.senderEmail}. For anything else,{' '}
+              {v.supportEmail}. We respond within one business day, Monday to Friday,
+              excluding U.S. federal holidays.
+            </Text>
+            <Text style={quiet}>Reference: {v.reference}</Text>
+            <Text style={quiet}>
+              Proovd will never ask you for your bank details, tax details, password, or
+              identity documents by email.
+            </Text>
+          </Section>
         </Container>
       </Body>
     </Html>
@@ -197,18 +231,18 @@ function InvitationEmail({ v }: { v: Resolved }) {
  *  happened to put them. */
 function plainText(v: Resolved): string {
   return [
-    `Hi ${v.recipientName},`,
-    '',
-    `Your Proovd invitation for ${v.productName} is ready to review.`,
+    `${v.recipientName}, your invite is ready.`,
+    `${v.productName}'s first campaign, already set up on proovd.`,
     '',
     "It came out of our call, so most of it is filled in. Read it over, fix anything we got wrong, and it's yours.",
     '',
-    'Review your Proovd invitation:',
+    'SEE YOUR INVITE',
     v.draftUrl,
     'This link is personal to you and works once. It does not create an account, and',
     'nothing is charged. If it stops working, reply to this email and we will send a',
     'new one.',
     '',
+    '---',
     v.senderName,
     'Proovd',
     '',
@@ -257,16 +291,29 @@ export async function renderFounderInvitation(
   return { subject, html, text, unresolved: [...found].sort() };
 }
 
-/* Inline styles keep the personal note readable across email clients. */
+/* ── Styles ───────────────────────────────────────────────────────────────────
+   Inline, because email clients strip stylesheets. These are the proovd.css
+   values written out by hand — a `<link>` to it would not survive the trip, and
+   a mail client has no CSS variables to read a mode slot from. */
 
 const body = {
   backgroundColor: '#FFFFFF',
-  color: '#222222',
-  fontFamily: 'Arial, Helvetica, sans-serif',
+  fontFamily: 'Satoshi, Arial, Helvetica, sans-serif',
   margin: 0,
-  padding: '20px 16px',
+  padding: '24px 12px',
 };
-const container = { maxWidth: '640px', margin: '0' };
-const text = { fontSize: '16px', lineHeight: '24px', color: '#222222', margin: '0 0 16px' };
-const quiet = { fontSize: '13px', lineHeight: '20px', color: '#555555', margin: '0 0 12px' };
-const action = { color: '#166534', textDecoration: 'underline' };
+const container = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
+const brandLogo = { display: 'block', width: '132px', height: '40px', border: 0, margin: 0 };
+/* The image is exactly 512x112 for the content box and sets the row's height. */
+const art = { margin: '34px 0 0' };
+/* The `width`/`height` ATTRIBUTES on the `<Img>` are what Outlook reads; these
+   are what lets every other client shrink the art on a narrow phone. */
+const artImage = { display: 'block', width: '100%', maxWidth: '512px', height: 'auto', border: 0 };
+const heading = { fontSize: '38px', lineHeight: '46px', fontWeight: 700, letterSpacing: '-0.03em', color: '#012D10', margin: '46px 0 0' };
+const subheading = { fontSize: '24px', lineHeight: '32px', fontWeight: 700, letterSpacing: '-0.02em', color: '#012D10', margin: '14px 0 0' };
+const intro = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, letterSpacing: '-0.012em', color: '#013F17', margin: '24px 0 36px' };
+const section = { margin: '0 0 24px' };
+const text = { fontSize: '18px', lineHeight: '28px', fontWeight: 500, color: '#013F17', margin: '0 0 8px' };
+const quiet = { fontSize: '12px', lineHeight: '20px', fontWeight: 500, color: '#A2AFA8', margin: '8px 0 0' };
+const rule = { borderColor: '#41ED98', margin: '40px 0 30px' };
+const action = { display: 'inline-block', backgroundColor: '#41ED98', color: '#E9FFE1', fontSize: '18px', lineHeight: '20px', fontWeight: 900, letterSpacing: '-0.02em', textDecoration: 'none', padding: '20px 44px', borderRadius: '1px' };
