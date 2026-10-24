@@ -47,8 +47,6 @@ import { TOKEN_INVALID, type TokenInvalid } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
 import { FOUNDER_EMAIL_CODE } from '../notifications/events.js';
 import { EMAIL_CODE_TTL_MINUTES } from './email-code-logic.js';
-import { resolveFounderEmailCopy } from '../notifications/founder-email-editor/definitions.js';
-import { readFounderEmailCopy } from '../notifications/founder-email-editor/store.js';
 
 export interface EmailCodeDeps {
   db: Database;
@@ -87,27 +85,23 @@ export async function renderEmailCodeNotice(input: {
   supportEmail: string;
   founderName?: string | null;
   companyName?: string | null;
-}, copy?: Record<string, string>) {
+}) {
   const founderName = input.founderName?.trim() || '';
   const companyName = input.companyName?.trim() || '';
-  const messageCopy = resolveFounderEmailCopy('founder_email_code', copy, {
-    personalGreeting: founderName ? `${founderName}, here’s your code.` : 'Here’s your code.',
-    personalSignoff: companyName ? `Wishing ${companyName} the best,` : 'Wishing you the best,',
-    founderName, companyName, expiryMinutes: String(EMAIL_CODE_TTL_MINUTES),
-  });
-  const greeting = messageCopy.greeting!;
+  const greeting = founderName ? `${founderName}, here’s your code.` : 'Here’s your code.';
   const formattedCode = `${input.code.slice(0, 3)}\u00a0${input.code.slice(3)}`;
-  const subject = messageCopy.subject!;
+  const subject = 'Your proovd confirmation code';
+  const instruction = `Type it into proovd to confirm it's you. It expires in ${EMAIL_CODE_TTL_MINUTES} minutes.`;
   const text = [
     greeting,
     '',
-    messageCopy.instruction,
+    instruction,
     '',
     formattedCode.replace('\u00a0', ' '),
     '',
     "Didn't ask for a code? Ignore this email and nothing happens.",
     '',
-    messageCopy.signoff,
+    companyName ? `Wishing ${companyName} the best,` : 'Wishing you the best,',
     'the Proovd team.',
     '',
     `Questions: ${input.supportEmail}`,
@@ -119,13 +113,13 @@ export async function renderEmailCodeNotice(input: {
     html: await render(
       <Html lang="en">
         <Head><BrandEmailTheme /></Head>
-        <Preview>{messageCopy.preheader}</Preview>
+        <Preview>{`Type it in to confirm it's you. It expires in ${EMAIL_CODE_TTL_MINUTES} minutes.`}</Preview>
         <Body style={codeBody}>
           <Container style={codeContainer}>
             <Text style={codeWordmark}>proovd</Text>
             <Heading style={codeHeading}>{greeting}</Heading>
             <Text style={codeIntro}>
-              {messageCopy.instruction}
+              {instruction}
             </Text>
             <Section style={codeBox}>
               <Text style={codeDigits}>{formattedCode}</Text>
@@ -135,7 +129,7 @@ export async function renderEmailCodeNotice(input: {
             </Text>
             <Hr style={codeRule} />
             <Text style={codeSignoff}>
-              {messageCopy.signoff}
+              {companyName ? `Wishing ${companyName} the best,` : 'Wishing you the best,'}
               <br />
               the Proovd team.
             </Text>
@@ -164,7 +158,7 @@ const codeBody = {
 const codeContainer = { backgroundColor: '#FFFFFF', maxWidth: '600px', margin: '0 auto', padding: '44px' };
 const codeWordmark = { fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: '24px', color: '#012D10', margin: 0 };
 const codeHeading = { fontSize: '38px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: '46px', color: '#012D10', margin: '42px 0 0' };
-const codeIntro = { fontSize: '18px', fontWeight: 500, letterSpacing: '-0.012em', lineHeight: '28px', color: '#013F17', margin: '22px 0 0', whiteSpace: 'pre-line' as const };
+const codeIntro = { fontSize: '18px', fontWeight: 500, letterSpacing: '-0.012em', lineHeight: '28px', color: '#013F17', margin: '22px 0 0' };
 const codeBox = { border: '2px solid #41ED98', borderRadius: '1px', backgroundColor: '#F1F9F5', padding: '26px 20px', margin: '36px 0 0', textAlign: 'center' as const };
 const codeDigits = { fontSize: '40px', fontWeight: 700, letterSpacing: '0.18em', lineHeight: '48px', color: '#012D10', margin: 0 };
 const codeQuiet = { fontSize: '14px', fontWeight: 500, lineHeight: '22px', color: '#A2AFA8', margin: '22px 0 0' };
@@ -230,14 +224,13 @@ export async function requestFounderEmailCode(
         email,
         tx,
       );
-      const copy = await readFounderEmailCopy(tx, 'founder_email_code');
       const notice = await renderEmailCodeNotice({
         code,
         reference: input.campaignId,
         supportEmail: deps.supportEmail,
         founderName: current.preferredName || current.legalName,
         companyName: current.businessName,
-      }, copy);
+      });
 
       const outcome = await deps.notifier!.send({
         eventKey: FOUNDER_EMAIL_CODE,

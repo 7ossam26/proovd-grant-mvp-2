@@ -469,12 +469,6 @@ export const SENSITIVE_ACTION_PROPERTIES = [
  */
 export const UNGATED_ADMIN_WRITES = [
   {
-    route: 'POST /api/admin/founder-emails/:key/preview',
-    specRef: '§27.2 (Founder email editor, owner direction 2026-10-25)',
-    reason:
-      'Renders an unsaved Founder email with fictional sample values. It persists nothing, creates no access link, and sends no email; publishing shared copy has its own freshness gate.',
-  },
-  {
     route: 'POST /api/admin/founders',
     specRef: '§7',
     reason:

@@ -316,12 +316,9 @@ const rootChildren: RouteObject[] = [
     ),
   },
   {
+    // Retired by owner direction. Old editor bookmarks return to the directory.
     path: 'admin/founders/emails',
-    element: (
-      <RequireRole allow={['admin']} signInPath="/admin/signin">
-        <FoundersPanel view="emails" />
-      </RequireRole>
-    ),
+    element: <Navigate to="/admin/founders" replace />,
   },
   {
     /*
