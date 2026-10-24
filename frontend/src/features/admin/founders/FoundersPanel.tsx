@@ -23,11 +23,12 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { invalidateSession } from '../../../lib/session.js';
 import { signOut } from '../api.js';
 import { Directory } from './Directory.js';
 import { Workspace } from './Workspace.js';
+import { FounderEmailEditor } from './emails/FounderEmailEditor.js';
 
 /**
  * The panel's isolated reference stylesheet.
@@ -88,11 +89,13 @@ function useReferenceStylesheet(): boolean {
   return ready;
 }
 
-export function FoundersPanel() {
+export function FoundersPanel({ view = 'founders' }: { view?: 'founders' | 'emails' }) {
   const { prospectId } = useParams();
   const navigate = useNavigate();
   const stylesReady = useReferenceStylesheet();
   const [signingOut, setSigningOut] = useState(false);
+  const [emailEdits, setEmailEdits] = useState(false);
+  const [allowEmailNavigation, setAllowEmailNavigation] = useState(false);
 
   const openFounder = useCallback(
     (id: string) => navigate(`/admin/founders/${encodeURIComponent(id)}`),
@@ -101,6 +104,8 @@ export function FoundersPanel() {
   const backToDirectory = useCallback(() => navigate('/admin/founders'), [navigate]);
   const onSignOut = useCallback(async () => {
     if (signingOut) return;
+    if (view === 'emails' && emailEdits && !window.confirm('Your email edits have not been saved. Sign out without saving?')) return;
+    setAllowEmailNavigation(true);
     setSigningOut(true);
 
     try {
@@ -112,7 +117,7 @@ export function FoundersPanel() {
       invalidateSession();
       navigate('/admin/signin', { replace: true });
     }
-  }, [navigate, signingOut]);
+  }, [navigate, signingOut, view, emailEdits]);
 
   if (!stylesReady) {
     // Deliberately bare: this is the sub-second gap before the reference's own
@@ -129,6 +134,7 @@ export function FoundersPanel() {
         </a>
         <span className="admin-label">ADMIN</span>
         <div className="topbar-actions">
+          <Link className="founder-emails-nav" to="/admin/founders/emails" aria-current={view === 'emails' ? 'page' : undefined}>Emails</Link>
           <button className="search-trigger" type="button">
             <span>Search anything</span>
             <kbd>⌘ K</kbd>
@@ -144,7 +150,9 @@ export function FoundersPanel() {
         </div>
       </header>
 
-      {prospectId ? (
+      {view === 'emails' ? (
+        <FounderEmailEditor onDirtyChange={setEmailEdits} allowNavigation={allowEmailNavigation} />
+      ) : prospectId ? (
         <Workspace prospectId={prospectId} onBack={backToDirectory} />
       ) : (
         <Directory onOpenFounder={openFounder} />

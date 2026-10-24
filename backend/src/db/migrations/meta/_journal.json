@@ -533,6 +533,13 @@
       "when": 1789056000000,
       "tag": "0075_founder_manual_invitation_links",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1792886400000,
+      "tag": "0076_founder_email_templates",
+      "breakpoints": true
     }
   ]
 }

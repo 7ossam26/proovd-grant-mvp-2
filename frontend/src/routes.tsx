@@ -316,6 +316,14 @@ const rootChildren: RouteObject[] = [
     ),
   },
   {
+    path: 'admin/founders/emails',
+    element: (
+      <RequireRole allow={['admin']} signInPath="/admin/signin">
+        <FoundersPanel view="emails" />
+      </RequireRole>
+    ),
+  },
+  {
     /*
       The Founders panel — built to `ProovdAdminFounder.html`, 2026-08-22.
 

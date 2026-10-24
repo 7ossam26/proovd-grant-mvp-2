@@ -40,6 +40,7 @@ import type { Database } from '../db/client.js';
 import type { TokenService } from '../auth/token-service.js';
 import type { Notifier } from '../notifications/send.js';
 import { FOUNDER_INVITATION } from '../notifications/events.js';
+import { readFounderEmailCopy } from '../notifications/founder-email-editor/store.js';
 import {
   renderFounderInvitation,
   type InvitationVariables,
@@ -464,6 +465,7 @@ export async function previewInvitation(
   const record = await readDraft(db, draftId);
   if (!record) return null;
 
+  const copy = await readFounderEmailCopy(db, 'founder_invitation');
   const rendered = await renderFounderInvitation(
     variablesFor(
       record,
@@ -471,6 +473,7 @@ export async function previewInvitation(
       context.supportEmail,
       context.appBaseUrl,
     ),
+    copy,
   );
 
   const missingFields = missingInvitationFields(record);
@@ -620,6 +623,7 @@ export async function sendInvitation(
 
   // §7's gate, enforced on the rendered output rather than on a list of fields
   // the caller might not share. Runs before anything is issued or written.
+  const copy = await readFounderEmailCopy(db, 'founder_invitation');
   const rendered = await renderFounderInvitation(
     variablesFor(
       record,
@@ -627,6 +631,7 @@ export async function sendInvitation(
       input.context.supportEmail,
       input.context.appBaseUrl,
     ),
+    copy,
   );
   if (rendered.unresolved.length > 0) {
     return {
@@ -709,6 +714,7 @@ export async function sendInvitation(
           input.context.supportEmail,
           input.context.appBaseUrl,
         ),
+        copy,
       );
 
       await tx.insert(campaignInvitationSends).values({
@@ -847,6 +853,7 @@ export async function createManualInvitationLink(
       unresolved: missingFields,
     };
   }
+  const copy = await readFounderEmailCopy(db, 'founder_invitation');
   const preview = await renderFounderInvitation(
     variablesFor(
       record,
@@ -854,6 +861,7 @@ export async function createManualInvitationLink(
       input.context.supportEmail,
       input.context.appBaseUrl,
     ),
+    copy,
   );
   if (preview.unresolved.length > 0) {
     return {

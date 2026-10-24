@@ -10,7 +10,8 @@ import {
   FOUNDER_APPLICATION_REVIEW_RECEIVED,
   INTERNAL_FOUNDER_APPLICATION_SUBMITTED,
 } from '../notifications/events.js';
-import { renderInternalNotice, renderPlainNotice } from '../notifications/templates/plain.js';
+import { renderInternalNotice } from '../notifications/templates/plain.js';
+import { renderStoredFounderApplicationNotice } from '../notifications/founder-email-editor/application.js';
 import { loadFounder, type LaunchNotificationContext } from '../launch/notifications.js';
 
 export interface ApplicationReviewNotifyDeps {
@@ -62,7 +63,7 @@ export async function notifyApplicationReviewSubmitted(
   const campaign = founder.productName ?? 'your campaign';
 
   if (founder.email) {
-    const notice = await renderPlainNotice({
+    const notice = await renderStoredFounderApplicationNotice(deps.db, FOUNDER_APPLICATION_REVIEW_RECEIVED, {
       subject: `We received your application — ${campaign}`,
       headline: 'Your application is with Proovd.',
       facts: [
@@ -147,7 +148,7 @@ export async function notifyApplicationReviewOutcome(
   switch (input.review.outcome) {
     case 'needs_information':
       eventKey = FOUNDER_APPLICATION_INFORMATION_NEEDED;
-      notice = await renderPlainNotice({
+      notice = await renderStoredFounderApplicationNotice(deps.db, eventKey, {
         subject: `We need more information about ${campaign}`,
         headline: 'We need more information before we can finish the review.',
         facts: [
@@ -165,7 +166,7 @@ export async function notifyApplicationReviewOutcome(
     case 'changes_requested': {
       eventKey = FOUNDER_APPLICATION_CHANGES_REQUESTED;
       const request = input.review.changeRequests[0];
-      notice = await renderPlainNotice({
+      notice = await renderStoredFounderApplicationNotice(deps.db, eventKey, {
         subject: `Changes requested for ${campaign}`,
         headline: 'Please update your application and resubmit it.',
         facts: [
@@ -188,7 +189,7 @@ export async function notifyApplicationReviewOutcome(
     }
     case 'approved':
       eventKey = FOUNDER_APPLICATION_APPROVED;
-      notice = await renderPlainNotice({
+      notice = await renderStoredFounderApplicationNotice(deps.db, eventKey, {
         subject: `Your application is approved — ${campaign}`,
         headline: 'Your application is approved.',
         facts: [
@@ -204,7 +205,7 @@ export async function notifyApplicationReviewOutcome(
       break;
     case 'rejected':
       eventKey = FOUNDER_APPLICATION_REJECTED;
-      notice = await renderPlainNotice({
+      notice = await renderStoredFounderApplicationNotice(deps.db, eventKey, {
         subject: `Application Review decision — ${campaign}`,
         headline: 'We cannot approve this application.',
         facts: [

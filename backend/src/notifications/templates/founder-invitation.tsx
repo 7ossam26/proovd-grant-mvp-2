@@ -31,6 +31,7 @@ import {
   Text,
 } from '@react-email/components';
 import { render } from '@react-email/render';
+import { resolveFounderEmailCopy } from '../founder-email-editor/definitions.js';
 
 /**
  * §7's no-guarantee paragraph. Fixed text. A test asserts the sent body
@@ -141,28 +142,24 @@ function resolve(variables: InvitationVariables): Resolved {
  * "An invitation from Proovd" is the kind a Founder deletes unread and support
  * later cannot find.
  */
-export function invitationSubject(variables: InvitationVariables): string {
-  const productName = variables.productName?.trim() || MARKERS['productName']!;
-  return `Your Proovd invitation for ${productName}`;
+export function invitationSubject(variables: InvitationVariables, copy?: Record<string, string>): string {
+  return resolveFounderEmailCopy('founder_invitation', copy, resolve(variables)).subject!;
 }
 
-function InvitationEmail({ v }: { v: Resolved }) {
+function InvitationEmail({ v, copy }: { v: Resolved; copy: Record<string, string> }) {
   return (
     <Html lang="en">
       <Head />
-      <Preview>{`${v.senderName} has sent your invitation for ${v.productName}.`}</Preview>
+      <Preview>{copy.preheader}</Preview>
       <Body style={body}>
         <Container style={container}>
-          <Text style={text}>Hi {v.recipientName},</Text>
-          <Text style={text}>Your Proovd invitation for {v.productName} is ready to review.</Text>
-          <Text style={text}>
-            It came out of our call, so most of it is filled in. Read it over, fix
-            anything we got wrong, and it's yours.
-          </Text>
+          <Text style={text}>{copy.greeting}</Text>
+          <Text style={text}>{copy.intro}</Text>
+          <Text style={text}>{copy.body}</Text>
           {/* §7 item 9 / §27.2 — exactly one primary action. */}
           <Text style={text}>
             <Link href={v.draftUrl} style={action}>
-              Review your Proovd invitation
+              {copy.actionLabel}
             </Link>
           </Text>
           <Text style={text}>
@@ -195,15 +192,15 @@ function InvitationEmail({ v }: { v: Resolved }) {
 /** The plain-text part. Hand-written so the support route and reference are
  *  exactly where §27.2 says they must be, rather than wherever a converter
  *  happened to put them. */
-function plainText(v: Resolved): string {
+function plainText(v: Resolved, copy: Record<string, string>): string {
   return [
-    `Hi ${v.recipientName},`,
+    copy.greeting,
     '',
-    `Your Proovd invitation for ${v.productName} is ready to review.`,
+    copy.intro,
     '',
-    "It came out of our call, so most of it is filled in. Read it over, fix anything we got wrong, and it's yours.",
+    copy.body,
     '',
-    'Review your Proovd invitation:',
+    `${copy.actionLabel}:`,
     v.draftUrl,
     'This link is personal to you and works once. It does not create an account, and',
     'nothing is charged. If it stops working, reply to this email and we will send a',
@@ -241,11 +238,13 @@ export interface RenderedInvitation {
  */
 export async function renderFounderInvitation(
   variables: InvitationVariables,
+  copy?: Record<string, string>,
 ): Promise<RenderedInvitation> {
   const resolved = resolve(variables);
-  const subject = invitationSubject(variables);
-  const html = await render(<InvitationEmail v={resolved} />);
-  const text = plainText(resolved);
+  const messageCopy = resolveFounderEmailCopy('founder_invitation', copy, resolved);
+  const subject = messageCopy.subject!;
+  const html = await render(<InvitationEmail v={resolved} copy={messageCopy} />);
+  const text = plainText(resolved, messageCopy);
 
   const found = new Set<string>();
   for (const part of [subject, html, text]) {
@@ -267,6 +266,6 @@ const body = {
   padding: '20px 16px',
 };
 const container = { maxWidth: '640px', margin: '0' };
-const text = { fontSize: '16px', lineHeight: '24px', color: '#222222', margin: '0 0 16px' };
+const text = { fontSize: '16px', lineHeight: '24px', color: '#222222', margin: '0 0 16px', whiteSpace: 'pre-line' as const };
 const quiet = { fontSize: '13px', lineHeight: '20px', color: '#555555', margin: '0 0 12px' };
 const action = { color: '#166534', textDecoration: 'underline' };

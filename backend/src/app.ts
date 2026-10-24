@@ -16,6 +16,7 @@ import { policyReacceptanceGate } from './enforcement/reacceptance.js';
 import { crossOriginWriteGuard } from './auth/origin-guard.js';
 import { creatorStandingGate, founderStandingGate } from './enforcement/standing.js';
 import { createAdminFoundersRouter } from './routes/admin-founders.js';
+import { createFounderEmailsRouter } from './routes/admin-founder-emails.js';
 import { createAdminFounderPanelRouter } from './routes/admin-founder-panel.js';
 import { createAdminAffiliatesRouter } from './routes/admin-affiliates.js';
 import { createAdminCreatorsRouter } from './routes/admin-creators.js';
@@ -500,6 +501,7 @@ export function createApp(db: Database, config: AppConfig): ProovdApp {
   // The Stripe onboarding context is passed only when this deployment has a
   // client. Without it the money pane says Stripe is not configured rather than
   // making a claim about the Founder's payment setup (§1.4, §32.2).
+  app.use(createFounderEmailsRouter({ db, auth, audit, publicDir: config.publicDir }));
   app.use(
     createAdminFoundersRouter({
       db,
