@@ -29,6 +29,7 @@
  */
 
 import type { NotificationEventKey } from './events.js';
+import { renderSetupChangeNotice } from '../campaign/setup-change-requests.js';
 import { renderFounderInvitation } from './templates/founder-invitation.js';
 import { INVITATION_ART_PATH, PROOVD_LOGO_PATH } from './templates/email-art.js';
 import { renderAffiliateInvitation } from './templates/affiliate-invitation.js';
@@ -1228,6 +1229,15 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventKey, () => Promise<Re
       reference: REF,
       supportEmail: SUPPORT,
     }),
+
+  founder_setup_change_requested: () => renderSetupChangeNotice({
+    campaignName: CAMPAIGN,
+    fieldLabel: 'Final voice',
+    reason: 'Please use the tone we discussed on our call.',
+    url: `${APP}/campaigns/c1/setup/voice?changeRequest=${REF}`,
+    reference: REF,
+    supportEmail: SUPPORT,
+  }),
 
   founder_changes_required: () =>
     renderPlainNotice({

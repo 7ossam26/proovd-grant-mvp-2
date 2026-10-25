@@ -79,6 +79,19 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 /* ── Shapes ───────────────────────────────────────────────────────────────── */
 
+export interface SetupChangeRequest {
+  id: string;
+  campaignId: string;
+  fieldKey: string;
+  fieldLabel: string;
+  reason: string;
+  deepLink: string;
+  requestedAt: string;
+}
+
+export const fetchSetupChangeRequests = (campaignId: string): Promise<{ requests: SetupChangeRequest[] }> =>
+  call(`/api/founder/campaigns/${encodeURIComponent(campaignId)}/setup-change-requests`);
+
 export type OptionalItemKey = 'visuals' | 'branding' | 'interview' | 'story' | 'socials';
 
 export interface ItemState {

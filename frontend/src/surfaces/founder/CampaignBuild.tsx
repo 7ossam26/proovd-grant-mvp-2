@@ -49,6 +49,7 @@ import {
   Textarea,
 } from '../../components/index.js';
 import { supportMailto } from '../../features/public/states.js';
+import { SetupChangeRequests } from './SetupChangeRequests.js';
 import {
   fetchBuild,
   saveBuild,
@@ -217,6 +218,7 @@ export function CampaignBuild() {
       </Section>
 
       {/* §33.4.1: changes-required feedback, grouped and deep-linked. */}
+      <SetupChangeRequests campaignId={campaignId} />
       {review && review.outcome === 'changes_required' ? (
         <ChangesRequired review={review} />
       ) : null}

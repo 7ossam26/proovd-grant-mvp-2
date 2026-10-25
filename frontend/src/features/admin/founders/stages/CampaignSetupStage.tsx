@@ -27,15 +27,9 @@
  * says "linked to this Campaign Setup field", and that is the string this
  * screen has to render.
  *
- * ── Request change has no route yet, and the refusal is rendered ────────────
- * `POST /api/admin/campaigns/:id/review/changes` is the existing control and it
- * is the wrong one: it takes an array, closes the review round, and refuses
- * without a deep link and an owner (422 `deep_link_required` — "a change with
- * nowhere to point and nobody to own it is not actionable feedback"). One field
- * and one reason is a different record, so this calls
- * `POST …/setup-change-requests`. Where that is not mounted the server's own
- * refusal is what the Admin reads — nothing here paraphrases it, and nothing
- * pretends the request was filed.
+ * A field request is saved separately from a formal review decision. Its
+ * stable key survives delivery retries, and delivery is reported separately
+ * from saving the request, so an unsent email cannot look successful.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -144,8 +138,14 @@ function ProseEditDialog({
 
 type OpenDialog =
   | { kind: 'edit'; row: SetupRow }
-  | { kind: 'request'; row: SetupRow }
+  | { kind: 'request'; row: SetupRow; requestKey: string }
   | null;
+
+interface SetupChangeResponse {
+  requestId: string;
+  created: boolean;
+  notification: { status: 'sent' | 'duplicate' | 'failed' | 'pending' | 'unavailable' };
+}
 
 /**
  * The panel's client lives in `founders/api.ts`, which is shared and does not
@@ -167,10 +167,11 @@ const requestSetupChange = (
   campaignId: string,
   fieldKey: string,
   reason: string,
-): Promise<unknown> =>
+  requestKey: string,
+): Promise<SetupChangeResponse> =>
   call(`/api/admin/campaigns/${enc(campaignId)}/setup-change-requests`, {
     method: 'POST',
-    body: JSON.stringify({ fieldKey, reason }),
+    body: JSON.stringify({ fieldKey, reason, requestKey }),
   });
 
 const approveSetup = (campaignId: string): Promise<unknown> =>
@@ -195,6 +196,42 @@ export function CampaignSetupStage({ detail, panel, onSaved }: StageProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AdminRequestError | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [deliveryNote, setDeliveryNote] = useState<string | null>(null);
+  const [requestSaved, setRequestSaved] = useState(false);
+
+  function openDialog(dialog: OpenDialog) {
+    if (busy) return;
+    setError(null);
+    setDeliveryNote(null);
+    setRequestSaved(false);
+    setOpen(dialog);
+  }
+
+  async function sendChangeRequest(reason: string) {
+    if (busy || open?.kind !== 'request' || !campaignId) return;
+    setBusy(true);
+    setError(null);
+    setDeliveryNote(null);
+    try {
+      const result = await requestSetupChange(
+        campaignId, open.row.requestFieldKey ?? open.row.key, reason, open.requestKey,
+      );
+      setRequestSaved(true);
+      onSaved();
+      if (result.notification.status === 'sent' || result.notification.status === 'duplicate') {
+        setDone(`Change requested against ${open.row.label}. The Founder email was sent.`);
+        setOpen(null);
+      } else {
+        setDeliveryNote(result.notification.status === 'pending'
+          ? 'The request is saved. Email delivery is still being processed. Try again to check its status; this will not create another request.'
+          : 'The request is saved and visible to the Founder, but the email was not sent. Try again to retry email delivery.');
+      }
+    } catch (e: unknown) {
+      setError(asRequestError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(work: () => Promise<unknown>, closed: string) {
     setBusy(true);
@@ -244,14 +281,14 @@ export function CampaignSetupStage({ detail, panel, onSaved }: StageProps) {
     if (row.actions.includes('edit')) {
       out.push(
         campaignId
-          ? action('Edit', () => setOpen({ kind: 'edit', row }))
+          ? action('Edit', () => openDialog({ kind: 'edit', row }))
           : inert('Edit', NO_CAMPAIGN),
       );
     }
     if (row.actions.includes('requestChange')) {
       out.push(
         campaignId
-          ? action('Request change', () => setOpen({ kind: 'request', row }))
+          ? action('Request change', () => openDialog({ kind: 'request', row, requestKey: crypto.randomUUID() }))
           : inert('Request change', NO_CAMPAIGN),
       );
     }
@@ -380,15 +417,11 @@ export function CampaignSetupStage({ detail, panel, onSaved }: StageProps) {
           heading={`Request change · ${open.row.label}`}
           lead={`Explain exactly what is wrong with “${open.row.label}” and what ${founderName} must change. This request will be linked to this Campaign Setup field and shown to the Founder.`}
           submitLabel="Request this change"
+          reasonReadOnly={busy || requestSaved}
           busy={busy}
-          refusal={refusalLine(error)}
+          refusal={deliveryNote ?? refusalLine(error)}
           onClose={() => setOpen(null)}
-          onDecide={(reason) =>
-            void run(
-              () => requestSetupChange(campaignId, open.row.key, reason),
-              `Change requested against ${open.row.label}.`,
-            )
-          }
+          onDecide={(reason) => void sendChangeRequest(reason)}
         />
       ) : null}
     </>

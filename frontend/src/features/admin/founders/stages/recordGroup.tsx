@@ -783,6 +783,8 @@ export interface DecisionDialogProps {
   submitLabel: string;
   /** §25.6 keeps the two apart — only the second may ever reach a Founder. */
   withCustomerExplanation?: boolean;
+  /** A saved request can retry delivery without changing its recorded reason. */
+  reasonReadOnly?: boolean;
   busy?: boolean;
   refusal?: string | null;
   onDecide: (internalReason: string, customerExplanation: string) => void;
@@ -795,6 +797,7 @@ export function DecisionDialog({
   lead,
   submitLabel,
   withCustomerExplanation,
+  reasonReadOnly,
   busy,
   refusal,
   onDecide,
@@ -819,6 +822,7 @@ export function DecisionDialog({
           <span>Required reason</span>
           <textarea
             value={internalReason}
+            readOnly={reasonReadOnly}
             onChange={(e) => setInternalReason(e.target.value)}
             placeholder="This reason is shown to the Founder when applicable and saved to History"
           />

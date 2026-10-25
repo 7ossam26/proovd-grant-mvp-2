@@ -77,7 +77,8 @@ import { readPanel } from './stages/recordGroup.js';
 /* ── The stage screens, resolved by convention rather than by a second list ── */
 
 /**
- * Every module in `stages/`, collected by the bundler.
+ * Stage modules in `stages/`, collected by the bundler. Co-located tests must
+ * be excluded before eager loading, so test runners cannot enter the app.
  *
  * This is deliberately not eleven `import` statements. The stage screens are
  * built one at a time and by a different hand; a static import list would make
@@ -92,7 +93,11 @@ import { readPanel } from './stages/recordGroup.js';
  * arrangement costs anything, and it is why the props are three obvious values
  * and not a wide surface.
  */
-const STAGE_MODULES = import.meta.glob('./stages/*.tsx', { eager: true }) as Record<
+const STAGE_MODULES = import.meta.glob([
+  './stages/*.tsx',
+  '!./stages/*.test.tsx',
+  '!./stages/*.spec.tsx',
+], { eager: true }) as Record<
   string,
   Record<string, unknown>
 >;

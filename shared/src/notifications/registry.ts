@@ -170,6 +170,11 @@ export const NOTIFICATION_EVENTS = {
     specRef: '§27.3',
     description: 'Application Review changes requested',
   },
+  founder_setup_change_requested: {
+    audience: 'founder',
+    specRef: '§27.3',
+    description: 'Campaign setup field change requested',
+  },
   founder_application_approved: {
     audience: 'founder',
     specRef: '§27.3',

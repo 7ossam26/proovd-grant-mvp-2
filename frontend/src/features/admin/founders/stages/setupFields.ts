@@ -246,6 +246,8 @@ export type SetupAction = 'edit' | 'requestChange' | 'download';
 export interface SetupRow {
   /** Stable key for `PATCH /api/admin/campaigns/:id/setup/:fieldKey`. */
   key: string;
+  /** Request targets use stored row ids, so sorting cannot change the target. */
+  requestFieldKey?: string;
   label: string;
   /** Null renders `absence` — never a blank cell. */
   value: string | null;
@@ -321,7 +323,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: prefill.source ?? 'Admin prefill',
       status: prefill.status ?? 'Starting values',
       tone: prefill.tone ?? 'plain',
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
     {
@@ -372,7 +374,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: rule.source ?? 'Campaign configuration',
       status: rule.status ?? 'Locked before launch',
       tone: rule.tone ?? 'done',
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
     {
@@ -383,7 +385,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: limit.source ?? 'System rule',
       status: limit.status ?? 'Separate from goal',
       tone: limit.tone ?? 'plain',
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
   ];
@@ -391,24 +393,26 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
   const faqRows: SetupRow[] = faqs.flatMap((faq, index) => [
     {
       key: `faq.${index}.question`,
+      ...(faq.id ? { requestFieldKey: `faq.${faq.id}.question` } : {}),
       label: `FAQ ${index + 1} · Question`,
       value: text(faq.question),
       absence: 'Blank',
       source: 'Founder saved',
       status: blank(faq.question) ? 'Incomplete' : 'Complete',
       tone: (blank(faq.question) ? 'action' : 'done') as RecordTone,
-      actions: ['edit', 'requestChange', 'download'] as SetupAction[],
+      actions: ['edit', ...(faq.id ? ['requestChange'] : []), 'download'] as SetupAction[],
       multiline: true,
     },
     {
       key: `faq.${index}.answer`,
+      ...(faq.id ? { requestFieldKey: `faq.${faq.id}.answer` } : {}),
       label: `FAQ ${index + 1} · Answer`,
       value: text(faq.answer),
       absence: 'Blank',
       source: 'Founder saved',
       status: blank(faq.answer) ? 'Incomplete' : 'Complete',
       tone: (blank(faq.answer) ? 'action' : 'done') as RecordTone,
-      actions: ['edit', 'requestChange'] as SetupAction[],
+      actions: ['edit', ...(faq.id ? ['requestChange'] : [])] as SetupAction[],
       multiline: true,
     },
   ]);
@@ -421,13 +425,14 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       multiline: boolean,
     ): SetupRow => ({
       key: `reward.${index}.${suffix}`,
+      ...(reward.id ? { requestFieldKey: `reward.${reward.id}.${suffix}` } : {}),
       label: `Reward ${index + 1} · ${label}`,
       value,
       absence: 'Blank',
       source: 'Founder saved',
       status: value === null ? 'Incomplete' : 'Complete',
       tone: (value === null ? 'action' : 'done') as RecordTone,
-      actions: ['edit', 'requestChange'] as SetupAction[],
+      actions: ['edit', ...(reward.id ? ['requestChange'] : [])] as SetupAction[],
       multiline,
     });
     return [
@@ -454,7 +459,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: account.source ?? 'Stripe',
       status: account.status ?? 'Saved',
       tone: account.tone ?? 'plain',
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
     {
@@ -465,7 +470,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: status.source ?? 'Stripe',
       status: status.status ?? text(status.value) ?? NOT_STATED,
       tone: status.tone ?? 'action',
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
     {
@@ -476,7 +481,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: refunds.source ?? 'Founder saved',
       status: refunds.status ?? (refundsUrl ? 'Required URL present' : 'Missing blocker'),
       tone: refunds.tone ?? ((refundsUrl ? 'done' : 'action') as RecordTone),
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
     {
@@ -487,7 +492,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: 'Versioned page',
       status: 'Draft',
       tone: 'plain',
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
     {
@@ -498,7 +503,7 @@ export function buildSetupGroups(ctx: PanelContext): SetupGroup[] {
       source: 'Versioned page',
       status: 'Published',
       tone: draftVersion !== null && draftVersion === publicVersion ? 'done' : 'waiting',
-      actions: ['edit', 'requestChange'],
+      actions: ['edit'],
       multiline: false,
     },
   ];

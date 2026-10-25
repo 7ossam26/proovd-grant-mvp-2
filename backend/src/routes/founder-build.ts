@@ -47,6 +47,7 @@ import {
 } from '../campaign/updates.js';
 import { campaignAffiliateAssociations } from '../db/schema/domain.js';
 import { affiliateSignupProfiles } from '../db/schema/affiliate-signup.js';
+import { listSetupChangeRequests } from '../campaign/setup-change-requests.js';
 
 export interface FounderBuildDeps {
   db: Database;
@@ -107,6 +108,12 @@ export function createFounderBuildRouter(deps: FounderBuildDeps): Router {
     });
 
   /* ── The build (§14.4) ──────────────────────────────────────────────────── */
+
+  router.get('/api/founder/campaigns/:campaignId/setup-change-requests', founder, async (req, res) => {
+    const campaign = await resolve(req.params['campaignId'] as string, userId(req));
+    if (!campaign) return notFound(res);
+    res.json({ requests: await listSetupChangeRequests(db, campaign.campaignId) });
+  });
 
   router.get('/api/founder/campaigns/:campaignId/build', founder, async (req, res) => {
     const campaign = await resolve(req.params['campaignId'] as string, userId(req));

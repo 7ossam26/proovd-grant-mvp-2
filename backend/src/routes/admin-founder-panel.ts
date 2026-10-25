@@ -52,6 +52,11 @@ import { ObjectNotStored, type ObjectStorage } from '../storage/object-storage.j
 import type { Notifier } from '../notifications/send.js';
 import type { LaunchNotificationContext } from '../launch/notifications.js';
 import { notifyApplicationReviewOutcome } from '../campaign/application-review-notifications.js';
+import {
+  notifySetupChangeRequest,
+  requestSetupChange,
+  setupChangeRequestView,
+} from '../campaign/setup-change-requests.js';
 import { requireAdmin, requireFreshSession } from '../auth/guards.js';
 import { readAdminReauthWindowSeconds } from '../settings/service.js';
 import {
@@ -715,6 +720,39 @@ export function createAdminFounderPanelRouter(deps: AdminFounderPanelDeps): Rout
         materiality: result.materiality,
         draftVersion: result.draftVersion,
         editId: result.editId,
+      });
+    },
+  );
+
+  router.post(
+    `${ADMIN_PANEL_CAMPAIGNS_PATH}/:campaignId/setup-change-requests`,
+    admin,
+    fresh,
+    json,
+    async (req, res) => {
+      const body = bodyOf(req);
+      const result = await requestSetupChange(db, whoOf(req), {
+        campaignId: String(req.params['campaignId'] ?? ''),
+        fieldKey: str(body, 'fieldKey'),
+        reason: str(body, 'reason'),
+        requestKey: str(body, 'requestKey'),
+      });
+      if (!result.ok) {
+        if (result.code === 'not_editable' || result.code === 'idempotency_conflict') {
+          res.status(409).json({ error: result.code, title: 'That change could not be requested', whatHappened: result.message, next: result.next });
+        } else {
+          sendRefusal(res, result);
+        }
+        return;
+      }
+      const notification = await notifySetupChangeRequest({
+        db, notifier: deps.notifier, context: deps.notificationContext,
+      }, result.request.id);
+      res.status(result.created ? 201 : 200).json({
+        requestId: result.request.id,
+        created: result.created,
+        request: setupChangeRequestView(result.request),
+        notification,
       });
     },
   );

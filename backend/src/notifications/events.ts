@@ -576,6 +576,7 @@ export const INTERNAL_FIXED_FUNDING_FAILED = 'internal_fixed_funding_failed' as 
 
 export const FOUNDER_SUBMISSION_RECEIPT = 'founder_submission_receipt' as const;
 export const FOUNDER_CHANGES_REQUIRED = 'founder_changes_required' as const;
+export const FOUNDER_SETUP_CHANGE_REQUESTED = 'founder_setup_change_requested' as const;
 export const FOUNDER_CAMPAIGN_APPROVED = 'founder_campaign_approved' as const;
 export const INTERNAL_CAMPAIGN_SUBMITTED = 'internal_campaign_submitted' as const;
 export const FOUNDER_APPLICATION_REVIEW_RECEIVED =
@@ -703,6 +704,7 @@ export const BACKEND_NOTIFICATION_EVENTS = [
   BACKER_FOLLOW_CONFIRMATION,
   FOUNDER_SUBMISSION_RECEIPT,
   FOUNDER_CHANGES_REQUIRED,
+  FOUNDER_SETUP_CHANGE_REQUESTED,
   FOUNDER_CAMPAIGN_APPROVED,
   INTERNAL_CAMPAIGN_SUBMITTED,
   FOUNDER_APPLICATION_REVIEW_RECEIVED,

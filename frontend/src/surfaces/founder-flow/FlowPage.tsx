@@ -47,6 +47,7 @@ import { Button } from '../../components/Button.js';
 import { pageExit, relayIn } from '../../components/anim.js';
 import { useProovdMotion } from '../../motion/MotionProvider.js';
 import { HelpDrawer } from './HelpDrawer.js';
+import { SetupChangeRequests } from '../founder/SetupChangeRequests.js';
 
 export { HelpDrawer } from './HelpDrawer.js';
 
@@ -257,6 +258,10 @@ export function FlowPage({ pageId, param, meta, badge, children }: FlowPageProps
           </div>
 
           <div className="ff__body">{children}</div>
+
+          {['voice', 'threshold', 'faqs', 'rewards'].includes(pageId) ? (
+            <SetupChangeRequests campaignId={param} floating />
+          ) : null}
 
           {badge ? (
             <div className="ff__badge">

@@ -540,6 +540,13 @@
       "when": 1792886400000,
       "tag": "0076_founder_email_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1792972800000,
+      "tag": "0077_campaign_setup_change_requests",
+      "breakpoints": true
     }
   ]
 }

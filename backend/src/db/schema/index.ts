@@ -197,3 +197,4 @@ export * from './backer-data.js';
 // review the lifecycle has no state for, and the append-only trail behind every
 // Admin content edit.
 export * from './admin-founder-panel.js';
+export * from './setup-change-requests.js';
